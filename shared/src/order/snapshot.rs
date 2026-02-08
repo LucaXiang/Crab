@@ -27,13 +27,13 @@ pub struct OrderSnapshot {
     pub order_id: String,
     /// Table ID
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub table_id: Option<String>,
+    pub table_id: Option<i64>,
     /// Table name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
     /// Zone ID
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zone_id: Option<String>,
+    pub zone_id: Option<i64>,
     /// Zone name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zone_name: Option<String>,

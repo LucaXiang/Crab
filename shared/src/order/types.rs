@@ -60,7 +60,7 @@ pub enum ServiceType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CartItemSnapshot {
     /// Product ID
-    pub id: String,
+    pub id: i64,
     /// Instance ID (content-addressed hash)
     pub instance_id: String,
     /// Product name
@@ -117,7 +117,7 @@ pub struct CartItemSnapshot {
     pub note: Option<String>,
     /// Authorizer ID (for discounts)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     /// Authorizer name snapshot
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorizer_name: Option<String>,
@@ -134,7 +134,7 @@ pub struct CartItemSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CartItemInput {
     /// Product ID
-    pub product_id: String,
+    pub product_id: i64,
     /// Product name
     pub name: String,
     /// Price
@@ -158,7 +158,7 @@ pub struct CartItemInput {
     pub note: Option<String>,
     /// Authorizer ID
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     /// Authorizer name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorizer_name: Option<String>,
@@ -167,7 +167,7 @@ pub struct CartItemInput {
 /// Item option selection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ItemOption {
-    pub attribute_id: String,
+    pub attribute_id: i64,
     pub attribute_name: String,
     pub option_idx: i32,
     pub option_name: String,
@@ -191,7 +191,7 @@ fn is_default_quantity(qty: &i32) -> bool {
 /// Specification info
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SpecificationInfo {
-    pub id: String,
+    pub id: i64,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_name: Option<String>,
@@ -412,7 +412,7 @@ pub struct CompRecord {
     /// Unit price before comp (for uncomp restore)
     pub original_price: f64,
     pub reason: String,
-    pub authorizer_id: String,
+    pub authorizer_id: i64,
     pub authorizer_name: String,
     pub timestamp: i64,
 }
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn test_cart_item_snapshot_rule_fields() {
         let item = CartItemSnapshot {
-            id: "prod-1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(),
             name: "Test".to_string(),
             price: 100.0,

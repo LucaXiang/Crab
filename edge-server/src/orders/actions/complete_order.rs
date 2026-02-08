@@ -84,7 +84,7 @@ impl CommandHandler for CompleteOrderAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),

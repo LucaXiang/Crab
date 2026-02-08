@@ -18,7 +18,7 @@ pub struct RemoveItemAction {
     pub instance_id: String,
     pub quantity: Option<i32>,
     pub reason: Option<String>,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -107,7 +107,7 @@ impl CommandHandler for RemoveItemAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -117,7 +117,7 @@ impl CommandHandler for RemoveItemAction {
                 item_name: item.name.clone(),
                 quantity: effective_qty,
                 reason: self.reason.clone(),
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );

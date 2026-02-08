@@ -172,18 +172,9 @@ impl RequestCommandProcessor {
     }
 
     /// 检查操作者是否拥有指定权限
-    async fn check_operator_permission(&self, operator_id: &str, permission: &str) -> bool {
-        // operator_id from message bus is a string; parse to i64
-        let op_id: i64 = match operator_id.parse() {
-            Ok(id) => id,
-            Err(_) => {
-                tracing::warn!(operator_id = %operator_id, "Invalid operator_id format");
-                return false;
-            }
-        };
-
+    async fn check_operator_permission(&self, operator_id: i64, permission: &str) -> bool {
         // 查询员工信息
-        let employee = match employee::find_by_id(&self.state.pool, op_id).await {
+        let employee = match employee::find_by_id(&self.state.pool, operator_id).await {
             Ok(Some(emp)) => emp,
             Ok(None) => {
                 tracing::warn!(operator_id = %operator_id, "Operator not found");
@@ -250,7 +241,7 @@ impl RequestCommandProcessor {
         // 权限检查：敏感命令需要验证操作者权限
         if let Some(required_permission) = get_required_permission(&command.payload) {
             let has_permission =
-                self.check_operator_permission(&command.operator_id, required_permission)
+                self.check_operator_permission(command.operator_id, required_permission)
                     .await;
             if !has_permission {
                 tracing::warn!(
@@ -270,7 +261,7 @@ impl RequestCommandProcessor {
         let rule_load_info = match &command.payload {
             OrderCommandPayload::OpenTable {
                 zone_id, is_retail, ..
-            } => Some((zone_id.clone(), *is_retail)),
+            } => Some((*zone_id, *is_retail)),
             _ => None,
         };
         // MoveOrder: 保存移桌信息用于规则重新加载
@@ -280,7 +271,7 @@ impl RequestCommandProcessor {
             ..
         } = &command.payload
         {
-            Some((order_id.clone(), target_zone_id.clone()))
+            Some((order_id.clone(), *target_zone_id))
         } else {
             None
         };
@@ -294,7 +285,7 @@ impl RequestCommandProcessor {
                 && let Some(ref order_id) = response.order_id
             {
                 let rules =
-                    load_matching_rules(&self.state.pool, zone_id.as_deref(), is_retail).await;
+                    load_matching_rules(&self.state.pool, zone_id, is_retail).await;
                 if !rules.is_empty() {
                     tracing::debug!(
                         order_id = %order_id,
@@ -311,7 +302,7 @@ impl RequestCommandProcessor {
                 if let Ok(Some(snapshot)) = self.state.orders_manager().get_snapshot(order_id) {
                     let rules = load_matching_rules(
                         &self.state.pool,
-                        target_zone_id.as_deref(),
+                        *target_zone_id,
                         snapshot.is_retail,
                     )
                     .await;

@@ -266,13 +266,13 @@ mod tests {
 
     fn create_test_item(
         instance_id: &str,
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: product_id.to_string(),
+            id: product_id,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
@@ -308,7 +308,7 @@ mod tests {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -331,11 +331,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 2));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 2);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 2);
         let changes = ItemChanges {
             price: Some(15.0),
             ..Default::default()
@@ -367,11 +367,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 100.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 100.0, 1));
         snapshot.subtotal = 100.0;
         snapshot.total = 100.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 100.0, 1);
+        let source = create_test_item("item-1", 1, "Product A", 100.0, 1);
         let changes = ItemChanges {
             manual_discount_percent: Some(20.0),
             ..Default::default()
@@ -400,11 +400,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 5));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
         snapshot.subtotal = 50.0;
         snapshot.total = 50.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 5);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 5);
         let changes = ItemChanges {
             manual_discount_percent: Some(10.0),
             ..Default::default()
@@ -453,9 +453,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 1);
         let changes = ItemChanges {
             note: Some("Extra spicy".to_string()),
             ..Default::default()
@@ -481,11 +481,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 3));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
         snapshot.subtotal = 30.0;
         snapshot.total = 30.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 3);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 3);
         let changes = ItemChanges {
             quantity: Some(5),
             ..Default::default()
@@ -513,10 +513,10 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 1);
         let changes = ItemChanges {
             price: Some(15.0),
             ..Default::default()
@@ -542,10 +542,10 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 1);
         let changes = ItemChanges {
             price: Some(15.0),
             ..Default::default()
@@ -572,10 +572,10 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
 
         // Try to modify nonexistent item
-        let source = create_test_item("nonexistent", "product:p1", "Product A", 10.0, 1);
+        let source = create_test_item("nonexistent", 1, "Product A", 10.0, 1);
         let changes = ItemChanges {
             price: Some(15.0),
             ..Default::default()
@@ -603,9 +603,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 2));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 2);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 2);
         let changes = ItemChanges {
             price: Some(15.0),
             manual_discount_percent: Some(10.0),
@@ -640,9 +640,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 3));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 3);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 3);
         let changes = ItemChanges {
             note: Some("Make it spicy".to_string()),
             ..Default::default()
@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_apply_changes_to_item() {
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 10.0, 2);
+        let mut item = create_test_item("item-1", 1, "Product A", 10.0, 2);
 
         let changes = ItemChanges {
             price: Some(20.0),
@@ -700,7 +700,7 @@ mod tests {
 
     #[test]
     fn test_apply_changes_partial() {
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 10.0, 2);
+        let mut item = create_test_item("item-1", 1, "Product A", 10.0, 2);
         item.manual_discount_percent = Some(5.0);
         item.note = Some("Original note".to_string());
 
@@ -720,11 +720,11 @@ mod tests {
 
     #[test]
     fn test_apply_changes_options() {
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
+        let mut item = create_test_item("item-1", 1, "Product A", 10.0, 1);
         assert!(item.selected_options.is_none());
 
         let new_options = vec![shared::order::ItemOption {
-            attribute_id: "attribute:a1".to_string(),
+            attribute_id: 1,
             attribute_name: "Size".to_string(),
             option_idx: 1,
             option_name: "Large".to_string(),
@@ -748,11 +748,11 @@ mod tests {
 
     #[test]
     fn test_apply_changes_specification() {
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
+        let mut item = create_test_item("item-1", 1, "Product A", 10.0, 1);
         assert!(item.selected_specification.is_none());
 
         let new_spec = shared::order::SpecificationInfo {
-            id: "spec-1".to_string(),
+            id: 1,
             name: "Large".to_string(),
             receipt_name: Some("L".to_string()),
             price: Some(15.0),
@@ -776,12 +776,12 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 1);
 
         let new_options = vec![shared::order::ItemOption {
-            attribute_id: "attribute:a1".to_string(),
+            attribute_id: 1,
             attribute_name: "Spicy".to_string(),
             option_idx: 2,
             option_name: "Extra Hot".to_string(),
@@ -817,12 +817,12 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 3));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 3);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 3);
 
         let new_options = vec![shared::order::ItemOption {
-            attribute_id: "attribute:a1".to_string(),
+            attribute_id: 1,
             attribute_name: "Spicy".to_string(),
             option_idx: 1,
             option_name: "Mild".to_string(),
@@ -880,9 +880,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 100.0, 2));
+            .push(create_test_item("item-1", 1, "Product A", 100.0, 2));
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 100.0, 2);
+        let source = create_test_item("item-1", 1, "Product A", 100.0, 2);
         let changes = ItemChanges {
             manual_discount_percent: Some(10.0),
             ..Default::default()
@@ -921,7 +921,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         // Step 1: Add initial item
-        let initial_item = create_test_item("original-id", "product:p1", "Product A", 100.0, 1);
+        let initial_item = create_test_item("original-id", 1, "Product A", 100.0, 1);
         snapshot.items.push(initial_item.clone());
 
         // Step 2: Modify item with discount (instance_id changes)
@@ -948,11 +948,11 @@ mod tests {
         assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
 
         // Step 3: Add same product again (with original instance_id, no discount)
-        let new_item = create_test_item("original-id", "product:p1", "Product A", 100.0, 1);
+        let new_item = create_test_item("original-id", 1, "Product A", 100.0, 1);
         let items_added_event = OrderEvent::new(
             3,
             "order-1".to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-3".to_string(),
             Some(1234567890),
@@ -988,10 +988,10 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 6));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 6));
         snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 6);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 6);
         let changes = ItemChanges {
             quantity: Some(7), // new unpaid quantity
             ..Default::default()
@@ -1029,10 +1029,10 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 6));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 6));
         snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 6);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 6);
         let changes = ItemChanges {
             note: Some("Extra spicy".to_string()),
             ..Default::default()
@@ -1067,11 +1067,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 5.0, 10));
+            .push(create_test_item("item-1", 1, "Product A", 5.0, 10));
         snapshot.paid_item_quantities.insert("item-1".to_string(), 9);
         snapshot.paid_amount = 45.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 5.0, 10);
+        let source = create_test_item("item-1", 1, "Product A", 5.0, 10);
         let changes = ItemChanges {
             manual_discount_percent: Some(50.0),
             ..Default::default()
@@ -1128,11 +1128,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 5.0, 10));
+            .push(create_test_item("item-1", 1, "Product A", 5.0, 10));
         snapshot.paid_item_quantities.insert("item-1".to_string(), 9);
         snapshot.paid_amount = 45.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 5.0, 10);
+        let source = create_test_item("item-1", 1, "Product A", 5.0, 10);
         let changes = ItemChanges {
             manual_discount_percent: Some(50.0),
             quantity: Some(10), // new unpaid qty
@@ -1175,11 +1175,11 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 5));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
         snapshot.paid_item_quantities.insert("item-1".to_string(), 3);
         snapshot.paid_amount = 30.0;
 
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 5);
+        let source = create_test_item("item-1", 1, "Product A", 10.0, 5);
         let changes = ItemChanges {
             price: Some(8.0), // reduce price
             ..Default::default()

@@ -327,7 +327,7 @@ impl OrderArchiveService {
                     OrderEventType::OrderCompleted | OrderEventType::OrderVoided
                 )
             })
-            .map(|e| (Some(e.operator_id.clone()), Some(e.operator_name.clone())))
+            .map(|e| (Some(e.operator_id), Some(e.operator_name.clone())))
             .unwrap_or((None, None));
 
         // 4. Status string
@@ -404,7 +404,7 @@ impl OrderArchiveService {
         .bind(snapshot.tax)
         .bind(snapshot.start_time)
         .bind(snapshot.end_time)
-        .bind(&operator_id)
+        .bind(operator_id)
         .bind(&operator_name)
         .bind(snapshot.void_type.as_ref().map(|v| {
             serde_json::to_value(v)
@@ -497,7 +497,7 @@ impl OrderArchiveService {
                 ) RETURNING id",
             )
             .bind(order_pk)
-            .bind(&item.id)
+            .bind(item.id)
             .bind(&instance_id)
             .bind(&item.name)
             .bind(&spec_name)

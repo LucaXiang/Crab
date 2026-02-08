@@ -22,7 +22,7 @@ pub struct CompItemAction {
     pub instance_id: String,
     pub quantity: i32,
     pub reason: String,
-    pub authorizer_id: String,
+    pub authorizer_id: i64,
     pub authorizer_name: String,
 }
 
@@ -40,24 +40,17 @@ impl CommandHandler for CompItemAction {
             ));
         }
 
-        // 2. Validate authorizer is non-empty
-        if self.authorizer_id.trim().is_empty() {
-            return Err(OrderError::InvalidOperation(
-                "authorizer_id must not be empty".to_string(),
-            ));
-        }
-
-        // 3. Validate quantity
+        // 2. Validate quantity
         if self.quantity <= 0 {
             return Err(OrderError::InvalidOperation(
                 "quantity must be positive".to_string(),
             ));
         }
 
-        // 4. Load existing snapshot
+        // 3. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 5. Validate order status
+        // 4. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
@@ -74,29 +67,29 @@ impl CommandHandler for CompItemAction {
             }
         }
 
-        // 6. Find the item
+        // 5. Find the item
         let item = snapshot
             .items
             .iter()
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 7. Cannot comp an already comped item
+        // 6. Cannot comp an already comped item
         if item.is_comped {
             return Err(OrderError::InvalidOperation(
                 "Item is already comped".to_string(),
             ));
         }
 
-        // 8. Validate quantity against unpaid quantity
+        // 7. Validate quantity against unpaid quantity
         if self.quantity > item.unpaid_quantity {
             return Err(OrderError::InsufficientQuantity);
         }
 
-        // 9. Capture original price BEFORE zeroing
+        // 8. Capture original price BEFORE zeroing
         let original_price = item.original_price.unwrap_or(item.price);
 
-        // 10. Determine full vs partial comp (compare against unpaid, not total)
+        // 9. Determine full vs partial comp (compare against unpaid, not total)
         let is_full_comp = self.quantity == item.unpaid_quantity;
 
         let (event_instance_id, source_instance_id) = if is_full_comp {
@@ -108,12 +101,12 @@ impl CommandHandler for CompItemAction {
             (derived_id, self.instance_id.clone())
         };
 
-        // 11. Generate event
+        // 10. Generate event
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -125,7 +118,7 @@ impl CommandHandler for CompItemAction {
                 quantity: self.quantity,
                 original_price,
                 reason: self.reason.clone(),
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );

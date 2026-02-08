@@ -49,7 +49,7 @@ pub enum OrderError {
 #[derive(Debug, Clone)]
 pub struct CommandMetadata {
     pub command_id: String,
-    pub operator_id: String,
+    pub operator_id: i64,
     pub operator_name: String,
     pub timestamp: i64,
 }
@@ -129,7 +129,7 @@ impl<'a> CommandContext<'a> {
     /// Check if a table is occupied by an active order
     ///
     /// Returns the order_id if the table is occupied.
-    pub fn find_active_order_for_table(&self, table_id: &str) -> Result<Option<String>, OrderError> {
+    pub fn find_active_order_for_table(&self, table_id: i64) -> Result<Option<String>, OrderError> {
         self.storage
             .find_active_order_for_table_txn(self.txn, table_id)
             .map_err(|e| OrderError::Storage(e.to_string()))

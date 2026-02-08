@@ -525,7 +525,7 @@ impl OrderStorage {
     pub fn find_active_order_for_table_txn(
         &self,
         txn: &WriteTransaction,
-        table_id: &str,
+        table_id: i64,
     ) -> StorageResult<Option<String>> {
         let active_table = txn.open_table(ACTIVE_ORDERS_TABLE)?;
         let snapshots_table = txn.open_table(SNAPSHOTS_TABLE)?;
@@ -536,9 +536,7 @@ impl OrderStorage {
 
             if let Some(value) = snapshots_table.get(order_id)? {
                 let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
-                if let Some(ref tid) = snapshot.table_id
-                    && tid == table_id
-                {
+                if snapshot.table_id == Some(table_id) {
                     return Ok(Some(order_id.to_string()));
                 }
             }
@@ -550,7 +548,7 @@ impl OrderStorage {
     /// Find active order for a specific table (read-only, outside transaction)
     ///
     /// Returns the order_id if the table is occupied by an active order.
-    pub fn find_active_order_for_table(&self, table_id: &str) -> StorageResult<Option<String>> {
+    pub fn find_active_order_for_table(&self, table_id: i64) -> StorageResult<Option<String>> {
         let read_txn = self.db.begin_read()?;
         let active_table = read_txn.open_table(ACTIVE_ORDERS_TABLE)?;
         let snapshots_table = read_txn.open_table(SNAPSHOTS_TABLE)?;
@@ -561,9 +559,7 @@ impl OrderStorage {
 
             if let Some(value) = snapshots_table.get(order_id)? {
                 let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
-                if let Some(ref tid) = snapshot.table_id
-                    && tid == table_id
-                {
+                if snapshot.table_id == Some(table_id) {
                     return Ok(Some(order_id.to_string()));
                 }
             }

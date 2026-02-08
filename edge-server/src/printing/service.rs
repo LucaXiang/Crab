@@ -153,7 +153,7 @@ impl KitchenPrintService {
         catalog: &CatalogService,
     ) -> PrintItemContext {
         // Get product from catalog
-        let product = catalog.get_product(&item.id);
+        let product = catalog.get_product(&item.id.to_string());
 
         // Get category info
         let (category_id, category_name) = if let Some(ref p) = product {
@@ -168,8 +168,8 @@ impl KitchenPrintService {
         };
 
         // Get print config from catalog (with fallback chain)
-        let kitchen_config = catalog.get_kitchen_print_config(&item.id);
-        let label_config = catalog.get_label_print_config(&item.id);
+        let kitchen_config = catalog.get_kitchen_print_config(&item.id.to_string());
+        let label_config = catalog.get_label_print_config(&item.id.to_string());
 
         let kitchen_destinations = kitchen_config
             .as_ref()
@@ -217,7 +217,7 @@ impl KitchenPrintService {
         PrintItemContext {
             category_id,
             category_name,
-            product_id: item.id.clone(),
+            product_id: item.id.to_string(),
             external_id,
             kitchen_name,
             product_name: item.name.clone(),

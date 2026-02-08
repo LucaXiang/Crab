@@ -20,7 +20,7 @@ pub struct AddItemsAction {
     /// Matched price rules for this order (from cache)
     pub rules: Vec<PriceRule>,
     /// Product metadata for rule matching (category_id, tags) from backend cache
-    pub product_metadata: HashMap<String, ProductMeta>,
+    pub product_metadata: HashMap<i64, ProductMeta>,
 }
 
 #[async_trait]
@@ -86,16 +86,11 @@ impl CommandHandler for AddItemsAction {
             .map(|(idx, item)| {
                 // Get product metadata from cache for rule matching
                 let meta = self.product_metadata.get(&item.product_id);
-                // Parse string IDs to i64 for rule matching
-                // product_id is in "table:key" format in CartItemInput, extract the numeric part
-                let product_id_i64: i64 = item.product_id
-                    .split(':')
-                    .next_back()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0);
-                let category_id: Option<i64> = meta.and_then(|m| m.category_id.parse().ok());
+                // product_id is already i64
+                let product_id_i64: i64 = item.product_id;
+                let category_id: Option<i64> = meta.map(|m| m.category_id);
                 let tag_ids: Vec<i64> = meta
-                    .map(|m| m.tags.iter().filter_map(|t| t.parse().ok()).collect())
+                    .map(|m| m.tags.clone())
                     .unwrap_or_default();
 
                 debug!(
@@ -151,7 +146,7 @@ impl CommandHandler for AddItemsAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),

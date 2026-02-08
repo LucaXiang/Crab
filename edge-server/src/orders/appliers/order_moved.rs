@@ -20,11 +20,11 @@ impl EventApplier for OrderMovedApplier {
         } = &event.payload
         {
             // Update table information to the target
-            snapshot.table_id = Some(target_table_id.clone());
+            snapshot.table_id = Some(*target_table_id);
             snapshot.table_name = Some(target_table_name.clone());
 
             // Update zone information
-            snapshot.zone_id = target_zone_id.clone();
+            snapshot.zone_id = *target_zone_id;
             snapshot.zone_name = target_zone_name.clone();
 
             // Update sequence and timestamp

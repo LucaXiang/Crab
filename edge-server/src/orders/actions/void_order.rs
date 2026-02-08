@@ -17,7 +17,7 @@ pub struct VoidOrderAction {
     pub loss_reason: Option<LossReason>,
     pub loss_amount: Option<f64>,
     pub note: Option<String>,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -71,7 +71,7 @@ impl CommandHandler for VoidOrderAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -81,7 +81,7 @@ impl CommandHandler for VoidOrderAction {
                 loss_reason,
                 loss_amount,
                 note: self.note.clone(),
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );

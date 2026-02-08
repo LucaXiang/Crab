@@ -14,11 +14,11 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 #[derive(Debug, Clone)]
 pub struct MoveOrderAction {
     pub order_id: String,
-    pub target_table_id: String,
+    pub target_table_id: i64,
     pub target_table_name: String,
-    pub target_zone_id: Option<String>,
+    pub target_zone_id: Option<i64>,
     pub target_zone_name: Option<String>,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -54,7 +54,7 @@ impl CommandHandler for MoveOrderAction {
         }
 
         // 4. Validate target table is not occupied by another order
-        if let Some(existing_order_id) = ctx.find_active_order_for_table(&self.target_table_id)? {
+        if let Some(existing_order_id) = ctx.find_active_order_for_table(self.target_table_id)? {
             // Allow moving to the same table (no-op case)
             if existing_order_id != self.order_id {
                 return Err(OrderError::TableOccupied(format!(
@@ -65,7 +65,7 @@ impl CommandHandler for MoveOrderAction {
         }
 
         // 5. Get source table info from snapshot
-        let source_table_id = snapshot.table_id.clone().unwrap_or_default();
+        let source_table_id = snapshot.table_id.unwrap_or_default();
         let source_table_name = snapshot.table_name.clone().unwrap_or_default();
 
         // 6. Allocate sequence number
@@ -75,7 +75,7 @@ impl CommandHandler for MoveOrderAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -83,12 +83,12 @@ impl CommandHandler for MoveOrderAction {
             EventPayload::OrderMoved {
                 source_table_id,
                 source_table_name,
-                target_table_id: self.target_table_id.clone(),
+                target_table_id: self.target_table_id,
                 target_table_name: self.target_table_name.clone(),
-                target_zone_id: self.target_zone_id.clone(),
+                target_zone_id: self.target_zone_id,
                 target_zone_name: self.target_zone_name.clone(),
                 items: snapshot.items.clone(),
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );

@@ -23,9 +23,9 @@ impl EventApplier for TableOpenedApplier {
         {
             // Set order_id from event (important for replay scenarios)
             snapshot.order_id = event.order_id.clone();
-            snapshot.table_id = table_id.clone();
+            snapshot.table_id = *table_id;
             snapshot.table_name = table_name.clone();
-            snapshot.zone_id = zone_id.clone();
+            snapshot.zone_id = *zone_id;
             snapshot.zone_name = zone_name.clone();
             snapshot.guest_count = *guest_count;
             snapshot.is_retail = *is_retail;

@@ -13,7 +13,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 pub struct UncompItemAction {
     pub order_id: String,
     pub instance_id: String,
-    pub authorizer_id: String,
+    pub authorizer_id: i64,
     pub authorizer_name: String,
 }
 
@@ -24,17 +24,10 @@ impl CommandHandler for UncompItemAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Validate authorizer is non-empty
-        if self.authorizer_id.trim().is_empty() {
-            return Err(OrderError::InvalidOperation(
-                "authorizer_id must not be empty".to_string(),
-            ));
-        }
-
-        // 2. Load existing snapshot
+        // 1. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 3. Validate order status
+        // 2. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
@@ -51,14 +44,14 @@ impl CommandHandler for UncompItemAction {
             }
         }
 
-        // 4. Find the comped item
+        // 3. Find the comped item
         let item = snapshot
             .items
             .iter()
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 5. Item must be comped
+        // 4. Item must be comped
         if !item.is_comped {
             return Err(OrderError::InvalidOperation(
                 "Item is not comped".to_string(),
@@ -67,7 +60,7 @@ impl CommandHandler for UncompItemAction {
 
         let item_name = item.name.clone();
 
-        // 6. Find the CompRecord for this instance_id
+        // 5. Find the CompRecord for this instance_id
         let comp_record = snapshot
             .comps
             .iter()
@@ -81,7 +74,7 @@ impl CommandHandler for UncompItemAction {
         let restored_price = comp_record.original_price;
         let source_instance_id = comp_record.source_instance_id.clone();
 
-        // 7. Check if source item still exists (for merge-back)
+        // 6. Check if source item still exists (for merge-back)
         let merged_into = if source_instance_id != self.instance_id {
             // Partial comp case: check if source item exists
             if snapshot.items.iter().any(|i| i.instance_id == source_instance_id) {
@@ -94,12 +87,12 @@ impl CommandHandler for UncompItemAction {
             None
         };
 
-        // 8. Generate event
+        // 7. Generate event
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -109,7 +102,7 @@ impl CommandHandler for UncompItemAction {
                 item_name,
                 restored_price,
                 merged_into,
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );

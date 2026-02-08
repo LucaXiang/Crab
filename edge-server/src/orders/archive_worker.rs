@@ -246,10 +246,10 @@ impl ArchiveWorker {
                     OrderEventType::OrderCompleted | OrderEventType::OrderVoided
                 )
             })
-            .map(|e| (Some(e.operator_id.as_str()), Some(e.operator_name.as_str())))
+            .map(|e| (Some(e.operator_id.to_string()), Some(e.operator_name.as_str())))
             .unwrap_or((None, None));
 
-        match payment::create_from_snapshot(&self.pool, snapshot, op_id, op_name).await {
+        match payment::create_from_snapshot(&self.pool, snapshot, op_id.as_deref(), op_name).await {
             Ok(count) => {
                 tracing::info!(
                     order_id = %snapshot.order_id,
@@ -359,7 +359,7 @@ impl ArchiveWorker {
                     details["authorizer_name"] = serde_json::json!(name);
                 }
                 // target points to the source table (where items came from)
-                target = Some(source_table_id.clone());
+                target = Some(source_table_id.to_string());
             }
             _ => {}
         }
@@ -370,7 +370,7 @@ impl ArchiveWorker {
                 action,
                 "order",
                 &resource_id,
-                Some(event.operator_id.clone()),
+                Some(event.operator_id.to_string()),
                 Some(event.operator_name.clone()),
                 details,
                 target,
@@ -421,7 +421,7 @@ impl ArchiveWorker {
             .iter()
             .rev()
             .find(|e| TERMINAL_EVENT_TYPES.contains(&e.event_type))
-            .map(|e| e.operator_id.clone());
+            .map(|e| e.operator_id);
 
         let Some(operator_id) = operator_id else {
             tracing::warn!(
@@ -433,18 +433,7 @@ impl ArchiveWorker {
         };
 
         let cash_amount = to_f64(cash_total);
-        let op_id: i64 = match operator_id.parse() {
-            Ok(id) => id,
-            Err(_) => {
-                tracing::warn!(
-                    order_id = %snapshot.order_id,
-                    operator_id = %operator_id,
-                    "Invalid operator_id format for cash tracking"
-                );
-                return;
-            }
-        };
-        if let Err(e) = shift::add_cash_payment(&self.pool, op_id, cash_amount).await {
+        if let Err(e) = shift::add_cash_payment(&self.pool, operator_id, cash_amount).await {
             // Log but don't fail the archive - shift tracking is secondary
             tracing::warn!(
                 order_id = %snapshot.order_id,

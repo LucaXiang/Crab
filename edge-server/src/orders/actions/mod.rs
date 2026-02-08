@@ -134,7 +134,7 @@ impl From<&OrderCommand> for CommandAction {
                 instance_id: instance_id.clone(),
                 affected_quantity: *affected_quantity,
                 changes: changes.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::AddPayment { order_id, payment } => {
@@ -153,7 +153,7 @@ impl From<&OrderCommand> for CommandAction {
                 order_id: order_id.clone(),
                 payment_id: payment_id.clone(),
                 reason: reason.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::RemoveItem {
@@ -168,7 +168,7 @@ impl From<&OrderCommand> for CommandAction {
                 instance_id: instance_id.clone(),
                 quantity: *quantity,
                 reason: reason.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::CompleteOrder {
@@ -192,7 +192,7 @@ impl From<&OrderCommand> for CommandAction {
                 loss_reason: loss_reason.clone(),
                 loss_amount: *loss_amount,
                 note: note.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::UpdateOrderInfo {
@@ -216,11 +216,11 @@ impl From<&OrderCommand> for CommandAction {
                 authorizer_name,
             } => CommandAction::MoveOrder(MoveOrderAction {
                 order_id: order_id.clone(),
-                target_table_id: target_table_id.clone(),
+                target_table_id: *target_table_id,
                 target_table_name: target_table_name.clone(),
-                target_zone_id: target_zone_id.clone(),
+                target_zone_id: *target_zone_id,
                 target_zone_name: target_zone_name.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::MergeOrders {
@@ -231,7 +231,7 @@ impl From<&OrderCommand> for CommandAction {
             } => CommandAction::MergeOrders(MergeOrdersAction {
                 source_order_id: source_order_id.clone(),
                 target_order_id: target_order_id.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::SplitByItems {
@@ -292,7 +292,7 @@ impl From<&OrderCommand> for CommandAction {
                 instance_id: instance_id.clone(),
                 quantity: *quantity,
                 reason: reason.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::UncompItem {
@@ -303,7 +303,7 @@ impl From<&OrderCommand> for CommandAction {
             } => CommandAction::UncompItem(UncompItemAction {
                 order_id: order_id.clone(),
                 instance_id: instance_id.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::ToggleRuleSkip {
@@ -325,7 +325,7 @@ impl From<&OrderCommand> for CommandAction {
                 order_id: order_id.clone(),
                 discount_percent: *discount_percent,
                 discount_fixed: *discount_fixed,
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::ApplyOrderSurcharge {
@@ -338,7 +338,7 @@ impl From<&OrderCommand> for CommandAction {
                 order_id: order_id.clone(),
                 surcharge_percent: *surcharge_percent,
                 surcharge_amount: *surcharge_amount,
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
             }),
             OrderCommandPayload::AddOrderNote { order_id, note } => {

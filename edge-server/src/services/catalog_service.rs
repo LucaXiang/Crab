@@ -25,10 +25,10 @@ use parking_lot::RwLock;
 /// Product metadata for price rule matching and tax calculation
 #[derive(Debug, Clone, Default)]
 pub struct ProductMeta {
-    pub category_id: String,   // "42" (i64 as string)
-    pub category_name: String, // e.g. "饮品"
-    pub tags: Vec<String>,     // ["1", "2", ...] (tag i64 IDs as strings)
-    pub tax_rate: i32,         // Tax rate percentage (e.g., 21 for 21% IVA)
+    pub category_id: i64,
+    pub category_name: String,
+    pub tags: Vec<i64>,
+    pub tax_rate: i32,
 }
 
 /// Kitchen print configuration (computed result with fallback chain applied)
@@ -1083,36 +1083,37 @@ impl CatalogService {
     pub fn get_product_meta(&self, product_id: &str) -> Option<ProductMeta> {
         let cache = self.products.read();
         cache.get(product_id).map(|p| {
-            let category_id = p.category_id.to_string();
+            let cat_key = p.category_id.to_string();
             let category_name = {
                 let cat_cache = self.categories.read();
-                cat_cache.get(&category_id).map(|c| c.name.clone()).unwrap_or_default()
+                cat_cache.get(&cat_key).map(|c| c.name.clone()).unwrap_or_default()
             };
             ProductMeta {
-                category_id,
+                category_id: p.category_id,
                 category_name,
-                tags: p.tags.iter().map(|t| t.id.to_string()).collect(),
+                tags: p.tags.iter().map(|t| t.id).collect(),
                 tax_rate: p.tax_rate,
             }
         })
     }
 
     /// Get product metadata for multiple products
-    pub fn get_product_meta_batch(&self, product_ids: &[String]) -> HashMap<String, ProductMeta> {
+    pub fn get_product_meta_batch(&self, product_ids: &[i64]) -> HashMap<i64, ProductMeta> {
         let cache = self.products.read();
         let cat_cache = self.categories.read();
         product_ids
             .iter()
-            .filter_map(|id| {
-                cache.get(id).map(|p| {
-                    let category_id = p.category_id.to_string();
-                    let category_name = cat_cache.get(&category_id).map(|c| c.name.clone()).unwrap_or_default();
+            .filter_map(|&id| {
+                let key = id.to_string();
+                cache.get(&key).map(|p| {
+                    let cat_key = p.category_id.to_string();
+                    let category_name = cat_cache.get(&cat_key).map(|c| c.name.clone()).unwrap_or_default();
                     (
-                        id.clone(),
+                        id,
                         ProductMeta {
-                            category_id,
+                            category_id: p.category_id,
                             category_name,
-                            tags: p.tags.iter().map(|t| t.id.to_string()).collect(),
+                            tags: p.tags.iter().map(|t| t.id).collect(),
                             tax_rate: p.tax_rate,
                         },
                     )

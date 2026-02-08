@@ -22,7 +22,7 @@ pub struct ModifyItemAction {
     pub instance_id: String,
     pub affected_quantity: Option<i32>,
     pub changes: ItemChanges,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -152,7 +152,7 @@ impl CommandHandler for ModifyItemAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -164,7 +164,7 @@ impl CommandHandler for ModifyItemAction {
                 changes: Box::new(self.changes.clone()),
                 previous_values: Box::new(previous_values),
                 results,
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );
@@ -282,7 +282,7 @@ fn calculate_modification_results(
 
     // Generate base instance_id from item properties (deterministic hash)
     let base_id = generate_instance_id_from_parts(
-        &item.id,
+        item.id,
         new_price,
         new_discount,
         &new_options.cloned(),

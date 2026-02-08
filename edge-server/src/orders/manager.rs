@@ -401,11 +401,11 @@ impl OrdersManager {
     fn get_product_metadata_for_items(
         &self,
         items: &[shared::order::CartItemInput],
-    ) -> HashMap<String, ProductMeta> {
+    ) -> HashMap<i64, ProductMeta> {
         let Some(catalog) = &self.catalog_service else {
             return HashMap::new();
         };
-        let product_ids: Vec<String> = items.iter().map(|i| i.product_id.clone()).collect();
+        let product_ids: Vec<i64> = items.iter().map(|i| i.product_id).collect();
         catalog.get_product_meta_batch(&product_ids)
     }
 
@@ -431,8 +431,8 @@ impl OrdersManager {
         // 2. For OpenTable: pre-check table availability before generating receipt_number
         // This avoids wasting receipt numbers on failed table opens
         if let shared::order::OrderCommandPayload::OpenTable { table_id: Some(tid), table_name, .. } = &cmd.payload
-            && let Some(existing) = self.storage.find_active_order_for_table(tid)? {
-                let name = table_name.as_deref().unwrap_or(tid);
+            && let Some(existing) = self.storage.find_active_order_for_table(*tid)? {
+                let name = table_name.as_deref().unwrap_or("unknown");
                 return Err(ManagerError::TableOccupied(format!(
                     "桌台 {} 已被占用 (订单: {})", name, existing
                 )));
@@ -482,7 +482,7 @@ impl OrdersManager {
         let mut ctx = CommandContext::new(&txn, &self.storage, current_sequence);
         let metadata = CommandMetadata {
             command_id: cmd.command_id.clone(),
-            operator_id: cmd.operator_id.clone(),
+            operator_id: cmd.operator_id,
             operator_name: cmd.operator_name.clone(),
             timestamp: cmd.timestamp,
         };
@@ -505,9 +505,9 @@ impl OrdersManager {
                     OrderError::InvalidOperation("receipt_number must be pre-generated for OpenTable".to_string())
                 })?;
                 CommandAction::OpenTable(super::actions::OpenTableAction {
-                    table_id: table_id.clone(),
+                    table_id: *table_id,
                     table_name: table_name.clone(),
-                    zone_id: zone_id.clone(),
+                    zone_id: *zone_id,
                     zone_name: zone_name.clone(),
                     guest_count: *guest_count,
                     is_retail: *is_retail,

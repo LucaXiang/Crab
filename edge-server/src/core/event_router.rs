@@ -173,7 +173,7 @@ mod tests {
             order_id: "test".to_string(),
             timestamp: shared::util::now_millis(),
             client_timestamp: None,
-            operator_id: "op".to_string(),
+            operator_id: 1,
             operator_name: "Test Operator".to_string(),
             command_id: uuid::Uuid::new_v4().to_string(),
             event_type,

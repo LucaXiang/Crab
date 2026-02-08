@@ -77,7 +77,7 @@ impl EventApplier for ItemCompedApplier {
                 quantity: *quantity,
                 original_price: *original_price,
                 reason: reason.clone(),
-                authorizer_id: authorizer_id.clone(),
+                authorizer_id: *authorizer_id,
                 authorizer_name: authorizer_name.clone(),
                 timestamp: event.timestamp,
             };
@@ -103,13 +103,13 @@ mod tests {
 
     fn create_test_item(
         instance_id: &str,
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: product_id.to_string(),
+            id: product_id,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
@@ -146,7 +146,7 @@ mod tests {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -158,7 +158,7 @@ mod tests {
                 quantity,
                 original_price,
                 reason: "VIP customer".to_string(),
-                authorizer_id: "manager-1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Manager".to_string(),
             },
         )
@@ -169,7 +169,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 2));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_item_comped_full_preserves_existing_original_price() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 8.0, 1);
+        let mut item = create_test_item("item-1", 1, "Product A", 8.0, 1);
         item.original_price = Some(12.0); // Already has original_price
         snapshot.items.push(item);
 
@@ -219,7 +219,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 5));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
         snapshot.subtotal = 50.0;
         snapshot.total = 50.0;
 
@@ -264,7 +264,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
         let event = create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 10.0);
@@ -281,7 +281,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
         let event = create_item_comped_event("order-1", 6, "item-1", "item-1", "Product A", 1, 10.0);
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn test_item_comped_preserves_discounts_and_rules() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 100.0, 1);
+        let mut item = create_test_item("item-1", 1, "Product A", 100.0, 1);
         item.manual_discount_percent = Some(10.0);
         item.rule_discount_amount = Some(5.0);
         item.rule_surcharge_amount = Some(2.0);
@@ -320,7 +320,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 15.50, 1));
+            .push(create_test_item("item-1", 1, "Product A", 15.50, 1));
 
         let event = create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 15.50);
 

@@ -28,7 +28,7 @@ use tracing::debug;
 /// 这确保了同一商品在任何时刻（规则缓存是否存在）都能正确合并。
 pub fn generate_instance_id(input: &shared::order::CartItemInput) -> String {
     generate_instance_id_from_parts(
-        &input.product_id,
+        input.product_id,
         input.price,
         input.manual_discount_percent,
         &input.selected_options,
@@ -41,7 +41,7 @@ pub fn generate_instance_id(input: &shared::order::CartItemInput) -> String {
 /// This is used by `generate_instance_id` and also by modify_item when
 /// computing instance_id for modified item portions.
 pub(crate) fn generate_instance_id_from_parts(
-    product_id: &str,
+    product_id: i64,
     price: f64,
     manual_discount_percent: Option<f64>,
     options: &Option<Vec<shared::order::ItemOption>>,
@@ -51,7 +51,7 @@ pub(crate) fn generate_instance_id_from_parts(
 
     let mut hasher = Sha256::new();
 
-    hasher.update(product_id.as_bytes());
+    hasher.update(product_id.to_le_bytes());
     hasher.update(price.to_be_bytes());
 
     if let Some(discount) = manual_discount_percent.filter(|&d| d.abs() > 0.01) {
@@ -60,14 +60,14 @@ pub(crate) fn generate_instance_id_from_parts(
 
     if let Some(opts) = options {
         for opt in opts {
-            hasher.update(opt.attribute_id.as_bytes());
+            hasher.update(opt.attribute_id.to_le_bytes());
             hasher.update(opt.option_idx.to_be_bytes());
             hasher.update(opt.quantity.to_be_bytes());
         }
     }
 
     if let Some(spec) = specification {
-        hasher.update(spec.id.as_bytes());
+        hasher.update(spec.id.to_le_bytes());
     }
 
     let result = hasher.finalize();
@@ -177,7 +177,7 @@ pub fn input_to_snapshot_with_rules(
     let instance_id = generate_instance_id(input);
 
     CartItemSnapshot {
-        id: input.product_id.clone(),
+        id: input.product_id,
         instance_id,
         name: input.name.clone(),
         price: calc_result.item_final,
@@ -207,7 +207,7 @@ pub fn input_to_snapshot_with_rules(
         tax: None,         // Computed by recalculate_totals
         tax_rate: None,    // Computed by recalculate_totals
         note: input.note.clone(),
-        authorizer_id: input.authorizer_id.clone(),
+        authorizer_id: input.authorizer_id,
         authorizer_name: input.authorizer_name.clone(),
         category_name: None,
         is_comped: false,
@@ -220,9 +220,9 @@ mod tests {
 
     #[test]
     fn test_generate_instance_id_from_parts() {
-        let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
-        let id2 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
-        let id3 = generate_instance_id_from_parts("product:1", 10.0, Some(50.0), &None, &None);
+        let id1 = generate_instance_id_from_parts(1, 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts(1, 10.0, None, &None, &None);
+        let id3 = generate_instance_id_from_parts(1, 10.0, Some(50.0), &None, &None);
 
         // Same inputs should produce same ID
         assert_eq!(id1, id2);
@@ -233,8 +233,8 @@ mod tests {
 
     #[test]
     fn test_generate_instance_id_with_price_difference() {
-        let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
-        let id2 = generate_instance_id_from_parts("product:1", 15.0, None, &None, &None);
+        let id1 = generate_instance_id_from_parts(1, 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts(1, 15.0, None, &None, &None);
 
         assert_ne!(id1, id2);
     }
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn test_generate_instance_id_with_options() {
         let opts = Some(vec![shared::order::ItemOption {
-            attribute_id: "size".to_string(),
+            attribute_id: 1,
             attribute_name: "Size".to_string(),
             option_idx: 1,
             option_name: "Large".to_string(),
@@ -250,8 +250,8 @@ mod tests {
             quantity: 1,
         }]);
 
-        let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
-        let id2 = generate_instance_id_from_parts("product:1", 10.0, None, &opts, &None);
+        let id1 = generate_instance_id_from_parts(1, 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts(1, 10.0, None, &opts, &None);
 
         assert_ne!(id1, id2);
     }
@@ -260,7 +260,7 @@ mod tests {
     fn test_generate_instance_id_from_input() {
         // Test the public API that takes CartItemInput
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 10.0,
             original_price: None,
@@ -281,7 +281,7 @@ mod tests {
 
         // Should match the from_parts version
         let id_from_parts = generate_instance_id_from_parts(
-            &input.product_id,
+            input.product_id,
             input.price,
             input.manual_discount_percent,
             &input.selected_options,
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_input_to_snapshot() {
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 10.0,
             original_price: None,
@@ -308,7 +308,7 @@ mod tests {
 
         let snapshot = input_to_snapshot(&input);
 
-        assert_eq!(snapshot.id, "product:1");
+        assert_eq!(snapshot.id, 1);
         assert_eq!(snapshot.original_price, Some(10.0));
         assert_eq!(snapshot.name, "Test Product");
         // Price is now calculated: base $10, 10% manual discount = $9
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn test_input_to_snapshot_with_rules_no_rules() {
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -348,7 +348,7 @@ mod tests {
     fn test_input_to_snapshot_with_rules_discount() {
         use shared::models::{AdjustmentType, ProductScope, RuleType};
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -403,14 +403,14 @@ mod tests {
         use shared::order::ItemOption;
 
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
             quantity: 1,
             selected_options: Some(vec![
                 ItemOption {
-                    attribute_id: "attribute:a1".to_string(),
+                    attribute_id: 1,
                     attribute_name: "Size".to_string(),
                     option_idx: 1,
                     option_name: "Large".to_string(),
@@ -418,7 +418,7 @@ mod tests {
                     quantity: 1,
                 },
                 ItemOption {
-                    attribute_id: "attribute:a2".to_string(),
+                    attribute_id: 2,
                     attribute_name: "Extra".to_string(),
                     option_idx: 0,
                     option_name: "Cheese".to_string(),
@@ -473,7 +473,7 @@ mod tests {
         use shared::models::{AdjustmentType, ProductScope, RuleType};
 
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -528,7 +528,7 @@ mod tests {
 
         // Same input for both cases
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -590,7 +590,7 @@ mod tests {
 
         // Item for product with id=1
         let input = shared::order::CartItemInput {
-            product_id: "product:1".to_string(),
+            product_id: 1,
             name: "Product 1".to_string(),
             price: 100.0,
             original_price: None,

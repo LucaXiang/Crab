@@ -24,7 +24,7 @@ pub struct OrderEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_timestamp: Option<i64>,
     /// Operator who triggered this event
-    pub operator_id: String,
+    pub operator_id: i64,
     /// Operator name (snapshot for audit)
     pub operator_name: String,
     /// Command that triggered this event (for audit tracing)
@@ -122,11 +122,11 @@ pub enum EventPayload {
     // ========== Lifecycle ==========
     TableOpened {
         #[serde(skip_serializing_if = "Option::is_none")]
-        table_id: Option<String>,
+        table_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         table_name: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        zone_id: Option<String>,
+        zone_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         zone_name: Option<String>,
         guest_count: i32,
@@ -161,7 +161,7 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         note: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -187,7 +187,7 @@ pub enum EventPayload {
         results: Vec<ItemModificationResult>,
         /// Authorizer info
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -200,7 +200,7 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -216,7 +216,7 @@ pub enum EventPayload {
         /// Unit price before comp (for restore on uncomp)
         original_price: f64,
         reason: String,
-        authorizer_id: String,
+        authorizer_id: i64,
         authorizer_name: String,
     },
 
@@ -230,7 +230,7 @@ pub enum EventPayload {
         /// Whether the item was merged back into source
         #[serde(skip_serializing_if = "Option::is_none")]
         merged_into: Option<String>,
-        authorizer_id: String,
+        authorizer_id: i64,
         authorizer_name: String,
     },
 
@@ -254,7 +254,7 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -311,34 +311,34 @@ pub enum EventPayload {
 
     // ========== Table Operations ==========
     OrderMoved {
-        source_table_id: String,
+        source_table_id: i64,
         source_table_name: String,
-        target_table_id: String,
+        target_table_id: i64,
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        target_zone_id: Option<String>,
+        target_zone_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         target_zone_name: Option<String>,
         items: Vec<CartItemSnapshot>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
 
     OrderMovedOut {
-        target_table_id: String,
+        target_table_id: i64,
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
 
     OrderMerged {
-        source_table_id: String,
+        source_table_id: i64,
         source_table_name: String,
         items: Vec<CartItemSnapshot>,
         payments: Vec<PaymentRecord>,
@@ -349,26 +349,26 @@ pub enum EventPayload {
         aa_total_shares: Option<i32>,
         aa_paid_shares: i32,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
 
     OrderMergedOut {
-        target_table_id: String,
+        target_table_id: i64,
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
 
     TableReassigned {
-        source_table_id: String,
+        source_table_id: i64,
         source_table_name: String,
-        target_table_id: String,
+        target_table_id: i64,
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         target_zone_name: Option<String>,
@@ -406,7 +406,7 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_discount_fixed: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
         /// 重新计算后的金额
@@ -426,7 +426,7 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_surcharge_amount: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
         /// 重新计算后的金额
@@ -462,7 +462,7 @@ impl OrderEvent {
     pub fn new(
         sequence: u64,
         order_id: String,
-        operator_id: String,
+        operator_id: i64,
         operator_name: String,
         command_id: String,
         client_timestamp: Option<i64>,
@@ -496,7 +496,7 @@ impl OrderEvent {
         Self::new(
             sequence,
             order_id,
-            command.operator_id.clone(),
+            command.operator_id,
             command.operator_name.clone(),
             command.command_id.clone(),
             Some(command.timestamp), // Preserve client timestamp

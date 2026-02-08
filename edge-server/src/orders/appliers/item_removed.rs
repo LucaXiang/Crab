@@ -79,13 +79,13 @@ mod tests {
 
     fn create_test_item(
         instance_id: &str,
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: product_id.to_string(),
+            id: product_id,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
@@ -125,7 +125,7 @@ mod tests {
             order_id: order_id.to_string(),
             timestamp: 1234567890,
             client_timestamp: Some(1234567890),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             command_id: "cmd-1".to_string(),
             event_type: OrderEventType::ItemRemoved,

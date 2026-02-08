@@ -32,7 +32,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// 返回区域匹配的活跃价格规则列表（不含时间过滤）
 pub async fn load_matching_rules(
     pool: &SqlitePool,
-    zone_id: Option<&str>,
+    zone_id: Option<i64>,
     is_retail: bool,
 ) -> Vec<PriceRule> {
     info!(
@@ -41,8 +41,7 @@ pub async fn load_matching_rules(
         "[LoadRules] Loading zone-matched price rules"
     );
 
-    let zone_id_i64 = zone_id.and_then(|s| s.parse::<i64>().ok());
-    let rules = match price_rule::find_by_zone(pool, zone_id_i64, is_retail).await {
+    let rules = match price_rule::find_by_zone(pool, zone_id, is_retail).await {
         Ok(rules) => rules,
         Err(e) => {
             tracing::error!("Failed to load price rules: {:?}", e);
@@ -78,9 +77,9 @@ pub async fn load_matching_rules(
 /// OpenTable action
 #[derive(Debug, Clone)]
 pub struct OpenTableAction {
-    pub table_id: Option<String>,
+    pub table_id: Option<i64>,
     pub table_name: Option<String>,
-    pub zone_id: Option<String>,
+    pub zone_id: Option<i64>,
     pub zone_name: Option<String>,
     pub guest_count: i32,
     pub is_retail: bool,
@@ -105,10 +104,10 @@ impl CommandHandler for OpenTableAction {
         );
 
         // 0. Validate table is not occupied (only for non-retail orders with table_id)
-        if let Some(ref table_id) = self.table_id
+        if let Some(table_id) = self.table_id
             && let Some(existing_order_id) = ctx.find_active_order_for_table(table_id)?
         {
-            let table_name = self.table_name.as_deref().unwrap_or(table_id);
+            let table_name = self.table_name.as_deref().unwrap_or("unknown");
             return Err(OrderError::TableOccupied(format!(
                 "桌台 {} 已被占用 (订单: {})",
                 table_name, existing_order_id
@@ -124,9 +123,9 @@ impl CommandHandler for OpenTableAction {
 
         // 3. Create snapshot with server-generated receipt_number
         let mut snapshot = ctx.create_snapshot(order_id.clone());
-        snapshot.table_id = self.table_id.clone();
+        snapshot.table_id = self.table_id;
         snapshot.table_name = self.table_name.clone();
-        snapshot.zone_id = self.zone_id.clone();
+        snapshot.zone_id = self.zone_id;
         snapshot.zone_name = self.zone_name.clone();
         snapshot.guest_count = self.guest_count;
         snapshot.is_retail = self.is_retail;
@@ -148,15 +147,15 @@ impl CommandHandler for OpenTableAction {
         let event = OrderEvent::new(
             seq,
             order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp), // Preserve client timestamp
             OrderEventType::TableOpened,
             EventPayload::TableOpened {
-                table_id: self.table_id.clone(),
+                table_id: self.table_id,
                 table_name: self.table_name.clone(),
-                zone_id: self.zone_id.clone(),
+                zone_id: self.zone_id,
                 zone_name: self.zone_name.clone(),
                 guest_count: self.guest_count,
                 is_retail: self.is_retail,

@@ -406,7 +406,7 @@ impl ServerState {
                 // redb 中没有快照，从数据库回退加载
                 let rules = load_matching_rules(
                     &self.pool,
-                    order.zone_id.as_deref(),
+                    order.zone_id,
                     order.is_retail,
                 )
                 .await;
@@ -452,7 +452,7 @@ impl ServerState {
 
         let rules = load_matching_rules(
             &self.pool,
-            snapshot.zone_id.as_deref(),
+            snapshot.zone_id,
             snapshot.is_retail,
         )
         .await;

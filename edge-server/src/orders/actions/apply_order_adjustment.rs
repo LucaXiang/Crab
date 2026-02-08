@@ -15,7 +15,7 @@ pub struct ApplyOrderDiscountAction {
     pub order_id: String,
     pub discount_percent: Option<f64>,
     pub discount_fixed: Option<f64>,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -84,7 +84,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -94,7 +94,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
                 discount_fixed: self.discount_fixed,
                 previous_discount_percent,
                 previous_discount_fixed,
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
                 subtotal: snapshot.subtotal,
                 discount: snapshot.discount,
@@ -112,7 +112,7 @@ pub struct ApplyOrderSurchargeAction {
     pub order_id: String,
     pub surcharge_percent: Option<f64>,
     pub surcharge_amount: Option<f64>,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -181,7 +181,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -191,7 +191,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
                 surcharge_amount: self.surcharge_amount,
                 previous_surcharge_percent,
                 previous_surcharge_amount,
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
                 subtotal: snapshot.subtotal,
                 surcharge: to_f64(

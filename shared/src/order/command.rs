@@ -13,7 +13,7 @@ pub struct OrderCommand {
     /// Command timestamp
     pub timestamp: i64,
     /// Operator ID
-    pub operator_id: String,
+    pub operator_id: i64,
     /// Operator name (snapshot for audit)
     pub operator_name: String,
     /// Command payload
@@ -28,11 +28,11 @@ pub enum OrderCommandPayload {
     /// Open a new table/order
     OpenTable {
         #[serde(skip_serializing_if = "Option::is_none")]
-        table_id: Option<String>,
+        table_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         table_name: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        zone_id: Option<String>,
+        zone_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         zone_name: Option<String>,
         #[serde(default = "default_guest_count")]
@@ -66,7 +66,7 @@ pub enum OrderCommandPayload {
         note: Option<String>,
         /// Authorizer for void operation
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -88,7 +88,7 @@ pub enum OrderCommandPayload {
         changes: ItemChanges,
         /// Authorizer for changes requiring permission
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -104,7 +104,7 @@ pub enum OrderCommandPayload {
         reason: Option<String>,
         /// Authorizer for removal
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -124,7 +124,7 @@ pub enum OrderCommandPayload {
         reason: Option<String>,
         /// Authorizer for cancellation
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -174,14 +174,14 @@ pub enum OrderCommandPayload {
     /// Move order to another table
     MoveOrder {
         order_id: String,
-        target_table_id: String,
+        target_table_id: i64,
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        target_zone_id: Option<String>,
+        target_zone_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         target_zone_name: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -191,7 +191,7 @@ pub enum OrderCommandPayload {
         source_order_id: String,
         target_order_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -227,7 +227,7 @@ pub enum OrderCommandPayload {
         discount_fixed: Option<f64>,
         /// 都为 None = 取消折扣；percent 和 fixed 互斥
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -241,7 +241,7 @@ pub enum OrderCommandPayload {
         /// Reason for comp (required for audit)
         reason: String,
         /// Authorizer ID (required)
-        authorizer_id: String,
+        authorizer_id: i64,
         /// Authorizer name (required)
         authorizer_name: String,
     },
@@ -252,7 +252,7 @@ pub enum OrderCommandPayload {
         /// The comped item's instance_id
         instance_id: String,
         /// Authorizer ID (required)
-        authorizer_id: String,
+        authorizer_id: i64,
         /// Authorizer name (required)
         authorizer_name: String,
     },
@@ -267,7 +267,7 @@ pub enum OrderCommandPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         surcharge_amount: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
@@ -287,7 +287,7 @@ fn default_guest_count() -> i32 {
 
 impl OrderCommand {
     /// Create a new command with auto-generated ID
-    pub fn new(operator_id: String, operator_name: String, payload: OrderCommandPayload) -> Self {
+    pub fn new(operator_id: i64, operator_name: String, payload: OrderCommandPayload) -> Self {
         Self {
             command_id: uuid::Uuid::new_v4().to_string(),
             timestamp: crate::util::now_millis(),

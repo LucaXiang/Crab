@@ -17,7 +17,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 pub struct MergeOrdersAction {
     pub source_order_id: String,
     pub target_order_id: String,
-    pub authorizer_id: Option<String>,
+    pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
 
@@ -104,9 +104,9 @@ impl CommandHandler for MergeOrdersAction {
         }
 
         // 9. Extract table info
-        let source_table_id = source_snapshot.table_id.clone().unwrap_or_default();
+        let source_table_id = source_snapshot.table_id.unwrap_or_default();
         let source_table_name = source_snapshot.table_name.clone().unwrap_or_default();
-        let target_table_id = target_snapshot.table_id.clone().unwrap_or_default();
+        let target_table_id = target_snapshot.table_id.unwrap_or_default();
         let target_table_name = target_snapshot.table_name.clone().unwrap_or_default();
 
         // 10. Allocate sequence numbers for both events
@@ -117,16 +117,16 @@ impl CommandHandler for MergeOrdersAction {
         let event1 = OrderEvent::new(
             seq1,
             self.source_order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
             OrderEventType::OrderMergedOut,
             EventPayload::OrderMergedOut {
-                target_table_id: target_table_id.clone(),
+                target_table_id,
                 target_table_name: target_table_name.clone(),
                 reason: None,
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );
@@ -135,7 +135,7 @@ impl CommandHandler for MergeOrdersAction {
         let event2 = OrderEvent::new(
             seq2,
             self.target_order_id.clone(),
-            metadata.operator_id.clone(),
+            metadata.operator_id,
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
@@ -150,7 +150,7 @@ impl CommandHandler for MergeOrdersAction {
                 has_amount_split: source_snapshot.has_amount_split,
                 aa_total_shares: source_snapshot.aa_total_shares,
                 aa_paid_shares: source_snapshot.aa_paid_shares,
-                authorizer_id: self.authorizer_id.clone(),
+                authorizer_id: self.authorizer_id,
                 authorizer_name: self.authorizer_name.clone(),
             },
         );
