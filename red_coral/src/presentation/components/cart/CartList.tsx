@@ -4,7 +4,7 @@ import { CartItem as CartItemType } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useCategories, useProducts } from '@/core/stores/resources';
 import { CartItem } from './CartItem';
-import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, hashToColorIndex } from '@/utils/categoryColors';
+import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 
 interface CartListProps {
   cart: CartItemType[];
@@ -37,6 +37,8 @@ export const CartList = React.memo<CartListProps>(({
 
     return groups;
   }, [cart, products]);
+
+  const colorMap = React.useMemo(() => buildCategoryColorMap(categories), [categories]);
 
   const sortedGroups = React.useMemo(() => {
     const categoryMap = new Map(categories.map(c => [c.id, c]));
@@ -73,7 +75,7 @@ export const CartList = React.memo<CartListProps>(({
     <div className="pb-4">
       <div>
         {sortedGroups.map(([categoryId, items]) => {
-          const colorIdx = hashToColorIndex(categoryId);
+          const colorIdx = colorMap.get(categoryId) ?? 0;
           return (
             <div key={categoryId} className="mb-0" style={{ backgroundColor: CATEGORY_BG[colorIdx] }}>
               <div

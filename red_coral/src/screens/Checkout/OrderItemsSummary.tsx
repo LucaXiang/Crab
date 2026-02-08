@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { CartItem } from '@/core/domain/types';
 import { useProductStore, useCategories } from '@/core/stores/resources';
 import { UnpaidItemRow } from './components';
-import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, hashToColorIndex } from '@/utils/categoryColors';
+import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 
 interface OrderItemsSummaryProps {
   items: CartItem[];
@@ -65,6 +65,8 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
     return map;
   }, [products]);
 
+  const colorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
+
   // Sort groups by category sort_order
   const sortedGroups = useMemo(() => {
     const categoryMap = new Map(categories.map(c => [c.id, c]));
@@ -83,7 +85,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   return (
     <div className="space-y-6">
       {sortedGroups.map(([categoryId, entries]) => {
-        const colorIdx = hashToColorIndex(categoryId);
+        const colorIdx = colorMap.get(categoryId) ?? 0;
         return (
           <div key={categoryId} className="space-y-3">
             {entries.map((item) => (
