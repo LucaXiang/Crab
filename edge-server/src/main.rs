@@ -18,7 +18,7 @@ use std::path::PathBuf;
 /// - 初始化日志系统
 fn setup_environment() -> Result<PathBuf, Box<dyn std::error::Error>> {
     // 加载 .env 文件 (仅 bin 层面支持)
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // 获取工作目录
     let work_dir = std::env::var("WORK_DIR")

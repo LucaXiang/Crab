@@ -562,29 +562,31 @@ impl Default for LabelTemplate {
 /// Supports {key} placeholders that will be replaced with values from the JSON data
 /// Example: "Order: {order_id}" with {"order_id": "A123"} -> "Order: A123"
 fn render_template(template: &str, data: &serde_json::Value) -> String {
-    use regex::Regex;
+    let mut result = String::with_capacity(template.len());
+    let mut rest = template;
 
-    let re = Regex::new(r"\{([^}]+)\}").unwrap();
-    let mut result = template.to_string();
-
-    for cap in re.captures_iter(template) {
-        let key = &cap[1];
-        let placeholder = &cap[0];
-
-        if let Some(value) = data.get(key) {
-            let value_str = match value {
-                serde_json::Value::String(s) => s.clone(),
-                serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::Bool(b) => b.to_string(),
-                serde_json::Value::Null => String::new(),
-                _ => serde_json::to_string(value).unwrap_or_default(),
-            };
-            result = result.replace(placeholder, &value_str);
+    while let Some(open) = rest.find('{') {
+        result.push_str(&rest[..open]);
+        let after_open = &rest[open + 1..];
+        if let Some(close) = after_open.find('}') {
+            let key = &after_open[..close];
+            if let Some(value) = data.get(key) {
+                match value {
+                    serde_json::Value::String(s) => result.push_str(s),
+                    serde_json::Value::Number(n) => result.push_str(&n.to_string()),
+                    serde_json::Value::Bool(b) => result.push_str(&b.to_string()),
+                    serde_json::Value::Null => {}
+                    _ => result.push_str(&serde_json::to_string(value).unwrap_or_default()),
+                }
+            }
+            // key not found → replace with empty string
+            rest = &after_open[close + 1..];
         } else {
-            // If key not found, leave placeholder or replace with empty string
-            result = result.replace(placeholder, "");
+            result.push('{');
+            rest = after_open;
         }
     }
+    result.push_str(rest);
 
     result
 }

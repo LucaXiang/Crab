@@ -2,6 +2,7 @@
 name = "crab-auth"
 version.workspace = true
 edition.workspace = true
+publish = false
 
 [dependencies]
 # Workspace crates
@@ -20,7 +21,6 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Error handling
-anyhow.workspace = true
 thiserror.workspace = true
 
 # JWT and Auth

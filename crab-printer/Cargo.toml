@@ -2,8 +2,7 @@
 name = "crab-printer"
 version.workspace = true
 edition.workspace = true
-description = "ESC/POS thermal printer library for restaurant POS systems"
-license = "MIT"
+publish = false
 
 [dependencies]
 # Encoding

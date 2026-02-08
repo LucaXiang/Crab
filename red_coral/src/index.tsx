@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { attachConsole } from '@tauri-apps/plugin-log';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import GlobalErrorBoundary from './presentation/components/GlobalErrorBoundary';
 import { reportError } from '@/utils/reportError';
@@ -17,7 +16,6 @@ if (!rootElement) {
 initUIScale();
 
 const root = ReactDOM.createRoot(rootElement);
-void attachConsole();
 
 if ('__TAURI__' in window) {
   const win = getCurrentWindow();

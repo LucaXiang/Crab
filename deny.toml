@@ -1,0 +1,100 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/
+#
+# Run: cargo deny check
+
+[graph]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
+
+# ── Licenses ─────────────────────────────────────────────────────────
+[licenses]
+version = 2
+confidence-threshold = 0.8
+
+# Commercial-safe licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "MIT-0",
+    "CC0-1.0",
+    "Unlicense",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "OpenSSL",
+    "MPL-2.0",
+]
+
+exceptions = [
+    # bzip2 original license — permissive, commercial OK
+    { name = "libbz2-rs-sys", allow = ["bzip2-1.0.6"] },
+    # NCSA (University of Illinois) — permissive, dev-only
+    { name = "libfuzzer-sys", allow = ["NCSA"] },
+    # LGPL-2.1+ but only compiled on EFI targets, not in our binaries
+    { name = "r-efi", allow = ["MIT", "Apache-2.0", "LGPL-2.1-or-later"] },
+    # BSD-1-Clause — permissive
+    { name = "fiat-crypto", allow = ["BSD-1-Clause"] },
+]
+
+# Workspace crates are proprietary (publish = false) — skip license checks
+[licenses.private]
+ignore = true
+registries = []
+
+# ── Bans ─────────────────────────────────────────────────────────────
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "lowest-version"
+
+# ── Advisories ───────────────────────────────────────────────────────
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# All below are Tauri/Tao transitive deps — no fix available upstream.
+# Re-evaluate when upgrading Tauri.
+ignore = [
+    # gtk-rs GTK3 bindings (unmaintained, Tao/Linux dep)
+    "RUSTSEC-2024-0411", # atk
+    "RUSTSEC-2024-0412", # cairo-rs
+    "RUSTSEC-2024-0413", # gdk
+    "RUSTSEC-2024-0414", # gdk-pixbuf
+    "RUSTSEC-2024-0415", # gio
+    "RUSTSEC-2024-0416", # glib
+    "RUSTSEC-2024-0417", # gtk
+    "RUSTSEC-2024-0418", # pango
+    "RUSTSEC-2024-0419", # gdkx11
+    "RUSTSEC-2024-0420", # gdkwayland-sys
+    "RUSTSEC-2024-0429", # glib VariantStrIter unsoundness
+    # unic-* (unmaintained, Tauri urlpattern dep)
+    "RUSTSEC-2025-0075", # unic-char-range
+    "RUSTSEC-2025-0080", # unic-common
+    "RUSTSEC-2025-0081", # unic-char-property
+    "RUSTSEC-2025-0100", # unic-ucd-ident
+    "RUSTSEC-2025-0098", # unic-ucd-version
+    # Other unmaintained (Tauri transitive deps)
+    "RUSTSEC-2024-0370", # proc-macro-error
+    "RUSTSEC-2024-0436", # paste
+    "RUSTSEC-2025-0057", # fxhash
+    "RUSTSEC-2025-0134", # rustls-pemfile
+    # Vulnerabilities in Tauri transitive deps — no upgrade path
+    "RUSTSEC-2023-0071", # rsa Marvin Attack (rcgen dep)
+]
+
+# ── Sources ──────────────────────────────────────────────────────────
+[sources]
+unknown-registry = "deny"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

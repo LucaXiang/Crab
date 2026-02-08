@@ -78,7 +78,9 @@ impl AuthStorage {
         Self { root_path }
     }
 
-    pub fn get_or_create_root_ca(&self) -> anyhow::Result<CertificateAuthority> {
+    pub fn get_or_create_root_ca(
+        &self,
+    ) -> Result<CertificateAuthority, Box<dyn std::error::Error>> {
         let ca_dir = self.root_path.join("ca");
         if !ca_dir.exists() {
             std::fs::create_dir_all(&ca_dir)?;
@@ -86,7 +88,7 @@ impl AuthStorage {
 
         info!("Loading/Creating Root CA in {:?}", ca_dir);
         crab_cert::trust::get_or_create_root_ca(&ca_dir)
-            .map_err(|e| anyhow::anyhow!("Failed to get or create Root CA: {}", e))
+            .map_err(|e| format!("Failed to get or create Root CA: {e}").into())
     }
 
     pub fn get_tenant_dir(&self, tenant_id: &str) -> PathBuf {

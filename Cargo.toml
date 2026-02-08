@@ -44,27 +44,23 @@ serde_json = "1.0"
 
 # ========== Error Handling ==========
 thiserror = "2"
-anyhow = "1"
 
 # ========== HTTP and Web ==========
 http = "1"
 axum = { version = "0.8", features = ["json"] }
-hyper = { version = "1", features = ["full"] }
-tower = { version = "0.5", features = ["limit", "timeout"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "request-id"] }
-http-body-util = "0.1"
+tower = { version = "0.5", features = ["limit"] }
+tower-http = { version = "0.6", features = ["cors", "compression-gzip"] }
 
 # ========== HTTP Client ==========
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
 
 # ========== TLS (aws-lc-rs backend) ==========
 aws-lc-rs = "1"
-rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "ring"] }
 tokio-rustls = "0.26"
 rustls-pemfile = "2"
 rustls-pki-types = "1"
 rustls-webpki = "0.103"
-webpki-roots = "1.0"
 
 # ========== Async Runtime ==========
 tokio = { version = "1", features = ["full"] }
@@ -76,7 +72,7 @@ futures = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 uuid = { version = "1", features = ["v4", "serde"] }
-time = { version = "0.3", features = ["macros", "parsing", "formatting"] }
+time = { version = "0.3", features = ["macros"] }
 
 # ========== Cryptography ==========
 sha2 = "0.10"
@@ -105,24 +101,13 @@ redb = "3.0"
 rust_decimal = "1.37"
 
 # ========== Utilities ==========
-dotenv = "0.15"
-socketioxide = "0.18"
-mime_guess = "2.0"
+dotenvy = "0.15"
 image = { version = "0.25", features = ["jpeg", "png", "webp"] }
-include_dir = "0.7"
-symlink = "0.1"
 tempfile = "3"
 dashmap = "6.1"
 parking_lot = "0.12"
 sysinfo = "0.37"
 base64 = "0.22"
-log = "0.4"
 
 # ========== HTTPS Server ==========
 axum-server = { version = "0.8", features = ["tls-rustls"] }
-
-# ========== TUI (dev/examples) ==========
-ratatui = "0.29"
-crossterm = "0.28"
-tui-input = "0.10"
-tui-logger = { version = "0.14", features = ["tracing-support"] }

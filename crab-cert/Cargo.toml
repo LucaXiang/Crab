@@ -2,6 +2,7 @@
 name = "crab-cert"
 version.workspace = true
 edition.workspace = true
+publish = false
 
 [dependencies]
 # Certificate generation

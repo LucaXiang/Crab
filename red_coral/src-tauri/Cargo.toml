@@ -3,8 +3,7 @@ name = "red-coral"
 version = "1.1.0"
 description = "RedCoral POS - A Tauri App"
 authors = ["you"]
-license = ""
-repository = ""
+publish = false
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -40,14 +39,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 # ========== Error Handling (workspace) ==========
-anyhow.workspace = true
 thiserror.workspace = true
-
-# ========== HTTP and Web (workspace) ==========
-axum = { workspace = true, features = ["multipart"] }
-tower.workspace = true
-tower-http.workspace = true
-http.workspace = true
 
 # ========== Async Runtime (workspace) ==========
 tokio.workspace = true
@@ -55,13 +47,12 @@ tokio-util.workspace = true
 
 # ========== Time and UUID (workspace) ==========
 chrono.workspace = true
-uuid.workspace = true
 time.workspace = true
+uuid.workspace = true
 
 # ========== Cryptography (workspace) ==========
 argon2.workspace = true
 sha2.workspace = true
-rand.workspace = true
 
 # ========== Logging (workspace) ==========
 tracing.workspace = true
@@ -71,24 +62,16 @@ tracing-appender.workspace = true
 # ========== HTTP Client (workspace) ==========
 reqwest.workspace = true
 
+# ========== TLS (workspace) ==========
+rustls.workspace = true
+
 # ========== Utilities (workspace) ==========
 image.workspace = true
 base64.workspace = true
 hex.workspace = true
-log.workspace = true
 
 # ========== Red Coral Specific ==========
-rust_decimal = { version = "1.36", features = ["std", "serde-float"] }
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
-jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
-bcrypt = "0.15"
-mimalloc = "0.1.48"
-dotenvy = "0.15.7"
-clap = { version = "4.5.54", features = ["derive", "env"] }
-encoding_rs = "0.8.35"
-regex = "1.11"
 zip = "6.0.0"
-tracing-log = "0.2.0"
 urlencoding = "2.1.3"
 
 [target.'cfg(windows)'.dependencies]

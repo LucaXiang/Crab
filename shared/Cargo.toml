@@ -2,6 +2,7 @@
 name = "shared"
 version.workspace = true
 edition.workspace = true
+publish = false
 build = "build.rs"
 
 [dependencies]
@@ -11,8 +12,6 @@ crab-cert.workspace = true
 # HTTP types
 http.workspace = true
 axum.workspace = true
-hyper.workspace = true
-http-body-util.workspace = true
 
 # Serialization
 serde.workspace = true
@@ -23,7 +22,6 @@ base64.workspace = true
 
 # Error handling
 thiserror.workspace = true
-anyhow.workspace = true
 
 # Time
 chrono.workspace = true
