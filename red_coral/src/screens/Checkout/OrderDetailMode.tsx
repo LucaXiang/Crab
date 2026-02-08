@@ -54,7 +54,7 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
   const visibleItems = useMemo(() => {
     const items = order.items.filter(i => !i._removed);
     const categoryMap = new Map(categories.map(c => [c.id, c]));
-    const productMap = new Map(products.map(p => [String(p.id), p]));
+    const productMap = new Map(products.map(p => [p.id, p]));
 
     return [...items].sort((a, b) => {
       // Sort by category sort_order

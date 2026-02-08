@@ -27,10 +27,10 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     const isManageOnly = !!manageTableId;
 
     // Track processed manageTableId to prevent re-opening or loops
-    const processedManageIdRef = React.useRef<string | null>(null);
+    const processedManageIdRef = React.useRef<number | null>(null);
 
-    // Get order for a table by table_id (Table.id is number, OrderSnapshot.table_id is string)
-    const getOrderByTable = (tableId: number) => heldOrders.find((o) => o.table_id === String(tableId));
+    // Get order for a table by table_id
+    const getOrderByTable = (tableId: number) => heldOrders.find((o) => o.table_id === tableId);
 
     // Auto-open management modal if manageTableId is provided
     useEffect(() => {
@@ -154,7 +154,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
     // Helper to get the table object for management
     const managementTable = selectedTableForInput ||
-      (manageTableId ? allTables.find((t) => String(t.id) === manageTableId) : null) ||
+      (manageTableId ? allTables.find((t) => t.id === manageTableId) : null) ||
       null;
 
     if (isManageOnly) {
@@ -167,7 +167,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
               heldOrders={heldOrders}
               onClose={onClose}
               onSuccess={(navigateToTableId) => {
-                if (navigateToTableId) {
+                if (navigateToTableId != null) {
                   const checkout = useCheckoutStore.getState();
                   const store = useActiveOrdersStore.getState();
                   checkout.setCurrentOrderKey(navigateToTableId);
@@ -273,7 +273,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
               onSuccess={(navigateToTableId) => {
                 setShowManagementModal(false);
                 setSelectedTableForInput(null);
-                if (navigateToTableId) {
+                if (navigateToTableId != null) {
                   const checkout = useCheckoutStore.getState();
                   const store = useActiveOrdersStore.getState();
                   checkout.setCurrentOrderKey(navigateToTableId);

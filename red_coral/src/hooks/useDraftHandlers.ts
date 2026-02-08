@@ -9,7 +9,7 @@ interface UseDraftHandlersParams {
   clearCart: () => void;
   setCart: (items: CartItem[]) => void;
   setShowDraftModal: (v: boolean) => void;
-  setCurrentOrderKey: (key: string | null) => void;
+  setCurrentOrderKey: (key: string | number | null) => void;
 }
 
 export function useDraftHandlers(params: UseDraftHandlersParams) {

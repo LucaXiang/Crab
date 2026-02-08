@@ -3,10 +3,10 @@ import { HeldOrder } from '@/core/domain/types';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 
 interface CheckoutState {
-  currentOrderKey: string | null;
+  currentOrderKey: string | number | null;
   checkoutOrder: HeldOrder | null;
 
-  setCurrentOrderKey: (key: string | null) => void;
+  setCurrentOrderKey: (key: string | number | null) => void;
   setCheckoutOrder: (order: HeldOrder | null) => void;
   reset: () => void;
 }
@@ -27,13 +27,15 @@ export const useCheckoutOrder = () => {
   const fallbackOrder = useCheckoutStore((s) => s.checkoutOrder);
 
   const orderFromStore = useActiveOrdersStore((state) => {
-    if (!currentOrderKey) return null;
-    // 零售订单: currentOrderKey 是 order_id，直接从 Map 查找
-    const directMatch = state.orders.get(currentOrderKey);
-    if (directMatch && directMatch.status === 'ACTIVE') {
-      return directMatch;
+    if (currentOrderKey == null) return null;
+    // 零售订单: currentOrderKey 是 order_id (string)，直接从 Map 查找
+    if (typeof currentOrderKey === 'string') {
+      const directMatch = state.orders.get(currentOrderKey);
+      if (directMatch && directMatch.status === 'ACTIVE') {
+        return directMatch;
+      }
     }
-    // 堂食订单: currentOrderKey 是 table_id，按 table_id 遍历查找
+    // 堂食订单: currentOrderKey 是 table_id (number)，按 table_id 遍历查找
     for (const order of state.orders.values()) {
       if (order.table_id === currentOrderKey && order.status === 'ACTIVE') {
         return order;

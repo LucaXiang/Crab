@@ -87,7 +87,7 @@ export const LabelTemplateManager: React.FC = () => {
     }
   };
 
-  const handleDeleteTemplate = (template_id: string) => {
+  const handleDeleteTemplate = (template_id: number) => {
     if (templates.length === 1) {
       toast.error(t('settings.printer.alert.delete_last_template'));
       return;

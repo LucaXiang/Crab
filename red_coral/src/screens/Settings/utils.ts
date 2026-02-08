@@ -1,14 +1,12 @@
 
 // Helper for attribute binding synchronization
 export async function syncAttributeBindings(
-  selectedAttributeIds: string[],
-  attributeDefaultOptions: Record<string, string | string[]>,
-  existingBindings: { attributeId: string; id: string; defaultOptionIds?: string[]; defaultOptionId?: string }[],
-  unbindFn: (bindingId: string) => Promise<unknown>,
-  bindFn: (attributeId: string, defaultOptionIds: string[], displayOrder: number) => Promise<unknown>
+  selectedAttributeIds: number[],
+  attributeDefaultOptions: Record<number, number | number[]>,
+  existingBindings: { attributeId: number; id: number; defaultOptionIds?: number[]; defaultOptionId?: number }[],
+  unbindFn: (bindingId: number) => Promise<unknown>,
+  bindFn: (attributeId: number, defaultOptionIds: number[], displayOrder: number) => Promise<unknown>
 ) {
-  const existingAttributeIds = existingBindings.map(b => b.attributeId);
-
   // Unbind removed attributes - use binding ID, not attribute ID
   const toUnbind = existingBindings.filter(b => !selectedAttributeIds.includes(b.attributeId));
   for (const binding of toUnbind) {
@@ -38,7 +36,7 @@ export async function syncAttributeBindings(
     } else {
       // Existing binding, check if default option changed
       const oldDefaultOptionIds = existingBinding.defaultOptionIds ||
-                                 (existingBinding.defaultOptionId ? [existingBinding.defaultOptionId] : []);
+                                 (existingBinding.defaultOptionId != null ? [existingBinding.defaultOptionId] : []);
 
       const oldStr = [...oldDefaultOptionIds].sort().join(',');
       const newStr = [...newDefaultOptionIds].sort().join(',');
@@ -64,10 +62,6 @@ export async function syncAttributeBindings(
       } catch (error) {
         const msg = String(error);
         if (msg.includes('BINDING_ALREADY_EXISTS')) {
-             // If it exists but we thought we needed to bind (maybe unbind failed silently or wasn't needed?),
-             // we should try to unbind explicitly and retry bind, OR just log warning.
-             // If we are here, it means we wanted to UPDATE the binding (change defaults).
-             // If ALREADY_EXISTS, it means unbind didn't work.
              console.warn('Binding already exists during sync, attempting force update:', attributeId);
              try {
                 // Find binding ID for this attribute

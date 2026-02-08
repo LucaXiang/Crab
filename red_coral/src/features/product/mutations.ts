@@ -31,7 +31,7 @@ export interface ProductFormData {
 export async function createProduct(
   formData: ProductFormData,
   categories: Category[]
-): Promise<{ productId: number | string; success: boolean }> {
+): Promise<{ productId: number; success: boolean }> {
   // Get price from root spec
   const rootSpec = formData.specs?.find(s => s.is_root);
   const price = rootSpec?.price ?? 0;
@@ -78,7 +78,7 @@ export async function createProduct(
 
     try {
       await getApi().bindProductAttribute({
-        product_id: Number(productId),
+        product_id: productId,
         attribute_id: attributeId,
         is_required: false,
         display_order: i,
@@ -101,7 +101,7 @@ export async function createProduct(
         is_root: spec.is_root,
       }));
 
-      await getApi().updateProduct(Number(productId), {
+      await getApi().updateProduct(productId, {
         specs: embeddedSpecs,
       });
     } catch (error) {
@@ -117,7 +117,7 @@ export async function createProduct(
  * Update an existing product
  */
 export async function updateProduct(
-  id: number | string,
+  id: number,
   formData: ProductFormData
 ): Promise<{ success: boolean }> {
   // Get price from root spec
@@ -153,57 +153,44 @@ export async function updateProduct(
     specs: updatedSpecs,
   };
 
-  const updated = await getApi().updateProduct(Number(id), updatePayload);
+  const updated = await getApi().updateProduct(id, updatePayload);
 
   // Update ProductStore cache with API response data
   if (updated?.id) {
-    useProductStore.getState().optimisticUpdate(Number(id), () => updated as Product & { id: number });
+    useProductStore.getState().optimisticUpdate(id, () => updated as Product & { id: number });
   }
 
   // Handle attribute bindings
   const selectedAttributeIds = formData.selected_attribute_ids || [];
 
   // Get existing bindings (exclude inherited ones — they are managed at category level)
-  let existingBindings: { attributeId: string; id: string; defaultOptionIds?: string[] }[] = [];
+  let existingBindings: { attributeId: number; id: number; defaultOptionIds?: number[] }[] = [];
   try {
-    const productAttrs = await getApi().fetchProductAttributes(Number(id));
+    const productAttrs = await getApi().fetchProductAttributes(id);
     existingBindings = (productAttrs ?? [])
       .filter((pa) => !pa.is_inherited)
       .map((pa) => ({
-        attributeId: String(pa.attribute.id),
-        id: String(pa.id),
-        defaultOptionIds: pa.default_option_indices?.map(String) ?? [],
+        attributeId: pa.attribute.id,
+        id: pa.id,
+        defaultOptionIds: pa.default_option_indices ?? [],
       }));
   } catch (error) {
     console.error('Failed to fetch existing attributes:', error);
   }
 
-  // Convert number IDs/options to string for syncAttributeBindings compatibility
-  const strAttrIds = selectedAttributeIds.map(String);
-  const strDefaults: Record<string, string | string[]> = {};
-  const opts = formData.attribute_default_options;
-  if (opts) {
-    for (const [k, v] of Object.entries(opts)) {
-      strDefaults[k] = Array.isArray(v) ? v.map(String) : String(v);
-    }
-  }
-
   // Handle attribute bindings using helper
   await syncAttributeBindings(
-    strAttrIds,
-    strDefaults,
+    selectedAttributeIds,
+    formData.attribute_default_options || {},
     existingBindings,
-    async (attrId) => getApi().unbindProductAttribute(Number(attrId)),
+    async (bindingId) => getApi().unbindProductAttribute(bindingId),
     async (attrId, defaultOptionIds, index) => {
-      const defaultIndices = defaultOptionIds
-        .map((id: string) => parseInt(id, 10))
-        .filter((n: number) => !isNaN(n));
       await getApi().bindProductAttribute({
-        product_id: Number(id),
-        attribute_id: Number(attrId),
+        product_id: id,
+        attribute_id: attrId,
         is_required: false,
         display_order: index,
-        default_option_indices: defaultIndices.length > 0 ? defaultIndices : undefined,
+        default_option_indices: defaultOptionIds.length > 0 ? defaultOptionIds : undefined,
       });
     }
   );
@@ -214,10 +201,10 @@ export async function updateProduct(
 /**
  * Delete a product
  */
-export async function deleteProduct(id: number | string): Promise<{ success: boolean }> {
-  await getApi().deleteProduct(Number(id));
+export async function deleteProduct(id: number): Promise<{ success: boolean }> {
+  await getApi().deleteProduct(id);
   // Optimistic update: remove from ProductStore
-  useProductStore.getState().optimisticRemove(Number(id));
+  useProductStore.getState().optimisticRemove(id);
   return { success: true };
 }
 
@@ -227,8 +214,8 @@ export async function deleteProduct(id: number | string): Promise<{ success: boo
  * list_products 返回的是 Product（不含 attributes），
  * 编辑时需要通过 get_product_full 获取完整的 ProductFull 数据。
  */
-export async function loadProductFullData(productId: number | string) {
-  const productFull = await getApi().getProductFull(String(productId));
+export async function loadProductFullData(productId: number) {
+  const productFull = await getApi().getProductFull(productId);
   if (!productFull) {
     throw new Error('Failed to load product full data');
   }

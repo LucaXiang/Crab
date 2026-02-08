@@ -36,9 +36,9 @@ import type {
 // ============================================================================
 
 export interface OpenTableParams {
-  table_id?: string;
+  table_id?: number;
   table_name?: string;
-  zone_id?: string;
+  zone_id?: number;
   zone_name?: string;
   guest_count?: number;
   is_retail: boolean;
@@ -111,9 +111,9 @@ export function useOrderCommands() {
     async (params: OpenTableParams): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'OPEN_TABLE',
-        table_id: params.table_id || null,
+        table_id: params.table_id ?? null,
         table_name: params.table_name || null,
-        zone_id: params.zone_id || null,
+        zone_id: params.zone_id ?? null,
         zone_name: params.zone_name || null,
         guest_count: params.guest_count ?? 1,
         is_retail: params.is_retail,
@@ -147,7 +147,7 @@ export function useOrderCommands() {
     lossReason?: 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
     lossAmount?: number;
     note?: string;
-    authorizerId?: string | null;
+    authorizerId?: number | null;
     authorizerName?: string | null;
   }
 
@@ -198,7 +198,7 @@ export function useOrderCommands() {
       orderId: string,
       instanceId: string,
       changes: ItemChanges,
-      authorizer?: { id: string; name: string },
+      authorizer?: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'MODIFY_ITEM',
@@ -224,7 +224,7 @@ export function useOrderCommands() {
       instanceId: string,
       quantity?: number,
       reason?: string,
-      authorizer?: { id: string; name: string },
+      authorizer?: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'REMOVE_ITEM',
@@ -272,7 +272,7 @@ export function useOrderCommands() {
       orderId: string,
       paymentId: string,
       reason?: string,
-      authorizer?: { id: string; name: string },
+      authorizer?: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'CANCEL_PAYMENT',
@@ -390,11 +390,11 @@ export function useOrderCommands() {
   const moveOrder = useCallback(
     async (
       orderId: string,
-      targetTableId: string,
+      targetTableId: number,
       targetTableName: string,
-      targetZoneId?: string | null,
+      targetZoneId?: number | null,
       targetZoneName?: string | null,
-      authorizer?: { id: string; name: string },
+      authorizer?: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'MOVE_ORDER',
@@ -420,7 +420,7 @@ export function useOrderCommands() {
     async (
       sourceOrderId: string,
       targetOrderId: string,
-      authorizer?: { id: string; name: string },
+      authorizer?: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'MERGE_ORDERS',
@@ -474,7 +474,7 @@ export function useOrderCommands() {
       instanceId: string,
       quantity: number,
       reason: string,
-      authorizer: { id: string; name: string },
+      authorizer: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'COMP_ITEM',
@@ -498,7 +498,7 @@ export function useOrderCommands() {
     async (
       orderId: string,
       instanceId: string,
-      authorizer: { id: string; name: string },
+      authorizer: { id: number; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'UNCOMP_ITEM',
@@ -543,7 +543,7 @@ export function useOrderCommands() {
       options?: {
         discountPercent?: number;
         discountFixed?: number;
-        authorizer?: { id: string; name: string };
+        authorizer?: { id: number; name: string };
       },
     ): Promise<CommandResponse> => {
       const command = createCommand({
@@ -569,7 +569,7 @@ export function useOrderCommands() {
       orderId: string,
       options?: {
         surchargeAmount?: number;
-        authorizer?: { id: string; name: string };
+        authorizer?: { id: number; name: string };
       },
     ): Promise<CommandResponse> => {
       const command = createCommand({

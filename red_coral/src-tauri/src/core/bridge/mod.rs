@@ -1850,7 +1850,7 @@ impl ClientBridge {
                         if let Some(ref order_id) = response.order_id {
                             let rules = edge_server::orders::actions::open_table::load_matching_rules(
                                 &server_state.pool,
-                                zone_id.as_deref(),
+                                zone_id,
                                 is_retail,
                             )
                             .await;
@@ -1871,7 +1871,7 @@ impl ClientBridge {
                         if let Ok(Some(snapshot)) = server_state.orders_manager().get_snapshot(order_id) {
                             let rules = edge_server::orders::actions::open_table::load_matching_rules(
                                 &server_state.pool,
-                                target_zone_id.as_deref(),
+                                *target_zone_id,
                                 snapshot.is_retail,
                             )
                             .await;

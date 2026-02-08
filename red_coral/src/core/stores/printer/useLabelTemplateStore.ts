@@ -16,7 +16,7 @@ const getApi = () => createTauriClient();
 function mapApiToFrontend(apiTemplate: Record<string, unknown>): LabelTemplate {
   return {
     ...apiTemplate,
-    id: String(apiTemplate.id),
+    id: apiTemplate.id as number,
     padding: apiTemplate.padding as number || 2,
     fields: (apiTemplate.fields as LabelField[]) || [],
     is_default: apiTemplate.is_default as boolean || false,
@@ -75,10 +75,10 @@ interface LabelTemplateStore {
   // Actions
   fetchAll: (force?: boolean) => Promise<void>;
   createTemplate: (template: Partial<LabelTemplate>) => Promise<LabelTemplate>;
-  updateTemplate: (id: string, template: Partial<LabelTemplate>) => Promise<LabelTemplate>;
-  deleteTemplate: (id: string) => Promise<void>;
+  updateTemplate: (id: number, template: Partial<LabelTemplate>) => Promise<LabelTemplate>;
+  deleteTemplate: (id: number) => Promise<void>;
   duplicateTemplate: (template: LabelTemplate) => Promise<LabelTemplate>;
-  getById: (id: string) => LabelTemplate | undefined;
+  getById: (id: number) => LabelTemplate | undefined;
   clear: () => void;
   applySync: (payload: SyncPayload) => void;
 
@@ -199,7 +199,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
       return;
     }
 
-    const actualId = String(id);
+    const actualId = Number(id);
 
     switch (action) {
       case 'created':
@@ -254,7 +254,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
 // Convenience hooks
 export const useLabelTemplates = () => useLabelTemplateStore((state) => state.templates);
 export const useLabelTemplatesLoading = () => useLabelTemplateStore((state) => state.isLoading);
-export const useLabelTemplateById = (id: string) =>
+export const useLabelTemplateById = (id: number) =>
   useLabelTemplateStore((state) => state.templates.find((t) => t.id === id));
 
 // Action hooks

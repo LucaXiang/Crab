@@ -40,7 +40,7 @@ pub async fn order_execute_command(
 #[tauri::command]
 pub async fn order_execute(
     bridge: State<'_, Arc<ClientBridge>>,
-    operator_id: String,
+    operator_id: i64,
     operator_name: String,
     payload: OrderCommandPayload,
 ) -> Result<ApiResponse<CommandResponse>, String> {

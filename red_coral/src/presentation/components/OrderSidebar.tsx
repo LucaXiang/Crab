@@ -46,7 +46,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     }
   }, [order]);
 
-  const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, authorizer?: { id: string; name: string }) => {
+  const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, authorizer?: { id: number; name: string }) => {
     const item = order.items[index];
     const instanceId = item.instance_id;
 
@@ -63,7 +63,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     setEditingItem(null);
   }, [order]);
 
-  const handleDeleteItem = React.useCallback(async (index: number, authorizer?: { id: string; name: string }) => {
+  const handleDeleteItem = React.useCallback(async (index: number, authorizer?: { id: number; name: string }) => {
     const item = order.items[index];
     // Server Authority: backend handles paid item protection, no local computation
     await orderOps.removeItem(order.order_id, item.instance_id, 'Removed from payment screen', undefined, authorizer);

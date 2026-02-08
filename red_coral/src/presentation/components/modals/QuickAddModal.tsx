@@ -19,7 +19,7 @@ interface QuickAddModalProps {
 }
 
 // Helper to check if two items are identical for merging
-const areItemsEqual = (item1: CartItemType, item2: Partial<CartItemType> & { id: string }) => {
+const areItemsEqual = (item1: CartItemType, item2: Partial<CartItemType> & { id: number }) => {
   if (item1.id !== item2.id) return false;
   
   // Check price (safeguard for open price or other variations)
@@ -41,8 +41,8 @@ const areItemsEqual = (item1: CartItemType, item2: Partial<CartItemType> & { id:
   
   if (opts1.length !== opts2.length) return false;
   
-  const sorted1 = [...opts1].sort((a, b) => a.attribute_id.localeCompare(b.attribute_id));
-  const sorted2 = [...opts2].sort((a, b) => a.attribute_id.localeCompare(b.attribute_id));
+  const sorted1 = [...opts1].sort((a, b) => a.attribute_id - b.attribute_id);
+  const sorted2 = [...opts2].sort((a, b) => a.attribute_id - b.attribute_id);
   
   return sorted1.every((opt1, idx) => {
     const opt2 = sorted2[idx];
@@ -68,7 +68,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     product: Product;
     basePrice: number;
     attributes: Attribute[];
-    options: Map<string, AttributeOption[]>;
+    options: Map<number, AttributeOption[]>;
     bindings: ProductAttribute[];
     specifications?: ProductSpec[];
     hasMultiSpec?: boolean;
@@ -150,10 +150,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       // ProductFull.attributes 已包含产品直接绑定 + 分类继承属性
       const attrBindings = productFull.attributes || [];
       const attributeList: Attribute[] = attrBindings.map(b => b.attribute);
-      const optionsMap = new Map<string, AttributeOption[]>();
+      const optionsMap = new Map<number, AttributeOption[]>();
       attributeList.forEach(attr => {
         if (attr.options && attr.options.length > 0) {
-          optionsMap.set(String(attr.id), attr.options);
+          optionsMap.set(attr.id, attr.options);
         }
       });
       const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
@@ -226,7 +226,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     const price = defaultSpec?.price ?? 0;
 
     const newItem: CartItemType = {
-      id: String(product.id),
+      id: product.id,
       name: product.name,
       price,
       quantity: 1,
@@ -234,7 +234,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       instance_id: uuidv4(),
       selected_options: [],
       selected_specification: defaultSpec ? {
-        id: String(defaultSpecIdx),
+        id: defaultSpecIdx,
         name: defaultSpec.name,
         price: defaultSpec.price,
         is_multi_spec: (product.specs?.length ?? 0) > 1,
@@ -263,8 +263,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       selectedOptions: ItemOption[],
       quantity: number,
       discount: number,
-      authorizer?: { id: string; name: string },
-      selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }
+      authorizer?: { id: number; name: string },
+      selectedSpecification?: { id: number; name: string; receiptName?: string; price?: number }
     ) => {
       if (!selectedProductForOptions) return;
 
@@ -278,7 +278,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       const finalPrice = specPrice + optionsModifier;
 
       const newItem: CartItemType = {
-        id: String(product.id),
+        id: product.id,
         name: product.name,
         price: finalPrice,
         original_price: specPrice,
@@ -293,7 +293,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
           price: selectedSpecification.price,
           is_multi_spec: (product.specs?.length ?? 0) > 1,
         } : defaultSpec ? {
-          id: String(defaultSpecIdx),
+          id: defaultSpecIdx,
           name: defaultSpec.name,
           price: defaultSpec.price,
           is_multi_spec: (product.specs?.length ?? 0) > 1,

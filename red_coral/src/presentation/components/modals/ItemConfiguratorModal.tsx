@@ -18,30 +18,30 @@ interface ItemConfiguratorModalProps {
   // Data & State
   isLoading?: boolean;
   attributes: Attribute[];
-  allOptions: Map<string, AttributeOption[]>;
+  allOptions: Map<number, AttributeOption[]>;
   bindings?: ProductAttribute[];
   /** Map of attributeId -> Map<optionIdx, quantity> */
-  selections: Map<string, Map<string, number>>;
-  onAttributeSelect: (attributeId: string, options: Map<string, number>) => void;
+  selections: Map<number, Map<string, number>>;
+  onAttributeSelect: (attributeId: number, options: Map<string, number>) => void;
 
   // Specification Selection (product specs, use index as ID)
   specifications?: ProductSpec[];
   hasMultiSpec?: boolean;
-  selectedSpecId?: string | null;
-  onSpecificationSelect?: (specId: string) => void;
+  selectedSpecId?: number | null;
+  onSpecificationSelect?: (specId: number) => void;
 
   // Pricing & Quantity
   basePrice: number;
   quantity: number;
   discount: number;
   onQuantityChange: (val: number) => void;
-  onDiscountChange: (val: number, authorizer?: { id: string; name: string }) => void;
+  onDiscountChange: (val: number, authorizer?: { id: number; name: string }) => void;
   onBasePriceChange?: (val: number) => void;
 
   // Actions
   onConfirm: () => void;
   confirmLabel?: string;
-  onDelete?: (authorizer?: { id: string; name: string }) => void;
+  onDelete?: (authorizer?: { id: number; name: string }) => void;
   showDelete?: boolean;
   readOnlyAttributes?: boolean;
 }
@@ -85,7 +85,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   }, [attributes, bindings]);
 
   // Sort options by display_order
-  const getSortedOptions = useCallback((attrId: string) => {
+  const getSortedOptions = useCallback((attrId: number) => {
     const opts = allOptions.get(attrId) || [];
     return [...opts].sort((a, b) => a.display_order - b.display_order);
   }, [allOptions]);
@@ -159,12 +159,12 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                           .map((spec, specIdx) => ({ spec, specIdx }))
                           .filter(({ spec }) => spec.is_active)
                           .map(({ spec, specIdx }) => {
-                            const isSelected = selectedSpecId === String(specIdx);
+                            const isSelected = selectedSpecId === specIdx;
                             return (
                               <button
                                 key={specIdx}
                                 type="button"
-                                onClick={() => onSpecificationSelect?.(String(specIdx))}
+                                onClick={() => onSpecificationSelect?.(specIdx)}
                                 className={`
                                   relative p-4 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[5rem] justify-center active:scale-[0.97]
                                   ${isSelected
@@ -198,7 +198,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
 
                   {/* Attribute Selectors */}
                   {hasAttributes && sortedAttributes.map((attr) => {
-                    const attrId = String(attr.id);
+                    const attrId = attr.id;
                     const options = getSortedOptions(attrId);
                     const selectedOptions = selections.get(attrId) || new Map<string, number>();
                     // binding.to is the attribute ID in AttributeBinding relation

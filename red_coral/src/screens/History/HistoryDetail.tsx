@@ -36,7 +36,7 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
     sequence: index,
     order_id: '',
     timestamp: event.timestamp,
-    operator_id: '',
+    operator_id: 0,
     operator_name: '',
     command_id: '',
     event_type: eventType,

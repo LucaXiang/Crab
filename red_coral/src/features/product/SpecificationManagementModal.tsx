@@ -56,13 +56,13 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
   const saveSpecs = async (newSpecs: ProductSpec[]) => {
     setIsSaving(true);
     try {
-      const updated = await getApi().updateProduct(Number(productId), { specs: newSpecs });
+      const updated = await getApi().updateProduct(productId, { specs: newSpecs });
       setSpecs(newSpecs);
 
       // Optimistic update - sync mechanism will also update via broadcast
       // This ensures immediate UI update without waiting for sync
       if (updated) {
-        useProductStore.getState().optimisticUpdate(Number(productId), (prev) => ({
+        useProductStore.getState().optimisticUpdate(productId, (prev) => ({
           ...prev,
           specs: updated.specs,
         }));

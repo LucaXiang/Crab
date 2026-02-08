@@ -105,7 +105,7 @@ const handleMergeToOrder = async (
 };
 
 const handleCreateNewOrder = async (
-  tableId: string,
+  tableId: number,
   table: Table,
   guestCount: number,
   zone: Zone | undefined,
@@ -116,7 +116,7 @@ const handleCreateNewOrder = async (
     type: 'OPEN_TABLE',
     table_id: tableId,
     table_name: table.name,
-    zone_id: zone?.id ? String(zone.id) : null,
+    zone_id: zone?.id ?? null,
     zone_name: zone?.name || null,
     guest_count: guestCount,
     is_retail: false,
@@ -201,7 +201,7 @@ export const handleTableSelect = async (
   _totalAmount: number,
   zone?: Zone
 ): Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'> => {
-  const tableId = String(table.id);
+  const tableId = table.id;
   const store = useActiveOrdersStore.getState();
   const checkoutStore = useCheckoutStore.getState();
 
@@ -273,7 +273,7 @@ export interface VoidOrderOptions {
   /** 备注 */
   note?: string;
   /** 授权人 ID（提权操作时传入） */
-  authorizerId?: string | null;
+  authorizerId?: number | null;
   /** 授权人名称 */
   authorizerName?: string | null;
 }
@@ -451,11 +451,11 @@ export const updateOrderInfo = async (
  */
 export const moveOrder = async (
   orderId: string,
-  targetTableId: string,
+  targetTableId: number,
   targetTableName: string,
-  targetZoneId?: string | null,
+  targetZoneId?: number | null,
   targetZoneName?: string | null,
-  authorizer?: { id: string; name: string },
+  authorizer?: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'MOVE_ORDER',
@@ -479,7 +479,7 @@ export const moveOrder = async (
 export const mergeOrders = async (
   sourceOrderId: string,
   targetOrderId: string,
-  authorizer?: { id: string; name: string },
+  authorizer?: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'MERGE_ORDERS',
@@ -528,7 +528,7 @@ export const modifyItem = async (
     selected_options?: ItemOption[];
     selected_specification?: SpecificationInfo;
   },
-  authorizer?: { id: string; name: string },
+  authorizer?: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'MODIFY_ITEM',
@@ -558,7 +558,7 @@ export const removeItem = async (
   instance_id: string,
   reason?: string,
   quantity?: number,
-  authorizer?: { id: string; name: string },
+  authorizer?: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'REMOVE_ITEM',
@@ -609,7 +609,7 @@ export const compItem = async (
   instanceId: string,
   quantity: number,
   reason: string,
-  authorizer: { id: string; name: string },
+  authorizer: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'COMP_ITEM',
@@ -632,7 +632,7 @@ export const compItem = async (
 export const uncompItem = async (
   orderId: string,
   instanceId: string,
-  authorizer: { id: string; name: string },
+  authorizer: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'UNCOMP_ITEM',
@@ -682,7 +682,7 @@ export const applyOrderDiscount = async (
   options?: {
     discountPercent?: number;
     discountFixed?: number;
-    authorizer?: { id: string; name: string };
+    authorizer?: { id: number; name: string };
   },
 ): Promise<void> => {
   const command = createCommand({
@@ -708,7 +708,7 @@ export const applyOrderSurcharge = async (
   options?: {
     surchargePercent?: number;
     surchargeAmount?: number;
-    authorizer?: { id: string; name: string };
+    authorizer?: { id: number; name: string };
   },
 ): Promise<void> => {
   const command = createCommand({

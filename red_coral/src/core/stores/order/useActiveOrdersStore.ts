@@ -75,7 +75,7 @@ interface ActiveOrdersActions {
   /**
    * Get order by table ID
    */
-  getOrderByTable: (tableId: string) => OrderSnapshot | undefined;
+  getOrderByTable: (tableId: number) => OrderSnapshot | undefined;
 
   /**
    * Get all orders (including completed/voided)
@@ -85,7 +85,7 @@ interface ActiveOrdersActions {
   /**
    * Check if a table has an active order
    */
-  hasActiveOrderOnTable: (tableId: string) => boolean;
+  hasActiveOrderOnTable: (tableId: number) => boolean;
 
   // ==================== Internal Methods (Server Authority) ====================
   // These methods are prefixed with _ to indicate they should only be called
@@ -172,7 +172,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     );
   },
 
-  getOrderByTable: (tableId: string) => {
+  getOrderByTable: (tableId: number) => {
     const orders = get().orders;
     return Array.from(orders.values()).find(
       (order) => order.table_id === tableId && order.status === 'ACTIVE'
@@ -183,7 +183,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     return Array.from(get().orders.values());
   },
 
-  hasActiveOrderOnTable: (tableId: string) => {
+  hasActiveOrderOnTable: (tableId: number) => {
     const orders = get().orders;
     return Array.from(orders.values()).some(
       (order) => order.table_id === tableId && order.status === 'ACTIVE'
@@ -373,7 +373,7 @@ export const useOrder = (orderId: string | null | undefined) =>
 /**
  * Select order by table ID
  */
-export const useOrderByTable = (tableId: string | null | undefined) =>
+export const useOrderByTable = (tableId: number | null | undefined) =>
   useActiveOrdersStore((state) => {
     if (!tableId) return undefined;
     return Array.from(state.orders.values()).find(

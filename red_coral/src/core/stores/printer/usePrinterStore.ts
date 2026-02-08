@@ -11,7 +11,7 @@ interface PrinterStore {
   kitchenPrinter: string | null;
   labelPrinter: string | null;
   cashDrawerPrinter: string | null;
-  activeLabelTemplateId: string | null;
+  activeLabelTemplateId: number | null;
   autoOpenCashDrawerAfterReceipt: boolean;
 
   // Actions
@@ -19,7 +19,7 @@ interface PrinterStore {
   setKitchenPrinter: (name: string | null) => void;
   setLabelPrinter: (name: string | null) => void;
   setCashDrawerPrinter: (name: string | null) => void;
-  setActiveLabelTemplateId: (id: string | null) => void;
+  setActiveLabelTemplateId: (id: number | null) => void;
   setAutoOpenCashDrawerAfterReceipt: (enabled: boolean) => void;
 }
 
@@ -43,7 +43,7 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
   kitchenPrinter: getItem('printer_kitchen'),
   labelPrinter: getItem('printer_label'),
   cashDrawerPrinter: getItem('printer_cash_drawer'),
-  activeLabelTemplateId: getItem('active_label_template_id'),
+  activeLabelTemplateId: (() => { const v = getItem('active_label_template_id'); return v ? Number(v) : null; })(),
   autoOpenCashDrawerAfterReceipt: getItem('auto_open_cash_drawer_after_receipt') === 'true',
 
   // Actions
@@ -68,7 +68,7 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
   },
 
   setActiveLabelTemplateId: (id) => {
-    setItem('active_label_template_id', id);
+    setItem('active_label_template_id', id != null ? String(id) : null);
     set({ activeLabelTemplateId: id });
   },
 

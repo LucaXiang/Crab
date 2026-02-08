@@ -54,7 +54,7 @@ export interface LabelField {
  * Label template
  */
 export interface LabelTemplate {
-  id: string;
+  id: number;
   name: string;
   description?: string;
   width: number;  // Label width in mm
@@ -115,7 +115,7 @@ export interface LabelPrintJob {
  */
 export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
   {
-    id: 'default-small',
+    id: -1,
     name: '小标签 (30x20)',
     description: '适用于小规格标签',
     width: 30,
@@ -171,7 +171,7 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     ],
   },
   {
-    id: 'default-standard',
+    id: -2,
     name: '标准标签 (40x30)',
     description: '适用于标准规格标签',
     width: 40,
@@ -254,7 +254,7 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     ],
   },
   {
-    id: 'default-kitchen',
+    id: -3,
     name: '厨打标签 (50x40)',
     description: '适用于厨房打印',
     width: 50,

@@ -23,7 +23,7 @@ export const CartList = React.memo<CartListProps>(({
 
   const groupedItems = React.useMemo(() => {
     const groups: Record<string, CartItemType[]> = {};
-    const productMap = new Map(products.map(p => [String(p.id), p]));
+    const productMap = new Map(products.map(p => [p.id, p]));
 
     cart.forEach(item => {
       const product = productMap.get(item.id);
@@ -39,14 +39,14 @@ export const CartList = React.memo<CartListProps>(({
   }, [cart, products]);
 
   const sortedGroups = React.useMemo(() => {
-    const categoryMap = new Map(categories.map(c => [String(c.id), c]));
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
 
     return Object.entries(groupedItems).sort(([catIdA], [catIdB]) => {
       if (catIdA === 'uncategorized') return 1;
       if (catIdB === 'uncategorized') return -1;
 
-      const catA = categoryMap.get(catIdA);
-      const catB = categoryMap.get(catIdB);
+      const catA = categoryMap.get(Number(catIdA));
+      const catB = categoryMap.get(Number(catIdB));
 
       return (catA?.sort_order ?? 0) - (catB?.sort_order ?? 0);
     });
@@ -54,7 +54,7 @@ export const CartList = React.memo<CartListProps>(({
 
   const getCategoryName = (categoryId: string) => {
     if (categoryId === 'uncategorized') return t('pos.cart.uncategorized');
-    const category = categories.find(c => String(c.id) === categoryId);
+    const category = categories.find(c => c.id === Number(categoryId));
     return category?.name || t('pos.cart.unknown_category');
   };
 

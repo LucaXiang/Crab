@@ -5,11 +5,11 @@ export interface ItemActionPanelProps {
   basePrice: number;
   optionsModifier: number;
   onQuantityChange: (val: number) => void;
-  onDiscountChange: (val: number, authorizer?: { id: string; name: string }) => void;
+  onDiscountChange: (val: number, authorizer?: { id: number; name: string }) => void;
   onBasePriceChange?: (val: number) => void;
   onConfirm: () => void;
   onCancel?: () => void;
-  onDelete?: (authorizer?: { id: string; name: string }) => void;
+  onDelete?: (authorizer?: { id: number; name: string }) => void;
   confirmLabel?: string;
   showDelete?: boolean;
 }

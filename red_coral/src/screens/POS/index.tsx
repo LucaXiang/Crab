@@ -188,7 +188,7 @@ export const POSScreen: React.FC = () => {
   const screen = useScreen();
   const viewMode = useViewMode();
 	const { showTableScreen, showDraftModal } = useModalStates();
-	const [manageTableId, setManageTableId] = useState<string | null>(null);
+	const [manageTableId, setManageTableId] = useState<number | null>(null);
 	const performanceMode = useSettingsStore((state) => state.performanceMode);
 
   // Product Options Modal State
@@ -200,7 +200,7 @@ export const POSScreen: React.FC = () => {
     basePrice: number;  // Computed from root spec
     startRect?: DOMRect;
     attributes: Attribute[];
-    options: Map<string, AttributeOption[]>;
+    options: Map<number, AttributeOption[]>;
     bindings: ProductAttribute[];
     specifications?: ProductSpec[];
     hasMultiSpec?: boolean;
@@ -272,15 +272,15 @@ export const POSScreen: React.FC = () => {
       // ProductFull.attributes 已包含产品直接绑定 + 分类继承属性
       const attrBindings = productFull.attributes || [];
       const attributeList: Attribute[] = attrBindings.map(b => b.attribute);
-      const optionsMap = new Map<string, AttributeOption[]>();
+      const optionsMap = new Map<number, AttributeOption[]>();
       attributeList.forEach(attr => {
         if (attr.options && attr.options.length > 0) {
-          optionsMap.set(String(attr.id), attr.options);
+          optionsMap.set(attr.id, attr.options);
         }
       });
       const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
         id: binding.id,
-        owner_id: binding.is_inherited ? productFull.category_id : product.id as number,
+        owner_id: binding.is_inherited ? productFull.category_id : product.id,
         attribute_id: binding.attribute.id,
         is_required: binding.is_required,
         display_order: binding.display_order,
@@ -348,7 +348,7 @@ export const POSScreen: React.FC = () => {
               ?? binding.attribute?.default_option_indices;
             if (!defaults || defaults.length === 0) return false;
             // 确保至少有一个默认选项存在
-            const attrOpts = optionsMap.get(String(binding.attribute?.id)) || [];
+            const attrOpts = optionsMap.get(binding.attribute?.id) || [];
             return defaults.some(idx => attrOpts[idx] !== undefined);
           });
 
@@ -361,7 +361,7 @@ export const POSScreen: React.FC = () => {
               const defaults = binding.default_option_indices
                 ?? attr.default_option_indices;
               if (!defaults || defaults.length === 0) return;
-              const attrOpts = optionsMap.get(String(attr.id)) || [];
+              const attrOpts = optionsMap.get(attr.id) || [];
               let count = 0;
               defaults.forEach(idx => {
                 // Enforce max_selections for multi-select
@@ -369,7 +369,7 @@ export const POSScreen: React.FC = () => {
                 const opt = attrOpts[idx];
                 if (opt) {
                   quickOptions.push({
-                    attribute_id: String(attr.id),
+                    attribute_id: attr.id,
                     attribute_name: attr.name,
                     option_idx: idx,
                     option_name: opt.name,
@@ -382,11 +382,11 @@ export const POSScreen: React.FC = () => {
             });
 
             // Build spec info
-            let quickSpec: { id: string; name: string; price?: number; is_multi_spec?: boolean } | undefined;
+            let quickSpec: { id: number; name: string; price?: number; is_multi_spec?: boolean } | undefined;
             if (selectedDefaultSpec) {
               const specIdx = specifications.indexOf(selectedDefaultSpec);
               quickSpec = {
-                id: String(specIdx),
+                id: specIdx,
                 name: selectedDefaultSpec.name,
                 price: selectedDefaultSpec.price,
                 is_multi_spec: hasMultiSpec,
@@ -395,7 +395,7 @@ export const POSScreen: React.FC = () => {
               const spec = specifications.find(s => s.is_default) ?? specifications[0];
               const specIdx = specifications.indexOf(spec);
               quickSpec = {
-                id: String(specIdx),
+                id: specIdx,
                 name: spec.name,
                 price: spec.price,
                 is_multi_spec: hasMultiSpec,
@@ -463,8 +463,8 @@ export const POSScreen: React.FC = () => {
       selectedOptions: ItemOption[],
       quantity: number,
       discount: number,
-      authorizer?: { id: string; name: string },
-      selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }
+      authorizer?: { id: number; name: string },
+      selectedSpecification?: { id: number; name: string; receiptName?: string; price?: number }
     ) => {
       if (!selectedProductForOptions) return;
 
@@ -510,7 +510,7 @@ export const POSScreen: React.FC = () => {
   }, [t, selectedPrinter]);
 
   const handleManageTableWithId = useCallback(() => {
-    setManageTableId(currentOrderKey);
+    setManageTableId(typeof currentOrderKey === 'number' ? currentOrderKey : null);
     setShowTableScreen(true);
   }, [currentOrderKey, setShowTableScreen]);
 

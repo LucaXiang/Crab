@@ -35,7 +35,7 @@ export const ProductModal: React.FC = React.memo(() => {
   const [isSaving, setIsSaving] = useState(false);
   const [inheritedAttributeIds, setInheritedAttributeIds] = useState<number[]>([]);
   const defaultCategorySet = useRef(false);
-  const initialCategoryRef = useRef<string | null>(null);
+  const initialCategoryRef = useRef<number | null>(null);
 
   // Check if this modal is for PRODUCT entity
   const isProductModal = modal.open && modal.entity === 'PRODUCT';
@@ -74,7 +74,7 @@ export const ProductModal: React.FC = React.memo(() => {
     if (isProductModal && modal.action === 'EDIT' && productId) {
       const loadData = async () => {
         try {
-          const fullData = await loadProductFullData(String(productId));
+          const fullData = await loadProductFullData(productId);
           if (fullData.inherited_attribute_ids) {
             setInheritedAttributeIds(fullData.inherited_attribute_ids);
           }
@@ -93,17 +93,17 @@ export const ProductModal: React.FC = React.memo(() => {
   // For EDIT mode, skip the first run (server-computed data is authoritative)
   useEffect(() => {
     if (!isProductModal || !formData.category_id) return;
-    const categoryStr = String(formData.category_id);
+    const categoryId = formData.category_id;
     if (initialCategoryRef.current === null) {
       // First time category is set — record it, don't fetch (server data is authoritative for EDIT)
-      initialCategoryRef.current = categoryStr;
+      initialCategoryRef.current = categoryId;
       if (modal.action === 'EDIT') return; // Skip; loadProductFullData already set inherited IDs
     }
     // Fetch inherited attributes when category actually changes
     const fetchInherited = async () => {
       try {
         const api = createTauriClient();
-        const catAttrs = await api.listCategoryAttributes(Number(categoryStr));
+        const catAttrs = await api.listCategoryAttributes(categoryId!);
         setInheritedAttributeIds(catAttrs.map((a) => a.id).filter((id): id is number => id != null));
       } catch {
         setInheritedAttributeIds([]);

@@ -103,7 +103,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
     setIsSelected(true);
   }, []);
 
-  const handleApply = async (authorizer?: { id: string; name: string }) => {
+  const handleApply = async (authorizer?: { id: number; name: string }) => {
     if (!canConfirm) return;
     setIsProcessing(true);
     try {
@@ -122,7 +122,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
     }
   };
 
-  const handleClear = async (authorizer?: { id: string; name: string }) => {
+  const handleClear = async (authorizer?: { id: number; name: string }) => {
     setIsProcessing(true);
     try {
       await applyOrderSurcharge(order.order_id, { authorizer });
@@ -259,7 +259,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
               permission={Permission.ORDERS_DISCOUNT}
               mode="intercept"
               description={t('checkout.order_surcharge.auth_required')}
-              onAuthorized={(user) => handleClear({ id: String(user.id), name: user.display_name })}
+              onAuthorized={(user) => handleClear({ id: user.id, name: user.display_name })}
             >
               <button
                 disabled={isProcessing}
@@ -280,7 +280,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
               permission={Permission.ORDERS_DISCOUNT}
               mode="intercept"
               description={t('checkout.order_surcharge.auth_required')}
-              onAuthorized={(user) => handleApply({ id: String(user.id), name: user.display_name })}
+              onAuthorized={(user) => handleApply({ id: user.id, name: user.display_name })}
             >
               <button
                 disabled={!canConfirm}

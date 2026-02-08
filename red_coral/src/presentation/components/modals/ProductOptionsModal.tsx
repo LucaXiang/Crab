@@ -10,7 +10,7 @@ interface ProductOptionsModalProps {
   productName: string;
   basePrice: number;
   attributes: Attribute[];
-  allOptions: Map<string, AttributeOption[]>;
+  allOptions: Map<number, AttributeOption[]>;
   bindings?: ProductAttribute[];
   specifications?: ProductSpec[]; // Product specifications (use index as ID)
   hasMultiSpec?: boolean; // Whether this product has multiple specifications
@@ -18,8 +18,8 @@ interface ProductOptionsModalProps {
     selectedOptions: ItemOption[],
     quantity: number,
     discount: number,
-    authorizer?: { id: string; name: string },
-    selectedSpecification?: { id: string; name: string; receipt_name?: string; price?: number }
+    authorizer?: { id: number; name: string },
+    selectedSpecification?: { id: number; name: string; receipt_name?: string; price?: number }
   ) => void;
 }
 
@@ -38,13 +38,13 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
   const { t } = useI18n();
 
   // Track selected specification
-  const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
+  const [selectedSpecId, setSelectedSpecId] = useState<number | null>(null);
 
   // Track selected options for each attribute: attributeId -> Map<optionIdx, quantity>
-  const [selections, setSelections] = useState<Map<string, Map<string, number>>>(new Map());
+  const [selections, setSelections] = useState<Map<number, Map<string, number>>>(new Map());
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
-  const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; name: string } | undefined>();
+  const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: number; name: string } | undefined>();
   // Local override for base price (null = use spec/default price)
   const [localBasePrice, setLocalBasePrice] = useState<number | null>(null);
 
@@ -62,15 +62,15 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         const defaultIdx = specifications.findIndex(spec => spec.is_default && spec.is_active);
         const firstActiveIdx = specifications.findIndex(spec => spec.is_active);
         const initialIdx = defaultIdx >= 0 ? defaultIdx : (firstActiveIdx >= 0 ? firstActiveIdx : 0);
-        setSelectedSpecId(String(initialIdx));
+        setSelectedSpecId(initialIdx);
       } else {
         setSelectedSpecId(null);
       }
 
-      const initialSelections = new Map<string, Map<string, number>>();
+      const initialSelections = new Map<number, Map<string, number>>();
 
       attributes.forEach((attr) => {
-        const options = allOptions.get(String(attr.id)) || [];
+        const options = allOptions.get(attr.id) || [];
         // binding.to is the attribute ID in AttributeBinding relation
         const binding = bindings?.find(b => b.attribute_id === attr.id);
 
@@ -98,14 +98,14 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
           });
         }
 
-        initialSelections.set(String(attr.id), optionMap);
+        initialSelections.set(attr.id, optionMap);
       });
 
       setSelections(initialSelections);
     }
   }, [isOpen, attributes, allOptions, bindings, specifications, hasMultiSpec]);
 
-  const handleAttributeSelect = (attributeId: string, optionMap: Map<string, number>) => {
+  const handleAttributeSelect = (attributeId: number, optionMap: Map<string, number>) => {
     const newSelections = new Map(selections);
     newSelections.set(attributeId, optionMap);
     setSelections(newSelections);
@@ -114,7 +114,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
   const handleConfirm = () => {
     // Validate specification selection if multi-spec is enabled
     if (hasMultiSpec && specifications && specifications.length > 0) {
-      if (!selectedSpecId) {
+      if (selectedSpecId === null) {
         toast.error(t('pos.product.specification_required'));
         return;
       }
@@ -124,7 +124,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     for (const attr of attributes) {
       const binding = bindings?.find(b => b.attribute_id === attr.id);
       if (binding?.is_required) {
-        const optionMap = selections.get(String(attr.id));
+        const optionMap = selections.get(attr.id);
         const hasSelection = optionMap && Array.from(optionMap.values()).some(qty => qty > 0);
         if (!hasSelection) {
           toast.error(t('pos.attributeRequired', { name: attr.name }));
@@ -137,7 +137,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     const result: ItemOption[] = [];
 
     selections.forEach((optionMap, attributeId) => {
-      const attr = attributes.find(a => String(a.id) === attributeId);
+      const attr = attributes.find(a => a.id === attributeId);
       if (!attr) return;
 
       const options = allOptions.get(attributeId) || [];
@@ -150,7 +150,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         if (!option) return;
 
         result.push({
-          attribute_id: String(attr.id),
+          attribute_id: attr.id,
           attribute_name: attr.name,
           option_idx: optionIdx,
           option_name: option.name,
@@ -162,13 +162,12 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
     // Get selected specification details (use index as ID)
     // Use currentPrice (which may be user-overridden) instead of spec.price
-    let selectedSpec: { id: string; name: string; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
+    let selectedSpec: { id: number; name: string; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
     if (hasMultiSpec && selectedSpecId !== null && specifications) {
-      const specIdx = parseInt(selectedSpecId, 10);
-      const spec = specifications[specIdx];
+      const spec = specifications[selectedSpecId];
       if (spec) {
         selectedSpec = {
-          id: String(specIdx),
+          id: selectedSpecId,
           name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
           price: currentPrice, // Use possibly user-modified price
           is_multi_spec: hasMultiSpec,
@@ -179,7 +178,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
       const defaultSpec = specifications.find(s => s.is_default) ?? specifications[0];
       const specIdx = specifications.indexOf(defaultSpec);
       selectedSpec = {
-        id: String(specIdx),
+        id: specIdx,
         name: defaultSpec.name,
         price: currentPrice, // Use possibly user-modified price
         is_multi_spec: hasMultiSpec,
@@ -190,14 +189,14 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
   };
 
   // Handle specification selection (reset price override when changing spec)
-  const handleSpecificationSelect = (specId: string) => {
+  const handleSpecificationSelect = (specId: number) => {
     setSelectedSpecId(specId);
     setLocalBasePrice(null); // Reset price override when changing spec
   };
 
   // Calculate current price (local override > specification price > base price)
   const specPrice = hasMultiSpec && selectedSpecId !== null && specifications
-    ? specifications[parseInt(selectedSpecId, 10)]?.price ?? basePrice
+    ? specifications[selectedSpecId]?.price ?? basePrice
     : basePrice;
   const currentPrice = localBasePrice !== null ? localBasePrice : specPrice;
 

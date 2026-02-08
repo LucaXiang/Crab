@@ -23,7 +23,7 @@ interface UseOrderHandlersParams {
   ) => Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'>;
   voidOrder: (orderId: string, options?: VoidOrderOptions) => Promise<void>;
   setCheckoutOrder: (order: HeldOrder | null) => void;
-  setCurrentOrderKey: (key: string | null) => void;
+  setCurrentOrderKey: (key: string | number | null) => void;
   setViewMode: (mode: 'pos' | 'checkout') => void;
   setShowTableScreen: (v: boolean) => void;
 }
@@ -57,9 +57,9 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
 
         if (result === 'RETRIEVED') {
           setViewMode('checkout');
-          setCurrentOrderKey(String(table.id));
+          setCurrentOrderKey(table.id);
         } else if (result === 'CREATED' || result === 'MERGED') {
-          setCurrentOrderKey(String(table.id));
+          setCurrentOrderKey(table.id);
         }
 
         setShowTableScreen(false);
@@ -85,13 +85,13 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
   }, [setShowTableScreen]);
 
   const handleCheckoutStart = useCallback(
-    async (key: string | null) => {
+    async (key: string | number | null) => {
       const store = useActiveOrdersStore.getState();
       const checkout = useCheckoutStore.getState();
       const { cart } = useCartStore.getState();
 
       // Try to retrieve existing non-retail order (dine-in checkout)
-      if (key) {
+      if (key && typeof key === 'string') {
         const existingSnapshot = store.getOrder(key);
         if (existingSnapshot && !existingSnapshot.is_retail) {
           setCurrentOrderKey(key);

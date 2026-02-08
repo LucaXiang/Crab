@@ -70,7 +70,7 @@ export interface OrderEvent {
   /** Client timestamp (Unix milliseconds) - for audit/debugging, may differ due to clock skew */
   client_timestamp?: number | null;
   /** Operator who performed the action */
-  operator_id: string;
+  operator_id: number;
   /** Operator name snapshot (for timeline display) */
   operator_name: string;
   /** Command ID that triggered this event (audit trail) */
@@ -114,9 +114,9 @@ export type EventPayload =
 
 export interface TableOpenedPayload {
   type: 'TABLE_OPENED';
-  table_id: string | null;
+  table_id: number | null;
   table_name: string | null;
-  zone_id: string | null;
+  zone_id: number | null;
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
@@ -151,7 +151,7 @@ export interface OrderVoidedPayload {
   loss_amount?: number | null;
   /** 备注 */
   note?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -175,7 +175,7 @@ export interface ItemModifiedPayload {
   /** Resulting items after modification */
   results: ItemModificationResult[];
   /** Authorizer ID */
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   /** Authorizer name */
   authorizer_name?: string | null;
 }
@@ -194,7 +194,7 @@ export interface ItemRemovedPayload {
   item_name: string;
   quantity?: number | null;
   reason?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -210,7 +210,7 @@ export interface ItemCompedPayload {
   /** Original price before comp (captured from item before zeroing) */
   original_price: number;
   reason: string;
-  authorizer_id: string;
+  authorizer_id: number;
   authorizer_name: string;
 }
 
@@ -223,7 +223,7 @@ export interface ItemUncompedPayload {
   restored_price: number;
   /** If set, merge comped qty back into this source item */
   merged_into?: string | null;
-  authorizer_id: string;
+  authorizer_id: number;
   authorizer_name: string;
 }
 
@@ -243,7 +243,7 @@ export interface PaymentCancelledPayload {
   method: string;
   amount: number;
   reason?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -297,25 +297,25 @@ export interface AaSplitCancelledPayload {
 
 export interface OrderMovedPayload {
   type: 'ORDER_MOVED';
-  source_table_id: string;
+  source_table_id: number;
   source_table_name: string;
-  target_table_id: string;
+  target_table_id: number;
   target_table_name: string;
-  target_zone_id?: string | null;
+  target_zone_id?: number | null;
   target_zone_name?: string | null;
   items: CartItemSnapshot[];
 }
 
 export interface OrderMovedOutPayload {
   type: 'ORDER_MOVED_OUT';
-  target_table_id: string;
+  target_table_id: number;
   target_table_name: string;
   reason?: string | null;
 }
 
 export interface OrderMergedPayload {
   type: 'ORDER_MERGED';
-  source_table_id: string;
+  source_table_id: number;
   source_table_name: string;
   items: CartItemSnapshot[];
   payments: PaymentRecord[];
@@ -328,16 +328,16 @@ export interface OrderMergedPayload {
 
 export interface OrderMergedOutPayload {
   type: 'ORDER_MERGED_OUT';
-  target_table_id: string;
+  target_table_id: number;
   target_table_name: string;
   reason?: string | null;
 }
 
 export interface TableReassignedPayload {
   type: 'TABLE_REASSIGNED';
-  source_table_id: string;
+  source_table_id: number;
   source_table_name: string;
-  target_table_id: string;
+  target_table_id: number;
   target_table_name: string;
   target_zone_name?: string | null;
   original_start_time: number;
@@ -366,7 +366,7 @@ export interface OrderDiscountAppliedPayload {
   discount_fixed?: number | null;
   previous_discount_percent?: number | null;
   previous_discount_fixed?: number | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
   subtotal: number;
   discount: number;
@@ -380,7 +380,7 @@ export interface OrderSurchargeAppliedPayload {
   surcharge_amount?: number | null;
   previous_surcharge_percent?: number | null;
   previous_surcharge_amount?: number | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
   subtotal: number;
   surcharge: number;
@@ -409,7 +409,7 @@ export interface OrderCommand {
   /** Send timestamp */
   timestamp: number;
   /** Operator ID */
-  operator_id: string;
+  operator_id: number;
   /** Operator name */
   operator_name: string;
   /** Command payload */
@@ -441,9 +441,9 @@ export type OrderCommandPayload =
 
 export interface OpenTableCommand {
   type: 'OPEN_TABLE';
-  table_id?: string | null;
+  table_id?: number | null;
   table_name?: string | null;
-  zone_id?: string | null;
+  zone_id?: number | null;
   zone_name?: string | null;
   guest_count?: number;
   is_retail: boolean;
@@ -468,7 +468,7 @@ export interface VoidOrderCommand {
   /** 备注 */
   note?: string | null;
   /** 授权人 ID（提权操作时传入） */
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   /** 授权人名称 */
   authorizer_name?: string | null;
 }
@@ -485,7 +485,7 @@ export interface ModifyItemCommand {
   instance_id: string;
   affected_quantity?: number | null;
   changes: ItemChanges;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -495,7 +495,7 @@ export interface RemoveItemCommand {
   instance_id: string;
   quantity?: number | null;
   reason?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -509,7 +509,7 @@ export interface CompItemCommand {
   /** Reason for comp (required for audit) */
   reason: string;
   /** Authorizer ID (required) */
-  authorizer_id: string;
+  authorizer_id: number;
   /** Authorizer name (required) */
   authorizer_name: string;
 }
@@ -521,7 +521,7 @@ export interface UncompItemCommand {
   /** Instance ID of the comped item to uncomp */
   instance_id: string;
   /** Authorizer ID (required) */
-  authorizer_id: string;
+  authorizer_id: number;
   /** Authorizer name (required) */
   authorizer_name: string;
 }
@@ -545,7 +545,7 @@ export interface CancelPaymentCommand {
   order_id: string;
   payment_id: string;
   reason?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -589,11 +589,11 @@ export interface PayAaSplitCommand {
 export interface MoveOrderCommand {
   type: 'MOVE_ORDER';
   order_id: string;
-  target_table_id: string;
+  target_table_id: number;
   target_table_name: string;
-  target_zone_id?: string | null;
+  target_zone_id?: number | null;
   target_zone_name?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -601,7 +601,7 @@ export interface MergeOrdersCommand {
   type: 'MERGE_ORDERS';
   source_order_id: string;
   target_order_id: string;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -630,7 +630,7 @@ export interface ApplyOrderDiscountCommand {
   /** 固定金额折扣，null = 清除 */
   discount_fixed?: number | null;
   reason?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -643,7 +643,7 @@ export interface ApplyOrderSurchargeCommand {
   /** 固定附加费金额，与 surcharge_percent 互斥；两者都为 null = 清除 */
   surcharge_amount?: number | null;
   reason?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
@@ -739,9 +739,9 @@ export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MERGED';
  */
 export interface OrderSnapshot {
   order_id: string;
-  table_id: string | null;
+  table_id: number | null;
   table_name: string | null;
-  zone_id: string | null;
+  zone_id: number | null;
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
@@ -847,7 +847,7 @@ export type PaymentMethod = 'cash' | 'card' | 'wechat' | 'alipay' | 'other';
  */
 export interface CartItemSnapshot {
   /** Product ID */
-  id: string;
+  id: number;
   /** Instance ID (unique identifier for this item) */
   instance_id: string;
   name: string;
@@ -883,7 +883,7 @@ export interface CartItemSnapshot {
   tax_rate?: number | null;
 
   note?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
   /** Category name snapshot (for statistics) */
   category_name?: string | null;
@@ -917,7 +917,7 @@ export interface AppliedRule {
  * Cart item input (for AddItems command - no instance_id, generated by backend)
  */
 export interface CartItemInput {
-  product_id: string;
+  product_id: number;
   name: string;
   price: number;
   original_price?: number | null;
@@ -927,12 +927,12 @@ export interface CartItemInput {
   /** Manual discount percentage (0-100) */
   manual_discount_percent?: number | null;
   note?: string | null;
-  authorizer_id?: string | null;
+  authorizer_id?: number | null;
   authorizer_name?: string | null;
 }
 
 export interface ItemOption {
-  attribute_id: string;
+  attribute_id: number;
   attribute_name: string;
   option_idx: number;
   option_name: string;
@@ -942,7 +942,7 @@ export interface ItemOption {
 }
 
 export interface SpecificationInfo {
-  id: string;
+  id: number;
   name: string;
   receipt_name?: string | null;
   price?: number | null;
@@ -1004,7 +1004,7 @@ export interface CompRecord {
   quantity: number;
   original_price: number;
   reason: string;
-  authorizer_id: string;
+  authorizer_id: number;
   authorizer_name: string;
   timestamp: number;
 }
