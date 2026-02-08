@@ -116,6 +116,44 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 - ❌ 使用 `string` 格式的时间戳 (用 `i64` Unix 毫秒)
 - ❌ EventApplier 中执行 I/O 或副作用
 - ❌ 使用 `f64` 进行金额计算 (用 `rust_decimal`)
+- ❌ 添加转换函数/兼容层/适配器来修复类型不匹配 (从源头修)
+- ❌ 使用 INTEGER cents 存储金额 (用 REAL + `rust_decimal`)
+- ❌ 使用 JSON TEXT 列存储嵌套对象 (用独立关联表)
+
+### 修复原则
+
+类型不匹配或数据不一致时，**从 SOURCE 向外修**：数据库 schema → Rust shared 类型 → 前端 TypeScript 类型。禁止反向添加 `Number()`/`String()` 转换包装或适配代码。
+
+### 提交规范
+
+- 提交前必须通过零警告零错误: `cargo clippy --workspace` + `cd red_coral && npx tsc --noEmit`
+- 只 stage 当前任务范围内的文件，不包含无关 crate/目录的变更
+
+### 执行风格
+
+- 设计意图明确时直接实现，不要过度提问或扩大范围（如用户说"zone-matching rules"就只处理 zone-matching rules）
+- 方向已给出时优先行动，减少规划
+- UI 布局指令（按钮位置、网格列数、对齐方式）必须一次到位，实现前逐项核对约束
+
+### 测试规范
+
+- **命名**: `test_<action>_<scenario>` (如 `test_add_items_with_discount_rule`)
+- **运行**: `cargo test --workspace --lib` (只跑单元测试，不跑 doc tests)
+- **组织**: 按职责拆分测试文件，单文件不超过 500 行 (参考 `orders/manager/tests/`)
+- **断言**: 用 `assert_eq!` / `assert!(matches!(..))` 而非 `unwrap()` 后比较
+- **金额**: 测试中的金额断言使用 `rust_decimal::dec!()` 宏
+
+### Schema 变更工作流
+
+修改数据库 schema 时按以下顺序执行:
+
+1. `sqlx migrate add -r -s <desc> --source edge-server/migrations` — 创建迁移
+2. 编写 up/down SQL
+3. `sqlx db reset -y --source edge-server/migrations` — 重置并应用
+4. 更新 Rust 模型 (`edge-server/src/db/models/`) + 共享类型 (`shared/`)
+5. `cargo sqlx prepare --workspace` — 更新离线元数据
+6. 更新 TypeScript 类型 (`red_coral/src/core/domain/types/`)
+7. 验证: `cargo check --workspace && cd red_coral && npx tsc --noEmit`
 
 ### 日志规范 (tracing)
 
