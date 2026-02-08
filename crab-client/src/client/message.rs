@@ -17,6 +17,11 @@ use uuid::Uuid;
 use crate::MessageClientConfig;
 use crate::error::ClientError;
 
+/// TCP connect timeout (局域网场景)
+const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// TLS handshake timeout
+const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// 连接参数 (用于重连)
 #[derive(Clone)]
 struct ConnectionParams {
@@ -278,19 +283,23 @@ impl NetworkMessageClient {
                 ClientError::Connection(format!("Failed to configure TLS: {}", e))
             })?;
 
-        // TCP 连接
-        let tcp_stream = TcpStream::connect(&params.addr)
-            .await
-            .map_err(|e| ClientError::Connection(format!("TCP connect failed: {}", e)))?;
+        // TCP 连接 (带超时)
+        let tcp_stream = tokio::time::timeout(
+            TCP_CONNECT_TIMEOUT,
+            TcpStream::connect(&params.addr),
+        )
+        .await
+        .map_err(|_| ClientError::Connection(format!("TCP connect timed out after {:?}", TCP_CONNECT_TIMEOUT)))?
+        .map_err(|e| ClientError::Connection(format!("TCP connect failed: {}", e)))?;
 
-        // TLS 握手
+        // TLS 握手 (带超时)
         let connector = TlsConnector::from(Arc::new(tls_config));
         let domain = ServerName::try_from("edge-server")
             .map_err(|e| ClientError::Connection(format!("Invalid domain: {}", e)))?;
 
-        connector
-            .connect(domain, tcp_stream)
+        tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, connector.connect(domain, tcp_stream))
             .await
+            .map_err(|_| ClientError::Connection(format!("TLS handshake timed out after {:?}", TLS_HANDSHAKE_TIMEOUT)))?
             .map_err(|e| ClientError::Connection(format!("TLS handshake failed: {}", e)))
     }
 
@@ -487,7 +496,7 @@ impl NetworkMessageClient {
             }
 
             attempts += 1;
-            tracing::info!(
+            tracing::debug!(
                 "Reconnection attempt #{}/{}",
                 attempts,
                 if max_attempts > 0 {
@@ -550,7 +559,7 @@ impl NetworkMessageClient {
 
                 // 如果还有剩余等待时间，做快速网络探测
                 if remaining > Duration::ZERO && Self::quick_tcp_probe(&params.addr).await {
-                    tracing::info!("Network recovered, attempting immediate reconnection");
+                    tracing::debug!("Network recovered, attempting immediate reconnection");
                     break; // 跳出等待循环，立即重连
                 }
             }

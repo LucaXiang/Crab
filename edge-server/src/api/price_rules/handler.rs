@@ -12,8 +12,38 @@ use crate::core::ServerState;
 use crate::db::repository::price_rule;
 use crate::utils::{AppError, AppResult};
 use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
+use shared::models::price_rule::AdjustmentType;
 
 const RESOURCE: &str = "price_rule";
+
+fn validate_adjustment_value(
+    adjustment_type: &AdjustmentType,
+    value: f64,
+) -> Result<(), AppError> {
+    if !value.is_finite() {
+        return Err(AppError::validation("adjustment_value must be a finite number"));
+    }
+    if value < 0.0 {
+        return Err(AppError::validation("adjustment_value must be non-negative"));
+    }
+    match adjustment_type {
+        AdjustmentType::Percentage => {
+            if value > 100.0 {
+                return Err(AppError::validation(
+                    "Percentage adjustment_value must be between 0 and 100",
+                ));
+            }
+        }
+        AdjustmentType::FixedAmount => {
+            if value > 1_000_000.0 {
+                return Err(AppError::validation(
+                    "FixedAmount adjustment_value must not exceed 1,000,000",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
 
 /// GET /api/price-rules - 获取所有价格规则
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<PriceRule>>> {
@@ -73,6 +103,7 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<PriceRuleCreate>,
 ) -> AppResult<Json<PriceRule>> {
+    validate_adjustment_value(&payload.adjustment_type, payload.adjustment_value)?;
     let rule = price_rule::create(&state.pool, payload).await?;
 
     let id = rule.id.to_string();
@@ -100,10 +131,15 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<PriceRuleUpdate>,
 ) -> AppResult<Json<PriceRule>> {
-    // 查询旧值（用于审计 diff）
+    // 查询旧值（用于审计 diff + 部分更新验证）
     let old_rule = price_rule::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Price rule {}", id)))?;
+
+    // 验证 adjustment_value（部分更新时用旧值补齐）
+    let adj_type = payload.adjustment_type.as_ref().unwrap_or(&old_rule.adjustment_type);
+    let adj_value = payload.adjustment_value.unwrap_or(old_rule.adjustment_value);
+    validate_adjustment_value(adj_type, adj_value)?;
 
     let rule = price_rule::update(&state.pool, id, payload).await?;
 

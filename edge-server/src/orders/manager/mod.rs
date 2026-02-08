@@ -49,6 +49,9 @@ use tokio::sync::broadcast;
 /// Event broadcast channel capacity (支持高并发: 10000订单 × 4事件)
 const EVENT_CHANNEL_CAPACITY: usize = 65536;
 
+/// Rule cache size warning threshold
+const RULE_CACHE_WARN_THRESHOLD: usize = 500;
+
 /// OrdersManager for command processing
 ///
 /// The `epoch` field is a unique identifier generated on each startup.
@@ -147,6 +150,12 @@ impl OrdersManager {
         // 写入内存缓存
         let mut cache = self.rule_cache.write();
         cache.insert(order_id.to_string(), rules);
+        if cache.len() > RULE_CACHE_WARN_THRESHOLD {
+            tracing::warn!(
+                cache_size = cache.len(),
+                "Rule cache exceeds threshold, possible order leak"
+            );
+        }
     }
 
     /// Get cached rules for an order
@@ -492,7 +501,7 @@ impl OrdersManager {
         let mut snapshot = self.storage.get_snapshot(order_id)?;
         // 确保 line_total 已计算
         if let Some(ref mut order) = snapshot {
-            let needs_recalc = order.items.iter().any(|item| item.line_total == 0.0 && !item.is_comped);
+            let needs_recalc = order.items.iter().any(|item| item.line_total.abs() < f64::EPSILON && !item.is_comped);
             if needs_recalc {
                 money::recalculate_totals(order);
             }
@@ -507,7 +516,7 @@ impl OrdersManager {
         let mut orders = self.storage.get_active_orders()?;
         // 确保 line_total 已计算
         for order in &mut orders {
-            let needs_recalc = order.items.iter().any(|item| item.line_total == 0.0 && !item.is_comped);
+            let needs_recalc = order.items.iter().any(|item| item.line_total.abs() < f64::EPSILON && !item.is_comped);
             if needs_recalc {
                 money::recalculate_totals(order);
             }
