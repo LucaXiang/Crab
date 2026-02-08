@@ -27,6 +27,7 @@ import { TargetPicker } from './TargetPicker';
 import { TimeConditionEditor } from './TimeConditionEditor';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 
 interface RuleDetailPanelProps {
   rule: PriceRule | null;
@@ -230,7 +231,7 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
       setEditData({});
       onRuleUpdated();
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to update price rule', e);
       toast.error(t('common.message.save_failed'));
     } finally {
       setSaving(false);

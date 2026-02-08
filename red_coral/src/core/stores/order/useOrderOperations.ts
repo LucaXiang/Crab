@@ -11,6 +11,7 @@
  */
 
 import { invokeApi } from '@/infrastructure/api/tauri-client';
+import { logger } from '@/utils/logger';
 import { CartItem, PaymentRecord, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 import { useCheckoutStore } from './useCheckoutStore';
@@ -28,7 +29,7 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
   try {
     return await invokeApi<CommandResponse>('order_execute_command', { command });
   } catch (error: unknown) {
-    console.error('Command failed:', error);
+    logger.error('Command failed', error);
     return {
       command_id: command.command_id,
       success: false,
@@ -46,7 +47,7 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
 function ensureSuccess(response: CommandResponse, context: string): void {
   if (!response.success) {
     const message = response.error?.message || `${context} failed`;
-    console.error(`[OrderOps] ${context}:`, message);
+    logger.error(`OrderOps ${context}: ${message}`);
     throw new Error(message);
   }
 }

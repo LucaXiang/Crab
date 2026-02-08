@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { logger } from '@/utils/logger';
 import DefaultImage from '../../assets/reshot.svg';
 import { getImageUrl } from '@/core/services/imageCache';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
@@ -72,6 +73,8 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useOrderHandlers } from '@/hooks/useOrderHandlers';
 import { useDraftHandlers } from '@/hooks/useDraftHandlers';
 import { useRetailOrderRecovery } from '@/hooks/useRetailOrderRecovery';
+
+const CART_ANIMATION_TARGET_X = 190;
 
 export const POSScreen: React.FC = () => {
   const { t } = useI18n();
@@ -406,7 +409,7 @@ export const POSScreen: React.FC = () => {
 
             if (startRect && !performanceMode) {
               const id = `fly-${Date.now()}-${Math.random()}`;
-              const targetX = 190;
+              const targetX = CART_ANIMATION_TARGET_X;
               const targetY = window.innerHeight / 2;
               getImageUrl(product.image).then((imageForAnim) => {
                 addAnimation({ id, type: 'fly', image: imageForAnim || DefaultImage, startRect, targetX, targetY });
@@ -439,7 +442,7 @@ export const POSScreen: React.FC = () => {
 
       if (startRect && !performanceMode) {
         const id = `fly-${Date.now()}-${Math.random()}`;
-        const targetX = 190;
+        const targetX = CART_ANIMATION_TARGET_X;
         const targetY = window.innerHeight / 2;
 
         // Get image URL async, use default immediately if not cached
@@ -476,7 +479,7 @@ export const POSScreen: React.FC = () => {
       // Play animation
       if (startRect && !performanceMode) {
         const id = `fly-${Date.now()}-${Math.random()}`;
-        const targetX = 190;
+        const targetX = CART_ANIMATION_TARGET_X;
         const targetY = window.innerHeight / 2;
 
         getImageUrl(product.image).then((imageForAnim) => {
@@ -504,7 +507,7 @@ export const POSScreen: React.FC = () => {
       await openCashDrawer(selectedPrinter || undefined);
       toast.success(t('app.action.cash_drawer_opened'));
     } catch (error) {
-      console.error('Failed to open cash drawer:', error);
+      logger.error('Failed to open cash drawer', error);
       toast.error(t('app.action.cash_drawer_failed'));
     }
   }, [t, selectedPrinter]);

@@ -42,10 +42,7 @@ impl MessageBusService {
         &self,
         tls_config: Arc<rustls::ServerConfig>,
     ) -> Result<(), crate::utils::AppError> {
-        tracing::info!(
-            "Starting Message Bus TCP server on port {}...",
-            self.tcp_port
-        );
+        tracing::debug!(port = self.tcp_port, "Starting Message Bus TCP server");
         self.bus.start_tcp_server(Some(tls_config)).await
     }
 
@@ -69,6 +66,6 @@ impl MessageBusService {
             handler.run().await;
         });
 
-        tracing::info!("Message handler started in background");
+        tracing::debug!("Message handler started in background");
     }
 }

@@ -88,8 +88,7 @@ pub async fn run() {
             std::panic::set_hook(Box::new(|info| {
                 let backtrace = std::backtrace::Backtrace::capture();
                 let msg = info.to_string();
-                eprintln!("!!! APPLICATION PANIC !!!\nMessage: {}\nBacktrace:\n{}", msg, backtrace);
-                tracing::error!(target: "panic", message = %msg, backtrace = %backtrace, "panic occurred");
+                tracing::error!(target: "panic", message = %msg, backtrace = %backtrace, "APPLICATION PANIC");
             }));
 
             tracing::info!(path = log_dir.display().to_string(), "Tracing initialized successfully");

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { CartItem, HeldOrder, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
@@ -74,7 +75,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         } else {
           toast.error(message);
         }
-        console.error('[handleTableSelect] Error:', error);
+        logger.error('Table select failed', error);
       }
     },
     [handleTableSelectStore, setViewMode, setCurrentOrderKey, setShowTableScreen]
@@ -129,11 +130,11 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           setCurrentOrderKey(orderId);
           setViewMode('checkout');
         } else {
-          console.error('Retail order created but not found in store after polling');
+          logger.error('Retail order created but not found in store after polling');
           toast.error(t('common.message.order_load_failed'));
         }
       } catch (error) {
-        console.error('Failed to create retail order:', error);
+        logger.error('Failed to create retail order', error);
         toast.error(t('common.message.retail_order_failed'));
       }
     },
@@ -162,7 +163,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         // Clear pending retail order tracker after successful void
         clearPendingRetailOrder();
       } catch (error) {
-        console.error('Failed to void retail order on cancel:', error);
+        logger.error('Failed to void retail order on cancel', error);
         // Continue with UI cleanup even if void fails
       }
     }

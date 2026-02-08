@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
 import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp, ClipboardList, ChevronRight } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -268,7 +269,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         toast.error(response.error?.message || t('checkout.payment.cancel_failed'));
       }
     } catch (error) {
-      console.error('Failed to cancel payment:', error);
+      logger.error('Failed to cancel payment', error);
       toast.error(t('checkout.payment.cancel_failed'));
     } finally {
       setCancellingPaymentId(null);
@@ -323,7 +324,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           autoCloseDelay: is_retail ? 0 : 10000,
         });
       } catch (error) {
-        console.error('Cash payment failed:', error);
+        logger.error('Cash payment failed', error);
         toast.error(t('checkout.payment.failed'));
       } finally {
         setIsProcessing(false);
@@ -362,7 +363,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         autoCloseDelay: is_retail ? 0 : 5000,
       });
     } catch (error) {
-      console.error('Card payment failed:', error);
+      logger.error('Card payment failed', error);
       toast.error(t('checkout.payment.failed'));
     } finally {
       setIsProcessing(false);
@@ -387,7 +388,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
       toast.success(t('settings.payment.receipt_print_success'));
     } catch (error) {
-      console.error('Pre-payment print failed:', error);
+      logger.error('Pre-payment print failed', error);
       toast.error(t('settings.payment.receipt_print_failed'));
     }
   }, [order, t]);
@@ -473,7 +474,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         }
         return true;
       } catch (err) {
-        console.error('Split failed:', err);
+        logger.error('Split failed', err);
         toast.error(`${t('checkout.split.failed')}: ${err}`);
         return false;
       } finally {
@@ -569,7 +570,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         }
         return true;
       } catch (err) {
-        console.error('Amount split failed:', err);
+        logger.error('Amount split failed', err);
         toast.error(`${t('checkout.amount_split.failed')}: ${err}`);
         return false;
       } finally {

@@ -13,6 +13,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { formatCurrency } from '@/utils/currency';
 import type { Shift, ShiftStatus } from '@/core/domain/types/api';
@@ -51,7 +52,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       setShifts(allShifts);
       setCurrentShift(current);
     } catch (err) {
-      console.error('Failed to load shifts:', err);
+      logger.error('Failed to load shifts', err);
       toast.error(t('settings.shift.load_failed'));
     } finally {
       setLoading(false);

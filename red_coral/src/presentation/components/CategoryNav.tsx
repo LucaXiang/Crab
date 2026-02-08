@@ -3,6 +3,9 @@ import { useI18n } from '@/hooks/useI18n';
 import { ChevronUp, ChevronDown, Tag } from 'lucide-react';
 import { Category } from '@/core/domain/types';
 
+const SCROLL_CHECK_DELAY_MS = 100;
+const SCROLL_ANIMATION_DURATION_MS = 300;
+
 interface CategoryNavProps {
   selected: string;
   onSelect: (category: string) => void;
@@ -69,8 +72,8 @@ export const CategoryNav = React.memo<CategoryNavProps>(
           behavior: 'smooth'
         });
 
-        setTimeout(checkScroll, 100);
-        setTimeout(checkScroll, 300);
+        setTimeout(checkScroll, SCROLL_CHECK_DELAY_MS);
+        setTimeout(checkScroll, SCROLL_ANIMATION_DURATION_MS);
       }
     }, [checkScroll]);
 

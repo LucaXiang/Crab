@@ -8,6 +8,7 @@ import { createTauriClient } from '@/infrastructure/api';
 const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Permission, Category } from '@/core/domain/types';
 import { useCanManageMenu } from '@/hooks/usePermission';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
@@ -78,7 +79,7 @@ const CategoryList: React.FC<CategoryListProps> = React.memo(({
       // Refresh categories from store
       await categoryStore.fetchAll();
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to reorder categories', e);
       toast.error(t('settings.reorder_failed'));
       // Revert to server data
       await categoryStore.fetchAll();

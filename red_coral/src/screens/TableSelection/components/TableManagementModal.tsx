@@ -11,6 +11,7 @@ import { ZoneSidebar } from '../ZoneSidebar';
 import { formatCurrency } from '@/utils/currency';
 import { TableCard } from '../TableCard';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 
@@ -75,7 +76,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             await orderOps.mergeOrders(sourceOrder.order_id, targetSnapshot.order_id, operationAuthorizer ?? undefined);
             onSuccess(selectedTargetTable.id);
         } catch (err) {
-            console.error('Merge failed:', err);
+            logger.error('Merge failed', err);
             toast.error(t('checkout.error.merge_failed'));
         }
     };
@@ -96,7 +97,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             );
             onSuccess(selectedTargetTable.id);
         } catch (err) {
-            console.error('Move failed:', err);
+            logger.error('Move failed', err);
             toast.error(t('checkout.error.move_failed'));
         }
     };
@@ -132,7 +133,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             onClose();
             toast.success(t('checkout.split.success'));
         } catch (err) {
-            console.error("Split failed:", err);
+            logger.error('Split failed', err);
             toast.error(t('checkout.split.failed') + ": " + err);
         } finally {
             setIsProcessingSplit(false);
@@ -434,7 +435,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             await toggleRuleSkip(sourceOrder.order_id, ruleId, !currentSkipped);
             toast.success(currentSkipped ? t('table.price_rules.rule_enabled') : t('table.price_rules.rule_disabled'));
         } catch (err) {
-            console.error('Toggle rule failed:', err);
+            logger.error('Toggle rule failed', err);
             toast.error(t('table.price_rules.toggle_failed'));
         }
     };

@@ -153,14 +153,15 @@ pub fn apply_discount_rules(
         .collect();
 
     debug!(
+        target: "pricing",
         total_rules = rules.len(),
         discount_rules_count = discount_rules.len(),
         price_basis = %price_basis,
-        "[DiscountRules] Starting discount rule application"
+        "Starting discount rule application"
     );
 
     if discount_rules.is_empty() {
-        debug!("[DiscountRules] No discount rules to apply");
+        debug!(target: "pricing", "No discount rules to apply");
         return DiscountResult {
             amount: Decimal::ZERO,
             applied: vec![],
@@ -349,14 +350,15 @@ pub fn apply_surcharge_rules(
         .collect();
 
     debug!(
+        target: "pricing",
         total_rules = rules.len(),
         surcharge_rules_count = surcharge_rules.len(),
         price_basis = %price_basis,
-        "[SurchargeRules] Starting surcharge rule application"
+        "Starting surcharge rule application"
     );
 
     if surcharge_rules.is_empty() {
-        debug!("[SurchargeRules] No surcharge rules to apply");
+        debug!(target: "pricing", "No surcharge rules to apply");
         return SurchargeResult {
             amount: Decimal::ZERO,
             applied: vec![],

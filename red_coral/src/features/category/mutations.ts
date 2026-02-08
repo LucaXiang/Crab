@@ -1,4 +1,5 @@
 import { createTauriClient } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { useProductStore } from '@/core/stores/resources';
 import { useCategoryStore } from './store';
 import type { Attribute } from '@/core/domain/types/api';
@@ -19,7 +20,7 @@ async function syncAttributeBindings(
     try {
       await getApi().unbindCategoryAttribute(categoryId, binding.id);
     } catch (error) {
-      console.error('Failed to unbind attribute:', binding.attributeId, error);
+      logger.error('Failed to unbind attribute', error, { attributeId: binding.attributeId });
     }
   }
 
@@ -47,7 +48,7 @@ async function syncAttributeBindings(
       } catch (e) {
         const msg = String(e);
         if (!msg.includes('BINDING_NOT_FOUND')) {
-          console.error('Failed to unbind for update:', attributeId, e);
+          logger.error('Failed to unbind for update', e, { attributeId });
         }
       }
       shouldBind = true;
@@ -65,7 +66,7 @@ async function syncAttributeBindings(
             : undefined
         });
       } catch (error) {
-        console.error('Failed to bind attribute:', attributeId, error);
+        logger.error('Failed to bind attribute', error, { attributeId });
       }
     }
   }
@@ -158,7 +159,7 @@ export async function updateCategory(id: number, formData: CategoryFormData): Pr
       id: ca.id
     }));
   } catch (error) {
-    console.error('Failed to fetch existing category attributes:', error);
+    logger.error('Failed to fetch existing category attributes', error);
   }
 
   await syncAttributeBindings(

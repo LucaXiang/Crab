@@ -24,6 +24,7 @@ import type {
   OrderEvent,
   OrderConnectionState,
 } from '@/core/domain/types/orderEvent';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // Constants
@@ -206,22 +207,23 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 
       if (gap > MAX_SEQUENCE_GAP) {
         // Gap 过大，标记需要 timeline 补全
-        console.warn(
-          `[OrderSync] Large sequence gap for order ${orderId}: ` +
-          `local=${localSeq} → server=${serverSeq} (missed ${gap - 1} events, triggering sync)`
+        logger.warn(
+          `Large sequence gap for order ${orderId}: local=${localSeq} -> server=${serverSeq} (missed ${gap - 1} events, triggering sync)`,
+          { component: 'OrderSync' }
         );
         needsTimelineSync = true;
       } else if (gap > 1) {
         // 小 gap，记录警告但不触发补全
-        console.warn(
-          `[OrderSync] Sequence gap for order ${orderId}: ` +
-          `local=${localSeq} → server=${serverSeq} (missed ${gap - 1} events)`
+        logger.warn(
+          `Sequence gap for order ${orderId}: local=${localSeq} -> server=${serverSeq} (missed ${gap - 1} events)`,
+          { component: 'OrderSync' }
         );
       }
     } else if (event.sequence > 1) {
       // 新订单但首个事件不是 sequence=1，说明错过了前面的事件
-      console.warn(
-        `[OrderSync] New order ${orderId} first event is sequence=${event.sequence}, triggering sync`
+      logger.warn(
+        `New order ${orderId} first event is sequence=${event.sequence}, triggering sync`,
+        { component: 'OrderSync' }
       );
       needsTimelineSync = true;
     }

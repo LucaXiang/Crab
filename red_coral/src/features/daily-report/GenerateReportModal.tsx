@@ -7,6 +7,7 @@ import { X, FileText, Calendar, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 
 const getApi = () => createTauriClient();
 
@@ -48,7 +49,7 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
       toast.success(t('settings.daily_report.generate.success'));
       onSuccess();
     } catch (err: unknown) {
-      console.error('Failed to generate report:', err);
+      logger.error('Failed to generate report', err);
       // Check if it's a duplicate error
       const errObj = err as { message?: string; code?: number };
       if (errObj?.message?.includes('already exists') || errObj?.code === 1003) {

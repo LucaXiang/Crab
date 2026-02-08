@@ -6,6 +6,8 @@ import { LabelTemplate, LabelField } from '@/core/domain/types/print';
 import { getImageUrl } from '@/core/services/imageCache';
 import { useI18n } from '../../../hooks/useI18n';
 
+const LABEL_IMAGE_LOAD_DEBOUNCE_MS = 800;
+
 interface LabelTemplateEditorProps {
   template: LabelTemplate;
   onTemplateChange: (template: LabelTemplate) => void;
@@ -123,7 +125,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       }
     };
 
-    const debounceTimer = setTimeout(loadImages, 800);
+    const debounceTimer = setTimeout(loadImages, LABEL_IMAGE_LOAD_DEBOUNCE_MS);
     return () => {
       isMounted = false;
       clearTimeout(debounceTimer);

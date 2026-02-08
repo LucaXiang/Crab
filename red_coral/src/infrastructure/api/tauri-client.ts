@@ -8,6 +8,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore } from '@/core/stores/bridge';
 import { t } from '@/infrastructure/i18n';
@@ -93,7 +94,7 @@ function handleAuthError(code: number) {
   if (isHandlingAuthError) return;
   isHandlingAuthError = true;
   try {
-    console.warn(`[invokeApi] Auth error ${code}, clearing auth state`);
+    logger.warn(`Auth error ${code}, clearing auth state`, { component: 'invokeApi' });
     useAuthStore.getState().logout();
     useBridgeStore.setState({ currentSession: null });
   } finally {
@@ -120,7 +121,7 @@ function localizeErrorCode(
     return localized;
   }
   // i18n 没有对应 key，用 rawMessage 做关键词匹配作为 fallback
-  console.warn(`[invokeApi] Missing i18n for error code ${code}, add to zh-CN.json`);
+  logger.warn(`Missing i18n for error code ${code}, add to zh-CN.json`, { component: 'invokeApi' });
   if (rawMessage) {
     return friendlyError(rawMessage);
   }

@@ -7,6 +7,7 @@ import { usePriceInput } from '@/hooks/usePriceInput';
 import type { ProductSpec } from '@/core/domain/types';
 import { validateSpecData, createEmptySpec } from './spec-utils';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 
 interface SpecFormData {
   name: string;
@@ -110,7 +111,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
       await onSave(fullSpec, specIndex);
       onClose();
     } catch (error) {
-      console.error('Failed to save spec:', error);
+      logger.error('Failed to save spec', error);
       toast.error(t('common.message.error'));
     } finally {
       setIsSubmitting(false);

@@ -19,6 +19,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useShallow } from 'zustand/shallow';
 import { invokeApi } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useBridgeStore } from '@/core/stores/bridge/useBridgeStore';
 import type { OrderEvent, OrderSnapshot, SyncResponse } from '@/core/domain/types/orderEvent';
@@ -64,11 +65,9 @@ export function useOrderEventListener() {
       store._setInitialized(true);
       isInitializedRef.current = true;
 
-      console.log(
-        `[OrderEventListener] Initialized with ${response.active_orders.length} active orders, sequence: ${response.server_sequence}`
-      );
+      logger.debug(`Initialized with ${response.active_orders.length} active orders, sequence: ${response.server_sequence}`, { component: 'OrderEventListener' });
     } catch (error) {
-      console.error('[OrderEventListener] Failed to initialize orders:', error);
+      logger.error('Failed to initialize orders', error, { component: 'OrderEventListener' });
       store._setConnectionState('disconnected');
     }
   }, []);
@@ -85,16 +84,14 @@ export function useOrderEventListener() {
     // Server Authority: backend sends snapshot directly, no API call needed
     const unlisten = await listen<OrderSyncPayload>('order-sync', (event) => {
       const { event: orderEvent, snapshot } = event.payload;
-      console.log(
-        `[OrderEventListener] Received sync: ${orderEvent.event_type} for order ${orderEvent.order_id}`
-      );
+      logger.debug(`Received sync: ${orderEvent.event_type} for order ${orderEvent.order_id}`, { component: 'OrderEventListener' });
 
       // Apply with server-computed snapshot directly (no API call)
       useActiveOrdersStore.getState()._applyOrderSync(orderEvent, snapshot);
     });
 
     unlistenRef.current = unlisten;
-    console.log('[OrderEventListener] Event listener set up (Server Authority Mode)');
+    logger.debug('Event listener set up (Server Authority Mode)', { component: 'OrderEventListener' });
   }, []);
 
   useEffect(() => {
@@ -147,7 +144,7 @@ export function useOrderSyncActions() {
 
       return true;
     } catch (error) {
-      console.error('[OrderSync] Sync failed:', error);
+      logger.error('Sync failed', error, { component: 'OrderSync' });
       store._setConnectionState('disconnected');
       return false;
     }
@@ -212,7 +209,7 @@ export function useOrderTimelineSync() {
       if (syncingRef.current.has(orderId)) return;
       syncingRef.current.add(orderId);
 
-      console.log(`[TimelineSync] Fetching events for order ${orderId}`);
+      logger.debug(`Fetching events for order ${orderId}`, { component: 'TimelineSync' });
 
       try {
         const response = await invokeApi<OrderEventsResponse>(
@@ -225,11 +222,9 @@ export function useOrderTimelineSync() {
 
         useActiveOrdersStore.getState()._syncOrderTimeline(orderId, response.events);
         retryCountRef.current.delete(orderId); // 成功后清除重试计数
-        console.log(
-          `[TimelineSync] Synced ${response.events.length} events for order ${orderId}`
-        );
+        logger.debug(`Synced ${response.events.length} events for order ${orderId}`, { component: 'TimelineSync' });
       } catch (error) {
-        console.error(`[TimelineSync] Failed to sync order ${orderId}:`, error);
+        logger.error(`Failed to sync order ${orderId}`, error, { component: 'TimelineSync' });
 
         if (!mountedRef.current) return;
 
@@ -238,7 +233,7 @@ export function useOrderTimelineSync() {
         if (retries < MAX_SYNC_RETRIES) {
           retryCountRef.current.set(orderId, retries + 1);
           const delay = RETRY_BASE_DELAY * Math.pow(2, retries);
-          console.log(`[TimelineSync] Retry ${retries + 1}/${MAX_SYNC_RETRIES} for ${orderId} in ${delay}ms`);
+          logger.debug(`Retry ${retries + 1}/${MAX_SYNC_RETRIES} for ${orderId} in ${delay}ms`, { component: 'TimelineSync' });
           
           setTimeout(() => {
             if (mountedRef.current) {
@@ -247,7 +242,7 @@ export function useOrderTimelineSync() {
             }
           }, delay);
         } else {
-          console.error(`[TimelineSync] Max retries exceeded for ${orderId}`);
+          logger.error(`Max retries exceeded for ${orderId}`, undefined, { component: 'TimelineSync' });
           useActiveOrdersStore.getState()._clearTimelineSyncRequest(orderId);
           retryCountRef.current.delete(orderId);
         }

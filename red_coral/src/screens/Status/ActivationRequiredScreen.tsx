@@ -120,4 +120,3 @@ export const ActivationRequiredScreen: React.FC = () => {
   );
 };
 
-export default ActivationRequiredScreen;

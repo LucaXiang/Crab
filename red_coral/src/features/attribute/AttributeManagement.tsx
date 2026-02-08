@@ -5,6 +5,7 @@ import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
 import { getErrorMessage } from '@/utils/error';
+import { logger } from '@/utils/logger';
 import {
   useAttributes,
   useAttributesLoading,
@@ -132,7 +133,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
           await deleteAttribute(attr.id);
           toast.success(t('settings.user.message.delete_success'));
         } catch (error) {
-          console.error('Delete attribute error:', error);
+          logger.error('Failed to delete attribute', error);
           toast.error(getErrorMessage(error));
         }
       },
@@ -162,7 +163,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
           await deleteOption(option.attributeId, option.index);
           toast.success(t('settings.user.message.delete_success'));
         } catch (error) {
-          console.error('Delete option error:', error);
+          logger.error('Failed to delete option', error);
           toast.error(getErrorMessage(error));
         }
       },
@@ -195,7 +196,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         default_option_indices: newDefaults,
       });
     } catch (error) {
-      console.error('Toggle default error:', error);
+      logger.error('Failed to toggle default option', error);
       toast.error(getErrorMessage(error));
     }
   };

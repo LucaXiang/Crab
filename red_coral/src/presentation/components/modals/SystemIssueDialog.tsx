@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import type { SystemIssue, ResolveSystemIssueRequest } from '@/core/domain/types/api';
 
 interface SystemIssueDialogProps {
@@ -58,7 +59,7 @@ export const SystemIssueDialog: React.FC<SystemIssueDialogProps> = ({ issue, onR
       setCustomInput('');
       toast.success(t('system_issue.resolve_success'));
     } catch (err) {
-      console.error('[SystemIssueDialog] resolve failed:', err);
+      logger.error('System issue resolve failed', err);
       toast.error(t('system_issue.resolve_failed'));
     } finally {
       setIsSubmitting(false);

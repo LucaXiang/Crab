@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Server, Printer, Trash2, Edit2, Plus, Wifi, Monitor, ChefHat, Receipt, Tag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
+import { logger } from '@/utils/logger';
 import { PrinterEditModal } from './PrinterEditModal';
 import type { PrintDestination, Printer as PrinterModel } from '@/core/domain/types/api';
 
@@ -105,7 +106,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
       setModalOpen(false);
       setEditingItem(null);
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to save print station', e);
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, RefreshCw, LogOut } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAppState, useBridgeStore } from '@/core/stores/bridge';
+import { logger } from '@/utils/logger';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { t } from '@/infrastructure/i18n';
 import type { SubscriptionStatus } from '@/core/domain/types/appState';
@@ -71,7 +72,7 @@ export const SubscriptionBlockedScreen: React.FC = () => {
       await invokeApi('exit_tenant');
       await fetchAppState();
     } catch (error) {
-      console.error('Exit tenant failed:', error);
+      logger.error('Exit tenant failed', error);
     }
   };
 
@@ -242,4 +243,3 @@ function statusKey(status: SubscriptionStatus): string {
   return map[status];
 }
 
-export default SubscriptionBlockedScreen;

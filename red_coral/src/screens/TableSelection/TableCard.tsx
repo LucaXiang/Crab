@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Users, Clock, Receipt } from 'lucide-react';
 import { Table, HeldOrder } from '@/core/domain/types';
 
+const TABLE_OVERTIME_THRESHOLD_MS = 2 * 60 * 60 * 1000;
+const TABLE_TIMER_UPDATE_INTERVAL_MS = 60 * 1000;
+
 interface TableCardProps {
   table: Table;
   order?: HeldOrder;
@@ -18,7 +21,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
 
     // Check if overtime (2 hours)
     const isLongTime =
-      isOccupied && order && Date.now() - order.start_time > 2 * 60 * 60 * 1000;
+      isOccupied && order && Date.now() - order.start_time > TABLE_OVERTIME_THRESHOLD_MS;
 
     const is_pre_payment = isOccupied && !!order?.is_pre_payment;
 
@@ -43,7 +46,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
 
       updateTime();
       // Update every minute for accurate time display
-      const timer = setInterval(updateTime, 60 * 1000);
+      const timer = setInterval(updateTime, TABLE_TIMER_UPDATE_INTERVAL_MS);
       return () => clearInterval(timer);
     }, [isOccupied, order?.order_id]);
 

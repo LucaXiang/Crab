@@ -72,30 +72,6 @@ pub enum ActivationRequiredReason {
 }
 
 impl ActivationRequiredReason {
-    /// 获取恢复建议 (完整文本)
-    pub fn recovery_hint(&self) -> &'static str {
-        match self {
-            Self::FirstTimeSetup => "输入管理员提供的凭据完成激活",
-            Self::CertificateExpired { .. } => "请重新激活设备以更新证书",
-            Self::CertificateExpiringSoon { .. } => "建议尽快重新激活以更新证书",
-            Self::CertificateInvalid { .. } => "证书文件损坏，请重新激活",
-            Self::SignatureInvalid { .. } => "安全验证失败，请重新激活",
-            Self::DeviceMismatch { .. } => "如果更换了设备，请联系管理员重新激活",
-            Self::ClockTampering { .. } => "请检查系统时间设置是否正确",
-            Self::BindingInvalid { .. } => "设备绑定无效，请重新激活",
-            Self::TokenExpired { .. } => "凭据已过期，请重新激活",
-            Self::NetworkError {
-                can_continue_offline: true,
-                ..
-            } => "可以离线继续使用，联网后将自动同步",
-            Self::NetworkError {
-                can_continue_offline: false,
-                ..
-            } => "请检查网络连接后重试",
-            Self::Revoked { .. } => "请联系管理员了解详情",
-        }
-    }
-
     /// 是否可以自动恢复
     pub fn can_auto_recover(&self) -> bool {
         matches!(
@@ -176,14 +152,15 @@ pub enum ActivationStep {
 }
 
 impl ActivationStep {
-    pub fn message_zh(&self) -> &'static str {
+    /// Fallback message (English). Frontend should use `step` field for i18n.
+    pub fn message(&self) -> &'static str {
         match self {
-            Self::Authenticating => "正在验证凭据...",
-            Self::DownloadingCertificates => "正在下载证书...",
-            Self::VerifyingBinding => "正在验证设备绑定...",
-            Self::CheckingSubscription => "正在检查订阅状态...",
-            Self::StartingServer => "正在启动服务...",
-            Self::Complete => "激活完成",
+            Self::Authenticating => "Authenticating...",
+            Self::DownloadingCertificates => "Downloading certificates...",
+            Self::VerifyingBinding => "Verifying device binding...",
+            Self::CheckingSubscription => "Checking subscription...",
+            Self::StartingServer => "Starting server...",
+            Self::Complete => "Activation complete",
         }
     }
 
@@ -217,7 +194,7 @@ impl ActivationProgress {
             step,
             total_steps: ActivationStep::TOTAL_STEPS,
             current_step: step.step_number(),
-            message: step.message_zh().to_string(),
+            message: step.message().to_string(),
             started_at: crate::util::now_millis(),
         }
     }

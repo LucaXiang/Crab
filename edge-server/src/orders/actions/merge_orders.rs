@@ -82,24 +82,24 @@ impl CommandHandler for MergeOrdersAction {
         // 6. Reject if either order has payments
         if to_decimal(source_snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
-                "存在支付记录的订单不能合并".to_string(),
+                "Cannot merge order with existing payments".to_string(),
             ));
         }
         if to_decimal(target_snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
-                "目标订单存在支付记录，不能合并".to_string(),
+                "Target order has existing payments, cannot merge".to_string(),
             ));
         }
 
         // 7. Reject if either order has active AA split
         if source_snapshot.aa_total_shares.is_some() {
             return Err(OrderError::InvalidOperation(
-                "源订单存在 AA 分单，不能合并".to_string(),
+                "Source order has active AA split, cannot merge".to_string(),
             ));
         }
         if target_snapshot.aa_total_shares.is_some() {
             return Err(OrderError::InvalidOperation(
-                "目标订单存在 AA 分单，不能合并".to_string(),
+                "Target order has active AA split, cannot merge".to_string(),
             ));
         }
 
@@ -722,7 +722,7 @@ mod tests {
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
         assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
         if let Err(OrderError::InvalidOperation(msg)) = result {
-            assert!(msg.contains("AA 分单"));
+            assert!(msg.contains("AA split"));
         }
     }
 
@@ -750,7 +750,7 @@ mod tests {
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
         assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
         if let Err(OrderError::InvalidOperation(msg)) = result {
-            assert!(msg.contains("AA 分单"));
+            assert!(msg.contains("AA split"));
         }
     }
 }

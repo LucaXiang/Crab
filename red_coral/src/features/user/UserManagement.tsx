@@ -12,6 +12,7 @@ import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
 import { UserFormModal } from './UserFormModal';
 import { ResetPasswordModal } from './ResetPasswordModal';
 import { RolePermissionsEditor } from '@/features/role';
+import { logger } from '@/utils/logger';
 
 export const UserManagement: React.FC = React.memo(() => {
   const { t, locale } = useI18n();
@@ -48,7 +49,7 @@ export const UserManagement: React.FC = React.memo(() => {
       setIsLoading(true);
       fetchUsers()
         .then(setUsers)
-        .catch(console.error)
+        .catch((err) => logger.error('Failed to fetch users', err))
         .finally(() => setIsLoading(false));
     }
   }, [canManageUsers, fetchUsers]);

@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import type { StoreInfo, StoreInfoUpdate } from '@/core/domain/types/api';
 import type { SyncPayload } from '../factory/createResourceStore';
 
@@ -64,7 +65,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch store info';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] store_info: fetch failed -', errorMsg);
+      logger.error('Store info fetch failed', undefined, { component: 'StoreInfoStore', detail: errorMsg });
     }
   },
 
@@ -77,7 +78,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to update store info';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] store_info: update failed -', errorMsg);
+      logger.error('Store info update failed', undefined, { component: 'StoreInfoStore', detail: errorMsg });
       throw e;
     }
   },

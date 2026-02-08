@@ -1,5 +1,6 @@
 import { createTauriClient } from '@/infrastructure/api';
 import { useProductStore } from './store';
+import { logger } from '@/utils/logger';
 import type { Product, Category, ProductSpec, PrintState } from '@/core/domain/types';
 import { syncAttributeBindings } from '@/screens/Settings/utils';
 
@@ -84,7 +85,7 @@ export async function createProduct(
         default_option_indices: defaultIndices.length > 0 ? defaultIndices : undefined,
       });
     } catch (error) {
-      console.error('Failed to bind attribute:', attributeId, error);
+      logger.error('Failed to bind attribute', error, { attributeId });
     }
   }
 
@@ -104,7 +105,7 @@ export async function createProduct(
         specs: embeddedSpecs,
       });
     } catch (error) {
-      console.error('Failed to update specifications:', error);
+      logger.error('Failed to update specifications', error);
       throw error;
     }
   }
@@ -173,7 +174,7 @@ export async function updateProduct(
         defaultOptionIds: pa.default_option_indices ?? [],
       }));
   } catch (error) {
-    console.error('Failed to fetch existing attributes:', error);
+    logger.error('Failed to fetch existing attributes', error);
   }
 
   // Handle attribute bindings using helper

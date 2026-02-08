@@ -7,6 +7,7 @@ import { useSyncListener, useOrderEventListener, useOrderTimelineSync, useSyncCo
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { t } from '@/infrastructure/i18n';
+import { logger } from '@/utils/logger';
 
 // Components
 import { ToastContainer } from '@/presentation/components/Toast';
@@ -27,6 +28,9 @@ import { ActivateScreen } from '@/screens/Activate';
 
 import { OrderDebug } from '@/screens/Debug';
 import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
+
+const WINDOW_SHOW_DELAY_MS = 50;
+const KEYBOARD_FOCUSOUT_DELAY_MS = 100;
 
 /**
  * 全局初始化状态 hook
@@ -81,7 +85,7 @@ const useAppInitialization = () => {
 
       setIsInitialized(true);
     } catch (err) {
-      console.error('[AppInit] 初始化失败:', err);
+      logger.error('App initialization failed', err);
       setError(err instanceof Error ? err.message : t('app.init.error_default'));
     }
   };
@@ -140,14 +144,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const showWindow = async () => {
       // Small delay to ensure initial render paint is complete
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, WINDOW_SHOW_DELAY_MS));
       try {
         await getCurrentWindow().show();
         // Ensure focus
         await getCurrentWindow().setFocus();
       } catch (err) {
         // Ignore errors if window is already visible or API fails
-        console.debug('Failed to show window:', err);
+        logger.debug('Failed to show window', { error: err });
       }
     };
 
@@ -199,7 +203,7 @@ const App: React.FC = () => {
         if (active?.tagName !== 'INPUT' && active?.tagName !== 'TEXTAREA') {
           useVirtualKeyboardStore.getState().hide();
         }
-      }, 100);
+      }, KEYBOARD_FOCUSOUT_DELAY_MS);
     };
 
     document.addEventListener('focusin', handleFocusIn);

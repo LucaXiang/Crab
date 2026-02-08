@@ -1,2 +1,2 @@
-export { default as ActivationRequiredScreen } from './ActivationRequiredScreen';
-export { default as SubscriptionBlockedScreen } from './SubscriptionBlockedScreen';
+export { ActivationRequiredScreen } from './ActivationRequiredScreen';
+export { SubscriptionBlockedScreen } from './SubscriptionBlockedScreen';

@@ -8,6 +8,7 @@
  */
 
 import { create } from 'zustand';
+import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Shift, ShiftCreate, ShiftClose, ShiftForceClose } from '@/core/domain/types/api';
 
@@ -64,7 +65,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
 
       return shift;
     } catch (error) {
-      console.error('Failed to fetch current shift:', error);
+      logger.error('Failed to fetch current shift', error);
       set({ isLoading: false });
       throw error;
     }
@@ -80,7 +81,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
       set({ currentShift: shift, isLoading: false, needsOpenShift: false });
       return shift;
     } catch (error) {
-      console.error('Failed to open shift:', error);
+      logger.error('Failed to open shift', error);
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to open shift',
@@ -99,7 +100,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
       set({ currentShift: null, isLoading: false });
       return shift;
     } catch (error) {
-      console.error('Failed to close shift:', error);
+      logger.error('Failed to close shift', error);
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to close shift',
@@ -123,7 +124,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
       });
       return shift;
     } catch (error) {
-      console.error('Failed to force close shift:', error);
+      logger.error('Failed to force close shift', error);
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to force close shift',

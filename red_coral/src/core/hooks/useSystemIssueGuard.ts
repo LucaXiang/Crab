@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { createTauriClient } from '@/infrastructure/api/tauri-client';
+import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore } from '@/core/stores/bridge';
 import { toast } from '@/presentation/components/Toast';
@@ -44,7 +45,7 @@ export function useSystemIssueGuard() {
       const pending = await client.getSystemIssues();
       setIssues(pending);
     } catch (err) {
-      console.error('[SystemIssueGuard] Failed to fetch pending issues:', err);
+      logger.error('Failed to fetch pending issues', err, { component: 'SystemIssueGuard' });
       toast.warning(t('system.issue_check_failed'));
     }
   }, [isServerAuthenticated]);
@@ -81,7 +82,7 @@ export function useSystemIssueGuard() {
             ? JSON.parse(msg.payload)
             : msg.payload) as SyncPayload;
           if (sync.resource === 'system_issue') {
-            console.log('[SystemIssueGuard] system_issue sync received, refetching');
+            logger.debug('system_issue sync received, refetching', { component: 'SystemIssueGuard' });
             fetchIssues();
           }
         } catch {

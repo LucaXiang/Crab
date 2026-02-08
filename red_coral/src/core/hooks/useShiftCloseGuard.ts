@@ -11,6 +11,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { createTauriClient } from '@/infrastructure/api/tauri-client';
+import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { formatCurrency } from '@/utils/currency';
 import type { Shift } from '@/core/domain/types/api';
@@ -64,7 +65,7 @@ export function useShiftCloseGuard() {
           await message('班次已强制关闭', { title: '提示', kind: 'info' });
           return true;
         } catch (err) {
-          console.error('Failed to force close shift:', err);
+          logger.error('Failed to force close shift', err);
           await message(`强制关闭班次失败: ${err}`, { title: '错误', kind: 'error' });
           return false;
         }
@@ -73,7 +74,7 @@ export function useShiftCloseGuard() {
       // 用户选择取消
       return false;
     } catch (err) {
-      console.error('Failed to check open shift:', err);
+      logger.error('Failed to check open shift', err);
       // 出错时允许关闭，避免用户无法退出
       return true;
     }
@@ -101,7 +102,7 @@ export function useShiftCloseGuard() {
 
         unlistenRef.current = unlisten;
       } catch (err) {
-        console.error('Failed to setup close handler:', err);
+        logger.error('Failed to setup close handler', err);
       }
     };
 

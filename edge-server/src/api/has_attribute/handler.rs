@@ -60,7 +60,7 @@ pub async fn create(
         && attribute::has_binding(&state.pool, "category", cat_id, payload.attribute_id).await?
     {
         return Err(AppError::validation(
-            "该属性已通过分类继承绑定到此产品，不能重复添加".to_string(),
+            "This attribute is already inherited from the category, cannot add duplicate binding".to_string(),
         ));
     }
 

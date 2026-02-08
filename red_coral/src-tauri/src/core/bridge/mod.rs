@@ -1859,7 +1859,7 @@ impl ClientBridge {
                                 tracing::debug!(
                                     order_id = %order_id,
                                     rule_count = rules.len(),
-                                    "缓存订单价格规则 (Server 模式)"
+                                    "Cached order price rules (server mode)"
                                 );
                                 server_state.orders_manager().cache_rules(order_id, rules);
                             }
@@ -1879,7 +1879,7 @@ impl ClientBridge {
                                 order_id = %order_id,
                                 target_zone_id = ?target_zone_id,
                                 rule_count = rules.len(),
-                                "移桌后重新加载区域规则 (Server 模式)"
+                                "Reloaded zone rules after table move (server mode)"
                             );
                             server_state.orders_manager().cache_rules(order_id, rules);
                         }

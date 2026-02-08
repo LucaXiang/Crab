@@ -11,11 +11,14 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { invokeApi } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { storeRegistry } from '@/core/stores/resources/registry';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useShiftStore } from '@/core/stores/shift';
 import type { SyncResponse } from '@/core/domain/types/orderEvent';
 import type { Shift } from '@/core/domain/types/api';
+
+const PRODUCT_REFRESH_DEBOUNCE_MS = 500;
 
 interface SyncPayload {
   resource: string;
@@ -91,7 +94,7 @@ function parseLaggedPayload(payload: unknown): LaggedSyncPayload | null {
 async function handleGapDetectedSync(): Promise<void> {
   const { _fullSync, _setConnectionState, lastSequence } = useActiveOrdersStore.getState();
 
-  console.log(`[Sync] Gap detected recovery starting from lastSequence=${lastSequence}`);
+  logger.debug(`Gap detected recovery starting from lastSequence=${lastSequence}`, { component: 'Sync' });
 
   try {
     // 请求全量同步
@@ -101,12 +104,10 @@ async function handleGapDetectedSync(): Promise<void> {
 
     if (response) {
       _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
-      console.log(
-        `[Sync] Gap recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`
-      );
+      logger.debug(`Gap recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`, { component: 'Sync' });
     }
   } catch (err) {
-    console.error('[Sync] Gap recovery failed:', err);
+    logger.error('Gap recovery failed', err, { component: 'Sync' });
     _setConnectionState('disconnected');
   }
 }
@@ -132,9 +133,7 @@ export function useSyncListener() {
       // 检查是否为 WiFi 丢包恢复消息
       if (isLaggedPayload(message.payload)) {
         const laggedInfo = parseLaggedPayload(message.payload);
-        console.warn(
-          `[Sync] WiFi lag detected - dropped ${laggedInfo?.dropped_messages || '?'} messages, triggering full resync`
-        );
+        logger.warn(`WiFi lag detected - dropped ${laggedInfo?.dropped_messages || '?'} messages, triggering full resync`, { component: 'Sync' });
 
         // 触发 Order 全量重同步
         const { _fullSync, _setConnectionState } = useActiveOrdersStore.getState();
@@ -148,12 +147,10 @@ export function useSyncListener() {
 
           if (response) {
             _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
-            console.log(
-              `[Sync] WiFi lag recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`
-            );
+            logger.debug(`WiFi lag recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`, { component: 'Sync' });
           }
         } catch (err) {
-          console.error('[Sync] WiFi lag recovery failed:', err);
+          logger.error('WiFi lag recovery failed', err, { component: 'Sync' });
           _setConnectionState('disconnected');
         }
 
@@ -163,12 +160,12 @@ export function useSyncListener() {
       // 常规资源同步
       const payload = message.payload as SyncPayload;
       const { resource, id, version, action, data } = payload;
-      console.log(`[SyncListener] Received sync event: resource=${resource}, action=${action}, id=${id}`);
+      logger.debug(`Received sync event: resource=${resource}, action=${action}, id=${id}`, { component: 'SyncListener' });
 
       // 特殊处理: shift settlement_required - 跨营业日班次需要结算
       // 此时班次还未关闭，需要用户手动强制关闭
       if (resource === 'shift' && action === 'settlement_required') {
-        console.log('[SyncListener] Shift settlement required, notifying ShiftGuard');
+        logger.debug('Shift settlement required, notifying ShiftGuard', { component: 'SyncListener' });
         const shiftData = data as Shift | null;
         if (shiftData) {
           // 保存过期班次信息，ShiftGuard 会显示强制关闭弹窗
@@ -184,7 +181,7 @@ export function useSyncListener() {
             event: import('@/core/domain/types/orderEvent').OrderEvent;
             snapshot: import('@/core/domain/types/orderEvent').OrderSnapshot;
           };
-          console.log(`[SyncListener] Order sync: ${event.event_type}, order=${snapshot.order_id}`);
+          logger.debug(`Order sync: ${event.event_type}, order=${snapshot.order_id}`, { component: 'SyncListener' });
           useActiveOrdersStore.getState()._applyOrderSync(event, snapshot);
         }
         return;
@@ -193,10 +190,10 @@ export function useSyncListener() {
       // 调用 resources store 的 applySync（只处理标准 CRUD 操作）
       const store = storeRegistry[resource];
       if (store && (action === 'created' || action === 'updated' || action === 'deleted')) {
-        console.log(`[SyncListener] Found store for ${resource}, calling applySync`);
+        logger.debug(`Found store for ${resource}, calling applySync`, { component: 'SyncListener' });
         store.getState().applySync({ id, version, action, data });
       } else if (!store) {
-        console.warn(`[SyncListener] No store found for resource: ${resource}`);
+        logger.warn(`No store found for resource: ${resource}`, { component: 'SyncListener' });
       }
 
       // 属性/分类变更时级联刷新 product store（ProductFull 嵌入了完整属性数据）
@@ -207,10 +204,10 @@ export function useSyncListener() {
           productRefreshTimer = null;
           const productStore = storeRegistry.product?.getState();
           if (productStore?.isLoaded) {
-            console.log(`[SyncListener] ${resource} changed, refreshing product store (debounced)`);
+            logger.debug(`${resource} changed, refreshing product store (debounced)`, { component: 'SyncListener' });
             productStore.fetchAll(true);
           }
-        }, 500);
+        }, PRODUCT_REFRESH_DEBOUNCE_MS);
       }
     }).then((fn) => {
       if (isMounted) {

@@ -6,6 +6,7 @@
  */
 
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { logger } from '@/utils/logger';
 
 // 内存缓存: hash -> asset URL
 const cache = new Map<string, string>();
@@ -102,14 +103,14 @@ async function resolveAssetUrl(imageRef: string): Promise<string> {
     }
 
     if (!filePath) {
-      console.warn('[ImageCache] Empty path for:', imageRef);
+      logger.warn('Empty path for image', { component: 'ImageCache', imageRef });
       return '';
     }
 
     // 直接返回 asset URL，利用浏览器原生缓存
     return convertFileSrc(filePath);
   } catch (error) {
-    console.error('[ImageCache] Failed to resolve image:', imageRef, error);
+    logger.error('Failed to resolve image', error, { component: 'ImageCache', imageRef });
     return '';
   }
 }

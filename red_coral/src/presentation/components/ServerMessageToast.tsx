@@ -57,6 +57,7 @@ interface ToastItem {
 // ============================================================================
 
 const MAX_VISIBLE_TOASTS = 10;
+const TOAST_DISMISS_ANIMATION_MS = 300;
 
 // Level 配置
 const levelConfig: Record<
@@ -125,7 +126,7 @@ function ServerToast({ item, onDismiss }: ToastProps) {
 
   const handleDismiss = useCallback(() => {
     setIsExiting(true);
-    setTimeout(() => onDismiss(item.id), 300);
+    setTimeout(() => onDismiss(item.id), TOAST_DISMISS_ANIMATION_MS);
   }, [item.id, onDismiss]);
 
   // Format timestamp
@@ -310,4 +311,3 @@ export const serverToast = {
 // Re-export types for external use
 export type { NotificationLevel, NotificationCategory, NotificationPayload };
 
-export default ServerMessageToastContainer;

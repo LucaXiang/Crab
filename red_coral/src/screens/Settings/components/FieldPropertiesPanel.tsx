@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { LabelField, TextAlign, VerticalAlign } from '@/core/domain/types/print';
 import { Type, Image as ImageIcon, X, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Upload, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -61,7 +62,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       // Save local path for preview, actual upload happens on template save
       handleUpdate({ _pending_image_path: file, template: '' });
     } catch (e) {
-      console.error('Failed to select image:', e);
+      logger.error('Failed to select image', e, { component: 'FieldPropertiesPanel' });
     }
   };
 

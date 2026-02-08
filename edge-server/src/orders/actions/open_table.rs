@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use sqlx::SqlitePool;
-use tracing::{debug, info};
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::db::repository::price_rule;
@@ -35,29 +35,25 @@ pub async fn load_matching_rules(
     zone_id: Option<i64>,
     is_retail: bool,
 ) -> Vec<PriceRule> {
-    info!(
-        zone_id = ?zone_id,
-        is_retail,
-        "[LoadRules] Loading zone-matched price rules"
-    );
-
     let rules = match price_rule::find_by_zone(pool, zone_id, is_retail).await {
         Ok(rules) => rules,
         Err(e) => {
-            tracing::error!("Failed to load price rules: {:?}", e);
+            tracing::error!(zone_id = ?zone_id, is_retail, error = %e, "Failed to load price rules");
             return vec![];
         }
     };
 
-    info!(
-        matched_rules_count = rules.len(),
+    debug!(
+        target: "pricing",
+        matched_count = rules.len(),
         zone_id = ?zone_id,
         is_retail,
-        "[LoadRules] Zone-matched rules loaded"
+        "Zone-matched price rules loaded"
     );
 
     for rule in &rules {
         debug!(
+            target: "pricing",
             rule_name = %rule.name,
             rule_type = ?rule.rule_type,
             product_scope = ?rule.product_scope,
@@ -67,7 +63,7 @@ pub async fn load_matching_rules(
             target_id = ?rule.target_id,
             is_stackable = rule.is_stackable,
             is_exclusive = rule.is_exclusive,
-            "[LoadRules] Matched rule detail"
+            "Matched rule detail"
         );
     }
 
@@ -96,7 +92,7 @@ impl CommandHandler for OpenTableAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        info!(
+        debug!(
             table_id = ?self.table_id,
             table_name = ?self.table_name,
             receipt_number = %self.receipt_number,
@@ -109,14 +105,14 @@ impl CommandHandler for OpenTableAction {
         {
             let table_name = self.table_name.as_deref().unwrap_or("unknown");
             return Err(OrderError::TableOccupied(format!(
-                "桌台 {} 已被占用 (订单: {})",
+                "Table {} is already occupied (order: {})",
                 table_name, existing_order_id
             )));
         }
 
         // 1. Generate new order ID
         let order_id = Uuid::new_v4().to_string();
-        info!(order_id = %order_id, "Generated new order ID");
+        debug!(order_id = %order_id, "Generated new order ID");
 
         // 2. Allocate sequence number
         let seq = ctx.next_sequence();
@@ -164,7 +160,7 @@ impl CommandHandler for OpenTableAction {
             },
         );
 
-        info!(
+        debug!(
             order_id = %order_id,
             seq = seq,
             receipt_number = %self.receipt_number,

@@ -14,6 +14,7 @@ import { X, Play, CheckCircle, AlertTriangle, Banknote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useShiftStore } from '@/core/stores/shift';
 import { Currency, formatCurrency } from '@/utils/currency';
@@ -147,7 +148,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
       }
       onSuccess();
     } catch (err) {
-      console.error('Shift action failed:', err);
+      logger.error('Shift action failed', err);
       toast.error(t('settings.shift.action_failed'));
     } finally {
       setLoading(false);

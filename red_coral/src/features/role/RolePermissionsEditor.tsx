@@ -3,6 +3,7 @@ import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { getErrorMessage } from '@/utils/error';
+import { logger } from '@/utils/logger';
 import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react';
 import { Role, RoleListData, RolePermissionListData } from '@/core/domain/types';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -108,7 +109,7 @@ export const RolePermissionsEditor: React.FC = () => {
       }
       setRolePermissions(rolePerms);
     } catch (err) {
-      console.error(err);
+      logger.error('Failed to load roles', err);
       toast.error(t('settings.roles.message.load_failed'));
     } finally {
       setLoading(false);
@@ -147,7 +148,7 @@ export const RolePermissionsEditor: React.FC = () => {
       }
       toast.success(t('common.message.save_success'));
     } catch (err) {
-      console.error(err);
+      logger.error('Failed to save role permissions', err);
       toast.error(t('common.message.save_failed'));
     } finally {
       setLoading(false);
@@ -183,7 +184,7 @@ export const RolePermissionsEditor: React.FC = () => {
       setNewRoleDesc('');
       loadData();
     } catch (err) {
-      console.error(err);
+      logger.error('Failed to create role', err);
       toast.error(getErrorMessage(err));
     }
   };
@@ -197,7 +198,7 @@ export const RolePermissionsEditor: React.FC = () => {
       setConfirmDelete(null);
       loadData();
     } catch (err) {
-      console.error(err);
+      logger.error('Failed to delete role', err);
       toast.error(getErrorMessage(err));
     }
   };

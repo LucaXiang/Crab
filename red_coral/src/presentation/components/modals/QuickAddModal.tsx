@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, ShoppingBag } from 'lucide-react';
 import { formatCurrency, Currency } from '@/utils/currency';
+import { logger } from '@/utils/logger';
 import { CartItem as CartItemType, Product, ItemOption, Attribute, AttributeOption, ProductSpec, ProductAttribute } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useCategories, useCategoryStore } from '@/features/category';
@@ -142,7 +143,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     // Get full product data from store (ProductFull includes attributes)
     const productFull = useProductStore.getState().getById(product.id);
     if (!productFull) {
-      console.error('Product not found in store:', product.id);
+      logger.error('Product not found in store', undefined, { productId: product.id });
       return;
     }
 

@@ -3,6 +3,7 @@ import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, Pro
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore } from '@/features/product';
 import { toast } from '../Toast';
+import { logger } from '@/utils/logger';
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface CartItemDetailModalProps {
@@ -44,7 +45,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             // Get full product data from store (ProductFull includes attributes)
             const productFull = useProductStore.getState().getById(item.id);
             if (!productFull) {
-              console.error('Product not found in store:', item.id);
+              logger.error('Product not found in store', undefined, { productId: item.id });
               setIsLoadingAttributes(false);
               return;
             }
@@ -136,7 +137,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             setSelections(initialSelections);
 
         } catch (err) {
-            console.error(err);
+            logger.error('Failed to load attributes', err);
             toast.error(t('error.load_attributes'));
         } finally {
             if (mounted) setIsLoadingAttributes(false);

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
+import { logger } from '@/utils/logger';
 import type { ApiResponse } from '@/core/domain/types/api';
 import type {
   ActivationRequiredReason,
@@ -254,7 +255,7 @@ export const useBridgeStore = create<BridgeStore>()(
           set({ appState: state });
           return state;
         } catch (error: unknown) {
-          console.error('Failed to fetch app state:', error);
+          logger.error('Failed to fetch app state', error);
           set({ error: error instanceof Error ? error.message : 'Failed to fetch app state' });
           return null;
         }
@@ -264,7 +265,7 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           return await invokeApi<HealthStatus>('get_health_status');
         } catch (error) {
-          console.error('Failed to fetch health status:', error);
+          logger.error('Failed to fetch health status', error);
           return null;
         }
       },
@@ -275,7 +276,7 @@ export const useBridgeStore = create<BridgeStore>()(
           const info = await invokeApi<ModeInfo>('get_mode_info');
           set({ modeInfo: info });
         } catch (error: unknown) {
-          console.error('Failed to fetch mode info:', error);
+          logger.error('Failed to fetch mode info', error);
         }
       },
 
@@ -283,7 +284,7 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           return await invokeApi<boolean>('check_first_run');
         } catch (error) {
-          console.error('Failed to check first run:', error);
+          logger.error('Failed to check first run', error);
           return false;
         }
       },
@@ -362,7 +363,7 @@ export const useBridgeStore = create<BridgeStore>()(
           const data = await invokeApi<{ tenants: TenantInfo[] }>('list_tenants');
           set({ tenants: data.tenants });
         } catch (error) {
-          console.error('Failed to fetch tenants:', error);
+          logger.error('Failed to fetch tenants', error);
         }
       },
 
@@ -453,7 +454,7 @@ export const useBridgeStore = create<BridgeStore>()(
           // 刷新 appState 以反映登出状态
           await get().fetchAppState();
         } catch (error: unknown) {
-          console.error('Logout failed:', error);
+          logger.error('Logout failed', error);
         }
       },
 
@@ -462,11 +463,11 @@ export const useBridgeStore = create<BridgeStore>()(
           const session = await invokeApi<EmployeeSession | null>('get_current_session');
           if (session) {
             set({ currentSession: session });
-            console.log('[Bridge] Restored session from backend:', session.username);
+            logger.debug('Restored session from backend', { component: 'Bridge', username: session.username });
           }
           return session;
         } catch (error) {
-          console.error('Failed to fetch current session:', error);
+          logger.error('Failed to fetch current session', error);
           return null;
         }
       },

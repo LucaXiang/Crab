@@ -4,6 +4,7 @@ import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { getErrorMessage } from '@/utils/error';
+import { logger } from '@/utils/logger';
 import { User, Role } from '@/core/domain/types';
 import { RoleListData } from '@/core/domain/types/api';
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
@@ -50,7 +51,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         }
       })
       .catch((err) => {
-        console.error('Failed to fetch roles:', err);
+        logger.error('Failed to fetch roles', err);
         toast.error(t('settings.user.message.load_roles_failed'));
       });
   }, []);
@@ -115,7 +116,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       }
       onSuccess();
     } catch (error) {
-      console.error('User form error:', error);
+      logger.error('User form error', error);
       toast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);

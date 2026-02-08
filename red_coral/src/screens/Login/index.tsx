@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore, useAppState, AppStateHelpers, type LoginMode } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
+import { logger } from '@/utils/logger';
 
 interface LocationState {
   from?: { pathname: string };
@@ -129,7 +130,7 @@ export const LoginScreen: React.FC = () => {
       const appWindow = getCurrentWindow();
       await appWindow.close();
     } catch (error) {
-      console.error('Failed to close window:', error);
+      logger.error('Failed to close window', error);
     }
   };
 

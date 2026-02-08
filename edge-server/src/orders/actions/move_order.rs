@@ -49,7 +49,7 @@ impl CommandHandler for MoveOrderAction {
         // 3. Reject if order has any payments
         if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
-                "存在支付记录的订单不能移动桌台".to_string(),
+                "Cannot move order with existing payments".to_string(),
             ));
         }
 
@@ -58,7 +58,7 @@ impl CommandHandler for MoveOrderAction {
             // Allow moving to the same table (no-op case)
             if existing_order_id != self.order_id {
                 return Err(OrderError::TableOccupied(format!(
-                    "目标桌台 {} 已被占用 (订单: {})",
+                    "Target table {} is already occupied (order: {})",
                     self.target_table_name, existing_order_id
                 )));
             }

@@ -3,6 +3,9 @@ import { Check, Coins, Printer } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
+const PAYMENT_SUCCESS_AUTO_CLOSE_MS = 5000;
+const PAYMENT_SUCCESS_TICK_MS = 1000;
+
 interface PaymentSuccessModalProps {
   isOpen: boolean;
   type: 'NORMAL' | 'CASH';
@@ -18,7 +21,7 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
   change,
   onClose,
   onPrint,
-  autoCloseDelay = 5000
+  autoCloseDelay = PAYMENT_SUCCESS_AUTO_CLOSE_MS
 }) => {
   const { t } = useI18n();
   const [timeLeft, setTimeLeft] = React.useState(Math.ceil(autoCloseDelay / 1000));
@@ -37,7 +40,7 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
         }
         return prev - 1;
       });
-    }, 1000);
+    }, PAYMENT_SUCCESS_TICK_MS);
 
     return () => clearInterval(timer);
   }, [isOpen, autoCloseDelay, onClose]);

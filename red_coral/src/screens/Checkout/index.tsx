@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { HeldOrder, User } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -113,7 +114,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       const response = await voidOrder(orderKey, options);
 
       if (!response.success) {
-        console.error('Void order failed:', response.error);
+        logger.error('Void order failed', response.error);
         toast.error(getErrorMessage(response.error));
         setIsVoidModalOpen(false);
         return;

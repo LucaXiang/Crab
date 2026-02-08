@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import type { PriceRule, PriceRuleCreate } from '@/core/domain/types';
 
 // Step components
@@ -213,7 +214,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       }
       onSuccess();
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to save price rule', e);
       toast.error(t('common.message.save_failed'));
     } finally {
       setSaving(false);

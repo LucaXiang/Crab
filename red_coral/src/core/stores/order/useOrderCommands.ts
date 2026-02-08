@@ -30,6 +30,7 @@ import type {
   PaymentMethod,
   ServiceType,
 } from '@/core/domain/types/orderEvent';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // Types
@@ -65,7 +66,7 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
   // Check command lock before execution
   const lockCheck = checkCommandLock();
   if (!lockCheck.canExecute) {
-    console.warn(`[Command] Blocked: ${command.payload.type} - ${lockCheck.error}`);
+    logger.warn(`Command blocked: ${command.payload.type} - ${lockCheck.error}`, { component: 'OrderCommands' });
     return {
       command_id: command.command_id,
       success: false,
@@ -85,7 +86,7 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
     return response;
   } catch (error: unknown) {
     // Convert invoke errors to CommandResponse format
-    console.error('[Command] Failed:', error);
+    logger.error('Command failed', error, { component: 'OrderCommands' });
     return {
       command_id: command.command_id,
       success: false,

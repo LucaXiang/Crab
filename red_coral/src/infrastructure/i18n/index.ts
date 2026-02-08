@@ -60,7 +60,8 @@ async function loadTranslations(): Promise<void> {
     flattenedTranslations['zh-CN'] = flattenObject(zhModule.default);
     flattenedTranslations['es-ES'] = flattenObject(esModule.default);
   } catch (error) {
-    console.error('Failed to load translations:', error);
+    // Cannot use logger here as i18n initializes before logger
+    console.error('[i18n] Failed to load translations:', error);
     flattenedTranslations['zh-CN'] = {};
     flattenedTranslations['es-ES'] = {};
   }
@@ -120,6 +121,7 @@ export function t(key: string, params?: Record<string, string | number>): string
 
   // Return the key itself as fallback and warn about missing translation
   if (result === undefined) {
+    // Cannot use logger here as i18n initializes before logger
     console.warn(`[i18n] Missing translation for key: "${key}"`);
     result = key;
   }
@@ -155,4 +157,3 @@ loadTranslations().then(() => {
   initLocale();
 });
 
-export default i18n;

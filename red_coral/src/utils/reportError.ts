@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 interface ReportErrorOptions {
   source?: string;
   userActionOverride?: string | null;
@@ -54,5 +56,5 @@ export async function reportError(
   }
 
   // 局域网部署：使用本地日志即可，无需云端上报
-  console.error('[reportError]', payload);
+  logger.error('Uncaught error reported', err, payload);
 }

@@ -23,6 +23,7 @@
 
 import { useCallback, useState } from 'react';
 import { invokeApi } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 import type { SyncResponse, OrderEvent, OrderSnapshot } from '@/core/domain/types/orderEvent';
@@ -82,7 +83,7 @@ export function useOrderSync() {
       });
       return response;
     } catch (err: unknown) {
-      console.error('Failed to sync orders:', err);
+      logger.error('Failed to sync orders', err);
       setError(err instanceof Error ? err.message : 'Sync failed');
       return null;
     }
@@ -112,14 +113,14 @@ export function useOrderSync() {
       }
 
       // Server Authority: always use full sync with server-provided snapshots
-      console.log(`[Sync] Full sync: ${response.active_orders.length} orders, epoch=${response.server_epoch}`);
+      logger.debug(`Full sync: ${response.active_orders.length} orders, epoch=${response.server_epoch}`, { component: 'Sync' });
       _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
 
       setReconnectAttempts(0);
       setIsReconnecting(false);
       return true;
     } catch (err: unknown) {
-      console.error('[Sync] Reconnection failed:', err);
+      logger.error('Reconnection failed', err, { component: 'Sync' });
       setError(err instanceof Error ? err.message : 'Reconnection failed');
       _setConnectionState('disconnected');
       setIsReconnecting(false);
@@ -146,12 +147,12 @@ export function useOrderSync() {
       if (attempts < MAX_RECONNECT_ATTEMPTS) {
         // Calculate exponential backoff delay
         const delay = calculateBackoffDelay(attempts - 1);
-        console.log(`[Sync] Reconnect attempt ${attempts}/${MAX_RECONNECT_ATTEMPTS} failed, retrying in ${delay}ms`);
+        logger.debug(`Reconnect attempt ${attempts}/${MAX_RECONNECT_ATTEMPTS} failed, retrying in ${delay}ms`, { component: 'Sync' });
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
-    console.error(`[Sync] Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+    logger.error(`Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts`, undefined, { component: 'Sync' });
     return false;
   }, [reconnect]);
 
@@ -173,13 +174,13 @@ export function useOrderSync() {
       }
 
       // Full sync with all active orders, storing the server epoch
-      console.log(`[Sync] Initial sync: ${response.active_orders.length} orders, epoch=${response.server_epoch}`);
+      logger.debug(`Initial sync: ${response.active_orders.length} orders, epoch=${response.server_epoch}`, { component: 'Sync' });
       _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       _setInitialized(true);
 
       return true;
     } catch (err: unknown) {
-      console.error('[Sync] Failed to initialize from server:', err);
+      logger.error('Failed to initialize from server', err, { component: 'Sync' });
       setError(err instanceof Error ? err.message : 'Initialization failed');
       _setConnectionState('disconnected');
       return false;
@@ -245,7 +246,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
   // Listen for order-sync events (Server Authority: event + snapshot bundled)
   const unlistenOrderSync = await listen<OrderSyncPayload>('order-sync', (event) => {
     const { event: orderEvent, snapshot } = event.payload;
-    console.log(`[OrderSync] Received sync: ${orderEvent.event_type} for order ${orderEvent.order_id}`);
+    logger.debug(`Received sync: ${orderEvent.event_type} for order ${orderEvent.order_id}`, { component: 'OrderSync' });
 
     // Apply with server-computed snapshot directly (no API call)
     useActiveOrdersStore.getState()._applyOrderSync(orderEvent, snapshot);
@@ -261,7 +262,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
 
       // Auto-reconnect on disconnect
       if (status === 'disconnected') {
-        console.log('Order connection lost, will attempt reconnect...');
+        logger.debug('Order connection lost, will attempt reconnect', { component: 'OrderSync' });
       }
     }
   );
@@ -272,7 +273,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
   const unlistenSyncRequest = await listen<{ since_sequence: number }>(
     'order-sync-request',
     async () => {
-      console.log('[Sync] Server requested sync');
+      logger.debug('Server requested sync', { component: 'Sync' });
       const { _fullSync, _setConnectionState } = useActiveOrdersStore.getState();
 
       _setConnectionState('syncing');
@@ -285,7 +286,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
 
         _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       } catch (err) {
-        console.error('[Sync] Sync request failed:', err);
+        logger.error('Sync request failed', err, { component: 'Sync' });
         _setConnectionState('disconnected');
       }
     }

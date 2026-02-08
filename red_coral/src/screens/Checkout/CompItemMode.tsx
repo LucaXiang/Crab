@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { compItem, uncompItem } from '@/core/stores/order/useOrderOperations';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useProductStore } from '@/features/product';
 import { useCategoryStore } from '@/features/category';
@@ -149,7 +150,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
       setReason('');
       setCompQty(1);
     } catch (err) {
-      console.error('Comp item failed:', err);
+      logger.error('Comp item failed', err);
       toast.error(String(err));
     } finally {
       setIsProcessing(false);
@@ -162,7 +163,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
       await uncompItem(order.order_id, instanceId, authorizer);
       toast.success(t('checkout.comp.uncomp'));
     } catch (err) {
-      console.error('Uncomp item failed:', err);
+      logger.error('Uncomp item failed', err);
       toast.error(String(err));
     } finally {
       setIsProcessing(false);

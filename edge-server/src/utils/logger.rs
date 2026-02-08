@@ -15,10 +15,10 @@ pub fn init_logger_with_file(log_level: Option<&str>, _json: Option<bool>, log_d
 
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(level.parse().unwrap_or(tracing::Level::INFO))
-        .with_file(false)
-        .with_line_number(false)
+        .with_file(true)
+        .with_line_number(true)
         .with_thread_ids(false)
-        .with_target(false);
+        .with_target(true);
 
     // Add file output if log_dir is provided
     if let Some(dir) = log_dir {

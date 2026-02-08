@@ -5,6 +5,7 @@
  */
 
 import { create } from 'zustand';
+import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
 import type { LabelTemplate, LabelField } from '@/core/domain/types/print';
 import type { LabelTemplateCreate, LabelTemplateUpdate } from '@/core/domain/types/api';
@@ -115,7 +116,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch label templates';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] label_template: fetch failed -', errorMsg);
+      logger.error('Label template fetch failed', undefined, { component: 'LabelTemplateStore', detail: errorMsg });
     }
   },
 
@@ -133,7 +134,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to create label template';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] label_template: create failed -', errorMsg);
+      logger.error('Label template create failed', undefined, { component: 'LabelTemplateStore', detail: errorMsg });
       throw e;
     }
   },
@@ -152,7 +153,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to update label template';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] label_template: update failed -', errorMsg);
+      logger.error('Label template update failed', undefined, { component: 'LabelTemplateStore', detail: errorMsg });
       throw e;
     }
   },
@@ -168,7 +169,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to delete label template';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] label_template: delete failed -', errorMsg);
+      logger.error('Label template delete failed', undefined, { component: 'LabelTemplateStore', detail: errorMsg });
       throw e;
     }
   },

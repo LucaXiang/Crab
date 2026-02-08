@@ -8,6 +8,7 @@ import { createTauriClient } from '@/infrastructure/api';
 const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Permission, Tag } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -84,7 +85,7 @@ export const TagManagement: React.FC = React.memo(() => {
       // Refresh tags from store
       await tagStore.fetchAll();
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to reorder tags', e);
       toast.error(t('settings.reorder_failed'));
       // Revert to server data
       await tagStore.fetchAll();

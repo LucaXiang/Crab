@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ChevronRight, Shield, Power } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore } from '@/core/stores/bridge';
+import { logger } from '@/utils/logger';
 import { useI18n } from '@/hooks/useI18n';
 
 // 订阅被阻止的状态
@@ -55,7 +56,7 @@ export const ActivateScreen: React.FC = () => {
       const appWindow = getCurrentWindow();
       await appWindow.destroy();
     } catch (err) {
-      console.error('Failed to close app:', err);
+      logger.error('Failed to close app', err);
     }
   };
 
@@ -135,4 +136,3 @@ export const ActivateScreen: React.FC = () => {
   );
 };
 
-export default ActivateScreen;

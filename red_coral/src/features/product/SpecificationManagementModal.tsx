@@ -6,6 +6,7 @@ import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { formatCurrency } from '@/utils/currency';
 import { getErrorMessage } from '@/utils/error';
+import { logger } from '@/utils/logger';
 import { SpecificationFormModal } from './SpecificationFormModal';
 import { canDeleteSpec, setDefaultSpec } from './spec-utils';
 import { useProductStore } from './store';
@@ -70,7 +71,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
 
       return true;
     } catch (error) {
-      console.error('Failed to save specs:', error);
+      logger.error('Failed to save specs', error);
       toast.error(getErrorMessage(error));
       return false;
     } finally {

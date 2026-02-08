@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './components/Overview';
 import { SalesReport } from './components/SalesReport';
@@ -54,7 +55,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
   const fetchStatistics = async () => {
     try {
       if (!('__TAURI__' in window)) {
-        console.warn('[Statistics] Not running inside Tauri; skipping invoke');
+        logger.warn('Not running inside Tauri, skipping invoke', { component: 'Statistics' });
         toast.error(t('statistics.error.load'));
         return;
       }
@@ -65,7 +66,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
       const result = await invokeApi<StatisticsResponse>('get_statistics', params);
       setData(result);
     } catch (error) {
-      console.error('Failed to fetch statistics:', error);
+      logger.error('Failed to fetch statistics', error);
       toast.error(t('statistics.error.load'));
     } finally {
     }

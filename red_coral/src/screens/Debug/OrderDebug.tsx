@@ -25,6 +25,7 @@ import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 import { invokeApi } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { ConfirmDialog } from '@/shared/components';
 import type { OrderSnapshot, SyncResponse } from '@/core/domain/types/orderEvent';
 
@@ -87,7 +88,7 @@ export const OrderDebug: React.FC = () => {
       _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       toast.success(`同步完成: ${response.active_orders.length} 个订单`);
     } catch (error) {
-      console.error('Force sync failed:', error);
+      logger.error('Force sync failed', error);
       toast.error(`同步失败: ${error}`);
     } finally {
       setIsLoading(false);

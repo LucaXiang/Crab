@@ -28,6 +28,7 @@ fn setup_environment() -> Result<PathBuf, Box<dyn std::error::Error>> {
     // 创建工作目录
     if !work_dir.exists() {
         std::fs::create_dir_all(&work_dir)?;
+        // Bootstrap log (before tracing is initialized)
         println!("Created work directory: {}", work_dir.display());
     }
 
@@ -44,6 +45,7 @@ fn setup_environment() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let certs_dir = work_dir.join("certs");
     if !certs_dir.exists() {
         std::fs::create_dir_all(&certs_dir)?;
+        // Bootstrap log (before tracing is initialized)
         println!("Created certs directory: {}", certs_dir.display());
     }
 

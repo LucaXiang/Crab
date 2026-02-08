@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api/tauri-client';
 import type { AuditEntry } from '@/core/domain/types/api';
 import {
@@ -174,7 +175,7 @@ export const AuditLog: React.FC = () => {
       setItems(result.items);
       setTotal(result.total);
     } catch (err) {
-      console.error('Failed to fetch audit logs:', err);
+      logger.error('Failed to fetch audit logs', err);
       setError(t('audit.error.load'));
       toast.error(t('audit.error.load'));
     } finally {

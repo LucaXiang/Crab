@@ -8,6 +8,7 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invokeApi } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { storeRegistry, getLoadedStores, refreshAllLoadedStores } from '@/core/stores/resources';
 
 interface SyncStatus {
@@ -40,14 +41,14 @@ export function useSyncConnection() {
       if (!connected || isReconnecting.current) return;
 
       isReconnecting.current = true;
-      console.log('[SyncConnection] Reconnected, checking sync status...');
+      logger.debug('Reconnected, checking sync status', { component: 'SyncConnection' });
 
       try {
         const status = await invokeApi<SyncStatus>('get_sync_status');
 
         // Epoch 检查：epoch 变化说明服务器重启，需要全量刷新
         if (cachedEpoch && cachedEpoch !== status.epoch) {
-          console.warn('[SyncConnection] Epoch changed, full refresh all stores');
+          logger.warn('Epoch changed, full refresh all stores', { component: 'SyncConnection' });
           cachedEpoch = status.epoch;
           await refreshAllLoadedStores();
           return;
@@ -68,15 +69,15 @@ export function useSyncConnection() {
         }
 
         if (staleStores.length > 0) {
-          console.log(`[SyncConnection] Refreshing stale stores: ${staleStores.join(', ')}`);
+          logger.debug(`Refreshing stale stores: ${staleStores.join(', ')}`, { component: 'SyncConnection' });
           await Promise.all(
             staleStores.map(name => storeRegistry[name].getState().fetchAll(true))
           );
         } else {
-          console.log('[SyncConnection] All stores up to date');
+          logger.debug('All stores up to date', { component: 'SyncConnection' });
         }
       } catch (err) {
-        console.error('[SyncConnection] Sync status check failed, fallback to full refresh:', err);
+        logger.error('Sync status check failed, fallback to full refresh', err, { component: 'SyncConnection' });
         await refreshAllLoadedStores();
       } finally {
         isReconnecting.current = false;

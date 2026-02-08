@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
 
+const TOAST_AUTO_DISMISS_MS = 3000;
+const TOAST_EXIT_ANIMATION_MS = 300;
+
 type ToastType = 'success' | 'error' | 'warning';
 
 interface ToastItem {
@@ -20,8 +23,8 @@ const Toast: React.FC<ToastProps> = ({ item, onRemove }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsExiting(true);
-      setTimeout(() => onRemove(item.id), 300);
-    }, 3000);
+      setTimeout(() => onRemove(item.id), TOAST_EXIT_ANIMATION_MS);
+    }, TOAST_AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
   }, [item.id, onRemove]);
 
@@ -48,7 +51,7 @@ const Toast: React.FC<ToastProps> = ({ item, onRemove }) => {
       <button
         onClick={() => {
           setIsExiting(true);
-          setTimeout(() => onRemove(item.id), 300);
+          setTimeout(() => onRemove(item.id), TOAST_EXIT_ANIMATION_MS);
         }}
         className="text-gray-400 hover:text-gray-600"
       >

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { SalesReportItem, TimeRange } from '@/core/domain/types';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Download, FileText, Loader2, AlertCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown } from 'lucide-react';
 import { OrderDetailModal } from '@/presentation/components/modals/OrderDetailModal';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
@@ -60,7 +61,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
 
     try {
       if (!('__TAURI__' in window)) {
-         console.warn('[SalesReport] Not running inside Tauri; skipping invoke');
+         logger.warn('Not running inside Tauri, skipping invoke', { component: 'SalesReport' });
          setLoading(false);
          return;
       }
@@ -73,7 +74,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
       setTotalPages(result.totalPages);
       setTotalCount(result.total);
     } catch (err) {
-      console.error('Failed to fetch sales report:', err);
+      logger.error('Failed to fetch sales report', err);
       setError(t('statistics.error.load'));
       toast.error(t('statistics.error.load'));
     } finally {

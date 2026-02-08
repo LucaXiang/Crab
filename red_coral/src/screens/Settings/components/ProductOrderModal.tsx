@@ -8,6 +8,7 @@ import { createTauriClient } from '@/infrastructure/api';
 
 const getApi = () => createTauriClient();
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Product } from '@/core/domain/types';
 import { useProducts } from '@/core/stores/resources';
 import DefaultImage from '@/assets/reshot.svg';
@@ -186,7 +187,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
       toast.success(t('common.message.save_success'));
       onClose();
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to save product order', e);
       toast.error(t('common.message.save_failed'));
     } finally {
       setSaving(false);

@@ -249,10 +249,10 @@ impl RequestCommandProcessor {
                     operator_name = %command.operator_name,
                     required_permission = required_permission,
                     command = ?std::mem::discriminant(&command.payload),
-                    "权限拒绝：操作者无权执行此命令"
+                    "Permission denied: operator lacks required permission"
                 );
                 return Ok(ProcessResult::Failed {
-                    reason: format!("权限不足：需要 {} 权限", required_permission),
+                    reason: format!("Permission denied: requires {} permission", required_permission),
                 });
             }
         }
@@ -290,7 +290,7 @@ impl RequestCommandProcessor {
                     tracing::debug!(
                         order_id = %order_id,
                         rule_count = rules.len(),
-                        "缓存订单价格规则"
+                        "Cached order price rules"
                     );
                     self.state.orders_manager().cache_rules(order_id, rules);
                 }
@@ -310,7 +310,7 @@ impl RequestCommandProcessor {
                         order_id = %order_id,
                         target_zone_id = ?target_zone_id,
                         rule_count = rules.len(),
-                        "移桌后重新加载区域规则"
+                        "Reloaded zone rules after table move"
                     );
                     self.state.orders_manager().cache_rules(order_id, rules);
                 }

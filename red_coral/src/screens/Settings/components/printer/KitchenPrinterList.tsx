@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Printer, ChefHat, Trash2, Edit2, Plus } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
+import { logger } from '@/utils/logger';
 import { PrinterEditModal } from './PrinterEditModal';
 
 interface KitchenPrinterListProps {
@@ -69,7 +70,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
       setModalOpen(false);
       setEditingItem(null);
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to save kitchen printer', e);
     }
   };
 

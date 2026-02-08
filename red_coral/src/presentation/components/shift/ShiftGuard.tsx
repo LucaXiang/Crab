@@ -17,6 +17,7 @@ import { useShiftStore } from '@/core/stores/shift';
 import { useShiftCloseGuard } from '@/core/hooks';
 import { ShiftActionModal } from '@/features/shift';
 import { useI18n } from '@/hooks/useI18n';
+import { logger } from '@/utils/logger';
 
 interface ShiftGuardProps {
   children: React.ReactNode;
@@ -72,7 +73,7 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
         setShowOpenModal(true);
       }
     } catch (err) {
-      console.error('[ShiftGuard] 班次检查失败:', err);
+      logger.error('Shift check failed', err, { component: 'ShiftGuard' });
       setCheckError(err instanceof Error ? err.message : t('settings.shift.check_failed'));
       setIsChecking(false);
     }

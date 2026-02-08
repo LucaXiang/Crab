@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { invokeApi } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { X, Shield, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { User } from '@/core/domain/types';
@@ -71,7 +72,7 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
       setPassword('');
       onClose();
     } catch (err) {
-      console.error('Supervisor auth failed:', err);
+      logger.error('Supervisor auth failed', err);
       setError(typeof err === 'string' ? err : (err as Error).message || t('auth.login.failed'));
     } finally {
       setIsLoading(false);

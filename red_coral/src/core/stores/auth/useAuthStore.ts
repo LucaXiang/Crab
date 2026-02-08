@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createTauriClient, type LoginRequest } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import type { User } from '@/core/domain/types';
 
 // Lazy getter to break circular dependency:
@@ -79,7 +80,7 @@ export const useAuthStore = create<AuthStore>()(
 
           return true;
         } catch (error: unknown) {
-          console.error('Login failed:', error);
+          logger.error('Login failed', error);
           set({
             isLoading: false,
             error: error instanceof Error ? error.message : 'Authentication failed',

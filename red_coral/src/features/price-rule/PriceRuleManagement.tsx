@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { usePriceRuleStore } from './store';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import type { PriceRule } from '@/core/domain/types';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
@@ -69,7 +70,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
         setSelectedRuleId(null);
       }
     } catch (e) {
-      console.error(e);
+      logger.error('Failed to delete price rule', e);
       toast.error(t('common.message.delete_failed'));
     } finally {
       setDeleteConfirm(null);

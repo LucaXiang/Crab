@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { invokeApi } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle, Loader2 } from 'lucide-react';
 import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
@@ -238,7 +239,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
               : f
           );
         } catch (e) {
-          console.error(`Failed to upload image for field ${field.id}:`, e);
+          logger.error('Failed to upload image for field', e, { component: 'LabelEditor', fieldId: field.id });
           // Continue with other fields even if one fails
         }
       }
@@ -313,7 +314,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                 test_data[field.data_key || field.name] = dataUri;
               }
             } catch (genError) {
-              console.warn(`Failed to generate ${source_type} for field ${field.id}:`, genError);
+              logger.warn(`Failed to generate ${source_type} for field`, { component: 'LabelEditor', fieldId: field.id, detail: String(genError) });
             }
           } else if (source_type === 'image' || source_type === 'productimage') {
             // Load regular image and convert to Base64
@@ -353,7 +354,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                 test_data[field.data_key || field.name] = dataUri;
               }
             } catch (loadError) {
-              console.warn(`Failed to load image for field ${field.id} (${resolvedPath}):`, loadError);
+              logger.warn('Failed to load image for field', { component: 'LabelEditor', fieldId: field.id, path: resolvedPath, detail: String(loadError) });
               // Continue without this image
             }
           }
@@ -368,8 +369,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           override_dpi: template.render_dpi
         };
 
-        // TODO: 调用服务端标签打印 API 实现测试打印
-        console.warn('[LabelEditor] 待实现：调用服务端标签打印 API', ticketData);
+        // TODO: Call server-side label print API for test printing
+        logger.warn('Label print API not yet implemented', { component: 'LabelEditor' });
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),
@@ -377,7 +378,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           variant: 'info'
         });
       } catch (e) {
-        console.error("Failed to print test label:", e);
+        logger.error('Failed to print test label', e, { component: 'LabelEditor' });
         const errorMsg = String(e);
         setDialogConfig({
           isOpen: true,

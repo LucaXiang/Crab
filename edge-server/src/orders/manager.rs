@@ -434,7 +434,7 @@ impl OrdersManager {
             && let Some(existing) = self.storage.find_active_order_for_table(*tid)? {
                 let name = table_name.as_deref().unwrap_or("unknown");
                 return Err(ManagerError::TableOccupied(format!(
-                    "桌台 {} 已被占用 (订单: {})", name, existing
+                    "Table {} is already occupied (order: {})", name, existing
                 )));
             }
 

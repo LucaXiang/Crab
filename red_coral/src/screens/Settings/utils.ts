@@ -1,4 +1,6 @@
 
+import { logger } from '@/utils/logger';
+
 // Helper for attribute binding synchronization
 export async function syncAttributeBindings(
   selectedAttributeIds: number[],
@@ -49,7 +51,7 @@ export async function syncAttributeBindings(
           // Ignore BINDING_NOT_FOUND, log others
           const msg = String(e);
           if (!msg.includes('BINDING_NOT_FOUND')) {
-             console.error('Failed to unbind for update:', attributeId, e);
+             logger.error('Failed to unbind for update', e, { attributeId });
           }
         }
         shouldBind = true;
@@ -62,7 +64,7 @@ export async function syncAttributeBindings(
       } catch (error) {
         const msg = String(error);
         if (msg.includes('BINDING_ALREADY_EXISTS')) {
-             console.warn('Binding already exists during sync, attempting force update:', attributeId);
+             logger.warn('Binding already exists during sync, attempting force update', { attributeId });
              try {
                 // Find binding ID for this attribute
                 const binding = existingBindings.find(b => b.attributeId === attributeId);
@@ -74,7 +76,7 @@ export async function syncAttributeBindings(
                 throw retryError;
              }
         } else {
-             console.error('Failed to bind attribute:', attributeId, error);
+             logger.error('Failed to bind attribute', error, { attributeId });
         }
       }
     }

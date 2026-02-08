@@ -16,6 +16,7 @@ import { createTauriClient } from '@/infrastructure/api';
 const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ProductImage } from './ProductImage';
 import { formatCurrency } from '@/utils/currency';
@@ -126,7 +127,7 @@ export const ProductManagement: React.FC = React.memo(() => {
           });
           toast.success(t('settings.product.list.batch_delete_success'));
         } catch (e) {
-          console.error(e);
+          logger.error('Failed to batch delete products', e);
           toast.error(t('settings.product.list.batch_delete_failed'));
         }
       },

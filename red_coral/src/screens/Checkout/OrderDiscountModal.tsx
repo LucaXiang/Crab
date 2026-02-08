@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { applyOrderDiscount } from '@/core/stores/order/useOrderOperations';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Numpad } from '@/presentation/components/ui/Numpad';
 
 type DiscountType = 'percent' | 'fixed';
@@ -112,7 +113,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
       toast.success(t('checkout.order_discount.title'));
       onClose();
     } catch (err) {
-      console.error('Apply order discount failed:', err);
+      logger.error('Apply order discount failed', err);
       toast.error(String(err));
     } finally {
       setIsProcessing(false);
@@ -126,7 +127,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
       toast.success(t('checkout.order_discount.clear'));
       onClose();
     } catch (err) {
-      console.error('Clear order discount failed:', err);
+      logger.error('Clear order discount failed', err);
       toast.error(String(err));
     } finally {
       setIsProcessing(false);

@@ -13,6 +13,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { formatCurrency } from '@/utils/currency';
 import type { DailyReport } from '@/core/domain/types/api';
 
@@ -43,7 +44,7 @@ export const DailyReportManagement: React.FC = React.memo(() => {
       const data = await getApi().listDailyReports({ limit: 100 });
       setReports(data);
     } catch (err) {
-      console.error('Failed to load daily reports:', err);
+      logger.error('Failed to load daily reports', err);
       toast.error(t('settings.daily_report.load_failed'));
     } finally {
       setLoading(false);

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
+import { logger } from '@/utils/logger';
 import type { PrintDestination, PrintDestinationCreate, PrintDestinationUpdate } from '@/core/domain/types/api';
 import type { SyncPayload } from '../factory/createResourceStore';
 
@@ -53,7 +54,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch print destinations';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] print_destination: fetch failed -', errorMsg);
+      logger.error('Print destination fetch failed', undefined, { component: 'PrintDestinationStore', detail: errorMsg });
     }
   },
 
@@ -128,7 +129,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to create print destination';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] print_destination: create failed -', errorMsg);
+      logger.error('Print destination create failed', undefined, { component: 'PrintDestinationStore', detail: errorMsg });
       throw e;
     }
   },
@@ -146,7 +147,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to update print destination';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] print_destination: update failed -', errorMsg);
+      logger.error('Print destination update failed', undefined, { component: 'PrintDestinationStore', detail: errorMsg });
       throw e;
     }
   },
@@ -162,7 +163,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to delete print destination';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] print_destination: remove failed -', errorMsg);
+      logger.error('Print destination remove failed', undefined, { component: 'PrintDestinationStore', detail: errorMsg });
       throw e;
     }
   },

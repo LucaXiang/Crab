@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
+import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Attribute, AttributeOption } from '@/core/domain/types/api';
 import type { SyncPayload } from '@/core/stores/factory/createResourceStore';
@@ -131,7 +132,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     } catch (e: unknown) {
       const errorMsg = (e instanceof Error ? e.message : '') || 'Failed to fetch attributes';
       set({ error: errorMsg, isLoading: false });
-      console.error('[Store] attribute: fetch failed -', errorMsg);
+      logger.error('Attribute fetch failed', undefined, { component: 'AttributeStore', detail: errorMsg });
     }
   },
 
@@ -230,7 +231,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      console.error('[Store] attribute: loadOptions failed -', msg);
+      logger.error('Attribute loadOptions failed', undefined, { component: 'AttributeStore', detail: msg });
       set({ error: msg, isLoading: false });
     }
   },
@@ -242,7 +243,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] createAttribute failed:', e);
+      logger.error('Failed to create attribute', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -253,7 +254,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] updateAttribute failed:', e);
+      logger.error('Failed to update attribute', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -263,7 +264,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] deleteAttribute failed:', e);
+      logger.error('Failed to delete attribute', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -285,7 +286,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] createOption failed:', e);
+      logger.error('Failed to create option', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -307,7 +308,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] updateOption failed:', e);
+      logger.error('Failed to update option', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -328,7 +329,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] deleteOption failed:', e);
+      logger.error('Failed to delete option', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -362,7 +363,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       });
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] reorderOptions failed:', e);
+      logger.error('Failed to reorder options', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -376,7 +377,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       });
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] bindProductAttribute failed:', e);
+      logger.error('Failed to bind product attribute', e, { component: 'AttributeStore' });
       throw e;
     }
   },
@@ -385,7 +386,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       await getApi().unbindProductAttribute(bindingId);
       cascadeRefreshProducts();
     } catch (e: unknown) {
-      console.error('[Store] unbindProductAttribute failed:', e);
+      logger.error('Failed to unbind product attribute', e, { component: 'AttributeStore' });
       throw e;
     }
   },

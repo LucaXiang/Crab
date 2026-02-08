@@ -9,6 +9,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { logger } from '@/utils/logger';
 import { t } from '@/infrastructure/i18n';
 
 /** API 响应格式 */
@@ -27,10 +28,10 @@ export async function listPrinters(): Promise<string[]> {
     if (response.code === 0) {
       return response.data;
     }
-    console.warn('[PrintService] 获取打印机列表失败:', response.message);
+    logger.warn('Failed to list printers', { component: 'PrintService', detail: response.message });
     return [];
   } catch (error) {
-    console.error('[PrintService] 获取打印机列表错误:', error);
+    logger.error('Failed to list printers', error, { component: 'PrintService' });
     return [];
   }
 }

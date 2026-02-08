@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { applyOrderSurcharge } from '@/core/stores/order/useOrderOperations';
 import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
 import { Numpad } from '@/presentation/components/ui/Numpad';
 
 type SurchargeType = 'percent' | 'fixed';
@@ -115,7 +116,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
       toast.success(t('checkout.order_surcharge.title'));
       onClose();
     } catch (err) {
-      console.error('Apply order surcharge failed:', err);
+      logger.error('Apply order surcharge failed', err);
       toast.error(String(err));
     } finally {
       setIsProcessing(false);
@@ -129,7 +130,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
       toast.success(t('checkout.order_surcharge.clear'));
       onClose();
     } catch (err) {
-      console.error('Clear order surcharge failed:', err);
+      logger.error('Clear order surcharge failed', err);
       toast.error(String(err));
     } finally {
       setIsProcessing(false);
