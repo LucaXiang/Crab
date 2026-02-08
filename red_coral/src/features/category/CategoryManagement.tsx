@@ -9,7 +9,7 @@ const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { Permission, Category } from '@/core/domain/types';
-import { useCanManageCategories } from '@/hooks/usePermission';
+import { useCanManageMenu } from '@/hooks/usePermission';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Plus } from 'lucide-react';
 
@@ -41,7 +41,7 @@ const CategoryList: React.FC<CategoryListProps> = React.memo(({
   onProductOrder,
 }) => {
   const { t } = useI18n();
-  const canManageCategories = useCanManageCategories();
+  const canManageCategories = useCanManageMenu();
   const { openModal } = useSettingsModal();
   const categoryStore = useCategoryStore();
 
@@ -214,7 +214,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
 
   // Permission check
-  const canManageCategories = useCanManageCategories();
+  const canManageCategories = useCanManageMenu();
 
   // Use resources store for data
   const categoryStore = useCategoryStore();

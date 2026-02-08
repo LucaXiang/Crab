@@ -15,9 +15,6 @@ export { useHeldOrders, useHeldOrdersCount } from './useActiveOrdersStore';
 // Draft Orders (Local Client State)
 export { useDraftOrders, useDraftOrdersCount } from './useDraftOrderStore';
 
-// Order Actions - Combined hook for all order manipulation (draft, checkout, operations)
-export { useOrderActions } from './useOrderActions';
-
 // Order Operations - Async command functions
 export * as orderOps from './useOrderOperations';
 
@@ -49,5 +46,3 @@ export type { OpenTableParams, PaymentInput, OrderCommandsHook } from './useOrde
 // Order Sync Hook - Reconnection and synchronization
 export { useOrderSync, setupOrderEventListeners } from './useOrderSync';
 export type { OrderSyncHook } from './useOrderSync';
-
-

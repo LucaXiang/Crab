@@ -3,7 +3,7 @@ import { Utensils, Plus, Filter, Search, ListChecks, Edit3, Trash2, Settings } f
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission, PrintState, ProductSpec } from '@/core/domain/types';
-import { useCanDeleteProduct, useCanUpdateProduct } from '@/hooks/usePermission';
+import { useCanManageMenu } from '@/hooks/usePermission';
 import {
   useSettingsModal,
   useDataVersion,
@@ -43,8 +43,7 @@ export const ProductManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
 
   // Permission checks
-  const canDeleteProduct = useCanDeleteProduct();
-  const canUpdateProduct = useCanUpdateProduct();
+  const canManageMenu = useCanManageMenu();
 
   // Use resources stores for data
   const productStore = useProductStore();
@@ -292,7 +291,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         align: 'right',
         render: (item) => (
           <div className="flex items-center justify-end gap-1">
-            {canUpdateProduct && (
+            {canManageMenu && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -304,7 +303,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                 <Settings size={14} />
               </button>
             )}
-            {canUpdateProduct && (
+            {canManageMenu && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -316,7 +315,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                 <Edit3 size={14} />
               </button>
             )}
-            {canDeleteProduct && (
+            {canManageMenu && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -332,7 +331,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         ),
       },
     ],
-    [t, categories, canUpdateProduct, canDeleteProduct, openModal, handleManageSpecs]
+    [t, categories, canManageMenu, canManageMenu, openModal, handleManageSpecs]
   );
 
   return (
@@ -408,7 +407,7 @@ export const ProductManagement: React.FC = React.memo(() => {
             <span className="text-xs text-gray-400">
               {t('common.label.total')} {filteredProducts.length} {t('common.label.items')}
             </span>
-            {canDeleteProduct && !isSelectionMode && (
+            {canManageMenu && !isSelectionMode && (
               <button
                 onClick={() => setIsSelectionMode(true)}
                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors border border-transparent text-orange-600 bg-orange-50 hover:bg-orange-100 border-orange-100"
@@ -427,7 +426,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         columns={columns}
         loading={loading}
         getRowKey={(item) => String(item.id)}
-        onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
+        onBatchDelete={canManageMenu ? handleBatchDelete : undefined}
         emptyText={t('common.empty.no_data')}
         pageSize={5}
         totalItems={filteredProducts.length}

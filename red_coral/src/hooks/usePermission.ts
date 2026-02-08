@@ -84,19 +84,3 @@ export const useCanManagePriceRules = () => {
   return hasPermission(PermissionValues.PRICE_RULES_MANAGE);
 };
 
-// === 兼容性别名 (deprecated) ===
-
-/** @deprecated Use useCanManageMenu */
-export const useCanManageProducts = () => useCanManageMenu();
-
-/** @deprecated Use useCanManageMenu */
-export const useCanUpdateProduct = () => useCanManageMenu();
-
-/** @deprecated Use useCanManageMenu */
-export const useCanDeleteProduct = () => useCanManageMenu();
-
-/** @deprecated Use useCanManageMenu */
-export const useCanManageCategories = () => useCanManageMenu();
-
-/** @deprecated Use useCanManageTables */
-export const useCanManageZones = () => useCanManageTables();

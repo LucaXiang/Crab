@@ -109,7 +109,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 {t('history.status.merged')}
               </span>
             )}
-            <EscalatableGate permission={Permission.RECEIPTS_REPRINT}>
+            <EscalatableGate permission={Permission.SETTINGS_MANAGE}>
               <button
                 onClick={onReprint}
                 className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"

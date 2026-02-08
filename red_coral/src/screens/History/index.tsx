@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from '@/presentation/components/Toast';
+import { t } from '@/infrastructure/i18n';
 import { getErrorMessage } from '@/utils/error';
 import { useHistoryOrderList } from '@/hooks/useHistoryOrderList';
 import { useHistoryOrderDetail } from '@/hooks/useHistoryOrderDetail';
@@ -45,12 +46,8 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
 
   const handleReprint = async () => {
     if (!selectedOrder) return;
-    try {
-      const { reprintReceipt } = await import('@/infrastructure/print/printService');
-      await reprintReceipt(selectedOrder.order_id);
-    } catch (e) {
-      toast.error(getErrorMessage(e));
-    }
+    // TODO: 收据重打由服务端处理，待接入后端 API
+    toast.warning(t('common.message.not_implemented'));
   };
 
   return (

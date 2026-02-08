@@ -386,14 +386,14 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 {/* Delete Button */}
                 {showDelete && onDelete && (
                     <EscalatableGate
-                        permission={Permission.ORDERS_CANCEL_ITEM}
+                        permission={Permission.ORDERS_VOID}
                         mode="intercept"
                         description={t('common.action.delete')}
                         onAuthorized={(user) => handleProtectedDelete({ id: String(user.id), name: user.display_name })}
                     >
                         <button
                             onClick={() => {
-                                if (hasPermission(Permission.ORDERS_CANCEL_ITEM)) {
+                                if (hasPermission(Permission.ORDERS_VOID)) {
                                     handleProtectedDelete();
                                 }
                             }}

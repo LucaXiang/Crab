@@ -3,7 +3,7 @@ import DefaultImage from '../../assets/reshot.svg';
 import { getImageUrl } from '@/core/services/imageCache';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { voidOrder } from '@/core/stores/order/useOrderOperations';
-import { useCanManageProducts } from '@/hooks/usePermission';
+import { useCanManageMenu } from '@/hooks/usePermission';
 import { ProductModal } from '@/features/product/ProductModal';
 import { useShiftStore } from '@/core/stores/shift';
 import { ShiftActionModal } from '@/features/shift';
@@ -46,8 +46,11 @@ import {
   useDraftOrders,
   useCurrentOrderKey,
   useCheckoutOrder,
-  useOrderActions,
 } from '@/core/stores/order';
+import { useShallow } from 'zustand/react/shallow';
+import { useDraftOrderStore } from '@/core/stores/order/useDraftOrderStore';
+import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
+import * as orderOps from '@/core/stores/order/useOrderOperations';
 import {
   useScreen,
   useViewMode,
@@ -77,7 +80,7 @@ export const POSScreen: React.FC = () => {
   // No local hydration needed
 
   // Permissions & Modal
-  const canManageProducts = useCanManageProducts();
+  const canManageProducts = useCanManageMenu();
   const { openModal } = useSettingsModal();
 
   const handleLongPressProduct = useCallback((product: Product) => {
@@ -93,7 +96,7 @@ export const POSScreen: React.FC = () => {
   const isProductLoading = useProductsLoading();
   const allCategories = useCategories();
   // Filter out categories with is_display: false
-  const categories = allCategories.filter(c => c.is_display !== false);
+  const categories = useMemo(() => allCategories.filter(c => c.is_display !== false), [allCategories]);
   const selectedCategory = useSelectedCategory();
   const { setSelectedCategory } = usePOSUIActions();
 
@@ -173,15 +176,13 @@ export const POSScreen: React.FC = () => {
   const draftOrders = useDraftOrders();
   const currentOrderKey = useCurrentOrderKey();
   const checkoutOrder = useCheckoutOrder();
-  const {
-    handleTableSelect: handleTableSelectStore,
-    setCheckoutOrder,
-    setCurrentOrderKey,
-    voidOrder,
-    saveDraft,
-    restoreDraft,
-    deleteDraft,
-  } = useOrderActions();
+  const { saveDraft, restoreDraft, deleteDraft } = useDraftOrderStore(
+    useShallow((s) => ({ saveDraft: s.saveDraft, restoreDraft: s.restoreDraft, deleteDraft: s.deleteDraft }))
+  );
+  const { setCheckoutOrder, setCurrentOrderKey } = useCheckoutStore(
+    useShallow((s) => ({ setCheckoutOrder: s.setCheckoutOrder, setCurrentOrderKey: s.setCurrentOrderKey }))
+  );
+  const handleTableSelectStore = orderOps.handleTableSelect;
 
   // UI Store
   const screen = useScreen();

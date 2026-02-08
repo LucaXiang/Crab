@@ -173,9 +173,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         {activeTab === 'ITEMS' ? (
           <OrderItemsSummary
             items={order.items.filter(i => !i._removed)}
-            mode="SELECT"
-            selectedQuantities={{}}
-            onUpdateSelectedQty={() => {}}
             onEditItem={handleEditItem}
           />
         ) : (

@@ -256,7 +256,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
     .filter(r => r.rule_type === 'SURCHARGE')
     .reduce((sum, r) => sum + r.calculated_amount, 0);
   const discountPercent = item.manual_discount_percent || 0;
-  const isFullyPaid = (item.unpaid_quantity ?? item.quantity) === 0;
+  const isFullyPaid = item.unpaid_quantity === 0;
 
   return (
     <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>

@@ -1,4 +1,4 @@
 /**
  * Order Services
  */
-export { openCashDrawer, printOrderReceipt } from './paymentService';
+export { openCashDrawer } from './paymentService';

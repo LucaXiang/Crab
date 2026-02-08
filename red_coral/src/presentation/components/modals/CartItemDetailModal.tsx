@@ -16,8 +16,7 @@ interface CartItemDetailModalProps {
 export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
   const { t } = useI18n();
   const productExternalId = useProductStore(state => state.items.find(p => String(p.id) === item.id)?.external_id);
-  // 直接用服务端提供的 unpaid_quantity
-  const unpaidQuantity = item.unpaid_quantity ?? item.quantity;
+  const unpaidQuantity = item.unpaid_quantity;
   const [quantity, setQuantity] = useState(unpaidQuantity);
   const [discount, setDiscount] = useState(item.manual_discount_percent || 0);
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; name: string } | undefined>();

@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
-import { useCanManageTables, useCanManageZones } from '@/hooks/usePermission';
+import { useCanManageTables } from '@/hooks/usePermission';
 
 interface ZoneItem {
   id: number;
@@ -23,7 +23,7 @@ interface ZoneItem {
 
 const ZoneList: React.FC = React.memo(() => {
   const { t } = useI18n();
-  const canManageZones = useCanManageZones();
+  const canManageZones = useCanManageTables();
 
   // Use resources store for zones
   const zoneStore = useZoneStore();

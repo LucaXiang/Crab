@@ -12,5 +12,3 @@ export * from './i18n';
 // Print
 export * from './print';
 
-// Label
-export * from './label';

@@ -262,7 +262,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             )}
 
             <EscalatableGate
-                permission={Permission.TABLES_MERGE_BILL}
+                permission={Permission.TABLES_MANAGE}
                 mode="intercept"
                 description={t('table.auth_required.merge')}
                 onAuthorized={(user) => { setOperationAuthorizer({ id: String(user.id), name: user.display_name }); setMode('MERGE'); }}
@@ -286,7 +286,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             </EscalatableGate>
 
             <EscalatableGate
-                permission={Permission.TABLES_TRANSFER}
+                permission={Permission.TABLES_MANAGE}
                 mode="intercept"
                 description={t('table.auth_required.move')}
                 onAuthorized={(user) => { setOperationAuthorizer({ id: String(user.id), name: user.display_name }); setMode('MOVE'); }}

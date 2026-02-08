@@ -24,12 +24,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const handleReprint = async () => {
     if (!order) return;
-    try {
-      const { reprintReceipt } = await import('@/infrastructure/print/printService');
-      await reprintReceipt(order.order_id);
-    } catch (e) {
-      toast.error(getErrorMessage(e));
-    }
+    // TODO: 收据重打由服务端处理，待接入后端 API
+    toast.warning(t('common.message.not_implemented'));
   };
 
   if (loading) {

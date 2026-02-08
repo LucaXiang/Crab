@@ -297,7 +297,7 @@ export const ProductModal: React.FC = React.memo(() => {
             {t('common.action.cancel')}
           </button>
           {action === 'DELETE' ? (
-            <ProtectedGate permission={Permission.PRODUCTS_DELETE}>
+            <ProtectedGate permission={Permission.MENU_MANAGE}>
               <button
                 onClick={handleDelete}
                 className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"

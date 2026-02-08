@@ -1,6 +1,5 @@
 import React from 'react';
-import { CartItem, CheckoutMode } from '@/core/domain/types';
-import { useProductStore } from '@/core/stores/resources';
+import { CartItem } from '@/core/domain/types';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
 import { calculateOptionsModifier } from '@/utils/pricing';
@@ -10,32 +9,22 @@ import { Gift } from 'lucide-react';
 
 interface UnpaidItemRowProps {
   item: CartItem;
-  remainingQty: number;
-  originalIndex: number;
-  mode: CheckoutMode;
-  selectedQuantities: Record<number, number>;
-  onUpdateSelectedQty: (index: number, delta: number) => void;
   onEditItem: (item: CartItem) => void;
+  externalId?: number | null;
   bgColor?: string;
   hoverColor?: string;
   accentColor?: string;
 }
 
-export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
+const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
   item,
-  remainingQty,
-  originalIndex,
-  mode,
-  selectedQuantities,
-  onUpdateSelectedQty,
   onEditItem,
+  externalId,
   bgColor,
   hoverColor,
   accentColor,
 }) => {
-  const isSelected = selectedQuantities[originalIndex] > 0;
-  const currentQty = selectedQuantities[originalIndex] || 0;
-  const externalId = useProductStore(state => state.items.find(p => String(p.id) === item.id)?.external_id);
+  const unpaidQty = item.unpaid_quantity;
 
   // Price calculations
   const optionsModifier = calculateOptionsModifier(item.selected_options);
@@ -43,7 +32,6 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   const unitPrice = item.unit_price ?? item.price;
   const discountPercent = item.manual_discount_percent || 0;
   const hasDiscount = discountPercent > 0 || basePrice !== unitPrice;
-  const isSelectMode = mode === 'SELECT';
 
   const isComped = !!item.is_comped;
   const hasMultiSpec = item.selected_specification?.is_multi_spec;
@@ -60,7 +48,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   const clickHandlers = useLongPress(
     () => {},
     () => {
-      if (isSelectMode && !isComped) {
+      if (!isComped) {
         onEditItem(item);
       }
     },
@@ -71,19 +59,16 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
     <div
       {...clickHandlers}
       className={`
-        group relative border rounded-xl p-4 transition-all duration-200 select-none
+        group relative border rounded-xl p-4 transition-all duration-200 select-none cursor-pointer
         ${isComped
           ? 'bg-emerald-50/50 border-emerald-200'
-          : isSelected
-            ? 'ring-1 ring-blue-500 shadow-md'
-            : 'hover:shadow-md'
+          : 'hover:shadow-md'
         }
-        ${isSelectMode ? 'cursor-pointer' : ''}
         ${!isComped && hoverColor ? 'hover:[background-color:var(--hover-bg)]' : ''}
       `}
       style={!isComped ? {
         backgroundColor: bgColor || '#ffffff',
-        borderColor: isSelected ? '#3b82f6' : (hoverColor || '#e5e7eb'),
+        borderColor: hoverColor || '#e5e7eb',
         '--hover-bg': hoverColor,
       } as React.CSSProperties : undefined}
     >
@@ -115,7 +100,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
 
           {/* Line 5: Quantity × Unit Price */}
           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 tabular-nums">
-            <span className="font-medium">x{remainingQty}</span>
+            <span className="font-medium">x{unpaidQty}</span>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor || '#d1d5db' }} />
             {isComped ? (
               <>
@@ -133,7 +118,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
           </div>
         </div>
 
-        {/* Right: Total + Controls */}
+        {/* Right: Total + Badges */}
         <div className="flex flex-col items-end justify-between shrink-0 self-stretch">
           {/* Line Total + Badges */}
           <div className="flex items-center gap-2">
@@ -158,12 +143,12 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
                 +{formatCurrency(totalRuleSurcharge)}
               </span>
             )}
-            <div className={`font-bold text-xl tabular-nums ${isComped ? 'text-emerald-600' : isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
-              {formatCurrency(unitPrice * remainingQty)}
+            <div className="font-bold text-xl tabular-nums text-gray-900">
+              {formatCurrency(unitPrice * unpaidQty)}
             </div>
           </div>
 
-          {/* Instance ID + External ID + Quantity Selector */}
+          {/* Instance ID + External ID */}
           <div className="flex items-center gap-2">
             {item.instance_id && (
               <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border bg-blue-100 text-blue-600 border-blue-200">
@@ -175,50 +160,11 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
                 {externalId}
               </div>
             )}
-            {!isSelectMode && !isComped && (
-              <div
-                className={`
-                  flex items-center bg-gray-50 rounded-lg p-1 border transition-colors
-                  ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-gray-200'}
-                `}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => onUpdateSelectedQty(originalIndex, -1)}
-                  className={`
-                    w-8 h-8 flex items-center justify-center rounded-md transition-all font-bold
-                    ${currentQty > 0
-                      ? 'bg-white shadow-sm text-gray-700 hover:text-blue-600'
-                      : 'text-gray-300 cursor-not-allowed'}
-                  `}
-                  disabled={currentQty <= 0}
-                >
-                  -
-                </button>
-                <div className="w-14 text-center">
-                  <span className={`font-bold ${currentQty > 0 ? 'text-blue-600' : 'text-gray-800'}`}>
-                    {currentQty}
-                  </span>
-                  <span className="text-gray-400 text-sm mx-0.5">/</span>
-                  <span className="text-gray-500 text-sm">{remainingQty}</span>
-                </div>
-                <button
-                  onClick={() => onUpdateSelectedQty(originalIndex, 1)}
-                  className={`
-                    w-8 h-8 flex items-center justify-center rounded-md transition-all font-bold
-                    ${currentQty < remainingQty
-                      ? 'bg-white shadow-sm text-gray-700 hover:text-blue-600'
-                      : 'text-gray-300 cursor-not-allowed'}
-                  `}
-                  disabled={currentQty >= remainingQty}
-                >
-                  +
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export const UnpaidItemRow = React.memo(UnpaidItemRowInner);

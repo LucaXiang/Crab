@@ -120,20 +120,6 @@ export type HeldOrder = import('./orderEvent').OrderSnapshot & {
   timeline?: import('./orderEvent').OrderEvent[];
 };
 
-// ============================================================================
-// TimelineEvent 已删除
-// ============================================================================
-// Timeline 现在直接使用 OrderEvent[]（服务端权威类型）
-// UI 层通过 Renderer 按需格式化，不再存储转换后的数据
-
-export type CheckoutMode = 'retail' | 'dine-in' | 'takeout' | 'SELECT';
-export type DetailTab = 'items' | 'payments' | 'timeline';
-export interface PendingCashTx {
-  id: string;
-  amount: number;
-  timestamp: number;
-}
-
 export type DraftOrder = HeldOrder;
 export type CompletedOrder = HeldOrder;
 
@@ -161,33 +147,6 @@ export const Permission = {
   // === 管理员专属 ===
   USERS_MANAGE: 'users:manage' as Permission,         // 用户管理 (仅 admin)
 
-  // === 兼容性别名 (deprecated, 用于过渡) ===
-  /** @deprecated Use MENU_MANAGE */
-  PRODUCTS_WRITE: 'menu:manage' as Permission,
-  /** @deprecated Use MENU_MANAGE */
-  PRODUCTS_DELETE: 'menu:manage' as Permission,
-  /** @deprecated Use MENU_MANAGE */
-  CATEGORIES_MANAGE: 'menu:manage' as Permission,
-  /** @deprecated Use MENU_MANAGE */
-  ATTRIBUTES_MANAGE: 'menu:manage' as Permission,
-  /** @deprecated Use TABLES_MANAGE */
-  ZONES_MANAGE: 'tables:manage' as Permission,
-  /** @deprecated Use REPORTS_VIEW */
-  STATISTICS_READ: 'reports:view' as Permission,
-  /** @deprecated Use CASH_DRAWER_OPEN */
-  POS_CASH_DRAWER: 'cash_drawer:open' as Permission,
-  /** @deprecated Use SETTINGS_MANAGE */
-  SYSTEM_WRITE: 'settings:manage' as Permission,
-  /** @deprecated Use SETTINGS_MANAGE */
-  PRINTERS_MANAGE: 'settings:manage' as Permission,
-  /** @deprecated Use SETTINGS_MANAGE */
-  RECEIPTS_REPRINT: 'settings:manage' as Permission,
-  /** @deprecated 基础操作，无需权限检查 */
-  ORDERS_CANCEL_ITEM: 'orders:void' as Permission,
-  /** @deprecated 基础操作，无需权限检查 */
-  TABLES_MERGE_BILL: 'tables:manage' as Permission,
-  /** @deprecated 基础操作，无需权限检查 */
-  TABLES_TRANSFER: 'tables:manage' as Permission,
 } as const;
 
 // Statistics types

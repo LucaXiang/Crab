@@ -1,54 +1,40 @@
 import React, { useMemo } from 'react';
-import { CartItem, CheckoutMode } from '@/core/domain/types';
+import { CartItem } from '@/core/domain/types';
 import { useProductStore, useCategories } from '@/core/stores/resources';
-import { useI18n } from '@/hooks/useI18n';
 import { UnpaidItemRow } from './components';
 import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, hashToColorIndex } from '@/utils/categoryColors';
 
 interface OrderItemsSummaryProps {
   items: CartItem[];
-  mode: CheckoutMode;
-  selectedQuantities: Record<number, number>;
-  onUpdateSelectedQty: (index: number, delta: number) => void;
   onEditItem: (item: CartItem) => void;
 }
 
 export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   items,
-  mode,
-  selectedQuantities,
-  onUpdateSelectedQty,
   onEditItem,
 }) => {
-  const { t } = useI18n();
   const products = useProductStore(state => state.items);
   const categories = useCategories();
 
   // Filter to items with unpaid quantity > 0
   const activeItems = useMemo(() => {
     return items
-      .map((item, idx) => {
-        if (item._removed) return null;
-        const remainingQty = item.unpaid_quantity ?? item.quantity;
-        if (remainingQty <= 0) return null;
-        return { item, remainingQty, originalIndex: idx };
-      })
-      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+      .filter(item => !item._removed && item.unpaid_quantity > 0);
   }, [items]);
 
   // Group by category
   const groupedByCategory = useMemo(() => {
     const productMap = new Map(products.map(p => [String(p.id), p]));
-    const groups: Record<string, typeof activeItems> = {};
+    const groups: Record<string, CartItem[]> = {};
 
-    activeItems.forEach(entry => {
-      const product = productMap.get(entry.item.id);
+    activeItems.forEach(item => {
+      const product = productMap.get(item.id);
       const categoryId = product?.category_id != null ? String(product.category_id) : 'uncategorized';
 
       if (!groups[categoryId]) {
         groups[categoryId] = [];
       }
-      groups[categoryId].push(entry);
+      groups[categoryId].push(item);
     });
 
     // Sort within each group by external_id
@@ -58,19 +44,26 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
     for (const entries of Object.values(groups)) {
       entries.sort((a, b) => {
         // Comped items sink to end of each category group
-        const compA = a.item.is_comped ? 1 : 0;
-        const compB = b.item.is_comped ? 1 : 0;
+        const compA = a.is_comped ? 1 : 0;
+        const compB = b.is_comped ? 1 : 0;
         if (compA !== compB) return compA - compB;
 
-        const extIdA = externalIdMap.get(a.item.id) ?? Number.MAX_SAFE_INTEGER;
-        const extIdB = externalIdMap.get(b.item.id) ?? Number.MAX_SAFE_INTEGER;
+        const extIdA = externalIdMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const extIdB = externalIdMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
         if (extIdA !== extIdB) return extIdA - extIdB;
-        return a.item.name.localeCompare(b.item.name);
+        return a.name.localeCompare(b.name);
       });
     }
 
     return groups;
   }, [activeItems, products]);
+
+  // Map item id -> external_id for passing to UnpaidItemRow
+  const externalIdByItemId = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const p of products) map.set(String(p.id), p.external_id);
+    return map;
+  }, [products]);
 
   // Sort groups by category sort_order
   const sortedGroups = useMemo(() => {
@@ -93,16 +86,12 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
         const colorIdx = hashToColorIndex(categoryId);
         return (
           <div key={categoryId} className="space-y-3">
-            {entries.map(({ item, remainingQty, originalIndex }) => (
+            {entries.map((item) => (
               <UnpaidItemRow
-                key={`unpaid-${originalIndex}`}
+                key={item.instance_id}
                 item={item}
-                remainingQty={remainingQty}
-                originalIndex={originalIndex}
-                mode={mode}
-                selectedQuantities={selectedQuantities}
-                onUpdateSelectedQty={onUpdateSelectedQty}
                 onEditItem={onEditItem}
+                externalId={externalIdByItemId.get(item.id)}
                 bgColor={CATEGORY_BG[colorIdx]}
                 hoverColor={CATEGORY_HEADER_BG[colorIdx]}
                 accentColor={CATEGORY_ACCENT[colorIdx]}

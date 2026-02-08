@@ -14,7 +14,7 @@ import { formatCurrency } from '@/utils/currency';
 import { Currency } from '@/utils/currency';
 
 // Services & Operations
-import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
+import { openCashDrawer } from '@/core/services/order/paymentService';
 import { completeOrder, splitByItems, splitByAmount, startAaSplit, payAaSplit, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
 import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 
@@ -320,10 +320,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           type: 'CASH',
           change: payment.change ?? undefined,
           onClose: handleComplete,
-          onPrint: is_retail ? async () => {
-            await printOrderReceipt(order);
-            toast.success(t('settings.payment.receipt_print_success'));
-          } : undefined,
           autoCloseDelay: is_retail ? 0 : 10000,
         });
       } catch (error) {
@@ -363,10 +359,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         isOpen: true,
         type: 'NORMAL',
         onClose: handleComplete,
-        onPrint: is_retail ? async () => {
-          await printOrderReceipt(order);
-          toast.success(t('settings.payment.receipt_print_success'));
-        } : undefined,
         autoCloseDelay: is_retail ? 0 : 5000,
       });
     } catch (error) {
@@ -393,9 +385,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         is_pre_payment: true,
       });
 
-      // Print with current order (WebSocket will update if needed)
-      const orderToPrint = { ...order, is_pre_payment: true };
-      await printOrderReceipt(orderToPrint);
       toast.success(t('settings.payment.receipt_print_success'));
     } catch (error) {
       console.error('Pre-payment print failed:', error);
