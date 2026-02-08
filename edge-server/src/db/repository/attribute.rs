@@ -360,10 +360,10 @@ pub async fn find_bindings_for_owner(
 
     let mut result = Vec::new();
     for binding in bindings {
-        if let Some(attr) = attrs.get(&binding.attribute_id) {
-            if attr.is_active {
-                result.push((binding, attr.clone()));
-            }
+        if let Some(attr) = attrs.get(&binding.attribute_id)
+            && attr.is_active
+        {
+            result.push((binding, attr.clone()));
         }
     }
     Ok(result)
@@ -389,10 +389,10 @@ pub async fn find_all_bindings_with_attributes(
 
     let mut result = Vec::new();
     for binding in bindings {
-        if let Some(attr) = attrs.get(&binding.attribute_id) {
-            if attr.is_active {
-                result.push((binding, attr.clone()));
-            }
+        if let Some(attr) = attrs.get(&binding.attribute_id)
+            && attr.is_active
+        {
+            result.push((binding, attr.clone()));
         }
     }
     Ok(result)

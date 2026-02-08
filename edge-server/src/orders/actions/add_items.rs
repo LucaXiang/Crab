@@ -90,7 +90,7 @@ impl CommandHandler for AddItemsAction {
                 // product_id is in "table:key" format in CartItemInput, extract the numeric part
                 let product_id_i64: i64 = item.product_id
                     .split(':')
-                    .last()
+                    .next_back()
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0);
                 let category_id: Option<i64> = meta.and_then(|m| m.category_id.parse().ok());

@@ -152,11 +152,11 @@ pub async fn update(
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
 
     // 检查 external_id 是否已被其他商品使用
-    if let Some(eid) = payload.external_id {
-        if check_duplicate_external_id(&state, eid, Some(id)).await? {
-            return Err(AppError::new(ErrorCode::ProductExternalIdExists)
-                .with_detail("external_id", eid));
-        }
+    if let Some(eid) = payload.external_id
+        && check_duplicate_external_id(&state, eid, Some(id)).await?
+    {
+        return Err(AppError::new(ErrorCode::ProductExternalIdExists)
+            .with_detail("external_id", eid));
     }
 
     let product = state

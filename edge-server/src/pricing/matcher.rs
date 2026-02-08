@@ -75,7 +75,7 @@ pub fn matches_product_scope(
         }
         ProductScope::Tag => {
             if let Some(target_id) = rule.target_id {
-                let matches = tag_ids.iter().any(|&t| t == target_id);
+                let matches = tag_ids.contains(&target_id);
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,

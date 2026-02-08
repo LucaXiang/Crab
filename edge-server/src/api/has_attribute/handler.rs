@@ -56,12 +56,12 @@ pub async fn create(
     .await
     .map_err(|e| AppError::database(e.to_string()))?;
 
-    if let Some(cat_id) = category_id {
-        if attribute::has_binding(&state.pool, "category", cat_id, payload.attribute_id).await? {
-            return Err(AppError::validation(
-                "该属性已通过分类继承绑定到此产品，不能重复添加".to_string(),
-            ));
-        }
+    if let Some(cat_id) = category_id
+        && attribute::has_binding(&state.pool, "category", cat_id, payload.attribute_id).await?
+    {
+        return Err(AppError::validation(
+            "该属性已通过分类继承绑定到此产品，不能重复添加".to_string(),
+        ));
     }
 
     let binding = attribute::link(
@@ -75,6 +75,14 @@ pub async fn create(
     )
     .await?;
 
+    // 查询属性名用于审计
+    let attr_name = attribute::find_by_id(&state.pool, payload.attribute_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|a| a.name)
+        .unwrap_or_default();
+
     let binding_id = binding.id.to_string();
     audit_log!(
         state.audit_service,
@@ -86,6 +94,8 @@ pub async fn create(
             "op": "bind_attribute",
             "product_id": payload.product_id,
             "attribute_id": payload.attribute_id,
+            "attribute_name": attr_name,
+            "is_required": payload.is_required,
         })
     );
 
@@ -125,6 +135,14 @@ pub async fn update(
     )
     .await?;
 
+    // 查询属性名用于审计
+    let attr_name = attribute::find_by_id(&state.pool, binding.attribute_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|a| a.name)
+        .unwrap_or_default();
+
     let id_str = id.to_string();
     audit_log!(
         state.audit_service,
@@ -132,7 +150,12 @@ pub async fn update(
         "attribute_binding", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"op": "update_binding"})
+        details = serde_json::json!({
+            "op": "update_binding",
+            "attribute_name": attr_name,
+            "is_required": payload.is_required,
+            "display_order": payload.display_order,
+        })
     );
 
     Ok(Json(binding))
@@ -149,6 +172,18 @@ pub async fn delete(
     let owner_id = binding.as_ref().map(|b| b.owner_id);
     let owner_type = binding.as_ref().map(|b| b.owner_type.clone());
 
+    // 查询属性名用于审计
+    let attribute_id = binding.as_ref().map(|b| b.attribute_id);
+    let attr_name = if let Some(aid) = attribute_id {
+        attribute::find_by_id(&state.pool, aid)
+            .await
+            .ok()
+            .flatten()
+            .map(|a| a.name)
+    } else {
+        None
+    };
+
     attribute::delete_binding(&state.pool, id).await?;
 
     let id_str = id.to_string();
@@ -162,16 +197,17 @@ pub async fn delete(
             "op": "unbind_attribute",
             "owner_id": owner_id,
             "owner_type": &owner_type,
+            "attribute_name": attr_name,
         })
     );
 
     // Refresh product cache if the binding was for a product
-    if let (Some(oid), Some(otype)) = (owner_id, owner_type) {
-        if otype == "product" {
-            let product_id_str = oid.to_string();
-            if let Err(e) = state.catalog_service.refresh_product_cache(&product_id_str).await {
-                tracing::warn!("Failed to refresh product cache for {}: {}", product_id_str, e);
-            }
+    if let (Some(oid), Some(otype)) = (owner_id, owner_type)
+        && otype == "product"
+    {
+        let product_id_str = oid.to_string();
+        if let Err(e) = state.catalog_service.refresh_product_cache(&product_id_str).await {
+            tracing::warn!("Failed to refresh product cache for {}: {}", product_id_str, e);
         }
     }
 

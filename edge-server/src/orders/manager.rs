@@ -4409,16 +4409,7 @@ mod tests {
         );
     }
 
-    /// 断言订单金额 (使用近似比较)
-    fn assert_order_total(manager: &OrdersManager, order_id: &str, expected: f64) {
-        let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
-        let diff = (snapshot.total - expected).abs();
-        assert!(
-            diff < 0.01,
-            "Expected order total {}, got {}",
-            expected, snapshot.total
-        );
-    }
+
 
     /// 打开零售订单
     fn open_retail_order(manager: &OrdersManager) -> String {
@@ -7301,7 +7292,7 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let bread_iid = s.items.iter().find(|i| i.name == "Bread").unwrap().instance_id.clone();
-        let steak_iid = s.items.iter().find(|i| i.name == "Steak").unwrap().instance_id.clone();
+        let _steak_iid = s.items.iter().find(|i| i.name == "Steak").unwrap().instance_id.clone();
         let wine_iid = s.items.iter().find(|i| i.name == "Wine").unwrap().instance_id.clone();
 
         // 1. Comp bread (free) → subtotal = 40 + 30 = 70
@@ -8165,34 +8156,6 @@ mod tests {
             receipt_name: "FDISC".to_string(),
             description: None,
             rule_type: RuleType::Discount,
-            product_scope: ProductScope::Global,
-            target_id: None,
-            zone_scope: "all".to_string(),
-            adjustment_type: AdjustmentType::FixedAmount,
-            adjustment_value: amount,
-            is_stackable: true,
-            is_exclusive: false,
-            valid_from: None,
-            valid_until: None,
-            active_days: None,
-            active_start_time: None,
-            active_end_time: None,
-            is_active: true,
-            created_by: None,
-            created_at: 0,
-        }
-    }
-
-    /// Helper: 创建固定金额附加费规则
-    fn make_fixed_surcharge_rule(id: i64, amount: f64) -> PriceRule {
-        use shared::models::price_rule::*;
-        PriceRule {
-            id,
-            name: format!("fixed_surcharge_{}", id),
-            display_name: format!("Fixed Surcharge {}", id),
-            receipt_name: "FSURCH".to_string(),
-            description: None,
-            rule_type: RuleType::Surcharge,
             product_scope: ProductScope::Global,
             target_id: None,
             zone_scope: "all".to_string(),

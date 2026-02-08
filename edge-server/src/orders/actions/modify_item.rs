@@ -83,12 +83,12 @@ impl CommandHandler for ModifyItemAction {
         }
 
         // 8. Validate quantity against paid amount
-        if let Some(new_qty) = self.changes.quantity {
-            if new_qty <= 0 {
-                return Err(OrderError::InvalidOperation(
-                    "quantity must be positive".to_string(),
-                ));
-            }
+        if let Some(new_qty) = self.changes.quantity
+            && new_qty <= 0
+        {
+            return Err(OrderError::InvalidOperation(
+                "quantity must be positive".to_string(),
+            ));
         }
 
         // 8b. Validate affected_qty doesn't exceed unpaid quantity

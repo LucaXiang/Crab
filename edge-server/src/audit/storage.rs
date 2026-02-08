@@ -139,7 +139,7 @@ impl AuditStorage {
         );
 
         // 3. 序列化字段用于插入
-        let action_str = serde_json::to_value(&action)?
+        let action_str = serde_json::to_value(action)?
             .as_str()
             .unwrap_or_default()
             .to_string();

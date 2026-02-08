@@ -5,7 +5,7 @@
 //! All archive operations are atomic - either everything succeeds or nothing is written.
 
 use crate::db::repository::system_state;
-use rust_decimal::{prelude::*, Decimal, RoundingStrategy};
+use rust_decimal::{Decimal, RoundingStrategy, prelude::*};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
@@ -189,9 +189,11 @@ impl OrderArchiveService {
         events: Vec<OrderEvent>,
     ) -> ArchiveResult<()> {
         // Acquire semaphore permit to limit concurrent archives
-        let _permit = self.archive_semaphore.acquire().await.map_err(|_| {
-            ArchiveError::Database("Archive semaphore closed".to_string())
-        })?;
+        let _permit = self
+            .archive_semaphore
+            .acquire()
+            .await
+            .map_err(|_| ArchiveError::Database("Archive semaphore closed".to_string()))?;
 
         let mut last_error = None;
 
@@ -220,7 +222,8 @@ impl OrderArchiveService {
         }
 
         // All retries failed - save to bad archive file
-        let error = last_error.unwrap_or_else(|| ArchiveError::Database("Unknown error".to_string()));
+        let error =
+            last_error.unwrap_or_else(|| ArchiveError::Database("Unknown error".to_string()));
         self.save_to_bad_archive_sync(snapshot, &events, &error);
         Err(error)
     }
@@ -253,11 +256,7 @@ impl OrderArchiveService {
             return;
         }
 
-        let filename = format!(
-            "{}-{}.json",
-            shared::util::now_millis(),
-            snapshot.order_id
-        );
+        let filename = format!("{}-{}.json", shared::util::now_millis(), snapshot.order_id);
         let path = self.bad_archive_dir.join(&filename);
 
         match serde_json::to_string_pretty(&bad_archive) {
@@ -340,7 +339,7 @@ impl OrderArchiveService {
                 return Err(ArchiveError::Conversion(format!(
                     "Cannot archive order with status {:?}",
                     snapshot.status
-                )))
+                )));
             }
         };
 
@@ -390,7 +389,7 @@ impl OrderArchiveService {
         .bind(&snapshot.table_name)
         .bind(status_str)
         .bind(snapshot.is_retail)
-        .bind(snapshot.guest_count as i32)
+        .bind(snapshot.guest_count)
         .bind(snapshot.original_total)
         .bind(snapshot.subtotal)
         .bind(snapshot.total)
@@ -407,28 +406,18 @@ impl OrderArchiveService {
         .bind(snapshot.end_time)
         .bind(&operator_id)
         .bind(&operator_name)
-        .bind(
-            snapshot
-                .void_type
-                .as_ref()
-                .map(|v| {
-                    serde_json::to_value(v)
-                        .ok()
-                        .and_then(|val| val.as_str().map(String::from))
-                        .unwrap_or_default()
-                }),
-        )
-        .bind(
-            snapshot
-                .loss_reason
-                .as_ref()
-                .map(|r| {
-                    serde_json::to_value(r)
-                        .ok()
-                        .and_then(|val| val.as_str().map(String::from))
-                        .unwrap_or_default()
-                }),
-        )
+        .bind(snapshot.void_type.as_ref().map(|v| {
+            serde_json::to_value(v)
+                .ok()
+                .and_then(|val| val.as_str().map(String::from))
+                .unwrap_or_default()
+        }))
+        .bind(snapshot.loss_reason.as_ref().map(|r| {
+            serde_json::to_value(r)
+                .ok()
+                .and_then(|val| val.as_str().map(String::from))
+                .unwrap_or_default()
+        }))
         .bind(snapshot.loss_amount)
         .bind(&snapshot.void_note)
         .bind(&prev_hash)
@@ -446,25 +435,22 @@ impl OrderArchiveService {
             let d_qty = Decimal::from(item.quantity);
             let d_manual_discount_per_unit = item
                 .manual_discount_percent
-                .map(|p| {
-                    d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED
-                })
+                .map(|p| d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED)
                 .unwrap_or(Decimal::ZERO);
             let d_rule_discount_per_unit =
                 Decimal::from_f64(item.rule_discount_amount.unwrap_or(0.0)).unwrap_or_default();
-            let total_discount =
-                ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
-                    .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                    .to_f64()
-                    .unwrap_or_default();
+            let total_discount = ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
+                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                .to_f64()
+                .unwrap_or_default();
             let d_surcharge_per_unit =
                 Decimal::from_f64(item.rule_surcharge_amount.unwrap_or(0.0)).unwrap_or_default();
             let total_surcharge = (d_surcharge_per_unit * d_qty)
                 .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
                 .to_f64()
                 .unwrap_or_default();
-            let unit_price = if item.unit_price.is_some() {
-                item.unit_price.unwrap()
+            let unit_price = if let Some(up) = item.unit_price {
+                up
             } else {
                 (d_base - d_manual_discount_per_unit - d_rule_discount_per_unit
                     + d_surcharge_per_unit)
@@ -478,10 +464,7 @@ impl OrderArchiveService {
                     .to_f64()
                     .unwrap_or_default()
             });
-            let spec_name = item
-                .selected_specification
-                .as_ref()
-                .map(|s| s.name.clone());
+            let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
             let instance_id = item.instance_id.clone();
             let paid_qty = snapshot
                 .paid_item_quantities
@@ -723,9 +706,7 @@ impl OrderArchiveService {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            ArchiveError::Database(format!("Order not found: {}", receipt_number))
-        })?;
+        .ok_or_else(|| ArchiveError::Database(format!("Order not found: {}", receipt_number)))?;
 
         // 2. 查询该订单的所有事件（按 seq 排序）
         let events: Vec<VerifyEventRow> = sqlx::query_as::<_, VerifyEventRow>(

@@ -35,7 +35,7 @@ fn values_equal(a: &Value, b: &Value) -> bool {
                 return false;
             }
             a.iter().all(|(key, va)| {
-                b.get(key).map_or(false, |vb| values_equal(va, vb))
+                b.get(key).is_some_and(|vb| values_equal(va, vb))
             })
         }
         _ => false,
@@ -106,10 +106,13 @@ pub fn get_config(resource_type: &str) -> AuditConfig {
             exclude_fields: &["id"],
         },
         "label_template" => AuditConfig {
-            exclude_fields: &["id"],
+            exclude_fields: &["id", "fields", "test_data", "created_at", "updated_at"],
         },
         "shift" => AuditConfig {
             exclude_fields: &["id"],
+        },
+        "store_info" => AuditConfig {
+            exclude_fields: &["id", "created_at", "updated_at"],
         },
         _ => AuditConfig::default(),
     }
