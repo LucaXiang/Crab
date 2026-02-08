@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE system_state SET genesis_hash = COALESCE(?1, genesis_hash), last_order_id = COALESCE(?2, last_order_id), last_order_hash = COALESCE(?3, last_order_hash), synced_up_to_id = COALESCE(?4, synced_up_to_id), synced_up_to_hash = COALESCE(?5, synced_up_to_hash), last_sync_time = COALESCE(?6, last_sync_time), order_count = COALESCE(?7, order_count), updated_at = ?8 WHERE id = ?9",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "640ba4f6e78e2f248e9859e7a1eba30173947631eb69c5cd17e833c1f6f7efa9"
+}

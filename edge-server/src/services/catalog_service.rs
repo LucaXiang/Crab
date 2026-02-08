@@ -115,28 +115,28 @@ impl CatalogService {
             let cat_id = cat.id;
 
             // Kitchen print destinations
-            cat.kitchen_print_destinations = sqlx::query_scalar::<_, i64>(
-                "SELECT print_destination_id FROM category_kitchen_dest WHERE category_id = ?",
+            cat.kitchen_print_destinations = sqlx::query_scalar!(
+                "SELECT print_destination_id FROM category_kitchen_print_dest WHERE category_id = ?",
+                cat_id
             )
-            .bind(cat_id)
             .fetch_all(&self.pool)
             .await
             .unwrap_or_default();
 
             // Label print destinations
-            cat.label_print_destinations = sqlx::query_scalar::<_, i64>(
-                "SELECT print_destination_id FROM category_label_dest WHERE category_id = ?",
+            cat.label_print_destinations = sqlx::query_scalar!(
+                "SELECT print_destination_id FROM category_label_print_dest WHERE category_id = ?",
+                cat_id
             )
-            .bind(cat_id)
             .fetch_all(&self.pool)
             .await
             .unwrap_or_default();
 
             // Tag IDs for virtual categories
-            cat.tag_ids = sqlx::query_scalar::<_, i64>(
+            cat.tag_ids = sqlx::query_scalar!(
                 "SELECT tag_id FROM category_tag WHERE category_id = ?",
+                cat_id
             )
-            .bind(cat_id)
             .fetch_all(&self.pool)
             .await
             .unwrap_or_default();
@@ -394,34 +394,39 @@ impl CatalogService {
         }
 
         // Insert product
-        let product_id = sqlx::query_scalar::<_, i64>(
-            "INSERT INTO product (name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10) RETURNING id",
+        let image = data.image.as_deref().unwrap_or("");
+        let sort_order = data.sort_order.unwrap_or(0);
+        let tax_rate = data.tax_rate.unwrap_or(0);
+        let is_kitchen_print_enabled = data.is_kitchen_print_enabled.unwrap_or(-1);
+        let is_label_print_enabled = data.is_label_print_enabled.unwrap_or(-1);
+        let product_id = sqlx::query_scalar!(
+            r#"INSERT INTO product (name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10) RETURNING id as "id!""#,
+            data.name,
+            image,
+            data.category_id,
+            sort_order,
+            tax_rate,
+            data.receipt_name,
+            data.kitchen_print_name,
+            is_kitchen_print_enabled,
+            is_label_print_enabled,
+            data.external_id,
         )
-        .bind(&data.name)
-        .bind(data.image.as_deref().unwrap_or(""))
-        .bind(data.category_id)
-        .bind(data.sort_order.unwrap_or(0))
-        .bind(data.tax_rate.unwrap_or(0))
-        .bind(&data.receipt_name)
-        .bind(&data.kitchen_print_name)
-        .bind(data.is_kitchen_print_enabled.unwrap_or(-1))
-        .bind(data.is_label_print_enabled.unwrap_or(-1))
-        .bind(data.external_id)
         .fetch_one(&self.pool)
         .await?;
 
         // Insert specs
         for spec in &data.specs {
-            sqlx::query(
+            sqlx::query!(
                 "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)",
+                product_id,
+                spec.name,
+                spec.price,
+                spec.display_order,
+                spec.is_default,
+                spec.receipt_name,
+                spec.is_root,
             )
-            .bind(product_id)
-            .bind(&spec.name)
-            .bind(spec.price)
-            .bind(spec.display_order)
-            .bind(spec.is_default)
-            .bind(&spec.receipt_name)
-            .bind(spec.is_root)
             .execute(&self.pool)
             .await?;
         }
@@ -429,11 +434,12 @@ impl CatalogService {
         // Insert tags (junction table)
         if let Some(ref tag_ids) = data.tags {
             for tag_id in tag_ids {
-                sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
-                    .bind(product_id)
-                    .bind(*tag_id)
-                    .execute(&self.pool)
-                    .await?;
+                sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
+                    product_id,
+                    tag_id,
+                )
+                .execute(&self.pool)
+                .await?;
             }
         }
 
@@ -499,58 +505,57 @@ impl CatalogService {
 
         // Execute update of scalar fields using COALESCE pattern
         if has_scalar_updates {
-            sqlx::query(
+            sqlx::query!(
                 "UPDATE product SET name = COALESCE(?1, name), image = COALESCE(?2, image), category_id = COALESCE(?3, category_id), sort_order = COALESCE(?4, sort_order), tax_rate = COALESCE(?5, tax_rate), receipt_name = COALESCE(?6, receipt_name), kitchen_print_name = COALESCE(?7, kitchen_print_name), is_kitchen_print_enabled = COALESCE(?8, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?9, is_label_print_enabled), is_active = COALESCE(?10, is_active), external_id = COALESCE(?11, external_id) WHERE id = ?12",
+                data.name,
+                data.image,
+                data.category_id,
+                data.sort_order,
+                data.tax_rate,
+                data.receipt_name,
+                data.kitchen_print_name,
+                data.is_kitchen_print_enabled,
+                data.is_label_print_enabled,
+                data.is_active,
+                data.external_id,
+                product_id,
             )
-            .bind(&data.name)
-            .bind(&data.image)
-            .bind(data.category_id)
-            .bind(data.sort_order)
-            .bind(data.tax_rate)
-            .bind(&data.receipt_name)
-            .bind(&data.kitchen_print_name)
-            .bind(data.is_kitchen_print_enabled)
-            .bind(data.is_label_print_enabled)
-            .bind(data.is_active)
-            .bind(data.external_id)
-            .bind(product_id)
             .execute(&self.pool)
             .await?;
         }
 
         // Replace tags if provided
         if let Some(ref tag_ids) = data.tags {
-            sqlx::query("DELETE FROM product_tag WHERE product_id = ?")
-                .bind(product_id)
+            sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", product_id)
                 .execute(&self.pool)
                 .await?;
             for tag_id in tag_ids {
-                sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
-                    .bind(product_id)
-                    .bind(*tag_id)
-                    .execute(&self.pool)
-                    .await?;
+                sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
+                    product_id,
+                    tag_id,
+                )
+                .execute(&self.pool)
+                .await?;
             }
         }
 
         // Replace specs if provided
         if let Some(ref specs) = data.specs {
-            sqlx::query("DELETE FROM product_spec WHERE product_id = ?")
-                .bind(product_id)
+            sqlx::query!("DELETE FROM product_spec WHERE product_id = ?", product_id)
                 .execute(&self.pool)
                 .await?;
             for spec in specs {
-                sqlx::query(
+                sqlx::query!(
                     "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    product_id,
+                    spec.name,
+                    spec.price,
+                    spec.display_order,
+                    spec.is_default,
+                    spec.is_active,
+                    spec.receipt_name,
+                    spec.is_root,
                 )
-                .bind(product_id)
-                .bind(&spec.name)
-                .bind(spec.price)
-                .bind(spec.display_order)
-                .bind(spec.is_default)
-                .bind(spec.is_active)
-                .bind(&spec.receipt_name)
-                .bind(spec.is_root)
                 .execute(&self.pool)
                 .await?;
             }
@@ -607,26 +612,22 @@ impl CatalogService {
         .unwrap_or_default();
 
         // Clean up attribute bindings
-        sqlx::query("DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?")
-            .bind(product_id)
+        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?", product_id)
             .execute(&self.pool)
             .await?;
 
         // Clean up tag bindings
-        sqlx::query("DELETE FROM product_tag WHERE product_id = ?")
-            .bind(product_id)
+        sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", product_id)
             .execute(&self.pool)
             .await?;
 
         // Delete specs
-        sqlx::query("DELETE FROM product_spec WHERE product_id = ?")
-            .bind(product_id)
+        sqlx::query!("DELETE FROM product_spec WHERE product_id = ?", product_id)
             .execute(&self.pool)
             .await?;
 
         // Delete product
-        let result = sqlx::query("DELETE FROM product WHERE id = ?")
-            .bind(product_id)
+        let result = sqlx::query!("DELETE FROM product WHERE id = ?", product_id)
             .execute(&self.pool)
             .await?;
 
@@ -661,9 +662,7 @@ impl CatalogService {
             .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
 
         // Insert into junction table (ignore if already exists)
-        sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
-            .bind(pid)
-            .bind(tid)
+        sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)", pid, tid)
             .execute(&self.pool)
             .await?;
 
@@ -691,9 +690,7 @@ impl CatalogService {
             .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
 
         // Delete from junction table
-        sqlx::query("DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?")
-            .bind(pid)
-            .bind(tid)
+        sqlx::query!("DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?", pid, tid)
             .execute(&self.pool)
             .await?;
 
@@ -839,44 +836,50 @@ impl CatalogService {
             }
         }
 
-        let category_id = sqlx::query_scalar::<_, i64>(
-            "INSERT INTO category (name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7) RETURNING id",
+        let sort_order = data.sort_order.unwrap_or(0);
+        let is_kitchen_print_enabled = data.is_kitchen_print_enabled.unwrap_or(false);
+        let is_label_print_enabled = data.is_label_print_enabled.unwrap_or(false);
+        let is_virtual = data.is_virtual.unwrap_or(false);
+        let match_mode = data.match_mode.as_deref().unwrap_or("any");
+        let is_display = data.is_display.unwrap_or(true);
+        let category_id = sqlx::query_scalar!(
+            r#"INSERT INTO category (name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7) RETURNING id as "id!""#,
+            data.name,
+            sort_order,
+            is_kitchen_print_enabled,
+            is_label_print_enabled,
+            is_virtual,
+            match_mode,
+            is_display,
         )
-        .bind(&data.name)
-        .bind(data.sort_order.unwrap_or(0))
-        .bind(data.is_kitchen_print_enabled.unwrap_or(false))
-        .bind(data.is_label_print_enabled.unwrap_or(false))
-        .bind(data.is_virtual.unwrap_or(false))
-        .bind(data.match_mode.as_deref().unwrap_or("any"))
-        .bind(data.is_display.unwrap_or(true))
         .fetch_one(&self.pool)
         .await?;
 
         // Insert kitchen print destinations
         for dest_id in &data.kitchen_print_destinations {
-            sqlx::query("INSERT OR IGNORE INTO category_kitchen_dest (category_id, print_destination_id) VALUES (?, ?)")
-                .bind(category_id)
-                .bind(*dest_id)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query!("INSERT OR IGNORE INTO category_kitchen_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+                category_id, dest_id,
+            )
+            .execute(&self.pool)
+            .await?;
         }
 
         // Insert label print destinations
         for dest_id in &data.label_print_destinations {
-            sqlx::query("INSERT OR IGNORE INTO category_label_dest (category_id, print_destination_id) VALUES (?, ?)")
-                .bind(category_id)
-                .bind(*dest_id)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query!("INSERT OR IGNORE INTO category_label_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+                category_id, dest_id,
+            )
+            .execute(&self.pool)
+            .await?;
         }
 
         // Insert tag IDs
         for tag_id in &data.tag_ids {
-            sqlx::query("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)")
-                .bind(category_id)
-                .bind(*tag_id)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query!("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
+                category_id, tag_id,
+            )
+            .execute(&self.pool)
+            .await?;
         }
 
         // Fetch back the full category
@@ -916,63 +919,60 @@ impl CatalogService {
         }
 
         // Update scalar fields using COALESCE
-        sqlx::query(
+        sqlx::query!(
             "UPDATE category SET name = COALESCE(?1, name), sort_order = COALESCE(?2, sort_order), is_kitchen_print_enabled = COALESCE(?3, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?4, is_label_print_enabled), is_virtual = COALESCE(?5, is_virtual), match_mode = COALESCE(?6, match_mode), is_display = COALESCE(?7, is_display), is_active = COALESCE(?8, is_active) WHERE id = ?9",
+            data.name,
+            data.sort_order,
+            data.is_kitchen_print_enabled,
+            data.is_label_print_enabled,
+            data.is_virtual,
+            data.match_mode,
+            data.is_display,
+            data.is_active,
+            category_id,
         )
-        .bind(&data.name)
-        .bind(data.sort_order)
-        .bind(data.is_kitchen_print_enabled)
-        .bind(data.is_label_print_enabled)
-        .bind(data.is_virtual)
-        .bind(&data.match_mode)
-        .bind(data.is_display)
-        .bind(data.is_active)
-        .bind(category_id)
         .execute(&self.pool)
         .await?;
 
         // Replace kitchen print destinations if provided
         if let Some(ref dests) = data.kitchen_print_destinations {
-            sqlx::query("DELETE FROM category_kitchen_dest WHERE category_id = ?")
-                .bind(category_id)
+            sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", category_id)
                 .execute(&self.pool)
                 .await?;
             for dest_id in dests {
-                sqlx::query("INSERT OR IGNORE INTO category_kitchen_dest (category_id, print_destination_id) VALUES (?, ?)")
-                    .bind(category_id)
-                    .bind(*dest_id)
-                    .execute(&self.pool)
-                    .await?;
+                sqlx::query!("INSERT OR IGNORE INTO category_kitchen_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+                    category_id, dest_id,
+                )
+                .execute(&self.pool)
+                .await?;
             }
         }
 
         // Replace label print destinations if provided
         if let Some(ref dests) = data.label_print_destinations {
-            sqlx::query("DELETE FROM category_label_dest WHERE category_id = ?")
-                .bind(category_id)
+            sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", category_id)
                 .execute(&self.pool)
                 .await?;
             for dest_id in dests {
-                sqlx::query("INSERT OR IGNORE INTO category_label_dest (category_id, print_destination_id) VALUES (?, ?)")
-                    .bind(category_id)
-                    .bind(*dest_id)
-                    .execute(&self.pool)
-                    .await?;
+                sqlx::query!("INSERT OR IGNORE INTO category_label_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+                    category_id, dest_id,
+                )
+                .execute(&self.pool)
+                .await?;
             }
         }
 
         // Replace tag IDs if provided
         if let Some(ref tag_ids) = data.tag_ids {
-            sqlx::query("DELETE FROM category_tag WHERE category_id = ?")
-                .bind(category_id)
+            sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", category_id)
                 .execute(&self.pool)
                 .await?;
             for tag_id in tag_ids {
-                sqlx::query("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)")
-                    .bind(category_id)
-                    .bind(*tag_id)
-                    .execute(&self.pool)
-                    .await?;
+                sqlx::query!("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
+                    category_id, tag_id,
+                )
+                .execute(&self.pool)
+                .await?;
             }
         }
 
@@ -995,10 +995,10 @@ impl CatalogService {
             .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
 
         // Check if category has products
-        let count: i64 = sqlx::query_scalar(
+        let count = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM product WHERE category_id = ? AND is_active = 1",
+            category_id,
         )
-        .bind(category_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -1009,28 +1009,23 @@ impl CatalogService {
         }
 
         // Clean up attribute bindings
-        sqlx::query("DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?")
-            .bind(category_id)
+        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?", category_id)
             .execute(&self.pool)
             .await?;
 
         // Clean up junction tables
-        sqlx::query("DELETE FROM category_kitchen_dest WHERE category_id = ?")
-            .bind(category_id)
+        sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", category_id)
             .execute(&self.pool)
             .await?;
-        sqlx::query("DELETE FROM category_label_dest WHERE category_id = ?")
-            .bind(category_id)
+        sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", category_id)
             .execute(&self.pool)
             .await?;
-        sqlx::query("DELETE FROM category_tag WHERE category_id = ?")
-            .bind(category_id)
+        sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", category_id)
             .execute(&self.pool)
             .await?;
 
         // Delete category
-        sqlx::query("DELETE FROM category WHERE id = ?")
-            .bind(category_id)
+        sqlx::query!("DELETE FROM category WHERE id = ?", category_id)
             .execute(&self.pool)
             .await?;
 
@@ -1053,26 +1048,26 @@ impl CatalogService {
         .await?
         .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", category_id)))?;
 
-        cat.kitchen_print_destinations = sqlx::query_scalar::<_, i64>(
-            "SELECT print_destination_id FROM category_kitchen_dest WHERE category_id = ?",
+        cat.kitchen_print_destinations = sqlx::query_scalar!(
+            "SELECT print_destination_id FROM category_kitchen_print_dest WHERE category_id = ?",
+            category_id,
         )
-        .bind(category_id)
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();
 
-        cat.label_print_destinations = sqlx::query_scalar::<_, i64>(
-            "SELECT print_destination_id FROM category_label_dest WHERE category_id = ?",
+        cat.label_print_destinations = sqlx::query_scalar!(
+            "SELECT print_destination_id FROM category_label_print_dest WHERE category_id = ?",
+            category_id,
         )
-        .bind(category_id)
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();
 
-        cat.tag_ids = sqlx::query_scalar::<_, i64>(
+        cat.tag_ids = sqlx::query_scalar!(
             "SELECT tag_id FROM category_tag WHERE category_id = ?",
+            category_id,
         )
-        .bind(category_id)
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();

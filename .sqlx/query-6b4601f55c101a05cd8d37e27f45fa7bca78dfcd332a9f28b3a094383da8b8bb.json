@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "6b4601f55c101a05cd8d37e27f45fa7bca78dfcd332a9f28b3a094383da8b8bb"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO shift (operator_id, operator_name, status, start_time, starting_cash, expected_cash, abnormal_close, last_active_at, note, created_at, updated_at) VALUES (?1, ?2, 'OPEN', ?3, ?4, ?4, 0, ?3, ?5, ?3, ?3) RETURNING id as \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "34fe92c9d71e24b00f49a4889a3bbfda2fec4e63f3c36b384c3ceee80af00a21"
+}

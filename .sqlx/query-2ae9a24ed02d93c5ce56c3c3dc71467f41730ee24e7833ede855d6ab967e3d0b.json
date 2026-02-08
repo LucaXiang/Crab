@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM price_rule WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "2ae9a24ed02d93c5ce56c3c3dc71467f41730ee24e7833ede855d6ab967e3d0b"
+}

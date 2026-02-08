@@ -26,13 +26,14 @@ pub async fn sync_refs(
     // 3. Create new refs
     let now = shared::util::now_millis();
     for hash in &to_add {
-        sqlx::query(
+        let hash_str = hash.as_str();
+        sqlx::query!(
             "INSERT INTO image_ref (hash, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?)",
+            hash_str,
+            entity_type_str,
+            entity_id,
+            now
         )
-        .bind(hash.as_str())
-        .bind(entity_type_str)
-        .bind(entity_id)
-        .bind(now)
         .execute(pool)
         .await?;
     }
@@ -40,12 +41,12 @@ pub async fn sync_refs(
     // 4. Delete removed refs
     if !to_remove.is_empty() {
         for hash in &to_remove {
-            sqlx::query(
+            sqlx::query!(
                 "DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ? AND hash = ?",
+                entity_type_str,
+                entity_id,
+                hash
             )
-            .bind(entity_type_str)
-            .bind(entity_id)
-            .bind(hash)
             .execute(pool)
             .await?;
         }
@@ -66,11 +67,12 @@ pub async fn delete_entity_refs(
     let refs = get_entity_refs(pool, entity_type, entity_id).await?;
     let hashes: Vec<String> = refs.into_iter().map(|r| r.hash).collect();
 
-    sqlx::query("DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ?")
-        .bind(entity_type_str)
-        .bind(entity_id)
-        .execute(pool)
-        .await?;
+    sqlx::query!("DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ?",
+        entity_type_str,
+        entity_id
+    )
+    .execute(pool)
+    .await?;
 
     Ok(hashes)
 }
@@ -78,8 +80,7 @@ pub async fn delete_entity_refs(
 /// Count references for a hash
 pub async fn count_refs(pool: &SqlitePool, hash: &str) -> RepoResult<i64> {
     let count =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM image_ref WHERE hash = ?")
-            .bind(hash)
+        sqlx::query_scalar!("SELECT COUNT(*) FROM image_ref WHERE hash = ?", hash)
             .fetch_one(pool)
             .await?;
     Ok(count)
@@ -91,14 +92,16 @@ pub async fn find_orphan_hashes(pool: &SqlitePool, hashes: &[String]) -> RepoRes
         return Ok(vec![]);
     }
 
-    // Find which hashes still have references
-    let mut referenced = HashSet::new();
+    // Dynamic query: variable number of IN placeholders — keep as runtime query
+    let placeholders = hashes.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT DISTINCT hash FROM image_ref WHERE hash IN ({placeholders})"
+    );
+    let mut query = sqlx::query_scalar::<_, String>(&sql);
     for hash in hashes {
-        let count = count_refs(pool, hash).await?;
-        if count > 0 {
-            referenced.insert(hash.clone());
-        }
+        query = query.bind(hash);
     }
+    let referenced: HashSet<String> = query.fetch_all(pool).await?.into_iter().collect();
 
     Ok(hashes
         .iter()
@@ -113,10 +116,11 @@ pub async fn get_entity_refs(
     entity_type: ImageRefEntityType,
     entity_id: &str,
 ) -> RepoResult<Vec<ImageRef>> {
+    let entity_type_str = entity_type.as_str();
     let refs = sqlx::query_as::<_, ImageRef>(
         "SELECT id, hash, entity_type, entity_id, created_at FROM image_ref WHERE entity_type = ? AND entity_id = ?",
     )
-    .bind(entity_type.as_str())
+    .bind(entity_type_str)
     .bind(entity_id)
     .fetch_all(pool)
     .await?;

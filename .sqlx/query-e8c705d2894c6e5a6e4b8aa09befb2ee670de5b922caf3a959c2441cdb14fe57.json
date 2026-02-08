@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT category_id FROM product WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "category_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e8c705d2894c6e5a6e4b8aa09befb2ee670de5b922caf3a959c2441cdb14fe57"
+}

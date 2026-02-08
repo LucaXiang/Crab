@@ -29,6 +29,13 @@ cargo build --workspace        # 编译
 cargo test --workspace --lib   # 测试
 cargo clippy --workspace       # Lint
 
+# SQLx CLI (详见 memory/sqlx-cli-skill.md)
+sqlx migrate add -r -s <desc> --source edge-server/migrations   # 新建迁移
+sqlx migrate run --source edge-server/migrations                 # 运行迁移
+sqlx migrate info --source edge-server/migrations                # 查看状态
+sqlx db reset -y --source edge-server/migrations                 # 重置数据库
+cargo sqlx prepare --workspace                                   # 离线元数据
+
 # POS 前端 (red_coral/)
 cd red_coral && npm run tauri:dev   # Tauri 开发
 cd red_coral && npx tsc --noEmit    # TS 类型检查

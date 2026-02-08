@@ -13,7 +13,7 @@ interface UseHistoryOrderDetailResult {
 /**
  * Hook for fetching archived order details (items, payments, timeline)
  *
- * Backend returns ArchivedOrderDetail directly from SurrealDB graph model.
+ * Backend returns ArchivedOrderDetail directly.
  * No frontend conversion needed.
  */
 export const useHistoryOrderDetail = (order_id: string | null): UseHistoryOrderDetailResult => {
@@ -41,7 +41,7 @@ export const useHistoryOrderDetail = (order_id: string | null): UseHistoryOrderD
         orderId: order_id,
       });
 
-      logger.debug('Loaded archived order from SurrealDB', {
+      logger.debug('Loaded archived order detail', {
         component: 'useHistoryOrderDetail',
         action: 'fetchOrderDetail',
         order_id,

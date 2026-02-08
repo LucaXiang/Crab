@@ -1,4 +1,4 @@
 /**
  * Formatting Utilities
  */
-export * from './thingId';
+export * from './displayId';

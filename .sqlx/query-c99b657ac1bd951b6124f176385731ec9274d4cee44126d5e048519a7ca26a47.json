@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO daily_report_tax_breakdown (report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count) VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "c99b657ac1bd951b6124f176385731ec9274d4cee44126d5e048519a7ca26a47"
+}

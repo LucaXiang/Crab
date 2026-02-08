@@ -146,22 +146,23 @@ impl AuditStorage {
         let details_json = serde_json::to_string(&details)?;
 
         // 4. 写入 SQLite
-        sqlx::query(
+        let sequence_i64 = sequence as i64;
+        sqlx::query!(
             "INSERT INTO audit_log (sequence, timestamp, action, resource_type, resource_id, \
              operator_id, operator_name, details, target, prev_hash, curr_hash) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            sequence_i64,
+            timestamp,
+            action_str,
+            resource_type,
+            resource_id,
+            operator_id,
+            operator_name,
+            details_json,
+            target,
+            prev_hash,
+            curr_hash,
         )
-        .bind(sequence as i64)
-        .bind(timestamp)
-        .bind(&action_str)
-        .bind(&resource_type)
-        .bind(&resource_id)
-        .bind(&operator_id)
-        .bind(&operator_name)
-        .bind(&details_json)
-        .bind(&target)
-        .bind(&prev_hash)
-        .bind(&curr_hash)
         .execute(&self.pool)
         .await?;
 
@@ -252,7 +253,7 @@ impl AuditStorage {
 
     /// 查询最后 N 条审计日志（倒序）
     pub async fn query_last(&self, count: usize) -> AuditStorageResult<(Vec<AuditEntry>, u64)> {
-        let total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM audit_log")
+        let total = sqlx::query_scalar!("SELECT COUNT(*) FROM audit_log")
             .fetch_one(&self.pool)
             .await? as u64;
 

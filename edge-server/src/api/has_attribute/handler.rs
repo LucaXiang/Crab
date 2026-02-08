@@ -48,10 +48,10 @@ pub async fn create(
     Json(payload): Json<CreateBindingRequest>,
 ) -> AppResult<Json<AttributeBinding>> {
     // 查询产品的 category_id，检查分类是否已绑定此属性
-    let category_id: Option<i64> = sqlx::query_scalar(
+    let category_id: Option<i64> = sqlx::query_scalar!(
         "SELECT category_id FROM product WHERE id = ?",
+        payload.product_id,
     )
-    .bind(payload.product_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| AppError::database(e.to_string()))?;

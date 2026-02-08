@@ -544,15 +544,16 @@ impl OrderArchiveService {
             // Options
             if let Some(options) = &item.selected_options {
                 for opt in options {
-                    sqlx::query(
+                    let price = opt.price_modifier.unwrap_or(0.0);
+                    sqlx::query!(
                         "INSERT INTO archived_order_item_option (\
                             item_pk, attribute_name, option_name, price\
                         ) VALUES (?1, ?2, ?3, ?4)",
+                        item_pk,
+                        opt.attribute_name,
+                        opt.option_name,
+                        price,
                     )
-                    .bind(item_pk)
-                    .bind(&opt.attribute_name)
-                    .bind(&opt.option_name)
-                    .bind(opt.price_modifier.unwrap_or(0.0))
                     .execute(&mut *tx)
                     .await
                     .map_err(|e| ArchiveError::Database(e.to_string()))?;
@@ -583,30 +584,33 @@ impl OrderArchiveService {
                 serde_json::to_string(&archive_items).unwrap_or_else(|_| "[]".to_string())
             });
 
-            sqlx::query(
+            let seq = i as i32;
+            let split_type_str = payment.split_type.as_ref().map(|st| {
+                serde_json::to_value(st)
+                    .ok()
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_default()
+            });
+
+            sqlx::query!(
                 "INSERT INTO archived_order_payment (\
                     order_pk, seq, payment_id, method, amount, time, \
                     cancelled, cancel_reason, \
                     split_type, split_items, aa_shares, aa_total_shares\
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                order_pk,
+                seq,
+                payment.payment_id,
+                payment.method,
+                payment.amount,
+                payment.timestamp,
+                payment.cancelled,
+                payment.cancel_reason,
+                split_type_str,
+                split_items_str,
+                payment.aa_shares,
+                snapshot.aa_total_shares,
             )
-            .bind(order_pk)
-            .bind(i as i32)
-            .bind(&payment.payment_id)
-            .bind(&payment.method)
-            .bind(payment.amount)
-            .bind(payment.timestamp)
-            .bind(payment.cancelled)
-            .bind(&payment.cancel_reason)
-            .bind(payment.split_type.as_ref().map(|st| {
-                serde_json::to_value(st)
-                    .ok()
-                    .and_then(|v| v.as_str().map(String::from))
-                    .unwrap_or_default()
-            }))
-            .bind(&split_items_str)
-            .bind(payment.aa_shares)
-            .bind(snapshot.aa_total_shares)
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
@@ -631,30 +635,34 @@ impl OrderArchiveService {
             let payload_str =
                 serde_json::to_string(&event.payload).unwrap_or_else(|_| "{}".to_string());
 
-            sqlx::query(
+            let seq = i as i32;
+
+            sqlx::query!(
                 "INSERT INTO archived_order_event (\
                     order_pk, seq, event_type, timestamp, data, prev_hash, curr_hash\
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                order_pk,
+                seq,
+                event_type_str,
+                event.timestamp,
+                payload_str,
+                prev_event_hash,
+                curr_event_hash,
             )
-            .bind(order_pk)
-            .bind(i as i32)
-            .bind(&event_type_str)
-            .bind(event.timestamp)
-            .bind(&payload_str)
-            .bind(&prev_event_hash)
-            .bind(&curr_event_hash)
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
         }
 
         // 5e. Update system_state
-        sqlx::query("UPDATE system_state SET last_order_hash = ?1, updated_at = ?2 WHERE id = 1")
-            .bind(&order_hash)
-            .bind(now)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        sqlx::query!(
+            "UPDATE system_state SET last_order_hash = ?1, updated_at = ?2 WHERE id = 1",
+            order_hash,
+            now,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         tx.commit()
             .await

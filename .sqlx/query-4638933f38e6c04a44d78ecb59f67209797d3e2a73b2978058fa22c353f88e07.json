@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE shift SET last_active_at = ? WHERE id = ? AND status = 'OPEN'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "4638933f38e6c04a44d78ecb59f67209797d3e2a73b2978058fa22c353f88e07"
+}

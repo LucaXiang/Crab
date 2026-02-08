@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ? AND hash = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "9f37df3bd2321a7993736c74cad932844bad1dd02134f3bc76d18d763a8517db"
+}

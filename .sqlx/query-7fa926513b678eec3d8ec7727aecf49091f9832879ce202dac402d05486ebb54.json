@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7fa926513b678eec3d8ec7727aecf49091f9832879ce202dac402d05486ebb54"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM attribute_binding WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "69ec5c1b6b157ea86a96f96e91c5a7d62807ae7992f9bc71a86e3d5dab295034"
+}

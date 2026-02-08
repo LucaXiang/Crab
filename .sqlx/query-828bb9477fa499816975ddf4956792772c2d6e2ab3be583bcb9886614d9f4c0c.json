@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "828bb9477fa499816975ddf4956792772c2d6e2ab3be583bcb9886614d9f4c0c"
+}

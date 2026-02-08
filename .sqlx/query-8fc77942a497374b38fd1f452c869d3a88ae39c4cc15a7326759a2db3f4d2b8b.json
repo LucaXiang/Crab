@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE product SET name = COALESCE(?1, name), image = COALESCE(?2, image), category_id = COALESCE(?3, category_id), sort_order = COALESCE(?4, sort_order), tax_rate = COALESCE(?5, tax_rate), receipt_name = COALESCE(?6, receipt_name), kitchen_print_name = COALESCE(?7, kitchen_print_name), is_kitchen_print_enabled = COALESCE(?8, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?9, is_label_print_enabled), is_active = COALESCE(?10, is_active), external_id = COALESCE(?11, external_id) WHERE id = ?12",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "8fc77942a497374b38fd1f452c869d3a88ae39c4cc15a7326759a2db3f4d2b8b"
+}

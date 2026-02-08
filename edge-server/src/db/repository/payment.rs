@@ -60,25 +60,25 @@ pub async fn create_from_snapshot(
             serde_json::to_string(&simple).unwrap_or_else(|_| "[]".to_string())
         });
 
-        let result = sqlx::query(
+        let result = sqlx::query!(
             "INSERT INTO payment (payment_id, order_id, method, amount, tendered, change_amount, note, split_type, aa_shares, split_items, operator_id, operator_name, cancelled, cancel_reason, timestamp, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            payment.payment_id,
+            snapshot.order_id,
+            payment.method,
+            payment.amount,
+            payment.tendered,
+            payment.change,
+            payment.note,
+            split_type_str,
+            payment.aa_shares,
+            split_items_json,
+            operator_id,
+            operator_name,
+            payment.cancelled,
+            payment.cancel_reason,
+            payment.timestamp,
+            now
         )
-        .bind(&payment.payment_id)
-        .bind(&snapshot.order_id)
-        .bind(&payment.method)
-        .bind(payment.amount)
-        .bind(payment.tendered)
-        .bind(payment.change)
-        .bind(&payment.note)
-        .bind(split_type_str)
-        .bind(payment.aa_shares)
-        .bind(&split_items_json)
-        .bind(operator_id)
-        .bind(operator_name)
-        .bind(payment.cancelled)
-        .bind(&payment.cancel_reason)
-        .bind(payment.timestamp)
-        .bind(now)
         .execute(pool)
         .await;
 

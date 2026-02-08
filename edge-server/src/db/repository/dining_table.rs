@@ -50,12 +50,12 @@ pub async fn find_by_name_in_zone(
 
 pub async fn create(pool: &SqlitePool, data: DiningTableCreate) -> RepoResult<DiningTable> {
     let capacity = data.capacity.unwrap_or(4);
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO dining_table (name, zone_id, capacity) VALUES (?, ?, ?) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO dining_table (name, zone_id, capacity) VALUES (?, ?, ?) RETURNING id as "id!""#,
+        data.name,
+        data.zone_id,
+        capacity
     )
-    .bind(&data.name)
-    .bind(data.zone_id)
-    .bind(capacity)
     .fetch_one(pool)
     .await?;
     find_by_id(pool, id)
@@ -64,14 +64,14 @@ pub async fn create(pool: &SqlitePool, data: DiningTableCreate) -> RepoResult<Di
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, data: DiningTableUpdate) -> RepoResult<DiningTable> {
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE dining_table SET name = COALESCE(?1, name), zone_id = COALESCE(?2, zone_id), capacity = COALESCE(?3, capacity), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+        data.name,
+        data.zone_id,
+        data.capacity,
+        data.is_active,
+        id
     )
-    .bind(&data.name)
-    .bind(data.zone_id)
-    .bind(data.capacity)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
@@ -83,8 +83,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: DiningTableUpdate) -> Repo
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    sqlx::query("DELETE FROM dining_table WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM dining_table WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)

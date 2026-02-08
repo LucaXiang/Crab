@@ -20,24 +20,10 @@ Thumbs.db
 .env.*.local
 
 # ========== Database ==========
-# SurrealDB
-.surrealdb
 *.db
-
-# RocksDB files
-CURRENT
-IDENTITY
-LOCK
-LOG
-LOG.old*
-MANIFEST-*
-OPTIONS-*
-*.sst
-*.ldb
 
 # Database directories
 database/
-*.rocksdb/
 *.sqlite
 
 # ========== Certificates & Secrets ==========

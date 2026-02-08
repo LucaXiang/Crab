@@ -34,14 +34,14 @@ pub async fn create(pool: &SqlitePool, data: ShiftCreate) -> RepoResult<Shift> {
     }
 
     let now = shared::util::now_millis();
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO shift (operator_id, operator_name, status, start_time, starting_cash, expected_cash, abnormal_close, last_active_at, note, created_at, updated_at) VALUES (?1, ?2, 'OPEN', ?3, ?4, ?4, 0, ?3, ?5, ?3, ?3) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO shift (operator_id, operator_name, status, start_time, starting_cash, expected_cash, abnormal_close, last_active_at, note, created_at, updated_at) VALUES (?1, ?2, 'OPEN', ?3, ?4, ?4, 0, ?3, ?5, ?3, ?3) RETURNING id as "id!""#,
+        data.operator_id,
+        data.operator_name,
+        now,
+        data.starting_cash,
+        data.note
     )
-    .bind(data.operator_id)
-    .bind(&data.operator_name)
-    .bind(now)
-    .bind(data.starting_cash)
-    .bind(&data.note)
     .fetch_one(pool)
     .await?;
 
@@ -99,13 +99,13 @@ pub async fn update(pool: &SqlitePool, id: i64, data: ShiftUpdate) -> RepoResult
     let now = shared::util::now_millis();
 
     // When starting_cash changes, adjust expected_cash accordingly
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE shift SET starting_cash = COALESCE(?1, starting_cash), expected_cash = CASE WHEN ?1 IS NOT NULL THEN ?1 + (expected_cash - starting_cash) ELSE expected_cash END, note = COALESCE(?2, note), last_active_at = ?3, updated_at = ?3 WHERE id = ?4 AND status = 'OPEN'",
+        data.starting_cash,
+        data.note,
+        now,
+        id
     )
-    .bind(data.starting_cash)
-    .bind(&data.note)
-    .bind(now)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -123,21 +123,14 @@ pub async fn close(pool: &SqlitePool, id: i64, data: ShiftClose) -> RepoResult<S
     validate_cash_amount(data.actual_cash, "Actual cash")?;
     let now = shared::util::now_millis();
 
-    // Compute cash_variance in application: actual_cash - expected_cash
-    // Need to read expected_cash first
-    let existing = find_by_id(pool, id)
-        .await?
-        .ok_or_else(|| RepoError::NotFound(format!("Shift {id} not found")))?;
-    let cash_variance = data.actual_cash - existing.expected_cash;
-
-    let rows = sqlx::query(
-        "UPDATE shift SET status = 'CLOSED', end_time = ?1, actual_cash = ?2, cash_variance = ?3, abnormal_close = 0, note = COALESCE(?4, note), last_active_at = ?1, updated_at = ?1 WHERE id = ?5 AND status = 'OPEN'",
+    // Atomic: compute cash_variance = actual_cash - expected_cash in SQL
+    let rows = sqlx::query!(
+        "UPDATE shift SET status = 'CLOSED', end_time = ?1, actual_cash = ?2, cash_variance = (?2 - expected_cash), abnormal_close = 0, note = COALESCE(?3, note), last_active_at = ?1, updated_at = ?1 WHERE id = ?4 AND status = 'OPEN'",
+        now,
+        data.actual_cash,
+        data.note,
+        id
     )
-    .bind(now)
-    .bind(data.actual_cash)
-    .bind(cash_variance)
-    .bind(&data.note)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -155,12 +148,12 @@ pub async fn force_close(pool: &SqlitePool, id: i64, data: ShiftForceClose) -> R
     let now = shared::util::now_millis();
     let note = data.note.as_deref().unwrap_or("Force closed without cash counting");
 
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE shift SET status = 'CLOSED', end_time = ?1, abnormal_close = 1, note = ?2, last_active_at = ?1, updated_at = ?1 WHERE id = ?3 AND status = 'OPEN'",
+        now,
+        note,
+        id
     )
-    .bind(now)
-    .bind(note)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -186,12 +179,12 @@ pub async fn find_stale_shifts(pool: &SqlitePool, business_day_start: i64) -> Re
 
 pub async fn add_cash_payment(pool: &SqlitePool, operator_id: i64, amount: f64) -> RepoResult<()> {
     let now = shared::util::now_millis();
-    sqlx::query(
+    sqlx::query!(
         "UPDATE shift SET expected_cash = expected_cash + ?1, last_active_at = ?2, updated_at = ?2 WHERE operator_id = ?3 AND status = 'OPEN'",
+        amount,
+        now,
+        operator_id
     )
-    .bind(amount)
-    .bind(now)
-    .bind(operator_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -199,9 +192,7 @@ pub async fn add_cash_payment(pool: &SqlitePool, operator_id: i64, amount: f64) 
 
 pub async fn heartbeat(pool: &SqlitePool, id: i64) -> RepoResult<()> {
     let now = shared::util::now_millis();
-    sqlx::query("UPDATE shift SET last_active_at = ? WHERE id = ? AND status = 'OPEN'")
-        .bind(now)
-        .bind(id)
+    sqlx::query!("UPDATE shift SET last_active_at = ? WHERE id = ? AND status = 'OPEN'", now, id)
         .execute(pool)
         .await?;
     Ok(())

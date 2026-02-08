@@ -266,12 +266,10 @@ pub async fn fetch_order_list(
 
     let (orders, total) = if let Some(ref search) = params.search {
         let search_pattern = format!("%{}%", search.to_lowercase());
-        let total: i64 = sqlx::query_scalar(
+        let total: i64 = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND LOWER(receipt_number) LIKE ?3",
+            start_millis, end_millis, search_pattern,
         )
-        .bind(start_millis)
-        .bind(end_millis)
-        .bind(&search_pattern)
         .fetch_one(&state.pool)
         .await
         .unwrap_or(0);
@@ -290,11 +288,10 @@ pub async fn fetch_order_list(
 
         (rows, total)
     } else {
-        let total: i64 = sqlx::query_scalar(
+        let total: i64 = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
+            start_millis, end_millis,
         )
-        .bind(start_millis)
-        .bind(end_millis)
         .fetch_one(&state.pool)
         .await
         .unwrap_or(0);

@@ -45,12 +45,12 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Ta
 pub async fn create(pool: &SqlitePool, data: TagCreate) -> RepoResult<Tag> {
     let color = data.color.unwrap_or_else(|| "#3B82F6".to_string());
     let display_order = data.display_order.unwrap_or(0);
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO tag (name, color, display_order) VALUES (?, ?, ?) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO tag (name, color, display_order) VALUES (?, ?, ?) RETURNING id as "id!""#,
+        data.name,
+        color,
+        display_order
     )
-    .bind(&data.name)
-    .bind(&color)
-    .bind(display_order)
     .fetch_one(pool)
     .await?;
     find_by_id(pool, id)
@@ -59,14 +59,14 @@ pub async fn create(pool: &SqlitePool, data: TagCreate) -> RepoResult<Tag> {
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, data: TagUpdate) -> RepoResult<Tag> {
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE tag SET name = COALESCE(?1, name), color = COALESCE(?2, color), display_order = COALESCE(?3, display_order), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+        data.name,
+        data.color,
+        data.display_order,
+        data.is_active,
+        id
     )
-    .bind(&data.name)
-    .bind(&data.color)
-    .bind(data.display_order)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
@@ -78,8 +78,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: TagUpdate) -> RepoResult<T
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    sqlx::query("DELETE FROM tag WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM tag WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)

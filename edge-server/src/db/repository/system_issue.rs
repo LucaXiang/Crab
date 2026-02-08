@@ -11,18 +11,18 @@ pub async fn create(pool: &SqlitePool, data: SystemIssueCreate) -> RepoResult<Sy
     let options_json =
         serde_json::to_string(&data.options).unwrap_or_else(|_| "[]".to_string());
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO system_issue (source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO system_issue (source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9) RETURNING id as "id!""#,
+        data.source,
+        data.kind,
+        data.blocking,
+        data.target,
+        params_json,
+        data.title,
+        data.description,
+        options_json,
+        now
     )
-    .bind(&data.source)
-    .bind(&data.kind)
-    .bind(data.blocking)
-    .bind(&data.target)
-    .bind(&params_json)
-    .bind(&data.title)
-    .bind(&data.description)
-    .bind(&options_json)
-    .bind(now)
     .fetch_one(pool)
     .await?;
 
@@ -67,13 +67,13 @@ pub async fn resolve(
     resolved_by: Option<&str>,
 ) -> RepoResult<SystemIssue> {
     let now = shared::util::now_millis();
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE system_issue SET status = 'resolved', response = ?1, resolved_by = ?2, resolved_at = ?3 WHERE id = ?4",
+        response,
+        resolved_by,
+        now,
+        id
     )
-    .bind(response)
-    .bind(resolved_by)
-    .bind(now)
-    .bind(id)
     .execute(pool)
     .await?;
 

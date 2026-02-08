@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE shift SET starting_cash = COALESCE(?1, starting_cash), expected_cash = CASE WHEN ?1 IS NOT NULL THEN ?1 + (expected_cash - starting_cash) ELSE expected_cash END, note = COALESCE(?2, note), last_active_at = ?3, updated_at = ?3 WHERE id = ?4 AND status = 'OPEN'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "be860cf635b8fdd0ec5c5199a286b743a8850275921f2e4017107b784f77b555"
+}

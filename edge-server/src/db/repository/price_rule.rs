@@ -34,7 +34,7 @@ pub async fn find_by_scope(pool: &SqlitePool, scope: ProductScope) -> RepoResult
     let rules = sqlx::query_as::<_, PriceRule>(
         "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND product_scope = ? ORDER BY created_at DESC",
     )
-    .bind(&scope)
+    .bind(scope)
     .fetch_all(pool)
     .await?;
     Ok(rules)
@@ -68,28 +68,30 @@ pub async fn create(pool: &SqlitePool, data: PriceRuleCreate) -> RepoResult<Pric
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO price_rule (name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19) RETURNING id",
+    let is_stackable = data.is_stackable.unwrap_or(true);
+    let is_exclusive = data.is_exclusive.unwrap_or(false);
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO price_rule (name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19) RETURNING id as "id!""#,
+        data.name,
+        data.display_name,
+        data.receipt_name,
+        data.description,
+        data.rule_type,
+        data.product_scope,
+        data.target_id,
+        zone_scope,
+        data.adjustment_type,
+        data.adjustment_value,
+        is_stackable,
+        is_exclusive,
+        data.valid_from,
+        data.valid_until,
+        active_days_json,
+        data.active_start_time,
+        data.active_end_time,
+        data.created_by,
+        now
     )
-    .bind(&data.name)
-    .bind(&data.display_name)
-    .bind(&data.receipt_name)
-    .bind(&data.description)
-    .bind(&data.rule_type)
-    .bind(&data.product_scope)
-    .bind(data.target_id)
-    .bind(&zone_scope)
-    .bind(&data.adjustment_type)
-    .bind(data.adjustment_value)
-    .bind(data.is_stackable.unwrap_or(true))
-    .bind(data.is_exclusive.unwrap_or(false))
-    .bind(data.valid_from)
-    .bind(data.valid_until)
-    .bind(&active_days_json)
-    .bind(&data.active_start_time)
-    .bind(&data.active_end_time)
-    .bind(data.created_by)
-    .bind(now)
     .fetch_one(pool)
     .await?;
 
@@ -104,28 +106,28 @@ pub async fn update(pool: &SqlitePool, id: i64, data: PriceRuleUpdate) -> RepoRe
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE price_rule SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), receipt_name = COALESCE(?3, receipt_name), description = COALESCE(?4, description), rule_type = COALESCE(?5, rule_type), product_scope = COALESCE(?6, product_scope), target_id = COALESCE(?7, target_id), zone_scope = COALESCE(?8, zone_scope), adjustment_type = COALESCE(?9, adjustment_type), adjustment_value = COALESCE(?10, adjustment_value), is_stackable = COALESCE(?11, is_stackable), is_exclusive = COALESCE(?12, is_exclusive), valid_from = COALESCE(?13, valid_from), valid_until = COALESCE(?14, valid_until), active_days = COALESCE(?15, active_days), active_start_time = COALESCE(?16, active_start_time), active_end_time = COALESCE(?17, active_end_time), is_active = COALESCE(?18, is_active) WHERE id = ?19",
+        data.name,
+        data.display_name,
+        data.receipt_name,
+        data.description,
+        data.rule_type,
+        data.product_scope,
+        data.target_id,
+        data.zone_scope,
+        data.adjustment_type,
+        data.adjustment_value,
+        data.is_stackable,
+        data.is_exclusive,
+        data.valid_from,
+        data.valid_until,
+        active_days_json,
+        data.active_start_time,
+        data.active_end_time,
+        data.is_active,
+        id
     )
-    .bind(&data.name)
-    .bind(&data.display_name)
-    .bind(&data.receipt_name)
-    .bind(&data.description)
-    .bind(&data.rule_type)
-    .bind(&data.product_scope)
-    .bind(data.target_id)
-    .bind(&data.zone_scope)
-    .bind(&data.adjustment_type)
-    .bind(data.adjustment_value)
-    .bind(data.is_stackable)
-    .bind(data.is_exclusive)
-    .bind(data.valid_from)
-    .bind(data.valid_until)
-    .bind(&active_days_json)
-    .bind(&data.active_start_time)
-    .bind(&data.active_end_time)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -138,8 +140,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: PriceRuleUpdate) -> RepoRe
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    sqlx::query("DELETE FROM price_rule WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM price_rule WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)

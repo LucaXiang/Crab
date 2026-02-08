@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE dining_table SET name = COALESCE(?1, name), zone_id = COALESCE(?2, zone_id), capacity = COALESCE(?3, capacity), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "0064d04e10bb16dfe56e26b080e9a5b2da01e4999fa401febb045ce080e80064"
+}

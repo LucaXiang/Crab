@@ -1,7 +1,7 @@
 /**
  * Archived Order Types
  *
- * Types for archived order history from SurrealDB graph model.
+ * Types for archived order history.
  * Matches backend Rust types exactly.
  */
 

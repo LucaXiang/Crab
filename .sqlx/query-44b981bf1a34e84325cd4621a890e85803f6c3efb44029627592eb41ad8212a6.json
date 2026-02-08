@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE category SET name = COALESCE(?1, name), sort_order = COALESCE(?2, sort_order), is_kitchen_print_enabled = COALESCE(?3, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?4, is_label_print_enabled), is_virtual = COALESCE(?5, is_virtual), match_mode = COALESCE(?6, match_mode), is_display = COALESCE(?7, is_display), is_active = COALESCE(?8, is_active) WHERE id = ?9",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "44b981bf1a34e84325cd4621a890e85803f6c3efb44029627592eb41ad8212a6"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE shift SET status = 'CLOSED', end_time = ?1, actual_cash = ?2, cash_variance = (?2 - expected_cash), abnormal_close = 0, note = COALESCE(?3, note), last_active_at = ?1, updated_at = ?1 WHERE id = ?4 AND status = 'OPEN'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "549ea904dc5939a05b475efe7d8ebc4d1184bba7c6ad49c51135caf5c7b6b27a"
+}

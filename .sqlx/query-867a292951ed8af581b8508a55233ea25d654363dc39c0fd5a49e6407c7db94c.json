@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE print_destination SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active) WHERE id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "867a292951ed8af581b8508a55233ea25d654363dc39c0fd5a49e6407c7db94c"
+}

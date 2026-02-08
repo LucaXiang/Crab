@@ -19,10 +19,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
     .fetch_all(pool)
     .await?;
 
-    // Load options for each attribute
-    for attr in &mut attrs {
-        attr.options = find_options_by_attribute(pool, attr.id).await?;
-    }
+    batch_load_options(pool, &mut attrs).await?;
     Ok(attrs)
 }
 
@@ -48,35 +45,39 @@ pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attr
 
     let mut tx = pool.begin().await?;
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO attribute (name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id",
+    let is_multi_select = data.is_multi_select.unwrap_or(false);
+    let display_order = data.display_order.unwrap_or(0);
+    let show_on_receipt = data.show_on_receipt.unwrap_or(false);
+    let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(false);
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO attribute (name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id as "id!""#,
+        data.name,
+        is_multi_select,
+        data.max_selections,
+        default_option_indices_json,
+        display_order,
+        show_on_receipt,
+        data.receipt_name,
+        show_on_kitchen_print,
+        data.kitchen_print_name,
     )
-    .bind(&data.name)
-    .bind(data.is_multi_select.unwrap_or(false))
-    .bind(data.max_selections)
-    .bind(&default_option_indices_json)
-    .bind(data.display_order.unwrap_or(0))
-    .bind(data.show_on_receipt.unwrap_or(false))
-    .bind(&data.receipt_name)
-    .bind(data.show_on_kitchen_print.unwrap_or(false))
-    .bind(&data.kitchen_print_name)
     .fetch_one(&mut *tx)
     .await?;
 
     // Create options
     if let Some(options) = data.options {
         for opt in options {
-            sqlx::query(
+            sqlx::query!(
                 "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
+                id,
+                opt.name,
+                opt.price_modifier,
+                opt.display_order,
+                opt.receipt_name,
+                opt.kitchen_print_name,
+                opt.enable_quantity,
+                opt.max_quantity,
             )
-            .bind(id)
-            .bind(&opt.name)
-            .bind(opt.price_modifier)
-            .bind(opt.display_order)
-            .bind(&opt.receipt_name)
-            .bind(&opt.kitchen_print_name)
-            .bind(opt.enable_quantity)
-            .bind(opt.max_quantity)
             .execute(&mut *tx)
             .await?;
         }
@@ -95,20 +96,20 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE attribute SET name = COALESCE(?1, name), is_multi_select = COALESCE(?2, is_multi_select), max_selections = COALESCE(?3, max_selections), default_option_indices = COALESCE(?4, default_option_indices), display_order = COALESCE(?5, display_order), show_on_receipt = COALESCE(?6, show_on_receipt), receipt_name = COALESCE(?7, receipt_name), show_on_kitchen_print = COALESCE(?8, show_on_kitchen_print), kitchen_print_name = COALESCE(?9, kitchen_print_name), is_active = COALESCE(?10, is_active) WHERE id = ?11",
+        data.name,
+        data.is_multi_select,
+        data.max_selections,
+        default_option_indices_json,
+        data.display_order,
+        data.show_on_receipt,
+        data.receipt_name,
+        data.show_on_kitchen_print,
+        data.kitchen_print_name,
+        data.is_active,
+        id,
     )
-    .bind(&data.name)
-    .bind(data.is_multi_select)
-    .bind(data.max_selections)
-    .bind(&default_option_indices_json)
-    .bind(data.display_order)
-    .bind(data.show_on_receipt)
-    .bind(&data.receipt_name)
-    .bind(data.show_on_kitchen_print)
-    .bind(&data.kitchen_print_name)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -119,22 +120,21 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
     // Replace options if provided (atomic: delete + re-create in transaction)
     if let Some(options) = data.options {
         let mut tx = pool.begin().await?;
-        sqlx::query("DELETE FROM attribute_option WHERE attribute_id = ?")
-            .bind(id)
+        sqlx::query!("DELETE FROM attribute_option WHERE attribute_id = ?", id)
             .execute(&mut *tx)
             .await?;
         for opt in &options {
-            sqlx::query(
+            sqlx::query!(
                 "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
+                id,
+                opt.name,
+                opt.price_modifier,
+                opt.display_order,
+                opt.receipt_name,
+                opt.kitchen_print_name,
+                opt.enable_quantity,
+                opt.max_quantity,
             )
-            .bind(id)
-            .bind(&opt.name)
-            .bind(opt.price_modifier)
-            .bind(opt.display_order)
-            .bind(&opt.receipt_name)
-            .bind(&opt.kitchen_print_name)
-            .bind(opt.enable_quantity)
-            .bind(opt.max_quantity)
             .execute(&mut *tx)
             .await?;
         }
@@ -149,13 +149,11 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     let mut tx = pool.begin().await?;
     // Delete bindings first
-    sqlx::query("DELETE FROM attribute_binding WHERE attribute_id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM attribute_binding WHERE attribute_id = ?", id)
         .execute(&mut *tx)
         .await?;
     // Options cascade via FK
-    sqlx::query("DELETE FROM attribute WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM attribute WHERE id = ?", id)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
@@ -176,6 +174,52 @@ async fn find_options_by_attribute(pool: &SqlitePool, attribute_id: i64) -> Repo
     Ok(options)
 }
 
+/// Batch load options for multiple attributes (eliminates N+1)
+async fn batch_load_options(pool: &SqlitePool, attrs: &mut [Attribute]) -> RepoResult<()> {
+    if attrs.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<i64> = attrs.iter().map(|a| a.id).collect();
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity FROM attribute_option WHERE attribute_id IN ({placeholders}) ORDER BY display_order"
+    );
+    let mut query = sqlx::query_as::<_, AttributeOption>(&sql);
+    for id in &ids {
+        query = query.bind(id);
+    }
+    let all_options = query.fetch_all(pool).await?;
+
+    let mut map: std::collections::HashMap<i64, Vec<AttributeOption>> = std::collections::HashMap::new();
+    for opt in all_options {
+        map.entry(opt.attribute_id).or_default().push(opt);
+    }
+    for attr in attrs.iter_mut() {
+        attr.options = map.remove(&attr.id).unwrap_or_default();
+    }
+    Ok(())
+}
+
+/// Batch load attributes by IDs with their options (eliminates N+1 in binding queries)
+async fn batch_find_attributes(pool: &SqlitePool, ids: &[i64]) -> RepoResult<std::collections::HashMap<i64, Attribute>> {
+    if ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT id, name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id IN ({placeholders})"
+    );
+    let mut query = sqlx::query_as::<_, Attribute>(&sql);
+    for id in ids {
+        query = query.bind(id);
+    }
+    let mut attrs: Vec<Attribute> = query.fetch_all(pool).await?;
+    batch_load_options(pool, &mut attrs).await?;
+
+    let map = attrs.into_iter().map(|a| (a.id, a)).collect();
+    Ok(map)
+}
+
 // =========================================================================
 // Attribute Bindings
 // =========================================================================
@@ -193,15 +237,15 @@ pub async fn link(
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO attribute_binding (owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO attribute_binding (owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id as "id!""#,
+        owner_type,
+        owner_id,
+        attribute_id,
+        is_required,
+        display_order,
+        indices_json,
     )
-    .bind(owner_type)
-    .bind(owner_id)
-    .bind(attribute_id)
-    .bind(is_required)
-    .bind(display_order)
-    .bind(&indices_json)
     .fetch_one(pool)
     .await?;
 
@@ -216,12 +260,12 @@ pub async fn unlink(
     owner_id: i64,
     attribute_id: i64,
 ) -> RepoResult<bool> {
-    sqlx::query(
+    sqlx::query!(
         "DELETE FROM attribute_binding WHERE owner_type = ? AND owner_id = ? AND attribute_id = ?",
+        owner_type,
+        owner_id,
+        attribute_id,
     )
-    .bind(owner_type)
-    .bind(owner_id)
-    .bind(attribute_id)
     .execute(pool)
     .await?;
     Ok(true)
@@ -248,13 +292,13 @@ pub async fn update_binding(
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE attribute_binding SET is_required = COALESCE(?1, is_required), display_order = COALESCE(?2, display_order), default_option_indices = COALESCE(?3, default_option_indices) WHERE id = ?4",
+        is_required,
+        display_order,
+        indices_json,
+        id,
     )
-    .bind(is_required)
-    .bind(display_order)
-    .bind(&indices_json)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -268,8 +312,7 @@ pub async fn update_binding(
 }
 
 pub async fn delete_binding(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    let rows = sqlx::query("DELETE FROM attribute_binding WHERE id = ?")
-        .bind(id)
+    let rows = sqlx::query!("DELETE FROM attribute_binding WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(rows.rows_affected() > 0)
@@ -282,12 +325,12 @@ pub async fn has_binding(
     owner_id: i64,
     attribute_id: i64,
 ) -> RepoResult<bool> {
-    let count: i64 = sqlx::query_scalar(
+    let count = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM attribute_binding WHERE owner_type = ? AND owner_id = ? AND attribute_id = ?",
+        owner_type,
+        owner_id,
+        attribute_id,
     )
-    .bind(owner_type)
-    .bind(owner_id)
-    .bind(attribute_id)
     .fetch_one(pool)
     .await?;
     Ok(count > 0)
@@ -307,11 +350,19 @@ pub async fn find_bindings_for_owner(
     .fetch_all(pool)
     .await?;
 
+    if bindings.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Batch load all attributes
+    let attr_ids: Vec<i64> = bindings.iter().map(|b| b.attribute_id).collect();
+    let attrs = batch_find_attributes(pool, &attr_ids).await?;
+
     let mut result = Vec::new();
     for binding in bindings {
-        if let Some(attr) = find_by_id(pool, binding.attribute_id).await? {
+        if let Some(attr) = attrs.get(&binding.attribute_id) {
             if attr.is_active {
-                result.push((binding, attr));
+                result.push((binding, attr.clone()));
             }
         }
     }
@@ -328,20 +379,19 @@ pub async fn find_all_bindings_with_attributes(
     .fetch_all(pool)
     .await?;
 
+    if bindings.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Batch load all unique attributes
+    let attr_ids: Vec<i64> = bindings.iter().map(|b| b.attribute_id).collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let attrs = batch_find_attributes(pool, &attr_ids).await?;
+
     let mut result = Vec::new();
-    // Cache attributes to avoid repeated fetches for the same attribute_id
-    let mut attr_cache: std::collections::HashMap<i64, Option<Attribute>> = std::collections::HashMap::new();
     for binding in bindings {
-        let attr = if let Some(cached) = attr_cache.get(&binding.attribute_id) {
-            cached.clone()
-        } else {
-            let attr = find_by_id(pool, binding.attribute_id).await?;
-            attr_cache.insert(binding.attribute_id, attr.clone());
-            attr
-        };
-        if let Some(attr) = attr {
+        if let Some(attr) = attrs.get(&binding.attribute_id) {
             if attr.is_active {
-                result.push((binding, attr));
+                result.push((binding, attr.clone()));
             }
         }
     }

@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize TUI Logger with Tracing
     let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,surrealdb=warn,http_access=trace"));
+        .unwrap_or_else(|_| EnvFilter::new("info,http_access=trace"));
 
     tracing_subscriber::registry()
         .with(tui_logger::tracing_subscriber_layer())

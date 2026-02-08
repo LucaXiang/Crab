@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE attribute SET name = COALESCE(?1, name), is_multi_select = COALESCE(?2, is_multi_select), max_selections = COALESCE(?3, max_selections), default_option_indices = COALESCE(?4, default_option_indices), display_order = COALESCE(?5, display_order), show_on_receipt = COALESCE(?6, show_on_receipt), receipt_name = COALESCE(?7, receipt_name), show_on_kitchen_print = COALESCE(?8, show_on_kitchen_print), kitchen_print_name = COALESCE(?9, kitchen_print_name), is_active = COALESCE(?10, is_active) WHERE id = ?11",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "6373486140f64e1d26577dc156e1bc800579dc94d6d2ed15029f185e90fb6265"
+}

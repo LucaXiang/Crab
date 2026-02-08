@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE system_issue SET status = 'resolved', response = ?1, resolved_by = ?2, resolved_at = ?3 WHERE id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "220fa44bcaf2281d9dd37529423f043d96e7cbf15908e6340cedc64d9a8f930a"
+}

@@ -41,11 +41,9 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, argon2::passw
         .is_ok())
 }
 
-const SAFE_COLUMNS: &str = "id, username, display_name, role_id, is_system, is_active, created_at";
-
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Employee>> {
     let employees = sqlx::query_as::<_, Employee>(
-        &format!("SELECT {SAFE_COLUMNS} FROM employee WHERE is_active = 1 ORDER BY username"),
+        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee WHERE is_active = 1 ORDER BY username",
     )
     .fetch_all(pool)
     .await?;
@@ -54,7 +52,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Employee>> {
 
 pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Employee>> {
     let employees = sqlx::query_as::<_, Employee>(
-        &format!("SELECT {SAFE_COLUMNS} FROM employee ORDER BY username"),
+        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee ORDER BY username",
     )
     .fetch_all(pool)
     .await?;
@@ -63,7 +61,7 @@ pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Employe
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Employee>> {
     let employee = sqlx::query_as::<_, Employee>(
-        &format!("SELECT {SAFE_COLUMNS} FROM employee WHERE id = ?"),
+        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -73,7 +71,7 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Employe
 
 pub async fn find_by_username(pool: &SqlitePool, username: &str) -> RepoResult<Option<Employee>> {
     let employee = sqlx::query_as::<_, Employee>(
-        &format!("SELECT {SAFE_COLUMNS} FROM employee WHERE username = ? LIMIT 1"),
+        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee WHERE username = ? LIMIT 1",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -101,14 +99,14 @@ pub async fn create(pool: &SqlitePool, data: EmployeeCreate) -> RepoResult<Emplo
     let display_name = data.display_name.unwrap_or_else(|| data.username.clone());
     let now = shared::util::now_millis();
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO employee (username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, 0, 1, ?) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO employee (username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, 0, 1, ?) RETURNING id as "id!""#,
+        data.username,
+        hash_pass,
+        display_name,
+        data.role_id,
+        now
     )
-    .bind(&data.username)
-    .bind(&hash_pass)
-    .bind(&display_name)
-    .bind(data.role_id)
-    .bind(now)
     .fetch_one(pool)
     .await?;
 
@@ -144,15 +142,15 @@ pub async fn update(pool: &SqlitePool, id: i64, data: EmployeeUpdate) -> RepoRes
         None
     };
 
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE employee SET username = COALESCE(?1, username), display_name = COALESCE(?2, display_name), hash_pass = COALESCE(?3, hash_pass), role_id = COALESCE(?4, role_id), is_active = COALESCE(?5, is_active) WHERE id = ?6",
+        data.username,
+        data.display_name,
+        hash_pass,
+        data.role_id,
+        data.is_active,
+        id
     )
-    .bind(&data.username)
-    .bind(&data.display_name)
-    .bind(&hash_pass)
-    .bind(data.role_id)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -175,8 +173,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
         ));
     }
 
-    sqlx::query("DELETE FROM employee WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM employee WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)

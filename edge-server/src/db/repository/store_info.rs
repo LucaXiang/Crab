@@ -13,12 +13,12 @@ pub async fn get_or_create(pool: &SqlitePool) -> RepoResult<StoreInfo> {
 
     // Create singleton with defaults
     let now = shared::util::now_millis();
-    sqlx::query(
+    sqlx::query!(
         "INSERT INTO store_info (id, name, address, nif, business_day_cutoff, created_at, updated_at) VALUES (?, '', '', '', '02:00', ?, ?)",
+        SINGLETON_ID,
+        now,
+        now
     )
-    .bind(SINGLETON_ID)
-    .bind(now)
-    .bind(now)
     .execute(pool)
     .await?;
 
@@ -39,19 +39,19 @@ pub async fn get(pool: &SqlitePool) -> RepoResult<Option<StoreInfo>> {
 
 pub async fn update(pool: &SqlitePool, data: StoreInfoUpdate) -> RepoResult<StoreInfo> {
     let now = shared::util::now_millis();
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE store_info SET name = COALESCE(?1, name), address = COALESCE(?2, address), nif = COALESCE(?3, nif), logo_url = COALESCE(?4, logo_url), phone = COALESCE(?5, phone), email = COALESCE(?6, email), website = COALESCE(?7, website), business_day_cutoff = COALESCE(?8, business_day_cutoff), updated_at = ?9 WHERE id = ?10",
+        data.name,
+        data.address,
+        data.nif,
+        data.logo_url,
+        data.phone,
+        data.email,
+        data.website,
+        data.business_day_cutoff,
+        now,
+        SINGLETON_ID
     )
-    .bind(&data.name)
-    .bind(&data.address)
-    .bind(&data.nif)
-    .bind(&data.logo_url)
-    .bind(&data.phone)
-    .bind(&data.email)
-    .bind(&data.website)
-    .bind(&data.business_day_cutoff)
-    .bind(now)
-    .bind(SINGLETON_ID)
     .execute(pool)
     .await?;
 

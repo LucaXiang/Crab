@@ -13,9 +13,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<PrintDestination>> {
     .fetch_all(pool)
     .await?;
 
-    for dest in &mut dests {
-        dest.printers = find_printers(pool, dest.id).await?;
-    }
+    batch_load_printers(pool, &mut dests).await?;
     Ok(dests)
 }
 
@@ -26,9 +24,7 @@ pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<PrintDe
     .fetch_all(pool)
     .await?;
 
-    for dest in &mut dests {
-        dest.printers = find_printers(pool, dest.id).await?;
-    }
+    batch_load_printers(pool, &mut dests).await?;
     Ok(dests)
 }
 
@@ -63,28 +59,28 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Pr
 pub async fn create(pool: &SqlitePool, data: PrintDestinationCreate) -> RepoResult<PrintDestination> {
     let mut tx = pool.begin().await?;
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO print_destination (name, description, is_active) VALUES (?, ?, ?) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO print_destination (name, description, is_active) VALUES (?, ?, ?) RETURNING id as "id!""#,
+        data.name,
+        data.description,
+        data.is_active
     )
-    .bind(&data.name)
-    .bind(&data.description)
-    .bind(data.is_active)
     .fetch_one(&mut *tx)
     .await?;
 
     // Create printers
     for printer in &data.printers {
-        sqlx::query(
+        sqlx::query!(
             "INSERT INTO printer (print_destination_id, printer_type, printer_format, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            id,
+            printer.printer_type,
+            printer.printer_format,
+            printer.ip,
+            printer.port,
+            printer.driver_name,
+            printer.priority,
+            printer.is_active
         )
-        .bind(id)
-        .bind(&printer.printer_type)
-        .bind(&printer.printer_format)
-        .bind(&printer.ip)
-        .bind(printer.port)
-        .bind(&printer.driver_name)
-        .bind(printer.priority)
-        .bind(printer.is_active)
         .execute(&mut *tx)
         .await?;
     }
@@ -101,13 +97,13 @@ pub async fn update(
     id: i64,
     data: PrintDestinationUpdate,
 ) -> RepoResult<PrintDestination> {
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE print_destination SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active) WHERE id = ?4",
+        data.name,
+        data.description,
+        data.is_active,
+        id
     )
-    .bind(&data.name)
-    .bind(&data.description)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -120,22 +116,21 @@ pub async fn update(
     // Replace printers if provided (atomic: delete + re-create in transaction)
     if let Some(printers) = &data.printers {
         let mut tx = pool.begin().await?;
-        sqlx::query("DELETE FROM printer WHERE print_destination_id = ?")
-            .bind(id)
+        sqlx::query!("DELETE FROM printer WHERE print_destination_id = ?", id)
             .execute(&mut *tx)
             .await?;
         for printer in printers {
-            sqlx::query(
+            sqlx::query!(
                 "INSERT INTO printer (print_destination_id, printer_type, printer_format, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                id,
+                printer.printer_type,
+                printer.printer_format,
+                printer.ip,
+                printer.port,
+                printer.driver_name,
+                printer.priority,
+                printer.is_active
             )
-            .bind(id)
-            .bind(&printer.printer_type)
-            .bind(&printer.printer_format)
-            .bind(&printer.ip)
-            .bind(printer.port)
-            .bind(&printer.driver_name)
-            .bind(printer.priority)
-            .bind(printer.is_active)
             .execute(&mut *tx)
             .await?;
         }
@@ -149,8 +144,7 @@ pub async fn update(
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     // Printers cascade via FK
-    sqlx::query("DELETE FROM print_destination WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM print_destination WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)
@@ -166,5 +160,31 @@ async fn find_printers(pool: &SqlitePool, dest_id: i64) -> RepoResult<Vec<Printe
     .fetch_all(pool)
     .await?;
     Ok(printers)
+}
+
+/// Batch load printers for multiple destinations (eliminates N+1)
+async fn batch_load_printers(pool: &SqlitePool, dests: &mut [PrintDestination]) -> RepoResult<()> {
+    if dests.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<i64> = dests.iter().map(|d| d.id).collect();
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT id, print_destination_id, printer_type, printer_format, ip, port, driver_name, priority, is_active FROM printer WHERE print_destination_id IN ({placeholders}) ORDER BY priority"
+    );
+    let mut query = sqlx::query_as::<_, Printer>(&sql);
+    for id in &ids {
+        query = query.bind(id);
+    }
+    let all_printers = query.fetch_all(pool).await?;
+
+    let mut map: std::collections::HashMap<i64, Vec<Printer>> = std::collections::HashMap::new();
+    for p in all_printers {
+        map.entry(p.print_destination_id).or_default().push(p);
+    }
+    for dest in dests.iter_mut() {
+        dest.printers = map.remove(&dest.id).unwrap_or_default();
+    }
+    Ok(())
 }
 

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO employee (username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, 0, 1, ?) RETURNING id as \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0aa10558a3e04adec042d6a7b3182c994d3118f9514cf679244036c1795034a4"
+}

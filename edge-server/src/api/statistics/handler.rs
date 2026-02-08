@@ -221,67 +221,38 @@ pub async fn get_statistics(
 
     let pool = &state.pool;
 
-    // Overview: completed orders
-    let revenue: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(total_amount), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
+    // Overview: single aggregate query (was 7 separate queries)
+    let (revenue, total_orders, total_customers, voided_orders, voided_amount, total_discount, avg_dining_time): (f64, i32, i32, i32, f64, f64, Option<f64>) = sqlx::query_as(
+        "SELECT \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0), \
+            CAST(COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) AS INTEGER), \
+            CAST(COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN guest_count ELSE 0 END), 0) AS INTEGER), \
+            CAST(COUNT(CASE WHEN status = 'VOID' THEN 1 END) AS INTEGER), \
+            COALESCE(SUM(CASE WHEN status = 'VOID' THEN total_amount ELSE 0 END), 0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN discount_amount ELSE 0 END), 0), \
+            AVG(CASE WHEN status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL \
+                THEN CAST((end_time - start_time) AS REAL) / 60000.0 END) \
+         FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0.0);
-
-    let total_orders: i32 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0);
-
-    let total_customers: i32 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(guest_count), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0);
+    .fetch_one(pool).await.unwrap_or((0.0, 0, 0, 0, 0.0, 0.0, None));
 
     let average_order_value = if total_orders > 0 { revenue / total_orders as f64 } else { 0.0 };
     let avg_guest_spend = if total_customers > 0 { revenue / total_customers as f64 } else { 0.0 };
 
-    let voided_orders: i32 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'VOID'",
+    // Payment breakdown: single query (was 2 separate queries)
+    let (cash_revenue, card_revenue): (f64, f64) = sqlx::query_as(
+        "SELECT \
+            COALESCE(SUM(CASE WHEN p.method = 'CASH' THEN p.amount ELSE 0 END), 0), \
+            COALESCE(SUM(CASE WHEN p.method = 'CARD' THEN p.amount ELSE 0 END), 0) \
+         FROM archived_order_payment p \
+         JOIN archived_order o ON p.order_pk = o.id \
+         WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0);
-
-    let voided_amount: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(total_amount), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'VOID'",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0.0);
-
-    let total_discount: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(discount_amount), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0.0);
-
-    // Payment breakdowns from archived_order_payment
-    let cash_revenue: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(p.amount), 0) FROM archived_order_payment p JOIN archived_order o ON p.order_pk = o.id WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0 AND p.method = 'CASH'",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0.0);
-
-    let card_revenue: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(p.amount), 0) FROM archived_order_payment p JOIN archived_order o ON p.order_pk = o.id WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0 AND p.method = 'CARD'",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or(0.0);
+    .fetch_one(pool).await.unwrap_or((0.0, 0.0));
 
     let other_revenue = revenue - cash_revenue - card_revenue;
-
-    // Average dining time (minutes)
-    let avg_dining_time: Option<f64> = sqlx::query_scalar(
-        "SELECT AVG(CAST((end_time - start_time) AS REAL) / 60000.0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.ok().flatten();
 
     let overview = OverviewStats {
         revenue,
@@ -383,11 +354,12 @@ pub async fn get_sales_report(
 
     let pool = &state.pool;
 
-    let total: i32 = sqlx::query_scalar(
+    let total_i64: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
+        start_dt, end_dt,
     )
-    .bind(start_dt).bind(end_dt)
     .fetch_one(pool).await.unwrap_or(0);
+    let total = total_i64 as i32;
 
     let total_pages = if total > 0 { (total + page_size - 1) / page_size } else { 1 };
 

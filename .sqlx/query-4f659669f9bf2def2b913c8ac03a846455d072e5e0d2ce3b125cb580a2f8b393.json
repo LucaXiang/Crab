@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO daily_report (business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING id as \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 15
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4f659669f9bf2def2b913c8ac03a846455d072e5e0d2ce3b125cb580a2f8b393"
+}

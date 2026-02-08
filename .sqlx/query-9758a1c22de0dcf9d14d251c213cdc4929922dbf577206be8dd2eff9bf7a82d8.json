@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(SUM(surcharge_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+  "describe": {
+    "columns": [
+      {
+        "name": "COALESCE(SUM(surcharge_amount), 0.0)",
+        "ordinal": 0,
+        "type_info": "Float"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9758a1c22de0dcf9d14d251c213cdc4929922dbf577206be8dd2eff9bf7a82d8"
+}

@@ -23,20 +23,21 @@ async fn check_duplicate_external_id(
     exclude_product_id: Option<i64>,
 ) -> AppResult<bool> {
     let count: i64 = if let Some(exclude_id) = exclude_product_id {
-        sqlx::query_scalar(
+        sqlx::query_scalar!(
             "SELECT COUNT(*) FROM product WHERE external_id = ?1 AND id != ?2 LIMIT 1",
+            external_id, exclude_id,
         )
-        .bind(external_id)
-        .bind(exclude_id)
         .fetch_one(&state.pool)
         .await
         .map_err(|e| AppError::database(e.to_string()))?
     } else {
-        sqlx::query_scalar("SELECT COUNT(*) FROM product WHERE external_id = ?1 LIMIT 1")
-            .bind(external_id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| AppError::database(e.to_string()))?
+        sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM product WHERE external_id = ?1 LIMIT 1",
+            external_id,
+        )
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?
     };
     Ok(count > 0)
 }

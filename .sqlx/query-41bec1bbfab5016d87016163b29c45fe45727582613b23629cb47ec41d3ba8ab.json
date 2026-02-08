@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE role SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), permissions = COALESCE(?4, permissions), is_active = COALESCE(?5, is_active) WHERE id = ?6",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "41bec1bbfab5016d87016163b29c45fe45727582613b23629cb47ec41d3ba8ab"
+}

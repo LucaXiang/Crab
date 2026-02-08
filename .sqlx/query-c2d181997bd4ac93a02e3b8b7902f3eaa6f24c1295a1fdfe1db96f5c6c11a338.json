@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE zone SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active) WHERE id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "c2d181997bd4ac93a02e3b8b7902f3eaa6f24c1295a1fdfe1db96f5c6c11a338"
+}

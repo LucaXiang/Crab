@@ -43,10 +43,7 @@ pub async fn find_all(pool: &SqlitePool, limit: i32, offset: i32) -> RepoResult<
     .fetch_all(pool)
     .await?;
 
-    for r in &mut reports {
-        r.tax_breakdowns = find_tax_breakdowns(pool, r.id).await?;
-        r.payment_breakdowns = find_payment_breakdowns(pool, r.id).await?;
-    }
+    batch_load_breakdowns(pool, &mut reports).await?;
     Ok(reports)
 }
 
@@ -63,10 +60,7 @@ pub async fn find_by_date_range(
     .fetch_all(pool)
     .await?;
 
-    for r in &mut reports {
-        r.tax_breakdowns = find_tax_breakdowns(pool, r.id).await?;
-        r.payment_breakdowns = find_payment_breakdowns(pool, r.id).await?;
-    }
+    batch_load_breakdowns(pool, &mut reports).await?;
     Ok(reports)
 }
 
@@ -82,75 +76,75 @@ pub async fn generate(
     let now = shared::util::now_millis();
 
     // Aggregate from archived_order
-    let total_orders: i64 = sqlx::query_scalar(
+    let total_orders: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ?",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let completed_orders: i64 = sqlx::query_scalar(
+    let completed_orders: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let void_orders: i64 = sqlx::query_scalar(
+    let void_orders: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'VOID'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let total_sales: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(total_amount), 0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+    let total_sales: f64 = sqlx::query_scalar!(
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let total_paid: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(paid_amount), 0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+    let total_paid: f64 = sqlx::query_scalar!(
+        "SELECT COALESCE(SUM(paid_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let void_amount: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(total_amount), 0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'VOID'",
+    let void_amount: f64 = sqlx::query_scalar!(
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'VOID'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let total_tax: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(tax), 0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+    let total_tax: f64 = sqlx::query_scalar!(
+        "SELECT COALESCE(SUM(tax), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let total_discount: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(discount_amount), 0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+    let total_discount: f64 = sqlx::query_scalar!(
+        "SELECT COALESCE(SUM(discount_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
-    let total_surcharge: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(surcharge_amount), 0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+    let total_surcharge: f64 = sqlx::query_scalar!(
+        "SELECT COALESCE(SUM(surcharge_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        start_millis,
+        end_millis,
     )
-    .bind(start_millis)
-    .bind(end_millis)
     .fetch_one(pool)
     .await?;
 
@@ -159,24 +153,27 @@ pub async fn generate(
     // Create report + breakdowns in a single transaction
     let mut tx = pool.begin().await?;
 
-    let report_id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO daily_report (business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING id",
+    let total_orders_i32 = total_orders as i32;
+    let completed_orders_i32 = completed_orders as i32;
+    let void_orders_i32 = void_orders as i32;
+    let report_id = sqlx::query_scalar!(
+        r#"INSERT INTO daily_report (business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING id as "id!""#,
+        data.business_date,
+        total_orders_i32,
+        completed_orders_i32,
+        void_orders_i32,
+        total_sales,
+        total_paid,
+        total_unpaid,
+        void_amount,
+        total_tax,
+        total_discount,
+        total_surcharge,
+        now,
+        operator_id,
+        operator_name,
+        data.note,
     )
-    .bind(&data.business_date)
-    .bind(total_orders as i32)
-    .bind(completed_orders as i32)
-    .bind(void_orders as i32)
-    .bind(total_sales)
-    .bind(total_paid)
-    .bind(total_unpaid)
-    .bind(void_amount)
-    .bind(total_tax)
-    .bind(total_discount)
-    .bind(total_surcharge)
-    .bind(now)
-    .bind(&operator_id)
-    .bind(&operator_name)
-    .bind(&data.note)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -190,15 +187,16 @@ pub async fn generate(
     .await?;
 
     for (tax_rate, gross, tax_amt, net, order_count) in &tax_rows {
-        sqlx::query(
+        let order_count_i32 = *order_count as i32;
+        sqlx::query!(
             "INSERT INTO daily_report_tax_breakdown (report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count) VALUES (?, ?, ?, ?, ?, ?)",
+            report_id,
+            tax_rate,
+            net,
+            tax_amt,
+            gross,
+            order_count_i32,
         )
-        .bind(report_id)
-        .bind(tax_rate)
-        .bind(net)
-        .bind(tax_amt)
-        .bind(gross)
-        .bind(*order_count as i32)
         .execute(&mut *tx)
         .await?;
     }
@@ -213,13 +211,14 @@ pub async fn generate(
     .await?;
 
     for (method, amount, count) in &payment_rows {
-        sqlx::query(
+        let count_i32 = *count as i32;
+        sqlx::query!(
             "INSERT INTO daily_report_payment_breakdown (report_id, method, amount, count) VALUES (?, ?, ?, ?)",
+            report_id,
+            method,
+            amount,
+            count_i32,
         )
-        .bind(report_id)
-        .bind(method)
-        .bind(amount)
-        .bind(*count as i32)
         .execute(&mut *tx)
         .await?;
     }
@@ -254,4 +253,47 @@ async fn find_payment_breakdowns(
     .fetch_all(pool)
     .await?;
     Ok(breakdowns)
+}
+
+/// Batch load tax + payment breakdowns for multiple reports (eliminates N+1)
+async fn batch_load_breakdowns(pool: &SqlitePool, reports: &mut [DailyReport]) -> RepoResult<()> {
+    if reports.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<i64> = reports.iter().map(|r| r.id).collect();
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+
+    // Tax breakdowns
+    let tax_sql = format!(
+        "SELECT id, report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count FROM daily_report_tax_breakdown WHERE report_id IN ({placeholders}) ORDER BY tax_rate DESC"
+    );
+    let mut tax_query = sqlx::query_as::<_, TaxBreakdown>(&tax_sql);
+    for id in &ids {
+        tax_query = tax_query.bind(id);
+    }
+    let all_tax = tax_query.fetch_all(pool).await?;
+
+    // Payment breakdowns
+    let pay_sql = format!(
+        "SELECT id, report_id, method, amount, count FROM daily_report_payment_breakdown WHERE report_id IN ({placeholders})"
+    );
+    let mut pay_query = sqlx::query_as::<_, PaymentMethodBreakdown>(&pay_sql);
+    for id in &ids {
+        pay_query = pay_query.bind(id);
+    }
+    let all_pay = pay_query.fetch_all(pool).await?;
+
+    let mut tax_map: std::collections::HashMap<i64, Vec<TaxBreakdown>> = std::collections::HashMap::new();
+    for t in all_tax {
+        tax_map.entry(t.report_id).or_default().push(t);
+    }
+    let mut pay_map: std::collections::HashMap<i64, Vec<PaymentMethodBreakdown>> = std::collections::HashMap::new();
+    for p in all_pay {
+        pay_map.entry(p.report_id).or_default().push(p);
+    }
+    for r in reports.iter_mut() {
+        r.tax_breakdowns = tax_map.remove(&r.id).unwrap_or_default();
+        r.payment_breakdowns = pay_map.remove(&r.id).unwrap_or_default();
+    }
+    Ok(())
 }

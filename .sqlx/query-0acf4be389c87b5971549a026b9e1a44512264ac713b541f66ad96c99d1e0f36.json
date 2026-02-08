@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO payment (payment_id, order_id, method, amount, tendered, change_amount, note, split_type, aa_shares, split_items, operator_id, operator_name, cancelled, cancel_reason, timestamp, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "0acf4be389c87b5971549a026b9e1a44512264ac713b541f66ad96c99d1e0f36"
+}

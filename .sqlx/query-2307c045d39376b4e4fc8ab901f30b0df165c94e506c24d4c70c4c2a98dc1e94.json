@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT tag_id FROM category_tag WHERE category_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "tag_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2307c045d39376b4e4fc8ab901f30b0df165c94e506c24d4c70c4c2a98dc1e94"
+}

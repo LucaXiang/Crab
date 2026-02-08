@@ -34,11 +34,11 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Zo
 }
 
 pub async fn create(pool: &SqlitePool, data: ZoneCreate) -> RepoResult<Zone> {
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO zone (name, description) VALUES (?, ?) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO zone (name, description) VALUES (?, ?) RETURNING id as "id!""#,
+        data.name,
+        data.description
     )
-    .bind(&data.name)
-    .bind(&data.description)
     .fetch_one(pool)
     .await?;
     find_by_id(pool, id)
@@ -47,13 +47,13 @@ pub async fn create(pool: &SqlitePool, data: ZoneCreate) -> RepoResult<Zone> {
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, data: ZoneUpdate) -> RepoResult<Zone> {
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE zone SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active) WHERE id = ?4",
+        data.name,
+        data.description,
+        data.is_active,
+        id
     )
-    .bind(&data.name)
-    .bind(&data.description)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
@@ -66,10 +66,10 @@ pub async fn update(pool: &SqlitePool, id: i64, data: ZoneUpdate) -> RepoResult<
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     // Check for active dining tables
-    let count: i64 = sqlx::query_scalar(
+    let count = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM dining_table WHERE zone_id = ? AND is_active = 1",
+        id
     )
-    .bind(id)
     .fetch_one(pool)
     .await?;
     if count > 0 {
@@ -77,8 +77,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
             "Cannot delete zone with active tables".into(),
         ));
     }
-    sqlx::query("DELETE FROM zone WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM zone WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)

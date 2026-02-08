@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE store_info SET name = COALESCE(?1, name), address = COALESCE(?2, address), nif = COALESCE(?3, nif), logo_url = COALESCE(?4, logo_url), phone = COALESCE(?5, phone), email = COALESCE(?6, email), website = COALESCE(?7, website), business_day_cutoff = COALESCE(?8, business_day_cutoff), updated_at = ?9 WHERE id = ?10",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "ec38cf36ba6e63deadb051051e04eb0edea636ec2a63d2fe2598fbee2b7b19bc"
+}

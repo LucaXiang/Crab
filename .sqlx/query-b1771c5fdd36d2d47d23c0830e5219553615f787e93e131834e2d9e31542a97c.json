@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO attribute_binding (owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id as \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b1771c5fdd36d2d47d23c0830e5219553615f787e93e131834e2d9e31542a97c"
+}

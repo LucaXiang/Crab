@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM attribute_binding WHERE owner_type = ? AND owner_id = ? AND attribute_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "d8db0ab2380fa17cd5184882b1cee0556a0b48922d56c71631f7c5ff189845ec"
+}

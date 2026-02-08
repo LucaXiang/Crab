@@ -5,6 +5,7 @@
 
 use super::{RepoError, RepoResult};
 use sqlx::SqlitePool;
+use std::collections::HashMap;
 
 /// Archived order detail (for API response)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -119,6 +120,30 @@ struct OrderRow {
 }
 
 #[derive(sqlx::FromRow)]
+struct PaymentRow {
+    seq: i32,
+    payment_id: String,
+    method: String,
+    amount: f64,
+    time: i64,
+    cancelled: bool,
+    cancel_reason: Option<String>,
+    split_type: Option<String>,
+    split_items: Option<String>,
+    aa_shares: Option<i32>,
+    aa_total_shares: Option<i32>,
+}
+
+#[derive(sqlx::FromRow)]
+struct EventRow {
+    seq: i32,
+    id: i64,
+    event_type: String,
+    timestamp: i64,
+    data: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
 struct ItemRow {
     id: i64,
     instance_id: String,
@@ -142,7 +167,7 @@ struct ItemRow {
 /// Get full order detail by reconstructing from archived tables
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
-    let order: OrderRow = sqlx::query_as(
+    let order: OrderRow = sqlx::query_as::<_, OrderRow>(
         "SELECT id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
@@ -151,88 +176,100 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
     .ok_or_else(|| RepoError::NotFound(format!("Order {order_id} not found")))?;
 
     // 2. Get items
-    let item_rows: Vec<ItemRow> = sqlx::query_as(
+    let item_rows: Vec<ItemRow> = sqlx::query_as::<_, ItemRow>(
         "SELECT id, instance_id, name, spec_name, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, applied_rules, note, is_comped FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_id)
     .fetch_all(pool)
     .await?;
 
-    let mut items = Vec::new();
-    for row in item_rows {
-        let options: Vec<(String, String, f64)> = sqlx::query_as(
-            "SELECT attribute_name, option_name, price FROM archived_order_item_option WHERE item_pk = ?",
-        )
-        .bind(row.id)
-        .fetch_all(pool)
-        .await?;
-
-        items.push(OrderDetailItem {
-            id: row.id,
-            instance_id: row.instance_id,
-            name: row.name,
-            spec_name: row.spec_name,
-            category_name: row.category_name,
-            price: row.price,
-            quantity: row.quantity,
-            unpaid_quantity: row.unpaid_quantity,
-            unit_price: row.unit_price,
-            line_total: row.line_total,
-            discount_amount: row.discount_amount,
-            surcharge_amount: row.surcharge_amount,
-            rule_discount_amount: row.rule_discount_amount,
-            rule_surcharge_amount: row.rule_surcharge_amount,
-            applied_rules: row.applied_rules,
-            note: row.note,
-            is_comped: row.is_comped,
-            selected_options: options
-                .into_iter()
-                .map(|(a, o, p)| OrderDetailOption {
-                    attribute_name: a,
-                    option_name: o,
-                    price_modifier: p,
-                })
-                .collect(),
-        });
+    // Batch load all options for all items (eliminates N+1)
+    // Dynamic query: variable number of IN placeholders — keep as runtime query
+    let item_ids: Vec<i64> = item_rows.iter().map(|r| r.id).collect();
+    let mut options_map: HashMap<i64, Vec<OrderDetailOption>> = HashMap::new();
+    if !item_ids.is_empty() {
+        let placeholders = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT item_pk, attribute_name, option_name, price FROM archived_order_item_option WHERE item_pk IN ({placeholders})"
+        );
+        let mut query = sqlx::query_as::<_, (i64, String, String, f64)>(&sql);
+        for id in &item_ids {
+            query = query.bind(id);
+        }
+        let all_options = query.fetch_all(pool).await?;
+        for (item_pk, attr, opt, price) in all_options {
+            options_map.entry(item_pk).or_default().push(OrderDetailOption {
+                attribute_name: attr,
+                option_name: opt,
+                price_modifier: price,
+            });
+        }
     }
 
+    let items: Vec<OrderDetailItem> = item_rows
+        .into_iter()
+        .map(|row| {
+            let selected_options = options_map.remove(&row.id).unwrap_or_default();
+            OrderDetailItem {
+                id: row.id,
+                instance_id: row.instance_id,
+                name: row.name,
+                spec_name: row.spec_name,
+                category_name: row.category_name,
+                price: row.price,
+                quantity: row.quantity,
+                unpaid_quantity: row.unpaid_quantity,
+                unit_price: row.unit_price,
+                line_total: row.line_total,
+                discount_amount: row.discount_amount,
+                surcharge_amount: row.surcharge_amount,
+                rule_discount_amount: row.rule_discount_amount,
+                rule_surcharge_amount: row.rule_surcharge_amount,
+                applied_rules: row.applied_rules,
+                note: row.note,
+                is_comped: row.is_comped,
+                selected_options,
+            }
+        })
+        .collect();
+
     // 3. Get payments
-    let payments: Vec<OrderDetailPayment> = sqlx::query_as::<_, (i32, String, String, f64, i64, bool, Option<String>, Option<String>, Option<String>, Option<i32>, Option<i32>)>(
-        "SELECT seq, payment_id, method, amount, time, cancelled, cancel_reason, split_type, split_items, aa_shares, aa_total_shares FROM archived_order_payment WHERE order_pk = ? ORDER BY seq, time",
+    let payments: Vec<OrderDetailPayment> = sqlx::query_as::<_, PaymentRow>(
+        "SELECT seq, payment_id, method, amount, time, cancelled, cancel_reason, split_type, split_items, aa_shares, aa_total_shares FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
     )
     .bind(order_id)
     .fetch_all(pool)
     .await?
     .into_iter()
     .map(|r| OrderDetailPayment {
-        seq: r.0,
-        payment_id: r.1,
-        method: r.2,
-        amount: r.3,
-        timestamp: r.4,
-        cancelled: r.5,
-        cancel_reason: r.6,
-        split_type: r.7,
-        split_items: r.8,
-        aa_shares: r.9,
-        aa_total_shares: r.10,
+        seq: r.seq,
+        payment_id: r.payment_id,
+        method: r.method,
+        amount: r.amount,
+        timestamp: r.time,
+        cancelled: r.cancelled,
+        cancel_reason: r.cancel_reason,
+        split_type: r.split_type,
+        split_items: r.split_items,
+        aa_shares: r.aa_shares,
+        aa_total_shares: r.aa_total_shares,
     })
     .collect();
 
     // 4. Get events
-    let timeline: Vec<OrderDetailEvent> = sqlx::query_as::<_, (i32, i64, String, i64, Option<String>)>(
-        "SELECT seq, id, event_type, timestamp, data FROM archived_order_event WHERE order_pk = ? ORDER BY seq, timestamp",
+    let timeline: Vec<OrderDetailEvent> = sqlx::query_as::<_, EventRow>(
+        "SELECT seq, id, event_type, timestamp, data FROM archived_order_event WHERE order_pk = ? ORDER BY seq",
     )
     .bind(order_id)
     .fetch_all(pool)
     .await?
     .into_iter()
     .map(|r| OrderDetailEvent {
-        seq: r.0,
-        event_id: r.1,
-        event_type: r.2,
-        timestamp: r.3,
-        payload: r.4,
+        seq: r.seq,
+        event_id: r.id,
+        event_type: r.event_type,
+        timestamp: r.timestamp,
+        payload: r.data,
     })
     .collect();
 

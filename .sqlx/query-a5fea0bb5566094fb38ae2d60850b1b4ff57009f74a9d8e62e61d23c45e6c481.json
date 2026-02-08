@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE tag SET name = COALESCE(?1, name), color = COALESCE(?2, color), display_order = COALESCE(?3, display_order), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "a5fea0bb5566094fb38ae2d60850b1b4ff57009f74a9d8e62e61d23c45e6c481"
+}

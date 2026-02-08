@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE label_template SET is_default = 0 WHERE is_default = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "a6823601a725a8f6f6d8e6d2d26c0a813fe878f30d6989dd5aa89a3755643ab6"
+}

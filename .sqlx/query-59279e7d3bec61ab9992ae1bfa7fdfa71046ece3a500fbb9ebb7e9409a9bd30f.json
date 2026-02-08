@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO label_template (name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id as \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 15
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "59279e7d3bec61ab9992ae1bfa7fdfa71046ece3a500fbb9ebb7e9409a9bd30f"
+}

@@ -13,11 +13,10 @@ import { DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 // Lazy-load API client to avoid initialization issues
 const getApi = () => createTauriClient();
 
-// 从 API 响应提取 ID (去掉 "label_template:" 前缀)
 function mapApiToFrontend(apiTemplate: Record<string, unknown>): LabelTemplate {
   return {
     ...apiTemplate,
-    id: (apiTemplate.id as string)?.split(':')[1] || apiTemplate.id as string,
+    id: String(apiTemplate.id),
     padding: apiTemplate.padding as number || 2,
     fields: (apiTemplate.fields as LabelField[]) || [],
     is_default: apiTemplate.is_default as boolean || false,
@@ -200,8 +199,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
       return;
     }
 
-    const strId = String(id);
-    const actualId = strId.includes(':') ? strId.split(':')[1] : strId;
+    const actualId = String(id);
 
     switch (action) {
       case 'created':

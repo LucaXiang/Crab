@@ -47,13 +47,13 @@ pub async fn create(pool: &SqlitePool, data: RoleCreate) -> RepoResult<Role> {
     let permissions_json =
         serde_json::to_string(&data.permissions).unwrap_or_else(|_| "[]".to_string());
 
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO role (name, display_name, description, permissions) VALUES (?, ?, ?, ?) RETURNING id",
+    let id = sqlx::query_scalar!(
+        r#"INSERT INTO role (name, display_name, description, permissions) VALUES (?, ?, ?, ?) RETURNING id as "id!""#,
+        data.name,
+        display_name,
+        data.description,
+        permissions_json
     )
-    .bind(&data.name)
-    .bind(&display_name)
-    .bind(&data.description)
-    .bind(&permissions_json)
     .fetch_one(pool)
     .await?;
 
@@ -79,15 +79,15 @@ pub async fn update(pool: &SqlitePool, id: i64, data: RoleUpdate) -> RepoResult<
         .as_ref()
         .map(|p| serde_json::to_string(p).unwrap_or_else(|_| "[]".to_string()));
 
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE role SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), permissions = COALESCE(?4, permissions), is_active = COALESCE(?5, is_active) WHERE id = ?6",
+        data.name,
+        data.display_name,
+        data.description,
+        permissions_json,
+        data.is_active,
+        id
     )
-    .bind(&data.name)
-    .bind(&data.display_name)
-    .bind(&data.description)
-    .bind(&permissions_json)
-    .bind(data.is_active)
-    .bind(id)
     .execute(pool)
     .await?;
 
@@ -110,8 +110,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
         ));
     }
 
-    sqlx::query("DELETE FROM role WHERE id = ?")
-        .bind(id)
+    sqlx::query!("DELETE FROM role WHERE id = ?", id)
         .execute(pool)
         .await?;
     Ok(true)

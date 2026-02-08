@@ -12,12 +12,12 @@ pub async fn get_or_create(pool: &SqlitePool) -> RepoResult<SystemState> {
     }
 
     let now = shared::util::now_millis();
-    sqlx::query(
+    sqlx::query!(
         "INSERT INTO system_state (id, order_count, created_at, updated_at) VALUES (?, 0, ?, ?)",
+        SINGLETON_ID,
+        now,
+        now
     )
-    .bind(SINGLETON_ID)
-    .bind(now)
-    .bind(now)
     .execute(pool)
     .await?;
 
@@ -38,18 +38,18 @@ pub async fn get(pool: &SqlitePool) -> RepoResult<Option<SystemState>> {
 
 pub async fn update(pool: &SqlitePool, data: SystemStateUpdate) -> RepoResult<SystemState> {
     let now = shared::util::now_millis();
-    let rows = sqlx::query(
+    let rows = sqlx::query!(
         "UPDATE system_state SET genesis_hash = COALESCE(?1, genesis_hash), last_order_id = COALESCE(?2, last_order_id), last_order_hash = COALESCE(?3, last_order_hash), synced_up_to_id = COALESCE(?4, synced_up_to_id), synced_up_to_hash = COALESCE(?5, synced_up_to_hash), last_sync_time = COALESCE(?6, last_sync_time), order_count = COALESCE(?7, order_count), updated_at = ?8 WHERE id = ?9",
+        data.genesis_hash,
+        data.last_order_id,
+        data.last_order_hash,
+        data.synced_up_to_id,
+        data.synced_up_to_hash,
+        data.last_sync_time,
+        data.order_count,
+        now,
+        SINGLETON_ID
     )
-    .bind(&data.genesis_hash)
-    .bind(&data.last_order_id)
-    .bind(&data.last_order_hash)
-    .bind(&data.synced_up_to_id)
-    .bind(&data.synced_up_to_hash)
-    .bind(data.last_sync_time)
-    .bind(data.order_count)
-    .bind(now)
-    .bind(SINGLETON_ID)
     .execute(pool)
     .await?;
 
@@ -75,11 +75,11 @@ pub async fn init_genesis(pool: &SqlitePool, genesis_hash: String) -> RepoResult
 /// Atomically increment order_count and return the new value
 pub async fn get_next_order_number(pool: &SqlitePool) -> RepoResult<i32> {
     let now = shared::util::now_millis();
-    let new_count = sqlx::query_scalar::<_, i32>(
-        "UPDATE system_state SET order_count = order_count + 1, updated_at = ?1 WHERE id = ?2 RETURNING order_count",
+    let new_count = sqlx::query_scalar!(
+        r#"UPDATE system_state SET order_count = order_count + 1, updated_at = ?1 WHERE id = ?2 RETURNING order_count as "order_count!: i32""#,
+        now,
+        SINGLETON_ID
     )
-    .bind(now)
-    .bind(SINGLETON_ID)
     .fetch_one(pool)
     .await?;
     Ok(new_count)
@@ -92,13 +92,13 @@ pub async fn update_last_order(
     order_hash: String,
 ) -> RepoResult<SystemState> {
     let now = shared::util::now_millis();
-    sqlx::query(
+    sqlx::query!(
         "UPDATE system_state SET last_order_id = ?1, last_order_hash = ?2, order_count = order_count + 1, updated_at = ?3 WHERE id = ?4",
+        order_id,
+        order_hash,
+        now,
+        SINGLETON_ID
     )
-    .bind(order_id)
-    .bind(&order_hash)
-    .bind(now)
-    .bind(SINGLETON_ID)
     .execute(pool)
     .await?;
 

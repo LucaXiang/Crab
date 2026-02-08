@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT print_destination_id FROM category_label_print_dest WHERE category_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "print_destination_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "518c757abf676997f789c0d88b199d93fd13994ca4d0c2ccce8a190ebfbc592a"
+}

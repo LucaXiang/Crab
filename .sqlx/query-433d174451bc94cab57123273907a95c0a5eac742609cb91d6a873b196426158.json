@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE label_template SET name = COALESCE(?, name), description = COALESCE(?, description), width = COALESCE(?, width), height = COALESCE(?, height), padding = COALESCE(?, padding), is_default = COALESCE(?, is_default), is_active = COALESCE(?, is_active), width_mm = COALESCE(?, width_mm), height_mm = COALESCE(?, height_mm), padding_mm_x = COALESCE(?, padding_mm_x), padding_mm_y = COALESCE(?, padding_mm_y), render_dpi = COALESCE(?, render_dpi), test_data = COALESCE(?, test_data), updated_at = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 15
+    },
+    "nullable": []
+  },
+  "hash": "433d174451bc94cab57123273907a95c0a5eac742609cb91d6a873b196426158"
+}

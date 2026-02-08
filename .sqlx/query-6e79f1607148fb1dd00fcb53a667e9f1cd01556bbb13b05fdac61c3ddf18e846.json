@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM label_template WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "6e79f1607148fb1dd00fcb53a667e9f1cd01556bbb13b05fdac61c3ddf18e846"
+}

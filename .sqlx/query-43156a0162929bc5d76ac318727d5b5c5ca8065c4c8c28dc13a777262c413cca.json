@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO store_info (id, name, address, nif, business_day_cutoff, created_at, updated_at) VALUES (?, '', '', '', '02:00', ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "43156a0162929bc5d76ac318727d5b5c5ca8065c4c8c28dc13a777262c413cca"
+}

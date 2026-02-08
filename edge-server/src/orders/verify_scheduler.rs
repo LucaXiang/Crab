@@ -288,19 +288,19 @@ impl VerifyScheduler {
 
     /// 使用 INSERT OR REPLACE 写入 SQLite，按 (verification_type, date) UNIQUE 约束去重
     async fn save_record(&self, _date: &str, record: VerificationRecord) -> Result<(), String> {
-        sqlx::query(
+        sqlx::query!(
             "INSERT OR REPLACE INTO archive_verification (verification_type, date, total_orders, verified_orders, chain_intact, chain_resets_count, chain_breaks_count, invalid_orders_count, details, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            record.verification_type,
+            record.date,
+            record.total_orders,
+            record.verified_orders,
+            record.chain_intact,
+            record.chain_resets_count,
+            record.chain_breaks_count,
+            record.invalid_orders_count,
+            record.details,
+            record.created_at,
         )
-        .bind(&record.verification_type)
-        .bind(&record.date)
-        .bind(record.total_orders)
-        .bind(record.verified_orders)
-        .bind(record.chain_intact)
-        .bind(record.chain_resets_count)
-        .bind(record.chain_breaks_count)
-        .bind(record.invalid_orders_count)
-        .bind(&record.details)
-        .bind(record.created_at)
         .execute(&self.pool)
         .await
         .map_err(|e| e.to_string())?;
