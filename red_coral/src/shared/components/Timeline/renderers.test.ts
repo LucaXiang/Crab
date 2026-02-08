@@ -23,7 +23,7 @@ const createMockEvent = (event_type: string, payload: EventPayload, overrides?: 
   sequence: 1,
   order_id: 'order-test-1',
   timestamp: Date.now(),
-  operator_id: 'op-1',
+  operator_id: 1,
   operator_name: 'Test Operator',
   command_id: 'cmd-1',
   event_type: event_type as OrderEvent['event_type'],
@@ -37,9 +37,9 @@ describe('Timeline Renderers - Architecture Tests', () => {
       const mainEvents: OrderEvent[] = [
         createMockEvent('TABLE_OPENED', {
           type: 'TABLE_OPENED',
-          table_id: 'T1',
+          table_id: 1,
           table_name: 'Table 1',
-          zone_id: 'Z1',
+          zone_id: 1,
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
@@ -100,9 +100,9 @@ describe('Timeline Renderers - Architecture Tests', () => {
     it('should return TimelineDisplayData structure', () => {
       const event = createMockEvent('TABLE_OPENED', {
         type: 'TABLE_OPENED',
-        table_id: 'T1',
+        table_id: 1,
         table_name: 'Table 1',
-        zone_id: 'Z1',
+        zone_id: 1,
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
@@ -173,9 +173,9 @@ describe('Timeline Renderers - Architecture Tests', () => {
       const timestamp = Date.now();
       const event = createMockEvent('TABLE_OPENED', {
         type: 'TABLE_OPENED',
-        table_id: 'T1',
+        table_id: 1,
         table_name: 'Table 1',
-        zone_id: 'Z1',
+        zone_id: 1,
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
@@ -190,7 +190,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
   describe('Color Classes', () => {
     it('should assign unique color classes to different event types', () => {
       const events: OrderEvent[] = [
-        createMockEvent('TABLE_OPENED', { type: 'TABLE_OPENED', table_id: 'T1', table_name: 'T1', zone_id: 'Z1', zone_name: 'Z', guest_count: 2, is_retail: false, receipt_number: 'RCP-TEST' }),
+        createMockEvent('TABLE_OPENED', { type: 'TABLE_OPENED', table_id: 1, table_name: 'T1', zone_id: 1, zone_name: 'Z', guest_count: 2, is_retail: false, receipt_number: 'RCP-TEST' }),
         createMockEvent('ITEMS_ADDED', { type: 'ITEMS_ADDED', items: [] }),
         createMockEvent('PAYMENT_ADDED', { type: 'PAYMENT_ADDED', payment_id: 'p1', method: 'cash', amount: 100, tendered: null, change: null, note: null }),
         createMockEvent('ORDER_COMPLETED', { type: 'ORDER_COMPLETED', final_total: 100, receipt_number: 'R1', payment_summary: [], service_type: 'DINE_IN' }),
@@ -220,9 +220,9 @@ describe('Timeline Renderers - Architecture Tests', () => {
 
       const event = createMockEvent('TABLE_OPENED', {
         type: 'TABLE_OPENED',
-        table_id: 'T1',
+        table_id: 1,
         table_name: 'Table 1',
-        zone_id: 'Z1',
+        zone_id: 1,
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
@@ -242,9 +242,9 @@ describe('Timeline Renderers - Architecture Tests', () => {
       // Test that the renderer system doesn't crash on lookups
       const validEvent = createMockEvent('TABLE_OPENED', {
         type: 'TABLE_OPENED',
-        table_id: 'T1',
+        table_id: 1,
         table_name: 'Table 1',
-        zone_id: 'Z1',
+        zone_id: 1,
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
@@ -259,9 +259,9 @@ describe('Timeline Renderers - Architecture Tests', () => {
     it('should handle concurrent rendering calls', () => {
       const event = createMockEvent('TABLE_OPENED', {
         type: 'TABLE_OPENED',
-        table_id: 'T1',
+        table_id: 1,
         table_name: 'Table 1',
-        zone_id: 'Z1',
+        zone_id: 1,
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,

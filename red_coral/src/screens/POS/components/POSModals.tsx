@@ -17,7 +17,7 @@ interface POSModalsProps {
   cart: CartItem[];
   onSelectTable: (table: DiningTable, guestCount: number, zone?: Zone) => void;
   onCloseTableScreen: () => void;
-  manageTableId?: string | null;
+  manageTableId?: number | null;
   onNavigateCheckout: (tableId: string) => void;
 }
 

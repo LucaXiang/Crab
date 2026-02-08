@@ -13,7 +13,7 @@ export interface TableSelectionScreenProps {
   onNavigateCheckout?: (tableId: string) => void;
   mode: 'HOLD' | 'RETRIEVE';
   cart?: CartItem[];
-  manageTableId?: string;
+  manageTableId?: number;
 }
 
  

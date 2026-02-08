@@ -28,7 +28,7 @@ const createMockEvent = (event_type: string, payload: EventPayload, overrides?: 
   sequence: 1,
   order_id: 'order-test-1',
   timestamp: Date.now(),
-  operator_id: 'op-1',
+  operator_id: 1,
   operator_name: 'Test Operator',
   command_id: 'cmd-1',
   event_type: event_type as OrderEvent['event_type'],
@@ -46,9 +46,9 @@ describe('TimelineList Integration Tests', () => {
       const events: OrderEvent[] = [
         createMockEvent('TABLE_OPENED', {
           type: 'TABLE_OPENED',
-          table_id: 'T1',
+          table_id: 1,
           table_name: 'Table 1',
-          zone_id: 'Z1',
+          zone_id: 1,
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
@@ -67,9 +67,9 @@ describe('TimelineList Integration Tests', () => {
       const events: OrderEvent[] = [
         createMockEvent('TABLE_OPENED', {
           type: 'TABLE_OPENED',
-          table_id: 'T1',
+          table_id: 1,
           table_name: 'Table 1',
-          zone_id: 'Z1',
+          zone_id: 1,
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
@@ -103,7 +103,7 @@ describe('TimelineList Integration Tests', () => {
           type: 'ITEMS_ADDED',
           items: [
             {
-              id: 'item-1',
+              id: 1,
               name: 'Test Pizza',
               price: 1000,
               original_price: 1000,
@@ -173,9 +173,9 @@ describe('TimelineList Integration Tests', () => {
       const mainEventTypes: OrderEvent[] = [
         createMockEvent('TABLE_OPENED', {
           type: 'TABLE_OPENED',
-          table_id: 'T1',
+          table_id: 1,
           table_name: 'Table 1',
-          zone_id: 'Z1',
+          zone_id: 1,
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
@@ -215,7 +215,7 @@ describe('TimelineList Integration Tests', () => {
           sequence: 1,
           order_id: 'order-test-1',
           timestamp: Date.now(),
-          operator_id: 'op-1',
+          operator_id: 1,
           operator_name: 'Test Operator',
           command_id: 'cmd-1',
           event_type: 'UNKNOWN_TYPE' as any,

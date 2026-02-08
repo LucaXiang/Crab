@@ -142,7 +142,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     if (pendingVoidOptions) {
       processVoid({
         ...pendingVoidOptions,
-        authorizerId: String(supervisor.id),
+        authorizerId: supervisor.id,
         authorizerName: supervisor.display_name,
       });
       setPendingVoidOptions(null);
