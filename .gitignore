@@ -21,6 +21,7 @@ Thumbs.db
 
 # ========== Database ==========
 *.db
+.surrealdb
 
 # Database directories
 database/
