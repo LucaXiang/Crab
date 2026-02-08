@@ -46,7 +46,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::ZoneCreated,
         "zone", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&z, "zone")
     );
@@ -77,7 +77,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::ZoneUpdated,
         "zone", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_zone, &z, "zone")
     );
@@ -105,7 +105,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::ZoneDeleted,
             "zone", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );

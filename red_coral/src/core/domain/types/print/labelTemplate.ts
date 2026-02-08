@@ -101,7 +101,7 @@ export interface UpdateLabelTemplateParams extends Partial<CreateLabelTemplatePa
 export interface LabelPrintJob {
   id: string;
   template_id: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   quantity: number;
   status: 'pending' | 'printing' | 'completed' | 'failed';
   printer_id?: number;

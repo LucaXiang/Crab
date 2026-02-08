@@ -59,7 +59,7 @@ pub async fn list_by_category(
 ) -> AppResult<Json<Vec<ProductFull>>> {
     let products = state
         .catalog_service
-        .get_products_by_category(&category_id.to_string());
+        .get_products_by_category(category_id);
     Ok(Json(products))
 }
 
@@ -70,7 +70,7 @@ pub async fn get_by_id(
 ) -> AppResult<Json<ProductFull>> {
     let product = state
         .catalog_service
-        .get_product(&id.to_string())
+        .get_product(id)
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
     Ok(Json(product))
 }
@@ -83,7 +83,7 @@ pub async fn get_full(
 ) -> AppResult<Json<ProductFull>> {
     let product = state
         .catalog_service
-        .get_product(&id.to_string())
+        .get_product(id)
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
     Ok(Json(product))
 }
@@ -111,19 +111,19 @@ pub async fn create(
         .await
         ?;
 
-    let id = product.id.to_string();
+    let id_str = product.id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::ProductCreated,
-        "product", &id,
-        operator_id = Some(current_user.id.clone()),
+        "product", &id_str,
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&product, "product")
     );
 
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product))
+        .broadcast_sync(RESOURCE_PRODUCT, "created", &id_str, Some(&product))
         .await;
 
     Ok(Json(product))
@@ -148,7 +148,7 @@ pub async fn update(
     // 查询旧值（用于审计 diff）
     let old_product = state
         .catalog_service
-        .get_product(&id_str)
+        .get_product(id)
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
 
     // 检查 external_id 是否已被其他商品使用
@@ -161,7 +161,7 @@ pub async fn update(
 
     let product = state
         .catalog_service
-        .update_product(&id_str, payload)
+        .update_product(id, payload)
         .await?;
 
     tracing::debug!(
@@ -174,7 +174,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::ProductUpdated,
         "product", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_product, &product, "product")
     );
@@ -197,12 +197,12 @@ pub async fn delete(
     // 删除前查名称用于审计
     let name_for_audit = state
         .catalog_service
-        .get_product(&id_str)
+        .get_product(id)
         .map(|p| p.name.clone())
         .unwrap_or_default();
     state
         .catalog_service
-        .delete_product(&id_str)
+        .delete_product(id)
         .await
         ?;
 
@@ -210,7 +210,7 @@ pub async fn delete(
         state.audit_service,
         AuditAction::ProductDeleted,
         "product", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": name_for_audit})
     );
@@ -255,16 +255,14 @@ pub async fn add_product_tag(
     State(state): State<ServerState>,
     Path((product_id, tag_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<ProductFull>> {
-    let product_id_str = product_id.to_string();
-    let tag_id_str = tag_id.to_string();
-
     let product = state
         .catalog_service
-        .add_product_tag(&product_id_str, &tag_id_str)
+        .add_product_tag(product_id, tag_id)
         .await
         ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
+    let product_id_str = product_id.to_string();
     state
         .broadcast_sync(
             RESOURCE_PRODUCT,
@@ -282,16 +280,14 @@ pub async fn remove_product_tag(
     State(state): State<ServerState>,
     Path((product_id, tag_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<ProductFull>> {
-    let product_id_str = product_id.to_string();
-    let tag_id_str = tag_id.to_string();
-
     let product = state
         .catalog_service
-        .remove_product_tag(&product_id_str, &tag_id_str)
+        .remove_product_tag(product_id, tag_id)
         .await
         ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
+    let product_id_str = product_id.to_string();
     state
         .broadcast_sync(
             RESOURCE_PRODUCT,
@@ -343,7 +339,7 @@ pub async fn batch_update_sort_order(
         let result = state
             .catalog_service
             .update_product(
-                &update.id.to_string(),
+                update.id,
                 ProductUpdate {
                     name: None,
                     sort_order: Some(update.sort_order),

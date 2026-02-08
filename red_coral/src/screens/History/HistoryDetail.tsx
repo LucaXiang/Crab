@@ -32,7 +32,7 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
     : { type: eventType } as unknown as EventPayload;
 
   return {
-    event_id: event.event_id,
+    event_id: String(event.event_id),
     sequence: index,
     order_id: '',
     timestamp: event.timestamp,
@@ -312,8 +312,8 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
-  const totalRuleDiscount = item.rule_discount_amount ?? 0;
-  const totalRuleSurcharge = item.rule_surcharge_amount ?? 0;
+  const totalRuleDiscount = item.rule_discount_amount;
+  const totalRuleSurcharge = item.rule_surcharge_amount;
   const manualDiscount = Currency.sub(item.discount_amount, item.rule_discount_amount).toNumber();
   const isFullyPaid = item.unpaid_quantity === 0;
 

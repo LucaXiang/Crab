@@ -28,8 +28,8 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
 
   // Price calculations
   const optionsModifier = calculateOptionsModifier(item.selected_options);
-  const basePrice = (item.original_price ?? item.price) + optionsModifier;
-  const unitPrice = item.unit_price ?? item.price;
+  const basePrice = item.original_price + optionsModifier;
+  const unitPrice = item.unit_price;
   const discountPercent = item.manual_discount_percent || 0;
   const hasDiscount = discountPercent > 0 || basePrice !== unitPrice;
 
@@ -37,8 +37,8 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
   const hasMultiSpec = item.selected_specification?.is_multi_spec;
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
-  const totalRuleDiscount = item.rule_discount_amount ?? 0;
-  const totalRuleSurcharge = item.rule_surcharge_amount ?? 0;
+  const totalRuleDiscount = item.rule_discount_amount;
+  const totalRuleSurcharge = item.rule_surcharge_amount;
 
   const clickHandlers = useLongPress(
     () => {},
@@ -99,7 +99,7 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor || '#d1d5db' }} />
             {isComped ? (
               <>
-                <span className="line-through text-gray-400">{formatCurrency(item.original_price ?? basePrice)}</span>
+                <span className="line-through text-gray-400">{formatCurrency(item.original_price)}</span>
                 <span className="font-semibold text-emerald-600">{formatCurrency(0)}</span>
               </>
             ) : hasDiscount ? (

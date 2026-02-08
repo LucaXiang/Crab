@@ -89,19 +89,19 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
-            original_price: None,
+            original_price: 0.0,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -439,7 +439,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         // Create item with 21% IVA tax rate (Spanish standard rate)
         let mut item = create_test_item("item-1", 1, "Product A", 121.0, 1);
-        item.tax_rate = Some(21); // 21% IVA
+        item.tax_rate = 21; // 21% IVA
         snapshot.items.push(item);
         snapshot.order_manual_discount_fixed = Some(5.0); // Use structured field
 

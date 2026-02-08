@@ -48,7 +48,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::PrintDestinationCreated,
         "print_destination", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&item, "print_destination")
     );
@@ -79,7 +79,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::PrintDestinationUpdated,
         "print_destination", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_item, &item, "print_destination")
     );
@@ -111,7 +111,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::PrintDestinationDeleted,
             "print_destination", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );

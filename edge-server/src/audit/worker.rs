@@ -46,7 +46,7 @@ impl AuditWorker {
                         req.action,
                         req.resource_type.clone(),
                         req.resource_id.clone(),
-                        req.operator_id.clone(),
+                        req.operator_id,
                         req.operator_name.clone(),
                         req.details.clone(),
                         req.target.clone(),

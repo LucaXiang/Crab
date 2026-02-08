@@ -36,6 +36,8 @@ import type {
   OrderDiscountAppliedPayload,
   OrderSurchargeAppliedPayload,
   OrderNoteAddedPayload,
+  SpecificationInfo,
+  ItemOption,
 } from '@/core/domain/types/orderEvent';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { Currency } from '@/utils/currency';
@@ -67,7 +69,7 @@ export interface TimelineDisplayData {
   summary?: string;
   details: string[];
   detailTags?: DetailTag[];
-  icon: LucideIcon | React.FC<any>;
+  icon: LucideIcon | React.ComponentType;
   colorClass: string;
   customColor?: string;
   timestamp: number;
@@ -171,17 +173,17 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     // Show specification change
     if (changes.selected_specification) {
       const oldSpec = previousValues.selected_specification;
-      const oldName = oldSpec && typeof oldSpec === 'object' && 'name' in oldSpec ? (oldSpec as any).name : '-';
+      const oldName = oldSpec && typeof oldSpec === 'object' && 'name' in oldSpec ? (oldSpec as SpecificationInfo).name : '-';
       details.push(`${t('pos.cart.spec')}: ${oldName} → ${changes.selected_specification.name}`);
     }
 
     // Show options change (diff by attribute: added/removed/quantity changed)
     if (changes.selected_options) {
-      const oldOpts = (previousValues.selected_options as any[] | undefined) || [];
+      const oldOpts = previousValues.selected_options ?? [];
       const newOpts = changes.selected_options;
 
       // Group by attribute, storing option_name -> quantity
-      const groupByAttr = (opts: any[]) => {
+      const groupByAttr = (opts: ItemOption[]) => {
         const map = new Map<string, Map<string, number>>();
         for (const o of opts) {
           const attr = o.attribute_name || '';
@@ -865,6 +867,7 @@ const OrderNoteAddedRenderer: EventRenderer<OrderNoteAddedPayload> = {
  * 自动映射 OrderEventType → Renderer，无需 switch case
  * 新增事件类型只需在这里添加一行
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous registry requires existential type
 export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   TABLE_OPENED: TableOpenedRenderer,
   ITEMS_ADDED: ItemsAddedRenderer,

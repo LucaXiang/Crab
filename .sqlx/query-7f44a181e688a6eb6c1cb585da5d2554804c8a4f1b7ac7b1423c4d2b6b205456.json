@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO archived_order_payment (order_pk, seq, payment_id, method, amount, time, cancelled, cancel_reason, tendered, change_amount, split_type, split_items, aa_shares, aa_total_shares) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 14
+    },
+    "nullable": []
+  },
+  "hash": "7f44a181e688a6eb6c1cb585da5d2554804c8a4f1b7ac7b1423c4d2b6b205456"
+}

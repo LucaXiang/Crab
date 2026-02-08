@@ -47,10 +47,11 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
       });
       toast.success(t('settings.daily_report.generate.success'));
       onSuccess();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to generate report:', err);
       // Check if it's a duplicate error
-      if (err?.message?.includes('already exists') || err?.code === 1003) {
+      const errObj = err as { message?: string; code?: number };
+      if (errObj?.message?.includes('already exists') || errObj?.code === 1003) {
         toast.error(t('settings.daily_report.generate.already_exists'));
       } else {
         toast.error(t('settings.daily_report.generate.failed'));

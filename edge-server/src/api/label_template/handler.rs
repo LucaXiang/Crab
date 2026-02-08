@@ -58,7 +58,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::LabelTemplateCreated,
         "label_template", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&template, "label_template")
     );
@@ -89,7 +89,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::LabelTemplateUpdated,
         "label_template", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_template, &template, "label_template")
     );
@@ -118,7 +118,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::LabelTemplateDeleted,
             "label_template", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );

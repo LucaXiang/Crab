@@ -21,7 +21,7 @@ pub struct PaymentRow {
     pub split_type: Option<String>,
     pub aa_shares: Option<i32>,
     pub split_items: Option<String>,
-    pub operator_id: Option<String>,
+    pub operator_id: Option<i64>,
     pub operator_name: Option<String>,
     pub cancelled: bool,
     pub cancel_reason: Option<String>,
@@ -33,7 +33,7 @@ pub struct PaymentRow {
 pub async fn create_from_snapshot(
     pool: &SqlitePool,
     snapshot: &OrderSnapshot,
-    operator_id: Option<&str>,
+    operator_id: Option<i64>,
     operator_name: Option<&str>,
 ) -> RepoResult<usize> {
     let now = shared::util::now_millis();
@@ -53,7 +53,7 @@ pub async fn create_from_snapshot(
                     serde_json::json!({
                         "name": si.name,
                         "quantity": si.quantity,
-                        "unit_price": si.unit_price.unwrap_or(si.price),
+                        "unit_price": if si.unit_price > 0.0 { si.unit_price } else { si.price },
                     })
                 })
                 .collect();

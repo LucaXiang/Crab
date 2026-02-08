@@ -20,7 +20,7 @@ interface DataTableProps<T> {
   isEditable?: (item: T) => boolean;
   isDeletable?: (item: T) => boolean;
   onBatchDelete?: (items: T[]) => void;
-  getRowKey: (item: T) => string;
+  getRowKey: (item: T) => string | number;
   pageSize?: number;
   selectable?: boolean;
   themeColor?: 'blue' | 'orange' | 'purple' | 'teal' | 'indigo';
@@ -127,7 +127,7 @@ export function DataTable<T>({
   const { t } = useI18n();
   const theme = THEMES[themeColor] || THEMES.blue;
   const [internalPage, setInternalPage] = React.useState(1);
-  const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set());
+  const [selectedKeys, setSelectedKeys] = React.useState<Set<string | number>>(new Set());
   const [internalSelectionMode, setInternalSelectionMode] = React.useState(false);
   const [longPressTimer, setLongPressTimer] = React.useState<NodeJS.Timeout | null>(null);
 
@@ -184,7 +184,7 @@ export function DataTable<T>({
     }
   };
 
-  const toggleSelection = (key: string) => {
+  const toggleSelection = (key: string | number) => {
     const newSet = new Set(selectedKeys);
     if (newSet.has(key)) {
       newSet.delete(key);
@@ -471,7 +471,7 @@ export function DataTable<T>({
                   className={`px-4 py-3.5 text-sm text-gray-700 ${getAlignClass(col.align)}`}
                   style={{ width: col.width, flex: col.width ? undefined : 1 }}
                 >
-                  {col.render ? col.render(item) : (item as any)[col.key]}
+                  {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key] ?? '')}
                 </div>
               ))}
               {showActions && !isSelectionMode && (

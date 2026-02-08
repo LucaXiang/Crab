@@ -229,7 +229,7 @@ export const DailyReportManagement: React.FC = React.memo(() => {
         data={filteredReports}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => String(item.id) || item.business_date}
+        getRowKey={(item) => item.id || item.business_date}
         onEdit={handleViewDetail}
         emptyText={t('settings.daily_report.empty')}
         themeColor="purple"

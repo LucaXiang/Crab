@@ -70,7 +70,7 @@ pub async fn generate(
     data: DailyReportGenerate,
     start_millis: i64,
     end_millis: i64,
-    operator_id: Option<String>,
+    operator_id: Option<i64>,
     operator_name: Option<String>,
 ) -> RepoResult<DailyReport> {
     let now = shared::util::now_millis();
@@ -153,15 +153,12 @@ pub async fn generate(
     // Create report + breakdowns in a single transaction
     let mut tx = pool.begin().await?;
 
-    let total_orders_i32 = total_orders as i32;
-    let completed_orders_i32 = completed_orders as i32;
-    let void_orders_i32 = void_orders as i32;
     let report_id = sqlx::query_scalar!(
         r#"INSERT INTO daily_report (business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING id as "id!""#,
         data.business_date,
-        total_orders_i32,
-        completed_orders_i32,
-        void_orders_i32,
+        total_orders,
+        completed_orders,
+        void_orders,
         total_sales,
         total_paid,
         total_unpaid,
@@ -187,7 +184,6 @@ pub async fn generate(
     .await?;
 
     for (tax_rate, gross, tax_amt, net, order_count) in &tax_rows {
-        let order_count_i32 = *order_count as i32;
         sqlx::query!(
             "INSERT INTO daily_report_tax_breakdown (report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count) VALUES (?, ?, ?, ?, ?, ?)",
             report_id,
@@ -195,7 +191,7 @@ pub async fn generate(
             net,
             tax_amt,
             gross,
-            order_count_i32,
+            order_count,
         )
         .execute(&mut *tx)
         .await?;
@@ -211,13 +207,12 @@ pub async fn generate(
     .await?;
 
     for (method, amount, count) in &payment_rows {
-        let count_i32 = *count as i32;
         sqlx::query!(
             "INSERT INTO daily_report_payment_breakdown (report_id, method, amount, count) VALUES (?, ?, ?, ?)",
             report_id,
             method,
             amount,
-            count_i32,
+            count,
         )
         .execute(&mut *tx)
         .await?;

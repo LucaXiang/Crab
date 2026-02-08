@@ -129,6 +129,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
           unpaid_quantity: quantity,  // All items are unpaid when first added to cart
           price: effectivePrice,
           original_price: effectivePrice,
+          rule_discount_amount: 0,
+          rule_surcharge_amount: 0,
+          applied_rules: [],
+          unit_price: effectivePrice,
+          line_total: Currency.round2(Currency.mul(effectivePrice, quantity)).toNumber(),
+          tax: 0,
+          tax_rate: 0,
           manual_discount_percent: discount,
           selected_options: selectedOptions && selectedOptions.length > 0 ? selectedOptions : undefined,
           selected_specification: effectiveSpec,
@@ -198,16 +205,16 @@ export const useCartStore = create<CartStore>((set, get) => ({
     const total = cart.reduce((sum, item) => {
       if (item._removed) return sum;
       
-      // Use server-computed line_total if available
-      if (item.line_total !== undefined && item.line_total !== null) {
+      // Use server-computed line_total if available (non-zero means server has computed it)
+      if (item.line_total !== 0) {
         return Currency.add(sum, item.line_total).toNumber();
       }
-      
-      // Fallback to local calculation
+
+      // Fallback to local calculation (for draft items not yet sent to server)
       const discountPercent = item.manual_discount_percent || 0;
       // Options modifier considers quantity for each option
       const optionsModifier = calculateOptionsModifier(item.selected_options);
-      const basePrice = item.original_price ?? item.price;
+      const basePrice = item.original_price || item.price;
       const baseUnitPrice = basePrice + optionsModifier;
       
       let finalUnitPrice: number;

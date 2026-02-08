@@ -30,8 +30,8 @@ impl EventApplier for ItemCompedApplier {
                 // Full comp: find item by instance_id and mark as comped
                 if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == *instance_id) {
                     // Save original_price if not already set
-                    if item.original_price.is_none() {
-                        item.original_price = Some(item.price);
+                    if item.original_price == 0.0 {
+                        item.original_price = item.price;
                     }
                     item.is_comped = true;
                     item.price = 0.0;
@@ -62,7 +62,7 @@ impl EventApplier for ItemCompedApplier {
                     comped_item.unpaid_quantity = *quantity;
                     comped_item.is_comped = true;
                     comped_item.price = 0.0;
-                    comped_item.original_price = Some(*original_price);
+                    comped_item.original_price = *original_price;
 
                     snapshot.items.push(comped_item);
                 }
@@ -113,19 +113,19 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
-            original_price: None,
+            original_price: 0.0,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -183,7 +183,7 @@ mod tests {
         assert_eq!(snapshot.items[0].price, 0.0);
         assert_eq!(snapshot.items[0].quantity, 2);
         // original_price should be saved
-        assert_eq!(snapshot.items[0].original_price, Some(10.0));
+        assert_eq!(snapshot.items[0].original_price, 10.0);
         // Total should be 0 after comp
         assert_eq!(snapshot.subtotal, 0.0);
         assert_eq!(snapshot.total, 0.0);
@@ -200,7 +200,7 @@ mod tests {
     fn test_item_comped_full_preserves_existing_original_price() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = create_test_item("item-1", 1, "Product A", 8.0, 1);
-        item.original_price = Some(12.0); // Already has original_price
+        item.original_price = 12.0; // Already has original_price
         snapshot.items.push(item);
 
         let event = create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 1, 12.0);
@@ -209,7 +209,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // original_price should be preserved (12.0), not overwritten to 8.0
-        assert_eq!(snapshot.items[0].original_price, Some(12.0));
+        assert_eq!(snapshot.items[0].original_price, 12.0);
         assert_eq!(snapshot.items[0].price, 0.0);
         assert!(snapshot.items[0].is_comped);
     }
@@ -245,7 +245,7 @@ mod tests {
         assert_eq!(snapshot.items[1].quantity, 2);
         assert!(snapshot.items[1].is_comped);
         assert_eq!(snapshot.items[1].price, 0.0);
-        assert_eq!(snapshot.items[1].original_price, Some(10.0));
+        assert_eq!(snapshot.items[1].original_price, 10.0);
 
         // Totals: 10.0 * 3 + 0.0 * 2 = 30.0
         assert_eq!(snapshot.subtotal, 30.0);
@@ -297,8 +297,8 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = create_test_item("item-1", 1, "Product A", 100.0, 1);
         item.manual_discount_percent = Some(10.0);
-        item.rule_discount_amount = Some(5.0);
-        item.rule_surcharge_amount = Some(2.0);
+        item.rule_discount_amount = 5.0;
+        item.rule_surcharge_amount = 2.0;
         snapshot.items.push(item);
 
         let event = create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 100.0);
@@ -310,8 +310,8 @@ mod tests {
         assert_eq!(snapshot.items[0].price, 0.0);
         // Discounts and rules are preserved for uncomp restoration
         assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
-        assert_eq!(snapshot.items[0].rule_discount_amount, Some(5.0));
-        assert_eq!(snapshot.items[0].rule_surcharge_amount, Some(2.0));
+        assert_eq!(snapshot.items[0].rule_discount_amount, 5.0);
+        assert_eq!(snapshot.items[0].rule_surcharge_amount, 2.0);
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // BUG FIX: original_price must be the real price, not 0.0
-        assert_eq!(snapshot.items[0].original_price, Some(15.50));
+        assert_eq!(snapshot.items[0].original_price, 15.50);
         assert_eq!(snapshot.items[0].price, 0.0);
         // CompRecord must also have correct original_price
         assert_eq!(snapshot.comps[0].original_price, 15.50);

@@ -109,7 +109,7 @@ impl CommandHandler for AddItemsAction {
                 let mut snapshot = input_to_snapshot_with_rules(item, &rules_refs, product_id_i64, category_id, &tag_ids);
 
                 // Set tax_rate and category_name from product metadata
-                snapshot.tax_rate = meta.map(|m| m.tax_rate);
+                snapshot.tax_rate = meta.map(|m| m.tax_rate).unwrap_or(0);
                 snapshot.category_name = meta.map(|m| m.category_name.clone()).filter(|s| !s.is_empty());
 
                 info!(
@@ -120,12 +120,12 @@ impl CommandHandler for AddItemsAction {
                     final_price = snapshot.price,
                     rule_discount_amount = ?snapshot.rule_discount_amount,
                     rule_surcharge_amount = ?snapshot.rule_surcharge_amount,
-                    applied_rules_count = snapshot.applied_rules.as_ref().map(|r| r.len()).unwrap_or(0),
+                    applied_rules_count = snapshot.applied_rules.len(),
                     "[AddItems] Item processed with price rules"
                 );
 
-                if let Some(applied) = &snapshot.applied_rules {
-                    for rule in applied {
+                if !snapshot.applied_rules.is_empty() {
+                    for rule in &snapshot.applied_rules {
                         debug!(
                             product_id = %item.product_id,
                             rule_name = %rule.name,

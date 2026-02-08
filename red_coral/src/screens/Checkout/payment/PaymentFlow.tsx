@@ -409,7 +409,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             quantity: qty,
             name: originalItem?.name || t('common.label.unknown_item'),
             price: originalItem?.price || 0,
-            unit_price: originalItem?.unit_price ?? originalItem?.price ?? 0,
+            unit_price: originalItem?.unit_price ?? 0,
           };
         });
 
@@ -609,7 +609,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       const item = order.items.find(i => i.instance_id === instanceId);
       if (item) {
         // Use server-authoritative unit_price
-        const unitPrice = item.unit_price ?? item.price;
+        const unitPrice = item.unit_price;
         total += unitPrice * qty;
       }
     });
@@ -801,7 +801,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                       const currentSplitQty = splitItems[item.instance_id] || 0;
                                       const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
                                       const maxQty = item.quantity - paidQty;
-                                      const unitPrice = item.unit_price ?? item.price;
+                                      const unitPrice = item.unit_price;
                                       const imageRef = productInfoMap.get(item.instance_id)?.image;
                                       const imageSrc = imageRef ? (imageUrls.get(imageRef) || DefaultImage) : DefaultImage;
                                       const isSelected = currentSplitQty > 0;
@@ -891,7 +891,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                 .map(([instanceId, qty]) => {
                                   const item = order.items.find(i => i.instance_id === instanceId);
                                   if (!item) return null;
-                                  const unitPrice = item.unit_price ?? item.price;
+                                  const unitPrice = item.unit_price;
                                   
                                   return (
                                       <div key={instanceId} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm animate-in slide-in-from-right-4 duration-300">

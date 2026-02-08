@@ -195,7 +195,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
                 authorizer_name: self.authorizer_name.clone(),
                 subtotal: snapshot.subtotal,
                 surcharge: to_f64(
-                    snapshot.order_rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO)
+                    to_decimal(snapshot.order_rule_surcharge_amount)
                         + snapshot.order_manual_surcharge_percent
                             .map(|p| to_decimal(snapshot.subtotal) * to_decimal(p) / Decimal::ONE_HUNDRED)
                             .unwrap_or(Decimal::ZERO)
@@ -231,19 +231,19 @@ mod tests {
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price,
-            original_price: Some(price),
+            original_price: price,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

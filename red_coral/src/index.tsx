@@ -42,8 +42,9 @@ window.addEventListener('error', (ev) => {
 });
 
 window.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
-  const reason = ev.reason as any;
-  const message = typeof reason === 'string' ? reason : reason?.message || 'unhandledrejection';
+  const reason: unknown = ev.reason;
+  const message = typeof reason === 'string' ? reason
+    : (reason instanceof Error ? reason.message : 'unhandledrejection');
   void reportError(
     message,
     reason,

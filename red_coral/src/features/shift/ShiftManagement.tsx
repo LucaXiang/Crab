@@ -324,7 +324,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
         data={filteredShifts}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => String(item.id || item.start_time)}
+        getRowKey={(item) => item.id || item.start_time}
         emptyText={t('settings.shift.empty')}
         themeColor="teal"
       />

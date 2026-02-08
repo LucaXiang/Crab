@@ -108,19 +108,19 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -646,7 +646,7 @@ mod tests {
         // Target has item with 20% manual discount
         let mut target_item = create_test_item("item-1", "Coffee");
         target_item.price = 8.0;
-        target_item.original_price = Some(10.0);
+        target_item.original_price = 10.0;
         target_item.manual_discount_percent = Some(20.0);
         snapshot.items.push(target_item);
 

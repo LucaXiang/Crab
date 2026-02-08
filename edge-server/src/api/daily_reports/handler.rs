@@ -89,7 +89,7 @@ pub async fn generate(
     let next_day = date.succ_opt().unwrap_or(date);
     let end_millis = time::day_start_millis(next_day, tz);
 
-    let audit_operator_id = current_user.id.clone();
+    let audit_operator_id = current_user.id;
     let audit_operator_name = current_user.display_name.clone();
 
     let operator_id = Some(current_user.id);

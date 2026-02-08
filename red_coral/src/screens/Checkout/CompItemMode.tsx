@@ -220,7 +220,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                     {items.map((item) => {
                       const paidQty = order.paid_item_quantities?.[item.instance_id] || 0;
                       const unpaidQty = item.quantity - paidQty;
-                      const unitPrice = item.unit_price ?? item.price;
+                      const unitPrice = item.unit_price;
                       const imageRef = productInfoMap.get(item.instance_id)?.image;
                       const imageSrc = imageRef ? (imageUrls.get(imageRef) || DefaultImage) : DefaultImage;
                       const isSelected = selectedInstanceId === item.instance_id;
@@ -355,7 +355,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                       <div className="text-sm text-gray-500 mt-1">{t('pos.cart.spec')}: {selectedItem.selected_specification.name}</div>
                     )}
                     <div className="text-sm text-gray-500 mt-1">
-                      {formatCurrency(selectedItem.unit_price ?? selectedItem.price)} x {maxCompQty}
+                      {formatCurrency(selectedItem.unit_price)} x {maxCompQty}
                     </div>
                   </div>
 
@@ -422,7 +422,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                   <div className="flex justify-between items-end mb-4">
                     <span className="text-gray-500 font-medium">{t('checkout.comp.quantity_label')}</span>
                     <span className="text-2xl font-bold text-emerald-600 tabular-nums">
-                      {compQty} x {formatCurrency(selectedItem.unit_price ?? selectedItem.price)}
+                      {compQty} x {formatCurrency(selectedItem.unit_price)}
                     </span>
                   </div>
                   <EscalatableGate

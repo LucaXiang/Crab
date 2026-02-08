@@ -87,7 +87,7 @@ impl CommandHandler for CompItemAction {
         }
 
         // 8. Capture original price BEFORE zeroing
-        let original_price = item.original_price.unwrap_or(item.price);
+        let original_price = if item.original_price > 0.0 { item.original_price } else { item.price };
 
         // 9. Determine full vs partial comp (compare against unpaid, not total)
         let is_full_comp = self.quantity == item.unpaid_quantity;
@@ -155,19 +155,19 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
-            original_price: None,
+            original_price: 0.0,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -243,7 +243,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let mut item = create_test_item("item-1", 1, "Test Product", 8.0, 1);
-        item.original_price = Some(12.0);
+        item.original_price = 12.0;
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 

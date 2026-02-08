@@ -54,7 +54,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::EmployeeCreated,
         "employee", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&emp, "employee")
     );
@@ -85,7 +85,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::EmployeeUpdated,
         "employee", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_employee, &emp, "employee")
     );
@@ -114,7 +114,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::EmployeeDeleted,
             "employee", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"username": name_for_audit})
         );

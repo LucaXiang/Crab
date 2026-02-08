@@ -14,6 +14,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tsc": "tsc",
+    "lint": "eslint src/",
     "deadcode": "ts-prune -p tsconfig.json -s \"node_modules|dist|src-tauri|escpos-rs|\\.test\\.\" -i \"node_modules|dist|src-tauri|escpos-rs|vite\\.config\\.ts|vitest\\.config\\.ts\""
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.1.17",
     "@tauri-apps/cli": "^2.9.5",
     "@testing-library/dom": "^10.4.1",
@@ -52,6 +54,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.22",
     "concurrently": "^9.2.1",
+    "eslint": "^10.0.0",
     "jsdom": "^27.0.1",
     "knip": "^5.73.3",
     "madge": "^8.0.0",
@@ -60,6 +63,7 @@
     "terser": "^5.44.1",
     "ts-prune": "^0.10.3",
     "typescript": "~5.8.2",
+    "typescript-eslint": "^8.54.0",
     "vite": "^6.2.0",
     "vitest": "^3.2.4"
   }

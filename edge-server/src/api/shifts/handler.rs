@@ -99,7 +99,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::ShiftOpened,
         "shift", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"starting_cash": s.starting_cash})
     );
@@ -142,7 +142,7 @@ pub async fn close(
         state.audit_service,
         AuditAction::ShiftClosed,
         "shift", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "starting_cash": s.starting_cash,
@@ -174,7 +174,7 @@ pub async fn force_close(
         state.audit_service,
         AuditAction::ShiftClosed,
         "shift", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "forced": true,

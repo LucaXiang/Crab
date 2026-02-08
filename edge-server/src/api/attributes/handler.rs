@@ -46,7 +46,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::AttributeCreated,
         "attribute", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&attr, "attribute")
     );
@@ -78,7 +78,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::AttributeUpdated,
         "attribute", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_attr, &attr, "attribute")
     );
@@ -88,7 +88,7 @@ pub async fn update(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id_str).await {
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
         tracing::warn!("Failed to refresh product cache after attribute update: {e}");
     }
 
@@ -116,7 +116,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::AttributeDeleted,
             "attribute", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
@@ -126,7 +126,7 @@ pub async fn delete(
             .await;
 
         // 刷新引用此属性的产品缓存
-        if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id_str).await {
+        if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
             tracing::warn!("Failed to refresh product cache after attribute delete: {e}");
         }
     }
@@ -175,7 +175,7 @@ pub async fn add_option(
         state.audit_service,
         AuditAction::AttributeUpdated,
         "attribute", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "add_option", "option_name": &option.name})
     );
@@ -186,7 +186,7 @@ pub async fn add_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id_str).await {
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
         tracing::warn!("Failed to refresh product cache after option add: {e}");
     }
 
@@ -242,7 +242,7 @@ pub async fn update_option(
         state.audit_service,
         AuditAction::AttributeUpdated,
         "attribute", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "update_option", "index": idx, "option_name": option_name})
     );
@@ -253,7 +253,7 @@ pub async fn update_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id_str).await {
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
         tracing::warn!("Failed to refresh product cache after option update: {e}");
     }
 
@@ -307,7 +307,7 @@ pub async fn remove_option(
         state.audit_service,
         AuditAction::AttributeUpdated,
         "attribute", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "remove_option", "index": idx})
     );
@@ -318,7 +318,7 @@ pub async fn remove_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id_str).await {
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
         tracing::warn!("Failed to refresh product cache after option remove: {e}");
     }
 

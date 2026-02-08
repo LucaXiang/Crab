@@ -100,7 +100,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::RoleCreated,
         "role", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&r, "role")
     );
@@ -139,7 +139,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::RoleUpdated,
         "role", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_role, &r, "role")
     );
@@ -170,7 +170,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::RoleDeleted,
             "role", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"role_name": name_for_audit})
         );
@@ -238,7 +238,7 @@ pub async fn update_role_permissions(
         state.audit_service,
         AuditAction::RoleUpdated,
         "role", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_role, &r, "role")
     );

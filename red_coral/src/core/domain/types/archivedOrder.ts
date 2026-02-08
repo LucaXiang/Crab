@@ -52,6 +52,7 @@ export interface ArchivedItemOption {
   attribute_name: string;
   option_name: string;
   price_modifier: number;
+  quantity: number;
 }
 
 /** Order item for detail view */
@@ -73,6 +74,8 @@ export interface ArchivedOrderItem {
   applied_rules: AppliedRule[] | null;
   note: string | null;
   is_comped: boolean;
+  tax: number;
+  tax_rate: number;
   selected_options: ArchivedItemOption[];
 }
 
@@ -86,6 +89,8 @@ export interface ArchivedPayment {
   timestamp: number; // milliseconds
   cancelled: boolean;
   cancel_reason: string | null;
+  tendered: number | null;
+  change_amount: number | null;
   split_type?: SplitType | null;
   split_items: ArchivedSplitItem[];
   aa_shares?: number | null;
@@ -94,7 +99,7 @@ export interface ArchivedPayment {
 
 /** Event for detail view */
 export interface ArchivedEvent {
-  event_id: string;
+  event_id: number;
   event_type: string;
   timestamp: number; // milliseconds
   payload: unknown | null;

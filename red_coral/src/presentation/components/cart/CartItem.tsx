@@ -27,26 +27,14 @@ export const CartItem = React.memo<CartItemProps>(({
   
   // Calculate options modifier for display (considering option quantity)
   const optionsModifier = calculateOptionsModifier(item.selected_options);
-  const basePrice = item.original_price ?? item.price;
+  const basePrice = item.original_price || item.price;
   const baseUnitPrice = basePrice + optionsModifier;
 
-  // Use server-computed unit_price, fallback to local calculation
-  let finalUnitPrice = item.unit_price;
-  
-  if (finalUnitPrice === undefined || finalUnitPrice === null) {
-    if (discountPercent > 0) {
-      // Calculate discounted price: (base + options) * (1 - discount%)
-      const discountFactor = Currency.sub(1, Currency.div(discountPercent, 100));
-      finalUnitPrice = Currency.round2(
-        Currency.mul(baseUnitPrice, discountFactor)
-      ).toNumber();
-    } else {
-      finalUnitPrice = baseUnitPrice;
-    }
-  }
+  // Use server-computed unit_price (always present)
+  const finalUnitPrice = item.unit_price;
 
-  // Use server-computed line_total, fallback to local calculation
-  const finalLineTotal = item.line_total ?? Currency.round2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
+  // Use server-computed line_total (always present)
+  const finalLineTotal = item.line_total;
 
   const handleQuantityChange = (e: React.MouseEvent, delta: number) => {
     e.stopPropagation();
@@ -68,7 +56,7 @@ export const CartItem = React.memo<CartItemProps>(({
   const hasNote = item.note && item.note.trim().length > 0;
   
   // Applied price rules (filter out skipped ones for display)
-  const activeRules = (item.applied_rules ?? []).filter(r => !r.skipped);
+  const activeRules = item.applied_rules.filter(r => !r.skipped);
   const hasActiveRules = activeRules.length > 0;
 
   return (

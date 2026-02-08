@@ -79,12 +79,12 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   // Split: rule discount/surcharge (item-level + order-level rules)
   const itemRuleDiscount = order.items
     .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount ?? 0, item.quantity)).toNumber(), 0);
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0);
   const itemRuleSurcharge = order.items
     .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount ?? 0, item.quantity)).toNumber(), 0);
-  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount ?? 0).toNumber();
-  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount ?? 0).toNumber();
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0);
+  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
+  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
   // Manual item discount = total item discount - rule discount
   const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
 

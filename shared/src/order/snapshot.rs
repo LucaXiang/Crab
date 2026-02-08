@@ -129,15 +129,12 @@ pub struct OrderSnapshot {
     pub note: Option<String>,
 
     // === Order-level Rule Adjustments ===
-    /// Order-level rule discount amount
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub order_rule_discount_amount: Option<f64>,
-    /// Order-level rule surcharge amount
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub order_rule_surcharge_amount: Option<f64>,
+    /// Order-level rule discount amount (server-computed)
+    pub order_rule_discount_amount: f64,
+    /// Order-level rule surcharge amount (server-computed)
+    pub order_rule_surcharge_amount: f64,
     /// Order-level applied rules
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub order_applied_rules: Option<Vec<AppliedRule>>,
+    pub order_applied_rules: Vec<AppliedRule>,
 
     // === Order-level Manual Adjustments (pick one) ===
     /// Order-level manual discount percentage
@@ -213,9 +210,9 @@ impl OrderSnapshot {
             receipt_number: String::new(),
             is_pre_payment: false,
             note: None,
-            order_rule_discount_amount: None,
-            order_rule_surcharge_amount: None,
-            order_applied_rules: None,
+            order_rule_discount_amount: 0.0,
+            order_rule_surcharge_amount: 0.0,
+            order_applied_rules: Vec::new(),
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
             order_manual_surcharge_percent: None,
@@ -323,12 +320,12 @@ mod tests {
     #[test]
     fn test_order_snapshot_rule_fields() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.order_rule_discount_amount = Some(10.0);
-        snapshot.order_rule_surcharge_amount = Some(5.0);
+        snapshot.order_rule_discount_amount = 10.0;
+        snapshot.order_rule_surcharge_amount = 5.0;
         snapshot.order_manual_discount_percent = Some(5.0);
 
-        assert_eq!(snapshot.order_rule_discount_amount, Some(10.0));
-        assert_eq!(snapshot.order_rule_surcharge_amount, Some(5.0));
+        assert_eq!(snapshot.order_rule_discount_amount, 10.0);
+        assert_eq!(snapshot.order_rule_surcharge_amount, 5.0);
         assert_eq!(snapshot.order_manual_discount_percent, Some(5.0));
     }
 

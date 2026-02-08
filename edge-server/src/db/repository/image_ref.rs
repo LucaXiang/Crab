@@ -10,7 +10,7 @@ use std::collections::HashSet;
 pub async fn sync_refs(
     pool: &SqlitePool,
     entity_type: ImageRefEntityType,
-    entity_id: &str,
+    entity_id: i64,
     current_hashes: HashSet<String>,
 ) -> RepoResult<Vec<String>> {
     let entity_type_str = entity_type.as_str();
@@ -60,7 +60,7 @@ pub async fn sync_refs(
 pub async fn delete_entity_refs(
     pool: &SqlitePool,
     entity_type: ImageRefEntityType,
-    entity_id: &str,
+    entity_id: i64,
 ) -> RepoResult<Vec<String>> {
     let entity_type_str = entity_type.as_str();
 
@@ -114,7 +114,7 @@ pub async fn find_orphan_hashes(pool: &SqlitePool, hashes: &[String]) -> RepoRes
 pub async fn get_entity_refs(
     pool: &SqlitePool,
     entity_type: ImageRefEntityType,
-    entity_id: &str,
+    entity_id: i64,
 ) -> RepoResult<Vec<ImageRef>> {
     let entity_type_str = entity_type.as_str();
     let refs = sqlx::query_as::<_, ImageRef>(

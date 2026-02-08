@@ -73,19 +73,19 @@ mod tests {
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price,
-            original_price: Some(price),
+            original_price: price,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -418,7 +418,7 @@ mod tests {
     fn test_discount_with_rule_surcharge() {
         let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
         // 模拟规则附加费
-        snapshot.order_rule_surcharge_amount = Some(8.0);
+        snapshot.order_rule_surcharge_amount = 8.0;
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 108.0); // 100 + 8
 

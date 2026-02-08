@@ -57,6 +57,8 @@ pub struct OrderDetailItem {
     pub applied_rules: Option<String>,
     pub note: Option<String>,
     pub is_comped: bool,
+    pub tax: f64,
+    pub tax_rate: i32,
     pub selected_options: Vec<OrderDetailOption>,
 }
 
@@ -65,6 +67,7 @@ pub struct OrderDetailOption {
     pub attribute_name: String,
     pub option_name: String,
     pub price_modifier: f64,
+    pub quantity: i32,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -76,6 +79,8 @@ pub struct OrderDetailPayment {
     pub timestamp: i64,
     pub cancelled: bool,
     pub cancel_reason: Option<String>,
+    pub tendered: Option<f64>,
+    pub change_amount: Option<f64>,
     pub split_type: Option<String>,
     pub split_items: Option<String>,
     pub aa_shares: Option<i32>,
@@ -128,6 +133,8 @@ struct PaymentRow {
     time: i64,
     cancelled: bool,
     cancel_reason: Option<String>,
+    tendered: Option<f64>,
+    change_amount: Option<f64>,
     split_type: Option<String>,
     split_items: Option<String>,
     aa_shares: Option<i32>,
@@ -162,6 +169,8 @@ struct ItemRow {
     applied_rules: Option<String>,
     note: Option<String>,
     is_comped: bool,
+    tax: f64,
+    tax_rate: i32,
 }
 
 /// Get full order detail by reconstructing from archived tables
@@ -177,7 +186,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
 
     // 2. Get items
     let item_rows: Vec<ItemRow> = sqlx::query_as::<_, ItemRow>(
-        "SELECT id, instance_id, name, spec_name, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, applied_rules, note, is_comped FROM archived_order_item WHERE order_pk = ? ORDER BY id",
+        "SELECT id, instance_id, name, spec_name, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, applied_rules, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_id)
     .fetch_all(pool)
@@ -190,18 +199,19 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
     if !item_ids.is_empty() {
         let placeholders = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
-            "SELECT item_pk, attribute_name, option_name, price FROM archived_order_item_option WHERE item_pk IN ({placeholders})"
+            "SELECT item_pk, attribute_name, option_name, price, quantity FROM archived_order_item_option WHERE item_pk IN ({placeholders})"
         );
-        let mut query = sqlx::query_as::<_, (i64, String, String, f64)>(&sql);
+        let mut query = sqlx::query_as::<_, (i64, String, String, f64, i32)>(&sql);
         for id in &item_ids {
             query = query.bind(id);
         }
         let all_options = query.fetch_all(pool).await?;
-        for (item_pk, attr, opt, price) in all_options {
+        for (item_pk, attr, opt, price, qty) in all_options {
             options_map.entry(item_pk).or_default().push(OrderDetailOption {
                 attribute_name: attr,
                 option_name: opt,
                 price_modifier: price,
+                quantity: qty,
             });
         }
     }
@@ -228,6 +238,8 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
                 applied_rules: row.applied_rules,
                 note: row.note,
                 is_comped: row.is_comped,
+                tax: row.tax,
+                tax_rate: row.tax_rate,
                 selected_options,
             }
         })
@@ -235,7 +247,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
 
     // 3. Get payments
     let payments: Vec<OrderDetailPayment> = sqlx::query_as::<_, PaymentRow>(
-        "SELECT seq, payment_id, method, amount, time, cancelled, cancel_reason, split_type, split_items, aa_shares, aa_total_shares FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
+        "SELECT seq, payment_id, method, amount, time, cancelled, cancel_reason, tendered, change_amount, split_type, split_items, aa_shares, aa_total_shares FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
     )
     .bind(order_id)
     .fetch_all(pool)
@@ -249,6 +261,8 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         timestamp: r.time,
         cancelled: r.cancelled,
         cancel_reason: r.cancel_reason,
+        tendered: r.tendered,
+        change_amount: r.change_amount,
         split_type: r.split_type,
         split_items: r.split_items,
         aa_shares: r.aa_shares,

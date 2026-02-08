@@ -61,10 +61,10 @@ pub struct PrintDefaults {
 #[derive(Clone)]
 pub struct CatalogService {
     pool: SqlitePool,
-    /// Products cache: "42" -> ProductFull
-    products: Arc<RwLock<HashMap<String, ProductFull>>>,
-    /// Categories cache: "42" -> Category
-    categories: Arc<RwLock<HashMap<String, Category>>>,
+    /// Products cache: 42 -> ProductFull
+    products: Arc<RwLock<HashMap<i64, ProductFull>>>,
+    /// Categories cache: 42 -> Category
+    categories: Arc<RwLock<HashMap<i64, Category>>>,
     /// System default print destinations
     print_defaults: Arc<RwLock<PrintDefaults>>,
     /// Image cleanup service
@@ -110,7 +110,7 @@ impl CatalogService {
         .await?;
 
         // Load category relations (junction tables)
-        let mut cat_map: HashMap<String, Category> = HashMap::new();
+        let mut cat_map: HashMap<i64, Category> = HashMap::new();
         for mut cat in categories {
             let cat_id = cat.id;
 
@@ -141,7 +141,7 @@ impl CatalogService {
             .await
             .unwrap_or_default();
 
-            cat_map.insert(cat_id.to_string(), cat);
+            cat_map.insert(cat_id, cat);
         }
 
         let categories_count = cat_map.len();
@@ -254,7 +254,7 @@ impl CatalogService {
                 tags,
             };
 
-            built_products.insert(product_id.to_string(), full);
+            built_products.insert(product_id, full);
         }
 
         // 5. Store in cache (short lock scope, no await)
@@ -286,9 +286,9 @@ impl CatalogService {
     // =========================================================================
 
     /// Get product by ID (from cache)
-    pub fn get_product(&self, id: &str) -> Option<ProductFull> {
+    pub fn get_product(&self, id: i64) -> Option<ProductFull> {
         let cache = self.products.read();
-        cache.get(id).cloned()
+        cache.get(&id).cloned()
     }
 
     /// List all products (from cache)
@@ -300,11 +300,11 @@ impl CatalogService {
     }
 
     /// Get products by category ID (from cache)
-    pub fn get_products_by_category(&self, category_id: &str) -> Vec<ProductFull> {
+    pub fn get_products_by_category(&self, category_id: i64) -> Vec<ProductFull> {
         let cache = self.products.read();
         let mut products: Vec<_> = cache
             .values()
-            .filter(|p| p.category_id.to_string() == category_id)
+            .filter(|p| p.category_id == category_id)
             .cloned()
             .collect();
         products.sort_by_key(|p| p.sort_order);
@@ -312,26 +312,26 @@ impl CatalogService {
     }
 
     /// Refresh a single product's cache entry
-    pub async fn refresh_product_cache(&self, product_id: &str) -> RepoResult<()> {
+    pub async fn refresh_product_cache(&self, product_id: i64) -> RepoResult<()> {
         let full = self.fetch_product_full(product_id).await?;
         let mut cache = self.products.write();
-        cache.insert(product_id.to_string(), full);
+        cache.insert(product_id, full);
         Ok(())
     }
 
     /// Refresh cached products in a category (re-fetch from DB to pick up inherited attribute changes)
-    pub async fn refresh_products_in_category(&self, category_id: &str) -> RepoResult<()> {
-        let product_ids: Vec<String> = {
+    pub async fn refresh_products_in_category(&self, category_id: i64) -> RepoResult<()> {
+        let product_ids: Vec<i64> = {
             let cache = self.products.read();
             cache
                 .iter()
-                .filter(|(_, p)| p.category_id.to_string() == category_id)
-                .map(|(id, _)| id.clone())
+                .filter(|(_, p)| p.category_id == category_id)
+                .map(|(&id, _)| id)
                 .collect()
         };
 
         for product_id in product_ids {
-            let full = self.fetch_product_full(&product_id).await?;
+            let full = self.fetch_product_full(product_id).await?;
             let mut cache = self.products.write();
             cache.insert(product_id, full);
         }
@@ -340,24 +340,20 @@ impl CatalogService {
     }
 
     /// Refresh cached products that reference a given attribute (direct or inherited)
-    pub async fn refresh_products_with_attribute(&self, attribute_id: &str) -> RepoResult<()> {
-        let attr_id: i64 = attribute_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid attribute ID: {}", attribute_id)))?;
-
-        let product_ids: Vec<String> = {
+    pub async fn refresh_products_with_attribute(&self, attribute_id: i64) -> RepoResult<()> {
+        let product_ids: Vec<i64> = {
             let cache = self.products.read();
             cache
                 .iter()
                 .filter(|(_, p)| {
-                    p.attributes.iter().any(|b| b.attribute.id == attr_id)
+                    p.attributes.iter().any(|b| b.attribute.id == attribute_id)
                 })
-                .map(|(id, _)| id.clone())
+                .map(|(&id, _)| id)
                 .collect()
         };
 
         for product_id in product_ids {
-            let full = self.fetch_product_full(&product_id).await?;
+            let full = self.fetch_product_full(product_id).await?;
             let mut cache = self.products.write();
             cache.insert(product_id, full);
         }
@@ -383,8 +379,7 @@ impl CatalogService {
         // Validate category is not virtual
         {
             let categories = self.categories.read();
-            let cat_id = data.category_id.to_string();
-            if let Some(cat) = categories.get(&cat_id)
+            if let Some(cat) = categories.get(&data.category_id)
                 && cat.is_virtual
             {
                 return Err(RepoError::Validation(
@@ -444,15 +439,14 @@ impl CatalogService {
         }
 
         // Fetch the created product with all relations
-        let product_id_str = product_id.to_string();
-        let full = self.fetch_product_full(&product_id_str).await?;
+        let full = self.fetch_product_full(product_id).await?;
 
         // Sync image references
         let image_hashes = Self::extract_product_image_hashes(&full);
         let _ = image_ref::sync_refs(
             &self.pool,
             ImageRefEntityType::Product,
-            &product_id_str,
+            product_id,
             image_hashes,
         )
         .await;
@@ -460,18 +454,14 @@ impl CatalogService {
         // Update cache
         {
             let mut cache = self.products.write();
-            cache.insert(product_id_str, full.clone());
+            cache.insert(product_id, full.clone());
         }
 
         Ok(full)
     }
 
     /// Update a product
-    pub async fn update_product(&self, id: &str, data: ProductUpdate) -> RepoResult<ProductFull> {
-        let product_id: i64 = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
-
+    pub async fn update_product(&self, id: i64, data: ProductUpdate) -> RepoResult<ProductFull> {
         // Check if there's anything to update
         let has_scalar_updates = data.name.is_some()
             || data.image.is_some()
@@ -493,8 +483,7 @@ impl CatalogService {
         // Validate category if changing
         if let Some(new_cat_id) = data.category_id {
             let categories = self.categories.read();
-            let cat_id = new_cat_id.to_string();
-            if let Some(cat) = categories.get(&cat_id)
+            if let Some(cat) = categories.get(&new_cat_id)
                 && cat.is_virtual
             {
                 return Err(RepoError::Validation(
@@ -518,7 +507,7 @@ impl CatalogService {
                 data.is_label_print_enabled,
                 data.is_active,
                 data.external_id,
-                product_id,
+                id,
             )
             .execute(&self.pool)
             .await?;
@@ -526,12 +515,12 @@ impl CatalogService {
 
         // Replace tags if provided
         if let Some(ref tag_ids) = data.tags {
-            sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", product_id)
+            sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", id)
                 .execute(&self.pool)
                 .await?;
             for tag_id in tag_ids {
                 sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
-                    product_id,
+                    id,
                     tag_id,
                 )
                 .execute(&self.pool)
@@ -541,13 +530,13 @@ impl CatalogService {
 
         // Replace specs if provided
         if let Some(ref specs) = data.specs {
-            sqlx::query!("DELETE FROM product_spec WHERE product_id = ?", product_id)
+            sqlx::query!("DELETE FROM product_spec WHERE product_id = ?", id)
                 .execute(&self.pool)
                 .await?;
             for spec in specs {
                 sqlx::query!(
                     "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    product_id,
+                    id,
                     spec.name,
                     spec.price,
                     spec.display_order,
@@ -587,9 +576,9 @@ impl CatalogService {
         {
             let mut cache = self.products.write();
             if full.is_active {
-                cache.insert(id.to_string(), full.clone());
+                cache.insert(id, full.clone());
             } else {
-                cache.remove(id);
+                cache.remove(&id);
             }
         }
 
@@ -597,11 +586,7 @@ impl CatalogService {
     }
 
     /// Delete a product
-    pub async fn delete_product(&self, id: &str) -> RepoResult<()> {
-        let product_id: i64 = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
-
+    pub async fn delete_product(&self, id: i64) -> RepoResult<()> {
         // Get image references before deleting
         let image_hashes = image_ref::delete_entity_refs(
             &self.pool,
@@ -612,22 +597,22 @@ impl CatalogService {
         .unwrap_or_default();
 
         // Clean up attribute bindings
-        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?", product_id)
+        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?", id)
             .execute(&self.pool)
             .await?;
 
         // Clean up tag bindings
-        sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", product_id)
+        sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", id)
             .execute(&self.pool)
             .await?;
 
         // Delete specs
-        sqlx::query!("DELETE FROM product_spec WHERE product_id = ?", product_id)
+        sqlx::query!("DELETE FROM product_spec WHERE product_id = ?", id)
             .execute(&self.pool)
             .await?;
 
         // Delete product
-        let result = sqlx::query!("DELETE FROM product WHERE id = ?", product_id)
+        let result = sqlx::query!("DELETE FROM product WHERE id = ?", id)
             .execute(&self.pool)
             .await?;
 
@@ -638,7 +623,7 @@ impl CatalogService {
         // Update cache
         {
             let mut cache = self.products.write();
-            cache.remove(id);
+            cache.remove(&id);
         }
 
         // Cleanup orphan images (after transaction committed)
@@ -653,16 +638,9 @@ impl CatalogService {
     }
 
     /// Add tag to product
-    pub async fn add_product_tag(&self, product_id: &str, tag_id: &str) -> RepoResult<ProductFull> {
-        let pid: i64 = product_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-        let tid: i64 = tag_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
-
+    pub async fn add_product_tag(&self, product_id: i64, tag_id: i64) -> RepoResult<ProductFull> {
         // Insert into junction table (ignore if already exists)
-        sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)", pid, tid)
+        sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)", product_id, tag_id)
             .execute(&self.pool)
             .await?;
 
@@ -670,7 +648,7 @@ impl CatalogService {
         let full = self.fetch_product_full(product_id).await?;
         {
             let mut cache = self.products.write();
-            cache.insert(product_id.to_string(), full.clone());
+            cache.insert(product_id, full.clone());
         }
 
         Ok(full)
@@ -679,18 +657,11 @@ impl CatalogService {
     /// Remove tag from product
     pub async fn remove_product_tag(
         &self,
-        product_id: &str,
-        tag_id: &str,
+        product_id: i64,
+        tag_id: i64,
     ) -> RepoResult<ProductFull> {
-        let pid: i64 = product_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-        let tid: i64 = tag_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
-
         // Delete from junction table
-        sqlx::query!("DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?", pid, tid)
+        sqlx::query!("DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?", product_id, tag_id)
             .execute(&self.pool)
             .await?;
 
@@ -698,23 +669,19 @@ impl CatalogService {
         let full = self.fetch_product_full(product_id).await?;
         {
             let mut cache = self.products.write();
-            cache.insert(product_id.to_string(), full.clone());
+            cache.insert(product_id, full.clone());
         }
 
         Ok(full)
     }
 
     /// Fetch full product data from DB (helper)
-    async fn fetch_product_full(&self, product_id: &str) -> RepoResult<ProductFull> {
-        let pid: i64 = product_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-
+    async fn fetch_product_full(&self, product_id: i64) -> RepoResult<ProductFull> {
         // Fetch product
         let product: Product = sqlx::query_as(
             "SELECT id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id FROM product WHERE id = ?",
         )
-        .bind(pid)
+        .bind(product_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", product_id)))?;
@@ -723,7 +690,7 @@ impl CatalogService {
         let tags: Vec<Tag> = sqlx::query_as(
             "SELECT t.id, t.name, t.color, t.display_order, t.is_active, t.is_system FROM tag t JOIN product_tag pt ON t.id = pt.tag_id WHERE pt.product_id = ? AND t.is_active = 1",
         )
-        .bind(pid)
+        .bind(product_id)
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();
@@ -732,13 +699,13 @@ impl CatalogService {
         let specs: Vec<ProductSpec> = sqlx::query_as(
             "SELECT id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root FROM product_spec WHERE product_id = ? ORDER BY display_order",
         )
-        .bind(pid)
+        .bind(product_id)
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();
 
         // Fetch product's direct attribute bindings
-        let product_binding_pairs = attribute::find_bindings_for_owner(&self.pool, "product", pid).await?;
+        let product_binding_pairs = attribute::find_bindings_for_owner(&self.pool, "product", product_id).await?;
         let mut attributes: Vec<AttributeBindingFull> = product_binding_pairs
             .into_iter()
             .map(|(binding, attr)| AttributeBindingFull {
@@ -806,9 +773,9 @@ impl CatalogService {
     // =========================================================================
 
     /// Get category by ID (from cache)
-    pub fn get_category(&self, id: &str) -> Option<Category> {
+    pub fn get_category(&self, id: i64) -> Option<Category> {
         let cache = self.categories.read();
-        cache.get(id).cloned()
+        cache.get(&id).cloned()
     }
 
     /// List all categories (from cache)
@@ -888,18 +855,14 @@ impl CatalogService {
         // Update cache
         {
             let mut cache = self.categories.write();
-            cache.insert(category_id.to_string(), created.clone());
+            cache.insert(category_id, created.clone());
         }
 
         Ok(created)
     }
 
     /// Update a category
-    pub async fn update_category(&self, id: &str, data: CategoryUpdate) -> RepoResult<Category> {
-        let category_id: i64 = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
-
+    pub async fn update_category(&self, id: i64, data: CategoryUpdate) -> RepoResult<Category> {
         // Check existing
         let existing = self
             .get_category(id)
@@ -929,19 +892,19 @@ impl CatalogService {
             data.match_mode,
             data.is_display,
             data.is_active,
-            category_id,
+            id,
         )
         .execute(&self.pool)
         .await?;
 
         // Replace kitchen print destinations if provided
         if let Some(ref dests) = data.kitchen_print_destinations {
-            sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", category_id)
+            sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", id)
                 .execute(&self.pool)
                 .await?;
             for dest_id in dests {
                 sqlx::query!("INSERT OR IGNORE INTO category_kitchen_print_dest (category_id, print_destination_id) VALUES (?, ?)",
-                    category_id, dest_id,
+                    id, dest_id,
                 )
                 .execute(&self.pool)
                 .await?;
@@ -950,12 +913,12 @@ impl CatalogService {
 
         // Replace label print destinations if provided
         if let Some(ref dests) = data.label_print_destinations {
-            sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", category_id)
+            sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", id)
                 .execute(&self.pool)
                 .await?;
             for dest_id in dests {
                 sqlx::query!("INSERT OR IGNORE INTO category_label_print_dest (category_id, print_destination_id) VALUES (?, ?)",
-                    category_id, dest_id,
+                    id, dest_id,
                 )
                 .execute(&self.pool)
                 .await?;
@@ -964,12 +927,12 @@ impl CatalogService {
 
         // Replace tag IDs if provided
         if let Some(ref tag_ids) = data.tag_ids {
-            sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", category_id)
+            sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", id)
                 .execute(&self.pool)
                 .await?;
             for tag_id in tag_ids {
                 sqlx::query!("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
-                    category_id, tag_id,
+                    id, tag_id,
                 )
                 .execute(&self.pool)
                 .await?;
@@ -977,27 +940,23 @@ impl CatalogService {
         }
 
         // Fetch back the full category
-        let updated = self.fetch_category_full(category_id).await?;
+        let updated = self.fetch_category_full(id).await?;
 
         // Update cache
         {
             let mut cache = self.categories.write();
-            cache.insert(id.to_string(), updated.clone());
+            cache.insert(id, updated.clone());
         }
 
         Ok(updated)
     }
 
     /// Delete a category
-    pub async fn delete_category(&self, id: &str) -> RepoResult<()> {
-        let category_id: i64 = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
-
+    pub async fn delete_category(&self, id: i64) -> RepoResult<()> {
         // Check if category has products
         let count = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM product WHERE category_id = ? AND is_active = 1",
-            category_id,
+            id,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -1009,30 +968,30 @@ impl CatalogService {
         }
 
         // Clean up attribute bindings
-        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?", category_id)
+        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?", id)
             .execute(&self.pool)
             .await?;
 
         // Clean up junction tables
-        sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", category_id)
+        sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", id)
             .execute(&self.pool)
             .await?;
-        sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", category_id)
+        sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", id)
             .execute(&self.pool)
             .await?;
-        sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", category_id)
+        sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", id)
             .execute(&self.pool)
             .await?;
 
         // Delete category
-        sqlx::query!("DELETE FROM category WHERE id = ?", category_id)
+        sqlx::query!("DELETE FROM category WHERE id = ?", id)
             .execute(&self.pool)
             .await?;
 
         // Update cache
         {
             let mut cache = self.categories.write();
-            cache.remove(id);
+            cache.remove(&id);
         }
 
         Ok(())
@@ -1080,13 +1039,12 @@ impl CatalogService {
     // =========================================================================
 
     /// Get product metadata for price rule matching
-    pub fn get_product_meta(&self, product_id: &str) -> Option<ProductMeta> {
+    pub fn get_product_meta(&self, product_id: i64) -> Option<ProductMeta> {
         let cache = self.products.read();
-        cache.get(product_id).map(|p| {
-            let cat_key = p.category_id.to_string();
+        cache.get(&product_id).map(|p| {
             let category_name = {
                 let cat_cache = self.categories.read();
-                cat_cache.get(&cat_key).map(|c| c.name.clone()).unwrap_or_default()
+                cat_cache.get(&p.category_id).map(|c| c.name.clone()).unwrap_or_default()
             };
             ProductMeta {
                 category_id: p.category_id,
@@ -1104,10 +1062,8 @@ impl CatalogService {
         product_ids
             .iter()
             .filter_map(|&id| {
-                let key = id.to_string();
-                cache.get(&key).map(|p| {
-                    let cat_key = p.category_id.to_string();
-                    let category_name = cat_cache.get(&cat_key).map(|c| c.name.clone()).unwrap_or_default();
+                cache.get(&id).map(|p| {
+                    let category_name = cat_cache.get(&p.category_id).map(|c| c.name.clone()).unwrap_or_default();
                     (
                         id,
                         ProductMeta {
@@ -1126,12 +1082,12 @@ impl CatalogService {
     ///
     /// Priority: product.is_kitchen_print_enabled > category.is_kitchen_print_enabled
     /// Destinations: category.destinations > global default
-    pub fn get_kitchen_print_config(&self, product_id: &str) -> Option<KitchenPrintConfig> {
+    pub fn get_kitchen_print_config(&self, product_id: i64) -> Option<KitchenPrintConfig> {
         let products = self.products.read();
-        let product = products.get(product_id)?;
+        let product = products.get(&product_id)?;
 
         let categories = self.categories.read();
-        let category = categories.get(&product.category_id.to_string());
+        let category = categories.get(&product.category_id);
 
         // Determine if enabled (product > category)
         let enabled = match product.is_kitchen_print_enabled {
@@ -1174,12 +1130,12 @@ impl CatalogService {
     }
 
     /// Get label print configuration for a product (with fallback chain)
-    pub fn get_label_print_config(&self, product_id: &str) -> Option<LabelPrintConfig> {
+    pub fn get_label_print_config(&self, product_id: i64) -> Option<LabelPrintConfig> {
         let products = self.products.read();
-        let product = products.get(product_id)?;
+        let product = products.get(&product_id)?;
 
         let categories = self.categories.read();
-        let category = categories.get(&product.category_id.to_string());
+        let category = categories.get(&product.category_id);
 
         // Determine if enabled (product > category)
         let enabled = match product.is_label_print_enabled {

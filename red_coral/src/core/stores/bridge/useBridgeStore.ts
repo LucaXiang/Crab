@@ -240,13 +240,13 @@ export const useBridgeStore = create<BridgeStore>()(
   persist(
     (set, get) => ({
       // Initial State
-      appState: null,
-      modeInfo: null,
-      tenants: [],
-      currentSession: null,
+      appState: null as AppState | null,
+      modeInfo: null as ModeInfo | null,
+      tenants: [] as TenantInfo[],
+      currentSession: null as EmployeeSession | null,
       isFirstRun: true,
       isLoading: false,
-      error: null,
+      error: null as string | null,
       // App State Actions
       fetchAppState: async () => {
         try {

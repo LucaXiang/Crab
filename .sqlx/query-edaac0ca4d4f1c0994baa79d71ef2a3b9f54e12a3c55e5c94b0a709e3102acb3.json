@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO archived_order_item_option (item_pk, attribute_name, option_name, price, quantity) VALUES (?1, ?2, ?3, ?4, ?5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "edaac0ca4d4f1c0994baa79d71ef2a3b9f54e12a3c55e5c94b0a709e3102acb3"
+}

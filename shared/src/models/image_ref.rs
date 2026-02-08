@@ -32,6 +32,6 @@ pub struct ImageRef {
     pub id: i64,
     pub hash: String,
     pub entity_type: String,
-    pub entity_id: String,
+    pub entity_id: i64,
     pub created_at: i64,
 }

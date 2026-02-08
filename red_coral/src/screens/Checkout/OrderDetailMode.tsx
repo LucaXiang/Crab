@@ -101,12 +101,12 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
   // Split: rule vs manual
   const itemRuleDiscount = order.items
     .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount ?? 0, item.quantity)).toNumber(), 0);
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0);
   const itemRuleSurcharge = order.items
     .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount ?? 0, item.quantity)).toNumber(), 0);
-  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount ?? 0).toNumber();
-  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount ?? 0).toNumber();
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0);
+  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
+  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
   const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
 
   return (
@@ -248,8 +248,8 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
-  const totalRuleDiscount = item.rule_discount_amount ?? 0;
-  const totalRuleSurcharge = item.rule_surcharge_amount ?? 0;
+  const totalRuleDiscount = item.rule_discount_amount;
+  const totalRuleSurcharge = item.rule_surcharge_amount;
   const discountPercent = item.manual_discount_percent || 0;
   const isFullyPaid = item.unpaid_quantity === 0;
 
@@ -297,7 +297,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
               )}
             </div>
             <div className="text-xs text-gray-400 flex items-center gap-2">
-              <span>{formatCurrency(item.unit_price ?? item.price)}</span>
+              <span>{formatCurrency(item.unit_price)}</span>
               <span>/ {t('checkout.amount.unit_price')}</span>
               {hasOptions && (
                 <span className="flex items-center gap-1 ml-2 text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">
@@ -308,7 +308,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
             </div>
           </div>
         </div>
-        <div className="font-bold text-gray-800 pl-4">{formatCurrency(item.line_total ?? Currency.mul(item.unit_price ?? item.price, item.quantity).toNumber())}</div>
+        <div className="font-bold text-gray-800 pl-4">{formatCurrency(item.line_total)}</div>
       </div>
 
       {isExpanded && hasOptions && (() => {
@@ -439,11 +439,11 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, aaTotalShar
                     <span>{item.name}</span>
                   </div>
                   <div className="text-xs text-gray-400">
-                    {formatCurrency(item.unit_price ?? item.price)} / {t('checkout.amount.unit_price')}
+                    {formatCurrency(item.unit_price)} / {t('checkout.amount.unit_price')}
                   </div>
                 </div>
                 <div className="font-bold text-gray-800 pl-4 shrink-0">
-                  {formatCurrency(Currency.mul(item.unit_price ?? item.price, item.quantity).toNumber())}
+                  {formatCurrency(Currency.mul(item.unit_price, item.quantity).toNumber())}
                 </div>
               </div>
             ))}

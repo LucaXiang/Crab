@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE system_state SET order_count = order_count + 1, updated_at = ?1 WHERE id = ?2 RETURNING order_count as \"order_count!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "order_count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6a1a6e40449924f27f575df1002a5a3c971238fd1543a664e6cc16e2e52d6a89"
+}

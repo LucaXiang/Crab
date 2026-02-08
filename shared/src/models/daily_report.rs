@@ -17,7 +17,7 @@ pub struct TaxBreakdown {
     /// Gross amount (after tax)
     pub gross_amount: f64,
     /// Number of orders with this tax rate
-    pub order_count: i32,
+    pub order_count: i64,
 }
 
 /// Payment method breakdown (independent table)
@@ -31,7 +31,7 @@ pub struct PaymentMethodBreakdown {
     /// Total amount
     pub amount: f64,
     /// Number of payments
-    pub count: i32,
+    pub count: i64,
 }
 
 /// Daily Report - end-of-day settlement report
@@ -41,9 +41,9 @@ pub struct DailyReport {
     pub id: i64,
     /// Business date (YYYY-MM-DD format)
     pub business_date: String,
-    pub total_orders: i32,
-    pub completed_orders: i32,
-    pub void_orders: i32,
+    pub total_orders: i64,
+    pub completed_orders: i64,
+    pub void_orders: i64,
     pub total_sales: f64,
     pub total_paid: f64,
     pub total_unpaid: f64,
@@ -54,7 +54,7 @@ pub struct DailyReport {
     /// When the report was generated (Unix millis)
     pub generated_at: Option<i64>,
     /// Who generated the report (employee identifier)
-    pub generated_by_id: Option<String>,
+    pub generated_by_id: Option<i64>,
     pub generated_by_name: Option<String>,
     pub note: Option<String>,
 

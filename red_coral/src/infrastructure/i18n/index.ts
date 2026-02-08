@@ -28,7 +28,7 @@ const subscribers: Set<(locale: Locale) => void> = new Set();
 /**
  * Flatten a nested object into dot-notation keys
  */
-function flattenObject(obj: Record<string, any>, prefix: string = ''): Record<string, string> {
+function flattenObject(obj: Record<string, unknown>, prefix: string = ''): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const key in obj) {
@@ -37,7 +37,7 @@ function flattenObject(obj: Record<string, any>, prefix: string = ''): Record<st
       const newKey = prefix ? `${prefix}.${key}` : key;
 
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        Object.assign(result, flattenObject(value, newKey));
+        Object.assign(result, flattenObject(value as Record<string, unknown>, newKey));
       } else if (typeof value === 'string') {
         result[newKey] = value;
       }

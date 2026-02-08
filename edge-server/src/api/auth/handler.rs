@@ -97,7 +97,7 @@ pub async fn login(
     // Log successful login
     state.audit_service.log(
         AuditAction::LoginSuccess, "auth", format!("employee:{}", user_id),
-        Some(user_id.clone()), Some(emp.display_name.clone()),
+        Some(emp.id), Some(emp.display_name.clone()),
         serde_json::json!({"username": &emp.username}),
     ).await;
 
@@ -132,24 +132,17 @@ pub async fn me(
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<UserInfo>, AppError> {
     // Query fresh employee data from database for is_active and created_at
-    let id: i64 = user.id.parse()
-        .map_err(|_| AppError::internal(format!("Invalid user ID: {}", user.id)))?;
-
-    let emp = employee::find_by_id(&state.pool, id)
+    let emp = employee::find_by_id(&state.pool, user.id)
         .await?
         .ok_or_else(|| AppError::new(shared::ErrorCode::EmployeeNotFound))?;
 
     let (is_active, created_at) = (emp.is_active, emp.created_at);
 
-    let role_id: i64 = user.role_id
-        .parse()
-        .map_err(|_| AppError::internal(format!("Invalid role ID: {}", user.role_id)))?;
-
     let user_info = UserInfo {
-        id,
+        id: user.id,
         username: user.username,
         display_name: user.display_name,
-        role_id,
+        role_id: user.role_id,
         role_name: user.role_name,
         permissions: user.permissions,
         is_system: user.is_system,
@@ -167,7 +160,7 @@ pub async fn logout(
 ) -> Result<Json<()>, AppError> {
     state.audit_service.log(
         AuditAction::Logout, "auth", format!("employee:{}", user.id),
-        Some(user.id.clone()), Some(user.display_name.clone()),
+        Some(user.id), Some(user.display_name.clone()),
         serde_json::json!({"username": &user.username}),
     ).await;
 
@@ -260,14 +253,14 @@ pub async fn escalate(
             .with_detail("required_permission", req.required_permission.clone()));
     }
 
-    let authorizer_id = emp.id.to_string();
+    let authorizer_id = emp.id;
 
     // Log successful escalation
     state.audit_service.log(
         AuditAction::EscalationSuccess,
         "auth",
         format!("employee:{}", authorizer_id),
-        Some(authorizer_id.clone()),
+        Some(authorizer_id),
         Some(emp.display_name.clone()),
         serde_json::json!({
             "authorizer_username": &emp.username,

@@ -69,7 +69,7 @@ function toCartItemInput(item: CartItem): CartItemInput {
     product_id: item.id,
     name: item.name,
     price: item.price,
-    original_price: item.original_price ?? item.price,
+    original_price: item.original_price || item.price,
     quantity: item.quantity,
     note: item.note ?? null,
     manual_discount_percent: item.manual_discount_percent ?? null,

@@ -158,7 +158,7 @@ pub struct AuditEntry {
     /// 资源 ID（如 "order:xxx", "employee:yyy"）
     pub resource_id: String,
     /// 操作人 ID（系统事件为 None）
-    pub operator_id: Option<String>,
+    pub operator_id: Option<i64>,
     /// 操作人名称
     pub operator_name: Option<String>,
     /// 结构化详情（JSON）
@@ -182,7 +182,7 @@ pub struct AuditQuery {
     /// 操作类型过滤
     pub action: Option<AuditAction>,
     /// 操作人 ID 过滤
-    pub operator_id: Option<String>,
+    pub operator_id: Option<i64>,
     /// 资源类型过滤
     pub resource_type: Option<String>,
     /// 分页偏移

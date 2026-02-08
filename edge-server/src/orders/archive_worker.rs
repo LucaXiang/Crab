@@ -246,10 +246,10 @@ impl ArchiveWorker {
                     OrderEventType::OrderCompleted | OrderEventType::OrderVoided
                 )
             })
-            .map(|e| (Some(e.operator_id.to_string()), Some(e.operator_name.as_str())))
+            .map(|e| (Some(e.operator_id), Some(e.operator_name.as_str())))
             .unwrap_or((None, None));
 
-        match payment::create_from_snapshot(&self.pool, snapshot, op_id.as_deref(), op_name).await {
+        match payment::create_from_snapshot(&self.pool, snapshot, op_id, op_name).await {
             Ok(count) => {
                 tracing::info!(
                     order_id = %snapshot.order_id,
@@ -370,7 +370,7 @@ impl ArchiveWorker {
                 action,
                 "order",
                 &resource_id,
-                Some(event.operator_id.to_string()),
+                Some(event.operator_id),
                 Some(event.operator_name.clone()),
                 details,
                 target,

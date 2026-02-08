@@ -308,13 +308,13 @@ impl Default for JwtService {
 #[derive(Debug, Clone)]
 pub struct CurrentUser {
     /// 用户 ID
-    pub id: String,
+    pub id: i64,
     /// 用户名
     pub username: String,
     /// 显示名称
     pub display_name: String,
     /// 角色 ID
-    pub role_id: String,
+    pub role_id: i64,
     /// 角色名称
     pub role_name: String,
     /// 权限列表
@@ -336,10 +336,10 @@ impl From<Claims> for CurrentUser {
         };
 
         Self {
-            id: claims.sub,
+            id: claims.sub.parse::<i64>().unwrap_or(0),
             username: claims.username,
             display_name: claims.display_name,
-            role_id: claims.role_id,
+            role_id: claims.role_id.parse::<i64>().unwrap_or(0),
             role_name: claims.role_name,
             permissions,
             is_system: claims.is_system,
@@ -445,10 +445,10 @@ mod tests {
     #[test]
     fn test_current_user_permissions() {
         let user = CurrentUser {
-            id: "1".to_string(),
+            id: 1,
             username: "john".to_string(),
             display_name: "John Doe".to_string(),
-            role_id: "role:user".to_string(),
+            role_id: 1,
             role_name: "user".to_string(),
             permissions: vec!["products:read".to_string(), "products:*".to_string()],
             is_system: false,
@@ -462,10 +462,10 @@ mod tests {
     #[test]
     fn test_admin_has_all_permissions() {
         let admin = CurrentUser {
-            id: "1".to_string(),
+            id: 1,
             username: "admin".to_string(),
             display_name: "Admin".to_string(),
-            role_id: "role:admin".to_string(),
+            role_id: 1,
             role_name: "admin".to_string(),
             permissions: vec![],
             is_system: true,

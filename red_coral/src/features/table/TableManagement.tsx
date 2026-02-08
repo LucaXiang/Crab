@@ -159,7 +159,7 @@ const ZoneList: React.FC = React.memo(() => {
         data={filteredZones}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => String(item.id)}
+        getRowKey={(item) => item.id}
         onEdit={canManageZones ? (item) => openModal('ZONE', 'EDIT', item) : undefined}
         onDelete={canManageZones ? (item) => openModal('ZONE', 'DELETE', item) : undefined}
         onBatchDelete={canManageZones ? handleBatchDelete : undefined}
@@ -438,7 +438,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             data={filteredTables}
             columns={columns}
             loading={loading}
-            getRowKey={(item) => String(item.id)}
+            getRowKey={(item) => item.id}
             onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', item) : undefined}
             onDelete={canManageTables ? (item) => openModal('TABLE', 'DELETE', item) : undefined}
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}

@@ -73,10 +73,10 @@ pub async fn init_genesis(pool: &SqlitePool, genesis_hash: String) -> RepoResult
 }
 
 /// Atomically increment order_count and return the new value
-pub async fn get_next_order_number(pool: &SqlitePool) -> RepoResult<i32> {
+pub async fn get_next_order_number(pool: &SqlitePool) -> RepoResult<i64> {
     let now = shared::util::now_millis();
     let new_count = sqlx::query_scalar!(
-        r#"UPDATE system_state SET order_count = order_count + 1, updated_at = ?1 WHERE id = ?2 RETURNING order_count as "order_count!: i32""#,
+        r#"UPDATE system_state SET order_count = order_count + 1, updated_at = ?1 WHERE id = ?2 RETURNING order_count as "order_count!: i64""#,
         now,
         SINGLETON_ID
     )

@@ -399,8 +399,8 @@ impl OrderArchiveService {
         .bind(snapshot.comp_total_amount)
         .bind(snapshot.order_manual_discount_amount)
         .bind(snapshot.order_manual_surcharge_amount)
-        .bind(snapshot.order_rule_discount_amount.unwrap_or(0.0))
-        .bind(snapshot.order_rule_surcharge_amount.unwrap_or(0.0))
+        .bind(snapshot.order_rule_discount_amount)
+        .bind(snapshot.order_rule_surcharge_amount)
         .bind(snapshot.tax)
         .bind(snapshot.start_time)
         .bind(snapshot.end_time)
@@ -430,7 +430,7 @@ impl OrderArchiveService {
         // 5b. INSERT items and their options
         for item in &snapshot.items {
             // Compute item prices using Decimal
-            let base_price = item.original_price.unwrap_or(item.price);
+            let base_price = if item.original_price > 0.0 { item.original_price } else { item.price };
             let d_base = Decimal::from_f64(base_price).unwrap_or_default();
             let d_qty = Decimal::from(item.quantity);
             let d_manual_discount_per_unit = item
@@ -438,19 +438,19 @@ impl OrderArchiveService {
                 .map(|p| d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED)
                 .unwrap_or(Decimal::ZERO);
             let d_rule_discount_per_unit =
-                Decimal::from_f64(item.rule_discount_amount.unwrap_or(0.0)).unwrap_or_default();
+                Decimal::from_f64(item.rule_discount_amount).unwrap_or_default();
             let total_discount = ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
                 .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
                 .to_f64()
                 .unwrap_or_default();
             let d_surcharge_per_unit =
-                Decimal::from_f64(item.rule_surcharge_amount.unwrap_or(0.0)).unwrap_or_default();
+                Decimal::from_f64(item.rule_surcharge_amount).unwrap_or_default();
             let total_surcharge = (d_surcharge_per_unit * d_qty)
                 .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
                 .to_f64()
                 .unwrap_or_default();
-            let unit_price = if let Some(up) = item.unit_price {
-                up
+            let unit_price = if item.unit_price > 0.0 || item.is_comped {
+                item.unit_price
             } else {
                 (d_base - d_manual_discount_per_unit - d_rule_discount_per_unit
                     + d_surcharge_per_unit)
@@ -458,12 +458,14 @@ impl OrderArchiveService {
                     .to_f64()
                     .unwrap_or_default()
             };
-            let line_total = item.line_total.unwrap_or_else(|| {
+            let line_total = if item.line_total > 0.0 || item.is_comped {
+                item.line_total
+            } else {
                 (Decimal::from_f64(unit_price).unwrap_or_default() * d_qty)
                     .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
                     .to_f64()
                     .unwrap_or_default()
-            });
+            };
             let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
             let instance_id = item.instance_id.clone();
             let paid_qty = snapshot
@@ -510,13 +512,15 @@ impl OrderArchiveService {
             .bind(total_surcharge)
             .bind(rule_discount_total)
             .bind(rule_surcharge_total)
-            .bind(item.tax.unwrap_or(0.0))
-            .bind(item.tax_rate.unwrap_or(0))
+            .bind(item.tax)
+            .bind(item.tax_rate)
             .bind(&item.category_name)
             .bind(
-                item.applied_rules
-                    .as_ref()
-                    .and_then(|rules| serde_json::to_string(rules).ok()),
+                if item.applied_rules.is_empty() {
+                    None
+                } else {
+                    serde_json::to_string(&item.applied_rules).ok()
+                },
             )
             .bind(&item.note)
             .bind(item.is_comped)
@@ -528,14 +532,16 @@ impl OrderArchiveService {
             if let Some(options) = &item.selected_options {
                 for opt in options {
                     let price = opt.price_modifier.unwrap_or(0.0);
+                    let opt_qty = opt.quantity;
                     sqlx::query!(
                         "INSERT INTO archived_order_item_option (\
-                            item_pk, attribute_name, option_name, price\
-                        ) VALUES (?1, ?2, ?3, ?4)",
+                            item_pk, attribute_name, option_name, price, quantity\
+                        ) VALUES (?1, ?2, ?3, ?4, ?5)",
                         item_pk,
                         opt.attribute_name,
                         opt.option_name,
                         price,
+                        opt_qty,
                     )
                     .execute(&mut *tx)
                     .await
@@ -561,7 +567,7 @@ impl OrderArchiveService {
                         instance_id: si.instance_id.clone(),
                         name: si.name.clone(),
                         quantity: si.quantity,
-                        unit_price: si.unit_price.unwrap_or(si.price),
+                        unit_price: if si.unit_price > 0.0 { si.unit_price } else { si.price },
                     })
                     .collect();
                 serde_json::to_string(&archive_items).unwrap_or_else(|_| "[]".to_string())
@@ -579,8 +585,9 @@ impl OrderArchiveService {
                 "INSERT INTO archived_order_payment (\
                     order_pk, seq, payment_id, method, amount, time, \
                     cancelled, cancel_reason, \
+                    tendered, change_amount, \
                     split_type, split_items, aa_shares, aa_total_shares\
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 order_pk,
                 seq,
                 payment.payment_id,
@@ -589,6 +596,8 @@ impl OrderArchiveService {
                 payment.timestamp,
                 payment.cancelled,
                 payment.cancel_reason,
+                payment.tendered,
+                payment.change,
                 split_type_str,
                 split_items_str,
                 payment.aa_shares,
@@ -888,9 +897,9 @@ mod tests {
             receipt_number: "R001".to_string(),
             is_pre_payment: false,
             note: None,
-            order_rule_discount_amount: None,
-            order_rule_surcharge_amount: None,
-            order_applied_rules: None,
+            order_rule_discount_amount: 0.0,
+            order_rule_surcharge_amount: 0.0,
+            order_applied_rules: vec![],
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
             order_manual_surcharge_percent: None,

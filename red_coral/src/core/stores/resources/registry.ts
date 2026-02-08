@@ -24,6 +24,7 @@ interface RegistryStore {
     isLoaded: boolean;
     lastVersion?: number;
     fetchAll: (force?: boolean) => Promise<void>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous registry requires existential type
     applySync: (payload: SyncPayload<any>) => void;
     checkVersion?: (serverVersion: number) => boolean;
     clear: () => void;

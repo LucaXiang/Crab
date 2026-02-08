@@ -20,21 +20,17 @@ impl EventApplier for RuleSkipToggledApplier {
         {
             // 1. Update the skipped status on all items' applied_rules with matching rule_id
             for item in &mut snapshot.items {
-                if let Some(ref mut applied_rules) = item.applied_rules {
-                    for rule in applied_rules.iter_mut() {
-                        if rule.rule_id == *rule_id {
-                            rule.skipped = *skipped;
-                        }
+                for rule in item.applied_rules.iter_mut() {
+                    if rule.rule_id == *rule_id {
+                        rule.skipped = *skipped;
                     }
                 }
             }
 
             // 2. Update order-level applied rules with matching rule_id
-            if let Some(ref mut order_rules) = snapshot.order_applied_rules {
-                for rule in order_rules.iter_mut() {
-                    if rule.rule_id == *rule_id {
-                        rule.skipped = *skipped;
-                    }
+            for rule in snapshot.order_applied_rules.iter_mut() {
+                if rule.rule_id == *rule_id {
+                    rule.skipped = *skipped;
                 }
             }
 
@@ -71,23 +67,23 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: "Test Product".to_string(),
             price,
-            original_price: Some(original_price),
+            original_price,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
             rule_discount_amount: if rule_type == shared::models::price_rule::RuleType::Discount {
-                Some(calculated_amount)
+                calculated_amount
             } else {
-                None
+                0.0
             },
             rule_surcharge_amount: if rule_type == shared::models::price_rule::RuleType::Surcharge {
-                Some(calculated_amount)
+                calculated_amount
             } else {
-                None
+                0.0
             },
-            applied_rules: Some(vec![AppliedRule {
+            applied_rules: vec![AppliedRule {
                 rule_id,
                 name: "test_rule".to_string(),
                 display_name: "Test Rule".to_string(),
@@ -101,11 +97,11 @@ mod tests {
                 is_stackable: true,
                 is_exclusive: false,
                 skipped: false,
-            }]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            }],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -156,7 +152,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Rule should be marked as skipped
-        assert!(snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(snapshot.items[0].applied_rules[0].skipped);
 
         // Totals should be recalculated: discount rule skipped → full price
         // recalculate_totals uses calculate_unit_price which checks skipped
@@ -175,7 +171,7 @@ mod tests {
             "inst-1", 100.0, 100.0, 1,
             1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
         );
-        item.applied_rules.as_mut().unwrap()[0].skipped = true;
+        item.applied_rules[0].skipped = true;
         snapshot.items.push(item);
         snapshot.subtotal = 100.0;
         snapshot.discount = 0.0;
@@ -187,7 +183,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Rule should be unskipped
-        assert!(!snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(!snapshot.items[0].applied_rules[0].skipped);
 
         // Discount should now apply: 100 - 10 = 90
         assert_eq!(snapshot.subtotal, 90.0);
@@ -205,19 +201,19 @@ mod tests {
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
-            original_price: Some(100.0),
+            original_price: 100.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -226,7 +222,7 @@ mod tests {
         });
 
         // Order-level rule
-        snapshot.order_applied_rules = Some(vec![AppliedRule {
+        snapshot.order_applied_rules = vec![AppliedRule {
             rule_id: 10,
             name: "order_discount".to_string(),
             display_name: "Order Discount".to_string(),
@@ -240,10 +236,10 @@ mod tests {
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
-        }]);
+        }];
         snapshot.subtotal = 100.0;
         snapshot.total = 90.0;
-        snapshot.order_rule_discount_amount = Some(10.0);
+        snapshot.order_rule_discount_amount = 10.0;
 
         // Skip the order-level rule
         let event = create_rule_skip_toggled_event("order-1", 2, 10, true);
@@ -251,7 +247,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Order-level rule should be skipped
-        assert!(snapshot.order_applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(snapshot.order_applied_rules[0].skipped);
     }
 
     #[test]
@@ -262,7 +258,7 @@ mod tests {
             "inst-1", 90.0, 100.0, 1,
             1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
         ));
-        let original_skipped = snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped;
+        let original_skipped = snapshot.items[0].applied_rules[0].skipped;
 
         // Toggle nonexistent rule
         let event = create_rule_skip_toggled_event("order-1", 2, 999, true);
@@ -271,7 +267,7 @@ mod tests {
 
         // Existing rule unchanged
         assert_eq!(
-            snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped,
+            snapshot.items[0].applied_rules[0].skipped,
             original_skipped
         );
     }
@@ -332,8 +328,8 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Both items' rules should be skipped
-        assert!(snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
-        assert!(snapshot.items[1].applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(snapshot.items[0].applied_rules[0].skipped);
+        assert!(snapshot.items[1].applied_rules[0].skipped);
 
         // Totals recalculated: 100 + 50*2 = 200
         assert_eq!(snapshot.subtotal, 200.0);
@@ -358,7 +354,7 @@ mod tests {
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert!(snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(snapshot.items[0].applied_rules[0].skipped);
         // Surcharge skipped → back to base price
         assert_eq!(snapshot.subtotal, 100.0);
         assert_eq!(snapshot.total, 100.0);
@@ -424,7 +420,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Rule is marked skipped
-        assert!(snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(snapshot.items[0].applied_rules[0].skipped);
         // But comped item still zero
         assert_eq!(snapshot.subtotal, 0.0);
         assert_eq!(snapshot.total, 0.0);
@@ -496,14 +492,14 @@ mod tests {
             "inst-1", 90.0, 100.0, 1,
             1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
         );
-        item.tax_rate = Some(21); // 21% IVA
+        item.tax_rate = 21; // 21% IVA
         snapshot.items.push(item);
 
         // Apply with discount active
         let applier = RuleSkipToggledApplier;
         // First recalculate to set baseline
         money::recalculate_totals(&mut snapshot);
-        let tax_with_discount = snapshot.items[0].tax.unwrap();
+        let tax_with_discount = snapshot.items[0].tax;
         // Tax on 90: 90 * 21/121 ≈ 15.62
         assert_eq!(tax_with_discount, 15.62);
 
@@ -512,8 +508,8 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Tax on 100: 100 * 21/121 ≈ 17.36
-        assert_eq!(snapshot.items[0].tax, Some(17.36));
-        assert!(snapshot.items[0].tax.unwrap() > tax_with_discount,
+        assert_eq!(snapshot.items[0].tax, 17.36);
+        assert!(snapshot.items[0].tax > tax_with_discount,
             "Tax increases when discount is removed");
     }
 
@@ -529,7 +525,7 @@ mod tests {
         ));
 
         // Order-level discount (separate rule)
-        snapshot.order_applied_rules = Some(vec![AppliedRule {
+        snapshot.order_applied_rules = vec![AppliedRule {
             rule_id: 10,
             name: "order_discount".to_string(),
             display_name: "Order Discount".to_string(),
@@ -543,8 +539,8 @@ mod tests {
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
-        }]);
-        snapshot.order_rule_discount_amount = Some(9.0);
+        }];
+        snapshot.order_rule_discount_amount = 9.0;
 
         money::recalculate_totals(&mut snapshot);
         // subtotal = 90, order_discount = 9, total = 81
@@ -561,7 +557,7 @@ mod tests {
         assert_eq!(snapshot.subtotal, 100.0);
         assert_eq!(snapshot.total, 90.0);
         // Order rule is NOT skipped
-        assert!(!snapshot.order_applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(!snapshot.order_applied_rules[0].skipped);
     }
 
     #[test]
@@ -574,7 +570,7 @@ mod tests {
             "inst-1", 100.0, 100.0, 1,
             1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
         );
-        item.applied_rules.as_mut().unwrap()[0].skipped = true;
+        item.applied_rules[0].skipped = true;
         snapshot.items.push(item);
         snapshot.subtotal = 100.0;
         snapshot.total = 100.0;
@@ -585,7 +581,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Should remain consistent
-        assert!(snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
+        assert!(snapshot.items[0].applied_rules[0].skipped);
         assert_eq!(snapshot.subtotal, 100.0);
         assert_eq!(snapshot.total, 100.0);
         assert_eq!(snapshot.last_sequence, 2);
@@ -603,15 +599,15 @@ mod tests {
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price: 82.0,
-            original_price: Some(100.0),
+            original_price: 100.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: Some(18.0),
-            rule_surcharge_amount: None,
-            applied_rules: Some(vec![
+            rule_discount_amount: 18.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![
                 AppliedRule {
                     rule_id: 1,
                     name: "lunch".to_string(),
@@ -642,11 +638,11 @@ mod tests {
                     is_exclusive: false,
                     skipped: false,
                 },
-            ]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            ],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -664,8 +660,8 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // rule-1 skipped, rule-2 still active: 100 - 8 = 92
-        assert!(snapshot.items[0].applied_rules.as_ref().unwrap()[0].skipped);
-        assert!(!snapshot.items[0].applied_rules.as_ref().unwrap()[1].skipped);
+        assert!(snapshot.items[0].applied_rules[0].skipped);
+        assert!(!snapshot.items[0].applied_rules[1].skipped);
         assert_eq!(snapshot.subtotal, 92.0);
         assert_eq!(snapshot.total, 92.0);
     }

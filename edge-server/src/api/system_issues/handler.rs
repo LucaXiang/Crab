@@ -29,7 +29,7 @@ pub async fn resolve(
         &state.pool,
         req.id,
         &req.response,
-        Some(&current_user.id),
+        Some(&current_user.id.to_string()),
     )
     .await?;
 
@@ -41,7 +41,7 @@ pub async fn resolve(
             crate::audit::AuditAction::ResolveSystemIssue,
             "system_issue",
             &req.id.to_string(),
-            Some(current_user.id.clone()),
+            Some(current_user.id),
             Some(current_user.display_name.clone()),
             serde_json::json!({
                 "kind": resolved.kind,

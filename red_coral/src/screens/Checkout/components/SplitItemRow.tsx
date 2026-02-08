@@ -19,7 +19,7 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
 
   // For split items, always compute from unit_price × quantity
   // (item.line_total may reflect the original item's full total, not the split portion)
-  const unitPrice = item.unit_price ?? item.price;
+  const unitPrice = item.unit_price;
   const lineTotal = unitPrice * item.quantity;
 
   return (

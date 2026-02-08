@@ -12,7 +12,7 @@ interface DraftOrderState {
 export const useDraftOrderStore = create<DraftOrderState>()(
   persist(
     (set, get) => ({
-      draftOrders: [],
+      draftOrders: [] as DraftOrder[],
 
       saveDraft: (draft: DraftOrder) => {
         set((state) => ({

@@ -55,7 +55,6 @@ export async function createProduct(
       is_default: true,
       is_active: true,
       is_root: true,
-      receipt_name: undefined,
     }],
   };
 
@@ -134,7 +133,6 @@ export async function updateProduct(
         is_default: true,
         is_active: true,
         is_root: true,
-        receipt_name: undefined,
       }];
 
   const updatePayload = {

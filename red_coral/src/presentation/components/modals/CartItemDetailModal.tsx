@@ -245,7 +245,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
   // --- Calculations ---
   // Dynamic price: local override > selected spec price > item original price
-  const itemBasePrice = item.original_price ?? item.price;
+  const itemBasePrice = item.original_price || item.price;
   const specPrice = selectedSpecId !== undefined && specifications.length > 0
     ? specifications[selectedSpecId]?.price ?? itemBasePrice
     : itemBasePrice;

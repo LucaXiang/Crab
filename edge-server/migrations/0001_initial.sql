@@ -328,7 +328,7 @@ CREATE TABLE image_ref (
     id          INTEGER PRIMARY KEY,
     hash        TEXT    NOT NULL,
     entity_type TEXT    NOT NULL,
-    entity_id   TEXT    NOT NULL,
+    entity_id   INTEGER NOT NULL,
     created_at  INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX idx_image_ref_unique ON image_ref(hash, entity_type, entity_id);
@@ -374,7 +374,7 @@ CREATE TABLE daily_report (
     total_discount    REAL    NOT NULL DEFAULT 0,
     total_surcharge   REAL    NOT NULL DEFAULT 0,
     generated_at      INTEGER,
-    generated_by_id   TEXT,
+    generated_by_id   INTEGER,
     generated_by_name TEXT,
     note              TEXT
 );
@@ -450,7 +450,7 @@ CREATE TABLE archived_order (
     tax                             REAL    NOT NULL DEFAULT 0,
     start_time                      INTEGER NOT NULL,
     end_time                        INTEGER,
-    operator_id                     TEXT,
+    operator_id                     INTEGER,
     operator_name                   TEXT,
     void_type                       TEXT,
     loss_reason                     TEXT,
@@ -500,7 +500,8 @@ CREATE TABLE archived_order_item_option (
     item_pk         INTEGER NOT NULL REFERENCES archived_order_item(id),
     attribute_name  TEXT    NOT NULL,
     option_name     TEXT    NOT NULL,
-    price           REAL    NOT NULL DEFAULT 0
+    price           REAL    NOT NULL DEFAULT 0,
+    quantity        INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX idx_archived_option_item ON archived_order_item_option(item_pk);
 
@@ -514,6 +515,8 @@ CREATE TABLE archived_order_payment (
     time            INTEGER NOT NULL,
     cancelled       INTEGER NOT NULL DEFAULT 0,
     cancel_reason   TEXT,
+    tendered        REAL,
+    change_amount   REAL,
     split_type      TEXT,
     split_items     TEXT,       -- JSON string (SplitItem array)
     aa_shares       INTEGER,
@@ -549,7 +552,7 @@ CREATE TABLE payment (
     split_type    TEXT,
     aa_shares     INTEGER,
     split_items   TEXT,            -- JSON string
-    operator_id   TEXT,
+    operator_id   INTEGER,
     operator_name TEXT,
     cancelled     INTEGER NOT NULL DEFAULT 0,
     cancel_reason TEXT,

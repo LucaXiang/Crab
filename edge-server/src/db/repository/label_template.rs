@@ -135,7 +135,7 @@ pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<
         let _ = super::image_ref::sync_refs(
             pool,
             ImageRefEntityType::LabelTemplate,
-            &id.to_string(),
+            id,
             image_hashes,
         )
         .await;
@@ -235,7 +235,7 @@ pub async fn update(
     let _ = super::image_ref::sync_refs(
         pool,
         ImageRefEntityType::LabelTemplate,
-        &id.to_string(),
+        id,
         image_hashes,
     )
     .await;
@@ -248,7 +248,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     let _ = super::image_ref::delete_entity_refs(
         pool,
         ImageRefEntityType::LabelTemplate,
-        &id.to_string(),
+        id,
     )
     .await;
 
@@ -263,7 +263,7 @@ pub async fn hard_delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     let _ = super::image_ref::delete_entity_refs(
         pool,
         ImageRefEntityType::LabelTemplate,
-        &id.to_string(),
+        id,
     )
     .await;
 

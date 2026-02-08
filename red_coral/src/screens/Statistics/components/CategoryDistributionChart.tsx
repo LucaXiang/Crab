@@ -19,6 +19,7 @@ interface ChartDataItem {
   name: string;
   value: number;
   color?: string;
+  [key: string]: unknown;
 }
 
 // Predefined colors for chart
@@ -42,7 +43,7 @@ export const CategoryDistributionChart: React.FC<CategoryDistributionChartProps>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={chartData as any}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}

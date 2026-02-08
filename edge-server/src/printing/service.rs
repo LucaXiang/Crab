@@ -153,23 +153,22 @@ impl KitchenPrintService {
         catalog: &CatalogService,
     ) -> PrintItemContext {
         // Get product from catalog
-        let product = catalog.get_product(&item.id.to_string());
+        let product = catalog.get_product(item.id);
 
         // Get category info
         let (category_id, category_name) = if let Some(ref p) = product {
-            let cat_id = p.category_id.to_string();
             let cat_name = catalog
-                .get_category(&cat_id)
+                .get_category(p.category_id)
                 .map(|c| c.name.clone())
                 .unwrap_or_default();
-            (cat_id, cat_name)
+            (p.category_id.to_string(), cat_name)
         } else {
             (String::new(), String::new())
         };
 
         // Get print config from catalog (with fallback chain)
-        let kitchen_config = catalog.get_kitchen_print_config(&item.id.to_string());
-        let label_config = catalog.get_label_print_config(&item.id.to_string());
+        let kitchen_config = catalog.get_kitchen_print_config(item.id);
+        let label_config = catalog.get_label_print_config(item.id);
 
         let kitchen_destinations = kitchen_config
             .as_ref()

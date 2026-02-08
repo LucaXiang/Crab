@@ -113,7 +113,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     quantity: qty,
                     name: originalItem?.name || t('common.label.unknown_item'),
                     price: originalItem?.price || 0,
-                    unit_price: originalItem?.unit_price ?? originalItem?.price ?? 0
+                    unit_price: originalItem?.unit_price ?? 0
                 };
             });
 
@@ -401,7 +401,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         
         // Add item-level rules
         sourceOrder.items.forEach(item => {
-            (item.applied_rules ?? []).forEach(rule => {
+            item.applied_rules.forEach(rule => {
                 const existing = rulesMap.get(rule.rule_id);
                 if (existing) {
                     if (!existing.sources.includes(item.name)) {
@@ -414,7 +414,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         });
         
         // Add order-level rules
-        (sourceOrder.order_applied_rules ?? []).forEach(rule => {
+        sourceOrder.order_applied_rules.forEach(rule => {
             const existing = rulesMap.get(rule.rule_id);
             if (existing) {
                 if (!existing.sources.includes(t('table.price_rules.order_level'))) {

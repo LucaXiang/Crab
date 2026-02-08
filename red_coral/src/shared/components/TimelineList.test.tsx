@@ -111,6 +111,13 @@ describe('TimelineList Integration Tests', () => {
               unpaid_quantity: 2,
               instance_id: 'inst-1',
               selected_options: [],
+              rule_discount_amount: 0,
+              rule_surcharge_amount: 0,
+              applied_rules: [],
+              unit_price: 1000,
+              line_total: 2000,
+              tax: 0,
+              tax_rate: 0,
             },
           ],
         }),
@@ -218,8 +225,10 @@ describe('TimelineList Integration Tests', () => {
           operator_id: 1,
           operator_name: 'Test Operator',
           command_id: 'cmd-1',
-          event_type: 'UNKNOWN_TYPE' as any,
-          payload: {} as any,
+          // @ts-expect-error testing invalid event type
+          event_type: 'UNKNOWN_TYPE',
+          // @ts-expect-error testing invalid payload
+          payload: {},
         },
       ];
 

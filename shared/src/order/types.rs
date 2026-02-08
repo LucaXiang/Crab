@@ -67,8 +67,8 @@ pub struct CartItemSnapshot {
     pub name: String,
     /// Final price after discounts
     pub price: f64,
-    /// Original price before discounts
-    pub original_price: Option<f64>,
+    /// Original price before discounts (server-computed, defaults to price)
+    pub original_price: f64,
     /// Total quantity (paid + unpaid)
     pub quantity: i32,
     /// Unpaid quantity (computed by recalculate_totals: quantity - paid_qty)
@@ -87,30 +87,23 @@ pub struct CartItemSnapshot {
     pub manual_discount_percent: Option<f64>,
 
     // === Rule Adjustments ===
-    /// Rule discount amount (calculated)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rule_discount_amount: Option<f64>,
-    /// Rule surcharge amount (calculated)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rule_surcharge_amount: Option<f64>,
+    /// Rule discount amount (server-computed)
+    pub rule_discount_amount: f64,
+    /// Rule surcharge amount (server-computed)
+    pub rule_surcharge_amount: f64,
     /// Applied rules list
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub applied_rules: Option<Vec<AppliedRule>>,
+    pub applied_rules: Vec<AppliedRule>,
 
-    // === Computed Fields ===
+    // === Computed Fields (all server-computed) ===
     /// Unit price for display (computed by backend: price with manual discount and surcharge)
     /// This is the final per-unit price shown to customers
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unit_price: Option<f64>,
+    pub unit_price: f64,
     /// Line total (computed by backend: unit_price * quantity)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub line_total: Option<f64>,
+    pub line_total: f64,
     /// Tax amount for this item
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tax: Option<f64>,
+    pub tax: f64,
     /// Tax rate for this item (e.g., 21 for 21% IVA)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tax_rate: Option<i32>,
+    pub tax_rate: i32,
 
     /// Item note
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -440,19 +433,19 @@ mod tests {
             instance_id: "inst-1".to_string(),
             name: "Test".to_string(),
             price: 100.0,
-            original_price: Some(120.0),
+            original_price: 120.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(10.0),
-            rule_discount_amount: Some(5.0),
-            rule_surcharge_amount: Some(3.0),
-            applied_rules: Some(vec![]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 5.0,
+            rule_surcharge_amount: 3.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -461,6 +454,6 @@ mod tests {
         };
 
         assert_eq!(item.manual_discount_percent, Some(10.0));
-        assert_eq!(item.rule_discount_amount, Some(5.0));
+        assert_eq!(item.rule_discount_amount, 5.0);
     }
 }

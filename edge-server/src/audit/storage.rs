@@ -61,7 +61,7 @@ impl AuditRow {
             action,
             resource_type: self.resource_type,
             resource_id: self.resource_id,
-            operator_id: self.operator_id,
+            operator_id: self.operator_id.and_then(|s| s.parse::<i64>().ok()),
             operator_name: self.operator_name,
             details,
             target: self.target,
@@ -103,7 +103,7 @@ impl AuditStorage {
         action: AuditAction,
         resource_type: String,
         resource_id: String,
-        operator_id: Option<String>,
+        operator_id: Option<i64>,
         operator_name: Option<String>,
         details: serde_json::Value,
         target: Option<String>,
@@ -125,6 +125,7 @@ impl AuditStorage {
 
         // 2. 计算哈希（所有存储字段参与）
         let timestamp = shared::util::now_millis();
+        let operator_id_str = operator_id.map(|id| id.to_string());
         let curr_hash = compute_audit_hash(
             &prev_hash,
             sequence,
@@ -132,7 +133,7 @@ impl AuditStorage {
             &action,
             &resource_type,
             &resource_id,
-            operator_id.as_deref(),
+            operator_id_str.as_deref(),
             operator_name.as_deref(),
             &details,
             target.as_deref(),
@@ -156,7 +157,7 @@ impl AuditStorage {
             action_str,
             resource_type,
             resource_id,
-            operator_id,
+            operator_id_str,
             operator_name,
             details_json,
             target,
@@ -204,9 +205,9 @@ impl AuditStorage {
                 .to_string();
             bind_values.push(BindValue::Str(action_str));
         }
-        if let Some(ref operator_id) = q.operator_id {
+        if let Some(operator_id) = q.operator_id {
             conditions.push("operator_id = ?");
-            bind_values.push(BindValue::Str(operator_id.clone()));
+            bind_values.push(BindValue::Str(operator_id.to_string()));
         }
         if let Some(ref resource_type) = q.resource_type {
             conditions.push("resource_type = ?");

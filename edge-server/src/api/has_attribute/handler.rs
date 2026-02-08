@@ -88,7 +88,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::ProductUpdated,
         "attribute_binding", &binding_id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "op": "bind_attribute",
@@ -100,9 +100,8 @@ pub async fn create(
     );
 
     // Refresh product cache (attribute bindings changed)
-    let product_id_str = payload.product_id.to_string();
-    if let Err(e) = state.catalog_service.refresh_product_cache(&product_id_str).await {
-        tracing::warn!("Failed to refresh product cache for {}: {}", product_id_str, e);
+    if let Err(e) = state.catalog_service.refresh_product_cache(payload.product_id).await {
+        tracing::warn!("Failed to refresh product cache for {}: {}", payload.product_id, e);
     }
 
     Ok(Json(binding))
@@ -148,7 +147,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::ProductUpdated,
         "attribute_binding", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "op": "update_binding",
@@ -191,7 +190,7 @@ pub async fn delete(
         state.audit_service,
         AuditAction::ProductUpdated,
         "attribute_binding", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "op": "unbind_attribute",
@@ -205,9 +204,8 @@ pub async fn delete(
     if let (Some(oid), Some(otype)) = (owner_id, owner_type)
         && otype == "product"
     {
-        let product_id_str = oid.to_string();
-        if let Err(e) = state.catalog_service.refresh_product_cache(&product_id_str).await {
-            tracing::warn!("Failed to refresh product cache for {}: {}", product_id_str, e);
+        if let Err(e) = state.catalog_service.refresh_product_cache(oid).await {
+            tracing::warn!("Failed to refresh product cache for {}: {}", oid, e);
         }
     }
 

@@ -169,7 +169,7 @@ export const CategoryModal: React.FC = React.memo(() => {
           tag_ids: formData.tag_ids,
           match_mode: formData.match_mode,
         }}
-        onFieldChange={setFormField as any}
+        onFieldChange={(field, value) => setFormField(field, value)}
         t={t}
         isEditMode={action === 'EDIT'}
       />

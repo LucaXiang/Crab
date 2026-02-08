@@ -81,19 +81,19 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
-            original_price: if is_comped { Some(10.0) } else { None },
+            original_price: if is_comped { 10.0 } else { 0.0 },
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -180,7 +180,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         // Full comped item (source == instance)
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 2, true);
-        item.original_price = Some(10.0);
+        item.original_price = 10.0;
         snapshot.items.push(item);
         snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
 
@@ -194,7 +194,7 @@ mod tests {
         assert_eq!(snapshot.items[0].instance_id, "item-1");
         assert!(!snapshot.items[0].is_comped);
         assert_eq!(snapshot.items[0].price, 10.0);
-        assert_eq!(snapshot.items[0].original_price, Some(10.0)); // Preserved
+        assert_eq!(snapshot.items[0].original_price, 10.0); // Preserved
         // CompRecord should be removed
         assert_eq!(snapshot.comps.len(), 0);
         // Totals recalculated
@@ -205,7 +205,7 @@ mod tests {
     fn test_uncomp_updates_checksum() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
-        item.original_price = Some(10.0);
+        item.original_price = 10.0;
         snapshot.items.push(item);
         snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
         snapshot.update_checksum();
@@ -224,7 +224,7 @@ mod tests {
     fn test_uncomp_updates_sequence() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
-        item.original_price = Some(10.0);
+        item.original_price = 10.0;
         snapshot.items.push(item);
         snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
         snapshot.last_sequence = 5;

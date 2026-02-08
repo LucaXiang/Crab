@@ -254,7 +254,7 @@ export const ProductModal: React.FC = React.memo(() => {
           tags: formData.tags,
         }}
         categories={categories}
-        onFieldChange={setFormField as any}
+        onFieldChange={(field, value) => setFormField(field, value)}
         onSelectImage={handleSelectImage}
         t={t}
         inheritedAttributeIds={inheritedAttributeIds}

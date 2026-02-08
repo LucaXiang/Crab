@@ -23,6 +23,7 @@ pub struct OrderItemOptionDetail {
     pub attribute_name: String,
     pub option_name: String,
     pub price_modifier: f64,
+    pub quantity: i32,
 }
 
 /// Order item for detail view
@@ -45,6 +46,8 @@ pub struct OrderItemDetail {
     pub applied_rules: Option<serde_json::Value>,
     pub note: Option<String>,
     pub is_comped: bool,
+    pub tax: f64,
+    pub tax_rate: i32,
     pub selected_options: Vec<OrderItemOptionDetail>,
 }
 
@@ -57,6 +60,8 @@ pub struct OrderPaymentDetail {
     pub timestamp: i64,
     pub cancelled: bool,
     pub cancel_reason: Option<String>,
+    pub tendered: Option<f64>,
+    pub change_amount: Option<f64>,
     pub split_type: Option<String>,
     pub split_items: Vec<SplitItemDetail>,
     pub aa_shares: Option<i32>,
@@ -66,6 +71,7 @@ pub struct OrderPaymentDetail {
 /// Split item detail
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SplitItemDetail {
+    pub instance_id: String,
     pub name: String,
     pub quantity: i32,
     pub unit_price: f64,
@@ -162,10 +168,13 @@ pub async fn get_by_id(
             applied_rules: i.applied_rules.and_then(|s| serde_json::from_str(&s).ok()),
             note: i.note,
             is_comped: i.is_comped,
+            tax: i.tax,
+            tax_rate: i.tax_rate,
             selected_options: i.selected_options.into_iter().map(|o| OrderItemOptionDetail {
                 attribute_name: o.attribute_name,
                 option_name: o.option_name,
                 price_modifier: o.price_modifier,
+                quantity: o.quantity,
             }).collect(),
         }).collect(),
         payments: detail.payments.into_iter().map(|p| {
@@ -179,6 +188,8 @@ pub async fn get_by_id(
                 timestamp: p.timestamp,
                 cancelled: p.cancelled,
                 cancel_reason: p.cancel_reason,
+                tendered: p.tendered,
+                change_amount: p.change_amount,
                 split_type: p.split_type,
                 split_items,
                 aa_shares: p.aa_shares,

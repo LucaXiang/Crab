@@ -210,7 +210,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setProductsPagination: (page, total) => set({ productsPage: page, productsTotal: total }),
 
       // Modal State
-      modal: { open: false, action: 'CREATE', entity: 'TABLE', data: null },
+      modal: { open: false, action: 'CREATE', entity: 'TABLE', data: null } as ModalState,
       openModal: <E extends ModalEntity>(entity: E, action: ModalAction, data: EntityDataMap[E] | null = null) => {
         let formData = { ...initialFormData };
 

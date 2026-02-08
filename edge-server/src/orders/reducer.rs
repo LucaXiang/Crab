@@ -181,31 +181,27 @@ pub fn input_to_snapshot_with_rules(
         instance_id,
         name: input.name.clone(),
         price: calc_result.item_final,
-        original_price: Some(input.original_price.unwrap_or(input.price)),
+        original_price: input.original_price.unwrap_or(input.price),
         quantity: input.quantity,
         unpaid_quantity: input.quantity, // Initially all unpaid
         selected_options: input.selected_options.clone(),
         selected_specification: input.selected_specification.clone(),
         manual_discount_percent: input.manual_discount_percent,
         rule_discount_amount: if calc_result.rule_discount_amount > 0.0 {
-            Some(calc_result.rule_discount_amount)
+            calc_result.rule_discount_amount
         } else {
-            None
+            0.0
         },
         rule_surcharge_amount: if calc_result.rule_surcharge_amount > 0.0 {
-            Some(calc_result.rule_surcharge_amount)
+            calc_result.rule_surcharge_amount
         } else {
-            None
+            0.0
         },
-        applied_rules: if calc_result.applied_rules.is_empty() {
-            None
-        } else {
-            Some(calc_result.applied_rules)
-        },
-        unit_price: None,  // Computed by recalculate_totals
-        line_total: None,  // Computed by recalculate_totals
-        tax: None,         // Computed by recalculate_totals
-        tax_rate: None,    // Computed by recalculate_totals
+        applied_rules: calc_result.applied_rules,
+        unit_price: 0.0,   // Computed by recalculate_totals
+        line_total: 0.0,   // Computed by recalculate_totals
+        tax: 0.0,          // Computed by recalculate_totals
+        tax_rate: 0,       // Computed by recalculate_totals
         note: input.note.clone(),
         authorizer_id: input.authorizer_id,
         authorizer_name: input.authorizer_name.clone(),
@@ -309,7 +305,7 @@ mod tests {
         let snapshot = input_to_snapshot(&input);
 
         assert_eq!(snapshot.id, 1);
-        assert_eq!(snapshot.original_price, Some(10.0));
+        assert_eq!(snapshot.original_price, 10.0);
         assert_eq!(snapshot.name, "Test Product");
         // Price is now calculated: base $10, 10% manual discount = $9
         assert_eq!(snapshot.price, 9.0);
@@ -339,9 +335,9 @@ mod tests {
         let snapshot = input_to_snapshot_with_rules(&input, &[], 1, None, &[]);
 
         assert_eq!(snapshot.price, 100.0);
-        assert!(snapshot.rule_discount_amount.is_none());
-        assert!(snapshot.rule_surcharge_amount.is_none());
-        assert!(snapshot.applied_rules.is_none());
+        assert_eq!(snapshot.rule_discount_amount, 0.0);
+        assert_eq!(snapshot.rule_surcharge_amount, 0.0);
+        assert!(snapshot.applied_rules.is_empty());
     }
 
     #[test]
@@ -391,10 +387,10 @@ mod tests {
 
         // $100 - 10% = $90
         assert_eq!(snapshot.price, 90.0);
-        assert_eq!(snapshot.rule_discount_amount, Some(10.0));
-        assert!(snapshot.rule_surcharge_amount.is_none());
-        assert!(snapshot.applied_rules.is_some());
-        assert_eq!(snapshot.applied_rules.as_ref().unwrap().len(), 1);
+        assert_eq!(snapshot.rule_discount_amount, 10.0);
+        assert_eq!(snapshot.rule_surcharge_amount, 0.0);
+        assert!(!snapshot.applied_rules.is_empty());
+        assert_eq!(snapshot.applied_rules.len(), 1);
     }
 
     #[test]
@@ -465,7 +461,7 @@ mod tests {
         // 10% discount on $107 = $10.70
         // Final: $107 - $10.70 = $96.30
         assert_eq!(snapshot.price, 96.3);
-        assert_eq!(snapshot.rule_discount_amount, Some(10.7));
+        assert_eq!(snapshot.rule_discount_amount, 10.7);
     }
 
     #[test]
@@ -519,7 +515,7 @@ mod tests {
         // 10% rule discount on $90 -> $9 discount -> $81
         assert_eq!(snapshot.price, 81.0);
         assert_eq!(snapshot.manual_discount_percent, Some(10.0));
-        assert_eq!(snapshot.rule_discount_amount, Some(9.0));
+        assert_eq!(snapshot.rule_discount_amount, 9.0);
     }
 
     #[test]
@@ -689,10 +685,9 @@ mod tests {
         // Total discount: $15
         // Final: $100 - $10 - $5 = $85
         assert_eq!(snapshot.price, 85.0);
-        assert_eq!(snapshot.rule_discount_amount, Some(15.0));
+        assert_eq!(snapshot.rule_discount_amount, 15.0);
 
         // Should have 2 applied rules (global + p1), not 3
-        let applied_rules = snapshot.applied_rules.as_ref().unwrap();
-        assert_eq!(applied_rules.len(), 2);
+        assert_eq!(snapshot.applied_rules.len(), 2);
     }
 }

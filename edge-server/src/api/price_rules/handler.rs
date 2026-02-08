@@ -81,7 +81,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::PriceRuleCreated,
         "price_rule", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&rule, "price_rule")
     );
@@ -113,7 +113,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::PriceRuleUpdated,
         "price_rule", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_rule, &rule, "price_rule")
     );
@@ -142,7 +142,7 @@ pub async fn delete(
             state.audit_service,
             AuditAction::PriceRuleDeleted,
             "price_rule", &id_str,
-            operator_id = Some(current_user.id.clone()),
+            operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );

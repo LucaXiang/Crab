@@ -48,14 +48,13 @@ impl CommandHandler for ToggleRuleSkipAction {
         let rule_name = snapshot
             .items
             .iter()
-            .filter_map(|item| item.applied_rules.as_ref())
-            .flatten()
+            .flat_map(|item| item.applied_rules.iter())
             .find(|r| r.rule_id == self.rule_id)
             .or_else(|| {
                 snapshot
                     .order_applied_rules
-                    .as_ref()
-                    .and_then(|rules| rules.iter().find(|r| r.rule_id == self.rule_id))
+                    .iter()
+                    .find(|r| r.rule_id == self.rule_id)
             })
             .map(|r| r.display_name.clone());
 
@@ -128,19 +127,19 @@ mod tests {
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: Some(vec![create_test_applied_rule(rule_id)]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![create_test_applied_rule(rule_id)],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -200,7 +199,7 @@ mod tests {
         // Create an active order with order-level applied rule
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.order_applied_rules = Some(vec![create_test_applied_rule(100)]);
+        snapshot.order_applied_rules = vec![create_test_applied_rule(100)];
         snapshot.subtotal = 100.0;
         snapshot.discount = 10.0;
         snapshot.total = 90.0;
@@ -327,19 +326,19 @@ mod tests {
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: Some(vec![rule]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![rule],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -419,19 +418,19 @@ mod tests {
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: Some(vec![rule]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![rule],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -474,22 +473,22 @@ mod tests {
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: Some(vec![
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![
                 create_test_applied_rule(1),
                 create_test_applied_rule(2),
-            ]),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            ],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -529,7 +528,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item_with_rule(50)];
-        snapshot.order_applied_rules = Some(vec![create_test_applied_rule(50)]);
+        snapshot.order_applied_rules = vec![create_test_applied_rule(50)];
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

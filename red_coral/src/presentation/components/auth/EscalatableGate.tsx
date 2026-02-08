@@ -40,7 +40,7 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
   if (hasPermission(permission)) {
     // intercept 模式 + 有 onAuthorized 回调：注入 onClick 以当前用户身份调用
     if (mode === 'intercept' && onAuthorized && currentUser) {
-      const child = React.Children.only(children) as React.ReactElement<any>;
+      const child = React.Children.only(children) as React.ReactElement<Record<string, unknown>>;
       return React.cloneElement(child, {
         onClick: (e: React.MouseEvent) => {
           // 尊重 disabled 状态
@@ -69,7 +69,7 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
   if (mode === 'intercept') {
     // 拦截模式：渲染子元素，但拦截点击
     // 确保只有一个子元素
-    const child = React.Children.only(children) as React.ReactElement<any>;
+    const child = React.Children.only(children) as React.ReactElement<Record<string, unknown>>;
 
     const handleClick = (e: React.MouseEvent) => {
       e.preventDefault();

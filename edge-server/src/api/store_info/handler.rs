@@ -34,7 +34,7 @@ pub async fn update(
         state.audit_service,
         AuditAction::StoreInfoChanged,
         "store_info", "store_info:main",
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_store_info, &store_info, "store_info")
     );

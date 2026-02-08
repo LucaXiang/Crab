@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PaymentFlow } from './PaymentFlow';
+import type { HeldOrder } from '@/core/domain/types';
 
 vi.mock('@/hooks/useI18n', () => ({
   useI18n: () => ({
@@ -21,7 +22,7 @@ vi.mock('@/stores/usePaymentStore', () => ({
     initSession: vi.fn(),
     addPayment: vi.fn()
   }),
-  usePaymentSession: () => null,
+  usePaymentSession: (): null => null,
   usePaymentTotals: () => ({ totalPaid: 0 })
 }));
 
@@ -83,17 +84,30 @@ vi.mock('@/presentation/components/Toast', () => ({
   }
 }));
 
-const baseOrder: any = {
-  key: 'ORDER-1',
+const baseOrder = {
+  order_id: 'ORDER-1',
   total: 100,
-  paidAmount: 0,
+  paid_amount: 0,
+  remaining_amount: 100,
   is_retail: false,
   zone_name: 'Z',
-  tableName: 'T1',
-  guestCount: 2,
-  startTime: Date.now(),
+  zone_id: 1,
+  table_name: 'T1',
+  table_id: 1,
+  guest_count: 2,
+  status: 'OPEN',
   items: [],
-};
+  payments: [],
+  original_total: 100,
+  subtotal: 100,
+  total_discount: 0,
+  total_surcharge: 0,
+  tax: 0,
+  discount: 0,
+  comp_total_amount: 0,
+  order_manual_discount_amount: 0,
+  order_manual_surcharge_amount: 0,
+} as unknown as HeldOrder;
 
 describe('PaymentFlow', () => {
   it('renders and opens cash modal when clicking cash button', async () => {

@@ -90,19 +90,19 @@ mod tests {
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
-            original_price: None,
+            original_price: 0.0,
             quantity,
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -298,10 +298,10 @@ mod tests {
 
         // Create item with price rule already applied (as if it matched "Lunch Special" rule)
         let mut item = create_test_item("item-1", "Lunch Set", 100.0, 1);
-        item.original_price = Some(100.0);
+        item.original_price = 100.0;
         item.price = 90.0; // 10% discount already applied
-        item.rule_discount_amount = Some(10.0);
-        item.applied_rules = Some(vec![AppliedRule {
+        item.rule_discount_amount = 10.0;
+        item.applied_rules = vec![AppliedRule {
             rule_id: 1,
             name: "lunch-special".to_string(),
             display_name: "Lunch Special 10% Off".to_string(),
@@ -315,7 +315,7 @@ mod tests {
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
-        }]);
+        }];
 
         // Create Event with this item
         let event = create_items_added_event("order-1", 1, vec![item]);
@@ -331,12 +331,12 @@ mod tests {
         // Verify the item data is preserved from Event
         assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].price, 90.0); // Discounted price from Event
-        assert_eq!(snapshot.items[0].original_price, Some(100.0));
-        assert_eq!(snapshot.items[0].rule_discount_amount, Some(10.0));
-        assert!(snapshot.items[0].applied_rules.is_some());
-        assert_eq!(snapshot.items[0].applied_rules.as_ref().unwrap().len(), 1);
+        assert_eq!(snapshot.items[0].original_price, 100.0);
+        assert_eq!(snapshot.items[0].rule_discount_amount, 10.0);
+        assert!(!snapshot.items[0].applied_rules.is_empty());
+        assert_eq!(snapshot.items[0].applied_rules.len(), 1);
         assert_eq!(
-            snapshot.items[0].applied_rules.as_ref().unwrap()[0].display_name,
+            snapshot.items[0].applied_rules[0].display_name,
             "Lunch Special 10% Off"
         );
 
@@ -364,9 +364,9 @@ mod tests {
 
         // Existing item with 10% discount rule
         let mut existing = create_test_item("item-1", "Product A", 90.0, 2);
-        existing.original_price = Some(100.0);
-        existing.rule_discount_amount = Some(10.0);
-        existing.applied_rules = Some(vec![AppliedRule {
+        existing.original_price = 100.0;
+        existing.rule_discount_amount = 10.0;
+        existing.applied_rules = vec![AppliedRule {
             rule_id: 2,
             name: "lunch".to_string(),
             display_name: "Lunch 10%".to_string(),
@@ -380,7 +380,7 @@ mod tests {
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
-        }]);
+        }];
         snapshot.items.push(existing);
 
         // Incoming item: same instance_id but NO rule (from different order)
@@ -394,13 +394,13 @@ mod tests {
         assert_eq!(snapshot.items[0].instance_id, "item-1");
         assert_eq!(snapshot.items[0].quantity, 2); // unchanged
         assert_eq!(snapshot.items[0].price, 90.0);
-        assert!(snapshot.items[0].applied_rules.is_some());
+        assert!(!snapshot.items[0].applied_rules.is_empty());
 
         // New item gets suffixed instance_id (count=1: only "item-1" matched)
         assert_eq!(snapshot.items[1].instance_id, "item-1::m1");
         assert_eq!(snapshot.items[1].quantity, 1);
         assert_eq!(snapshot.items[1].price, 100.0);
-        assert!(snapshot.items[1].applied_rules.is_none());
+        assert!(snapshot.items[1].applied_rules.is_empty());
     }
 
     #[test]
@@ -424,7 +424,7 @@ mod tests {
 
         let mut existing = create_test_item("item-1", "Product A", 80.0, 1);
         existing.manual_discount_percent = Some(20.0);
-        existing.original_price = Some(100.0);
+        existing.original_price = 100.0;
         snapshot.items.push(existing);
 
         // Same product, no discount
@@ -443,7 +443,7 @@ mod tests {
 
         let mut existing = create_test_item("item-1", "Product A", 0.0, 1);
         existing.is_comped = true;
-        existing.original_price = Some(10.0);
+        existing.original_price = 10.0;
         snapshot.items.push(existing);
 
         // Same product, not comped

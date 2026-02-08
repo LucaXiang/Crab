@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useDirtyForm<T extends Record<string, any>>(initial: T) {
+export function useDirtyForm<T extends Record<string, unknown>>(initial: T) {
   const initialRef = useRef<T>(initial);
   const [values, setValues] = useState<T>(initial);
   const [isDirty, setIsDirty] = useState(false);

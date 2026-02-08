@@ -618,7 +618,7 @@ impl OrdersManager {
         let mut snapshot = self.storage.get_snapshot(order_id)?;
         // 确保 line_total 已计算
         if let Some(ref mut order) = snapshot {
-            let needs_recalc = order.items.iter().any(|item| item.line_total.is_none());
+            let needs_recalc = order.items.iter().any(|item| item.line_total == 0.0 && !item.is_comped);
             if needs_recalc {
                 money::recalculate_totals(order);
             }
@@ -633,7 +633,7 @@ impl OrdersManager {
         let mut orders = self.storage.get_active_orders()?;
         // 确保 line_total 已计算
         for order in &mut orders {
-            let needs_recalc = order.items.iter().any(|item| item.line_total.is_none());
+            let needs_recalc = order.items.iter().any(|item| item.line_total == 0.0 && !item.is_comped);
             if needs_recalc {
                 money::recalculate_totals(order);
             }
@@ -3018,10 +3018,10 @@ mod tests {
         let item = &snapshot.items[0];
 
         // original_price should be set to the input price (spec price)
-        assert_eq!(item.original_price, Some(20.0), "original_price = input price");
+        assert_eq!(item.original_price, 20.0, "original_price = input price");
 
         // unit_price: base(20)+options(5)=25, discount=25*10%=2.5, unit=22.5
-        assert_eq!(item.unit_price, Some(22.5), "unit_price = 22.5 (no double counting)");
+        assert_eq!(item.unit_price, 22.5, "unit_price = 22.5 (no double counting)");
 
         // subtotal = 22.5 * 2 = 45.0
         assert_eq!(snapshot.subtotal, 45.0, "subtotal = 45.0");
@@ -3085,7 +3085,7 @@ mod tests {
         let snapshot_before = manager.get_snapshot(&order_id).unwrap().unwrap();
         let instance_id = snapshot_before.items[0].instance_id.clone();
         // unit_price = 15 + 2.5 = 17.5, subtotal = 17.5 * 3 = 52.5
-        assert_eq!(snapshot_before.items[0].unit_price, Some(17.5));
+        assert_eq!(snapshot_before.items[0].unit_price, 17.5);
         assert_eq!(snapshot_before.subtotal, 52.5);
 
         // Modify: add 20% discount
@@ -3115,10 +3115,10 @@ mod tests {
         let item = &snapshot_after.items[0];
 
         // original_price should still be 15.0
-        assert_eq!(item.original_price, Some(15.0), "original_price unchanged after modify");
+        assert_eq!(item.original_price, 15.0, "original_price unchanged after modify");
 
         // unit_price: base(15)+options(2.5)=17.5, discount=17.5*20%=3.5, unit=14.0
-        assert_eq!(item.unit_price, Some(14.0), "unit_price after 20% discount");
+        assert_eq!(item.unit_price, 14.0, "unit_price after 20% discount");
 
         // subtotal = 14.0 * 3 = 42.0
         assert_eq!(snapshot_after.subtotal, 42.0, "subtotal after modify");
@@ -8265,10 +8265,10 @@ mod tests {
         assert_close(s.subtotal, 180.0, "subtotal after rule");
         assert_close(s.total, 180.0, "total after rule");
         let item = &s.items[0];
-        assert!(item.applied_rules.is_some(), "should have applied rules");
-        assert_close(item.unit_price.unwrap(), 90.0, "unit_price with 10% discount");
+        assert!(!item.applied_rules.is_empty(), "should have applied rules");
+        assert_close(item.unit_price, 90.0, "unit_price with 10% discount");
         assert_close(item.price, 90.0, "item.price synced to unit_price");
-        assert_eq!(item.original_price, Some(100.0), "original_price = catalog base");
+        assert_eq!(item.original_price, 100.0, "original_price = catalog base");
 
         // Skip 规则 → 恢复原价
         let r = toggle_rule_skip(&manager, &order_id, 10, true);
@@ -8318,13 +8318,13 @@ mod tests {
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         // 改价后 instance_id 可能变化，找到改价后的商品
         let item = &s.items[0];
-        assert_eq!(item.original_price, Some(80.0), "original_price updated to manual price");
-        assert_close(item.unit_price.unwrap(), 72.0, "unit_price = 80 - 10% = 72");
+        assert_eq!(item.original_price, 80.0, "original_price updated to manual price");
+        assert_close(item.unit_price, 72.0, "unit_price = 80 - 10% = 72");
         assert_close(item.price, 72.0, "item.price synced");
         assert_close(s.total, 72.0, "total");
 
         // Skip 规则 → 恢复到手动改价后的基础价
-        let rule_id = item.applied_rules.as_ref().unwrap()[0].rule_id.clone();
+        let rule_id = item.applied_rules[0].rule_id.clone();
         let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
@@ -8363,7 +8363,7 @@ mod tests {
         let item = &s.items[0];
         // base=50, options=+5 → base_with_options=55
         // rule discount = 10% of 55 = 5.5 → unit_price = 55 - 5.5 = 49.5
-        assert_close(item.unit_price.unwrap(), 49.5, "unit_price with option + rule");
+        assert_close(item.unit_price, 49.5, "unit_price with option + rule");
         assert_close(s.subtotal, 99.0, "subtotal = 49.5 × 2");
         let iid = item.instance_id.clone();
 
@@ -8376,7 +8376,7 @@ mod tests {
         // base_with_options=55, manual 20% = 11 → after_manual=44
         // rule discount = 10% of after_manual=44 → 4.4
         // unit_price = 55 - 11 - 4.4 = 39.6
-        assert_close(item.unit_price.unwrap(), 39.6, "unit_price with option + manual + rule");
+        assert_close(item.unit_price, 39.6, "unit_price with option + manual + rule");
         assert_close(s.subtotal, 79.2, "subtotal = 39.6 × 2");
 
         // 支付完成
@@ -8420,8 +8420,8 @@ mod tests {
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let item = &s.items[0];
         // original_price=150, rule 10% → unit_price=135
-        assert_eq!(item.original_price, Some(150.0), "original_price updated to new spec price");
-        assert_close(item.unit_price.unwrap(), 135.0, "unit_price after spec change");
+        assert_eq!(item.original_price, 150.0, "original_price updated to new spec price");
+        assert_close(item.unit_price, 135.0, "unit_price after spec change");
         assert_close(s.total, 135.0, "total after spec change");
 
         assert_snapshot_consistent(&manager, &order_id);
@@ -8448,7 +8448,7 @@ mod tests {
         // discount: 10% of 100 = 10
         // surcharge: 5% of (base_with_options=100) = 5
         // unit_price = 100 - 10 + 5 = 95
-        assert_close(s.items[0].unit_price.unwrap(), 95.0, "both rules active");
+        assert_close(s.items[0].unit_price, 95.0, "both rules active");
         assert_close(s.total, 95.0, "total");
 
         // Skip 折扣 → 只剩附加费
@@ -8519,7 +8519,7 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // Skip 商品规则 → subtotal 变大 → 整单折扣/附加费重算
-        let rule_id = s.items[0].applied_rules.as_ref().unwrap()[0].rule_id.clone();
+        let rule_id = s.items[0].applied_rules[0].rule_id.clone();
         let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
@@ -8566,7 +8566,7 @@ mod tests {
         // base=80, options=+10-3=+7 → base_with_options=87
         // rule discount = 10% of 87 = 8.7
         // unit_price = 87 - 8.7 = 78.3
-        assert_close(s.items[0].unit_price.unwrap(), 78.3, "initial with options + rule");
+        assert_close(s.items[0].unit_price, 78.3, "initial with options + rule");
 
         // 修改选项: 换成 Extra Meat +15€
         let r = modify_item(
@@ -8583,7 +8583,7 @@ mod tests {
         // base=80, options=+15 → base_with_options=95
         // rule discount = 10% of 95 = 9.5
         // unit_price = 95 - 9.5 = 85.5
-        assert_close(s.items[0].unit_price.unwrap(), 85.5, "after options change");
+        assert_close(s.items[0].unit_price, 85.5, "after options change");
         assert_close(s.total, 85.5, "total");
 
         // 支付完成
@@ -8616,7 +8616,7 @@ mod tests {
         // discount: fixed 5
         // surcharge: 15% of base_with_options(60) = 9
         // unit_price = 60 - 5 + 9 = 64
-        assert_close(s.items[0].unit_price.unwrap(), 64.0, "fixed disc + % surcharge");
+        assert_close(s.items[0].unit_price, 64.0, "fixed disc + % surcharge");
         assert_close(s.subtotal, 128.0, "subtotal = 64 × 2");
 
         // Skip 折扣 → unit_price = 60 + 9 = 69
@@ -8674,7 +8674,7 @@ mod tests {
         // manual 20% = 21 → after_manual=84
         // rule 10% of after_manual(84) = 8.4
         // unit_price = 105 - 21 - 8.4 = 75.6
-        assert_close(item.unit_price.unwrap(), 75.6, "item1 unit_price");
+        assert_close(item.unit_price, 75.6, "item1 unit_price");
         assert_close(s.subtotal, 151.2, "subtotal = 75.6 × 2");
 
         // 加第二个商品: 简单 30€ × 3
@@ -8736,7 +8736,7 @@ mod tests {
         assert_close(s.remaining_amount, 130.0, "remaining");
 
         // Skip 规则 → total 变为 200, remaining 变为 150
-        let rule_id = s.items[0].applied_rules.as_ref().unwrap()[0].rule_id.clone();
+        let rule_id = s.items[0].applied_rules[0].rule_id.clone();
         let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
@@ -8783,7 +8783,7 @@ mod tests {
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         // base=20, options=2*3=6 → base_with_options=26
         // surcharge=10% of 26=2.6 → unit_price=26+2.6=28.6
-        assert_close(s.items[0].unit_price.unwrap(), 28.6, "option qty 3 + surcharge");
+        assert_close(s.items[0].unit_price, 28.6, "option qty 3 + surcharge");
         assert_close(s.total, 28.6, "total");
 
         // 支付完成
@@ -8824,7 +8824,7 @@ mod tests {
         let iid = s.items[0].instance_id.clone();
         // base=50, option=+3, base_with_options=53
         // rule 5% of 53=2.65 → unit_price=53-2.65=50.35
-        assert_close(s.items[0].unit_price.unwrap(), 50.35, "initial");
+        assert_close(s.items[0].unit_price, 50.35, "initial");
 
         // 一次性: 改价 60, 改规格 spec B, 改选项 +8€, 加 10% 手动折扣
         let r = modify_item(
@@ -8844,8 +8844,8 @@ mod tests {
         // original_price=60, option=+8, base_with_options=68
         // manual 10% = 6.8 → after_manual=61.2
         // rule 5% of 61.2=3.06 → unit_price=68-6.8-3.06=58.14
-        assert_eq!(item.original_price, Some(60.0));
-        assert_close(item.unit_price.unwrap(), 58.14, "after combo modify");
+        assert_eq!(item.original_price, 60.0);
+        assert_close(item.unit_price, 58.14, "after combo modify");
         assert_close(s.total, 58.14, "total");
 
         // 支付完成
@@ -8877,7 +8877,7 @@ mod tests {
         assert_close(s.subtotal, 315.0, "subtotal = 180 + 135");
 
         let a_iid = s.items.iter().find(|i| i.name == "A").unwrap().instance_id.clone();
-        let a_unit_price = s.items.iter().find(|i| i.name == "A").unwrap().unit_price.unwrap();
+        let a_unit_price = s.items.iter().find(|i| i.name == "A").unwrap().unit_price;
 
         // 分单支付: 1 个 A
         let r = split_by_items(
@@ -8986,7 +8986,7 @@ mod tests {
         // base=30, option=-5 → base_with_options=25
         // after_manual=25, fixed discount=3
         // unit_price = 25 - 3 = 22
-        assert_close(s.items[0].unit_price.unwrap(), 22.0, "negative option + fixed discount");
+        assert_close(s.items[0].unit_price, 22.0, "negative option + fixed discount");
         assert_close(s.subtotal, 44.0, "subtotal = 22 × 2");
 
         // 支付完成
@@ -9040,8 +9040,8 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let iid = s.items[0].instance_id.clone();
-        assert_close(s.items[0].unit_price.unwrap(), 90.0, "before comp: 100*0.9=90");
-        assert!(s.items[0].applied_rules.is_some(), "should have rules");
+        assert_close(s.items[0].unit_price, 90.0, "before comp: 100*0.9=90");
+        assert!(!s.items[0].applied_rules.is_empty(), "should have rules");
 
         // Full comp → rules preserved
         let r = comp_item(&manager, &order_id, &iid);
@@ -9050,7 +9050,7 @@ mod tests {
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert!(s.items[0].is_comped);
         assert_close(s.total, 0.0, "comped = free");
-        assert!(s.items[0].applied_rules.is_some(), "rules preserved on comped item");
+        assert!(!s.items[0].applied_rules.is_empty(), "rules preserved on comped item");
 
         // Uncomp → rules correctly restored
         let r = uncomp_item(&manager, &order_id, &iid);
@@ -9058,8 +9058,8 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert!(!s.items[0].is_comped);
-        assert!(s.items[0].applied_rules.is_some(), "rules restored after uncomp");
-        assert_close(s.items[0].unit_price.unwrap(), 90.0, "100*0.9=90 correctly restored");
+        assert!(!s.items[0].applied_rules.is_empty(), "rules restored after uncomp");
+        assert_close(s.items[0].unit_price, 90.0, "100*0.9=90 correctly restored");
         assert_close(s.total, 90.0, "total correct after uncomp");
 
         assert_snapshot_consistent(&manager, &order_id);
@@ -9092,8 +9092,8 @@ mod tests {
         assert_eq!(source.quantity, 2);
         assert_eq!(comped.quantity, 1);
         // 源商品保留规则
-        assert!(source.applied_rules.is_some(), "source keeps rules");
-        assert_close(source.unit_price.unwrap(), 40.0, "source still 50*0.8=40");
+        assert!(!source.applied_rules.is_empty(), "source keeps rules");
+        assert_close(source.unit_price, 40.0, "source still 50*0.8=40");
         assert_close(s.subtotal, 80.0, "subtotal: 40*2=80 (comped=0)");
 
         // Uncomp → 合并回源
@@ -9105,7 +9105,7 @@ mod tests {
         assert_eq!(s.items.len(), 1, "merged back");
         assert_eq!(s.items[0].quantity, 3);
         // 源商品规则保留 → 价格正确
-        assert!(s.items[0].applied_rules.is_some(), "rules preserved after merge");
+        assert!(!s.items[0].applied_rules.is_empty(), "rules preserved after merge");
         assert_close(s.total, 120.0, "restored: 40*3=120");
 
         assert_snapshot_consistent(&manager, &order_id);
@@ -9139,7 +9139,7 @@ mod tests {
         assert!(r.success);
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_close(s.total, 0.0, "comped");
-        assert!(s.items[0].applied_rules.is_some(), "rules preserved on comp");
+        assert!(!s.items[0].applied_rules.is_empty(), "rules preserved on comp");
 
         // Toggle 规则应该成功 — rules 保留在 comped item 上
         let r = toggle_rule_skip(&manager, &order_id, rule_id, false);
@@ -9153,8 +9153,8 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert!(!s.items[0].is_comped);
-        assert!(s.items[0].applied_rules.is_some(), "rules restored after uncomp");
-        assert_close(s.items[0].unit_price.unwrap(), 170.0, "200*0.85=170 restored");
+        assert!(!s.items[0].applied_rules.is_empty(), "rules restored after uncomp");
+        assert_close(s.items[0].unit_price, 170.0, "200*0.85=170 restored");
         assert_close(s.total, 170.0, "total restored with rules");
         assert_remaining_consistent(&s);
         assert_snapshot_consistent(&manager, &order_id);
@@ -9288,7 +9288,7 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let source = s.items.iter().find(|i| !i.is_comped).unwrap();
-        assert_close(source.unit_price.unwrap(), 100.0, "rule skipped → 100/unit");
+        assert_close(source.unit_price, 100.0, "rule skipped → 100/unit");
         assert_close(s.subtotal, 300.0, "100*3=300");
         assert_remaining_consistent(&s);
 
@@ -9364,7 +9364,7 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let iid = s.items[0].instance_id.clone();
-        assert_close(s.items[0].unit_price.unwrap(), 81.0, "(80+10)*0.9=81");
+        assert_close(s.items[0].unit_price, 81.0, "(80+10)*0.9=81");
 
         // Full comp
         let r = comp_item(&manager, &order_id, &iid);
@@ -9396,7 +9396,7 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let iid = s.items[0].instance_id.clone();
-        let a_unit_price = s.items[0].unit_price.unwrap();
+        let a_unit_price = s.items[0].unit_price;
         assert_close(a_unit_price, 90.0, "100*0.9=90");
 
         // 分单支付 1 个 A
@@ -9476,7 +9476,7 @@ mod tests {
         assert_close(s.subtotal, 144.0, "A only");
 
         // 分单支付 1 个 A
-        let a_unit = s.items.iter().find(|i| i.name == "A").unwrap().unit_price.unwrap();
+        let a_unit = s.items.iter().find(|i| i.name == "A").unwrap().unit_price;
         let r = split_by_items(
             &manager, &order_id,
             vec![shared::order::SplitItem {
@@ -9543,7 +9543,7 @@ mod tests {
         // 源商品: 80*0.9=72 (如果规则还在), qty=3 → 216
         // comped 商品: price=0
         let source = s.items.iter().find(|i| !i.is_comped).unwrap();
-        assert_close(source.unit_price.unwrap(), 72.0, "80*0.9=72");
+        assert_close(source.unit_price, 72.0, "80*0.9=72");
         assert_remaining_consistent(&s);
 
         assert_snapshot_consistent(&manager, &order_id);
@@ -9626,14 +9626,14 @@ mod tests {
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         let iid = s.items[0].instance_id.clone();
-        assert_close(s.items[0].unit_price.unwrap(), 85.0, "100*0.9 - 5 = 85");
+        assert_close(s.items[0].unit_price, 85.0, "100*0.9 - 5 = 85");
         assert_close(s.subtotal, 170.0, "85*2=170");
 
         // Skip 固定折扣 → 90/unit
         let r = toggle_rule_skip(&manager, &order_id, 200, true);
         assert!(r.success);
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_close(s.items[0].unit_price.unwrap(), 90.0, "100*0.9=90 (fixed skipped)");
+        assert_close(s.items[0].unit_price, 90.0, "100*0.9=90 (fixed skipped)");
 
         // Comp 全部
         let r = comp_item(&manager, &order_id, &iid);
@@ -9682,8 +9682,8 @@ mod tests {
 
         // B 的规则不应受 comp A 影响
         let b_item = s.items.iter().find(|i| i.name == "B").unwrap();
-        assert!(b_item.applied_rules.is_some(), "B keeps its rules");
-        assert_close(b_item.unit_price.unwrap(), 45.0, "B=50*0.9=45");
+        assert!(!b_item.applied_rules.is_empty(), "B keeps its rules");
+        assert_close(b_item.unit_price, 45.0, "B=50*0.9=45");
         assert_remaining_consistent(&s);
 
         // 支付完成

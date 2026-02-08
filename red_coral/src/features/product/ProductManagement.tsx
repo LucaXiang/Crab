@@ -425,7 +425,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         data={filteredProducts}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => String(item.id)}
+        getRowKey={(item) => item.id}
         onBatchDelete={canManageMenu ? handleBatchDelete : undefined}
         emptyText={t('common.empty.no_data')}
         pageSize={5}

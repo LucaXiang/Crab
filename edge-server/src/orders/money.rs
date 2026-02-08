@@ -226,8 +226,11 @@ pub fn to_f64(value: Decimal) -> f64 {
 /// `after_manual` is the per-unit price after manual discount (basis for percentage discounts).
 /// Falls back to pre-computed `rule_discount_amount` when `applied_rules` is absent.
 fn effective_rule_discount(item: &CartItemSnapshot, after_manual: Decimal) -> Decimal {
-    match &item.applied_rules {
-        Some(rules) => rules
+    if item.applied_rules.is_empty() {
+        // Legacy fallback: use pre-computed amount
+        to_decimal(item.rule_discount_amount)
+    } else {
+        item.applied_rules
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Discount)
             .map(|r| match r.adjustment_type {
@@ -237,11 +240,7 @@ fn effective_rule_discount(item: &CartItemSnapshot, after_manual: Decimal) -> De
                 }
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
-            .sum(),
-        None => item
-            .rule_discount_amount
-            .map(to_decimal)
-            .unwrap_or(Decimal::ZERO),
+            .sum()
     }
 }
 
@@ -249,8 +248,11 @@ fn effective_rule_discount(item: &CartItemSnapshot, after_manual: Decimal) -> De
 /// `base_with_options` is the per-unit price before discounts (basis for percentage surcharges).
 /// Falls back to pre-computed `rule_surcharge_amount` when `applied_rules` is absent.
 fn effective_rule_surcharge(item: &CartItemSnapshot, base_with_options: Decimal) -> Decimal {
-    match &item.applied_rules {
-        Some(rules) => rules
+    if item.applied_rules.is_empty() {
+        // Legacy fallback: use pre-computed amount
+        to_decimal(item.rule_surcharge_amount)
+    } else {
+        item.applied_rules
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Surcharge)
             .map(|r| match r.adjustment_type {
@@ -260,11 +262,7 @@ fn effective_rule_surcharge(item: &CartItemSnapshot, base_with_options: Decimal)
                 }
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
-            .sum(),
-        None => item
-            .rule_surcharge_amount
-            .map(to_decimal)
-            .unwrap_or(Decimal::ZERO),
+            .sum()
     }
 }
 
@@ -272,8 +270,11 @@ fn effective_rule_surcharge(item: &CartItemSnapshot, base_with_options: Decimal)
 /// `subtotal` is the order subtotal (basis for percentage order-level discounts).
 /// Falls back to pre-computed `order_rule_discount_amount` when `order_applied_rules` is absent.
 fn effective_order_rule_discount(snapshot: &OrderSnapshot, subtotal: Decimal) -> Decimal {
-    match &snapshot.order_applied_rules {
-        Some(rules) => rules
+    if snapshot.order_applied_rules.is_empty() {
+        // Legacy fallback: use pre-computed amount
+        to_decimal(snapshot.order_rule_discount_amount)
+    } else {
+        snapshot.order_applied_rules
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Discount)
             .map(|r| match r.adjustment_type {
@@ -283,11 +284,7 @@ fn effective_order_rule_discount(snapshot: &OrderSnapshot, subtotal: Decimal) ->
                 }
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
-            .sum(),
-        None => snapshot
-            .order_rule_discount_amount
-            .map(to_decimal)
-            .unwrap_or(Decimal::ZERO),
+            .sum()
     }
 }
 
@@ -295,8 +292,11 @@ fn effective_order_rule_discount(snapshot: &OrderSnapshot, subtotal: Decimal) ->
 /// `subtotal` is the order subtotal (basis for percentage order-level surcharges).
 /// Falls back to pre-computed `order_rule_surcharge_amount` when `order_applied_rules` is absent.
 fn effective_order_rule_surcharge(snapshot: &OrderSnapshot, subtotal: Decimal) -> Decimal {
-    match &snapshot.order_applied_rules {
-        Some(rules) => rules
+    if snapshot.order_applied_rules.is_empty() {
+        // Legacy fallback: use pre-computed amount
+        to_decimal(snapshot.order_rule_surcharge_amount)
+    } else {
+        snapshot.order_applied_rules
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Surcharge)
             .map(|r| match r.adjustment_type {
@@ -306,11 +306,7 @@ fn effective_order_rule_surcharge(snapshot: &OrderSnapshot, subtotal: Decimal) -
                 }
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
-            .sum(),
-        None => snapshot
-            .order_rule_surcharge_amount
-            .map(to_decimal)
-            .unwrap_or(Decimal::ZERO),
+            .sum()
     }
 }
 
@@ -327,7 +323,7 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     }
 
     // Use original_price as the base for calculations (updated on manual repricing/spec change)
-    let base_price = to_decimal(item.original_price.unwrap_or(item.price));
+    let base_price = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
 
     // Options modifier: sum of (price_modifier × quantity) for each selected option
     let options_modifier: Decimal = item
@@ -406,7 +402,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         item.unpaid_quantity = (item.quantity - paid_qty).max(0);
 
         // Calculate base price + options modifier
-        let base_price = to_decimal(item.original_price.unwrap_or(item.price));
+        let base_price = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
         // Options modifier: sum of (price_modifier × quantity) for each selected option
         let options_modifier: Decimal = item
             .selected_options
@@ -440,50 +436,48 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         }
 
         // Sync calculated_amount in applied_rules so snapshot stays consistent
-        if let Some(ref mut rules) = item.applied_rules {
-            for rule in rules.iter_mut() {
-                if rule.skipped {
-                    continue;
-                }
-                let basis = match rule.rule_type {
-                    RuleType::Discount => after_manual,
-                    RuleType::Surcharge => base_with_options,
-                };
-                rule.calculated_amount = to_f64(match rule.adjustment_type {
-                    AdjustmentType::Percentage => {
-                        (basis * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
-                            .round_dp(DECIMAL_PLACES)
-                    }
-                    AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
-                });
+        for rule in item.applied_rules.iter_mut() {
+            if rule.skipped {
+                continue;
             }
+            let basis = match rule.rule_type {
+                RuleType::Discount => after_manual,
+                RuleType::Surcharge => base_with_options,
+            };
+            rule.calculated_amount = to_f64(match rule.adjustment_type {
+                AdjustmentType::Percentage => {
+                    (basis * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
+                        .round_dp(DECIMAL_PLACES)
+                }
+                AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
+            });
         }
 
         // Calculate and set unit_price (final per-unit price for display)
         let unit_price = calculate_unit_price(item);
-        item.unit_price = Some(to_f64(unit_price));
+        item.unit_price = to_f64(unit_price);
         // Sync item.price to match computed unit_price (keeps price = "final price after rules")
         item.price = to_f64(unit_price);
 
         // Calculate and set line_total (unit_price * quantity)
         let item_total = unit_price * quantity;
-        item.line_total = Some(to_f64(item_total));
+        item.line_total = to_f64(item_total);
 
         // Calculate item tax (Spain IVA: prices are tax-inclusive)
         // Formula: tax = gross_amount * tax_rate / (100 + tax_rate)
-        let tax_rate = Decimal::from(item.tax_rate.unwrap_or(0));
+        let tax_rate = Decimal::from(item.tax_rate);
         let item_tax = if tax_rate > Decimal::ZERO {
             item_total * tax_rate / (Decimal::ONE_HUNDRED + tax_rate)
         } else {
             Decimal::ZERO
         };
-        item.tax = Some(to_f64(item_tax));
+        item.tax = to_f64(item_tax);
         total_tax += item_tax;
 
         // Accumulate comp total (original value of comped items)
         // Use original_price for comp value since item.price is zeroed on comp
         if item.is_comped {
-            let comp_base = to_decimal(item.original_price.unwrap_or(item.price));
+            let comp_base = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
             let comp_with_options = comp_base + options_modifier;
             comp_total += comp_with_options * quantity;
         }
@@ -513,19 +507,17 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let order_surcharge = eff_order_rule_surcharge + order_manual_surcharge;
 
     // Sync calculated_amount in order_applied_rules so snapshot stays consistent
-    if let Some(ref mut rules) = snapshot.order_applied_rules {
-        for rule in rules.iter_mut() {
-            if rule.skipped {
-                continue;
-            }
-            rule.calculated_amount = to_f64(match rule.adjustment_type {
-                AdjustmentType::Percentage => {
-                    (subtotal * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
-                        .round_dp(DECIMAL_PLACES)
-                }
-                AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
-            });
+    for rule in snapshot.order_applied_rules.iter_mut() {
+        if rule.skipped {
+            continue;
         }
+        rule.calculated_amount = to_f64(match rule.adjustment_type {
+            AdjustmentType::Percentage => {
+                (subtotal * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
+                    .round_dp(DECIMAL_PLACES)
+            }
+            AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
+        });
     }
 
     // Total discount and surcharge (item-level + order-level)
@@ -548,8 +540,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.comp_total_amount = to_f64(comp_total);
     snapshot.order_manual_discount_amount = to_f64(order_manual_discount);
     snapshot.order_manual_surcharge_amount = to_f64(order_manual_surcharge);
-    snapshot.order_rule_discount_amount = Some(to_f64(eff_order_rule_discount));
-    snapshot.order_rule_surcharge_amount = Some(to_f64(eff_order_rule_surcharge));
+    snapshot.order_rule_discount_amount = to_f64(eff_order_rule_discount);
+    snapshot.order_rule_surcharge_amount = to_f64(eff_order_rule_surcharge);
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);
 
@@ -621,24 +613,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 10.99,
-            original_price: None,
+            original_price: 0.0,
             quantity: 3,
             unpaid_quantity: 3,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-        tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let total = calculate_item_total(&item);
@@ -652,24 +644,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(33.33), // Tricky percentage
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-        tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let total = calculate_item_total(&item);
@@ -684,24 +676,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(33.0),
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-        tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let total = calculate_item_total(&item);
@@ -745,24 +737,24 @@ mod tests {
                 instance_id: format!("i{}", i),
                 name: "Penny Item".to_string(),
                 price: 0.01,
-                original_price: None,
+                original_price: 0.0,
                 quantity: 1,
                 unpaid_quantity: 1,
                 selected_options: None,
                 selected_specification: None,
                 manual_discount_percent: None,
-                rule_discount_amount: None,
-                rule_surcharge_amount: None,
-                applied_rules: None,
+                rule_discount_amount: 0.0,
+                rule_surcharge_amount: 0.0,
+                applied_rules: vec![],
                 note: None,
                 authorizer_id: None,
                 authorizer_name: None,
                 category_name: None,
                 is_comped: false,
-                unit_price: None,
-                line_total: None,
-            tax: None,
-            tax_rate: None,
+                unit_price: 0.0,
+                line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             })
             .collect();
 
@@ -780,24 +772,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-        tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         });
 
         // Initial calculation
@@ -817,24 +809,24 @@ mod tests {
             instance_id: "i2".to_string(),
             name: "Item 2".to_string(),
             price: 50.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-        tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         });
 
         recalculate_totals(&mut snapshot);
@@ -852,24 +844,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-        tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         });
 
         // is_pre_payment is false by default
@@ -942,24 +934,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: -50.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_unit_price(&item);
@@ -974,24 +966,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(150.0), // 150% 折扣
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_unit_price(&item);
@@ -1006,24 +998,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: f64::NAN,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_unit_price(&item);
@@ -1037,24 +1029,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: f64::INFINITY,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_unit_price(&item);
@@ -1068,24 +1060,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(-20.0), // 负折扣 = 加价
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_unit_price(&item);
@@ -1104,24 +1096,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: -5,
             unpaid_quantity: -5,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_item_total(&item);
@@ -1136,24 +1128,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 0,
             unpaid_quantity: 0,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_item_total(&item);
@@ -1168,24 +1160,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 999999.99,
-            original_price: None,
+            original_price: 0.0,
             quantity: 10000,
             unpaid_quantity: 10000,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         };
 
         let result = calculate_item_total(&item);
@@ -1209,24 +1201,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Normal".to_string(),
             price: 10.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 2,
             unpaid_quantity: 2,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         });
 
         // 零价格商品
@@ -1235,24 +1227,24 @@ mod tests {
             instance_id: "i2".to_string(),
             name: "Free".to_string(),
             price: 0.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         });
 
         recalculate_totals(&mut snapshot);
@@ -1272,24 +1264,24 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 50.0,
-            original_price: None,
+            original_price: 0.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
             note: None,
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
             is_comped: false,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
         });
         // 订单级固定折扣大于小计
         snapshot.order_manual_discount_fixed = Some(100.0);
@@ -1336,7 +1328,7 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Pizza".to_string(),
             price: 16.50,                     // item_final from reducer (already includes options)
-            original_price: Some(12.0),       // spec price set by reducer
+            original_price: 12.0,       // spec price set by reducer
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: Some(vec![
@@ -1359,13 +1351,13 @@ mod tests {
             ]),
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1390,7 +1382,7 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 85.0,                      // item_final from reducer
-            original_price: Some(100.0),      // spec price
+            original_price: 100.0,      // spec price
             quantity: 2,
             unpaid_quantity: 2,
             selected_options: Some(vec![shared::order::ItemOption {
@@ -1403,13 +1395,13 @@ mod tests {
             }]),
             selected_specification: None,
             manual_discount_percent: Some(10.0),   // 10% off
-            rule_discount_amount: Some(3.0),       // -3 per unit
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 3.0,       // -3 per unit
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1440,7 +1432,7 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Noodles".to_string(),
             price: 16.0,                      // item_final from reducer
-            original_price: Some(10.0),       // base price
+            original_price: 10.0,       // base price
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: Some(vec![
@@ -1455,13 +1447,13 @@ mod tests {
             ]),
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1489,7 +1481,7 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Burger".to_string(),
             price: 17.0,
-            original_price: Some(10.0),       // base price
+            original_price: 10.0,       // base price
             quantity: 2,                      // 2 burgers
             unpaid_quantity: 2,
             selected_options: Some(vec![
@@ -1512,13 +1504,13 @@ mod tests {
             ]),
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1547,19 +1539,19 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 5.0,
-            original_price: Some(10.0),
+            original_price: 10.0,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: Some(15.0),  // Discount exceeds base price
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 15.0,  // Discount exceeds base price
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1917,19 +1909,19 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: original_price,
-            original_price: Some(original_price),
+            original_price,
             quantity: 1,
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: legacy_discount,
-            rule_surcharge_amount: legacy_surcharge,
-            applied_rules: Some(rules),
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: legacy_discount.unwrap_or(0.0),
+            rule_surcharge_amount: legacy_surcharge.unwrap_or(0.0),
+            applied_rules: rules,
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -2002,18 +1994,19 @@ mod tests {
 
     #[test]
     fn test_effective_rule_discount_empty_applied_rules() {
-        // applied_rules is Some but empty vec → should return 0, NOT fall back to legacy
+        // applied_rules is empty vec → falls back to legacy rule_discount_amount
+        // (with Vec<AppliedRule> there is no distinction between "absent" and "empty")
         let item = make_item_with_rules(100.0, vec![], Some(10.0), None);
         let eff = effective_rule_discount(&item, to_decimal(100.0));
-        assert_eq!(eff, Decimal::ZERO, "Empty applied_rules → zero (not legacy fallback)");
+        assert_eq!(to_f64(eff), 10.0, "Empty applied_rules → legacy fallback");
     }
 
     #[test]
     fn test_effective_rule_discount_legacy_fallback() {
         // applied_rules is None → fall back to legacy rule_discount_amount
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = None;
-        item.rule_discount_amount = Some(7.5);
+        item.applied_rules = vec![];
+        item.rule_discount_amount = 7.5;
         let eff = effective_rule_discount(&item, to_decimal(100.0));
         assert_eq!(to_f64(eff), 7.5, "None applied_rules → use legacy field");
     }
@@ -2021,8 +2014,8 @@ mod tests {
     #[test]
     fn test_effective_rule_surcharge_legacy_fallback() {
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = None;
-        item.rule_surcharge_amount = Some(3.5);
+        item.applied_rules = vec![];
+        item.rule_surcharge_amount = 3.5;
         let eff = effective_rule_surcharge(&item, to_decimal(100.0));
         assert_eq!(to_f64(eff), 3.5, "None applied_rules → use legacy field");
     }
@@ -2139,9 +2132,9 @@ mod tests {
         recalculate_totals(&mut snapshot);
 
         // unit_price = 100 - 5 (only active discount) = 95
-        assert_eq!(snapshot.items[0].unit_price, Some(95.0));
+        assert_eq!(snapshot.items[0].unit_price, 95.0);
         // line_total = 95 * 2 = 190
-        assert_eq!(snapshot.items[0].line_total, Some(190.0));
+        assert_eq!(snapshot.items[0].line_total, 190.0);
         // subtotal = 190
         assert_eq!(snapshot.subtotal, 190.0);
         assert_eq!(snapshot.total, 190.0);
@@ -2156,14 +2149,14 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         // Simple item, no item-level rules
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = None;
+        item.applied_rules = vec![];
         snapshot.items.push(item);
 
         // Order-level discount, skipped
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(101, RuleType::Discount, 20.0, true), // skipped
-        ]);
-        snapshot.order_rule_discount_amount = Some(20.0); // legacy
+        ];
+        snapshot.order_rule_discount_amount = 20.0; // legacy
 
         recalculate_totals(&mut snapshot);
 
@@ -2177,13 +2170,13 @@ mod tests {
     fn test_recalculate_totals_skipped_order_level_surcharge() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = None;
+        item.applied_rules = vec![];
         snapshot.items.push(item);
 
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(111, RuleType::Surcharge, 15.0, true), // skipped
-        ]);
-        snapshot.order_rule_surcharge_amount = Some(15.0);
+        ];
+        snapshot.order_rule_surcharge_amount = 15.0;
 
         recalculate_totals(&mut snapshot);
 
@@ -2195,15 +2188,15 @@ mod tests {
     fn test_recalculate_totals_mixed_active_and_skipped_order_rules() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = make_item_with_rules(200.0, vec![], None, None);
-        item.applied_rules = None;
+        item.applied_rules = vec![];
         snapshot.items.push(item);
 
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(101, RuleType::Discount, 10.0, false),  // active
             make_applied_rule(102, RuleType::Discount, 20.0, true),   // skipped
             make_applied_rule(111, RuleType::Surcharge, 5.0, false),  // active
             make_applied_rule(112, RuleType::Surcharge, 8.0, true),   // skipped
-        ]);
+        ];
 
         recalculate_totals(&mut snapshot);
 
@@ -2233,7 +2226,7 @@ mod tests {
         snapshot.is_pre_payment = true;
 
         // Now "skip" the rule (simulating applier toggle)
-        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        snapshot.items[0].applied_rules[0].skipped = true;
         recalculate_totals(&mut snapshot);
 
         // Total changed from 90 to 100 → pre_payment should reset
@@ -2251,15 +2244,15 @@ mod tests {
             None,
             Some(10.0),
         );
-        item.tax_rate = Some(21); // 21% IVA
+        item.tax_rate = 21; // 21% IVA
         snapshot.items.push(item);
 
         recalculate_totals(&mut snapshot);
 
         // Surcharge skipped → unit_price = 100, line_total = 100
-        assert_eq!(snapshot.items[0].unit_price, Some(100.0));
+        assert_eq!(snapshot.items[0].unit_price, 100.0);
         // Tax: 100 * 21 / (100 + 21) = 100 * 21/121 ≈ 17.36
-        assert_eq!(snapshot.items[0].tax, Some(17.36));
+        assert_eq!(snapshot.items[0].tax, 17.36);
         assert_eq!(snapshot.tax, 17.36);
     }
 
@@ -2273,15 +2266,15 @@ mod tests {
             None,
             Some(10.0),
         );
-        item.tax_rate = Some(21);
+        item.tax_rate = 21;
         snapshot.items.push(item);
 
         recalculate_totals(&mut snapshot);
 
         // Surcharge active → unit_price = 110, line_total = 110
-        assert_eq!(snapshot.items[0].unit_price, Some(110.0));
+        assert_eq!(snapshot.items[0].unit_price, 110.0);
         // Tax: 110 * 21 / 121 ≈ 19.09
-        assert_eq!(snapshot.items[0].tax, Some(19.09));
+        assert_eq!(snapshot.items[0].tax, 19.09);
     }
 
     #[test]
@@ -2305,7 +2298,7 @@ mod tests {
         assert_eq!(snapshot.total, 72.0);
 
         // Now skip the item rule
-        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        snapshot.items[0].applied_rules[0].skipped = true;
         recalculate_totals(&mut snapshot);
 
         // subtotal = 100 (no item discount), order_discount = 100 * 10% = 10, total = 90
@@ -2373,12 +2366,12 @@ mod tests {
         assert_eq!(original_total, 90.0);
 
         // Skip
-        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        snapshot.items[0].applied_rules[0].skipped = true;
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 100.0);
 
         // Unskip
-        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = false;
+        snapshot.items[0].applied_rules[0].skipped = false;
         recalculate_totals(&mut snapshot);
 
         assert_eq!(snapshot.total, original_total, "Total restored after unskip");
@@ -2388,11 +2381,11 @@ mod tests {
     #[test]
     fn test_effective_order_rule_discount_skipped() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(101, RuleType::Discount, 10.0, false),
             make_applied_rule(102, RuleType::Discount, 5.0, true), // skipped
-        ]);
-        snapshot.order_rule_discount_amount = Some(15.0);
+        ];
+        snapshot.order_rule_discount_amount = 15.0;
 
         // subtotal=100 as basis, adjustment_value=10 → 100*10/100=10.0
         let eff = effective_order_rule_discount(&snapshot, to_decimal(100.0));
@@ -2402,10 +2395,10 @@ mod tests {
     #[test]
     fn test_effective_order_rule_surcharge_skipped() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(111, RuleType::Surcharge, 8.0, true), // skipped
-        ]);
-        snapshot.order_rule_surcharge_amount = Some(8.0);
+        ];
+        snapshot.order_rule_surcharge_amount = 8.0;
 
         let eff = effective_order_rule_surcharge(&snapshot, to_decimal(100.0));
         assert_eq!(eff, Decimal::ZERO, "Skipped order surcharge → zero");
@@ -2414,8 +2407,8 @@ mod tests {
     #[test]
     fn test_effective_order_rule_discount_legacy_fallback() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.order_applied_rules = None;
-        snapshot.order_rule_discount_amount = Some(12.0);
+        snapshot.order_applied_rules = vec![];
+        snapshot.order_rule_discount_amount = 12.0;
 
         let eff = effective_order_rule_discount(&snapshot, to_decimal(100.0));
         assert_eq!(to_f64(eff), 12.0, "None order_applied_rules → legacy fallback");
@@ -2424,8 +2417,8 @@ mod tests {
     #[test]
     fn test_effective_order_rule_surcharge_legacy_fallback() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.order_applied_rules = None;
-        snapshot.order_rule_surcharge_amount = Some(6.0);
+        snapshot.order_applied_rules = vec![];
+        snapshot.order_rule_surcharge_amount = 6.0;
 
         let eff = effective_order_rule_surcharge(&snapshot, to_decimal(100.0));
         assert_eq!(to_f64(eff), 6.0, "None order_applied_rules → legacy fallback");
@@ -2449,7 +2442,7 @@ mod tests {
         assert_eq!(snapshot.remaining_amount, 30.0);
 
         // Skip the discount → total goes up
-        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        snapshot.items[0].applied_rules[0].skipped = true;
         recalculate_totals(&mut snapshot);
         // subtotal = 100, total = 100, remaining = 100 - 50 = 50
         assert_eq!(snapshot.total, 100.0);
@@ -2503,7 +2496,7 @@ mod tests {
     fn test_fixed_amount_rule_unaffected_by_manual_discount() {
         // FixedAmount rule discount stays constant regardless of manual discount
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = Some(vec![AppliedRule {
+        item.applied_rules = vec![AppliedRule {
             rule_id: 1,
             name: "r1".to_string(),
             display_name: "r1".to_string(),
@@ -2517,7 +2510,7 @@ mod tests {
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
-        }]);
+        }];
 
         // No manual discount: unit_price = 100 - 5 = 95
         let up1 = calculate_unit_price(&item);
@@ -2534,12 +2527,12 @@ mod tests {
         // Order-level 10% discount should recalculate when subtotal changes
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = None;
+        item.applied_rules = vec![];
         snapshot.items.push(item);
 
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(101, RuleType::Discount, 10.0, false),
-        ]);
+        ];
 
         recalculate_totals(&mut snapshot);
         // subtotal = 100, order_discount = 100 * 10% = 10, total = 90
@@ -2547,7 +2540,7 @@ mod tests {
 
         // Change item price → subtotal changes
         snapshot.items[0].price = 200.0;
-        snapshot.items[0].original_price = Some(200.0);
+        snapshot.items[0].original_price = 200.0;
         recalculate_totals(&mut snapshot);
         // subtotal = 200, order_discount = 200 * 10% = 20, total = 180
         assert_eq!(snapshot.total, 180.0, "Order rule discount should recalculate on subtotal change");
@@ -2567,7 +2560,7 @@ mod tests {
         recalculate_totals(&mut snapshot);
 
         // calculated_amount should be synced: 100 * 10% = 10.0
-        let ca = snapshot.items[0].applied_rules.as_ref().unwrap()[0].calculated_amount;
+        let ca = snapshot.items[0].applied_rules[0].calculated_amount;
         assert_eq!(ca, 10.0, "calculated_amount should be synced by recalculate_totals");
 
         // Change manual discount → after_manual changes → calculated_amount should update
@@ -2575,7 +2568,7 @@ mod tests {
         recalculate_totals(&mut snapshot);
 
         // after_manual = 50, rule discount = 50 * 10% = 5.0
-        let ca2 = snapshot.items[0].applied_rules.as_ref().unwrap()[0].calculated_amount;
+        let ca2 = snapshot.items[0].applied_rules[0].calculated_amount;
         assert_eq!(ca2, 5.0, "calculated_amount should update after manual discount change");
     }
 
@@ -2584,22 +2577,22 @@ mod tests {
         // Verify that recalculate_totals syncs calculated_amount in order_applied_rules
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = make_item_with_rules(100.0, vec![], None, None);
-        item.applied_rules = None;
+        item.applied_rules = vec![];
         snapshot.items.push(item);
 
-        snapshot.order_applied_rules = Some(vec![
+        snapshot.order_applied_rules = vec![
             make_applied_rule(101, RuleType::Discount, 10.0, false),
-        ]);
+        ];
 
         recalculate_totals(&mut snapshot);
-        let ca = snapshot.order_applied_rules.as_ref().unwrap()[0].calculated_amount;
+        let ca = snapshot.order_applied_rules[0].calculated_amount;
         assert_eq!(ca, 10.0, "order calculated_amount should be 100*10%=10");
 
         // Change item price → subtotal changes
         snapshot.items[0].price = 200.0;
-        snapshot.items[0].original_price = Some(200.0);
+        snapshot.items[0].original_price = 200.0;
         recalculate_totals(&mut snapshot);
-        let ca2 = snapshot.order_applied_rules.as_ref().unwrap()[0].calculated_amount;
+        let ca2 = snapshot.order_applied_rules[0].calculated_amount;
         assert_eq!(ca2, 20.0, "order calculated_amount should update to 200*10%=20");
     }
 
@@ -2614,7 +2607,7 @@ mod tests {
             instance_id: "i1".to_string(),
             name: "Noodles".to_string(),
             price: 16.0,                      // base 10 + options 6
-            original_price: Some(10.0),
+            original_price: 10.0,
             quantity: 2,                      // 2 bowls
             unpaid_quantity: 2,
             selected_options: Some(vec![
@@ -2629,13 +2622,13 @@ mod tests {
             ]),
             selected_specification: None,
             manual_discount_percent: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            unit_price: None,
-            line_total: None,
-            tax: None,
-            tax_rate: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            unit_price: 0.0,
+            line_total: 0.0,
+            tax: 0.0,
+            tax_rate: 0,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -2650,8 +2643,8 @@ mod tests {
         // options = 2.0 * 3 = 6.0
         // unit_price = 16.0
         // line_total = 16.0 * 2 = 32.0
-        assert_eq!(snapshot.items[0].unit_price, Some(16.0));
-        assert_eq!(snapshot.items[0].line_total, Some(32.0));
+        assert_eq!(snapshot.items[0].unit_price, 16.0);
+        assert_eq!(snapshot.items[0].line_total, 32.0);
         assert_eq!(snapshot.subtotal, 32.0);
         assert_eq!(snapshot.total, 32.0);
     }

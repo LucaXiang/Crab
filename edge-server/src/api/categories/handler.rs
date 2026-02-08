@@ -27,10 +27,9 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Category>> {
-    let id_str = id.to_string();
     let category = state
         .catalog_service
-        .get_category(&id_str)
+        .get_category(id)
         .ok_or_else(|| AppError::not_found(format!("Category {} not found", id)))?;
     Ok(Json(category))
 }
@@ -53,7 +52,7 @@ pub async fn create(
         state.audit_service,
         AuditAction::CategoryCreated,
         "category", &id,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&category, "category")
     );
@@ -77,19 +76,19 @@ pub async fn update(
     // 查询旧值（用于审计 diff）
     let old_category = state
         .catalog_service
-        .get_category(&id_str)
+        .get_category(id)
         .ok_or_else(|| AppError::not_found(format!("Category {}", id)))?;
 
     let category = state
         .catalog_service
-        .update_category(&id_str, payload)
+        .update_category(id, payload)
         .await?;
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryUpdated,
         "category", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_category, &category, "category")
     );
@@ -110,11 +109,11 @@ pub async fn delete(
     let id_str = id.to_string();
     tracing::info!(id = %id, "Deleting category");
 
-    let name_for_audit = state.catalog_service.get_category(&id_str)
+    let name_for_audit = state.catalog_service.get_category(id)
         .map(|c| c.name.clone()).unwrap_or_default();
     state
         .catalog_service
-        .delete_category(&id_str)
+        .delete_category(id)
         .await
         ?;
 
@@ -122,7 +121,7 @@ pub async fn delete(
         state.audit_service,
         AuditAction::CategoryDeleted,
         "category", &id_str,
-        operator_id = Some(current_user.id.clone()),
+        operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": name_for_audit})
     );
@@ -164,7 +163,6 @@ pub async fn batch_update_sort_order(
     let mut updated_count = 0;
 
     for update in &updates {
-        let id_str = update.id.to_string();
         tracing::debug!(
             id = %update.id,
             sort_order = update.sort_order,
@@ -174,7 +172,7 @@ pub async fn batch_update_sort_order(
         let result = state
             .catalog_service
             .update_category(
-                &id_str,
+                update.id,
                 CategoryUpdate {
                     name: None,
                     sort_order: Some(update.sort_order),
@@ -258,8 +256,7 @@ pub async fn bind_category_attribute(
     .await?;
 
     // Refresh product cache for this category (inherited attributes changed)
-    let category_id_str = category_id.to_string();
-    if let Err(e) = state.catalog_service.refresh_products_in_category(&category_id_str).await {
+    if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
         tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
     }
 
@@ -285,8 +282,7 @@ pub async fn unbind_category_attribute(
 
     // Refresh product cache for this category (inherited attributes changed)
     if deleted {
-        let category_id_str = category_id.to_string();
-        if let Err(e) = state.catalog_service.refresh_products_in_category(&category_id_str).await {
+        if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
             tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
         }
     }

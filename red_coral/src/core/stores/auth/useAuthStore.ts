@@ -167,7 +167,7 @@ export const useAuthStore = create<AuthStore>()(
 
       fetchUsers: async () => {
         const employees = await getApi().listEmployees();
-        return employees.map((e) => ({
+        return employees.map((e): User => ({
           id: e.id,
           username: e.username,
           display_name: e.display_name,
@@ -176,7 +176,8 @@ export const useAuthStore = create<AuthStore>()(
           permissions: [],
           is_active: e.is_active,
           is_system: e.is_system,
-        })) as User[];
+          created_at: 0,
+        }));
       },
 
       createUser: async (data: { username: string; password: string; displayName?: string; role_id: number }) => {

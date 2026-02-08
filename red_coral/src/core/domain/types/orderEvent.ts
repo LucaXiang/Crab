@@ -806,11 +806,11 @@ export interface OrderSnapshot {
 
   // === Order-level Rule Adjustments ===
   /** Order-level rule discount amount */
-  order_rule_discount_amount?: number | null;
+  order_rule_discount_amount: number;
   /** Order-level rule surcharge amount */
-  order_rule_surcharge_amount?: number | null;
+  order_rule_surcharge_amount: number;
   /** Order-level applied rules */
-  order_applied_rules?: AppliedRule[] | null;
+  order_applied_rules: AppliedRule[];
 
   // === Order-level Manual Adjustments ===
   /** Order-level manual discount percentage */
@@ -853,7 +853,7 @@ export interface CartItemSnapshot {
   name: string;
   /** Final price after all discounts */
   price: number;
-  original_price?: number | null;
+  original_price: number;
   quantity: number;
   /** Unpaid quantity (computed by backend: quantity - paid_quantity) */
   unpaid_quantity: number;
@@ -866,21 +866,21 @@ export interface CartItemSnapshot {
 
   // === Rule Adjustments ===
   /** Rule discount amount (calculated from price rules) */
-  rule_discount_amount?: number | null;
+  rule_discount_amount: number;
   /** Rule surcharge amount (calculated from price rules) */
-  rule_surcharge_amount?: number | null;
+  rule_surcharge_amount: number;
   /** Applied price rules list */
-  applied_rules?: AppliedRule[] | null;
+  applied_rules: AppliedRule[];
 
   // === Computed Fields ===
   /** Unit price for display (computed by backend: price with manual discount and rule adjustments) */
-  unit_price?: number | null;
+  unit_price: number;
   /** Line total (computed by backend: unit_price * quantity) */
-  line_total?: number | null;
+  line_total: number;
   /** Tax amount for this item */
-  tax?: number | null;
+  tax: number;
   /** Tax rate percentage (e.g., 21 for 21% IVA) */
-  tax_rate?: number | null;
+  tax_rate: number;
 
   note?: string | null;
   authorizer_id?: number | null;
