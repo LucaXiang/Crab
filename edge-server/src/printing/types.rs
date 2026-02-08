@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrintItemContext {
     // 分类
-    pub category_id: String,
+    pub category_id: i64,
     pub category_name: String,
 
     // 商品
-    pub product_id: String,
+    pub product_id: i64,
     pub external_id: Option<i64>,        // 菜品编号
     pub kitchen_name: String,            // 厨房打印名称
     pub product_name: String,            // 原始商品名

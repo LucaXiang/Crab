@@ -41,7 +41,7 @@ struct AuditRow {
     action: String,
     resource_type: String,
     resource_id: String,
-    operator_id: Option<String>,
+    operator_id: Option<i64>,
     operator_name: Option<String>,
     details: String,
     target: Option<String>,
@@ -61,7 +61,7 @@ impl AuditRow {
             action,
             resource_type: self.resource_type,
             resource_id: self.resource_id,
-            operator_id: self.operator_id.and_then(|s| s.parse::<i64>().ok()),
+            operator_id: self.operator_id,
             operator_name: self.operator_name,
             details,
             target: self.target,
@@ -125,7 +125,6 @@ impl AuditStorage {
 
         // 2. 计算哈希（所有存储字段参与）
         let timestamp = shared::util::now_millis();
-        let operator_id_str = operator_id.map(|id| id.to_string());
         let curr_hash = compute_audit_hash(
             &prev_hash,
             sequence,
@@ -133,7 +132,7 @@ impl AuditStorage {
             &action,
             &resource_type,
             &resource_id,
-            operator_id_str.as_deref(),
+            operator_id,
             operator_name.as_deref(),
             &details,
             target.as_deref(),
@@ -157,7 +156,7 @@ impl AuditStorage {
             action_str,
             resource_type,
             resource_id,
-            operator_id_str,
+            operator_id,
             operator_name,
             details_json,
             target,
@@ -207,7 +206,7 @@ impl AuditStorage {
         }
         if let Some(operator_id) = q.operator_id {
             conditions.push("operator_id = ?");
-            bind_values.push(BindValue::Str(operator_id.to_string()));
+            bind_values.push(BindValue::Int(operator_id));
         }
         if let Some(ref resource_type) = q.resource_type {
             conditions.push("resource_type = ?");
@@ -331,7 +330,7 @@ fn compute_audit_hash(
     action: &AuditAction,
     resource_type: &str,
     resource_id: &str,
-    operator_id: Option<&str>,
+    operator_id: Option<i64>,
     operator_name: Option<&str>,
     details: &serde_json::Value,
     target: Option<&str>,
@@ -357,8 +356,17 @@ fn compute_audit_hash(
     hasher.update(resource_id.as_bytes());
     hasher.update(b"\x00");
 
-    // Optional 字段 — tag byte 区分 None/Some
-    hash_optional(&mut hasher, operator_id);
+    // operator_id — Optional i64, 用 LE 字节序
+    match operator_id {
+        Some(id) => {
+            hasher.update(b"\x01");
+            hasher.update(id.to_le_bytes());
+        }
+        None => {
+            hasher.update(b"\x00");
+        }
+    }
+    hasher.update(b"\x00");
     hash_optional(&mut hasher, operator_name);
 
     // details JSON (规范化)

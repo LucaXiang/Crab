@@ -73,11 +73,10 @@ impl KitchenTicketRenderer {
     ) -> Vec<(String, Vec<&'a PrintItemContext>)> {
         use std::collections::BTreeMap;
 
-        let mut groups: BTreeMap<String, Vec<&PrintItemContext>> = BTreeMap::new();
+        let mut groups: BTreeMap<i64, Vec<&PrintItemContext>> = BTreeMap::new();
 
         for item in items {
-            let key = item.context.category_id.clone();
-            groups.entry(key).or_default().push(&item.context);
+            groups.entry(item.context.category_id).or_default().push(&item.context);
         }
 
         // Convert to vec with category names, sort items by external_id
@@ -216,9 +215,9 @@ mod tests {
             items: vec![
                 KitchenOrderItem {
                     context: PrintItemContext {
-                        category_id: "category:c1".to_string(),
+                        category_id: 1,
                         category_name: "热菜".to_string(),
-                        product_id: "product:p1".to_string(),
+                        product_id: 1,
                         external_id: Some(1),
                         kitchen_name: "宫保鸡丁".to_string(),
                         product_name: "宫保鸡丁".to_string(),
@@ -233,9 +232,9 @@ mod tests {
                 },
                 KitchenOrderItem {
                     context: PrintItemContext {
-                        category_id: "category:c1".to_string(),
+                        category_id: 1,
                         category_name: "热菜".to_string(),
-                        product_id: "product:p2".to_string(),
+                        product_id: 2,
                         external_id: Some(3),
                         kitchen_name: "红烧肉".to_string(),
                         product_name: "红烧肉".to_string(),
@@ -250,9 +249,9 @@ mod tests {
                 },
                 KitchenOrderItem {
                     context: PrintItemContext {
-                        category_id: "category:c2".to_string(),
+                        category_id: 2,
                         category_name: "凉菜".to_string(),
-                        product_id: "product:p3".to_string(),
+                        product_id: 3,
                         external_id: Some(15),
                         kitchen_name: "凉拌黄瓜".to_string(),
                         product_name: "凉拌黄瓜".to_string(),

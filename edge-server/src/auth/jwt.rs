@@ -64,14 +64,14 @@ impl Default for JwtConfig {
 /// 存储在令牌中的 JWT Claims
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    /// 用户 ID (Subject)
+    /// 用户 ID (Subject) — JWT spec requires string
     pub sub: String,
     /// 用户名
     pub username: String,
     /// 显示名称
     pub display_name: String,
     /// 角色 ID
-    pub role_id: String,
+    pub role_id: i64,
     /// 角色名称
     pub role_name: String,
     /// 权限列表 (逗号分隔)
@@ -213,10 +213,10 @@ impl JwtService {
     #[allow(clippy::too_many_arguments)]
     pub fn generate_token(
         &self,
-        user_id: &str,
+        user_id: i64,
         username: &str,
         display_name: &str,
-        role_id: &str,
+        role_id: i64,
         role_name: &str,
         permissions: &[String],
         is_system: bool,
@@ -230,7 +230,7 @@ impl JwtService {
             sub: user_id.to_string(),
             username: username.to_string(),
             display_name: display_name.to_string(),
-            role_id: role_id.to_string(),
+            role_id,
             role_name: role_name.to_string(),
             permissions: permissions_str,
             is_system,
@@ -339,7 +339,7 @@ impl From<Claims> for CurrentUser {
             id: claims.sub.parse::<i64>().unwrap_or(0),
             username: claims.username,
             display_name: claims.display_name,
-            role_id: claims.role_id.parse::<i64>().unwrap_or(0),
+            role_id: claims.role_id,
             role_name: claims.role_name,
             permissions,
             is_system: claims.is_system,
@@ -419,10 +419,10 @@ mod tests {
 
         let token = service
             .generate_token(
-                "user123",
+                123,
                 "john_doe",
                 "John Doe",
-                "role:user",
+                1,
                 "user",
                 &permissions,
                 false,
@@ -433,10 +433,10 @@ mod tests {
             .validate_token(&token)
             .expect("Failed to validate test token");
 
-        assert_eq!(claims.sub, "user123");
+        assert_eq!(claims.sub, "123");
         assert_eq!(claims.username, "john_doe");
         assert_eq!(claims.display_name, "John Doe");
-        assert_eq!(claims.role_id, "role:user");
+        assert_eq!(claims.role_id, 1);
         assert_eq!(claims.role_name, "user");
         assert_eq!(claims.permissions, "products:read,products:write");
         assert!(!claims.is_system);
@@ -499,10 +499,10 @@ mod tests {
 
         let token = service
             .generate_token(
-                "user123",
+                123,
                 "john_doe",
                 "John Doe",
-                "role:user",
+                1,
                 "user",
                 &permissions,
                 false,
@@ -513,10 +513,10 @@ mod tests {
             .validate_token(&token)
             .expect("Failed to validate test token");
 
-        assert_eq!(claims.sub, "user123");
+        assert_eq!(claims.sub, "123");
         assert_eq!(claims.username, "john_doe");
         assert_eq!(claims.display_name, "John Doe");
-        assert_eq!(claims.role_id, "role:user");
+        assert_eq!(claims.role_id, 1);
         assert_eq!(claims.role_name, "user");
         assert_eq!(claims.permissions, "products:read,products:write");
         assert!(!claims.is_system);

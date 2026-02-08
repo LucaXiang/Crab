@@ -80,14 +80,13 @@ pub async fn login(
 
     // Generate JWT token
     let jwt_service = state.get_jwt_service();
-    let user_id = emp.id.to_string();
 
     let token = jwt_service
         .generate_token(
-            &user_id,
+            emp.id,
             &emp.username,
             &emp.display_name,
-            &emp.role_id.to_string(),
+            emp.role_id,
             &role.name,
             &role.permissions,
             emp.is_system,
@@ -96,13 +95,13 @@ pub async fn login(
 
     // Log successful login
     state.audit_service.log(
-        AuditAction::LoginSuccess, "auth", format!("employee:{}", user_id),
+        AuditAction::LoginSuccess, "auth", format!("employee:{}", emp.id),
         Some(emp.id), Some(emp.display_name.clone()),
         serde_json::json!({"username": &emp.username}),
     ).await;
 
     tracing::info!(
-        user_id = %user_id,
+        user_id = %emp.id,
         username = %emp.username,
         role = %role.name,
         "User logged in successfully"

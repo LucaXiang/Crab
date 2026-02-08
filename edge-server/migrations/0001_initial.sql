@@ -594,7 +594,7 @@ CREATE TABLE audit_log (
     action        TEXT    NOT NULL,
     resource_type TEXT    NOT NULL,
     resource_id   TEXT    NOT NULL,
-    operator_id   TEXT,
+    operator_id   INTEGER,
     operator_name TEXT,
     details       TEXT    NOT NULL DEFAULT '{}',  -- JSON object
     target        TEXT,
@@ -606,3 +606,90 @@ CREATE INDEX idx_audit_timestamp ON audit_log(timestamp);
 CREATE INDEX idx_audit_action ON audit_log(action);
 CREATE INDEX idx_audit_operator ON audit_log(operator_id);
 CREATE INDEX idx_audit_resource_type ON audit_log(resource_type);
+
+-- ============================================================
+-- Extra FK Indexes + Safety Constraints
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_employee_role ON employee(role_id);
+CREATE INDEX IF NOT EXISTS idx_attr_binding_attribute ON attribute_binding(attribute_id);
+CREATE INDEX IF NOT EXISTS idx_price_rule_creator ON price_rule(created_by);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_operator_open
+    ON shift(operator_id) WHERE status = 'OPEN';
+
+-- ============================================================
+-- Seed Data
+-- ============================================================
+
+-- Admin role + user (password: 'admin')
+INSERT INTO role (id, name, display_name, description, permissions, is_system, is_active)
+VALUES (1, 'admin', 'admin', 'administrator', '["*"]', 1, 1);
+
+INSERT INTO employee (id, username, hash_pass, display_name, role_id, is_system, is_active, created_at)
+VALUES (1, 'admin', '$argon2id$v=19$m=19456,t=2,p=1$4K7SyBwr5d3uF4hroPQf2w$hPqq7x5rSE1d9TTf+hK3eipuaeeElC7GMHuSJIozDws', 'admin', 1, 1, 1, 0);
+
+-- Store info + system state
+INSERT INTO store_info (id, name, address, nif, business_day_cutoff, created_at, updated_at)
+VALUES (1, '', '', '', '00:00', 0, 0);
+
+INSERT INTO system_state (id, order_count, created_at, updated_at)
+VALUES (1, 0, 0, 0);
+
+-- Zones
+INSERT INTO zone (id, name, description, is_active) VALUES (1, 'Main Hall', 'Main dining area', 1);
+INSERT INTO zone (id, name, description, is_active) VALUES (2, 'Terrace', 'Outdoor terrace', 1);
+INSERT INTO zone (id, name, description, is_active) VALUES (3, 'Bar', 'Bar area', 1);
+
+-- Tables
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (1, '1', 1, 4, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (2, '2', 1, 4, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (3, '3', 1, 6, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (4, '4', 1, 2, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (5, '5', 1, 8, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (6, 'T1', 2, 4, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (7, 'T2', 2, 4, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (8, 'T3', 2, 6, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (9, 'B1', 3, 2, 1);
+INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (10, 'B2', 3, 2, 1);
+
+-- Categories
+INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active) VALUES (1, 'Starters', 1, 1, 0, 1);
+INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active) VALUES (2, 'Main Course', 2, 1, 0, 1);
+INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active) VALUES (3, 'Desserts', 3, 1, 0, 1);
+INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active) VALUES (4, 'Drinks', 4, 0, 0, 1);
+
+-- Products
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (1, 'Garlic Bread', 1, 1, 23, 1, 1);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (2, 'Soup of the Day', 1, 2, 23, 1, 2);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (3, 'Caesar Salad', 1, 3, 23, 1, 3);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (4, 'Grilled Salmon', 2, 1, 23, 1, 10);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (5, 'Beef Steak', 2, 2, 23, 1, 11);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (6, 'Pasta Carbonara', 2, 3, 23, 1, 12);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (7, 'Margherita Pizza', 2, 4, 23, 1, 13);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (8, 'Chicken Curry', 2, 5, 23, 1, 14);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (9, 'Tiramisu', 3, 1, 23, 1, 20);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (10, 'Chocolate Cake', 3, 2, 23, 1, 21);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (11, 'Ice Cream', 3, 3, 23, 1, 22);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (12, 'Espresso', 4, 1, 23, 1, 30);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (13, 'Cappuccino', 4, 2, 23, 1, 31);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (14, 'Orange Juice', 4, 3, 23, 1, 32);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (15, 'Beer', 4, 4, 23, 1, 33);
+INSERT INTO product (id, name, category_id, sort_order, tax_rate, is_active, external_id) VALUES (16, 'Water', 4, 5, 6, 1, 34);
+
+-- Product specs (prices)
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (1, 1, 'default', 4.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (2, 2, 'default', 5.00, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (3, 3, 'default', 7.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (4, 4, 'default', 16.90, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (5, 5, 'default', 22.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (6, 6, 'default', 12.90, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (7, 7, 'default', 10.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (8, 8, 'default', 13.90, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (9, 9, 'default', 6.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (10, 10, 'default', 6.00, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (11, 11, 'default', 4.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (12, 12, 'default', 1.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (13, 13, 'default', 2.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (14, 14, 'default', 3.50, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (15, 15, 'default', 3.00, 1, 1);
+INSERT INTO product_spec (id, product_id, name, price, is_default, is_root) VALUES (16, 16, 'default', 1.50, 1, 1);

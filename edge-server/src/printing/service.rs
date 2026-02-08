@@ -161,9 +161,9 @@ impl KitchenPrintService {
                 .get_category(p.category_id)
                 .map(|c| c.name.clone())
                 .unwrap_or_default();
-            (p.category_id.to_string(), cat_name)
+            (p.category_id, cat_name)
         } else {
-            (String::new(), String::new())
+            (0, String::new())
         };
 
         // Get print config from catalog (with fallback chain)
@@ -216,7 +216,7 @@ impl KitchenPrintService {
         PrintItemContext {
             category_id,
             category_name,
-            product_id: item.id.to_string(),
+            product_id: item.id,
             external_id,
             kitchen_name,
             product_name: item.name.clone(),

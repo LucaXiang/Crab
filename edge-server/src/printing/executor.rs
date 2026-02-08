@@ -250,9 +250,9 @@ mod tests {
             created_at: 1705912335000, // 2024-01-22 14:32:15 UTC (millis)
             items: vec![KitchenOrderItem {
                 context: PrintItemContext {
-                    category_id: "category:c1".to_string(),
+                    category_id: 1,
                     category_name: "热菜".to_string(),
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     external_id: Some(1),
                     kitchen_name: "宫保鸡丁".to_string(),
                     product_name: "宫保鸡丁".to_string(),
