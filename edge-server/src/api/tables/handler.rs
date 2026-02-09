@@ -96,6 +96,14 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
+    // Reject if table has active orders (stored in redb, not SQLite)
+    if let Ok(Some(order_id)) = state.orders_manager.storage().find_active_order_for_table(id) {
+        return Err(AppError::validation(format!(
+            "Cannot delete table: active order {} exists",
+            order_id
+        )));
+    }
+
     let name_for_audit = dining_table::find_by_id(&state.pool, id).await.ok().flatten()
         .map(|t| t.name.clone()).unwrap_or_default();
     let result = dining_table::delete(&state.pool, id).await?;

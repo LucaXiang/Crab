@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE shift SET expected_cash = expected_cash + ?1, last_active_at = ?2, updated_at = ?2 WHERE status = 'OPEN'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "0c0aa8e834de97c741c8d50d183ff7562828e2fd7353be975652f3f8f7f14e26"
+}

@@ -614,8 +614,9 @@ CREATE INDEX idx_audit_resource_type ON audit_log(resource_type);
 CREATE INDEX IF NOT EXISTS idx_employee_role ON employee(role_id);
 CREATE INDEX IF NOT EXISTS idx_attr_binding_attribute ON attribute_binding(attribute_id);
 CREATE INDEX IF NOT EXISTS idx_price_rule_creator ON price_rule(created_by);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_operator_open
-    ON shift(operator_id) WHERE status = 'OPEN';
+-- Global single shift: only one OPEN shift allowed at a time
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_single_open
+    ON shift(status) WHERE status = 'OPEN';
 
 -- ============================================================
 -- Seed Data
