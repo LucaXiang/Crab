@@ -63,7 +63,6 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
     if (!deleteConfirm?.id) return;
     try {
       await getApi().deletePriceRule(deleteConfirm.id);
-      await priceRuleStore.fetchAll(true);
       toast.success(t('settings.price_rule.message.deleted'));
       // Clear selection if deleted rule was selected
       if (selectedRuleId === deleteConfirm.id) {
@@ -82,13 +81,12 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
     setEditingRule(null);
   };
 
-  const handleWizardSuccess = async () => {
-    await priceRuleStore.fetchAll(true);
+  const handleWizardSuccess = () => {
     handleWizardClose();
   };
 
-  const handleRuleUpdated = async () => {
-    await priceRuleStore.fetchAll(true);
+  const handleRuleUpdated = () => {
+    // Sync events will refresh the store automatically
   };
 
   // Empty state
