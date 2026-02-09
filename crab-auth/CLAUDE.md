@@ -34,7 +34,6 @@ cargo build -p crab-auth
 | 变量 | 必须 | 默认值 | 说明 |
 |------|------|--------|------|
 | `DATABASE_URL` | **是** | - | PostgreSQL 连接字符串 |
-| `PORT` | 否 | `3001` | HTTP 监听端口 |
 | `P12_S3_BUCKET` | 否 | `crab-tenant-certificates` | S3 存储桶 |
 | `P12_KMS_KEY_ID` | 否 | - | KMS Key ID (SSE-KMS) |
 
@@ -42,9 +41,9 @@ cargo build -p crab-auth
 
 ```
 src/
-├── main.rs         # 入口 (PG 连接 + 迁移 + AWS SDK 初始化)
+├── main.rs         # Lambda 入口 (PG + 迁移 + AWS SDK + lambda_http)
 ├── config.rs       # Config (从环境变量读取)
-├── state.rs        # AppState (PgPool + CaStore + S3)
+├── state.rs        # AppState (PgPool + CaStore + S3) + CaStore (Secrets Manager)
 ├── api/            # HTTP 路由 (Axum)
 │   ├── mod.rs          # Router 定义
 │   ├── activate.rs     # POST /api/server/activate (设备激活)
@@ -129,9 +128,9 @@ crab-auth (云端, 唯一)          edge-server (餐厅本地, 每店一个)
 - **激活**: 一次性操作（开店/换设备时）
 - **无实时性要求**: 所有调用方都容忍 1-2 秒延迟
 
-### 部署: AWS Lambda + Secrets Manager
+### 部署: AWS Lambda (Function URL / API Gateway)
 
-CA 私钥已迁移到 Secrets Manager，支持纯 serverless 部署:
+已完成 Lambda 原生适配 (`lambda_http`)，无状态 serverless 部署:
 
 | 组件 | 费用 |
 |------|------|

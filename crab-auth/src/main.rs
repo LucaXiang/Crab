@@ -10,28 +10,22 @@ use std::sync::Arc;
 use tracing::info;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), lambda_http::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "crab_auth=info".into()),
         )
+        .without_time() // CloudWatch adds timestamps
         .init();
 
-    if let Err(e) = run().await {
-        tracing::error!(error = %e, "crab-auth failed to start");
-        std::process::exit(1);
-    }
-}
-
-async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     dotenvy::dotenv().ok();
 
     let config = Config::from_env();
 
     // Connect to PostgreSQL
     let pool = PgPoolOptions::new()
-        .max_connections(10)
+        .max_connections(2) // Lambda: one request at a time
         .acquire_timeout(std::time::Duration::from_secs(5))
         .idle_timeout(std::time::Duration::from_secs(600))
         .max_lifetime(std::time::Duration::from_secs(1800))
@@ -40,7 +34,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Connected to PostgreSQL");
 
-    // Run migrations (only activations + p12_certificates — tenants/subscriptions managed externally)
+    // Run migrations (idempotent, fast on warm starts)
     sqlx::migrate!("./migrations").run(&pool).await?;
 
     // Initialize AWS SDK
@@ -63,35 +57,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let app = api::router(state);
 
-    let addr = format!("0.0.0.0:{}", config.port);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    info!(addr = %addr, "crab-auth started");
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-
-    info!("crab-auth stopped");
-    Ok(())
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = tokio::signal::ctrl_c();
-
-    #[cfg(unix)]
-    {
-        let mut sigterm =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .expect("Failed to install SIGTERM handler");
-        tokio::select! {
-            _ = ctrl_c => info!("Received SIGINT"),
-            _ = sigterm.recv() => info!("Received SIGTERM"),
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        ctrl_c.await.ok();
-        info!("Received SIGINT");
-    }
+    info!("crab-auth Lambda handler ready");
+    lambda_http::run(app).await
 }

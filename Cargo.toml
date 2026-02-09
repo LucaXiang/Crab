@@ -115,6 +115,7 @@ aws-config = "1"
 aws-sdk-s3 = "1"
 aws-sdk-kms = "1"
 aws-sdk-secretsmanager = "1"
+lambda_http = "1"
 
 # ========== HTTPS Server ==========
 axum-server = { version = "0.8", features = ["tls-rustls"] }
