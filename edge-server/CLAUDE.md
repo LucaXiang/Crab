@@ -220,6 +220,30 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 - `is_kitchen_print_enabled()` / `is_label_print_enabled()`
 - 在商品/分类更新时自动失效
 
+## 错误处理原则
+
+### 启动阶段 vs 运行时
+
+- **启动阶段** (`ServerState::initialize`): 所有错误返回 `Result`，由调用方决定处理方式（Tauri 返回错误给前端，standalone 退出进程）
+- **运行时** (启动成功后): **不允许存在不可恢复的 panic**。API handlers / Services 必须零 `.unwrap()` / `.expect()`
+- **Background tasks**: 已有 `catch_unwind` 保护，panic 会被捕获并记录日志
+
+### `.expect()` / `.unwrap()` 使用规则
+
+| 场景 | 允许? | 说明 |
+|------|-------|------|
+| 测试代码 (`#[test]`) | ✅ | 测试 panic 是正常行为 |
+| 启动初始化 (一次性) | ❌ | 用 `Result` + `?` |
+| API handler / Service | ❌ | 用 `Result` + `?` |
+| 真不变量 (数学证明安全) | ✅ | 必须附 `// SAFETY:` 注释说明为何不可能失败 |
+
+### 同进程架构 (Server 模式)
+
+edge-server 和 Tauri 前端运行在同一进程。edge-server panic = 整个应用崩溃，无法恢复。因此:
+- ❌ 不需要心跳/健康检查/重连机制
+- ❌ 不需要 panic recovery
+- ✅ 启动前确保一切就绪，启动后不允许 panic
+
 ## 响应语言
 
 使用中文回答。

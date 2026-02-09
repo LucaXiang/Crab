@@ -52,11 +52,8 @@ impl CommandHandler for CancelPaymentAction {
             .ok_or_else(|| OrderError::PaymentNotFound(self.payment_id.clone()))?;
 
         // 4. Check if this is an AA payment that would zero-out AA shares
-        let is_aa_zero_out = payment.split_type == Some(SplitType::AaSplit)
-            && payment.aa_shares.is_some()
-            && {
-                let shares = payment.aa_shares.unwrap();
-                // Calculate remaining after this cancel
+        let is_aa_zero_out =
+            if let (Some(SplitType::AaSplit), Some(shares)) = (&payment.split_type, payment.aa_shares) {
                 let other_active_aa_shares: i32 = snapshot
                     .payments
                     .iter()
@@ -67,8 +64,9 @@ impl CommandHandler for CancelPaymentAction {
                     })
                     .filter_map(|p| p.aa_shares)
                     .sum();
-                // If cancelling this leaves 0 active AA shares
                 other_active_aa_shares == 0 && shares > 0
+            } else {
+                false
             };
 
         let aa_total_for_cancel = snapshot.aa_total_shares;

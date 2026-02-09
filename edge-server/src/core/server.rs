@@ -55,7 +55,7 @@ impl Server {
         // ═══════════════════════════════════════════════════════════════════
         let state = match &self.state {
             Some(s) => s.clone(),
-            None => ServerState::initialize(&self.config).await,
+            None => ServerState::initialize(&self.config).await?,
         };
 
         // ═══════════════════════════════════════════════════════════════════

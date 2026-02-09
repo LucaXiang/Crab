@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&temp_dir)?;
 
     let config = Config::with_overrides(temp_dir.to_string_lossy(), 0, 0);
-    let state = ServerState::initialize(&config).await;
+    let state = ServerState::initialize(&config).await?;
 
     // 启动后台任务 (MessageHandler 等)
     state.start_background_tasks().await;

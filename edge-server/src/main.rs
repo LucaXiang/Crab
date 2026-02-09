@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env();
 
     // 3. 初始化服务器状态
-    let state = ServerState::initialize(&config).await;
+    let state = ServerState::initialize(&config).await?;
 
     // 4. 启动 HTTP 服务器 (Server::run 会自动启动后台任务)
     let server = Server::with_state(config, state);

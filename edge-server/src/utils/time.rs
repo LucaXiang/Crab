@@ -30,7 +30,10 @@ pub fn validate_not_future(date: NaiveDate, tz: Tz) -> AppResult<()> {
 ///
 /// DST gap fallback: 如果本地时间不存在 (夏令时跳跃)，fallback 到 UTC。
 pub fn date_hms_to_millis(date: NaiveDate, hour: u32, min: u32, sec: u32, tz: Tz) -> i64 {
-    let naive = date.and_hms_opt(hour, min, sec).unwrap();
+    let Some(naive) = date.and_hms_opt(hour, min, sec) else {
+        // Invalid h/m/s — fallback to day start in UTC
+        return date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
+    };
     naive
         .and_local_timezone(tz)
         .latest()
