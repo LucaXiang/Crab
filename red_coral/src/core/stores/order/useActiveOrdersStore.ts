@@ -8,7 +8,7 @@
  * - State is updated only through server-computed snapshots (_applyOrderSync, _fullSync)
  * - Client NEVER computes snapshots locally
  * - UI components read state through selectors
- * - Commands are sent via useOrderCommands hook (fire & forget)
+ * - Commands are sent via commands/ module (fire & forget)
  *
  * Event Flow:
  * 1. Server broadcasts OrderEvent with computed snapshot

@@ -9,5 +9,3 @@ export { useHeldOrders, useHeldOrdersCount } from './useActiveOrdersStore';
 // Draft Orders (Local Client State)
 export { useDraftOrders, useDraftOrdersCount } from './useDraftOrderStore';
 
-// Order Commands Hook - Send commands to server
-export { useOrderCommands } from './useOrderCommands';

@@ -127,7 +127,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col md:flex-row overflow-hidden">
+      <div className="bg-gray-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col md:flex-row overflow-hidden">
         {/* Left Panel - Info & Suggestions */}
         <div className="md:w-1/2 p-4 md:p-8 flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white">
           <div className="shrink-0">
@@ -199,11 +199,13 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
             ))}
           </div>
 
-          {/* Cancel Button - mt-auto pushes to bottom to align with confirm button */}
+          {/* Spacer to push cancel button to bottom, aligned with confirm */}
+          <div className="mt-auto" />
+          {/* Cancel Button */}
           <button
             onClick={onCancel}
             disabled={isProcessing}
-            className="mt-auto w-full h-14 md:h-20 bg-gray-100 text-gray-600 text-lg md:text-2xl font-bold hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-4 w-full h-14 md:h-20 bg-gray-100 text-gray-600 text-lg md:text-2xl font-bold hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.action.cancel')}
           </button>

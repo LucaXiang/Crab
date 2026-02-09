@@ -60,7 +60,7 @@ pub async fn run() {
             } else if cfg!(debug_assertions) {
                 EnvFilter::new("info,tao=error,http_access=warn,red_coral=debug,edge_server::orders=debug,edge_server::pricing=debug")
             } else {
-                EnvFilter::new("warn,tao=error,http_access=warn")
+                EnvFilter::new("info,tao=error,http_access=warn")
             };
 
             let file_layer = fmt::layer()

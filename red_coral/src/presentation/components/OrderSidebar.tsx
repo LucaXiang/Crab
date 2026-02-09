@@ -5,7 +5,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
-import * as orderOps from '@/core/stores/order/useOrderOperations';
+import * as orderOps from '@/core/stores/order/commands';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
 import { formatCurrency, Currency } from '@/utils/currency';

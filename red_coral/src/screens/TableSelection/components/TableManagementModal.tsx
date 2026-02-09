@@ -5,8 +5,8 @@ import { Table, Zone, HeldOrder, Permission, AppliedRule } from '@/core/domain/t
 import { useTables } from '@/core/stores/resources';
 import { Currency } from '@/utils/currency';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
-import * as orderOps from '@/core/stores/order/useOrderOperations';
-import { toggleRuleSkip } from '@/core/stores/order/useOrderOperations';
+import * as orderOps from '@/core/stores/order/commands';
+import { toggleRuleSkip } from '@/core/stores/order/commands';
 import { ZoneSidebar } from '../ZoneSidebar';
 import { formatCurrency } from '@/utils/currency';
 import { TableCard } from '../TableCard';

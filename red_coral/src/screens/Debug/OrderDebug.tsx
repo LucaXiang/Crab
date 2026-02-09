@@ -22,7 +22,7 @@ import {
   Hash,
 } from 'lucide-react';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
-import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
+import { voidOrder } from '@/core/stores/order/commands';
 import { invokeApi } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -38,8 +38,6 @@ export const OrderDebug: React.FC = () => {
     type: 'reset' | 'voidAll';
     isOpen: boolean;
   }>({ type: 'reset', isOpen: false });
-  const { voidOrder } = useOrderCommands();
-
   // 获取 store 状态 - 使用 useShallow 避免不必要的重渲染
   const { ordersMap, timelines, lastSequence, connectionState, isInitialized, serverEpoch } =
     useActiveOrdersStore(useShallow((state) => ({
@@ -123,12 +121,8 @@ export const OrderDebug: React.FC = () => {
 
     for (const order of activeOrders) {
       try {
-        const response = await voidOrder(order.order_id, { voidType: 'CANCELLED', note: 'Debug: Batch void' });
-        if (response.success) {
-          successCount++;
-        } else {
-          failCount++;
-        }
+        await voidOrder(order.order_id, { voidType: 'CANCELLED', note: 'Debug: Batch void' });
+        successCount++;
       } catch {
         failCount++;
       }

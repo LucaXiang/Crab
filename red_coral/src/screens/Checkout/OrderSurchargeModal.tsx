@@ -4,7 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { X, TrendingUp, Percent, Tag } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
-import { applyOrderSurcharge } from '@/core/stores/order/useOrderOperations';
+import { applyOrderSurcharge } from '@/core/stores/order/commands';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { Numpad } from '@/presentation/components/ui/Numpad';

@@ -4,8 +4,8 @@ import { CartItem, HeldOrder, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
-import * as orderOps from '@/core/stores/order/useOrderOperations';
-import type { VoidOrderOptions } from '@/core/stores/order/useOrderOperations';
+import * as orderOps from '@/core/stores/order/commands';
+import type { VoidOrderOptions } from '@/core/stores/order/commands';
 
 import { toast } from '@/presentation/components/Toast';
 import {
@@ -19,7 +19,6 @@ interface UseOrderHandlersParams {
     table: Table,
     guestCount: number,
     cart: CartItem[],
-    totalAmount: number,
     zone?: Zone
   ) => Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'>;
   voidOrder: (orderId: string, options?: VoidOrderOptions) => Promise<void>;
@@ -45,14 +44,13 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
       guestCount: number,
       zone?: Zone
     ) => {
-      const { cart, totalAmount } = useCartStore.getState();
+      const { cart } = useCartStore.getState();
 
       try {
         const result = await handleTableSelectStore(
           table,
           guestCount,
           cart,
-          totalAmount,
           zone
         );
 

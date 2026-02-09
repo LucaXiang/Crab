@@ -14,7 +14,7 @@ import { HeldOrder, User } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useConfirm } from '@/hooks/useConfirm';
 import { PaymentFlow } from './payment/PaymentFlow';
-import { useOrderCommands } from '@/core/stores/order';
+import { voidOrder } from '@/core/stores/order/commands';
 import { VoidReasonModal, VoidOrderOptions } from './VoidReasonModal';
 import { SupervisorAuthModal } from '@/presentation/components/auth/SupervisorAuthModal';
 import { usePermission } from '@/hooks/usePermission';
@@ -42,7 +42,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 }) => {
   const { t } = useI18n();
   const { dialogProps } = useConfirm();
-  const { voidOrder } = useOrderCommands();
   const { hasPermission } = usePermission();
   const { setCheckoutOrder } = useCheckoutActions();
   
@@ -102,22 +101,17 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       propOnVoid(options);
       setIsVoidModalOpen(false);
     } else {
-      const orderKey = order.order_id;
-
-      // Execute async command
-      const response = await voidOrder(orderKey, options);
-
-      if (!response.success) {
-        logger.error('Void order failed', response.error);
-        toast.error(getErrorMessage(response.error));
+      try {
+        await voidOrder(order.order_id, options);
         setIsVoidModalOpen(false);
-        return;
+        onCancel();
+      } catch (error) {
+        logger.error('Void order failed', error);
+        toast.error(getErrorMessage(error));
+        setIsVoidModalOpen(false);
       }
-
-      setIsVoidModalOpen(false);
-      onCancel();
     }
-  }, [propOnVoid, voidOrder, order, onCancel]);
+  }, [propOnVoid, order, onCancel]);
 
   /**
    * 确认作废订单
