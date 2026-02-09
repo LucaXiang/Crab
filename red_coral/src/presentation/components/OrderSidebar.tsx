@@ -73,8 +73,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   // Use server-provided financial totals (authoritative)
   const displayOriginalPrice = order.original_total;
   // Combined item+orderRule discount/surcharge (excluding order manual)
-  const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
-  const displayItemSurcharge = order.total_surcharge - order.order_manual_surcharge_amount;
+  const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
+  const displayItemSurcharge = Currency.sub(order.total_surcharge, order.order_manual_surcharge_amount).toNumber();
 
   // Split: rule discount/surcharge (item-level + order-level rules)
   const itemRuleDiscount = order.items

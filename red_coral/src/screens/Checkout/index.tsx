@@ -8,7 +8,7 @@
  * 4. 处理订单作废
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 import { HeldOrder, User } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
@@ -53,15 +53,9 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   // Local state for modified order (for discounts and item edits)
   const [localOrder, setLocalOrder] = useState<HeldOrder>(order);
 
-  // 计算已付金额和未付金额
-  const { paidAmount, unpaidAmount } = useMemo(() => {
-    const paid = localOrder.paid_amount ?? 0;
-    const total = localOrder.total ?? 0;
-    return {
-      paidAmount: paid,
-      unpaidAmount: Math.max(0, total - paid),
-    };
-  }, [localOrder.paid_amount, localOrder.total]);
+  // 服务端权威值
+  const paidAmount = localOrder.paid_amount ?? 0;
+  const unpaidAmount = localOrder.remaining_amount ?? 0;
 
   // Keep localOrder in sync when the incoming order prop changes (e.g., after merge/move)
   useEffect(() => {

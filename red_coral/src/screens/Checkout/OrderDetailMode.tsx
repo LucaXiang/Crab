@@ -96,7 +96,7 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
   };
 
   // Price breakdown (same logic as OrderSidebar)
-  const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
+  const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
 
   // Split: rule vs manual
   const itemRuleDiscount = order.items

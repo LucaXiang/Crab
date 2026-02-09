@@ -467,6 +467,8 @@
     "table_order": "桌台订单",
     "retail_order": "零售订单",
     "order_completed": "订单完成",
+    "complete_order": "完结订单",
+    "complete_order_confirm": "确认完结此订单？已付金额已覆盖订单总额。",
     "payment": {
       "confirm": "确认支付",
       "failed": "支付失败",

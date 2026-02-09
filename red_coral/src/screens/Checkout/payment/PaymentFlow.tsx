@@ -46,10 +46,10 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const serviceType = useRetailServiceType();
   const { cancelPayment } = useOrderCommands();
 
-  // Calculate payment state from order (server state)
+  // Server-authoritative payment state
   const totalPaid = order.paid_amount;
-  const remaining = Math.max(0, Currency.sub(order.total, totalPaid).toNumber());
-  const isPaidInFull = remaining === 0;
+  const remaining = order.remaining_amount;
+  const isPaidInFull = remaining <= 0;
 
   // Get active (non-cancelled) payments
   const activePayments = useMemo(() => {
@@ -220,6 +220,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
   // Retail order cancel confirmation
   const [showRetailCancelConfirm, setShowRetailCancelConfirm] = useState(false);
+  // Manual complete confirmation
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
 
   // Order adjustment modals
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -243,6 +245,24 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       onCancel?.();
     }
   }, [order.is_retail, onCancel]);
+
+  const handleManualComplete = useCallback(async () => {
+    setIsProcessing(true);
+    try {
+      await completeOrder(order.order_id, [], order.is_retail ? toBackendServiceType(serviceType) : null);
+      setSuccessModal({
+        isOpen: true,
+        type: 'NORMAL',
+        onClose: handleComplete,
+        autoCloseDelay: order.is_retail ? 0 : 5000,
+      });
+    } catch (error) {
+      logger.error('Manual complete failed', error);
+      toast.error(t('checkout.payment.failed'));
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [order, handleComplete, serviceType, t]);
 
   /**
    * 打开取消支付确认对话框
@@ -454,7 +474,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
-            change: cashDetails.tendered - total,
+            change: Currency.sub(cashDetails.tendered, total).toNumber(),
             onClose: willComplete ? handleComplete : () => setSuccessModal(null),
             autoCloseDelay: willComplete && order.is_retail ? 0 : 10000,
           });
@@ -509,7 +529,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         return false;
       }
 
-      if (amount > remaining + 0.01) {
+      if (Currency.sub(amount, remaining).toNumber() > 0.01) {
         toast.error(t('checkout.amount_split.exceeds_remaining'));
         return false;
       }
@@ -551,7 +571,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
-            change: cashDetails.tendered - amount,
+            change: Currency.sub(cashDetails.tendered, amount).toNumber(),
             onClose: willComplete ? handleComplete : () => setSuccessModal(null),
             autoCloseDelay: willComplete && order.is_retail ? 0 : 10000,
           });
@@ -609,9 +629,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     (Object.entries(splitItems) as [string, number][]).forEach(([instanceId, qty]) => {
       const item = order.items.find(i => i.instance_id === instanceId);
       if (item) {
-        // Use server-authoritative unit_price
-        const unitPrice = item.unit_price;
-        total += unitPrice * qty;
+        total = Currency.add(total, Currency.mul(item.unit_price, qty)).toNumber();
       }
     });
     return total;
@@ -975,13 +993,12 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     // Calculate Share Stats - use server AA state when locked
     const totalShares = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 1);
     const paidSharesExact = isAALocked ? (order.aa_paid_shares ?? 0) : (() => {
-      const sharePrice = order.total / totalShares;
-      const paidAmount = order.total - remaining;
-      return Math.abs(sharePrice) < 0.01 ? 0 : paidAmount / sharePrice;
+      const sharePrice = Currency.div(order.total, totalShares).toNumber();
+      return Math.abs(sharePrice) < 0.01 ? 0 : Currency.div(order.paid_amount, sharePrice).toNumber();
     })();
     const remainingSharesExact = isAALocked ? (totalShares - paidSharesExact) : (() => {
-      const sharePrice = order.total / totalShares;
-      return Math.abs(sharePrice) < 0.01 ? 0 : remaining / sharePrice;
+      const sharePrice = Currency.div(order.total, totalShares).toNumber();
+      return Math.abs(sharePrice) < 0.01 ? 0 : Currency.div(remaining, sharePrice).toNumber();
     })();
 
     // Helper to format shares (e.g. 1, 1.5, 0.3)
@@ -1310,6 +1327,12 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                     {t('checkout.pre_payment.receipt')}
                   </button>
                 )}
+                {isPaidInFull && (
+                  <button onClick={() => setShowCompleteConfirm(true)} disabled={isProcessing} className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <Check size={20} />
+                    {t('checkout.complete_order')}
+                  </button>
+                )}
                 {onVoid && !order.is_retail && (
                   <EscalatableGate
                     permission={Permission.ORDERS_VOID}
@@ -1622,6 +1645,19 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         onConfirm={handleConfirmCancelPayment}
         onCancel={() => setCancelConfirm(null)}
         variant="danger"
+      />
+
+      {/* Manual Complete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showCompleteConfirm}
+        title={t('checkout.complete_order')}
+        description={t('checkout.complete_order_confirm')}
+        confirmText={t('checkout.complete_order')}
+        onConfirm={() => {
+          setShowCompleteConfirm(false);
+          handleManualComplete();
+        }}
+        onCancel={() => setShowCompleteConfirm(false)}
       />
 
       {/* Retail Order Cancel Confirmation Dialog */}

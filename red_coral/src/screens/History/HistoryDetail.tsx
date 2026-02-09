@@ -211,7 +211,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 </div>
               )}
               {(() => {
-                const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
+                const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
                 const itemRuleDiscount = order.items.reduce((sum, item) => Currency.add(sum, item.rule_discount_amount).toNumber(), 0);
                 const itemRuleSurcharge = order.items.reduce((sum, item) => Currency.add(sum, item.rule_surcharge_amount).toNumber(), 0);
                 const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
