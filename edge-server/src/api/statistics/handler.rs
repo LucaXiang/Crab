@@ -224,12 +224,12 @@ pub async fn get_statistics(
     // Overview: single aggregate query (was 7 separate queries)
     let (revenue, total_orders, total_customers, voided_orders, voided_amount, total_discount, avg_dining_time): (f64, i32, i32, i32, f64, f64, Option<f64>) = sqlx::query_as(
         "SELECT \
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0.0 END), 0.0), \
             CAST(COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) AS INTEGER), \
             CAST(COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN guest_count ELSE 0 END), 0) AS INTEGER), \
             CAST(COUNT(CASE WHEN status = 'VOID' THEN 1 END) AS INTEGER), \
-            COALESCE(SUM(CASE WHEN status = 'VOID' THEN total_amount ELSE 0 END), 0), \
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN discount_amount ELSE 0 END), 0), \
+            COALESCE(SUM(CASE WHEN status = 'VOID' THEN total_amount ELSE 0.0 END), 0.0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN discount_amount ELSE 0.0 END), 0.0), \
             AVG(CASE WHEN status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL \
                 THEN CAST((end_time - start_time) AS REAL) / 60000.0 END) \
          FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
@@ -243,8 +243,8 @@ pub async fn get_statistics(
     // Payment breakdown: single query (was 2 separate queries)
     let (cash_revenue, card_revenue): (f64, f64) = sqlx::query_as(
         "SELECT \
-            COALESCE(SUM(CASE WHEN p.method = 'CASH' THEN p.amount ELSE 0 END), 0), \
-            COALESCE(SUM(CASE WHEN p.method = 'CARD' THEN p.amount ELSE 0 END), 0) \
+            COALESCE(SUM(CASE WHEN p.method = 'CASH' THEN p.amount ELSE 0.0 END), 0.0), \
+            COALESCE(SUM(CASE WHEN p.method = 'CARD' THEN p.amount ELSE 0.0 END), 0.0) \
          FROM archived_order_payment p \
          JOIN archived_order o ON p.order_pk = o.id \
          WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0",
@@ -273,7 +273,7 @@ pub async fn get_statistics(
     let revenue_trend = if query.time_range == "today" {
         // Hourly trend
         let rows: Vec<(String, f64)> = sqlx::query_as(
-            "SELECT PRINTF('%02d:00', (end_time / 1000 / 3600) % 24) AS time, COALESCE(SUM(total_amount), 0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
+            "SELECT PRINTF('%02d:00', (end_time / 1000 / 3600) % 24) AS time, COALESCE(SUM(total_amount), 0.0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
         )
         .bind(start_dt).bind(end_dt)
         .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
@@ -282,7 +282,7 @@ pub async fn get_statistics(
     } else {
         // Daily trend
         let rows: Vec<(String, f64)> = sqlx::query_as(
-            "SELECT STRFTIME('%m-%d', end_time / 1000, 'unixepoch') AS time, COALESCE(SUM(total_amount), 0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
+            "SELECT STRFTIME('%m-%d', end_time / 1000, 'unixepoch') AS time, COALESCE(SUM(total_amount), 0.0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
         )
         .bind(start_dt).bind(end_dt)
         .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
@@ -292,7 +292,7 @@ pub async fn get_statistics(
 
     // Category sales from archived_order_item
     let category_raw: Vec<(Option<String>, f64)> = sqlx::query_as(
-        "SELECT COALESCE(i.category_name, 'Unknown') AS name, COALESCE(SUM(i.line_total), 0) AS value FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY name ORDER BY value DESC LIMIT 10",
+        "SELECT COALESCE(i.category_name, 'Unknown') AS name, COALESCE(SUM(i.line_total), 0.0) AS value FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY name ORDER BY value DESC LIMIT 10",
     )
     .bind(start_dt).bind(end_dt)
     .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;

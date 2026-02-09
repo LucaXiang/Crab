@@ -176,7 +176,7 @@ pub async fn generate(
 
     // Tax breakdown by rate (use subquery directly — both strings are compile-time constants)
     let tax_rows: Vec<(i32, f64, f64, f64, i64)> = sqlx::query_as(
-        "SELECT tax_rate, COALESCE(SUM(quantity * unit_price), 0), COALESCE(SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0), COALESCE(SUM(quantity * unit_price) - SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0), COUNT(DISTINCT order_pk) FROM archived_order_item WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') GROUP BY tax_rate ORDER BY tax_rate DESC",
+        "SELECT tax_rate, COALESCE(SUM(quantity * unit_price), 0.0), COALESCE(SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0.0), COALESCE(SUM(quantity * unit_price) - SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0.0), COUNT(DISTINCT order_pk) FROM archived_order_item WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') GROUP BY tax_rate ORDER BY tax_rate DESC",
     )
     .bind(start_millis)
     .bind(end_millis)
@@ -199,7 +199,7 @@ pub async fn generate(
 
     // Payment breakdown by method
     let payment_rows: Vec<(String, f64, i64)> = sqlx::query_as(
-        "SELECT method, COALESCE(SUM(amount), 0), COUNT(*) FROM archived_order_payment WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') AND cancelled = 0 GROUP BY method",
+        "SELECT method, COALESCE(SUM(amount), 0.0), COUNT(*) FROM archived_order_payment WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') AND cancelled = 0 GROUP BY method",
     )
     .bind(start_millis)
     .bind(end_millis)
