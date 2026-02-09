@@ -8,17 +8,9 @@ impl ClientBridge {
         let config = self.config.read().await;
         let mode = config.current_mode;
         let client_config = config.client_config.clone();
-        let current_tenant = config.current_tenant.clone();
         drop(config);
 
-        // 恢复租户选择
-        if let Some(tenant_id) = current_tenant {
-            tracing::info!("Restoring tenant selection: {}", tenant_id);
-            let mut tm = self.tenant_manager.write().await;
-            if let Err(e) = tm.switch_tenant(&tenant_id) {
-                tracing::warn!("Failed to restore tenant {}: {}", tenant_id, e);
-            }
-        }
+        // 注: 租户选择已在构造函数中同步恢复（确保 get_app_state 立即可用）
 
         let result = match mode {
             ModeType::Server => {
@@ -101,7 +93,9 @@ impl ClientBridge {
             .auth_server_url(auth_url)
             .build();
 
-        let server_state = edge_server::ServerState::initialize(&edge_config).await;
+        let server_state = edge_server::ServerState::initialize(&edge_config)
+            .await
+            .map_err(|e| BridgeError::Server(format!("Edge server initialization failed: {e}")))?;
 
         let server_instance =
             edge_server::Server::with_state(edge_config.clone(), server_state.clone());

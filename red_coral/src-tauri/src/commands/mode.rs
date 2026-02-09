@@ -4,7 +4,16 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::response::{ApiResponse, AppConfigResponse, ErrorCode};
+use crate::core::bridge::InitStatus;
 use crate::core::{AppState, ClientBridge, ModeInfo, ModeType, ServerModeConfig};
+
+/// 查询后端初始化状态 (先于 get_app_state 调用)
+#[tauri::command]
+pub fn get_init_status(
+    bridge: State<'_, Arc<ClientBridge>>,
+) -> Result<ApiResponse<InitStatus>, String> {
+    Ok(ApiResponse::success(bridge.get_init_status()))
+}
 
 /// 获取应用状态 (用于前端路由守卫)
 ///

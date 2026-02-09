@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tracing_appender::rolling;
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -115,12 +115,20 @@ pub async fn run() {
 
             let bridge = Arc::new(bridge);
 
-            // Auto-restore session in background
+            // Auto-restore session in background, notify frontend when done
             let bridge_for_task = bridge.clone();
+            let handle_for_task = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = bridge_for_task.restore_last_session().await {
-                    tracing::error!("Failed to restore session: {}", e);
-                }
+                let error = match bridge_for_task.restore_last_session().await {
+                    Ok(()) => None,
+                    Err(e) => {
+                        tracing::error!("Failed to restore session: {}", e);
+                        Some(e.to_string())
+                    }
+                };
+                // 存储结果（可查询），同时发送事件（通知等待中的前端）
+                bridge_for_task.mark_initialized(error.clone());
+                let _ = handle_for_task.emit("backend-ready", error);
             });
 
             app.manage(bridge.clone());
@@ -146,6 +154,7 @@ pub async fn run() {
             commands::api_delete,
             // Mode commands
             commands::check_first_run,
+            commands::get_init_status,
             commands::get_app_state,
             commands::get_mode_info,
             commands::get_current_mode_type,

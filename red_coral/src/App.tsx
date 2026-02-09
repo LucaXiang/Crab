@@ -7,6 +7,7 @@ import { useSyncListener, useOrderEventListener, useOrderTimelineSync, useSyncCo
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { t } from '@/infrastructure/i18n';
+import { invokeApi } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
 
 // Components
@@ -50,10 +51,36 @@ const useAppInitialization = () => {
   const init = async () => {
     setError(null);
     try {
-      // 1. 获取租户列表
-      await fetchTenants();
+      // 1. 查询后端初始化状态（可查询，无竞态）
+      const initStatus = await invokeApi<{ ready: boolean; error: string | null }>('get_init_status');
 
-      // 2. 获取当前应用状态
+      if (initStatus.ready) {
+        // 后端已完成初始化（F5 刷新 / Disconnected 模式瞬间完成）
+        if (initStatus.error) {
+          setError(initStatus.error);
+          return;
+        }
+      } else {
+        // 后端还在启动，等待 backend-ready 事件
+        const backendError = await new Promise<string | null>((resolve) => {
+          const timeout = setTimeout(() => resolve(null), 30000);
+          listen<string | null>('backend-ready', (event) => {
+            clearTimeout(timeout);
+            resolve(event.payload);
+          }).catch(() => {
+            clearTimeout(timeout);
+            resolve(null);
+          });
+        });
+
+        if (backendError) {
+          setError(backendError);
+          return;
+        }
+      }
+
+      // 2. 后端就绪，获取租户列表和应用状态
+      await fetchTenants();
       await fetchAppState();
 
       // 3. 尝试恢复缓存的员工会话 (从后端获取)
@@ -61,7 +88,6 @@ const useAppInitialization = () => {
       if (currentAppState?.type === 'ServerAuthenticated' || currentAppState?.type === 'ClientAuthenticated') {
         const session = await fetchCurrentSession();
         if (session) {
-          // 后端有有效 session，同步到 auth store
           const user = {
             id: session.user_info.id,
             username: session.user_info.username,
@@ -75,11 +101,9 @@ const useAppInitialization = () => {
           };
           useAuthStore.getState().setUser(user);
         } else {
-          // 后端无 session，清除前端 auth 状态
           useAuthStore.getState().logout();
         }
       } else {
-        // 后端未认证，确保前端 auth 状态也清除
         useAuthStore.getState().logout();
       }
 
@@ -92,7 +116,7 @@ const useAppInitialization = () => {
 
   useEffect(() => {
     init();
-  }, [fetchTenants, fetchAppState, fetchCurrentSession]);
+  }, []);
 
   return { isInitialized, error, retry: init };
 };

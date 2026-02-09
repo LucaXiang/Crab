@@ -23,7 +23,7 @@ pub use types::{AppState, ModeInfo, ModeType};
 pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tauri::Emitter;
 use tokio::sync::RwLock;
 
@@ -32,6 +32,15 @@ use shared::activation::SubscriptionStatus;
 use shared::app_state::{ActivationRequiredReason, ClockDirection};
 use shared::order::{CommandResponse, OrderCommand, OrderCommandPayload, OrderEvent, OrderSnapshot, SyncResponse};
 use super::tenant_manager::{TenantError, TenantManager};
+
+/// 后端初始化状态 (restore_last_session 的结果)
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InitStatus {
+    /// 是否已完成初始化
+    pub ready: bool,
+    /// 初始化错误 (None = 成功)
+    pub error: Option<String>,
+}
 
 /// 客户端桥接层
 pub struct ClientBridge {
@@ -45,6 +54,8 @@ pub struct ClientBridge {
     config_path: PathBuf,
     /// Tauri AppHandle for emitting events (optional for testing)
     app_handle: Option<tauri::AppHandle>,
+    /// 后端初始化结果 (OnceLock: 只写一次，之后可查询)
+    init_error: OnceLock<Option<String>>,
 }
 
 impl ClientBridge {
@@ -69,18 +80,39 @@ impl ClientBridge {
         let mut tenant_manager = TenantManager::new(&tenants_path, client_name);
         tenant_manager.load_existing_tenants()?;
 
+        // 立即恢复租户选择（同步操作），确保 get_app_state 不会错误返回 ServerNoTenant
+        if let Some(ref tenant_id) = config.current_tenant {
+            if let Err(e) = tenant_manager.switch_tenant(tenant_id) {
+                tracing::warn!("Failed to restore tenant {}: {}", tenant_id, e);
+            }
+        }
+
         Ok(Self {
             tenant_manager: Arc::new(RwLock::new(tenant_manager)),
             mode: RwLock::new(ClientMode::Disconnected),
             config: RwLock::new(config),
             config_path,
             app_handle,
+            init_error: OnceLock::new(),
         })
     }
 
     /// Set the app handle after initialization
     pub fn set_app_handle(&mut self, handle: tauri::AppHandle) {
         self.app_handle = Some(handle);
+    }
+
+    /// 查询后端初始化状态
+    pub fn get_init_status(&self) -> InitStatus {
+        match self.init_error.get() {
+            Some(err) => InitStatus { ready: true, error: err.clone() },
+            None => InitStatus { ready: false, error: None },
+        }
+    }
+
+    /// 标记初始化完成 (由 restore_last_session 调用)
+    pub(crate) fn mark_initialized(&self, error: Option<String>) {
+        let _ = self.init_error.set(error);
     }
 
     /// 保存当前配置
