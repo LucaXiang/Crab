@@ -23,7 +23,7 @@ pub use types::{AppState, ModeInfo, ModeType};
 pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
 
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::sync::RwLock;
 
@@ -33,7 +33,17 @@ use shared::app_state::{ActivationRequiredReason, ClockDirection};
 use shared::order::{CommandResponse, OrderCommand, OrderCommandPayload, OrderEvent, OrderSnapshot, SyncResponse};
 use super::tenant_manager::{TenantError, TenantManager};
 
-/// 后端初始化状态 (restore_last_session 的结果)
+/// 后端初始化内部状态
+enum InitState {
+    /// 正在初始化 (restore_last_session 还在跑)
+    Pending,
+    /// 初始化成功
+    Ok,
+    /// 初始化失败
+    Failed(String),
+}
+
+/// 后端初始化状态 (前端可查询)
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct InitStatus {
     /// 是否已完成初始化
@@ -54,8 +64,8 @@ pub struct ClientBridge {
     config_path: PathBuf,
     /// Tauri AppHandle for emitting events (optional for testing)
     app_handle: Option<tauri::AppHandle>,
-    /// 后端初始化结果 (OnceLock: 只写一次，之后可查询)
-    init_error: OnceLock<Option<String>>,
+    /// 后端初始化状态 (可重置，支持 retry)
+    init_state: Mutex<InitState>,
 }
 
 impl ClientBridge {
@@ -93,7 +103,7 @@ impl ClientBridge {
             config: RwLock::new(config),
             config_path,
             app_handle,
-            init_error: OnceLock::new(),
+            init_state: Mutex::new(InitState::Pending),
         })
     }
 
@@ -104,15 +114,27 @@ impl ClientBridge {
 
     /// 查询后端初始化状态
     pub fn get_init_status(&self) -> InitStatus {
-        match self.init_error.get() {
-            Some(err) => InitStatus { ready: true, error: err.clone() },
-            None => InitStatus { ready: false, error: None },
+        let state = self.init_state.lock().unwrap();
+        match &*state {
+            InitState::Pending => InitStatus { ready: false, error: None },
+            InitState::Ok => InitStatus { ready: true, error: None },
+            InitState::Failed(e) => InitStatus { ready: true, error: Some(e.clone()) },
         }
     }
 
-    /// 标记初始化完成 (由 restore_last_session 调用)
+    /// 标记初始化完成
     pub(crate) fn mark_initialized(&self, error: Option<String>) {
-        let _ = self.init_error.set(error);
+        let mut state = self.init_state.lock().unwrap();
+        *state = match error {
+            None => InitState::Ok,
+            Some(e) => InitState::Failed(e),
+        };
+    }
+
+    /// 重置初始化状态为 Pending (retry 前调用)
+    pub(crate) fn reset_init_state(&self) {
+        let mut state = self.init_state.lock().unwrap();
+        *state = InitState::Pending;
     }
 
     /// 保存当前配置

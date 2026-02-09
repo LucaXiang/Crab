@@ -48,9 +48,14 @@ const useAppInitialization = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const init = async () => {
+  const init = async (isRetry = false) => {
     setError(null);
     try {
+      // 重试时先通知后端重新执行 restore_last_session
+      if (isRetry) {
+        await invokeApi('retry_init');
+      }
+
       // 1. 查询后端初始化状态（可查询，无竞态）
       const initStatus = await invokeApi<{ ready: boolean; error: string | null }>('get_init_status');
 
@@ -118,7 +123,7 @@ const useAppInitialization = () => {
     init();
   }, []);
 
-  return { isInitialized, error, retry: init };
+  return { isInitialized, error, retry: () => init(true) };
 };
 
 // Initial route component - 已初始化完成，只做路由决策

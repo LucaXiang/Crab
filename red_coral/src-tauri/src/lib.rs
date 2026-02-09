@@ -155,6 +155,7 @@ pub async fn run() {
             // Mode commands
             commands::check_first_run,
             commands::get_init_status,
+            commands::retry_init,
             commands::get_app_state,
             commands::get_mode_info,
             commands::get_current_mode_type,

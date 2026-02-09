@@ -1,7 +1,7 @@
 //! 模式管理命令
 
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Emitter, State};
 
 use crate::core::response::{ApiResponse, AppConfigResponse, ErrorCode};
 use crate::core::bridge::InitStatus;
@@ -13,6 +13,34 @@ pub fn get_init_status(
     bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<InitStatus>, String> {
     Ok(ApiResponse::success(bridge.get_init_status()))
+}
+
+/// 重试后端初始化 (前端点击重试按钮时调用)
+///
+/// 1. 重置 init_state 为 Pending
+/// 2. 重新 spawn restore_last_session
+/// 3. 完成后存储结果 + 发送 backend-ready 事件
+#[tauri::command]
+pub async fn retry_init(
+    bridge: State<'_, Arc<ClientBridge>>,
+    app_handle: tauri::AppHandle,
+) -> Result<ApiResponse<()>, String> {
+    bridge.reset_init_state();
+
+    let bridge_arc = (*bridge).clone();
+    tauri::async_runtime::spawn(async move {
+        let error = match bridge_arc.restore_last_session().await {
+            Ok(()) => None,
+            Err(e) => {
+                tracing::error!("Retry restore_last_session failed: {}", e);
+                Some(e.to_string())
+            }
+        };
+        bridge_arc.mark_initialized(error.clone());
+        let _ = app_handle.emit("backend-ready", error);
+    });
+
+    Ok(ApiResponse::success(()))
 }
 
 /// 获取应用状态 (用于前端路由守卫)
