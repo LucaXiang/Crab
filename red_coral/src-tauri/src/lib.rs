@@ -53,7 +53,7 @@ pub async fn run() {
                 .map_err(|e| format!("Failed to create logs directory: {}", e))?;
 
             let file_appender = rolling::daily(&log_dir, "redcoral-pos.log");
-            let (non_blocking_file, _guard) = tracing_appender::non_blocking(file_appender);
+            let (non_blocking_file, log_guard) = tracing_appender::non_blocking(file_appender);
 
             let env_filter = if let Ok(from_env) = EnvFilter::try_from_default_env() {
                 from_env
@@ -93,6 +93,11 @@ pub async fn run() {
                 let msg = info.to_string();
                 tracing::error!(target: "panic", message = %msg, backtrace = %backtrace, "APPLICATION PANIC");
             }));
+
+            // Keep the log guard alive for the app's lifetime.
+            // Without this, the non-blocking writer thread stops when setup() returns,
+            // silently dropping ALL subsequent log output.
+            app.manage(std::sync::Mutex::new(log_guard));
 
             tracing::info!(path = log_dir.display().to_string(), "Tracing initialized successfully");
 

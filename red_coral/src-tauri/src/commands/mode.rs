@@ -30,11 +30,20 @@ pub async fn get_mode_info(
 pub async fn start_server_mode(
     bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<()>, String> {
-    match bridge.start_server_mode().await {
-        Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        bridge.start_server_mode(),
+    )
+    .await
+    {
+        Ok(Ok(_)) => Ok(ApiResponse::success(())),
+        Ok(Err(e)) => Ok(ApiResponse::error_with_code(
             ErrorCode::InternalError,
             e.to_string(),
+        )),
+        Err(_) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
+            "Server startup timed out (30s). Check logs for details.",
         )),
     }
 }

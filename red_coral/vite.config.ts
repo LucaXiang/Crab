@@ -57,9 +57,8 @@ export default defineConfig(({ mode }) => {
         minify: isProduction ? 'terser' : false,
         terserOptions: isProduction ? {
           compress: {
-            drop_console: true,        // 移除console.log
             drop_debugger: true,       // 移除debugger
-            pure_funcs: ['console.log', 'console.info'], // 移除特定函数调用
+            pure_funcs: ['console.log', 'console.info', 'console.debug'], // 移除调试日志，保留 warn/error
           },
           format: {
             comments: false,           // 移除注释

@@ -37,15 +37,8 @@ impl Default for JwtConfig {
                     .unwrap_or_else(|_| "emergency-fallback-key-must-be-replaced".to_string())
             }),
             Err(e) => {
-                #[cfg(debug_assertions)]
-                {
-                    tracing::warn!("JWT configuration error: {}, using emergency key", e);
-                    "emergency-fallback-key-must-be-replaced-in-production".to_string()
-                }
-                #[cfg(not(debug_assertions))]
-                {
-                    panic!("🚨 FATAL: JWT_SECRET configuration failed: {}", e);
-                }
+                tracing::warn!("JWT configuration: {}, using fallback key", e);
+                "emergency-fallback-key-must-be-replaced-in-production".to_string()
             }
         };
 
@@ -167,21 +160,44 @@ fn load_jwt_secret() -> Result<Vec<u8>, JwtError> {
             #[cfg(debug_assertions)]
             {
                 tracing::warn!(
-                    "⚠️  JWT_SECRET not set! Using fixed development key for stability."
+                    "JWT_SECRET not set, using fixed development key"
                 );
-                // Use fixed key for development to avoid token invalidation on restart
-                Ok("CrabEdgeServerDevelopmentSecureKey2024!"
-                    .as_bytes()
-                    .to_vec())
             }
-            #[cfg(not(debug_assertions))]
-            {
-                Err(JwtError::ConfigError(
-                    "JWT_SECRET environment variable must be set in production!".to_string(),
-                ))
-            }
+            // 局域网 + mTLS 保护的 POS 系统，使用固定密钥确保重启后 token 有效
+            Ok("CrabEdgeServerDevelopmentSecureKey2024!"
+                .as_bytes()
+                .to_vec())
         }
     }
+}
+
+/// 从持久化文件加载或创建 JWT 密钥
+///
+/// 首次运行时生成随机密钥并写入文件，后续启动从文件读取。
+/// 确保同一安装的 token 在重启后仍然有效。
+pub fn load_or_create_persistent_secret(data_dir: &std::path::Path) -> String {
+    let secret_path = data_dir.join("jwt_secret");
+
+    // 尝试从文件读取
+    if let Ok(secret) = std::fs::read_to_string(&secret_path) {
+        let secret = secret.trim().to_string();
+        if secret.len() >= 32 {
+            return secret;
+        }
+    }
+
+    // 生成新密钥并持久化
+    let secret = generate_secure_printable_jwt_secret();
+    if let Err(e) = std::fs::create_dir_all(data_dir) {
+        tracing::error!("Failed to create data dir for JWT secret: {}", e);
+        return secret;
+    }
+    if let Err(e) = std::fs::write(&secret_path, &secret) {
+        tracing::error!("Failed to persist JWT secret: {}", e);
+    } else {
+        tracing::info!("JWT secret generated and persisted");
+    }
+    secret
 }
 
 /// JWT 令牌服务

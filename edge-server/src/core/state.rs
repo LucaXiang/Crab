@@ -202,7 +202,11 @@ impl ServerState {
         let cert_service = CertService::new(PathBuf::from(&config.work_dir));
         let message_bus = MessageBusService::new(config);
         let https = HttpsService::new(config.clone());
-        let jwt_service = Arc::new(JwtService::default());
+        let jwt_secret = crate::auth::jwt::load_or_create_persistent_secret(&config.data_dir());
+        let jwt_service = Arc::new(JwtService::with_config(crate::auth::jwt::JwtConfig {
+            secret: jwt_secret,
+            ..Default::default()
+        }));
         let resource_versions = Arc::new(ResourceVersions::new());
 
         // 3. Initialize CatalogService first (OrdersManager depends on it)
