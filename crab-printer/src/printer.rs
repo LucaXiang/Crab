@@ -325,10 +325,10 @@ impl WindowsPrinter {
                 let host = host.split(',').next().unwrap_or(host);
 
                 let timeout = Duration::from_millis(400);
-                if let Ok(mut iter) = format!("{}:9100", host).to_socket_addrs() {
-                    if let Some(addr) = iter.next() {
-                        return Ok(TcpStream::connect_timeout(&addr, timeout).is_ok());
-                    }
+                if let Ok(mut iter) = format!("{}:9100", host).to_socket_addrs()
+                    && let Some(addr) = iter.next()
+                {
+                    return Ok(TcpStream::connect_timeout(&addr, timeout).is_ok());
                 }
                 return Ok(false);
             }
