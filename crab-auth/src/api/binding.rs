@@ -2,7 +2,6 @@ use crate::db::activations;
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
-use crab_cert::CertificateAuthority;
 use shared::activation::SignedBinding;
 use std::sync::Arc;
 
@@ -16,17 +15,7 @@ pub async fn refresh_binding(
     Json(req): Json<RefreshBindingRequest>,
 ) -> Json<serde_json::Value> {
     // 1. Load Tenant CA
-    let tenant_dir = match state.auth_storage.get_tenant_dir(&req.binding.tenant_id) {
-        Ok(d) => d,
-        Err(e) => {
-            tracing::error!(error = %e, tenant_id = %req.binding.tenant_id, "Failed to access tenant directory");
-            return auth_failed();
-        }
-    };
-    let cert_path = tenant_dir.join("tenant_ca.crt");
-    let key_path = tenant_dir.join("tenant_ca.key");
-
-    let tenant_ca = match CertificateAuthority::load_from_file(&cert_path, &key_path) {
+    let tenant_ca = match state.ca_store.load_tenant_ca(&req.binding.tenant_id).await {
         Ok(ca) => ca,
         Err(e) => {
             tracing::warn!(

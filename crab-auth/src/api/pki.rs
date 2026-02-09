@@ -4,7 +4,7 @@ use axum::extract::State;
 use std::sync::Arc;
 
 pub async fn get_root_ca(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    match state.auth_storage.get_or_create_root_ca() {
+    match state.ca_store.get_or_create_root_ca().await {
         Ok(ca) => Json(serde_json::json!({
             "success": true,
             "root_ca_cert": ca.cert_pem()

@@ -5,7 +5,7 @@ mod state;
 
 use config::Config;
 use sqlx::postgres::PgPoolOptions;
-use state::{AppState, AuthStorage};
+use state::{AppState, CaStore};
 use std::sync::Arc;
 use tracing::info;
 
@@ -24,7 +24,7 @@ async fn main() {
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
+async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     dotenvy::dotenv().ok();
 
     let config = Config::from_env();
@@ -43,19 +43,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Run migrations (only activations + p12_certificates — tenants/subscriptions managed externally)
     sqlx::migrate!("./migrations").run(&pool).await?;
 
-    let auth_storage = AuthStorage::new(config.auth_storage_path);
-
-    // Verify Root CA is accessible
-    auth_storage.get_or_create_root_ca()?;
-    info!("Root CA ready");
-
     // Initialize AWS SDK
     let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+    let sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
     let s3_client = aws_sdk_s3::Client::new(&aws_config);
+
+    // Initialize CA store and verify Root CA is accessible
+    let ca_store = CaStore::new(sm_client);
+    ca_store.get_or_create_root_ca().await?;
+    info!("Root CA ready");
 
     let state = Arc::new(AppState {
         db: pool,
-        auth_storage,
+        ca_store,
         s3: s3_client,
         s3_bucket: config.s3_bucket,
         kms_key_id: config.kms_key_id,

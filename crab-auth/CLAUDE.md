@@ -6,7 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 认证服务器 — PostgreSQL 持久化 + PKI 证书管理 + 订阅校验 + P12 证书托管。
 
-**生产服务**，部署在云端。本地开发请用 `crab-auth-mock`。
+**云端唯一服务**，所有业务逻辑和数据都在餐厅本地 edge-server 运行。crab-auth 仅负责：
+- 签发证书（低频，仅设备激活时）
+- 订阅状态签名（每天/每周同步）
+- P12 证书托管（Verifactu 电子签名合规）
+- Root CA 私钥保管（最敏感资产）
+
+本地开发请用 `crab-auth-mock`。
 
 ## 命令
 
@@ -21,14 +27,13 @@ cargo build -p crab-auth
 |------|------|
 | **PostgreSQL** | 租户、订阅、激活记录、P12 元数据 |
 | **AWS S3** | .p12 证书文件存储 (SSE-KMS 加密) |
-| **文件系统** | Root CA / Tenant CA 证书 (`auth_storage/`) |
+| **AWS Secrets Manager** | Root CA / Tenant CA 证书私钥 |
 
 ## 环境变量
 
 | 变量 | 必须 | 默认值 | 说明 |
 |------|------|--------|------|
 | `DATABASE_URL` | **是** | - | PostgreSQL 连接字符串 |
-| `AUTH_STORAGE_PATH` | 否 | `auth_storage` | CA 证书存储目录 |
 | `PORT` | 否 | `3001` | HTTP 监听端口 |
 | `P12_S3_BUCKET` | 否 | `crab-tenant-certificates` | S3 存储桶 |
 | `P12_KMS_KEY_ID` | 否 | - | KMS Key ID (SSE-KMS) |
@@ -39,7 +44,7 @@ cargo build -p crab-auth
 src/
 ├── main.rs         # 入口 (PG 连接 + 迁移 + AWS SDK 初始化)
 ├── config.rs       # Config (从环境变量读取)
-├── state.rs        # AppState (PgPool + AuthStorage + S3)
+├── state.rs        # AppState (PgPool + CaStore + S3)
 ├── api/            # HTTP 路由 (Axum)
 │   ├── mod.rs          # Router 定义
 │   ├── activate.rs     # POST /api/server/activate (设备激活)
@@ -93,8 +98,8 @@ crab-auth **只拥有** `activations` 和 `p12_certificates` 表。
 ## 证书层级
 
 ```
-Root CA (auth_storage/ca/)
-  └── Tenant CA (auth_storage/tenants/<tenant_id>/)
+Root CA (Secrets Manager: crab-auth/root-ca)
+  └── Tenant CA (Secrets Manager: crab-auth/tenant/<tenant_id>)
         └── Entity Cert (签发给 edge-server, 含 device_id 绑定)
 ```
 
@@ -105,6 +110,51 @@ Root CA (auth_storage/ca/)
 - `SignedBinding` (含签名验证和时钟篡改检测)
 - `SubscriptionInfo` (含签名，`last_checked_at` 服务端设为 `0`，由客户端本地更新)
 - `SubscriptionStatus` / `PlanType` / `QuotaInfo`
+
+## 部署架构
+
+### 系统定位
+
+```
+crab-auth (云端, 唯一)          edge-server (餐厅本地, 每店一个)
+├── PKI 根证书管理              ├── 完全自治 (离线可跑 10 天)
+├── 设备激活 (一次性)           ├── 所有业务数据 (SQLite + redb)
+├── 订阅签名 (低频)            └── 与 crab-auth 通信: 极低频
+└── P12 托管 (合规)                (启动 + 每天 1-2 次)
+```
+
+### 流量特征
+
+- **极低频**: 每餐厅每天 1-2 次请求（订阅同步 + Binding 刷新）
+- **激活**: 一次性操作（开店/换设备时）
+- **无实时性要求**: 所有调用方都容忍 1-2 秒延迟
+
+### 部署: AWS Lambda + Secrets Manager
+
+CA 私钥已迁移到 Secrets Manager，支持纯 serverless 部署:
+
+| 组件 | 费用 |
+|------|------|
+| Lambda | $0（免费层内） |
+| Secrets Manager | ~$1.20/月 |
+| RDS db.t4g.micro | ~$12/月 |
+| S3 (P12 证书) | $0.几 |
+| **总计** | **~$13/月** |
+
+### 安全要求
+
+- **Root CA 私钥**: 最高机密，泄露等于整个 PKI 信任链崩塌
+- **crab-auth 必须与普通网站隔离**: 不混部
+- **RDS 放私有子网**: 外网不可达
+- **P12 使用 SSE-KMS 加密存储**
+
+### 离线容忍度
+
+| 场景 | 影响 |
+|------|------|
+| crab-auth 宕机 < 10 天 | 无影响，edge-server 用缓存的签名 |
+| crab-auth 宕机 > 10 天 | edge-server 订阅签名过期，进入阻止状态 |
+| 首次激活 | 必须联网，无法离线完成 |
 
 ## 响应语言
 

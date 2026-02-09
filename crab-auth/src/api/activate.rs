@@ -2,7 +2,7 @@ use crate::db::{activations, subscriptions, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
-use crab_cert::{CaProfile, CertMetadata, CertProfile, CertificateAuthority};
+use crab_cert::{CertMetadata, CertProfile};
 use shared::activation::{
     ActiveDevice, ActivationData, ActivationResponse, EntityType, PlanType, QuotaInfo,
     SignedBinding, SubscriptionInfo, SubscriptionStatus,
@@ -137,7 +137,7 @@ pub async fn activate(
     }
 
     // 4. Issue certificate
-    let root_ca = match state.auth_storage.get_or_create_root_ca() {
+    let root_ca = match state.ca_store.get_or_create_root_ca().await {
         Ok(ca) => ca,
         Err(e) => {
             tracing::error!(error = %e, "Root CA error");
@@ -145,40 +145,13 @@ pub async fn activate(
         }
     };
 
-    let tenant_dir = match state.auth_storage.get_tenant_dir(&tenant.id) {
-        Ok(d) => d,
+    let tenant_ca = match state.ca_store.get_or_create_tenant_ca(&tenant.id, &root_ca).await {
+        Ok(ca) => ca,
         Err(e) => {
-            tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to access tenant directory");
-            return Json(fail("Storage error"));
+            tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
+            return Json(fail("Tenant CA error"));
         }
     };
-
-    let tenant_ca_name = "tenant_ca";
-    let tenant_ca =
-        if tenant_dir.join(format!("{tenant_ca_name}.crt")).exists() {
-            match CertificateAuthority::load_from_file(
-                &tenant_dir.join(format!("{tenant_ca_name}.crt")),
-                &tenant_dir.join(format!("{tenant_ca_name}.key")),
-            ) {
-                Ok(ca) => ca,
-                Err(e) => {
-                    return Json(fail(&format!("Failed to load Tenant CA: {e}")));
-                }
-            }
-        } else {
-            let profile =
-                CaProfile::intermediate(&tenant.id, &format!("Tenant {}", tenant.id));
-            let ca = match CertificateAuthority::new_intermediate(profile, &root_ca) {
-                Ok(ca) => ca,
-                Err(e) => {
-                    return Json(fail(&format!("Failed to create Tenant CA: {e}")));
-                }
-            };
-            if let Err(e) = ca.save(&tenant_dir, tenant_ca_name) {
-                return Json(fail(&format!("Failed to save Tenant CA: {e}")));
-            }
-            ca
-        };
 
     // Issue server cert
     let mut profile = CertProfile::new_server(

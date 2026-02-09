@@ -41,6 +41,7 @@ tracing-subscriber.workspace = true
 aws-config.workspace = true
 aws-sdk-s3.workspace = true
 aws-sdk-kms.workspace = true
+aws-sdk-secretsmanager.workspace = true
 
 # Utilities
 dotenvy.workspace = true
