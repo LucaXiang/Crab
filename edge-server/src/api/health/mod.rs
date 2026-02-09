@@ -23,7 +23,7 @@ use serde::Serialize;
 use std::time::SystemTime;
 
 use crate::core::ServerState;
-use crate::services::tenant_binding::Subscription;
+use shared::activation::SubscriptionInfo;
 
 /// 健康检查路由 - 公共路由 (无需认证)
 pub fn router() -> Router<ServerState> {
@@ -49,7 +49,7 @@ pub struct HealthResponse {
     is_activated: bool,
     /// 订阅状态 (如果已激活且有订阅信息)
     #[serde(skip_serializing_if = "Option::is_none")]
-    subscription: Option<Subscription>,
+    subscription: Option<SubscriptionInfo>,
 }
 
 /// 详细健康检查响应

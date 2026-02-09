@@ -901,6 +901,7 @@ export type AuditAction =
   | 'print_destination_deleted'
   // 班次
   | 'shift_opened'
+  | 'shift_updated'
   | 'shift_closed'
   // 日结报告
   | 'daily_report_generated'

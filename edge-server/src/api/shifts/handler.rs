@@ -114,12 +114,27 @@ pub async fn create(
 /// PUT /api/shifts/:id - 更新班次
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
     Json(payload): Json<ShiftUpdate>,
 ) -> AppResult<Json<Shift>> {
+    let old = shift::find_by_id(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Shift {} not found", id)))?;
+
     let s = shift::update(&state.pool, id, payload).await?;
 
     let id_str = id.to_string();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ShiftUpdated,
+        "shift", &id_str,
+        operator_id = Some(current_user.id),
+        operator_name = Some(current_user.display_name.clone()),
+        details = crate::audit::create_diff(&old, &s, "shift")
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id_str, Some(&s))
         .await;

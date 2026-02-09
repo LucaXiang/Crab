@@ -335,7 +335,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                 #{item.instance_id.slice(-5)}
               </span>
               <span>{item.name}</span>
-              {item.spec_name && (
+              {item.spec_name && item.spec_name !== 'default' && (
                 <span className="text-xs text-gray-500">({item.spec_name})</span>
               )}
               {item.is_comped && (

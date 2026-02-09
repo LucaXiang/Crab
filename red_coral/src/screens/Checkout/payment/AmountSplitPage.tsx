@@ -314,30 +314,29 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
             <div className="flex-1 flex flex-col gap-6">
 
                 {/* Info Card */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
                         <div>
                             <div className="text-gray-500 font-medium mb-1">{t('checkout.split.total')}</div>
                             <div className="text-3xl font-bold text-gray-900">{formatCurrency(order.total)}</div>
                         </div>
+                        {(splitMode === 'AA' || isAALocked) && (
+                        <div className="flex flex-col gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-gray-600 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
+                                 <div className="p-1 bg-green-200 text-green-700 rounded-full"><Check size={12} strokeWidth={3} /></div>
+                                 <span>{t('checkout.aa_split.paid_shares')}: <b className="text-green-700">{formatShareCount(paidSharesExact)}</b> {t('checkout.aa_split.shares_unit')}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-100">
+                                 <div className="p-1 bg-orange-200 text-orange-700 rounded-full"><Clock size={12} strokeWidth={3} /></div>
+                                 <span>{t('checkout.aa_split.unpaid_shares')}: <b className="text-orange-700">{formatShareCount(remainingSharesExact)}</b> {t('checkout.aa_split.shares_unit')}</span>
+                            </div>
+                        </div>
+                        )}
                         <div className="text-right">
                             <div className="text-gray-500 font-medium mb-1">{t('checkout.payment.remaining')}</div>
                             <div className="text-3xl font-bold text-orange-600">{formatCurrency(remaining)}</div>
                         </div>
                     </div>
-
-                    {(splitMode === 'AA' || isAALocked) && (
-                    <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2 text-gray-600 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
-                             <div className="p-1 bg-green-200 text-green-700 rounded-full"><Check size={12} strokeWidth={3} /></div>
-                             <span>{t('checkout.aa_split.paid_shares')}: <b className="text-green-700">{formatShareCount(paidSharesExact)}</b> {t('checkout.aa_split.shares_unit')}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-100">
-                             <div className="p-1 bg-orange-200 text-orange-700 rounded-full"><Clock size={12} strokeWidth={3} /></div>
-                             <span>{t('checkout.aa_split.unpaid_shares')}: <b className="text-orange-700">{formatShareCount(remainingSharesExact)}</b> {t('checkout.aa_split.shares_unit')}</span>
-                        </div>
-                    </div>
-                    )}
                 </div>
 
                 {/* Split Controls */}

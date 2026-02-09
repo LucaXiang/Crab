@@ -241,6 +241,7 @@ pub async fn list_category_attributes(
 /// POST /api/categories/:id/attributes/:attr_id - 绑定属性到分类
 pub async fn bind_category_attribute(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path((category_id, attr_id)): Path<(i64, i64)>,
     Json(payload): Json<BindAttributePayload>,
 ) -> AppResult<Json<AttributeBinding>> {
@@ -254,6 +255,17 @@ pub async fn bind_category_attribute(
         payload.default_option_indices,
     )
     .await?;
+
+    let category_id_str = category_id.to_string();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::CategoryUpdated,
+        "category", &category_id_str,
+        operator_id = Some(current_user.id),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "bind_attribute", "attribute_id": attr_id})
+    );
 
     // Refresh product cache for this category (inherited attributes changed)
     if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
@@ -276,19 +288,29 @@ pub async fn bind_category_attribute(
 /// DELETE /api/categories/:id/attributes/:attr_id - 解绑属性与分类
 pub async fn unbind_category_attribute(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path((category_id, attr_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<bool>> {
     let deleted = attribute::unlink(&state.pool, "category", category_id, attr_id).await?;
 
-    // Refresh product cache for this category (inherited attributes changed)
-    if deleted
-        && let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await
-    {
-        tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
-    }
-
-    // 广播同步通知
     if deleted {
+        let category_id_str = category_id.to_string();
+
+        audit_log!(
+            state.audit_service,
+            AuditAction::CategoryUpdated,
+            "category", &category_id_str,
+            operator_id = Some(current_user.id),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({"op": "unbind_attribute", "attribute_id": attr_id})
+        );
+
+        // Refresh product cache for this category (inherited attributes changed)
+        if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
+            tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
+        }
+
+        // 广播同步通知
         state
             .broadcast_sync::<()>(
                 "category_attribute",

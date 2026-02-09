@@ -253,6 +253,7 @@ pub async fn list_product_attributes(
 /// POST /api/products/:id/tags/:tag_id - 给商品添加标签
 pub async fn add_product_tag(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path((product_id, tag_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<ProductFull>> {
     let product = state
@@ -261,8 +262,18 @@ pub async fn add_product_tag(
         .await
         ?;
 
-    // 广播同步通知 (发送完整 ProductFull 数据)
     let product_id_str = product_id.to_string();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductUpdated,
+        "product", &product_id_str,
+        operator_id = Some(current_user.id),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "add_tag", "tag_id": tag_id})
+    );
+
+    // 广播同步通知 (发送完整 ProductFull 数据)
     state
         .broadcast_sync(
             RESOURCE_PRODUCT,
@@ -278,6 +289,7 @@ pub async fn add_product_tag(
 /// DELETE /api/products/:id/tags/:tag_id - 从商品移除标签
 pub async fn remove_product_tag(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path((product_id, tag_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<ProductFull>> {
     let product = state
@@ -286,8 +298,18 @@ pub async fn remove_product_tag(
         .await
         ?;
 
-    // 广播同步通知 (发送完整 ProductFull 数据)
     let product_id_str = product_id.to_string();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductUpdated,
+        "product", &product_id_str,
+        operator_id = Some(current_user.id),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "remove_tag", "tag_id": tag_id})
+    );
+
+    // 广播同步通知 (发送完整 ProductFull 数据)
     state
         .broadcast_sync(
             RESOURCE_PRODUCT,

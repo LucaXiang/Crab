@@ -27,6 +27,16 @@ impl From<sqlx::Error> for AuditStorageError {
 
 pub type AuditStorageResult<T> = Result<T, AuditStorageError>;
 
+/// 哈希链验证结果
+pub struct ChainVerifyResult {
+    /// 是否全部通过验证
+    pub valid: bool,
+    /// 检查的条目数
+    pub checked: u64,
+    /// 第一个错误的 sequence（None 表示无错误）
+    pub first_error_at: Option<u64>,
+}
+
 impl From<AuditStorageError> for shared::error::AppError {
     fn from(err: AuditStorageError) -> Self {
         shared::error::AppError::internal(err.to_string())
@@ -249,6 +259,73 @@ impl AuditStorage {
 
         let entries = rows.into_iter().map(AuditRow::into_entry).collect();
         Ok((entries, total))
+    }
+
+    /// 验证哈希链完整性
+    ///
+    /// 查询最近 `limit` 条 entries（按 sequence ASC），逐条重算哈希并校验链接。
+    pub async fn verify_chain(&self, limit: u64) -> AuditStorageResult<ChainVerifyResult> {
+        let rows = sqlx::query_as::<_, AuditRow>(
+            "SELECT sequence, timestamp, action, resource_type, resource_id, \
+             operator_id, operator_name, details, target, prev_hash, curr_hash \
+             FROM audit_log ORDER BY sequence DESC LIMIT ?",
+        )
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // 反转为 ASC 顺序
+        let rows: Vec<_> = rows.into_iter().rev().collect();
+        let checked = rows.len() as u64;
+
+        if rows.is_empty() {
+            return Ok(ChainVerifyResult {
+                valid: true,
+                checked: 0,
+                first_error_at: None,
+            });
+        }
+
+        let mut first_error_at = None;
+
+        for i in 0..rows.len() {
+            let row = &rows[i];
+            let entry = row.clone().into_entry();
+
+            // 重算哈希
+            let expected_hash = compute_audit_hash(
+                &row.prev_hash,
+                entry.id,
+                entry.timestamp,
+                &entry.action,
+                &entry.resource_type,
+                &entry.resource_id,
+                entry.operator_id,
+                entry.operator_name.as_deref(),
+                &entry.details,
+                entry.target.as_deref(),
+            );
+
+            if expected_hash != row.curr_hash {
+                first_error_at = Some(row.sequence as u64);
+                break;
+            }
+
+            // 检查链接：当前条目的 prev_hash 应等于上一条的 curr_hash
+            if i > 0 {
+                let prev_row = &rows[i - 1];
+                if row.prev_hash != prev_row.curr_hash {
+                    first_error_at = Some(row.sequence as u64);
+                    break;
+                }
+            }
+        }
+
+        Ok(ChainVerifyResult {
+            valid: first_error_at.is_none(),
+            checked,
+            first_error_at,
+        })
     }
 
     /// 查询最后 N 条审计日志（倒序）

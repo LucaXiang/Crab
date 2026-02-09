@@ -26,6 +26,7 @@ const LOCK_FILE_NAME: &str = "audit.lock";
 const LONG_DOWNTIME_THRESHOLD_MS: i64 = 24 * 60 * 60 * 1000;
 
 /// 发送到 AuditService 的日志请求
+#[derive(serde::Serialize)]
 pub struct AuditLogRequest {
     pub action: AuditAction,
     pub resource_type: String,
@@ -260,8 +261,52 @@ impl AuditService {
             }
         }
 
-        // 3. 创建 LOCK 文件
-        if let Err(e) = std::fs::write(&self.lock_path, now.to_string()) {
+        // 3. 哈希链完整性验证（最近 1000 条）
+        match self.storage.verify_chain(1000).await {
+            Ok(r) if !r.valid => {
+                tracing::error!(
+                    first_error = r.first_error_at,
+                    "Audit hash chain integrity broken!"
+                );
+                // 写入 system_issue（非阻塞）
+                let mut params = std::collections::HashMap::new();
+                if let Some(seq) = r.first_error_at {
+                    params.insert("first_error_at".to_string(), seq.to_string());
+                }
+                params.insert("checked".to_string(), r.checked.to_string());
+                if let Err(e) = system_issue::create(
+                    &self.pool,
+                    SystemIssueCreate {
+                        source: "local".to_string(),
+                        kind: "audit_chain_broken".to_string(),
+                        blocking: false,
+                        target: None,
+                        params,
+                        title: None,
+                        description: None,
+                        options: vec![
+                            "acknowledged".to_string(),
+                        ],
+                    },
+                )
+                .await
+                {
+                    tracing::error!("Failed to create system_issue for chain break: {:?}", e);
+                }
+            }
+            Ok(r) => {
+                tracing::debug!(checked = r.checked, "Audit hash chain verified");
+            }
+            Err(e) => {
+                tracing::error!("Hash chain verification failed: {:?}", e);
+            }
+        }
+
+        // 4. 创建 LOCK 文件（原子写入：tmp + rename）
+        let tmp = self.lock_path.with_extension("tmp");
+        if let Err(e) = std::fs::write(&tmp, now.to_string())
+            .and_then(|_| std::fs::rename(&tmp, &self.lock_path))
+        {
             tracing::error!("Failed to create audit LOCK file: {:?}", e);
         }
     }
@@ -303,6 +348,20 @@ impl AuditService {
         details: serde_json::Value,
         target: Option<String>,
     ) {
+        // Details JSON 大小限制 (64KB)
+        const MAX_DETAILS_SIZE: usize = 64 * 1024;
+        let details_str = serde_json::to_string(&details).unwrap_or_default();
+        let details = if details_str.len() > MAX_DETAILS_SIZE {
+            tracing::warn!(
+                size = details_str.len(),
+                action = %action,
+                "Audit details too large, truncated"
+            );
+            serde_json::json!({"_truncated": true, "original_size": details_str.len()})
+        } else {
+            details
+        };
+
         let req = AuditLogRequest {
             action,
             resource_type: resource_type.into(),

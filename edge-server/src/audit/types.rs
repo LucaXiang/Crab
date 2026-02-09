@@ -58,6 +58,8 @@ pub enum AuditAction {
     // ═══ 班次 ═══
     /// 班次开启
     ShiftOpened,
+    /// 班次更新
+    ShiftUpdated,
     /// 班次关闭
     ShiftClosed,
 
