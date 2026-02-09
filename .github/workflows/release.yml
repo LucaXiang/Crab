@@ -57,7 +57,7 @@ jobs:
           cache-dependency-path: red_coral/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: red_coral
 
       - name: Install NASM (Windows)

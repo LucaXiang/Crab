@@ -45,8 +45,11 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/setup-nasm@v1
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
 
       - name: Test
-        run: cargo test --workspace --lib
+        run: cargo nextest run --workspace --lib
