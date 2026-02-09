@@ -5,6 +5,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
+import { DeleteReasonModal } from '@/screens/Checkout/DeleteReasonModal';
 import * as orderOps from '@/core/stores/order/commands';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
@@ -31,6 +32,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const [activeTab, setActiveTab] = useState<Tab>('ITEMS');
   const [editingItem, setEditingItem] = useState<{ item: CartItem; index: number } | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ index: number; item: CartItem; authorizer?: { id: number; name: string } } | null>(null);
   
   // 直接从 store 获取 timeline（不依赖 order.timeline）
   const timeline = useOrderTimeline(order.order_id);
@@ -63,12 +65,17 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     setEditingItem(null);
   }, [order]);
 
-  const handleDeleteItem = React.useCallback(async (index: number, authorizer?: { id: number; name: string }) => {
+  const handleDeleteItem = React.useCallback((index: number, authorizer?: { id: number; name: string }) => {
     const item = order.items[index];
-    // Server Authority: backend handles paid item protection, no local computation
-    await orderOps.removeItem(order.order_id, item.instance_id, 'Removed from payment screen', undefined, authorizer);
+    setPendingDelete({ index, item, authorizer });
     setEditingItem(null);
   }, [order]);
+
+  const handleConfirmDelete = React.useCallback(async (reason: string) => {
+    if (!pendingDelete) return;
+    await orderOps.removeItem(order.order_id, pendingDelete.item.instance_id, reason, undefined, pendingDelete.authorizer);
+    setPendingDelete(null);
+  }, [order, pendingDelete]);
 
   // Use server-provided financial totals (authoritative)
   const displayOriginalPrice = order.original_total;
@@ -322,6 +329,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           readOnlyAttributes={false}
         />
       )}
+
+      {/* Delete Reason Modal */}
+      <DeleteReasonModal
+        isOpen={pendingDelete !== null}
+        itemName={pendingDelete?.item.name ?? ''}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 });

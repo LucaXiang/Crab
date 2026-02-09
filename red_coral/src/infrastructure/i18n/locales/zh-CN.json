@@ -452,6 +452,18 @@
       "note_placeholder": "请输入备注信息...",
       "loss_amount_notice": "未付金额 {amount} 将计入损失"
     },
+    "delete_item": {
+      "title": "删除菜品",
+      "select_reason": "选择删除原因",
+      "confirm": "确认删除",
+      "note_placeholder": "请输入补充说明...",
+      "reason": {
+        "customer_changed_mind": "顾客改主意",
+        "wrong_item": "下错菜品",
+        "kitchen_issue": "厨房问题",
+        "other": "其他原因"
+      }
+    },
     "retail": {
       "cancel_title": "确认返回",
       "cancel_description": "返回将作废当前零售订单，所有菜品将被清空。确定要返回吗？",

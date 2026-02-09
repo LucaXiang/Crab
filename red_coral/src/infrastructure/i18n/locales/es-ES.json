@@ -452,6 +452,18 @@
       "note_placeholder": "Introducir nota...",
       "loss_amount_notice": "Importe {amount} como pérdida"
     },
+    "delete_item": {
+      "title": "Eliminar plato",
+      "select_reason": "Motivo de eliminación",
+      "confirm": "Confirmar eliminación",
+      "note_placeholder": "Introducir nota adicional...",
+      "reason": {
+        "customer_changed_mind": "Cliente cambia opinión",
+        "wrong_item": "Plato incorrecto",
+        "kitchen_issue": "Problema cocina",
+        "other": "Otro motivo"
+      }
+    },
     "retail": {
       "cancel_title": "Confirmar volver",
       "cancel_description": "Volver anulará la venta. ¿Continuar?",

@@ -350,7 +350,7 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
                                               <div className="p-3">
                                                   <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3">
                                                       <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
-                                                      {isFullySelected && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="text-white text-xs font-bold">ALL</div></div>}
+                                                      {isFullySelected && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="text-white text-xs font-bold">{t('common.label.all')}</div></div>}
                                                       <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
                                                         #{item.instance_id.slice(-5)}
                                                       </span>
