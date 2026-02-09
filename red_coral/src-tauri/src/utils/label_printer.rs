@@ -671,7 +671,7 @@ impl GdiplusToken {
         };
 
         unsafe {
-            let status = GdiplusStartup(&mut token, &mut input, std::ptr::null_mut());
+            let status = GdiplusStartup(&mut token, &input, std::ptr::null_mut());
             if status.0 != 0 {
                 return Err(Error::new(E_FAIL, "GdiplusStartup failed"));
             }
@@ -1037,7 +1037,7 @@ unsafe fn draw_rect_string(
     );
 
     // Clean up if we created a local font family
-    if let Some(_) = &field.font_family {
+    if field.font_family.is_some() {
         if !field_font_family.is_null() {
             GdipDeleteFontFamily(field_font_family);
         }
@@ -1132,7 +1132,7 @@ unsafe fn extract_bitmap_data(
     }
 
     // Copy pixel data (ARGB format)
-    let stride = bmp_data.Stride.abs() as usize;
+    let stride = usize::try_from(bmp_data.Stride.unsigned_abs()).expect("stride overflow");
     let data_size = stride * height as usize;
     let mut pixels = vec![0u8; data_size];
 
