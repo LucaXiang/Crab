@@ -287,7 +287,7 @@ impl WindowsPrinter {
 
             if needed6 > 0 {
                 let mut buf6: Vec<u8> = vec![0; needed6 as usize];
-                if GetPrinterW(handle, 6, Some(buf6.as_mut_slice()), &mut needed6).as_bool() {
+                if GetPrinterW(handle, 6, Some(buf6.as_mut_slice()), &mut needed6).is_ok() {
                     let info6 = *(buf6.as_ptr() as *const PRINTER_INFO_6);
                     if (info6.dwStatus & PRINTER_STATUS_OFFLINE) != 0 {
                         let _ = ClosePrinter(handle);
@@ -302,7 +302,7 @@ impl WindowsPrinter {
 
             let port = if needed5 > 0 {
                 let mut buf5: Vec<u8> = vec![0; needed5 as usize];
-                if GetPrinterW(handle, 5, Some(buf5.as_mut_slice()), &mut needed5).as_bool() {
+                if GetPrinterW(handle, 5, Some(buf5.as_mut_slice()), &mut needed5).is_ok() {
                     let info5 = *(buf5.as_ptr() as *const PRINTER_INFO_5W);
                     if !info5.pPortName.is_null() {
                         PWSTR(info5.pPortName.0).to_string().unwrap_or_default()
