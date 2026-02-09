@@ -57,6 +57,12 @@ export function useLogoutFlow() {
       });
     } else {
       if (currentShift) {
+        // Refresh shift to get latest expected_cash before showing close modal
+        try {
+          await useShiftStore.getState().fetchCurrentShift();
+        } catch {
+          // Continue with stale data if refresh fails
+        }
         setShowCloseShiftModal(true);
       } else {
         handleLogout();

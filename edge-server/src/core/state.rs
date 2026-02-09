@@ -180,15 +180,11 @@ impl ServerState {
     /// 2. 数据库 (work_dir/database/crab.db)
     /// 3. 各服务 (Activation, Cert, MessageBus, HTTPS, JWT)
     /// 4. HTTPS 服务延迟初始化
-    ///
-    /// # Panics
-    ///
-    /// 数据库初始化失败时 panic
-    pub async fn initialize(config: &Config) -> Self {
+    pub async fn initialize(config: &Config) -> Result<Self, crate::utils::AppError> {
         // 0. Ensure work_dir structure exists
         config
             .ensure_work_dir_structure()
-            .expect("Failed to create work directory structure");
+            .map_err(|e| crate::utils::AppError::internal(format!("Failed to create work directory: {e}")))?;
 
         // 1. Initialize DB
         // Database path: {tenant}/server/data/main.db/
@@ -197,7 +193,7 @@ impl ServerState {
 
         let db_service = DbService::new(&db_path_str)
             .await
-            .expect("Failed to initialize database");
+            .map_err(|e| crate::utils::AppError::internal(format!("Failed to initialize database: {e}")))?;
         let pool = db_service.pool;
 
         // 2. Initialize Services
@@ -220,7 +216,8 @@ impl ServerState {
         // 4. Initialize OrdersManager (event sourcing) with CatalogService
         let orders_db_path = config.orders_db_file();
         let mut orders_manager =
-            OrdersManager::new(&orders_db_path, config.timezone).expect("Failed to initialize orders manager");
+            OrdersManager::new(&orders_db_path, config.timezone)
+                .map_err(|e| crate::utils::AppError::internal(format!("Failed to initialize orders manager: {e}")))?;
         orders_manager.set_catalog_service(catalog_service.clone());
         orders_manager.set_archive_service(pool.clone());
 
@@ -231,7 +228,8 @@ impl ServerState {
         // 5. Initialize KitchenPrintService
         let print_db_path = config.print_db_file();
         let print_storage =
-            PrintStorage::open(&print_db_path).expect("Failed to initialize print storage");
+            PrintStorage::open(&print_db_path)
+                .map_err(|e| crate::utils::AppError::internal(format!("Failed to initialize print storage: {e}")))?;
         let kitchen_print_service = Arc::new(KitchenPrintService::new(print_storage));
 
         // 7. Initialize AuditService (税务级审计日志 — SQLite)
@@ -299,7 +297,7 @@ impl ServerState {
             serde_json::json!({"epoch": &state.epoch}),
         ).await;
 
-        state
+        Ok(state)
     }
 
     /// 启动后台任务
@@ -514,6 +512,7 @@ impl ServerState {
                 archive_service.clone(),
                 self.audit_service.clone(),
                 self.pool.clone(),
+                self.clone(),
             );
 
             tasks.spawn("archive_worker", TaskKind::Worker, async move {

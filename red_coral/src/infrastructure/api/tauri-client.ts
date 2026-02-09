@@ -501,8 +501,8 @@ export class TauriApiClient {
     return invokeAndUnwrap<Shift>('get_shift', { id });
   }
 
-  async getCurrentShift(operatorId?: number): Promise<Shift | null> {
-    return invokeAndUnwrap<Shift | null>('get_current_shift', { operatorId });
+  async getCurrentShift(): Promise<Shift | null> {
+    return invokeAndUnwrap<Shift | null>('get_current_shift');
   }
 
   async openShift(data: ShiftCreate): Promise<Shift> {

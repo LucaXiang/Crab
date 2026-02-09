@@ -162,14 +162,20 @@ export function useSyncListener() {
       const { resource, id, version, action, data } = payload;
       logger.debug(`Received sync event: resource=${resource}, action=${action}, id=${id}`, { component: 'SyncListener' });
 
-      // 特殊处理: shift settlement_required - 跨营业日班次需要结算
-      // 此时班次还未关闭，需要用户手动强制关闭
-      if (resource === 'shift' && action === 'settlement_required') {
-        logger.debug('Shift settlement required, notifying ShiftGuard', { component: 'SyncListener' });
-        const shiftData = data as Shift | null;
-        if (shiftData) {
-          // 保存过期班次信息，ShiftGuard 会显示强制关闭弹窗
-          useShiftStore.getState().setStaleShift(shiftData);
+      // 特殊处理: shift 事件
+      if (resource === 'shift') {
+        if (action === 'settlement_required') {
+          logger.debug('Shift settlement required, notifying ShiftGuard', { component: 'SyncListener' });
+          const shiftData = data as Shift | null;
+          if (shiftData) {
+            useShiftStore.getState().setStaleShift(shiftData);
+          }
+        } else if (action === 'updated' && data) {
+          const shiftData = data as Shift;
+          const { currentShift } = useShiftStore.getState();
+          if (currentShift && currentShift.id === shiftData.id) {
+            useShiftStore.setState({ currentShift: shiftData });
+          }
         }
         return;
       }

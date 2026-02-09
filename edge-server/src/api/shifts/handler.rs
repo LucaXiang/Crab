@@ -65,23 +65,11 @@ pub async fn get_by_id(
     Ok(Json(shift))
 }
 
-/// Query params for current shift
-#[derive(Debug, Deserialize)]
-pub struct CurrentQuery {
-    pub operator_id: Option<i64>,
-}
-
-/// GET /api/shifts/current - 获取当前班次
+/// GET /api/shifts/current - 获取当前班次 (全局单班次)
 pub async fn get_current(
     State(state): State<ServerState>,
-    Query(query): Query<CurrentQuery>,
 ) -> AppResult<Json<Option<Shift>>> {
-    let current = if let Some(operator_id) = query.operator_id {
-        shift::find_open_by_operator(&state.pool, operator_id).await
-    } else {
-        shift::find_any_open(&state.pool).await
-    }?;
-
+    let current = shift::find_any_open(&state.pool).await?;
     Ok(Json(current))
 }
 

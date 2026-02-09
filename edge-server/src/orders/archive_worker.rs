@@ -10,6 +10,7 @@ use super::archive::OrderArchiveService;
 use super::money::{to_decimal, to_f64};
 use super::storage::{OrderStorage, PendingArchive};
 use crate::audit::{AuditAction, AuditService};
+use crate::core::state::ServerState;
 use crate::db::repository::{payment, shift};
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
@@ -44,6 +45,7 @@ pub struct ArchiveWorker {
     archive_service: OrderArchiveService,
     audit_service: Arc<AuditService>,
     pool: SqlitePool,
+    state: ServerState,
     semaphore: Arc<tokio::sync::Semaphore>,
 }
 
@@ -53,12 +55,14 @@ impl ArchiveWorker {
         archive_service: OrderArchiveService,
         audit_service: Arc<AuditService>,
         pool: SqlitePool,
+        state: ServerState,
     ) -> Self {
         Self {
             storage,
             archive_service,
             audit_service,
             pool,
+            state,
             semaphore: Arc::new(tokio::sync::Semaphore::new(ARCHIVE_CONCURRENCY)),
         }
     }
@@ -194,7 +198,7 @@ impl ArchiveWorker {
                 tracing::info!(order_id = %order_id, "Order archived successfully");
 
                 // 3. Update shift expected_cash for cash payments
-                self.update_shift_cash(&snapshot, &events).await;
+                self.update_shift_cash(&snapshot).await;
 
                 // 4. Write payment records to independent payment table
                 self.write_payment_records(&snapshot, &events).await;
@@ -393,7 +397,7 @@ impl ArchiveWorker {
     }
 
     /// Update shift expected_cash for cash payments in the order
-    async fn update_shift_cash(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+    async fn update_shift_cash(&self, snapshot: &OrderSnapshot) {
         use shared::order::{OrderStatus, VoidType};
 
         // Skip cash tracking for CANCELLED void orders (no money changed hands)
@@ -430,28 +434,10 @@ impl ArchiveWorker {
             return;
         }
 
-        // Get operator_id from terminal event (any terminal event type)
-        let operator_id = events
-            .iter()
-            .rev()
-            .find(|e| TERMINAL_EVENT_TYPES.contains(&e.event_type))
-            .map(|e| e.operator_id);
-
-        let Some(operator_id) = operator_id else {
-            tracing::warn!(
-                order_id = %snapshot.order_id,
-                event_types = ?events.iter().map(|e| &e.event_type).collect::<Vec<_>>(),
-                "No terminal event found for cash tracking"
-            );
-            return;
-        };
-
         let cash_amount = to_f64(cash_total);
-        if let Err(e) = shift::add_cash_payment(&self.pool, operator_id, cash_amount).await {
-            // Log but don't fail the archive - shift tracking is secondary
+        if let Err(e) = shift::add_cash_payment(&self.pool, cash_amount).await {
             tracing::warn!(
                 order_id = %snapshot.order_id,
-                operator_id = %operator_id,
                 cash_total = cash_amount,
                 error = %e,
                 "Failed to update shift expected_cash"
@@ -459,10 +445,21 @@ impl ArchiveWorker {
         } else {
             tracing::debug!(
                 order_id = %snapshot.order_id,
-                operator_id = %operator_id,
                 cash_total = cash_amount,
                 "Updated shift expected_cash"
             );
+
+            // Broadcast shift update so frontend stores stay current
+            if let Ok(Some(updated_shift)) = shift::find_any_open(&self.pool).await {
+                self.state
+                    .broadcast_sync(
+                        "shift",
+                        "updated",
+                        &updated_shift.id.to_string(),
+                        Some(&updated_shift),
+                    )
+                    .await;
+            }
         }
     }
 }

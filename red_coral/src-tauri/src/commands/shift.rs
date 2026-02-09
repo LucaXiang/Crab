@@ -65,15 +65,8 @@ pub async fn get_shift(
 #[tauri::command]
 pub async fn get_current_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    operator_id: Option<i64>,
 ) -> Result<ApiResponse<Option<Shift>>, String> {
-
-    let path = match operator_id {
-        Some(id) => format!("/api/shifts/current?operator_id={}", id),
-        None => "/api/shifts/current".to_string(),
-    };
-
-    match bridge.get::<Option<Shift>>(&path).await {
+    match bridge.get::<Option<Shift>>("/api/shifts/current").await {
         Ok(shift) => Ok(ApiResponse::success(shift)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }

@@ -60,7 +60,7 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
     try {
       // 直接检查当前班次状态
       // edge-server 启动时已自动检测过期班次并通过 settlement_required 事件通知
-      const shift = await fetchCurrentShift(user.id);
+      const shift = await fetchCurrentShift();
       setIsChecking(false);
 
       // 检查是否有过期班次需要先结班

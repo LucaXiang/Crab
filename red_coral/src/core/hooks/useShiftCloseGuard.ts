@@ -35,7 +35,7 @@ export function useShiftCloseGuard() {
 
     try {
       // 检查当前用户是否有打开的班次
-      const openShift = await client.getCurrentShift(user.id);
+      const openShift = await client.getCurrentShift();
 
       if (!openShift) {
         // 没有打开的班次，允许关闭

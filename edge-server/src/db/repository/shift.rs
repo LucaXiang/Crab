@@ -26,10 +26,10 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Shift>>
 pub async fn create(pool: &SqlitePool, data: ShiftCreate) -> RepoResult<Shift> {
     validate_cash_amount(data.starting_cash, "Starting cash")?;
 
-    // Check if operator already has an open shift
-    if find_open_by_operator(pool, data.operator_id).await?.is_some() {
+    // Global single shift: only one OPEN shift allowed at a time
+    if find_any_open(pool).await?.is_some() {
         return Err(RepoError::Duplicate(
-            "Operator already has an open shift".into(),
+            "A shift is already open".into(),
         ));
     }
 
@@ -48,16 +48,6 @@ pub async fn create(pool: &SqlitePool, data: ShiftCreate) -> RepoResult<Shift> {
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create shift".into()))
-}
-
-pub async fn find_open_by_operator(pool: &SqlitePool, operator_id: i64) -> RepoResult<Option<Shift>> {
-    let shift = sqlx::query_as::<_, Shift>(
-        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE operator_id = ? AND status = 'OPEN' LIMIT 1",
-    )
-    .bind(operator_id)
-    .fetch_optional(pool)
-    .await?;
-    Ok(shift)
 }
 
 pub async fn find_any_open(pool: &SqlitePool) -> RepoResult<Option<Shift>> {
@@ -177,13 +167,12 @@ pub async fn find_stale_shifts(pool: &SqlitePool, business_day_start: i64) -> Re
     Ok(shifts)
 }
 
-pub async fn add_cash_payment(pool: &SqlitePool, operator_id: i64, amount: f64) -> RepoResult<()> {
+pub async fn add_cash_payment(pool: &SqlitePool, amount: f64) -> RepoResult<()> {
     let now = shared::util::now_millis();
     sqlx::query!(
-        "UPDATE shift SET expected_cash = expected_cash + ?1, last_active_at = ?2, updated_at = ?2 WHERE operator_id = ?3 AND status = 'OPEN'",
+        "UPDATE shift SET expected_cash = expected_cash + ?1, last_active_at = ?2, updated_at = ?2 WHERE status = 'OPEN'",
         amount,
         now,
-        operator_id
     )
     .execute(pool)
     .await?;

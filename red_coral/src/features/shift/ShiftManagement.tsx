@@ -47,7 +47,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
     try {
       const [allShifts, current] = await Promise.all([
         getApi().listShifts({ limit: 50 }),
-        user ? getApi().getCurrentShift(user.id) : Promise.resolve(null),
+        getApi().getCurrentShift(),
       ]);
       setShifts(allShifts);
       setCurrentShift(current);
@@ -57,7 +57,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [user, t]);
+  }, [t]);
 
   // Load on mount
   useEffect(() => {
@@ -227,8 +227,6 @@ export const ShiftManagement: React.FC = React.memo(() => {
         align: 'right',
         render: (item) => {
           if (item.status !== 'OPEN') return null;
-          // Only show actions for current user's shift
-          if (user && item.operator_id !== user.id) return null;
           return (
             <div className="w-full flex items-center justify-end gap-1">
               <button
@@ -256,7 +254,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
         },
       },
     ],
-    [t, user, handleCloseShift, handleForceClose]
+    [t, handleCloseShift, handleForceClose]
   );
 
   // Check if can open new shift

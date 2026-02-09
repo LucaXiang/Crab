@@ -30,7 +30,7 @@ interface ShiftStore {
   staleShift: Shift | null;
 
   // Actions
-  fetchCurrentShift: (operatorId: number) => Promise<Shift | null>;
+  fetchCurrentShift: () => Promise<Shift | null>;
   openShift: (data: ShiftCreate) => Promise<Shift>;
   closeShift: (shiftId: number, data: ShiftClose) => Promise<Shift>;
   forceCloseShift: (shiftId: number, data: ShiftForceClose) => Promise<Shift>;
@@ -52,10 +52,10 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   /**
    * Fetch current open shift for operator
    */
-  fetchCurrentShift: async (operatorId: number) => {
+  fetchCurrentShift: async () => {
     set({ isLoading: true, error: null });
     try {
-      const shift = await getApi().getCurrentShift(operatorId);
+      const shift = await getApi().getCurrentShift();
       set({ currentShift: shift, isLoading: false });
 
       // 如果没有班次，标记需要开班
