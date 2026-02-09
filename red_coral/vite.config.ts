@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
               'vendor-utils': ['uuid', 'decimal.js'],
 
               // Tauri API
-              'vendor-tauri': ['@tauri-apps/api', '@tauri-apps/plugin-dialog', '@tauri-apps/plugin-log'],
+              'vendor-tauri': ['@tauri-apps/api', '@tauri-apps/plugin-dialog'],
             },
           },
         },
