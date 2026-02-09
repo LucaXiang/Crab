@@ -213,8 +213,7 @@ impl TenantManager {
         let binding: edge_server::services::tenant_binding::TenantBinding =
             serde_json::from_str(&content).ok()?;
         let sub = binding.subscription?;
-        // serde rename_all = "snake_case"，直接序列化为字符串
-        Some(serde_json::to_value(&sub.status).ok()?.as_str()?.to_string())
+        Some(sub.status.as_str().to_string())
     }
 
     /// 激活设备 (获取 Edge Server 证书)
@@ -298,37 +297,13 @@ impl TenantManager {
         let credential_path = paths.credential_file();
         tracing::info!("Saving credential to: {:?}", credential_path);
         
-        // 需要包装在 TenantBinding 中，因为 edge-server 期望 {"binding": {...}, "subscription": ...}
+        // 包装在 TenantBinding 中，subscription 直接使用 shared::activation::SubscriptionInfo
         let mut tenant_binding =
             edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
 
-        // 将 ActivationData 中的订阅信息转换并存入 TenantBinding
-        if let Some(ref sub_info) = data.subscription {
-            let now = shared::util::now_millis();
-            tenant_binding.subscription = Some(edge_server::services::tenant_binding::Subscription {
-                id: sub_info.id.clone(),
-                tenant_id: sub_info.tenant_id.clone(),
-                status: match sub_info.status {
-                    shared::activation::SubscriptionStatus::Inactive => edge_server::services::tenant_binding::SubscriptionStatus::Inactive,
-                    shared::activation::SubscriptionStatus::Active => edge_server::services::tenant_binding::SubscriptionStatus::Active,
-                    shared::activation::SubscriptionStatus::PastDue => edge_server::services::tenant_binding::SubscriptionStatus::PastDue,
-                    shared::activation::SubscriptionStatus::Expired => edge_server::services::tenant_binding::SubscriptionStatus::Expired,
-                    shared::activation::SubscriptionStatus::Canceled => edge_server::services::tenant_binding::SubscriptionStatus::Canceled,
-                    shared::activation::SubscriptionStatus::Unpaid => edge_server::services::tenant_binding::SubscriptionStatus::Unpaid,
-                },
-                plan: match sub_info.plan {
-                    shared::activation::PlanType::Basic => edge_server::services::tenant_binding::PlanType::Basic,
-                    shared::activation::PlanType::Pro => edge_server::services::tenant_binding::PlanType::Pro,
-                    shared::activation::PlanType::Enterprise => edge_server::services::tenant_binding::PlanType::Enterprise,
-                },
-                starts_at: sub_info.starts_at,
-                expires_at: sub_info.expires_at,
-                features: sub_info.features.clone(),
-                max_stores: sub_info.max_stores,
-                last_checked_at: now,
-                signature_valid_until: Some(sub_info.signature_valid_until),
-                signature: Some(sub_info.signature.clone()),
-            });
+        if let Some(mut sub_info) = data.subscription.clone() {
+            sub_info.last_checked_at = shared::util::now_millis();
+            tenant_binding.subscription = Some(sub_info);
         }
         let credential_json = serde_json::to_string_pretty(&tenant_binding).map_err(|e| {
             tracing::error!("Failed to serialize credential: {}", e);

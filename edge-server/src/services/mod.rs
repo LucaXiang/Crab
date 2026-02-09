@@ -25,5 +25,5 @@ pub use cert::CertService;
 pub use https::HttpsService;
 pub use message_bus::MessageBusService;
 pub use provisioning::ProvisioningService;
-pub use tenant_binding::{Subscription, TenantBinding};
+pub use tenant_binding::TenantBinding;
 pub use image_cleanup::ImageCleanupService;

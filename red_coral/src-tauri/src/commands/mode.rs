@@ -171,10 +171,9 @@ pub async fn update_client_config(
     bridge: State<'_, Arc<ClientBridge>>,
     edge_url: String,
     message_addr: String,
-    auth_url: String,
 ) -> Result<ApiResponse<()>, String> {
     match bridge
-        .update_client_config(&edge_url, &message_addr, &auth_url)
+        .update_client_config(&edge_url, &message_addr)
         .await
     {
         Ok(_) => Ok(ApiResponse::success(())),

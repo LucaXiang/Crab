@@ -7,15 +7,10 @@
 //! 包含 last_verified_at 用于时钟篡改检测。
 
 use crate::utils::AppError;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crab_cert::{CertMetadata, generate_hardware_id};
 use serde::{Deserialize, Serialize};
-use shared::activation::SignedBinding;
+use shared::activation::{SignedBinding, SubscriptionInfo};
 use std::path::Path;
-
-fn base64_decode(s: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    STANDARD.decode(s)
-}
 
 /// 验证证书对（证书 + CA）以及硬件绑定
 pub fn verify_cert_pair(cert_pem: &str, ca_pem: &str) -> Result<(), AppError> {
@@ -52,235 +47,17 @@ pub fn verify_cert_pair(cert_pem: &str, ca_pem: &str) -> Result<(), AppError> {
 /// 凭证存储位置
 pub const CREDENTIAL_FILE: &str = "credential.json";
 
-/// 订阅状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum SubscriptionStatus {
-    /// 注册未付费/合同未签
-    Inactive,
-    /// 合同有效，付费正常
-    Active,
-    /// 扣费失败，Stripe 重试中
-    PastDue,
-    /// 合同到期未续约
-    Expired,
-    /// 主动终止/重试全败
-    Canceled,
-    /// 长期欠费
-    Unpaid,
-}
-
-impl SubscriptionStatus {
-    /// 订阅是否被阻止（不允许使用系统）
-    ///
-    /// PastDue 仍允许使用（Stripe 正在重试扣费）
-    pub fn is_blocked(&self) -> bool {
-        matches!(
-            self,
-            SubscriptionStatus::Inactive
-                | SubscriptionStatus::Expired
-                | SubscriptionStatus::Canceled
-                | SubscriptionStatus::Unpaid
-        )
-    }
-
-    /// 转换为 shared 类型
-    pub fn to_shared(&self) -> shared::activation::SubscriptionStatus {
-        match self {
-            SubscriptionStatus::Inactive => shared::activation::SubscriptionStatus::Inactive,
-            SubscriptionStatus::Active => shared::activation::SubscriptionStatus::Active,
-            SubscriptionStatus::PastDue => shared::activation::SubscriptionStatus::PastDue,
-            SubscriptionStatus::Expired => shared::activation::SubscriptionStatus::Expired,
-            SubscriptionStatus::Canceled => shared::activation::SubscriptionStatus::Canceled,
-            SubscriptionStatus::Unpaid => shared::activation::SubscriptionStatus::Unpaid,
-        }
-    }
-}
-
-/// 订阅计划类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum PlanType {
-    Basic,
-    Pro,
-    Enterprise,
-}
-
-impl PlanType {
-    /// 返回该计划允许的最大门店数量
-    /// 0 表示无限制
-    pub fn max_stores(&self) -> usize {
-        match self {
-            PlanType::Basic => 1,
-            PlanType::Pro => 3,
-            PlanType::Enterprise => 0, // 无限
-        }
-    }
-
-    /// 转换为 shared 类型
-    pub fn to_shared(&self) -> shared::activation::PlanType {
-        match self {
-            PlanType::Basic => shared::activation::PlanType::Basic,
-            PlanType::Pro => shared::activation::PlanType::Pro,
-            PlanType::Enterprise => shared::activation::PlanType::Enterprise,
-        }
-    }
-}
-
-fn default_now_millis() -> i64 {
-    shared::util::now_millis()
-}
-
-/// 订阅详情
-///
-/// 订阅信息有独立签名，防止本地篡改。
-/// 签名有效期较短 (默认 7 天)，需要定期从 Auth Server 刷新。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Subscription {
-    pub id: Option<String>,
-    pub tenant_id: String,
-    pub status: SubscriptionStatus,
-    pub plan: PlanType,
-    #[serde(default = "default_now_millis")]
-    pub starts_at: i64,
-    pub expires_at: Option<i64>,
-    #[serde(default)]
-    pub features: Vec<String>,
-    /// Plan 允许的最大门店数，0 = 无限
-    #[serde(default)]
-    pub max_stores: u32,
-    #[serde(default = "default_now_millis")]
-    pub last_checked_at: i64,
-    /// 签名有效期 (Unix millis，超过此时间需要从 Auth Server 刷新)
-    #[serde(default)]
-    pub signature_valid_until: Option<i64>,
-    /// Tenant CA 签名 (base64)
-    /// 签名内容: "{tenant_id}|{plan}|{status}|{features_joined}|{signature_valid_until}"
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature: Option<String>,
-}
-
-impl Subscription {
-    /// 签名过期宽限期 (3 天)
-    ///
-    /// 签名有效期 7 天 + 宽限期 3 天 = 最多 10 天离线容忍。
-    /// 超过此限制必须联网刷新，否则阻止使用。
-    pub const SIGNATURE_GRACE_PERIOD_MS: i64 = 3 * 24 * 60 * 60 * 1000;
-
-    /// 返回待签名的数据
-    pub fn signable_data(&self) -> String {
-        let features_str = self.features.join(",");
-        let valid_until = self
-            .signature_valid_until
-            .map(|t| t.to_string())
-            .unwrap_or_default();
-        format!(
-            "{}|{}|{:?}|{}|{}",
-            self.tenant_id,
-            self.plan_str(),
-            self.status,
-            features_str,
-            valid_until
-        )
-    }
-
-    fn plan_str(&self) -> &'static str {
-        match self.plan {
-            PlanType::Basic => "basic",
-            PlanType::Pro => "pro",
-            PlanType::Enterprise => "enterprise",
-        }
-    }
-
-    /// 验证订阅签名
-    pub fn verify_signature(&self, tenant_ca_cert_pem: &str) -> Result<(), AppError> {
-        let sig_b64 = self
-            .signature
-            .as_ref()
-            .ok_or_else(|| AppError::validation("Subscription is not signed"))?;
-
-        let sig_bytes = base64_decode(sig_b64).map_err(|e| {
-            AppError::validation(format!("Invalid subscription signature encoding: {}", e))
-        })?;
-
-        let data = self.signable_data();
-        crab_cert::verify(tenant_ca_cert_pem, data.as_bytes(), &sig_bytes).map_err(|e| {
-            AppError::validation(format!("Subscription signature verification failed: {}", e))
-        })
-    }
-
-    /// 检查签名是否过期 (需要刷新)
-    pub fn is_signature_expired(&self) -> bool {
-        match self.signature_valid_until {
-            Some(valid_until) => shared::util::now_millis() > valid_until,
-            None => true, // 没有有效期 = 已过期
-        }
-    }
-
-    /// 检查签名是否陈旧 (过期 + 宽限期也已过)
-    ///
-    /// 签名有效期 7 天 + 宽限期 3 天 = 最多 10 天离线容忍。
-    /// 超过此限制必须联网刷新，否则阻止使用。
-    pub fn is_signature_stale(&self) -> bool {
-        match self.signature_valid_until {
-            Some(valid_until) => {
-                shared::util::now_millis() > valid_until + Self::SIGNATURE_GRACE_PERIOD_MS
-            }
-            None => true,
-        }
-    }
-
-    /// 完整验证 (签名 + 有效期)
-    pub fn validate(&self, tenant_ca_cert_pem: &str) -> Result<(), AppError> {
-        // 1. 验证签名
-        self.verify_signature(tenant_ca_cert_pem)?;
-
-        // 2. 检查签名有效期
-        if self.is_signature_expired() {
-            return Err(AppError::validation(
-                "Subscription signature has expired, needs refresh",
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// 检查是否已签名
-    pub fn is_signed(&self) -> bool {
-        self.signature.is_some()
-    }
-}
-
-impl Default for Subscription {
-    fn default() -> Self {
-        let now = shared::util::now_millis();
-        Self {
-            id: None,
-            tenant_id: "default".to_string(),
-            status: SubscriptionStatus::Inactive,
-            plan: PlanType::Basic,
-            starts_at: now,
-            expires_at: None,
-            features: vec![],
-            max_stores: PlanType::Basic.max_stores() as u32,
-            last_checked_at: now,
-            signature_valid_until: None,
-            signature: None,
-        }
-    }
-}
-
 /// 已绑定租户的存储凭证
 ///
 /// 核心绑定数据使用 SignedBinding (来自 shared)，
 /// 由 Tenant CA 签名保护，包含 last_verified_at 用于时钟篡改检测。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantBinding {
     /// 签名的绑定数据 (来自 Auth Server)
     pub binding: SignedBinding,
-    /// 订阅信息 (独立签名)
+    /// 订阅信息 (独立签名，直接使用 shared 统一类型)
     #[serde(default)]
-    pub subscription: Option<Subscription>,
+    pub subscription: Option<SubscriptionInfo>,
 }
 
 impl TenantBinding {

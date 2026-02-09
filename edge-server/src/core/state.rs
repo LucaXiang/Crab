@@ -128,6 +128,8 @@ pub struct ServerState {
     /// 服务器实例 epoch (启动时生成的 UUID)
     /// 用于客户端检测服务器重启
     pub epoch: String,
+    /// 审计日志 worker handle (shutdown 时 drain)
+    pub audit_worker_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl ServerState {
@@ -150,6 +152,7 @@ impl ServerState {
         audit_service: Arc<AuditService>,
         config_notify: Arc<tokio::sync::Notify>,
         epoch: String,
+        audit_worker_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
     ) -> Self {
         Self {
             config,
@@ -166,6 +169,7 @@ impl ServerState {
             audit_service,
             config_notify,
             epoch,
+            audit_worker_handle,
         }
     }
 
@@ -238,8 +242,9 @@ impl ServerState {
         audit_service.on_startup().await;
 
         // 启动审计日志 worker (with panic catching)
-        let audit_worker = AuditWorker::new(audit_service.storage().clone());
-        tokio::spawn(async move {
+        let dead_letter_path = data_dir.join("audit_dead_letter.jsonl");
+        let audit_worker = AuditWorker::new(audit_service.storage().clone(), dead_letter_path);
+        let audit_worker_handle = tokio::spawn(async move {
             let result = futures::FutureExt::catch_unwind(
                 std::panic::AssertUnwindSafe(audit_worker.run(audit_rx)),
             )
@@ -255,6 +260,7 @@ impl ServerState {
                 tracing::error!(panic = %msg, "Audit worker panicked! Audit logs may be lost.");
             }
         });
+        let audit_worker_handle = Arc::new(tokio::sync::Mutex::new(Some(audit_worker_handle)));
 
         // 8. Config change notifier (唤醒依赖配置的调度器)
         let config_notify = Arc::new(tokio::sync::Notify::new());
@@ -277,6 +283,7 @@ impl ServerState {
             audit_service,
             config_notify,
             epoch,
+            audit_worker_handle,
         );
 
         // 3. Late initialization for HttpsService (needs state)

@@ -236,8 +236,9 @@ pub struct SubscriptionHealth {
     pub plan: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscription_status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_valid_until: Option<i64>,
+    /// 签名有效期截止时间 (Unix millis)，0 = 未知
+    #[serde(default)]
+    pub signature_valid_until: i64,
     pub needs_refresh: bool,
 }
 

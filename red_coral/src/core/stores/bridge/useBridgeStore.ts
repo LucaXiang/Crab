@@ -221,11 +221,11 @@ interface BridgeStore {
 
   // Config Actions
   updateServerConfig: (httpPort: number, messagePort: number) => Promise<void>;
-  updateClientConfig: (edgeUrl: string, messageAddr: string, authUrl: string) => Promise<void>;
+  updateClientConfig: (edgeUrl: string, messageAddr: string) => Promise<void>;
 
   // Tenant Actions
   fetchTenants: () => Promise<void>;
-  activateTenant: (authUrl: string, username: string, password: string) => Promise<ActivationResult>;
+  activateTenant: (username: string, password: string) => Promise<ActivationResult>;
   switchTenant: (tenantId: string) => Promise<void>;
   removeTenant: (tenantId: string) => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
@@ -344,10 +344,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      updateClientConfig: async (edgeUrl: string, messageAddr: string, authUrl: string) => {
+      updateClientConfig: async (edgeUrl: string, messageAddr: string) => {
         try {
           set({ isLoading: true, error: null });
-          await invokeApi('update_client_config', { edgeUrl, messageAddr, authUrl });
+          await invokeApi('update_client_config', { edgeUrl, messageAddr });
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Failed to update client config' });
           throw error;
@@ -367,11 +367,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateTenant: async (authUrl, username, password) => {
+      activateTenant: async (username, password) => {
         try {
           set({ isLoading: true, error: null });
           const result = await invokeApi<ActivationResult>('activate_tenant', {
-            authUrl,
             username,
             password,
           });

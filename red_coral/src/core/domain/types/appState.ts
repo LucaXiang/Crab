@@ -85,7 +85,7 @@ export interface SubscriptionHealth {
   status: HealthLevel;
   plan?: string;
   subscription_status?: string;
-  signature_valid_until?: number;
+  signature_valid_until: number;
   needs_refresh: boolean;
 }
 

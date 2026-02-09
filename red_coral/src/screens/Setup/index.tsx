@@ -37,7 +37,6 @@ export const SetupScreen: React.FC = () => {
   const [messagePort, setMessagePort] = useState(DEFAULT_MESSAGE_PORT);
 
   // Client mode config
-  const authUrl = 'http://127.0.0.1:3001';
   const [edgeUrl, setEdgeUrl] = useState('https://edge.example.com');
   const [messageAddr, setMessageAddr] = useState('edge.example.com:9626');
 
@@ -57,7 +56,7 @@ export const SetupScreen: React.FC = () => {
         await startServerMode();
       } else if (modeChoice === 'client') {
         // Save client config and start client mode
-        await updateClientConfig(edgeUrl, messageAddr, authUrl);
+        await updateClientConfig(edgeUrl, messageAddr);
         await startClientMode(edgeUrl, messageAddr);
       }
       setStep('complete');

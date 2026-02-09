@@ -18,8 +18,6 @@ export const ActivateScreen: React.FC = () => {
     error,
   } = useBridgeStore();
 
-  // 激活表单状态
-  const authUrl = 'http://127.0.0.1:3001';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [activationError, setActivationError] = useState('');
@@ -34,7 +32,7 @@ export const ActivateScreen: React.FC = () => {
     }
 
     try {
-      const result = await activateTenant(authUrl, username, password);
+      const result = await activateTenant(username, password);
 
       // 激活成功后立即检查订阅状态，blocked 直接跳转
       if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {

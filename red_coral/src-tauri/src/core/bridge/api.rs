@@ -8,6 +8,11 @@ impl ClientBridge {
         &self.tenant_manager
     }
 
+    /// 获取 Auth Server URL
+    pub async fn get_auth_url(&self) -> String {
+        self.config.read().await.auth_url.clone()
+    }
+
     /// 获取服务器模式配置
     pub async fn get_server_config(&self) -> ServerModeConfig {
         self.config.read().await.server_config.clone()
@@ -43,18 +48,16 @@ impl ClientBridge {
         &self,
         edge_url: &str,
         message_addr: &str,
-        auth_url: &str,
     ) -> Result<(), BridgeError> {
         {
             let mut config = self.config.write().await;
             config.client_config = Some(ClientModeConfig {
                 edge_url: edge_url.to_string(),
                 message_addr: message_addr.to_string(),
-                auth_url: auth_url.to_string(),
             });
             config.save(&self.config_path)?;
         }
-        tracing::info!(edge_url = %edge_url, message_addr = %message_addr, auth_url = %auth_url, "Client config updated");
+        tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client config updated");
         Ok(())
     }
 

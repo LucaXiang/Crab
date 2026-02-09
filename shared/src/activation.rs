@@ -26,6 +26,33 @@ pub struct ActivationResponse {
     /// 激活数据 (成功时)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<ActivationData>,
+    /// Quota 信息 (设备数已满时返回)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub quota_info: Option<QuotaInfo>,
+}
+
+/// 设备 Quota 信息
+///
+/// 当激活请求因设备数已满被拒绝时返回，
+/// 包含当前已激活设备列表，供前端展示替换选项。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuotaInfo {
+    /// 计划允许的最大 edge-server 数量
+    pub max_edge_servers: u32,
+    /// 当前活跃设备数
+    pub active_count: u32,
+    /// 当前已激活设备列表
+    pub active_devices: Vec<ActiveDevice>,
+}
+
+/// 已激活设备信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveDevice {
+    pub entity_id: String,
+    pub device_id: String,
+    pub activated_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_refreshed_at: Option<i64>,
 }
 
 /// 完整的激活数据
@@ -62,7 +89,7 @@ pub struct ActivationData {
 ///
 /// 关键数据由 Tenant CA 私钥签名，防止篡改。
 /// 包含 last_verified_at 用于时钟篡改检测。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedBinding {
     /// 实体 ID
     pub entity_id: String,
@@ -227,7 +254,7 @@ impl EntityType {
 ///
 /// 订阅信息有独立签名，有效期较短 (默认 7 天)。
 /// 签名过期后需要从 Auth Server 刷新。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SubscriptionInfo {
     /// 租户 ID
     pub tenant_id: String,
@@ -254,9 +281,28 @@ pub struct SubscriptionInfo {
     /// Tenant CA 签名 (base64)
     /// 签名内容: "{tenant_id}|{plan}|{status}|{features}|{max_stores}|{signature_valid_until}"
     pub signature: String,
+    /// 最后检查时间 (Unix millis，本地记录)
+    #[serde(default)]
+    pub last_checked_at: i64,
 }
 
 impl SubscriptionInfo {
+    /// 签名过期宽限期 (3 天)
+    ///
+    /// 签名有效期 7 天 + 宽限期 3 天 = 最多 10 天离线容忍。
+    /// 超过此限制必须联网刷新，否则阻止使用。
+    pub const SIGNATURE_GRACE_PERIOD_MS: i64 = 3 * 24 * 60 * 60 * 1000;
+
+    /// 检查签名是否陈旧 (过期 + 宽限期也已过)
+    pub fn is_signature_stale(&self) -> bool {
+        crate::util::now_millis() > self.signature_valid_until + Self::SIGNATURE_GRACE_PERIOD_MS
+    }
+
+    /// 检查是否已签名
+    pub fn is_signed(&self) -> bool {
+        !self.signature.is_empty()
+    }
+
     /// 返回待签名的数据
     pub fn signable_data(&self) -> String {
         let features_str = self.features.join(",");
@@ -319,6 +365,17 @@ impl SubscriptionStatus {
             SubscriptionStatus::Canceled => "canceled",
             SubscriptionStatus::Unpaid => "unpaid",
         }
+    }
+
+    /// 是否处于阻止激活的状态
+    pub fn is_blocked(&self) -> bool {
+        matches!(
+            self,
+            SubscriptionStatus::Inactive
+                | SubscriptionStatus::Expired
+                | SubscriptionStatus::Canceled
+                | SubscriptionStatus::Unpaid
+        )
     }
 }
 

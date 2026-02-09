@@ -241,7 +241,7 @@ impl ClientBridge {
                                 status: HealthLevel::Unknown,
                                 plan: None,
                                 subscription_status: None,
-                                signature_valid_until: None,
+                                signature_valid_until: 0,
                                 needs_refresh: false,
                             }
                         }
@@ -250,7 +250,7 @@ impl ClientBridge {
                         status: HealthLevel::Unknown,
                         plan: None,
                         subscription_status: None,
-                        signature_valid_until: None,
+                        signature_valid_until: 0,
                         needs_refresh: false,
                     },
                 };
@@ -335,7 +335,7 @@ impl ClientBridge {
                     status: HealthLevel::Unknown, // Client 模式不直接访问订阅
                     plan: None,
                     subscription_status: None,
-                    signature_valid_until: None,
+                    signature_valid_until: 0,
                     needs_refresh: false,
                 };
 
@@ -363,7 +363,7 @@ impl ClientBridge {
                     status: HealthLevel::Unknown,
                     plan: None,
                     subscription_status: None,
-                    signature_valid_until: None,
+                    signature_valid_until: 0,
                     needs_refresh: false,
                 };
 

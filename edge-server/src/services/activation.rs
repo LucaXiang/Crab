@@ -4,8 +4,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
-use crate::services::tenant_binding::{PlanType, Subscription, SubscriptionStatus, TenantBinding};
+use crate::services::tenant_binding::TenantBinding;
 use crate::utils::AppError;
+use shared::activation::SubscriptionInfo;
 use shared::app_state::SubscriptionBlockedInfo;
 
 /// 激活服务 - 管理边缘节点激活状态
@@ -130,31 +131,29 @@ impl ActivationService {
             return None;
         }
 
-        let status = sub.status.to_shared();
-        let plan = sub.plan.to_shared();
-
         let (user_message, expired_at) = if signature_stale && !status_blocked {
             // 签名陈旧但状态本身是 Active/PastDue → 需要联网刷新
             ("subscription_signature_stale".to_string(), None)
         } else {
             let msg = match sub.status {
-                SubscriptionStatus::Inactive => "subscription_inactive",
-                SubscriptionStatus::Expired => "subscription_expired",
-                SubscriptionStatus::Canceled => "subscription_canceled",
-                SubscriptionStatus::Unpaid => "subscription_unpaid",
+                shared::activation::SubscriptionStatus::Inactive => "subscription_inactive",
+                shared::activation::SubscriptionStatus::Expired => "subscription_expired",
+                shared::activation::SubscriptionStatus::Canceled => "subscription_canceled",
+                shared::activation::SubscriptionStatus::Unpaid => "subscription_unpaid",
                 _ => "subscription_blocked",
             };
             // Inactive/Unpaid 未激活状态不应有过期时间
             let expired_at = match sub.status {
-                SubscriptionStatus::Inactive | SubscriptionStatus::Unpaid => None,
+                shared::activation::SubscriptionStatus::Inactive
+                | shared::activation::SubscriptionStatus::Unpaid => None,
                 _ => sub.expires_at,
             };
             (msg.to_string(), expired_at)
         };
 
         Some(SubscriptionBlockedInfo {
-            status,
-            plan,
+            status: sub.status,
+            plan: sub.plan,
             max_stores: sub.max_stores,
             expired_at,
             grace_period_days: None,
@@ -503,24 +502,22 @@ impl ActivationService {
             // 网络失败 → 检查签名是否过期
             if let Some(sub) = &credential.subscription {
                 if sub.is_signature_expired() {
+                    let remaining_ms = (sub.signature_valid_until
+                        + SubscriptionInfo::SIGNATURE_GRACE_PERIOD_MS)
+                        - shared::util::now_millis();
+                    let remaining_days = (remaining_ms / 86_400_000).max(0);
                     tracing::warn!(
                         "Subscription sync failed AND signature expired! \
                          Offline grace period applies ({}d remaining).",
-                        sub.signature_valid_until
-                            .map(|v| {
-                                let remaining_ms = (v + Subscription::SIGNATURE_GRACE_PERIOD_MS)
-                                    - shared::util::now_millis();
-                                (remaining_ms / 86_400_000).max(0)
-                            })
-                            .unwrap_or(0)
+                        remaining_days
                     );
                 } else {
+                    let remaining_hours =
+                        (sub.signature_valid_until - shared::util::now_millis()) / 3_600_000;
                     tracing::info!(
                         "Subscription sync failed but signature still valid \
                          (expires in {}h). Using cached data.",
-                        sub.signature_valid_until
-                            .map(|v| (v - shared::util::now_millis()) / 3_600_000)
-                            .unwrap_or(0)
+                        remaining_hours
                     );
                 }
             } else {
@@ -534,9 +531,7 @@ impl ActivationService {
     pub async fn fetch_subscription_from_auth_server(
         &self,
         tenant_id: &str,
-    ) -> Option<Subscription> {
-        use shared::activation::SubscriptionInfo;
-
+    ) -> Option<SubscriptionInfo> {
         let client = reqwest::Client::new();
         let resp = match client
             .post(format!("{}/api/tenant/subscription", self.auth_server_url))
@@ -581,7 +576,7 @@ impl ActivationService {
             return None;
         }
 
-        let sub_info = match data.subscription {
+        let mut sub_info = match data.subscription {
             Some(s) => s,
             None => {
                 tracing::warn!("Auth Server returned no subscription");
@@ -590,7 +585,6 @@ impl ActivationService {
         };
 
         // Verify subscription signature using local tenant_ca.pem
-        // Note: cert_dir is {work_dir} = {tenant}/server/, tenant_ca is in {tenant}/server/certs/
         let tenant_ca_path = self.cert_dir.join("certs").join("tenant_ca.pem");
         let tenant_ca_pem = match std::fs::read_to_string(&tenant_ca_path) {
             Ok(pem) => pem,
@@ -610,38 +604,9 @@ impl ActivationService {
 
         tracing::debug!("Subscription signature verified successfully");
 
-        // Convert SubscriptionInfo to local Subscription
-        let status = match sub_info.status {
-            shared::activation::SubscriptionStatus::Inactive => SubscriptionStatus::Inactive,
-            shared::activation::SubscriptionStatus::Active => SubscriptionStatus::Active,
-            shared::activation::SubscriptionStatus::PastDue => SubscriptionStatus::PastDue,
-            shared::activation::SubscriptionStatus::Expired => SubscriptionStatus::Expired,
-            shared::activation::SubscriptionStatus::Canceled => SubscriptionStatus::Canceled,
-            shared::activation::SubscriptionStatus::Unpaid => SubscriptionStatus::Unpaid,
-        };
+        // 更新本地检查时间
+        sub_info.last_checked_at = shared::util::now_millis();
 
-        let plan = match sub_info.plan {
-            shared::activation::PlanType::Basic => PlanType::Basic,
-            shared::activation::PlanType::Pro => PlanType::Pro,
-            shared::activation::PlanType::Enterprise => PlanType::Enterprise,
-        };
-
-        let starts_at = sub_info.starts_at;
-        let expires_at = sub_info.expires_at;
-        let signature_valid_until = Some(sub_info.signature_valid_until);
-
-        Some(Subscription {
-            id: sub_info.id,
-            tenant_id: sub_info.tenant_id,
-            status,
-            plan,
-            starts_at,
-            expires_at,
-            features: sub_info.features,
-            max_stores: sub_info.max_stores,
-            last_checked_at: shared::util::now_millis(),
-            signature_valid_until,
-            signature: Some(sub_info.signature),
-        })
+        Some(sub_info)
     }
 }

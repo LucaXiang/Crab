@@ -92,10 +92,13 @@ impl ClientBridge {
         };
         drop(tenant_manager);
 
+        let auth_url = config.auth_url.clone();
+
         let edge_config = edge_server::Config::builder()
             .work_dir(work_dir)
             .http_port(server_config.http_port)
             .message_tcp_port(server_config.message_port)
+            .auth_server_url(auth_url)
             .build();
 
         let server_state = edge_server::ServerState::initialize(&edge_config).await;
@@ -302,11 +305,7 @@ impl ClientBridge {
             .ok_or(TenantError::NoTenantSelected)?;
 
         let config = self.config.read().await;
-        let auth_url = config
-            .client_config
-            .as_ref()
-            .map(|c| c.auth_url.clone())
-            .unwrap_or_else(|| "https://auth.example.com".to_string());
+        let auth_url = config.auth_url.clone();
         drop(config);
 
         if !paths.has_client_certificates() {
@@ -506,7 +505,6 @@ impl ClientBridge {
             config.client_config = Some(ClientModeConfig {
                 edge_url: edge_url.to_string(),
                 message_addr: message_addr.to_string(),
-                auth_url,
             });
         }
         self.save_config().await?;

@@ -256,6 +256,7 @@ async fn activate(
                 success: false,
                 error: Some("Invalid credentials".to_string()),
                 data: None,
+                quota_info: None,
             });
         }
     };
@@ -268,6 +269,7 @@ async fn activate(
                 success: false,
                 error: Some(e.to_string()),
                 data: None,
+                quota_info: None,
             });
         }
     };
@@ -286,6 +288,7 @@ async fn activate(
                     success: false,
                     error: Some(format!("Failed to load Tenant CA: {}", e)),
                     data: None,
+                    quota_info: None,
                 });
             }
         }
@@ -298,6 +301,7 @@ async fn activate(
                     success: false,
                     error: Some(format!("Failed to create Tenant CA: {}", e)),
                     data: None,
+                    quota_info: None,
                 });
             }
         };
@@ -306,6 +310,7 @@ async fn activate(
                 success: false,
                 error: Some(format!("Failed to save Tenant CA: {}", e)),
                 data: None,
+                quota_info: None,
             });
         }
         ca
@@ -330,6 +335,7 @@ async fn activate(
                 success: false,
                 error: Some(format!("Failed to issue certificate: {}", e)),
                 data: None,
+                quota_info: None,
             });
         }
     };
@@ -342,6 +348,7 @@ async fn activate(
                 success: false,
                 error: Some(format!("Failed to parse certificate metadata: {}", e)),
                 data: None,
+                quota_info: None,
             });
         }
     };
@@ -362,6 +369,7 @@ async fn activate(
                 success: false,
                 error: Some(format!("Failed to sign binding: {}", e)),
                 data: None,
+                quota_info: None,
             });
         }
     };
@@ -392,7 +400,8 @@ async fn activate(
         features: sub_features,
         max_stores: sub_plan.max_stores() as u32,
         signature_valid_until,
-        signature: String::new(), // Will be signed below
+        signature: String::new(),
+        last_checked_at: 0,
     };
 
     // Sign the subscription with Tenant CA
@@ -403,6 +412,7 @@ async fn activate(
                 success: false,
                 error: Some(format!("Failed to sign subscription: {}", e)),
                 data: None,
+                quota_info: None,
             });
         }
     };
@@ -430,6 +440,7 @@ async fn activate(
         success: true,
         error: None,
         data: Some(data),
+        quota_info: None,
     })
 }
 
@@ -506,6 +517,7 @@ async fn get_subscription_status(
         max_stores: plan.max_stores() as u32,
         signature_valid_until,
         signature: String::new(),
+        last_checked_at: 0,
     };
 
     // Sign the subscription with Tenant CA

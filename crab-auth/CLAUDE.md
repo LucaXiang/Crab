@@ -4,65 +4,107 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Crab Auth
 
-认证服务器 — 集中身份管理 + CA 层级管理 + 订阅状态校验。
+认证服务器 — PostgreSQL 持久化 + PKI 证书管理 + 订阅校验 + P12 证书托管。
+
+**生产服务**，部署在云端。本地开发请用 `crab-auth-mock`。
 
 ## 命令
 
 ```bash
 cargo check -p crab-auth
-cargo run -p crab-auth     # 启动服务器 (Port 3001)
+cargo build -p crab-auth
 ```
+
+## 依赖
+
+| 组件 | 说明 |
+|------|------|
+| **PostgreSQL** | 租户、订阅、激活记录、P12 元数据 |
+| **AWS S3** | .p12 证书文件存储 (SSE-KMS 加密) |
+| **文件系统** | Root CA / Tenant CA 证书 (`auth_storage/`) |
+
+## 环境变量
+
+| 变量 | 必须 | 默认值 | 说明 |
+|------|------|--------|------|
+| `DATABASE_URL` | **是** | - | PostgreSQL 连接字符串 |
+| `AUTH_STORAGE_PATH` | 否 | `auth_storage` | CA 证书存储目录 |
+| `PORT` | 否 | `3001` | HTTP 监听端口 |
+| `P12_S3_BUCKET` | 否 | `crab-tenant-certificates` | S3 存储桶 |
+| `P12_KMS_KEY_ID` | 否 | - | KMS Key ID (SSE-KMS) |
 
 ## 模块结构
 
 ```
 src/
-├── main.rs   # 入口
-├── api.rs    # HTTP API 路由
-└── state.rs  # AppState
+├── main.rs         # 入口 (PG 连接 + 迁移 + AWS SDK 初始化)
+├── config.rs       # Config (从环境变量读取)
+├── state.rs        # AppState (PgPool + AuthStorage + S3)
+├── api/            # HTTP 路由 (Axum)
+│   ├── mod.rs          # Router 定义
+│   ├── activate.rs     # POST /api/server/activate (设备激活)
+│   ├── subscription.rs # POST /api/tenant/subscription (订阅查询)
+│   ├── binding.rs      # POST /api/binding/refresh (Binding 刷新)
+│   ├── p12.rs          # POST /api/p12/upload (P12 证书上传)
+│   └── pki.rs          # GET /pki/root_ca (Root CA 证书)
+└── db/             # 数据访问层 (sqlx)
+    ├── mod.rs
+    ├── tenants.rs      # 租户认证 (argon2 密码校验)
+    ├── subscriptions.rs# 订阅查询 (只读)
+    ├── activations.rs  # 激活记录 CRUD
+    └── p12.rs          # P12 证书元数据
 ```
 
 ## API 端点
 
-| 端点 | 用途 |
-|------|------|
-| `POST /api/activate` | 设备激活 (验证租户 + 签发证书 + 返回订阅信息) |
-| `POST /api/tenant/register` | 租户注册 |
-| `GET /api/tenant/:id/ca` | 获取租户 CA |
-| `POST /api/cert/issue` | 签发实体证书 |
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/api/server/activate` | POST | 设备激活 (认证 + 签发证书 + 返回订阅) |
+| `/api/tenant/subscription` | POST | 查询/刷新订阅状态 (签名后返回) |
+| `/api/binding/refresh` | POST | 刷新 SignedBinding (更新 last_verified_at) |
+| `/api/p12/upload` | POST | 上传 .p12 证书 (Verifactu 电子签名) |
+| `/pki/root_ca` | GET | 获取 Root CA 证书 |
+
+## 数据库表
+
+crab-auth **只拥有** `activations` 和 `p12_certificates` 表。
+`tenants` 和 `subscriptions` 表由外部 SaaS 管理平台创建和维护 (Stripe webhook 等)，crab-auth 只读。
+
+| 表 | 权限 | 说明 |
+|-----|------|------|
+| `activations` | 读写 | 设备激活记录 (entity_id, device_id, status) |
+| `p12_certificates` | 读写 | P12 证书元数据 (S3 key, password, fingerprint) |
+| `tenants` | 只读 | 租户信息 (id, name, hashed_password, status) |
+| `subscriptions` | 只读 | 订阅信息 (plan, status, max_edge_servers, features) |
 
 ## 激活流程
 
 ```
-1. 客户端发送 ActivationRequest (tenant_code, password, device_id)
-2. crab-auth 验证租户凭据
-3. 检查订阅状态 (SubscriptionInfo)
-4. 签发 Entity Cert (包含 device_id 绑定)
-5. 生成 SignedBinding (硬件绑定 + 签名)
-6. 返回: Credential + SignedBinding + SubscriptionInfo
+1. Edge-server 发送 ActivationRequest (username, password, device_id)
+2. 验证租户凭据 (argon2 密码校验)
+3. 查询订阅状态 + Quota 检查 (max_edge_servers)
+4. 如设备已存在 → 复用/替换旧激活记录
+5. 签发 Entity Cert (Tenant CA 签名)
+6. 生成 SignedBinding (硬件绑定 + 时钟篡改检测)
+7. 签名 SubscriptionInfo (Tenant CA)
+8. 返回: ActivationResponse { data: ActivationData, quota_info }
 ```
 
-## 订阅系统
+## 证书层级
 
-**SubscriptionStatus**: Inactive → Active → PastDue → Expired / Canceled / Unpaid
+```
+Root CA (auth_storage/ca/)
+  └── Tenant CA (auth_storage/tenants/<tenant_id>/)
+        └── Entity Cert (签发给 edge-server, 含 device_id 绑定)
+```
 
-**PlanType**:
-| Plan | max_stores | 说明 |
-|------|------------|------|
-| Basic | 1 | 单店 |
-| Pro | 3 | 连锁 |
-| Enterprise | 无限 | 企业 |
+## 共享类型
 
-**SignedBinding**:
-- 硬件绑定: device_id + fingerprint
-- 时钟篡改检测: 后退 ≤1小时，前进 ≤30天
-- 签名验证: 防止绑定信息被篡改
-
-## 存储
-
-证书存储在 `auth_storage/` (gitignored):
-- `root_ca/` - Root CA
-- `tenants/<id>/` - 租户 CA + 元数据 + 订阅信息
+使用 `shared::activation` 中的统一类型:
+- `ActivationResponse` / `ActivationData`
+- `SignedBinding` (含签名验证和时钟篡改检测)
+- `SubscriptionInfo` (含签名，`last_checked_at` 服务端设为 `0`，由客户端本地更新)
+- `SubscriptionStatus` / `PlanType` / `QuotaInfo`
 
 ## 响应语言
 

@@ -147,6 +147,18 @@ impl Server {
 
         background_tasks.shutdown().await;
 
+        // 取出 audit worker handle，然后 drop state 释放所有 audit tx → channel 关闭 → worker drain
+        let audit_handle = state.audit_worker_handle.lock().await.take();
+        drop(state);
+        // 等待 worker 处理完残留条目
+        if let Some(handle) = audit_handle
+            && tokio::time::timeout(std::time::Duration::from_secs(5), handle)
+                .await
+                .is_err()
+        {
+            tracing::warn!("Audit worker drain timed out after 5s");
+        }
+
         Ok(())
     }
 

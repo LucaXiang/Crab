@@ -35,8 +35,13 @@ pub struct ClientModeConfig {
     pub edge_url: String,
     /// 消息总线地址
     pub message_addr: String,
-    /// Auth Server URL
-    pub auth_url: String,
+}
+
+fn default_auth_url() -> String {
+    std::env::var("AUTH_SERVER_URL").unwrap_or_else(|_| {
+        tracing::debug!("AUTH_SERVER_URL not set, using development default");
+        "http://127.0.0.1:3001".to_string()
+    })
 }
 
 /// 应用配置
@@ -52,6 +57,9 @@ pub struct AppConfig {
     pub client_config: Option<ClientModeConfig>,
     /// 已知租户列表
     pub known_tenants: Vec<String>,
+    /// Auth Server URL (全局，激活和 edge-server 都用)
+    #[serde(default = "default_auth_url")]
+    pub auth_url: String,
 }
 
 impl Default for AppConfig {
@@ -62,6 +70,7 @@ impl Default for AppConfig {
             server_config: ServerModeConfig::default(),
             client_config: None,
             known_tenants: Vec::new(),
+            auth_url: default_auth_url(),
         }
     }
 }

@@ -20,14 +20,15 @@ pub async fn list_tenants(
 
 /// 激活新租户 (设备激活)
 ///
-/// 同时预激活 edge-server，为 Server 模式做准备
+/// 同时预激活 edge-server，为 Server 模式做准备。
+/// auth_url 从 AppConfig 全局配置获取，前端不再传递。
 #[tauri::command]
 pub async fn activate_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    auth_url: String,
     username: String,
     password: String,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
+    let auth_url = bridge.get_auth_url().await;
 
     match bridge
         .handle_activation(&auth_url, &username, &password)

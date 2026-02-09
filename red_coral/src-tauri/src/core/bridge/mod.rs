@@ -28,7 +28,7 @@ use tauri::Emitter;
 use tokio::sync::RwLock;
 
 use crab_client::CrabClient;
-use edge_server::services::tenant_binding::SubscriptionStatus;
+use shared::activation::SubscriptionStatus;
 use shared::app_state::{ActivationRequiredReason, ClockDirection};
 use shared::order::{CommandResponse, OrderCommand, OrderCommandPayload, OrderEvent, OrderSnapshot, SyncResponse};
 use super::tenant_manager::{TenantError, TenantManager};
