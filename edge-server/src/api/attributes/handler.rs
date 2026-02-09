@@ -101,6 +101,22 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
+    // 检查是否有商品/分类正在使用此属性
+    let binding_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM attribute_binding WHERE attribute_id = ?",
+        id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
+    if binding_count > 0 {
+        return Err(AppError::validation(format!(
+            "Cannot delete attribute: {} product/category binding(s) exist",
+            binding_count
+        )));
+    }
+
     let name_for_audit = attribute::find_by_id(&state.pool, id)
         .await
         .ok()

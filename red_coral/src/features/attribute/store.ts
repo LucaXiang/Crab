@@ -240,7 +240,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   createAttribute: async (params) => {
     try {
       await getApi().createAttribute(params);
-      await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to create attribute', e, { component: 'AttributeStore' });
@@ -251,7 +250,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       const { id, ...data } = params;
       await getApi().updateAttribute(id, data);
-      await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to update attribute', e, { component: 'AttributeStore' });
@@ -261,7 +259,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   deleteAttribute: async (id) => {
     try {
       await getApi().deleteAttribute(id);
-      await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to delete attribute', e, { component: 'AttributeStore' });
@@ -283,7 +280,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         newOptions.set(attributeId, opts);
         return { options: newOptions };
       });
-      await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to create option', e, { component: 'AttributeStore' });
@@ -305,7 +301,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         newOptions.set(attributeId, opts);
         return { options: newOptions };
       });
-      await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to update option', e, { component: 'AttributeStore' });
@@ -326,7 +321,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         newOptions.set(attributeId, opts);
         return { options: newOptions };
       });
-      await get().fetchAll(true);
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to delete option', e, { component: 'AttributeStore' });

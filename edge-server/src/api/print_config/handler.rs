@@ -58,11 +58,9 @@ pub async fn update(
         })
     );
 
-    tracing::info!(
-        default_kitchen = ?config.default_kitchen_printer,
-        default_label = ?config.default_label_printer,
-        "System default print config updated"
-    );
+    state
+        .broadcast_sync("print_config", "updated", "default", Some(&config))
+        .await;
 
     Ok(Json(config))
 }

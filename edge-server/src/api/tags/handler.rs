@@ -95,6 +95,22 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
+    // 检查是否有商品正在使用此标签
+    let product_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM product_tag WHERE tag_id = ?",
+        id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
+    if product_count > 0 {
+        return Err(AppError::validation(format!(
+            "Cannot delete tag: {} product(s) are using it",
+            product_count
+        )));
+    }
+
     let name_for_audit = tag::find_by_id(&state.pool, id).await.ok().flatten()
         .map(|t| t.name.clone()).unwrap_or_default();
     let result = tag::delete(&state.pool, id).await?;

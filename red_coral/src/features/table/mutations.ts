@@ -1,5 +1,4 @@
 import { createTauriClient } from '@/infrastructure/api';
-import { useTableStore } from './store';
 
 const getApi = () => createTauriClient();
 
@@ -25,8 +24,6 @@ export async function createTable(input: CreateTableInput): Promise<void> {
     zone_id: input.zone_id,
     capacity: input.capacity,
   });
-  // Refresh tables from server
-  await useTableStore.getState().fetchAll(true);
 }
 
 /**
@@ -39,8 +36,6 @@ export async function updateTable(id: number, input: UpdateTableInput): Promise<
     capacity: input.capacity,
     is_active: input.is_active,
   });
-  // Refresh tables from server
-  await useTableStore.getState().fetchAll(true);
 }
 
 /**
@@ -48,6 +43,4 @@ export async function updateTable(id: number, input: UpdateTableInput): Promise<
  */
 export async function deleteTable(id: number): Promise<void> {
   await getApi().deleteTable(id);
-  // Refresh tables from server
-  await useTableStore.getState().fetchAll(true);
 }

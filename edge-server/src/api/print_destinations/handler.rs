@@ -97,12 +97,34 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    tracing::info!(id = %id, "Deleting print destination");
+    // 检查是否有分类正在使用此打印目标
+    let kitchen_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM category_kitchen_print_dest WHERE print_destination_id = ?",
+        id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
+    let label_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM category_label_print_dest WHERE print_destination_id = ?",
+        id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
+    let total_refs = kitchen_count + label_count;
+    if total_refs > 0 {
+        return Err(AppError::validation(format!(
+            "Cannot delete print destination: {} category reference(s) exist",
+            total_refs
+        )));
+    }
+
     let name_for_audit = print_destination::find_by_id(&state.pool, id).await.ok().flatten()
         .map(|p| p.name.clone()).unwrap_or_default();
     let result = print_destination::delete(&state.pool, id).await?;
-
-    tracing::info!(id = %id, result = %result, "Print destination delete result");
 
     let id_str = id.to_string();
 

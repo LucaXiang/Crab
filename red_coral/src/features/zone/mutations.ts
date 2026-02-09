@@ -1,5 +1,4 @@
 import { createTauriClient } from '@/infrastructure/api';
-import { useZoneStore } from './store';
 
 const getApi = () => createTauriClient();
 
@@ -21,8 +20,6 @@ export async function createZone(input: CreateZoneInput): Promise<void> {
     name: input.name,
     description: input.description,
   });
-  // Refresh zones from server
-  await useZoneStore.getState().fetchAll(true);
 }
 
 /**
@@ -33,8 +30,6 @@ export async function updateZone(id: number, input: UpdateZoneInput): Promise<vo
     name: input.name,
     description: input.description,
   });
-  // Refresh zones from server
-  await useZoneStore.getState().fetchAll(true);
 }
 
 /**
@@ -42,6 +37,4 @@ export async function updateZone(id: number, input: UpdateZoneInput): Promise<vo
  */
 export async function deleteZone(id: number): Promise<void> {
   await getApi().deleteZone(id);
-  // Refresh zones from server
-  await useZoneStore.getState().fetchAll(true);
 }
