@@ -663,7 +663,7 @@ struct GdiplusToken(usize);
 impl GdiplusToken {
     fn init() -> WinResult<Self> {
         let mut token: usize = 0;
-        let mut input = GdiplusStartupInput {
+        let input = GdiplusStartupInput {
             GdiplusVersion: 1,
             DebugEventCallback: 0,
             SuppressBackgroundThread: false.into(),
@@ -1037,10 +1037,8 @@ unsafe fn draw_rect_string(
     );
 
     // Clean up if we created a local font family
-    if field.font_family.is_some() {
-        if !field_font_family.is_null() {
-            GdipDeleteFontFamily(field_font_family);
-        }
+    if field.font_family.is_some() && !field_font_family.is_null() {
+        GdipDeleteFontFamily(field_font_family);
     }
 
     if font.is_null() {
