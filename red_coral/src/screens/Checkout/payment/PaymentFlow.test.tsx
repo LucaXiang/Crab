@@ -12,18 +12,10 @@ vi.mock('@/hooks/useI18n', () => ({
   })
 }));
 
-vi.mock('@/stores/order/useCheckoutStore', () => ({
-  useRetailServiceType: () => 'dine_in',
-  useCheckoutStore: () => () => {}
-}));
-
-vi.mock('@/stores/usePaymentStore', () => ({
-  usePaymentActions: () => ({
-    initSession: vi.fn(),
-    addPayment: vi.fn()
-  }),
-  usePaymentSession: (): null => null,
-  usePaymentTotals: () => ({ totalPaid: 0 })
+vi.mock('@/core/stores/order/useCheckoutStore', () => ({
+  useRetailServiceType: () => 'dineIn',
+  setRetailServiceType: () => {},
+  toBackendServiceType: (v: string) => v,
 }));
 
 vi.mock('@/core/stores/order/useActiveOrdersStore', () => ({
@@ -36,7 +28,7 @@ vi.mock('@/core/stores/order/useActiveOrdersStore', () => ({
   }
 }));
 
-vi.mock('@/core/stores/order/useOrderOperations', () => ({
+vi.mock('@/core/stores/order/commands', () => ({
   completeOrder: vi.fn(),
   voidOrder: vi.fn(),
   partialSettle: vi.fn(),
@@ -44,6 +36,12 @@ vi.mock('@/core/stores/order/useOrderOperations', () => ({
   splitByAmount: vi.fn(),
   startAaSplit: vi.fn(),
   payAaSplit: vi.fn(),
+  cancelPayment: vi.fn(),
+  updateOrderInfo: vi.fn(),
+}));
+
+vi.mock('@/core/services/order/paymentService', () => ({
+  openCashDrawer: vi.fn(),
 }));
 
 vi.mock('@/presentation/components/auth/EscalatableGate', () => ({
@@ -54,34 +52,19 @@ vi.mock('@/presentation/components/OrderSidebar', () => ({
   OrderSidebar: () => <div data-testid="ordersidebar-placeholder" />
 }));
 
-vi.mock('@/services/paymentService', () => ({
-  processCashPayment: vi.fn(async ({ amount }: { amount: number }) => ({
-    method: 'CASH',
-    amount,
-    tip: 0
-  })),
-  processCardPayment: vi.fn(async ({ amount }: { amount: number }) => ({
-    method: 'CARD',
-    amount,
-    tip: 0
-  })),
-  validatePaymentAmount: (paid: number, total: number) => ({
-    isValid: paid >= total
-  }),
-  printOrderReceipt: vi.fn()
-}));
-
-vi.mock('@/stores/useCartStore', () => ({
-  useCartStore: {
-    getState: () => ({})
-  }
-}));
-
 vi.mock('@/presentation/components/Toast', () => ({
   toast: {
     error: () => {},
     success: () => {}
   }
+}));
+
+vi.mock('@/features/product', () => ({
+  useProductStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
+}));
+
+vi.mock('@/features/category', () => ({
+  useCategoryStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
 }));
 
 const baseOrder = {
