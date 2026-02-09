@@ -83,6 +83,8 @@ pub enum ErrorCode {
     CertificateInvalid = 3004,
     /// License has expired
     LicenseExpired = 3005,
+    /// Device limit reached (quota full, need to replace an existing device)
+    DeviceLimitReached = 3007,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -270,6 +272,7 @@ impl ErrorCode {
             ErrorCode::ActivationFailed => "Activation failed",
             ErrorCode::CertificateInvalid => "Certificate is invalid",
             ErrorCode::LicenseExpired => "License has expired",
+            ErrorCode::DeviceLimitReached => "Device limit reached",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -407,6 +410,7 @@ impl TryFrom<u16> for ErrorCode {
             3003 => Ok(ErrorCode::ActivationFailed),
             3004 => Ok(ErrorCode::CertificateInvalid),
             3005 => Ok(ErrorCode::LicenseExpired),
+            3007 => Ok(ErrorCode::DeviceLimitReached),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
@@ -534,6 +538,7 @@ mod tests {
         assert_eq!(ErrorCode::ActivationFailed.code(), 3003);
         assert_eq!(ErrorCode::CertificateInvalid.code(), 3004);
         assert_eq!(ErrorCode::LicenseExpired.code(), 3005);
+        assert_eq!(ErrorCode::DeviceLimitReached.code(), 3007);
 
         // Order
         assert_eq!(ErrorCode::OrderNotFound.code(), 4001);

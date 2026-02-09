@@ -120,6 +120,7 @@ fn tenant_error_to_code(err: &super::tenant_manager::TenantError) -> ErrorCode {
         TenantError::Certificate(_) => ErrorCode::CertificateInvalid,
         TenantError::Network(_) => ErrorCode::NetworkError,
         TenantError::AuthFailed(_) => ErrorCode::ActivationFailed,
+        TenantError::DeviceLimitReached(_) => ErrorCode::DeviceLimitReached,
         TenantError::OfflineNotAvailable(_) => ErrorCode::NotAuthenticated,
         TenantError::SessionCache(_) | TenantError::Io(_) => ErrorCode::InternalError,
     }
@@ -354,6 +355,9 @@ pub struct ActivationResultData {
     pub tenant_id: String,
     /// 订阅状态 (来自 auth server)，null 表示无订阅信息
     pub subscription_status: Option<String>,
+    /// Quota 信息 (设备数已满时返回)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quota_info: Option<shared::activation::QuotaInfo>,
 }
 
 /// Tenants 列表

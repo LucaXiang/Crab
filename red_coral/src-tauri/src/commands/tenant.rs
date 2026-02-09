@@ -27,17 +27,40 @@ pub async fn activate_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
     username: String,
     password: String,
+    replace_entity_id: Option<String>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
     let auth_url = bridge.get_auth_url().await;
 
     match bridge
-        .handle_activation(&auth_url, &username, &password)
+        .handle_activation_with_replace(
+            &auth_url,
+            &username,
+            &password,
+            replace_entity_id.as_deref(),
+        )
         .await
     {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
             tenant_id,
             subscription_status,
+            quota_info: None,
         })),
+        Err(crate::core::bridge::BridgeError::Tenant(
+            crate::core::tenant_manager::TenantError::DeviceLimitReached(quota_info),
+        )) => {
+            // Put quota_info into details so ApiError carries it to frontend
+            let mut details = std::collections::HashMap::new();
+            details.insert(
+                "quota_info".to_string(),
+                serde_json::to_value(&quota_info).unwrap_or_default(),
+            );
+            Ok(ApiResponse {
+                code: Some(ErrorCode::DeviceLimitReached.code()),
+                message: ErrorCode::DeviceLimitReached.message().to_string(),
+                data: None,
+                details: Some(details),
+            })
+        }
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::ActivationFailed,
             e.to_string(),

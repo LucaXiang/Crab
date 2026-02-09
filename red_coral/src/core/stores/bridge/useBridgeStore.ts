@@ -188,9 +188,23 @@ interface AuthData {
   mode: LoginMode;
 }
 
+export interface QuotaInfo {
+  max_edge_servers: number;
+  active_count: number;
+  active_devices: ActiveDevice[];
+}
+
+export interface ActiveDevice {
+  entity_id: string;
+  device_id: string;
+  activated_at: number;
+  last_refreshed_at: number | null;
+}
+
 export interface ActivationResult {
   tenant_id: string;
   subscription_status: string | null;
+  quota_info: QuotaInfo | null;
 }
 
 export interface AppConfigResponse {
@@ -225,7 +239,7 @@ interface BridgeStore {
 
   // Tenant Actions
   fetchTenants: () => Promise<void>;
-  activateTenant: (username: string, password: string) => Promise<ActivationResult>;
+  activateTenant: (username: string, password: string, replaceEntityId?: string) => Promise<ActivationResult>;
   switchTenant: (tenantId: string) => Promise<void>;
   removeTenant: (tenantId: string) => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
@@ -367,12 +381,13 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateTenant: async (username, password) => {
+      activateTenant: async (username, password, replaceEntityId?) => {
         try {
           set({ isLoading: true, error: null });
           const result = await invokeApi<ActivationResult>('activate_tenant', {
             username,
             password,
+            replaceEntityId: replaceEntityId ?? null,
           });
           await get().fetchTenants();
           await get().fetchAppState();

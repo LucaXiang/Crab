@@ -56,7 +56,8 @@ impl ErrorCode {
             | Self::TenantNotFound
             | Self::ActivationFailed
             | Self::CertificateInvalid
-            | Self::LicenseExpired => StatusCode::FORBIDDEN,
+            | Self::LicenseExpired
+            | Self::DeviceLimitReached => StatusCode::FORBIDDEN,
 
             // 402 Payment Required
             Self::PaymentInsufficientAmount => StatusCode::PAYMENT_REQUIRED,

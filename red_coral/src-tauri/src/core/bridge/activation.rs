@@ -50,10 +50,21 @@ impl ClientBridge {
         username: &str,
         password: &str,
     ) -> Result<(String, Option<String>), BridgeError> {
+        self.handle_activation_with_replace(auth_url, username, password, None).await
+    }
+
+    /// 激活设备（支持替换已有设备）
+    pub async fn handle_activation_with_replace(
+        &self,
+        auth_url: &str,
+        username: &str,
+        password: &str,
+        replace_entity_id: Option<&str>,
+    ) -> Result<(String, Option<String>), BridgeError> {
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let tenant_id = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_device(auth_url, username, password).await?
+            tm.activate_device(auth_url, username, password, replace_entity_id).await?
         };
 
         // 2. 更新已知租户列表和当前租户

@@ -205,6 +205,16 @@
       "error": {
         "empty_fields": "Introduzca usuario y contraseña",
         "failed": "Error de activación"
+      },
+      "device_limit": {
+        "title": "Límite de dispositivos alcanzado",
+        "description": "Su plan permite hasta {{max}} dispositivos, actualmente hay {{count}}. Seleccione uno para reemplazar.",
+        "device_id": "ID dispositivo",
+        "activated_at": "Activado el",
+        "last_refreshed": "Último refresco",
+        "button_replace": "Reemplazar",
+        "button_cancel": "Cancelar",
+        "replacing": "Reemplazando..."
       }
     },
     "login": {
@@ -2091,6 +2101,7 @@
     "9203": "Etiquetas en desarrollo",
     "9301": "Cliente desconectado",
     "3006": "Suscripción pausada",
+    "3007": "Límite de dispositivos alcanzado, seleccione uno para reemplazar",
     "9401": "Sin espacio",
     "9402": "Sin memoria",
     "9403": "Datos corruptos",

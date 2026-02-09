@@ -43,6 +43,9 @@ pub enum TenantError {
     #[error("Authentication failed: {0}")]
     AuthFailed(String),
 
+    #[error("Device limit reached")]
+    DeviceLimitReached(shared::activation::QuotaInfo),
+
     #[error("Offline login not available for user: {0}")]
     OfflineNotAvailable(String),
 }
@@ -226,20 +229,26 @@ impl TenantManager {
         auth_url: &str,
         username: &str,
         password: &str,
+        replace_entity_id: Option<&str>,
     ) -> Result<String, TenantError> {
         // 1. 生成 Hardware ID
         let device_id = crab_cert::generate_hardware_id();
         tracing::info!("Activating device with ID: {}", device_id);
 
         // 2. 调用 Auth Server 激活接口
+        let mut body = serde_json::json!({
+            "username": username,
+            "password": password,
+            "device_id": device_id,
+        });
+        if let Some(replace_id) = replace_entity_id {
+            body["replace_entity_id"] = serde_json::json!(replace_id);
+        }
+
         let client = reqwest::Client::new();
         let resp = client
             .post(format!("{}/api/server/activate", auth_url))
-            .json(&serde_json::json!({
-                "username": username,
-                "password": password,
-                "device_id": device_id,
-            }))
+            .json(&body)
             .send()
             .await
             .map_err(|e| TenantError::Network(e.to_string()))?;
@@ -259,6 +268,12 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
+            // Check for device_limit_reached with quota_info
+            if resp_data.error.as_deref() == Some("device_limit_reached") {
+                if let Some(quota_info) = resp_data.quota_info {
+                    return Err(TenantError::DeviceLimitReached(quota_info));
+                }
+            }
             let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
             return Err(TenantError::AuthFailed(msg.to_string()));
         }
