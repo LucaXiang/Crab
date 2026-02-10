@@ -162,7 +162,7 @@ pub struct CartItemInput {
 pub struct ItemOption {
     pub attribute_id: i64,
     pub attribute_name: String,
-    pub option_idx: i32,
+    pub option_id: i64,
     pub option_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub price_modifier: Option<f64>,

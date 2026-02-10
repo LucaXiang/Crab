@@ -934,7 +934,7 @@ export interface CartItemInput {
 export interface ItemOption {
   attribute_id: number;
   attribute_name: string;
-  option_idx: number;
+  option_id: number;
   option_name: string;
   price_modifier?: number | null;
   /** Option quantity (default: 1) */

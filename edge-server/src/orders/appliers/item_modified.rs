@@ -726,7 +726,7 @@ mod tests {
         let new_options = vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 1,
+            option_id: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
@@ -783,7 +783,7 @@ mod tests {
         let new_options = vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Spicy".to_string(),
-            option_idx: 2,
+            option_id: 2,
             option_name: "Extra Hot".to_string(),
             price_modifier: None,
             quantity: 1,
@@ -824,7 +824,7 @@ mod tests {
         let new_options = vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Spicy".to_string(),
-            option_idx: 1,
+            option_id: 1,
             option_name: "Mild".to_string(),
             price_modifier: None,
             quantity: 1,

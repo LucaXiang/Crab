@@ -7,7 +7,7 @@ import { formatCurrency } from '@/utils/currency/formatCurrency';
 interface AttributeSelectorProps {
   attribute: Attribute;
   options: AttributeOption[];
-  /** Map of optionIdx -> quantity (quantity > 0 means selected) */
+  /** Map of optionId -> quantity (quantity > 0 means selected) */
   selectedOptions: Map<string, number>;
   defaultOptionIds?: string[];
   onSelect: (options: Map<string, number>) => void;
@@ -34,15 +34,15 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
   const maxSel = attribute.max_selections;
   const isAtLimit = !!(maxSel && selectedCount >= maxSel);
 
-  const handleOptionToggle = (optionIdx: string, option: AttributeOption) => {
+  const handleOptionToggle = (optionIdStr: string, option: AttributeOption) => {
     const newSelections = new Map(selectedOptions);
-    const currentQty = newSelections.get(optionIdx) || 0;
+    const currentQty = newSelections.get(optionIdStr) || 0;
 
     if (!option.enable_quantity) {
       // Traditional toggle logic (no quantity control)
       if (currentQty > 0) {
         // Deselect
-        newSelections.delete(optionIdx);
+        newSelections.delete(optionIdStr);
       } else {
         // Select
         if (isSingleChoice) {
@@ -51,7 +51,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
         } else if (isAtLimit) {
           return; // Can't add more for multi-select at limit
         }
-        newSelections.set(optionIdx, 1);
+        newSelections.set(optionIdStr, 1);
       }
     } else {
       // Quantity control enabled: first click sets to 1
@@ -61,16 +61,16 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
         } else if (isAtLimit) {
           return;
         }
-        newSelections.set(optionIdx, 1);
+        newSelections.set(optionIdStr, 1);
       }
       // If already selected, clicking the main area does nothing (use +/- buttons)
     }
     onSelect(newSelections);
   };
 
-  const handleQuantityChange = (optionIdx: string, delta: number, option: AttributeOption) => {
+  const handleQuantityChange = (optionIdStr: string, delta: number, option: AttributeOption) => {
     const newSelections = new Map(selectedOptions);
-    const currentQty = newSelections.get(optionIdx) || 0;
+    const currentQty = newSelections.get(optionIdStr) || 0;
     const newQty = Math.max(0, currentQty + delta);
 
     // Apply max_quantity limit
@@ -78,9 +78,9 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
     const finalQty = Math.min(newQty, maxQty);
 
     if (finalQty === 0) {
-      newSelections.delete(optionIdx);
+      newSelections.delete(optionIdStr);
     } else {
-      newSelections.set(optionIdx, finalQty);
+      newSelections.set(optionIdStr, finalQty);
     }
     onSelect(newSelections);
   };
@@ -113,8 +113,8 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
 
       {/* Options Grid - Card Style */}
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-        {activeOptions.map((option, optionIdx) => {
-          const optionIdStr = String(optionIdx);
+        {activeOptions.map((option) => {
+          const optionIdStr = String(option.id);
           const quantity = selectedOptions.get(optionIdStr) || 0;
           const isSelected = quantity > 0;
           const isDefault = defaultOptionIds.includes(optionIdStr);
@@ -124,7 +124,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
 
           return (
             <div
-              key={`${option.name}-${optionIdx}`}
+              key={`${option.name}-${option.id}`}
               className={`
                 relative p-2 rounded-xl border-2 transition-all flex flex-col
                 ${isSelected

@@ -61,7 +61,7 @@ async function syncAttributeBindings(
           attribute_id: attributeId,
           is_required: false,
           display_order: i,
-          default_option_indices: newDefaultOptionIds?.length
+          default_option_ids: newDefaultOptionIds?.length
             ? newDefaultOptionIds.map(Number).filter((n: number) => !isNaN(n))
             : undefined
         });
@@ -199,7 +199,7 @@ export async function loadCategoryAttributes(categoryId: number): Promise<{
   // Load default options from category attributes
   const defaultOptions: Record<number, number[]> = {};
   safeAttrs.forEach((ca) => {
-    const defaults = ca.default_option_indices ?? [];
+    const defaults = ca.default_option_ids ?? [];
     if (defaults.length > 0 && ca.id != null) {
       defaultOptions[ca.id] = defaults;
     }

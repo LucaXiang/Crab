@@ -20,11 +20,11 @@ interface ItemConfiguratorModalProps {
   attributes: Attribute[];
   allOptions: Map<number, AttributeOption[]>;
   bindings?: ProductAttribute[];
-  /** Map of attributeId -> Map<optionIdx, quantity> */
+  /** Map of attributeId -> Map<optionId, quantity> */
   selections: Map<number, Map<string, number>>;
   onAttributeSelect: (attributeId: number, options: Map<string, number>) => void;
 
-  // Specification Selection (product specs, use index as ID)
+  // Specification Selection (product specs, use spec.id as stable key)
   specifications?: ProductSpec[];
   hasMultiSpec?: boolean;
   selectedSpecId?: number | null;
@@ -95,9 +95,9 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
     let mod = 0;
     selections.forEach((optionMap, attrId) => {
       const opts = allOptions.get(attrId) || [];
-      optionMap.forEach((qty, idxStr) => {
-        const idx = parseInt(idxStr, 10);
-        const opt = opts[idx];
+      optionMap.forEach((qty, idStr) => {
+        const optionId = parseInt(idStr, 10);
+        const opt = opts.find(o => o.id === optionId);
         if (opt && qty > 0) {
           mod += opt.price_modifier * qty;
         }
@@ -156,15 +156,14 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {specifications
-                          .map((spec, specIdx) => ({ spec, specIdx }))
-                          .filter(({ spec }) => spec.is_active)
-                          .map(({ spec, specIdx }) => {
-                            const isSelected = selectedSpecId === specIdx;
+                          .filter(spec => spec.is_active)
+                          .map(spec => {
+                            const isSelected = selectedSpecId === spec.id;
                             return (
                               <button
-                                key={specIdx}
+                                key={spec.id}
                                 type="button"
-                                onClick={() => onSpecificationSelect?.(specIdx)}
+                                onClick={() => onSpecificationSelect?.(spec.id!)}
                                 className={`
                                   relative p-4 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[5rem] justify-center active:scale-[0.97]
                                   ${isSelected
@@ -204,8 +203,9 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     // binding.to is the attribute ID in AttributeBinding relation
                     const binding = bindings?.find(b => b.attribute_id === attr.id);
 
-                    // Logic to find defaults for display (visual cues in AttributeSelector)
-                    const defaultOptionIds = attr.default_option_indices?.map(String) ?? [];
+                    // Default option IDs for display (visual cues in AttributeSelector)
+                    const defaultOptionIds = (attr.default_option_ids ?? [])
+                      .map(String);
 
                     return (
                       <div key={attrId} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">

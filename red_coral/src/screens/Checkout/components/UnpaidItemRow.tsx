@@ -67,95 +67,83 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
         '--hover-bg': hoverColor,
       } as React.CSSProperties : undefined}
     >
+      {/* Row 1: Name (left) + Total/Badges (right) */}
       <div className="flex items-start justify-between gap-4">
-        {/* Left: Item Info */}
-        <div className="flex-1 min-w-0">
-          {/* Line 1: Product Name */}
-          <div className="font-bold text-gray-900 text-lg truncate">
-            {item.name}
-          </div>
-
-          {/* Line 2: Specification (if multi-spec) */}
-          {hasMultiSpec && (
-            <div className="text-sm text-gray-600 mt-0.5">
-              {t('pos.cart.spec')}: {item.selected_specification!.name}
-            </div>
+        <div className="font-bold text-gray-900 text-lg truncate flex-1 min-w-0">
+          {item.name}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isComped && (
+            <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Gift size={10} />
+              {t('checkout.comp.badge')}
+            </span>
           )}
-
-          {/* Line 3: Attribute Tags (grouped by attribute, one per line) */}
-          {hasOptions && <GroupedOptionsList options={item.selected_options!} />}
-
-          {/* Line 4: Note */}
-          {hasNote && (
-            <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-              <span>📝</span>
-              <span className="truncate">{item.note}</span>
-            </div>
+          {discountPercent > 0 && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
+              -{discountPercent}%
+            </span>
           )}
-
-          {/* Line 5: Quantity × Unit Price */}
-          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 tabular-nums">
-            <span className="font-medium">x{unpaidQty}</span>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor || '#d1d5db' }} />
-            {isComped ? (
-              <>
-                <span className="line-through text-gray-400">{formatCurrency(item.original_price)}</span>
-                <span className="font-semibold text-emerald-600">{formatCurrency(0)}</span>
-              </>
-            ) : hasDiscount ? (
-              <>
-                <span className="line-through text-gray-400">{formatCurrency(basePrice)}</span>
-                <span className="font-semibold text-gray-700">{formatCurrency(unitPrice)}</span>
-              </>
-            ) : (
-              <span className="font-semibold text-gray-700">{formatCurrency(unitPrice)}</span>
-            )}
+          {totalRuleDiscount > 0 && (
+            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+              -{formatCurrency(totalRuleDiscount)}
+            </span>
+          )}
+          {totalRuleSurcharge > 0 && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+              +{formatCurrency(totalRuleSurcharge)}
+            </span>
+          )}
+          <div className="font-bold text-xl tabular-nums text-gray-900">
+            {formatCurrency(unitPrice * unpaidQty)}
           </div>
         </div>
+      </div>
 
-        {/* Right: Total + Badges */}
-        <div className="flex flex-col items-end justify-between shrink-0 self-stretch">
-          {/* Line Total + Badges */}
-          <div className="flex items-center gap-2">
-            {isComped && (
-              <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Gift size={10} />
-                {t('checkout.comp.badge')}
-              </span>
-            )}
-            {discountPercent > 0 && (
-              <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
-                -{discountPercent}%
-              </span>
-            )}
-            {totalRuleDiscount > 0 && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                -{formatCurrency(totalRuleDiscount)}
-              </span>
-            )}
-            {totalRuleSurcharge > 0 && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
-                +{formatCurrency(totalRuleSurcharge)}
-              </span>
-            )}
-            <div className="font-bold text-xl tabular-nums text-gray-900">
-              {formatCurrency(unitPrice * unpaidQty)}
+      {/* Row 2: Spec + Options + Note — full width */}
+      {hasMultiSpec && (
+        <div className="text-sm text-gray-600 mt-1">
+          {t('pos.cart.spec')}: {item.selected_specification!.name}
+        </div>
+      )}
+      {hasOptions && <GroupedOptionsList options={item.selected_options!} />}
+      {hasNote && (
+        <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+          <span>📝</span>
+          <span className="truncate">{item.note}</span>
+        </div>
+      )}
+
+      {/* Row 3: Quantity × Unit Price + IDs */}
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-2 text-sm text-gray-500 tabular-nums">
+          <span className="font-medium">x{unpaidQty}</span>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor || '#d1d5db' }} />
+          {isComped ? (
+            <>
+              <span className="line-through text-gray-400">{formatCurrency(item.original_price)}</span>
+              <span className="font-semibold text-emerald-600">{formatCurrency(0)}</span>
+            </>
+          ) : hasDiscount ? (
+            <>
+              <span className="line-through text-gray-400">{formatCurrency(basePrice)}</span>
+              <span className="font-semibold text-gray-700">{formatCurrency(unitPrice)}</span>
+            </>
+          ) : (
+            <span className="font-semibold text-gray-700">{formatCurrency(unitPrice)}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {item.instance_id && (
+            <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border bg-blue-100 text-blue-600 border-blue-200">
+              #{item.instance_id.slice(-5)}
+            </span>
+          )}
+          {externalId != null && (
+            <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
+              {externalId}
             </div>
-          </div>
-
-          {/* Instance ID + External ID */}
-          <div className="flex items-center gap-2">
-            {item.instance_id && (
-              <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border bg-blue-100 text-blue-600 border-blue-200">
-                #{item.instance_id.slice(-5)}
-              </span>
-            )}
-            {externalId != null && (
-              <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
-                {externalId}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -754,7 +754,7 @@ fn test_unit_price_with_original_price_and_options_no_double_counting() {
             shared::order::ItemOption {
                 attribute_id: 1,
                 attribute_name: "Size".to_string(),
-                option_idx: 2,
+                option_id: 2,
                 option_name: "Large".to_string(),
                 price_modifier: Some(3.0),
                 quantity: 1,
@@ -762,7 +762,7 @@ fn test_unit_price_with_original_price_and_options_no_double_counting() {
             shared::order::ItemOption {
                 attribute_id: 2,
                 attribute_name: "Topping".to_string(),
-                option_idx: 0,
+                option_id: 0,
                 option_name: "Extra Cheese".to_string(),
                 price_modifier: Some(1.50),
                 quantity: 1,
@@ -807,7 +807,7 @@ fn test_rule_discount_plus_options_plus_manual_discount() {
         selected_options: Some(vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Extra".to_string(),
-            option_idx: 0,
+            option_id: 0,
             option_name: "Cheese".to_string(),
             price_modifier: Some(5.0),
             quantity: 1,
@@ -858,7 +858,7 @@ fn test_option_quantity_multiplies_price_modifier() {
             shared::order::ItemOption {
                 attribute_id: 1,
                 attribute_name: "加蛋".to_string(),
-                option_idx: 0,
+                option_id: 0,
                 option_name: "鸡蛋".to_string(),
                 price_modifier: Some(2.0),  // +2 per egg
                 quantity: 3,                // 3 eggs!
@@ -907,7 +907,7 @@ fn test_multiple_options_with_different_quantities() {
             shared::order::ItemOption {
                 attribute_id: 1,
                 attribute_name: "Cheese".to_string(),
-                option_idx: 0,
+                option_id: 0,
                 option_name: "Cheddar".to_string(),
                 price_modifier: Some(1.5),  // +1.5 per slice
                 quantity: 2,                // 2 slices
@@ -915,7 +915,7 @@ fn test_multiple_options_with_different_quantities() {
             shared::order::ItemOption {
                 attribute_id: 2,
                 attribute_name: "Bacon".to_string(),
-                option_idx: 0,
+                option_id: 0,
                 option_name: "Crispy".to_string(),
                 price_modifier: Some(2.0),  // +2 per strip
                 quantity: 2,                // 2 strips
@@ -1156,7 +1156,7 @@ fn test_validate_item_changes_option_nan_modifier() {
         selected_options: Some(vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 0,
+            option_id: 0,
             option_name: "Large".to_string(),
             price_modifier: Some(f64::NAN),
             quantity: 1,
@@ -1176,7 +1176,7 @@ fn test_validate_item_changes_option_exceeds_max_modifier() {
         selected_options: Some(vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 0,
+            option_id: 0,
             option_name: "Large".to_string(),
             price_modifier: Some(MAX_PRICE + 1.0),
             quantity: 1,
@@ -1737,7 +1737,7 @@ fn test_unit_price_with_options_and_skipped_rule() {
     item.selected_options = Some(vec![shared::order::ItemOption {
         attribute_id: 1,
         attribute_name: "Size".to_string(),
-        option_idx: 1,
+        option_id: 1,
         option_name: "Large".to_string(),
         price_modifier: Some(3.0),
         quantity: 1,
@@ -2033,7 +2033,7 @@ fn test_recalculate_totals_with_option_quantity() {
             shared::order::ItemOption {
                 attribute_id: 1,
                 attribute_name: "加蛋".to_string(),
-                option_idx: 0,
+                option_id: 0,
                 option_name: "鸡蛋".to_string(),
                 price_modifier: Some(2.0),  // +2 per egg
                 quantity: 3,                // 3 eggs per bowl

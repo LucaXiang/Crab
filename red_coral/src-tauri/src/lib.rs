@@ -213,7 +213,6 @@ pub async fn run() {
             commands::list_product_attributes,
             commands::bind_product_attribute,
             commands::unbind_product_attribute,
-            commands::update_product_attribute_binding,
             // Category-Attribute binding commands
             commands::list_category_attributes,
             commands::bind_category_attribute,
@@ -268,7 +267,6 @@ pub async fn run() {
             commands::update_employee,
             commands::delete_employee,
             commands::list_price_rules,
-            commands::list_active_price_rules,
             commands::get_price_rule,
             commands::create_price_rule,
             commands::update_price_rule,

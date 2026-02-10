@@ -464,7 +464,7 @@ mod tests {
         item.selected_options = Some(vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 1,
+            option_id: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(5.0),
             quantity: 1,

@@ -8,7 +8,6 @@
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { invokeApi } from '@/infrastructure/api';
 import type { User, Role } from '@/core/domain/types';
-import type { RoleListData } from '@/core/domain/types';
 
 /**
  * 获取用户列表
@@ -61,8 +60,7 @@ export async function resetPassword(userId: number, newPassword: string): Promis
  * 获取角色列表
  */
 export async function fetchRoles(): Promise<Role[]> {
-  const resp = await invokeApi<RoleListData>('list_roles');
-  return resp.roles;
+  return invokeApi<Role[]>('list_roles');
 }
 
 /**

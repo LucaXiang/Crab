@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE attribute_binding SET is_required = COALESCE(?1, is_required), display_order = COALESCE(?2, display_order), default_option_ids = COALESCE(?3, default_option_ids) WHERE id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "d950063cfb34c32b18f8574f21861b4f6d306ad6e08805b2b610771ac0c25e85"
+}

@@ -19,7 +19,7 @@ use tracing::debug;
 /// - product_id: 商品唯一标识
 /// - price: 输入价格（直接使用 CartItemInput.price）
 /// - manual_discount_percent: 手动折扣
-/// - selected_options: 选项（attribute_id + option_idx）
+/// - selected_options: 选项（attribute_id + option_id）
 /// - selected_specification: 规格
 ///
 /// Items with the same instance_id can be merged (quantities added together).
@@ -61,7 +61,7 @@ pub(crate) fn generate_instance_id_from_parts(
     if let Some(opts) = options {
         for opt in opts {
             hasher.update(opt.attribute_id.to_le_bytes());
-            hasher.update(opt.option_idx.to_be_bytes());
+            hasher.update(opt.option_id.to_le_bytes());
             hasher.update(opt.quantity.to_be_bytes());
         }
     }
@@ -240,7 +240,7 @@ mod tests {
         let opts = Some(vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 1,
+            option_id: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
@@ -408,7 +408,7 @@ mod tests {
                 ItemOption {
                     attribute_id: 1,
                     attribute_name: "Size".to_string(),
-                    option_idx: 1,
+                    option_id: 1,
                     option_name: "Large".to_string(),
                     price_modifier: Some(5.0),
                     quantity: 1,
@@ -416,7 +416,7 @@ mod tests {
                 ItemOption {
                     attribute_id: 2,
                     attribute_name: "Extra".to_string(),
-                    option_idx: 0,
+                    option_id: 0,
                     option_name: "Cheese".to_string(),
                     price_modifier: Some(2.0),
                     quantity: 1,

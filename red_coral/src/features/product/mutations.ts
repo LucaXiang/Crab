@@ -72,7 +72,7 @@ export async function createProduct(
   for (let i = 0; i < selectedAttributeIds.length; i++) {
     const attributeId = selectedAttributeIds[i];
     const rawDefaults = formData.attribute_default_options?.[attributeId];
-    const defaultIndices = Array.isArray(rawDefaults)
+    const defaultIds = Array.isArray(rawDefaults)
       ? rawDefaults
       : (rawDefaults != null ? [rawDefaults] : []);
 
@@ -82,7 +82,7 @@ export async function createProduct(
         attribute_id: attributeId,
         is_required: false,
         display_order: i,
-        default_option_indices: defaultIndices.length > 0 ? defaultIndices : undefined,
+        default_option_ids: defaultIds.length > 0 ? defaultIds : undefined,
       });
     } catch (error) {
       logger.error('Failed to bind attribute', error, { attributeId });
@@ -171,7 +171,7 @@ export async function updateProduct(
       .map((pa) => ({
         attributeId: pa.attribute.id,
         id: pa.id,
-        defaultOptionIds: pa.default_option_indices ?? [],
+        defaultOptionIds: pa.default_option_ids ?? [],
       }));
   } catch (error) {
     logger.error('Failed to fetch existing attributes', error);
@@ -189,7 +189,7 @@ export async function updateProduct(
         attribute_id: attrId,
         is_required: false,
         display_order: index,
-        default_option_indices: defaultOptionIds.length > 0 ? defaultOptionIds : undefined,
+        default_option_ids: defaultOptionIds.length > 0 ? defaultOptionIds : undefined,
       });
     }
   );
@@ -232,9 +232,9 @@ export async function loadProductFullData(productId: number) {
   const defaultOptions: Record<number, number[]> = {};
   directAttributes.forEach((binding) => {
     const attrId = binding.attribute.id;
-    const indices = binding.default_option_indices ?? binding.attribute.default_option_indices;
-    if (attrId && indices && indices.length > 0) {
-      defaultOptions[attrId] = indices;
+    const ids = binding.default_option_ids ?? binding.attribute.default_option_ids;
+    if (attrId && ids && ids.length > 0) {
+      defaultOptions[attrId] = ids;
     }
   });
 

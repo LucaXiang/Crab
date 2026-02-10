@@ -6,15 +6,14 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::response::{
-    ApiResponse, DeleteData, EmployeeListData, ErrorCode, PriceRuleListData, RoleListData,
-    RolePermission, RolePermissionListData,
+    ApiResponse, DeleteData, ErrorCode, RolePermission,
 };
 use crate::core::ClientBridge;
 use shared::models::{
     Employee, EmployeeCreate, EmployeeUpdate, InitGenesisRequest, LabelTemplate,
     LabelTemplateCreate, LabelTemplateUpdate, PriceRule, PriceRuleCreate, PriceRuleUpdate,
-    Role, StoreInfo, StoreInfoUpdate, SystemState, SystemStateUpdate, UpdateLastOrderRequest,
-    UpdateSyncStateRequest,
+    Role, RoleCreate, RoleUpdate, StoreInfo, StoreInfoUpdate, SystemState, SystemStateUpdate,
+    UpdateLastOrderRequest, UpdateSyncStateRequest,
 };
 
 // ============ System State ============
@@ -193,13 +192,13 @@ pub async fn update_label_template(
 pub async fn delete_label_template(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-) -> Result<ApiResponse<bool>, String> {
+) -> Result<ApiResponse<DeleteData>, String> {
 
     match bridge
         .delete::<bool>(&format!("/api/label-templates/{}", id))
         .await
     {
-        Ok(deleted) => Ok(ApiResponse::success(deleted)),
+        Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -212,10 +211,10 @@ pub async fn delete_label_template(
 #[tauri::command]
 pub async fn list_employees(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<EmployeeListData>, String> {
+) -> Result<ApiResponse<Vec<Employee>>, String> {
 
     match bridge.get::<Vec<Employee>>("/api/employees").await {
-        Ok(employees) => Ok(ApiResponse::success(EmployeeListData { employees })),
+        Ok(employees) => Ok(ApiResponse::success(employees)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -226,13 +225,13 @@ pub async fn list_employees(
 #[tauri::command]
 pub async fn list_all_employees(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<EmployeeListData>, String> {
+) -> Result<ApiResponse<Vec<Employee>>, String> {
 
     match bridge
         .get::<Vec<Employee>>("/api/employees/all")
         .await
     {
-        Ok(employees) => Ok(ApiResponse::success(EmployeeListData { employees })),
+        Ok(employees) => Ok(ApiResponse::success(employees)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -312,27 +311,10 @@ pub async fn delete_employee(
 #[tauri::command]
 pub async fn list_price_rules(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<PriceRuleListData>, String> {
+) -> Result<ApiResponse<Vec<PriceRule>>, String> {
 
     match bridge.get::<Vec<PriceRule>>("/api/price-rules").await {
-        Ok(rules) => Ok(ApiResponse::success(PriceRuleListData { rules })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
-    }
-}
-
-#[tauri::command]
-pub async fn list_active_price_rules(
-    bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<PriceRuleListData>, String> {
-
-    match bridge
-        .get::<Vec<PriceRule>>("/api/price-rules/active")
-        .await
-    {
-        Ok(rules) => Ok(ApiResponse::success(PriceRuleListData { rules })),
+        Ok(rules) => Ok(ApiResponse::success(rules)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -415,10 +397,10 @@ pub async fn delete_price_rule(
 #[tauri::command]
 pub async fn list_roles(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<RoleListData>, String> {
+) -> Result<ApiResponse<Vec<Role>>, String> {
 
     match bridge.get::<Vec<Role>>("/api/roles").await {
-        Ok(roles) => Ok(ApiResponse::success(RoleListData { roles })),
+        Ok(roles) => Ok(ApiResponse::success(roles)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -444,7 +426,7 @@ pub async fn get_role(
 #[tauri::command]
 pub async fn create_role(
     bridge: State<'_, Arc<ClientBridge>>,
-    data: serde_json::Value,
+    data: RoleCreate,
 ) -> Result<ApiResponse<Role>, String> {
 
     match bridge.post("/api/roles", &data).await {
@@ -460,7 +442,7 @@ pub async fn create_role(
 pub async fn update_role(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-    data: serde_json::Value,
+    data: RoleUpdate,
 ) -> Result<ApiResponse<Role>, String> {
 
     match bridge
@@ -497,7 +479,7 @@ pub async fn delete_role(
 pub async fn get_role_permissions(
     bridge: State<'_, Arc<ClientBridge>>,
     role_id: i64,
-) -> Result<ApiResponse<RolePermissionListData>, String> {
+) -> Result<ApiResponse<Vec<RolePermission>>, String> {
     // API 返回 Vec<String>，需要转换为 Vec<RolePermission>
     match bridge
         .get::<Vec<String>>(&format!("/api/roles/{}/permissions", role_id))
@@ -511,7 +493,7 @@ pub async fn get_role_permissions(
                     permission: p,
                 })
                 .collect();
-            Ok(ApiResponse::success(RolePermissionListData { permissions }))
+            Ok(ApiResponse::success(permissions))
         }
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,

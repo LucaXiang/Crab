@@ -954,7 +954,7 @@ fn test_option_price_modifiers_accumulate() {
                     shared::order::ItemOption {
                         attribute_id: 1,
                         attribute_name: "Size".to_string(),
-                        option_idx: 1,
+                        option_id: 1,
                         option_name: "Large".to_string(),
                         price_modifier: Some(5.0),
                         quantity: 1,
@@ -962,7 +962,7 @@ fn test_option_price_modifiers_accumulate() {
                     shared::order::ItemOption {
                         attribute_id: 2,
                         attribute_name: "Topping".to_string(),
-                        option_idx: 0,
+                        option_id: 0,
                         option_name: "Extra Cheese".to_string(),
                         price_modifier: Some(2.5),
                         quantity: 1,

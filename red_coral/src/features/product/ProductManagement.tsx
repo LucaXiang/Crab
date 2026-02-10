@@ -20,7 +20,6 @@ import { logger } from '@/utils/logger';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ProductImage } from './ProductImage';
 import { formatCurrency } from '@/utils/currency';
-import { displayId } from '@/utils/formatting';
 import { SpecificationManagementModal } from './SpecificationManagementModal';
 
 // ProductItem matches Product type from models.ts (snake_case naming)
@@ -154,9 +153,6 @@ export const ProductManagement: React.FC = React.memo(() => {
                     {item.receipt_name}
                   </div>
                 )}
-                <div className="text-xs text-gray-400 mt-0.5">
-                  id: {displayId(item.id)}
-                </div>
               </div>
             </div>
           );
@@ -382,7 +378,7 @@ export const ProductManagement: React.FC = React.memo(() => {
             >
               <option value="all">{t('common.status.all')}</option>
               {categories.map((c) => (
-                <option key={c.name} value={c.name}>
+                <option key={c.id} value={String(c.id)}>
                   {c.name}
                 </option>
               ))}

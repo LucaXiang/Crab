@@ -7,8 +7,7 @@ const getApi = () => createTauriClient();
 export const useRoleStore = createResourceStore<Role>(
   'role',
   async () => {
-    const data = await getApi().listRoles();
-    return data.roles;
+    return getApi().listRoles();
   }
 );
 

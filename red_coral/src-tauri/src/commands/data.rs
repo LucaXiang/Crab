@@ -7,21 +7,20 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::{
-    ApiResponse, AttributeData, AttributeListData, CategoryData, CategoryListData, ClientBridge,
-    DeleteData, PrintDestinationData, PrintDestinationListData, ProductData,
-    ProductListData, TagListData,
+    ApiResponse, ClientBridge, DeleteData,
 };
 use shared::models::{
     // Attributes
     Attribute,
+    AttributeBinding,
+    AttributeBindingFull,
     AttributeCreate,
-    AttributeOption,
+    AttributeOptionInput,
     AttributeUpdate,
     // Categories
     Category,
     CategoryCreate,
     CategoryUpdate,
-    AttributeBinding,
     // Print Destinations
     PrintDestination,
     PrintDestinationCreate,
@@ -41,9 +40,9 @@ use shared::models::{
 #[tauri::command]
 pub async fn list_tags(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<TagListData>, String> {
+) -> Result<ApiResponse<Vec<Tag>>, String> {
     match bridge.get::<Vec<Tag>>("/api/tags").await {
-        Ok(tags) => Ok(ApiResponse::success(TagListData { tags })),
+        Ok(tags) => Ok(ApiResponse::success(tags)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -107,9 +106,9 @@ pub async fn delete_tag(
 #[tauri::command]
 pub async fn list_categories(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<CategoryListData>, String> {
+) -> Result<ApiResponse<Vec<Category>>, String> {
     match bridge.get::<Vec<Category>>("/api/categories").await {
-        Ok(categories) => Ok(ApiResponse::success(CategoryListData { categories })),
+        Ok(categories) => Ok(ApiResponse::success(categories)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -118,12 +117,12 @@ pub async fn list_categories(
 pub async fn get_category(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-) -> Result<ApiResponse<CategoryData>, String> {
+) -> Result<ApiResponse<Category>, String> {
     match bridge
         .get::<Category>(&format!("/api/categories/{}", id))
         .await
     {
-        Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
+        Ok(cat) => Ok(ApiResponse::success(cat)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -132,9 +131,9 @@ pub async fn get_category(
 pub async fn create_category(
     bridge: State<'_, Arc<ClientBridge>>,
     data: CategoryCreate,
-) -> Result<ApiResponse<CategoryData>, String> {
+) -> Result<ApiResponse<Category>, String> {
     match bridge.post::<Category, _>("/api/categories", &data).await {
-        Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
+        Ok(cat) => Ok(ApiResponse::success(cat)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -144,12 +143,12 @@ pub async fn update_category(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
     data: CategoryUpdate,
-) -> Result<ApiResponse<CategoryData>, String> {
+) -> Result<ApiResponse<Category>, String> {
     match bridge
         .put::<Category, _>(&format!("/api/categories/{}", id), &data)
         .await
     {
-        Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
+        Ok(cat) => Ok(ApiResponse::success(cat)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -173,9 +172,9 @@ pub async fn delete_category(
 #[tauri::command]
 pub async fn list_products(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<ProductListData>, String> {
+) -> Result<ApiResponse<Vec<ProductFull>>, String> {
     match bridge.get::<Vec<ProductFull>>("/api/products").await {
-        Ok(products) => Ok(ApiResponse::success(ProductListData { products })),
+        Ok(products) => Ok(ApiResponse::success(products)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -184,12 +183,12 @@ pub async fn list_products(
 pub async fn get_product(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-) -> Result<ApiResponse<ProductData>, String> {
+) -> Result<ApiResponse<ProductFull>, String> {
     match bridge
         .get::<ProductFull>(&format!("/api/products/{}", id))
         .await
     {
-        Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
+        Ok(prod) => Ok(ApiResponse::success(prod)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -199,12 +198,12 @@ pub async fn get_product(
 pub async fn get_product_full(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-) -> Result<ApiResponse<ProductData>, String> {
+) -> Result<ApiResponse<ProductFull>, String> {
     match bridge
         .get::<ProductFull>(&format!("/api/products/{}/full", id))
         .await
     {
-        Ok(product) => Ok(ApiResponse::success(ProductData { product })),
+        Ok(product) => Ok(ApiResponse::success(product)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -213,9 +212,9 @@ pub async fn get_product_full(
 pub async fn create_product(
     bridge: State<'_, Arc<ClientBridge>>,
     data: ProductCreate,
-) -> Result<ApiResponse<ProductData>, String> {
+) -> Result<ApiResponse<ProductFull>, String> {
     match bridge.post::<ProductFull, _>("/api/products", &data).await {
-        Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
+        Ok(prod) => Ok(ApiResponse::success(prod)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -225,12 +224,12 @@ pub async fn update_product(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
     data: ProductUpdate,
-) -> Result<ApiResponse<ProductData>, String> {
+) -> Result<ApiResponse<ProductFull>, String> {
     match bridge
         .put::<ProductFull, _>(&format!("/api/products/{}", id), &data)
         .await
     {
-        Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
+        Ok(prod) => Ok(ApiResponse::success(prod)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -254,9 +253,9 @@ pub async fn delete_product(
 #[tauri::command]
 pub async fn list_attributes(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<AttributeListData>, String> {
+) -> Result<ApiResponse<Vec<Attribute>>, String> {
     match bridge.get::<Vec<Attribute>>("/api/attributes").await {
-        Ok(templates) => Ok(ApiResponse::success(AttributeListData { templates })),
+        Ok(templates) => Ok(ApiResponse::success(templates)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -265,12 +264,12 @@ pub async fn list_attributes(
 pub async fn get_attribute(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-) -> Result<ApiResponse<AttributeData>, String> {
+) -> Result<ApiResponse<Attribute>, String> {
     match bridge
         .get::<Attribute>(&format!("/api/attributes/{}", id))
         .await
     {
-        Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
+        Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -279,9 +278,9 @@ pub async fn get_attribute(
 pub async fn create_attribute(
     bridge: State<'_, Arc<ClientBridge>>,
     data: AttributeCreate,
-) -> Result<ApiResponse<AttributeData>, String> {
+) -> Result<ApiResponse<Attribute>, String> {
     match bridge.post::<Attribute, _>("/api/attributes", &data).await {
-        Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
+        Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -291,12 +290,12 @@ pub async fn update_attribute(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
     data: AttributeUpdate,
-) -> Result<ApiResponse<AttributeData>, String> {
+) -> Result<ApiResponse<Attribute>, String> {
     match bridge
         .put::<Attribute, _>(&format!("/api/attributes/{}", id), &data)
         .await
     {
-        Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
+        Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -321,8 +320,8 @@ pub async fn delete_attribute(
 pub async fn add_attribute_option(
     bridge: State<'_, Arc<ClientBridge>>,
     attribute_id: i64,
-    data: AttributeOption,
-) -> Result<ApiResponse<AttributeData>, String> {
+    data: AttributeOptionInput,
+) -> Result<ApiResponse<Attribute>, String> {
     match bridge
         .post::<Attribute, _>(
             &format!("/api/attributes/{}/options", attribute_id),
@@ -330,7 +329,7 @@ pub async fn add_attribute_option(
         )
         .await
     {
-        Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
+        Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -340,8 +339,8 @@ pub async fn update_attribute_option(
     bridge: State<'_, Arc<ClientBridge>>,
     attribute_id: i64,
     index: usize,
-    data: AttributeOption,
-) -> Result<ApiResponse<AttributeData>, String> {
+    data: AttributeOptionInput,
+) -> Result<ApiResponse<Attribute>, String> {
     match bridge
         .put::<Attribute, _>(
             &format!(
@@ -353,7 +352,7 @@ pub async fn update_attribute_option(
         )
         .await
     {
-        Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
+        Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -363,7 +362,7 @@ pub async fn delete_attribute_option(
     bridge: State<'_, Arc<ClientBridge>>,
     attribute_id: i64,
     index: usize,
-) -> Result<ApiResponse<AttributeData>, String> {
+) -> Result<ApiResponse<Attribute>, String> {
     match bridge
         .delete::<Attribute>(&format!(
             "/api/attributes/{}/options/{}",
@@ -372,7 +371,7 @@ pub async fn delete_attribute_option(
         ))
         .await
     {
-        Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
+        Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -383,9 +382,9 @@ pub async fn delete_attribute_option(
 pub async fn list_product_attributes(
     bridge: State<'_, Arc<ClientBridge>>,
     product_id: i64,
-) -> Result<ApiResponse<serde_json::Value>, String> {
+) -> Result<ApiResponse<Vec<AttributeBindingFull>>, String> {
     match bridge
-        .get::<serde_json::Value>(&format!("/api/products/{}/attributes", product_id))
+        .get::<Vec<AttributeBindingFull>>(&format!("/api/products/{}/attributes", product_id))
         .await
     {
         Ok(attrs) => Ok(ApiResponse::success(attrs)),
@@ -397,9 +396,9 @@ pub async fn list_product_attributes(
 pub async fn bind_product_attribute(
     bridge: State<'_, Arc<ClientBridge>>,
     data: serde_json::Value,
-) -> Result<ApiResponse<serde_json::Value>, String> {
+) -> Result<ApiResponse<AttributeBinding>, String> {
     match bridge
-        .post::<serde_json::Value, _>("/api/has-attribute", &data)
+        .post::<AttributeBinding, _>("/api/has-attribute", &data)
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
@@ -421,21 +420,6 @@ pub async fn unbind_product_attribute(
     }
 }
 
-#[tauri::command]
-pub async fn update_product_attribute_binding(
-    bridge: State<'_, Arc<ClientBridge>>,
-    id: i64,
-    data: serde_json::Value,
-) -> Result<ApiResponse<serde_json::Value>, String> {
-    match bridge
-        .put::<serde_json::Value, _>(&format!("/api/has-attribute/{}", id), &data)
-        .await
-    {
-        Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
 // ============ Category Attributes (Bindings) ============
 
 /// List attributes for a category
@@ -443,12 +427,12 @@ pub async fn update_product_attribute_binding(
 pub async fn list_category_attributes(
     bridge: State<'_, Arc<ClientBridge>>,
     category_id: i64,
-) -> Result<ApiResponse<AttributeListData>, String> {
+) -> Result<ApiResponse<Vec<Attribute>>, String> {
     match bridge
         .get::<Vec<Attribute>>(&format!("/api/categories/{}/attributes", category_id))
         .await
     {
-        Ok(templates) => Ok(ApiResponse::success(AttributeListData { templates })),
+        Ok(templates) => Ok(ApiResponse::success(templates)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -460,7 +444,7 @@ pub struct BindCategoryAttributeData {
     pub attribute_id: i64,
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_indices: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i32>>,
 }
 
 /// Bind attribute to category
@@ -473,7 +457,7 @@ pub async fn bind_category_attribute(
     let payload = serde_json::json!({
         "is_required": data.is_required,
         "display_order": data.display_order,
-        "default_option_indices": data.default_option_indices,
+        "default_option_ids": data.default_option_ids,
     });
     match bridge
         .post::<AttributeBinding, _>(
@@ -564,14 +548,12 @@ pub async fn batch_update_product_sort_order(
 #[tauri::command]
 pub async fn list_print_destinations(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<PrintDestinationListData>, String> {
+) -> Result<ApiResponse<Vec<PrintDestination>>, String> {
     match bridge
         .get::<Vec<PrintDestination>>("/api/print-destinations")
         .await
     {
-        Ok(print_destinations) => Ok(ApiResponse::success(PrintDestinationListData {
-            print_destinations,
-        })),
+        Ok(print_destinations) => Ok(ApiResponse::success(print_destinations)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -580,14 +562,12 @@ pub async fn list_print_destinations(
 pub async fn get_print_destination(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
-) -> Result<ApiResponse<PrintDestinationData>, String> {
+) -> Result<ApiResponse<PrintDestination>, String> {
     match bridge
         .get::<PrintDestination>(&format!("/api/print-destinations/{}", id))
         .await
     {
-        Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData {
-            print_destination,
-        })),
+        Ok(print_destination) => Ok(ApiResponse::success(print_destination)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -596,14 +576,12 @@ pub async fn get_print_destination(
 pub async fn create_print_destination(
     bridge: State<'_, Arc<ClientBridge>>,
     data: PrintDestinationCreate,
-) -> Result<ApiResponse<PrintDestinationData>, String> {
+) -> Result<ApiResponse<PrintDestination>, String> {
     match bridge
         .post::<PrintDestination, _>("/api/print-destinations", &data)
         .await
     {
-        Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData {
-            print_destination,
-        })),
+        Ok(print_destination) => Ok(ApiResponse::success(print_destination)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -613,14 +591,12 @@ pub async fn update_print_destination(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
     data: PrintDestinationUpdate,
-) -> Result<ApiResponse<PrintDestinationData>, String> {
+) -> Result<ApiResponse<PrintDestination>, String> {
     match bridge
         .put::<PrintDestination, _>(&format!("/api/print-destinations/{}", id), &data)
         .await
     {
-        Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData {
-            print_destination,
-        })),
+        Ok(print_destination) => Ok(ApiResponse::success(print_destination)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

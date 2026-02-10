@@ -172,7 +172,7 @@ CREATE TABLE attribute (
     name                   TEXT    NOT NULL,
     is_multi_select        INTEGER NOT NULL DEFAULT 0,
     max_selections         INTEGER,
-    default_option_indices TEXT,                -- JSON array of int
+    default_option_ids TEXT,                -- JSON array of option IDs
     display_order          INTEGER NOT NULL DEFAULT 0,
     is_active              INTEGER NOT NULL DEFAULT 1,
     show_on_receipt        INTEGER NOT NULL DEFAULT 0,
@@ -206,7 +206,7 @@ CREATE TABLE attribute_binding (
     attribute_id           INTEGER NOT NULL REFERENCES attribute(id) ON DELETE CASCADE,
     is_required            INTEGER NOT NULL DEFAULT 0,
     display_order          INTEGER NOT NULL DEFAULT 0,
-    default_option_indices TEXT                  -- JSON array of int
+    default_option_ids TEXT                  -- JSON array of option IDs
 );
 CREATE UNIQUE INDEX idx_attr_binding_unique ON attribute_binding(owner_type, owner_id, attribute_id);
 CREATE INDEX idx_attr_binding_owner ON attribute_binding(owner_type, owner_id);
@@ -753,18 +753,18 @@ INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_or
 
 -- Vinculaciones de atributos
 -- Punto → Solomillo (product 8), Secreto Ibérico (product 10)
-INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices)
-VALUES (1, 'product', 8, 1, 1, 1, '[1]');
-INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices)
-VALUES (2, 'product', 10, 1, 1, 1, '[1]');
+INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids)
+VALUES (1, 'product', 8, 1, 1, 1, '[2]');
+INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids)
+VALUES (2, 'product', 10, 1, 1, 1, '[2]');
 -- Complementos → Bebidas (category 5): 加冰/柠檬/橄榄
 INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order)
 VALUES (3, 'category', 5, 2, 0, 1);
 -- Tipo de Leche → Café con Leche (product 15), Cortado (product 16)
-INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices)
-VALUES (4, 'product', 15, 3, 0, 1, '[0]');
-INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices)
-VALUES (5, 'product', 16, 3, 0, 1, '[0]');
+INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids)
+VALUES (4, 'product', 15, 3, 0, 1, '[7]');
+INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids)
+VALUES (5, 'product', 16, 3, 0, 1, '[7]');
 -- Extras → Tapas y Raciones (category 1): 加面包/蒜泥蛋黄酱/芝士
 INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order)
 VALUES (6, 'category', 1, 4, 0, 2);

@@ -14,7 +14,7 @@ use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
     let mut attrs = sqlx::query_as::<_, Attribute>(
-        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_indices, 'null') as default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE is_active = 1 ORDER BY display_order",
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_ids, 'null') as default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE is_active = 1 ORDER BY display_order",
     )
     .fetch_all(pool)
     .await?;
@@ -25,7 +25,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Attribute>> {
     let mut attr = sqlx::query_as::<_, Attribute>(
-        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_indices, 'null') as default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id = ?",
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_ids, 'null') as default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -38,8 +38,8 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Attribu
 }
 
 pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attribute> {
-    let default_option_indices_json = data
-        .default_option_indices
+    let default_option_ids_json = data
+        .default_option_ids
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
@@ -50,11 +50,11 @@ pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attr
     let show_on_receipt = data.show_on_receipt.unwrap_or(false);
     let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(false);
     let id = sqlx::query_scalar!(
-        r#"INSERT INTO attribute (name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id as "id!""#,
+        r#"INSERT INTO attribute (name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id as "id!""#,
         data.name,
         is_multi_select,
         data.max_selections,
-        default_option_indices_json,
+        default_option_ids_json,
         display_order,
         show_on_receipt,
         data.receipt_name,
@@ -91,17 +91,17 @@ pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attr
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoResult<Attribute> {
-    let default_option_indices_json = data
-        .default_option_indices
+    let default_option_ids_json = data
+        .default_option_ids
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
     let rows = sqlx::query!(
-        "UPDATE attribute SET name = COALESCE(?1, name), is_multi_select = COALESCE(?2, is_multi_select), max_selections = COALESCE(?3, max_selections), default_option_indices = COALESCE(?4, default_option_indices), display_order = COALESCE(?5, display_order), show_on_receipt = COALESCE(?6, show_on_receipt), receipt_name = COALESCE(?7, receipt_name), show_on_kitchen_print = COALESCE(?8, show_on_kitchen_print), kitchen_print_name = COALESCE(?9, kitchen_print_name), is_active = COALESCE(?10, is_active) WHERE id = ?11",
+        "UPDATE attribute SET name = COALESCE(?1, name), is_multi_select = COALESCE(?2, is_multi_select), max_selections = COALESCE(?3, max_selections), default_option_ids = COALESCE(?4, default_option_ids), display_order = COALESCE(?5, display_order), show_on_receipt = COALESCE(?6, show_on_receipt), receipt_name = COALESCE(?7, receipt_name), show_on_kitchen_print = COALESCE(?8, show_on_kitchen_print), kitchen_print_name = COALESCE(?9, kitchen_print_name), is_active = COALESCE(?10, is_active) WHERE id = ?11",
         data.name,
         data.is_multi_select,
         data.max_selections,
-        default_option_indices_json,
+        default_option_ids_json,
         data.display_order,
         data.show_on_receipt,
         data.receipt_name,
@@ -207,7 +207,7 @@ async fn batch_find_attributes(pool: &SqlitePool, ids: &[i64]) -> RepoResult<std
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_indices, 'null') as default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id IN ({placeholders})"
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_ids, 'null') as default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id IN ({placeholders})"
     );
     let mut query = sqlx::query_as::<_, Attribute>(&sql);
     for id in ids {
@@ -231,14 +231,14 @@ pub async fn link(
     attribute_id: i64,
     is_required: bool,
     display_order: i32,
-    default_option_indices: Option<Vec<i32>>,
+    default_option_ids: Option<Vec<i32>>,
 ) -> RepoResult<AttributeBinding> {
-    let indices_json = default_option_indices
+    let indices_json = default_option_ids
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
     let id = sqlx::query_scalar!(
-        r#"INSERT INTO attribute_binding (owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id as "id!""#,
+        r#"INSERT INTO attribute_binding (owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id as "id!""#,
         owner_type,
         owner_id,
         attribute_id,
@@ -273,7 +273,7 @@ pub async fn unlink(
 
 pub async fn find_binding_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<AttributeBinding>> {
     let binding = sqlx::query_as::<_, AttributeBinding>(
-        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_indices, 'null') as default_option_indices FROM attribute_binding WHERE id = ?",
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_ids, 'null') as default_option_ids FROM attribute_binding WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -286,14 +286,14 @@ pub async fn update_binding(
     id: i64,
     is_required: Option<bool>,
     display_order: Option<i32>,
-    default_option_indices: Option<Vec<i32>>,
+    default_option_ids: Option<Vec<i32>>,
 ) -> RepoResult<AttributeBinding> {
-    let indices_json = default_option_indices
+    let indices_json = default_option_ids
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
     let rows = sqlx::query!(
-        "UPDATE attribute_binding SET is_required = COALESCE(?1, is_required), display_order = COALESCE(?2, display_order), default_option_indices = COALESCE(?3, default_option_indices) WHERE id = ?4",
+        "UPDATE attribute_binding SET is_required = COALESCE(?1, is_required), display_order = COALESCE(?2, display_order), default_option_ids = COALESCE(?3, default_option_ids) WHERE id = ?4",
         is_required,
         display_order,
         indices_json,
@@ -343,7 +343,7 @@ pub async fn find_bindings_for_owner(
     owner_id: i64,
 ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
     let bindings = sqlx::query_as::<_, AttributeBinding>(
-        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_indices, 'null') as default_option_indices FROM attribute_binding WHERE owner_type = ? AND owner_id = ? ORDER BY display_order",
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_ids, 'null') as default_option_ids FROM attribute_binding WHERE owner_type = ? AND owner_id = ? ORDER BY display_order",
     )
     .bind(owner_type)
     .bind(owner_id)
@@ -374,7 +374,7 @@ pub async fn find_all_bindings_with_attributes(
     pool: &SqlitePool,
 ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
     let bindings = sqlx::query_as::<_, AttributeBinding>(
-        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_indices, 'null') as default_option_indices FROM attribute_binding ORDER BY display_order",
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_ids, 'null') as default_option_ids FROM attribute_binding ORDER BY display_order",
     )
     .fetch_all(pool)
     .await?;

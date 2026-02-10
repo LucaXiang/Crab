@@ -5,7 +5,7 @@ import { toast } from '@/presentation/components/Toast';
 import { getErrorMessage } from '@/utils/error';
 import { logger } from '@/utils/logger';
 import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react';
-import { Role, RoleListData, RolePermissionListData } from '@/core/domain/types';
+import { Role, RolePermission } from '@/core/domain/types';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
 // Simplified permission labels (12 configurable permissions)
@@ -87,8 +87,7 @@ export const RolePermissionsEditor: React.FC = () => {
       setAvailablePermissions(allPerms || []);
 
       // 2. Get roles
-      const rolesData = await invokeApi<RoleListData>('list_roles');
-      const rolesList = rolesData?.roles || [];
+      const rolesList = await invokeApi<Role[]>('list_roles');
       setRoles(rolesList);
 
       // Select first role by default if none selected
@@ -103,9 +102,8 @@ export const RolePermissionsEditor: React.FC = () => {
       // 3. Get permissions for each role
       const rolePerms: Record<string, string[]> = {};
       for (const role of rolesList) {
-        const permsData = await invokeApi<RolePermissionListData>('get_role_permissions', { roleId: role.id });
-        // Extract permission strings from RolePermission objects
-        rolePerms[role.name] = permsData?.permissions?.map(p => p.permission) || [];
+        const perms = await invokeApi<RolePermission[]>('get_role_permissions', { roleId: role.id });
+        rolePerms[role.name] = perms?.map(p => p.permission) || [];
       }
       setRolePermissions(rolePerms);
     } catch (err) {

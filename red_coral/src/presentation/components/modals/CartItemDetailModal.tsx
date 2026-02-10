@@ -33,7 +33,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [allOptions, setAllOptions] = useState<Map<number, AttributeOption[]>>(new Map());
   const [bindings, setBindings] = useState<ProductAttribute[]>([]);
-  // Map of attributeId -> Map<optionIdx, quantity>
+  // Map of attributeId -> Map<optionId, quantity>
   const [selections, setSelections] = useState<Map<number, Map<string, number>>>(new Map());
 
   // Load attributes on mount
@@ -58,10 +58,11 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
             // If we have specs but none selected (or current selection invalid), select default
             if (specs.length > 1) {
-                 const currentSpecIdx = specs.findIndex((_s, idx) => idx === selectedSpecId);
-                 if (currentSpecIdx < 0) {
-                     const defaultIdx = specs.findIndex(s => s.is_default);
-                     setSelectedSpecId(defaultIdx >= 0 ? defaultIdx : 0);
+                 // Validate current selection still exists in specs (by id)
+                 const currentSpec = specs.find(s => s.id === selectedSpecId);
+                 if (!currentSpec) {
+                     const defaultSpec = specs.find(s => s.is_default);
+                     setSelectedSpecId(defaultSpec?.id ?? specs[0]?.id);
                  }
             }
 
@@ -76,7 +77,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
               attribute_id: binding.attribute.id,
               is_required: binding.is_required,
               display_order: binding.display_order,
-              default_option_indices: binding.default_option_indices,
+              default_option_ids: binding.default_option_ids,
               attribute: binding.attribute,
             }));
             setBindings(allBindings);
@@ -100,7 +101,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                   initialSelections.set(attrKey, new Map<string, number>());
                 }
                 const optionMap = initialSelections.get(attrKey)!;
-                optionMap.set(String(sel.option_idx), sel.quantity ?? 1);
+                optionMap.set(String(sel.option_id), sel.quantity ?? 1);
             });
 
             // 2. If no selection for an attribute (and we have defaults), fill with defaults
@@ -110,16 +111,18 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                      if (!initialSelections.has(attrId)) {
                          // Priority: binding override > attribute default
                          const binding = allBindings.find(b => b.attribute_id === attrId);
-                         const defaults = binding?.default_option_indices ?? attr.default_option_indices;
+                         const defaults = binding?.default_option_ids ?? attr.default_option_ids;
                          if (defaults && defaults.length > 0) {
-                             let defaultIdxs = [...defaults];
+                             let defaultIds = [...defaults];
                              if (!attr.is_multi_select) {
-                                 defaultIdxs = [defaultIdxs[0]];
-                             } else if (attr.max_selections && defaultIdxs.length > attr.max_selections) {
-                                 defaultIdxs = defaultIdxs.slice(0, attr.max_selections);
+                                 defaultIds = [defaultIds[0]];
+                             } else if (attr.max_selections && defaultIds.length > attr.max_selections) {
+                                 defaultIds = defaultIds.slice(0, attr.max_selections);
                              }
                              const optionMap = new Map<string, number>();
-                             defaultIdxs.forEach(idx => optionMap.set(String(idx), 1));
+                             defaultIds.forEach(id => {
+                               optionMap.set(String(id), 1);
+                             });
                              initialSelections.set(attrId, optionMap);
                          }
                      }
@@ -167,15 +170,15 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         const options = allOptions.get(attributeId) || [];
 
         if (attr) {
-            optionMap.forEach((qty, idxStr) => {
+            optionMap.forEach((qty, idStr) => {
                 if (qty <= 0) return; // Skip unselected
-                const idx = parseInt(idxStr, 10);
-                const opt = options[idx];
+                const optionId = parseInt(idStr, 10);
+                const opt = options.find(o => o.id === optionId);
                 if (opt) {
                     selectedOptions.push({
                         attribute_id: attr.id,
                         attribute_name: attr.name,
-                        option_idx: idx,
+                        option_id: optionId,
                         option_name: opt.name,
                         price_modifier: opt.price_modifier ?? null,
                         quantity: qty,
@@ -191,10 +194,10 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     // Resolve specification
     let selectedSpecification = item.selected_specification;
     if (selectedSpecId !== undefined && specifications.length > 0) {
-        const spec = specifications[selectedSpecId];
+        const spec = specifications.find(s => s.id === selectedSpecId);
         if (spec) {
             selectedSpecification = {
-                id: selectedSpecId,
+                id: spec.id!,
                 name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
                 price: currentPrice,
             };
@@ -213,9 +216,9 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       changes.manual_discount_percent = finalDisc;
     }
 
-    // Compare options by (attribute_id, option_idx, quantity) tuples
+    // Compare options by (attribute_id, option_id, quantity) tuples
     const origOpts = item.selected_options || [];
-    const toKey = (o: ItemOption) => `${o.attribute_id}:${o.option_idx}:${o.quantity ?? 1}`;
+    const toKey = (o: ItemOption) => `${o.attribute_id}:${o.option_id}:${o.quantity ?? 1}`;
     const origKeys = origOpts.map(toKey).sort().join(',');
     const newKeys = selectedOptions.map(toKey).sort().join(',');
     if (newKeys !== origKeys) {
@@ -248,7 +251,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   // Dynamic price: local override > selected spec price > item original price
   const itemBasePrice = item.original_price || item.price;
   const specPrice = selectedSpecId !== undefined && specifications.length > 0
-    ? specifications[selectedSpecId]?.price ?? itemBasePrice
+    ? specifications.find(s => s.id === selectedSpecId)?.price ?? itemBasePrice
     : itemBasePrice;
   const currentPrice = localBasePrice !== null ? localBasePrice : specPrice;
 

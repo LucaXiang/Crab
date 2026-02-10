@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::core::response::ErrorCode;
-use crate::core::{ApiResponse, ClientBridge, OrderEventListData, OrderSnapshotListData};
+use crate::core::{ApiResponse, ClientBridge};
 
 // ============ Order Commands ============
 
@@ -63,10 +63,10 @@ pub async fn order_execute(
 #[tauri::command]
 pub async fn order_get_active_orders(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<OrderSnapshotListData>, String> {
+) -> Result<ApiResponse<Vec<OrderSnapshot>>, String> {
 
     match bridge.get_active_orders().await {
-        Ok(snapshots) => Ok(ApiResponse::success(OrderSnapshotListData { snapshots })),
+        Ok(snapshots) => Ok(ApiResponse::success(snapshots)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -117,10 +117,10 @@ pub async fn order_sync_since(
 pub async fn order_get_events_since(
     bridge: State<'_, Arc<ClientBridge>>,
     since_sequence: u64,
-) -> Result<ApiResponse<OrderEventListData>, String> {
+) -> Result<ApiResponse<Vec<shared::order::OrderEvent>>, String> {
 
     match bridge.get_active_events_since(since_sequence).await {
-        Ok(events) => Ok(ApiResponse::success(OrderEventListData { events })),
+        Ok(events) => Ok(ApiResponse::success(events)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -135,10 +135,10 @@ pub async fn order_get_events_since(
 pub async fn order_get_events_for_order(
     bridge: State<'_, Arc<ClientBridge>>,
     order_id: String,
-) -> Result<ApiResponse<OrderEventListData>, String> {
+) -> Result<ApiResponse<Vec<shared::order::OrderEvent>>, String> {
 
     match bridge.get_events_for_order(&order_id).await {
-        Ok(events) => Ok(ApiResponse::success(OrderEventListData { events })),
+        Ok(events) => Ok(ApiResponse::success(events)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),

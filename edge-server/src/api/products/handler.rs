@@ -238,7 +238,7 @@ pub async fn list_product_attributes(
             attribute: attr,
             is_required: binding.is_required,
             display_order: binding.display_order,
-            default_option_indices: binding.default_option_indices,
+            default_option_ids: binding.default_option_ids,
             is_inherited: false,
         })
         .collect();

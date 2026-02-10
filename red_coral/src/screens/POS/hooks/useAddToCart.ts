@@ -67,7 +67,7 @@ export function useAddToCart() {
         attribute_id: binding.attribute.id,
         is_required: binding.is_required,
         display_order: binding.display_order,
-        default_option_indices: binding.default_option_indices,
+        default_option_ids: binding.default_option_ids,
         attribute: binding.attribute,
       }));
 
@@ -106,11 +106,11 @@ export function useAddToCart() {
       if (hasMultiSpec || allBindings.length > 0) {
         const canQuickAdd = allBindings.every(binding => {
           if (!binding.is_required) return true;
-          const defaults = binding.default_option_indices
-            ?? binding.attribute?.default_option_indices;
+          const defaults = binding.default_option_ids
+            ?? binding.attribute?.default_option_ids;
           if (!defaults || defaults.length === 0) return false;
           const attrOpts = optionsMap.get(binding.attribute?.id) || [];
-          return defaults.some(idx => attrOpts[idx] !== undefined);
+          return defaults.some(id => attrOpts.some(o => o.id === id));
         });
 
         if (canQuickAdd && (!hasMultiSpec || selectedDefaultSpec)) {
@@ -118,19 +118,19 @@ export function useAddToCart() {
           allBindings.forEach(binding => {
             const attr = binding.attribute;
             if (!attr) return;
-            const defaults = binding.default_option_indices
-              ?? attr.default_option_indices;
+            const defaults = binding.default_option_ids
+              ?? attr.default_option_ids;
             if (!defaults || defaults.length === 0) return;
             const attrOpts = optionsMap.get(attr.id) || [];
             let count = 0;
-            defaults.forEach(idx => {
+            defaults.forEach(id => {
               if (attr.is_multi_select && attr.max_selections && count >= attr.max_selections) return;
-              const opt = attrOpts[idx];
+              const opt = attrOpts.find(o => o.id === id);
               if (opt) {
                 quickOptions.push({
                   attribute_id: attr.id,
                   attribute_name: attr.name,
-                  option_idx: idx,
+                  option_id: opt.id,
                   option_name: opt.name,
                   price_modifier: opt.price_modifier ?? null,
                   quantity: 1,
@@ -142,18 +142,16 @@ export function useAddToCart() {
 
           let quickSpec: { id: number; name: string; price?: number; is_multi_spec?: boolean } | undefined;
           if (selectedDefaultSpec) {
-            const specIdx = specifications.indexOf(selectedDefaultSpec);
             quickSpec = {
-              id: specIdx,
+              id: selectedDefaultSpec.id!,
               name: selectedDefaultSpec.name,
               price: selectedDefaultSpec.price,
               is_multi_spec: hasMultiSpec,
             };
           } else if (specifications.length > 0) {
             const spec = specifications.find(s => s.is_default) ?? specifications[0];
-            const specIdx = specifications.indexOf(spec);
             quickSpec = {
-              id: specIdx,
+              id: spec.id!,
               name: spec.name,
               price: spec.price,
               is_multi_spec: hasMultiSpec,

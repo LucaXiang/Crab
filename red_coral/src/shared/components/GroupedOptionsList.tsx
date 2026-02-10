@@ -33,7 +33,7 @@ export const GroupedOptionsList: React.FC<GroupedOptionsListProps> = ({
   return (
     <div className={className}>
       {[...grouped.entries()].map(([attrName, opts]) => (
-        <div key={attrName} className={`${itemClassName} truncate`}>
+        <div key={attrName} className={itemClassName}>
           {attrName}: {opts.map((opt, i) => {
             const qty = opt.quantity ?? 1;
             const totalPrice = (opt.price_modifier ?? 0) * qty;

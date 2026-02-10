@@ -170,30 +170,29 @@ export const AttributeManagement: React.FC = React.memo(() => {
     });
   };
 
-  const handleToggleDefault = async (attr: Attribute, optionIndex: number) => {
-    const current = attr.default_option_indices ?? [];
-    const isCurrentlyDefault = current.includes(optionIndex);
+  const handleToggleDefault = async (attr: Attribute, optionId: number) => {
+    const current = attr.default_option_ids ?? [];
+    const isCurrentlyDefault = current.includes(optionId);
 
     let newDefaults: number[];
     if (attr.is_multi_select) {
       if (isCurrentlyDefault) {
-        newDefaults = current.filter(i => i !== optionIndex);
+        newDefaults = current.filter(id => id !== optionId);
       } else {
         if (attr.max_selections && current.length >= attr.max_selections) {
           toast.error(t('settings.attribute.error.max_defaults', { n: attr.max_selections }));
           return;
         }
-        newDefaults = [...current, optionIndex];
+        newDefaults = [...current, optionId];
       }
     } else {
-      newDefaults = isCurrentlyDefault ? [] : [optionIndex];
+      newDefaults = isCurrentlyDefault ? [] : [optionId];
     }
 
     try {
       await updateAttribute({
         id: attr.id,
-        // 发送空数组表示"清除默认"，不要发送 null（会被忽略）
-        default_option_indices: newDefaults,
+        default_option_ids: newDefaults,
       });
     } catch (error) {
       logger.error('Failed to toggle default option', error);
@@ -398,7 +397,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                     ) : (
                       <div className="space-y-2">
                         {selectedOptions.map((option) => {
-                          const isDefault = selectedAttribute.default_option_indices?.includes(option.index) ?? false;
+                          const isDefault = selectedAttribute.default_option_ids?.includes(option.id) ?? false;
                           const hasPriceMod = option.price_modifier !== 0;
                           const hasQuantityControl = option.enable_quantity;
 
@@ -414,7 +413,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               <div className="flex items-center gap-2">
                                 <ProtectedGate permission={Permission.MENU_MANAGE}>
                                   <button
-                                    onClick={() => handleToggleDefault(selectedAttribute, option.index)}
+                                    onClick={() => handleToggleDefault(selectedAttribute, option.id)}
                                     className={`shrink-0 p-1 rounded transition-colors ${
                                       isDefault ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-400'
                                     }`}

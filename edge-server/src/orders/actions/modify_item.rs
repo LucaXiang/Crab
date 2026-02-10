@@ -201,14 +201,14 @@ fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
         if new_opts.len() != current.len() {
             return true;
         }
-        // Compare by (attribute_id, option_idx, quantity) tuples
+        // Compare by (attribute_id, option_id, quantity) tuples
         let mut new_keys: Vec<_> = new_opts
             .iter()
-            .map(|o| (&o.attribute_id, o.option_idx, o.quantity))
+            .map(|o| (&o.attribute_id, o.option_id, o.quantity))
             .collect();
         let mut cur_keys: Vec<_> = current
             .iter()
-            .map(|o| (&o.attribute_id, o.option_idx, o.quantity))
+            .map(|o| (&o.attribute_id, o.option_id, o.quantity))
             .collect();
         new_keys.sort();
         cur_keys.sort();
@@ -822,7 +822,7 @@ mod tests {
         let new_options = vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 1,
+            option_id: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
@@ -1010,7 +1010,7 @@ mod tests {
         let opts = vec![shared::order::ItemOption {
             attribute_id: 1,
             attribute_name: "Size".to_string(),
-            option_idx: 1,
+            option_id: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
@@ -1109,7 +1109,7 @@ mod tests {
                 selected_options: Some(vec![shared::order::ItemOption {
                     attribute_id: 1,
                     attribute_name: "Size".to_string(),
-                    option_idx: 1,
+                    option_id: 1,
                     option_name: "Large".to_string(),
                     price_modifier: None,
                     quantity: 1,

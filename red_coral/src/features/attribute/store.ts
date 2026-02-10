@@ -65,7 +65,7 @@ interface AttributeStore {
     name?: string;
     is_multi_select?: boolean;
     max_selections?: number | null;
-    default_option_indices?: number[] | null;
+    default_option_ids?: number[] | null;
     display_order?: number;
     show_on_receipt?: boolean;
     receipt_name?: string;
@@ -249,7 +249,10 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   updateAttribute: async (params) => {
     try {
       const { id, ...data } = params;
-      await getApi().updateAttribute(id, data);
+      const updated = await getApi().updateAttribute(id, data);
+      set((state) => ({
+        items: state.items.map((item) => (item.id === id ? updated : item)),
+      }));
       cascadeRefreshProducts();
     } catch (e: unknown) {
       logger.error('Failed to update attribute', e, { component: 'AttributeStore' });

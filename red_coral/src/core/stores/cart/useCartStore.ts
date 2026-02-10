@@ -36,9 +36,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
       let effectiveSpec = selectedSpecification;
       if (!effectiveSpec && product.specs && product.specs.length > 0) {
         const defaultSpec = product.specs.find(s => s.is_default) ?? product.specs[0];
-        const specIdx = product.specs.indexOf(defaultSpec);
         effectiveSpec = {
-          id: specIdx,
+          id: defaultSpec.id!,
           name: defaultSpec.name,
           price: defaultSpec.price,
           is_multi_spec: (product.specs?.length ?? 0) > 1,

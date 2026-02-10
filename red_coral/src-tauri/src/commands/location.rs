@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::core::response::{ApiResponse, ErrorCode, TableListData, ZoneListData};
+use crate::core::response::{ApiResponse, ErrorCode};
 use crate::core::ClientBridge;
 use shared::models::{
     DiningTable, DiningTableCreate, DiningTableUpdate, Zone, ZoneCreate, ZoneUpdate,
@@ -16,9 +16,9 @@ use shared::models::{
 #[tauri::command]
 pub async fn list_zones(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<ZoneListData>, String> {
+) -> Result<ApiResponse<Vec<Zone>>, String> {
     match bridge.get::<Vec<Zone>>("/api/zones").await {
-        Ok(zones) => Ok(ApiResponse::success(ZoneListData { zones })),
+        Ok(zones) => Ok(ApiResponse::success(zones)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -99,9 +99,9 @@ pub async fn delete_zone(
 #[tauri::command]
 pub async fn list_tables(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<TableListData>, String> {
+) -> Result<ApiResponse<Vec<DiningTable>>, String> {
     match bridge.get::<Vec<DiningTable>>("/api/tables").await {
-        Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
+        Ok(tables) => Ok(ApiResponse::success(tables)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),
@@ -113,12 +113,12 @@ pub async fn list_tables(
 pub async fn list_tables_by_zone(
     bridge: State<'_, Arc<ClientBridge>>,
     zone_id: i64,
-) -> Result<ApiResponse<TableListData>, String> {
+) -> Result<ApiResponse<Vec<DiningTable>>, String> {
     match bridge
         .get::<Vec<DiningTable>>(&format!("/api/tables/zone/{}", zone_id))
         .await
     {
-        Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
+        Ok(tables) => Ok(ApiResponse::success(tables)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),

@@ -536,7 +536,7 @@ fn test_combo_option_quantity_with_rule() {
             vec![shared::order::ItemOption {
                 attribute_id: 7,
                 attribute_name: "Eggs".to_string(),
-                option_idx: 0,
+                option_id: 0,
                 option_name: "Extra Egg".to_string(),
                 price_modifier: Some(2.0),
                 quantity: 3,

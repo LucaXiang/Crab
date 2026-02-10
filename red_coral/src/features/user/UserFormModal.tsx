@@ -6,7 +6,7 @@ import { toast } from '@/presentation/components/Toast';
 import { getErrorMessage } from '@/utils/error';
 import { logger } from '@/utils/logger';
 import { User, Role } from '@/core/domain/types';
-import { RoleListData } from '@/core/domain/types/api';
+
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
 import { FormField, FormSection, CheckboxField, inputClass, selectClass } from '@/shared/components/FormField';
 
@@ -40,9 +40,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
   useEffect(() => {
     // Fetch roles
-    invokeApi<RoleListData>('list_roles')
-      .then((resp) => {
-        const fetchedRoles = resp.roles;
+    invokeApi<Role[]>('list_roles')
+      .then((fetchedRoles) => {
         setRoles(fetchedRoles);
         // Set default role if creating new user
         if (!editingUser && fetchedRoles.length > 0) {

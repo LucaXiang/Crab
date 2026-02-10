@@ -684,7 +684,7 @@ fn test_add_items_with_option_price_modifiers() {
                     shared::order::ItemOption {
                         attribute_id: 1,
                         attribute_name: "Size".to_string(),
-                        option_idx: 2,
+                        option_id: 2,
                         option_name: "Large".to_string(),
                         price_modifier: Some(3.0), // +3
                         quantity: 1,
@@ -692,7 +692,7 @@ fn test_add_items_with_option_price_modifiers() {
                     shared::order::ItemOption {
                         attribute_id: 2,
                         attribute_name: "Topping".to_string(),
-                        option_idx: 0,
+                        option_id: 0,
                         option_name: "Extra Cheese".to_string(),
                         price_modifier: Some(1.50), // +1.50
                         quantity: 1,
@@ -754,7 +754,7 @@ fn test_add_items_with_negative_option_modifier() {
                 selected_options: Some(vec![shared::order::ItemOption {
                     attribute_id: 3,
                     attribute_name: "Mod".to_string(),
-                    option_idx: 0,
+                    option_id: 0,
                     option_name: "Smaller".to_string(),
                     price_modifier: Some(-15.0), // -15 使总价变负
                     quantity: 1,
@@ -847,7 +847,7 @@ fn test_discount_surcharge_options_combined_precision() {
                 selected_options: Some(vec![shared::order::ItemOption {
                     attribute_id: 1,
                     attribute_name: "Size".to_string(),
-                    option_idx: 1,
+                    option_id: 1,
                     option_name: "Large".to_string(),
                     price_modifier: Some(1.67),
                     quantity: 1,
@@ -1222,7 +1222,7 @@ fn test_options_discount_rule_fields_no_double_counting() {
                     shared::order::ItemOption {
                         attribute_id: 4,
                         attribute_name: "Sauce".to_string(),
-                        option_idx: 0,
+                        option_id: 0,
                         option_name: "BBQ".to_string(),
                         price_modifier: Some(3.0),
                         quantity: 1,
@@ -1230,7 +1230,7 @@ fn test_options_discount_rule_fields_no_double_counting() {
                     shared::order::ItemOption {
                         attribute_id: 5,
                         attribute_name: "Side".to_string(),
-                        option_idx: 1,
+                        option_id: 1,
                         option_name: "Fries".to_string(),
                         price_modifier: Some(2.0),
                         quantity: 1,
@@ -1300,7 +1300,7 @@ fn test_modify_item_unit_price_consistency() {
                 selected_options: Some(vec![shared::order::ItemOption {
                     attribute_id: 6,
                     attribute_name: "Cheese".to_string(),
-                    option_idx: 0,
+                    option_id: 0,
                     option_name: "Extra".to_string(),
                     price_modifier: Some(2.5),
                     quantity: 1,

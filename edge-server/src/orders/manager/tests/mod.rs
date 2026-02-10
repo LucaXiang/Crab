@@ -706,11 +706,11 @@ fn item_with_spec(
 
 
 /// Helper: 创建选项
-fn make_option(attr_id: i64, attr_name: &str, idx: i32, opt_name: &str, modifier: f64) -> shared::order::ItemOption {
+fn make_option(attr_id: i64, attr_name: &str, id: i64, opt_name: &str, modifier: f64) -> shared::order::ItemOption {
     shared::order::ItemOption {
         attribute_id: attr_id,
         attribute_name: attr_name.to_string(),
-        option_idx: idx,
+        option_id: id,
         option_name: opt_name.to_string(),
         price_modifier: Some(modifier),
         quantity: 1,

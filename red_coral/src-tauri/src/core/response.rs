@@ -202,50 +202,6 @@ impl<T: Serialize> ApiResponse<T> {
     }
 }
 
-// ============ 列表数据包装 (与前端类型对齐) ============
-
-/// Tags 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct TagListData {
-    pub tags: Vec<shared::models::Tag>,
-}
-
-/// Categories 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct CategoryListData {
-    pub categories: Vec<shared::models::Category>,
-}
-
-/// 单个 Category
-#[derive(Debug, Clone, Serialize)]
-pub struct CategoryData {
-    pub category: shared::models::Category,
-}
-
-/// Products 列表 (完整数据，含属性和标签)
-#[derive(Debug, Clone, Serialize)]
-pub struct ProductListData {
-    pub products: Vec<shared::models::ProductFull>,
-}
-
-/// 单个 Product (完整数据，含属性和标签)
-#[derive(Debug, Clone, Serialize)]
-pub struct ProductData {
-    pub product: shared::models::ProductFull,
-}
-
-/// Attributes 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct AttributeListData {
-    pub templates: Vec<shared::models::Attribute>,
-}
-
-/// 单个 Attribute (template)
-#[derive(Debug, Clone, Serialize)]
-pub struct AttributeData {
-    pub template: shared::models::Attribute,
-}
-
 /// 删除响应
 #[derive(Debug, Clone, Serialize)]
 pub struct DeleteData {
@@ -258,59 +214,11 @@ impl DeleteData {
     }
 }
 
-/// Product Attributes 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct ProductAttributeListData {
-    pub attributes: Vec<shared::models::AttributeBinding>,
-}
-
-// ============ Print Destinations ============
-
-/// Print Destinations 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct PrintDestinationListData {
-    pub print_destinations: Vec<shared::models::PrintDestination>,
-}
-
-/// 单个 PrintDestination
-#[derive(Debug, Clone, Serialize)]
-pub struct PrintDestinationData {
-    pub print_destination: shared::models::PrintDestination,
-}
-
-// ============ Zones & Tables ============
-
-/// Zones 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct ZoneListData {
-    pub zones: Vec<shared::models::Zone>,
-}
-
-/// Tables 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct TableListData {
-    pub tables: Vec<shared::models::DiningTable>,
-}
-
-// ============ Roles ============
-
 /// Role Permission entity (constructed from API response)
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct RolePermission {
     pub role_id: i64,
     pub permission: String,
-}
-
-/// Roles 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct RoleListData {
-    pub roles: Vec<shared::models::Role>,
-}
-
-/// Role Permissions 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct RolePermissionListData {
-    pub permissions: Vec<RolePermission>,
 }
 
 // ============ Auth ============
@@ -320,32 +228,6 @@ pub struct RolePermissionListData {
 pub struct AuthData {
     pub session: Option<super::EmployeeSession>,
     pub mode: super::LoginMode,
-}
-
-// ============ System ============
-
-/// Employees 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct EmployeeListData {
-    pub employees: Vec<shared::models::Employee>,
-}
-
-/// Price Rules 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct PriceRuleListData {
-    pub rules: Vec<shared::models::PriceRule>,
-}
-
-/// Order Snapshots 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct OrderSnapshotListData {
-    pub snapshots: Vec<shared::order::OrderSnapshot>,
-}
-
-/// Order Events 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct OrderEventListData {
-    pub events: Vec<shared::order::OrderEvent>,
 }
 
 // ============ Tenants ============

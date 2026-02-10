@@ -173,7 +173,7 @@ impl CatalogService {
                     attribute: attr,
                     is_required: binding.is_required,
                     display_order: binding.display_order,
-                    default_option_indices: binding.default_option_indices,
+                    default_option_ids: binding.default_option_ids,
                     is_inherited: false,
                 };
                 if binding.owner_type == "product" {
@@ -713,7 +713,7 @@ impl CatalogService {
                 attribute: attr,
                 is_required: binding.is_required,
                 display_order: binding.display_order,
-                default_option_indices: binding.default_option_indices,
+                default_option_ids: binding.default_option_ids,
                 is_inherited: false,
             })
             .collect();
@@ -732,7 +732,7 @@ impl CatalogService {
                     attribute: attr,
                     is_required: binding.is_required,
                     display_order: binding.display_order,
-                    default_option_indices: binding.default_option_indices,
+                    default_option_ids: binding.default_option_ids,
                     is_inherited: true,
                 });
             }

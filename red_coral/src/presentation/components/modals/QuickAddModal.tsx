@@ -131,7 +131,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         attribute_id: binding.attribute.id,
         is_required: binding.is_required,
         display_order: binding.display_order,
-        default_option_indices: binding.default_option_indices,
+        default_option_ids: binding.default_option_ids,
         attribute: binding.attribute,
       }));
 

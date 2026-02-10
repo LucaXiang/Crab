@@ -18,7 +18,7 @@ export function toCartItemInput(item: CartItem): CartItemInput {
   const selectedOptions = item.selected_options?.map(opt => ({
     attribute_id: opt.attribute_id,
     attribute_name: opt.attribute_name,
-    option_idx: opt.option_idx,
+    option_id: opt.option_id,
     option_name: opt.option_name,
     price_modifier: opt.price_modifier ?? null,
     quantity: opt.quantity ?? 1,

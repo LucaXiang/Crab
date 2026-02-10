@@ -171,7 +171,7 @@ export interface AttributeBindingFull {
   attribute: Attribute;
   is_required: boolean;
   display_order: number;
-  default_option_indices?: number[];
+  default_option_ids?: number[];
   /** Whether this binding is inherited from the product's category */
   is_inherited?: boolean;
 }
@@ -224,7 +224,7 @@ export interface Attribute {
   name: string;
   is_multi_select: boolean;
   max_selections: number | null;
-  default_option_indices: number[] | null;
+  default_option_ids: number[] | null;
   display_order: number;
   show_on_receipt: boolean;
   receipt_name: string | null;
@@ -237,7 +237,7 @@ export interface AttributeCreate {
   name: string;
   is_multi_select?: boolean;
   max_selections?: number | null;
-  default_option_indices?: number[];
+  default_option_ids?: number[];
   display_order?: number;
   show_on_receipt?: boolean;
   receipt_name?: string;
@@ -250,7 +250,7 @@ export interface AttributeUpdate {
   name?: string;
   is_multi_select?: boolean;
   max_selections?: number | null;
-  default_option_indices?: number[] | null;
+  default_option_ids?: number[] | null;
   display_order?: number;
   show_on_receipt?: boolean;
   receipt_name?: string;
@@ -267,7 +267,7 @@ export interface AttributeBinding {
   attribute_id: number;
   is_required: boolean;
   display_order: number;
-  default_option_indices?: number[];
+  default_option_ids?: number[];
 }
 
 
@@ -496,14 +496,6 @@ export interface RoleUpdate {
 export interface RolePermission {
   role_id: number;
   permission: string;
-}
-
-export interface RoleListData {
-  roles: Role[];
-}
-
-export interface RolePermissionListData {
-  permissions: RolePermission[];
 }
 
 // ============ User (Frontend representation) ============
