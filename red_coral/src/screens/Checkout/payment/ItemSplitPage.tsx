@@ -15,6 +15,7 @@ import { useProductStore } from '@/features/product';
 import { useCategoryStore } from '@/features/category';
 import { useImageUrls } from '@/core/hooks';
 import DefaultImage from '@/assets/reshot.svg';
+import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 
 interface ItemSplitPageProps {
   order: HeldOrder;
@@ -140,6 +141,8 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
 
     return result;
   }, [order.items, order.paid_item_quantities, productInfoMap, categories, products, t]);
+
+  const colorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
 
   const [selectedCategory, setSelectedCategory] = useState<string | 'ALL'>('ALL');
 
@@ -317,9 +320,16 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
 
                   {/* Items Grid */}
                   <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                      {filteredItemsByCategory.map(({ categoryId, categoryName, items }) => (
-                          <div key={categoryId || 'uncategorized'} className="mb-8 last:mb-0">
-                              <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 ml-1">{categoryName}</h4>
+                      {filteredItemsByCategory.map(({ categoryId, categoryName, items }) => {
+                          const colorIdx = colorMap.get(categoryId ?? '') ?? 0;
+                          return (
+                          <div key={categoryId || 'uncategorized'} className="mb-8 last:mb-0 rounded-2xl p-4" style={{ backgroundColor: CATEGORY_BG[colorIdx] }}>
+                              <h4
+                                className="text-sm font-bold uppercase tracking-wider mb-4 px-2 py-1 rounded-lg inline-block"
+                                style={{ color: CATEGORY_ACCENT[colorIdx], backgroundColor: CATEGORY_HEADER_BG[colorIdx] }}
+                              >
+                                {categoryName}
+                              </h4>
                               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                                   {items.map((item) => {
                                       const currentSplitQty = splitItems[item.instance_id] || 0;
@@ -374,7 +384,8 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
                                   })}
                               </div>
                           </div>
-                      ))}
+                          );
+                      })}
                   </div>
               </div>
 

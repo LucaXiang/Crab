@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -251,6 +251,20 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     {t('checkout.complete_order')}
                   </button>
                 )}
+                <EscalatableGate
+                  permission={Permission.CASH_DRAWER_OPEN}
+                  mode="intercept"
+                  description={t('app.action.open_cash_drawer')}
+                  onAuthorized={() => {
+                    openCashDrawer();
+                    toast.success(t('app.action.cash_drawer_opened'));
+                  }}
+                >
+                  <button className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                    <Archive size={20} />
+                    {t('app.action.open_cash_drawer')}
+                  </button>
+                </EscalatableGate>
                 {onVoid && !order.is_retail && (
                   <EscalatableGate
                     permission={Permission.ORDERS_VOID}

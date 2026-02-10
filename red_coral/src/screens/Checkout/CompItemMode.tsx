@@ -12,6 +12,7 @@ import { useProductStore } from '@/features/product';
 import { useCategoryStore } from '@/features/category';
 import { useImageUrls } from '@/core/hooks';
 import DefaultImage from '@/assets/reshot.svg';
+import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 
 interface CompItemModeProps {
   order: HeldOrder;
@@ -80,7 +81,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
     return order.items.filter(item => !item._removed && item.is_comped);
   }, [order.items]);
 
-  // Group compable items by category
+  // Group compable items by category (sorted same as ItemSplitPage)
   const itemsByCategory = useMemo(() => {
     const groups = new Map<number, typeof compableItems>();
     const uncategorized: typeof compableItems = [];
@@ -96,17 +97,38 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
       }
     });
 
-    const result: Array<{ categoryName: string; items: typeof compableItems }> = [];
+    const result: Array<{ categoryId: number | null; categoryName: string; items: typeof compableItems }> = [];
     groups.forEach((items, categoryRef) => {
       const category = categories.find(c => c.id === categoryRef);
-      result.push({ categoryName: category?.name || t('common.label.unknown_item'), items });
+      result.push({ categoryId: categoryRef, categoryName: category?.name || t('common.label.unknown_item'), items });
     });
-    result.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+
+    // Sort items within each group by external_id then name
+    const extIdMap = new Map(products.map(p => [p.id, p.external_id]));
+    for (const group of result) {
+      group.items.sort((a, b) => {
+        const extA = extIdMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const extB = extIdMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        if (extA !== extB) return extA - extB;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    // Sort groups by category sort_order
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    result.sort((a, b) => {
+      const sortA = a.categoryId != null ? (categoryMap.get(a.categoryId)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      const sortB = b.categoryId != null ? (categoryMap.get(b.categoryId)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      return sortA - sortB;
+    });
+
     if (uncategorized.length > 0) {
-      result.push({ categoryName: t('common.label.unknown_item'), items: uncategorized });
+      result.push({ categoryId: null, categoryName: t('common.label.unknown_item'), items: uncategorized });
     }
     return result;
-  }, [compableItems, productInfoMap, categories, t]);
+  }, [compableItems, productInfoMap, categories, products, t]);
+
+  const colorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
 
   const selectedItem = useMemo(() => {
     return order.items.find(i => i.instance_id === selectedInstanceId) ?? null;
@@ -212,9 +234,14 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                 </div>
               )}
 
-              {itemsByCategory.map(({ categoryName, items }) => (
-                <div key={categoryName} className="mb-8 last:mb-0">
-                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 ml-1">
+              {itemsByCategory.map(({ categoryId, categoryName, items }) => {
+                const colorIdx = colorMap.get(String(categoryId ?? '')) ?? 0;
+                return (
+                <div key={categoryId ?? 'uncategorized'} className="mb-8 last:mb-0 rounded-2xl p-4" style={{ backgroundColor: CATEGORY_BG[colorIdx] }}>
+                  <h4
+                    className="text-sm font-bold uppercase tracking-wider mb-4 px-2 py-1 rounded-lg inline-block"
+                    style={{ color: CATEGORY_ACCENT[colorIdx], backgroundColor: CATEGORY_HEADER_BG[colorIdx] }}
+                  >
                     {categoryName}
                   </h4>
                   <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -267,7 +294,8 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                     })}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               {/* Already Comped Items */}
               {compedItems.length > 0 && (
