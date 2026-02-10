@@ -3,7 +3,7 @@ export interface VoidOrderOptions {
   /** Void type (defaults to CANCELLED) */
   voidType?: 'CANCELLED' | 'LOSS_SETTLED';
   /** Loss reason (only for LOSS_SETTLED) */
-  lossReason?: 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+  lossReason?: 'CUSTOMER_FLED' | 'REFUSED_TO_PAY' | 'OTHER';
   /** Loss amount (only for LOSS_SETTLED) */
   lossAmount?: number;
   /** Note */

@@ -469,9 +469,9 @@
       "unpaid_amount": "Importe pendiente",
       "type": {
         "cancelled": "Cancelar pedido",
-        "cancelled_desc": "Pedido no pagado, cancelar directamente",
-        "loss_settled": "Liquidar pérdida",
-        "loss_settled_desc": "Pago parcial, pendiente como pérdida"
+        "cancelled_desc": "Sin pérdida, cancelar pedido directamente",
+        "loss_settled": "Anular con pérdida",
+        "loss_settled_desc": "Fuga, impago, etc. El pendiente se registra como pérdida"
       },
       "cancel_reason": {
         "title": "Motivo de cancelación",
@@ -482,13 +482,13 @@
       },
       "loss_reason": {
         "title": "Motivo de pérdida",
-        "customer_fled": "Impago",
-        "customer_insolvent": "Sin medios de pago",
+        "customer_fled": "Fuga sin pagar",
+        "refused_to_pay": "Se niega a pagar",
         "other": "Otro motivo"
       },
       "note": "Nota",
       "note_placeholder": "Introducir nota...",
-      "loss_amount_notice": "Importe {amount} como pérdida"
+      "loss_amount_notice": "Se registrará {amount} como pérdida"
     },
     "delete_item": {
       "title": "Eliminar plato",
@@ -694,8 +694,8 @@
       "LOSS_SETTLED": "Pérdida"
     },
     "loss_reason": {
-      "CUSTOMER_FLED": "Impago",
-      "CUSTOMER_INSOLVENT": "Sin medios",
+      "CUSTOMER_FLED": "Fuga sin pagar",
+      "REFUSED_TO_PAY": "Se niega a pagar",
       "OTHER": "Otro"
     },
     "action": {
@@ -2343,8 +2343,8 @@
         "abnormal_shutdown_detected": "Cierre anómalo detectado",
         "CANCELLED": "Cancelado",
         "LOSS_SETTLED": "Pérdida",
-        "CUSTOMER_FLED": "Impago",
-        "CUSTOMER_INSOLVENT": "Sin medios",
+        "CUSTOMER_FLED": "Fuga sin pagar",
+        "REFUSED_TO_PAY": "Se niega a pagar",
         "OTHER": "Otro",
         "percentage": "Porcentaje",
         "fixed_amount": "Importe fijo",

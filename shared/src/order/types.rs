@@ -31,8 +31,8 @@ pub enum VoidType {
 pub enum LossReason {
     /// 客人逃单
     CustomerFled,
-    /// 客人无力支付
-    CustomerInsolvent,
+    /// 客人拒绝付款
+    RefusedToPay,
     /// 其他
     Other,
 }

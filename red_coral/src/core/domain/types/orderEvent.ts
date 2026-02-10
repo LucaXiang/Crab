@@ -139,7 +139,7 @@ export interface OrderCompletedPayload {
 export type VoidType = 'CANCELLED' | 'LOSS_SETTLED';
 
 /** 损失原因（预设选项） */
-export type LossReason = 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+export type LossReason = 'CUSTOMER_FLED' | 'REFUSED_TO_PAY' | 'OTHER';
 
 export interface OrderVoidedPayload {
   type: 'ORDER_VOIDED';

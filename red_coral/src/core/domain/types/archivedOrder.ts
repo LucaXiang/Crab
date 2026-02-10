@@ -109,7 +109,7 @@ export interface ArchivedEvent {
 export type ArchivedVoidType = 'CANCELLED' | 'LOSS_SETTLED';
 
 /** Loss reason for archived void orders */
-export type ArchivedLossReason = 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+export type ArchivedLossReason = 'CUSTOMER_FLED' | 'REFUSED_TO_PAY' | 'OTHER';
 
 /** Full order detail (matches backend OrderDetail) */
 export interface ArchivedOrderDetail {

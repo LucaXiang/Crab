@@ -469,9 +469,9 @@
       "unpaid_amount": "未付金额",
       "type": {
         "cancelled": "取消订单",
-        "cancelled_desc": "订单未付款，直接取消",
-        "loss_settled": "损失结算",
-        "loss_settled_desc": "顾客已部分付款，未付金额计入损失"
+        "cancelled_desc": "无损失，直接取消订单",
+        "loss_settled": "损失作废",
+        "loss_settled_desc": "逃单、霸王餐等，未付金额计入损失"
       },
       "cancel_reason": {
         "title": "选择取消原因",
@@ -483,7 +483,7 @@
       "loss_reason": {
         "title": "选择损失原因",
         "customer_fled": "逃单",
-        "customer_insolvent": "无力支付",
+        "refused_to_pay": "拒绝付款",
         "other": "其他原因"
       },
       "note": "备注",
@@ -695,7 +695,7 @@
     },
     "loss_reason": {
       "CUSTOMER_FLED": "逃单",
-      "CUSTOMER_INSOLVENT": "无力支付",
+      "REFUSED_TO_PAY": "拒绝付款",
       "OTHER": "其他"
     },
     "action": {
@@ -2370,7 +2370,7 @@
         "CANCELLED": "取消",
         "LOSS_SETTLED": "损失结算",
         "CUSTOMER_FLED": "顾客逃单",
-        "CUSTOMER_INSOLVENT": "顾客无力支付",
+        "REFUSED_TO_PAY": "拒绝付款",
         "OTHER": "其他",
         "percentage": "百分比",
         "fixed_amount": "固定金额",
