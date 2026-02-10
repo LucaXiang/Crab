@@ -4,7 +4,7 @@ import { X, ShoppingBag } from 'lucide-react';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { logger } from '@/utils/logger';
 import { CartItem as CartItemType, Product, ItemOption, Attribute, AttributeOption, ProductSpec, ProductAttribute } from '@/core/domain/types';
-import { v4 as uuidv4 } from 'uuid';
+import { calculateOptionsModifier, generateCartKey } from '@/utils/pricing';
 import { useCategories, useCategoryStore } from '@/features/category';
 import { useProducts, useProductStore, useProductsLoading, ProductWithPrice } from '@/features/product';
 import { ProductGrid } from '@/screens/POS/components/ProductGrid';
@@ -18,38 +18,6 @@ interface QuickAddModalProps {
   onClose: () => void;
   onConfirm: (items: CartItemType[]) => void;
 }
-
-// Helper to check if two items are identical for merging
-const areItemsEqual = (item1: CartItemType, item2: Partial<CartItemType> & { id: number }) => {
-  if (item1.id !== item2.id) return false;
-  
-  // Check price (safeguard for open price or other variations)
-  if (item1.price !== item2.price) return false;
-
-  // Check specs
-  const spec1 = item1.selected_specification?.id;
-  const spec2 = item2.selected_specification?.id;
-  if (spec1 !== spec2) return false;
-  
-  // Check manual discount (normalize null/undefined)
-  const discount1 = item1.manual_discount_percent ?? 0;
-  const discount2 = item2.manual_discount_percent ?? 0;
-  if (discount1 !== discount2) return false;
-
-  // Check options
-  const opts1 = item1.selected_options || [];
-  const opts2 = item2.selected_options || [];
-  
-  if (opts1.length !== opts2.length) return false;
-  
-  const sorted1 = [...opts1].sort((a, b) => a.attribute_id - b.attribute_id);
-  const sorted2 = [...opts2].sort((a, b) => a.attribute_id - b.attribute_id);
-  
-  return sorted1.every((opt1, idx) => {
-    const opt2 = sorted2[idx];
-    return opt1.attribute_id === opt2.attribute_id && opt1.option_idx === opt2.option_idx;
-  });
-};
 
 export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm }) => {
   const { t } = useI18n();
@@ -225,6 +193,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     const defaultSpec = getDefaultSpec(product);
     const defaultSpecIdx = product.specs?.findIndex(s => s === defaultSpec) ?? 0;
     const price = defaultSpec?.price ?? 0;
+    const cartKey = generateCartKey(product.id, price, undefined, undefined, defaultSpecIdx);
 
     const newItem: CartItemType = {
       id: product.id,
@@ -233,8 +202,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       original_price: price,
       quantity: 1,
       unpaid_quantity: 1,
-      instance_id: uuidv4(),
-      selected_options: [],
+      instance_id: cartKey,
+      selected_options: undefined,
       selected_specification: defaultSpec ? {
         id: defaultSpecIdx,
         name: defaultSpec.name,
@@ -251,14 +220,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     };
 
     setTempItems(prev => {
-      const existingIdx = prev.findIndex(item => areItemsEqual(item, newItem));
+      const existingIdx = prev.findIndex(item => item.instance_id === cartKey);
       if (existingIdx !== -1) {
         const newItems = [...prev];
         const existing = newItems[existingIdx];
+        const newQty = existing.quantity + 1;
         newItems[existingIdx] = {
           ...existing,
-          quantity: existing.quantity + 1,
+          quantity: newQty,
           unpaid_quantity: existing.unpaid_quantity + 1,
+          line_total: Currency.round2(Currency.mul(existing.unit_price, newQty)).toNumber(),
         };
         return newItems;
       }
@@ -281,20 +252,27 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       const defaultSpec = getDefaultSpec(product);
       const defaultSpecIdx = product.specs?.findIndex(s => s === defaultSpec) ?? 0;
 
-      // Calculate price from spec or base
+      // Use spec price as base (same as CartStore) — options stored separately
       const specPrice = selectedSpecification?.price ?? defaultSpec?.price ?? 0;
-      const optionsModifier = selectedOptions.reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
-      const finalPrice = specPrice + optionsModifier;
+      const opts = selectedOptions && selectedOptions.length > 0 ? selectedOptions : undefined;
+      const optsMod = calculateOptionsModifier(opts);
+      const unitPriceBeforeDiscount = specPrice + optsMod;
+      const discountMul = discount > 0 ? (1 - discount / 100) : 1;
+      const unitPrice = Currency.round2(Currency.mul(unitPriceBeforeDiscount, discountMul)).toNumber();
+      const lineTotal = Currency.round2(Currency.mul(unitPrice, quantity)).toNumber();
+
+      const specId = selectedSpecification?.id ?? defaultSpecIdx;
+      const cartKey = generateCartKey(product.id, specPrice, discount > 0 ? discount : undefined, opts, specId);
 
       const newItem: CartItemType = {
         id: product.id,
         name: product.name,
-        price: finalPrice,
+        price: specPrice,
         original_price: specPrice,
         quantity,
         unpaid_quantity: quantity,
-        instance_id: uuidv4(),
-        selected_options: selectedOptions,
+        instance_id: cartKey,
+        selected_options: opts,
         selected_specification: selectedSpecification ? {
           id: selectedSpecification.id,
           name: selectedSpecification.name,
@@ -310,8 +288,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         rule_discount_amount: 0,
         rule_surcharge_amount: 0,
         applied_rules: [],
-        unit_price: finalPrice,
-        line_total: Currency.round2(Currency.mul(finalPrice, quantity)).toNumber(),
+        unit_price: unitPrice,
+        line_total: lineTotal,
         tax: 0,
         tax_rate: 0,
         manual_discount_percent: discount > 0 ? discount : undefined,
@@ -320,14 +298,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       };
 
       setTempItems(prev => {
-        const existingIdx = prev.findIndex(item => areItemsEqual(item, newItem));
+        const existingIdx = prev.findIndex(item => item.instance_id === cartKey);
         if (existingIdx !== -1) {
           const newItems = [...prev];
           const existing = newItems[existingIdx];
+          const newQty = existing.quantity + quantity;
           newItems[existingIdx] = {
             ...existing,
-            quantity: existing.quantity + quantity,
+            quantity: newQty,
             unpaid_quantity: existing.unpaid_quantity + quantity,
+            line_total: Currency.round2(Currency.mul(existing.unit_price, newQty)).toNumber(),
           };
           return newItems;
         }
@@ -353,7 +333,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       }
 
       const newItems = [...prev];
-      newItems[idx] = { ...item, quantity: newQty };
+      newItems[idx] = {
+        ...item,
+        quantity: newQty,
+        unpaid_quantity: newQty,
+        line_total: Currency.round2(Currency.mul(item.unit_price, newQty)).toNumber(),
+      };
       return newItems;
     });
   }, []);
@@ -375,8 +360,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     setTempItems(prev => prev.filter(item => item.instance_id !== instanceId));
   }, []);
 
-  const totalAmount = tempItems.reduce((sum, item) =>
-    Currency.add(sum, Currency.mul(item.price, item.quantity)).toNumber(), 0);
+  const totalAmount = tempItems.reduce(
+    (sum, item) => Currency.add(sum, item.line_total).toNumber(),
+    0
+  );
 
   const handleConfirm = () => {
     if (tempItems.length > 0) {

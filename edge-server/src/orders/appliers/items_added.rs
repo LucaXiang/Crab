@@ -30,48 +30,30 @@ impl EventApplier for ItemsAddedApplier {
     }
 }
 
-/// Add item to snapshot, merging with existing item if instance_id matches
-/// and pricing is compatible. If pricing differs (different rules, discounts,
-/// or comp status), the item is kept separate with a suffixed instance_id.
+/// Add item to snapshot, merging with existing item if instance_id matches.
+///
+/// instance_id is a content-addressed hash (product_id + price + discount +
+/// options + spec), so matching IDs guarantee the same product identity.
+/// Always merge by adding quantity and updating pricing to the latest calculation.
 pub(crate) fn add_or_merge_item(snapshot: &mut OrderSnapshot, item: &CartItemSnapshot) {
     if let Some(existing) = snapshot
         .items
         .iter_mut()
         .find(|i| i.instance_id == item.instance_id)
     {
-        if is_price_compatible(existing, item) {
-            // Same pricing: merge by adding quantity
-            existing.quantity += item.quantity;
-            existing.unpaid_quantity += item.quantity;
-        } else {
-            // Different pricing: keep as separate item with unique instance_id
-            let mut new_item = item.clone();
-            let base_id = &item.instance_id;
-            let prefix = format!("{}::m", base_id);
-            let count = snapshot
-                .items
-                .iter()
-                .filter(|i| i.instance_id == *base_id || i.instance_id.starts_with(&prefix))
-                .count();
-            new_item.instance_id = format!("{}{}", prefix, count);
-            snapshot.items.push(new_item);
-        }
+        // Same identity: merge quantity, update pricing to latest
+        existing.quantity += item.quantity;
+        existing.unpaid_quantity += item.quantity;
+        existing.price = item.price;
+        existing.original_price = item.original_price;
+        existing.manual_discount_percent = item.manual_discount_percent;
+        existing.rule_discount_amount = item.rule_discount_amount;
+        existing.rule_surcharge_amount = item.rule_surcharge_amount;
+        existing.applied_rules = item.applied_rules.clone();
     } else {
         // Add new item
         snapshot.items.push(item.clone());
     }
-}
-
-/// Check if two items with the same instance_id have compatible pricing
-/// for safe quantity merging.
-fn is_price_compatible(a: &CartItemSnapshot, b: &CartItemSnapshot) -> bool {
-    a.price == b.price
-        && a.original_price == b.original_price
-        && a.manual_discount_percent == b.manual_discount_percent
-        && a.rule_discount_amount == b.rule_discount_amount
-        && a.rule_surcharge_amount == b.rule_surcharge_amount
-        && a.applied_rules == b.applied_rules
-        && a.is_comped == b.is_comped
 }
 
 #[cfg(test)]
@@ -356,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_same_instance_id_different_pricing_keeps_separate() {
+    fn test_merge_same_instance_id_different_pricing_merges_and_updates() {
         use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
         use shared::order::AppliedRule;
 
@@ -383,24 +365,19 @@ mod tests {
         }];
         snapshot.items.push(existing);
 
-        // Incoming item: same instance_id but NO rule (from different order)
+        // Incoming item: same instance_id, no rule (latest calculation)
         let incoming = create_test_item("item-1", "Product A", 100.0, 1);
 
-        // add_or_merge_item should NOT merge due to pricing conflict
+        // Same instance_id → always merge, update pricing to latest
         add_or_merge_item(&mut snapshot, &incoming);
 
-        // Should have 2 separate items
-        assert_eq!(snapshot.items.len(), 2);
+        assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].instance_id, "item-1");
-        assert_eq!(snapshot.items[0].quantity, 2); // unchanged
-        assert_eq!(snapshot.items[0].price, 90.0);
-        assert!(!snapshot.items[0].applied_rules.is_empty());
-
-        // New item gets suffixed instance_id (count=1: only "item-1" matched)
-        assert_eq!(snapshot.items[1].instance_id, "item-1::m1");
-        assert_eq!(snapshot.items[1].quantity, 1);
-        assert_eq!(snapshot.items[1].price, 100.0);
-        assert!(snapshot.items[1].applied_rules.is_empty());
+        assert_eq!(snapshot.items[0].quantity, 3); // 2 + 1
+        // Pricing updated to incoming item's values
+        assert_eq!(snapshot.items[0].price, 100.0);
+        assert_eq!(snapshot.items[0].rule_discount_amount, 0.0);
+        assert!(snapshot.items[0].applied_rules.is_empty());
     }
 
     #[test]
@@ -419,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_different_manual_discount_keeps_separate() {
+    fn test_merge_same_instance_id_updates_pricing_to_latest() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         let mut existing = create_test_item("item-1", "Product A", 80.0, 1);
@@ -427,18 +404,19 @@ mod tests {
         existing.original_price = 100.0;
         snapshot.items.push(existing);
 
-        // Same product, no discount
+        // Same instance_id, different pricing → merge and update
         let incoming = create_test_item("item-1", "Product A", 100.0, 1);
         add_or_merge_item(&mut snapshot, &incoming);
 
-        assert_eq!(snapshot.items.len(), 2);
-        assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
-        assert_eq!(snapshot.items[1].manual_discount_percent, None);
-        assert!(snapshot.items[1].instance_id.starts_with("item-1::m"));
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].quantity, 2);
+        // Pricing updated to incoming (latest)
+        assert_eq!(snapshot.items[0].price, 100.0);
+        assert_eq!(snapshot.items[0].manual_discount_percent, None);
     }
 
     #[test]
-    fn test_merge_comped_vs_normal_keeps_separate() {
+    fn test_merge_same_instance_id_comped_vs_normal() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         let mut existing = create_test_item("item-1", "Product A", 0.0, 1);
@@ -446,13 +424,13 @@ mod tests {
         existing.original_price = 10.0;
         snapshot.items.push(existing);
 
-        // Same product, not comped
+        // Same instance_id, not comped → merge and update
         let incoming = create_test_item("item-1", "Product A", 10.0, 1);
         add_or_merge_item(&mut snapshot, &incoming);
 
-        assert_eq!(snapshot.items.len(), 2);
-        assert!(snapshot.items[0].is_comped);
-        assert!(!snapshot.items[1].is_comped);
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].quantity, 2);
+        // Note: is_comped is NOT updated by merge (comp is a separate action)
     }
 
     /// Test that multiple replays produce identical checksum

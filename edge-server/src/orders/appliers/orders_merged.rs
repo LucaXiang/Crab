@@ -641,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn test_order_merged_same_instance_id_different_pricing_keeps_separate() {
+    fn test_order_merged_same_instance_id_different_pricing_merges_and_updates() {
         let mut snapshot = create_test_snapshot("target-1");
         // Target has item with 20% manual discount
         let mut target_item = create_test_item("item-1", "Coffee");
@@ -664,20 +664,17 @@ mod tests {
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
 
-        // Should have 2 items (not merged) because pricing differs
-        assert_eq!(snapshot.items.len(), 2);
+        // Same instance_id → merge and update pricing to latest
+        assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].instance_id, "item-1");
-        assert_eq!(snapshot.items[0].price, 8.0);
-        assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
+        assert_eq!(snapshot.items[0].quantity, 2); // 1 + 1
+        // Pricing updated to incoming (source) values
+        assert_eq!(snapshot.items[0].price, 10.0);
+        assert_eq!(snapshot.items[0].manual_discount_percent, None);
 
-        // Second item gets suffixed instance_id
-        assert!(snapshot.items[1].instance_id.starts_with("item-1::m"));
-        assert_eq!(snapshot.items[1].price, 10.0);
-        assert_eq!(snapshot.items[1].manual_discount_percent, None);
-
-        // Totals: 8.0 * 1 + 10.0 * 1 = 18.0
-        assert_eq!(snapshot.subtotal, 18.0);
-        assert_eq!(snapshot.total, 18.0);
+        // Totals: 10.0 * 2 = 20.0
+        assert_eq!(snapshot.subtotal, 20.0);
+        assert_eq!(snapshot.total, 20.0);
     }
 
     #[test]

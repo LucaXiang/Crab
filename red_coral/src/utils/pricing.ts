@@ -11,3 +11,26 @@ export function calculateOptionsModifier(options: ItemOption[] | undefined | nul
     0
   );
 }
+
+/**
+ * 生成前端购物车内容 key（与后端 SHA256 instance_id 字段对齐）
+ *
+ * 用于本地购物车合并：相同商品+价格+折扣+选项+规格 → 相同 key → 合并数量。
+ * 不需要和后端 hash 完全一致（后端会重新生成），只需前端内部一致。
+ */
+export function generateCartKey(
+  productId: number,
+  price: number,
+  discount?: number,
+  options?: ItemOption[] | null,
+  specId?: number,
+): string {
+  let key = `${productId}:${price}`;
+  if (discount && Math.abs(discount) > 0.01) key += `:d${discount}`;
+  if (options && options.length > 0) {
+    const sorted = [...options].sort((a, b) => a.attribute_id - b.attribute_id || a.option_idx - b.option_idx);
+    key += `:o${sorted.map(o => `${o.attribute_id}-${o.option_idx}-${o.quantity ?? 1}`).join(',')}`;
+  }
+  if (specId !== undefined) key += `:s${specId}`;
+  return key;
+}
