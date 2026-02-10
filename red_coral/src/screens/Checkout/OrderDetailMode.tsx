@@ -11,6 +11,7 @@ import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
+import { CATEGORY_ACCENT } from '@/utils/categoryColors';
 import {
   ArrowLeft, Receipt, CreditCard, Coins,
   ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban,
@@ -64,10 +65,10 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
       const sortB = catB ? (categoryMap.get(catB)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
       if (sortA !== sortB) return sortA - sortB;
 
-      // Comped items sink to end of each category
-      const compA = a.is_comped ? 1 : 0;
-      const compB = b.is_comped ? 1 : 0;
-      if (compA !== compB) return compA - compB;
+      // Fully-paid & comped items sink to end of each category (paid → comped)
+      const sinkA = a.is_comped ? 2 : a.unpaid_quantity === 0 ? 1 : 0;
+      const sinkB = b.is_comped ? 2 : b.unpaid_quantity === 0 ? 1 : 0;
+      if (sinkA !== sinkB) return sinkA - sinkB;
 
       // Then by external_id
       const extA = productMap.get(a.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
@@ -77,6 +78,20 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
       return a.name.localeCompare(b.name);
     });
   }, [order.items, products, categories]);
+
+  // 按排序后分类顺序分配颜色
+  const itemColorMap = useMemo(() => {
+    const productMap = new Map(products.map(p => [p.id, p]));
+    const map = new Map<string, number>();
+    const seen: string[] = [];
+    for (const item of visibleItems) {
+      const catId = String(productMap.get(item.id)?.category_id ?? 'uncategorized');
+      let idx = seen.indexOf(catId);
+      if (idx === -1) { seen.push(catId); idx = seen.length - 1; }
+      map.set(item.instance_id, idx % CATEGORY_ACCENT.length);
+    }
+    return map;
+  }, [visibleItems, products]);
 
   const toggleItem = useCallback((idx: number) => {
     setExpandedItems(prev => {
@@ -163,6 +178,7 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
                   index={idx}
                   isExpanded={expandedItems.has(idx)}
                   onToggle={toggleItem}
+                  accentColor={CATEGORY_ACCENT[itemColorMap.get(item.instance_id) ?? 0]}
                   t={t}
                 />
               ))}
@@ -243,10 +259,11 @@ interface OrderItemRowProps {
   index: number;
   isExpanded: boolean;
   onToggle: (index: number) => void;
+  accentColor?: string;
   t: (key: string, params?: Record<string, string | number>) => string;
 }
 
-const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, t }) => {
+const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, accentColor, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const totalRuleDiscount = item.rule_discount_amount;
   const totalRuleSurcharge = item.rule_surcharge_amount;
@@ -254,14 +271,17 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
   const isFullyPaid = item.unpaid_quantity === 0;
 
   return (
-    <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>
+    <div>
       <div
-        className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors select-none"
+        className={`p-4 flex justify-between items-center cursor-pointer transition-colors select-none ${
+          item.is_comped ? 'bg-emerald-50/60' : 'hover:bg-gray-50/50'
+        }`}
         onClick={() => onToggle(index)}
       >
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex items-center gap-3 flex-1">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor || '#d1d5db' }} />
           <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm shrink-0
-            ${isFullyPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}
+            ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : isFullyPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}
           `}>
             x{item.quantity}
           </div>

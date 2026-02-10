@@ -3,6 +3,7 @@ import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedE
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency, Currency } from '@/utils/currency';
+import { CATEGORY_ACCENT } from '@/utils/categoryColors';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
@@ -53,6 +54,20 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     if (!order?.timeline) return [];
     return order.timeline.map((event, index) => convertArchivedEventToOrderEvent(event, index));
   }, [order?.timeline]);
+
+  // 按 category_name 出现顺序分配颜色（不依赖当前分类表）
+  const itemColorMap = useMemo(() => {
+    if (!order) return new Map<string, number>();
+    const map = new Map<string, number>();
+    const seen: string[] = [];
+    for (const item of order.items) {
+      const catName = item.category_name ?? 'uncategorized';
+      let idx = seen.indexOf(catName);
+      if (idx === -1) { seen.push(catName); idx = seen.length - 1; }
+      map.set(item.instance_id, idx % CATEGORY_ACCENT.length);
+    }
+    return map;
+  }, [order]);
 
   useEffect(() => {
     setExpandedItems(new Set());
@@ -199,6 +214,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                   index={idx}
                   isExpanded={expandedItems.has(idx)}
                   onToggle={toggleItem}
+                  accentColor={CATEGORY_ACCENT[itemColorMap.get(item.instance_id) ?? 0]}
                   t={t}
                 />
               ))}
@@ -307,10 +323,11 @@ interface OrderItemRowProps {
   index: number;
   isExpanded: boolean;
   onToggle: (index: number) => void;
+  accentColor?: string;
   t: (key: string, params?: Record<string, string | number>) => string;
 }
 
-const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, t }) => {
+const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, accentColor, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const totalRuleDiscount = item.rule_discount_amount;
   const totalRuleSurcharge = item.rule_surcharge_amount;
@@ -318,14 +335,17 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
   const isFullyPaid = item.unpaid_quantity === 0;
 
   return (
-    <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>
+    <div>
       <div
-        className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors select-none"
+        className={`p-4 flex justify-between items-center cursor-pointer transition-colors select-none ${
+          item.is_comped ? 'bg-emerald-50/60' : 'hover:bg-gray-50/50'
+        }`}
         onClick={() => onToggle(index)}
       >
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex items-center gap-3 flex-1">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor || '#d1d5db' }} />
           <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm shrink-0
-            ${isFullyPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}
+            ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : isFullyPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}
           `}>
             x{item.quantity}
           </div>
