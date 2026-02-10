@@ -5,7 +5,7 @@ use tauri::{Emitter, State};
 
 use crate::core::response::{ApiResponse, AppConfigResponse, ErrorCode};
 use crate::core::bridge::InitStatus;
-use crate::core::{AppState, ClientBridge, ModeInfo, ModeType, ServerModeConfig};
+use crate::core::{AppState, ClientBridge, ModeInfo, ModeType};
 
 /// 查询后端初始化状态 (先于 get_app_state 调用)
 #[tauri::command]
@@ -119,7 +119,7 @@ pub async fn stop_mode(
 #[tauri::command]
 pub async fn get_current_mode_type(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<ModeType>, String> {
+) -> Result<ApiResponse<Option<ModeType>>, String> {
     let info = bridge.get_mode_info().await;
     Ok(ApiResponse::success(info.mode))
 }
@@ -146,7 +146,7 @@ pub async fn reconnect(
 
     // Check mode and get client config
     let mode_info = bridge_arc.get_mode_info().await;
-    if mode_info.mode != ModeType::Client {
+    if mode_info.mode != Some(ModeType::Client) {
         return Ok(ApiResponse::error_with_code(
             ErrorCode::InvalidRequest,
             "Reconnect is only available in Client mode",
@@ -226,14 +226,15 @@ pub async fn get_app_config(
     bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<AppConfigResponse>, String> {
     let info = bridge.get_mode_info().await;
+    let server_config = bridge.get_server_config().await;
+    let client_config = bridge.get_client_config().await;
     let tenant_manager = bridge.tenant_manager().read().await;
 
-    // 构建响应
     Ok(ApiResponse::success(AppConfigResponse {
         current_mode: info.mode,
         current_tenant: info.tenant_id,
-        server_config: ServerModeConfig::default(),
-        client_config: None,
+        server_config,
+        client_config,
         known_tenants: tenant_manager
             .list_tenants()
             .into_iter()

@@ -47,10 +47,13 @@ fn default_auth_url() -> String {
 /// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// 当前模式
-    pub current_mode: ModeType,
+    /// 当前模式 (None = 未选模式)
+    pub current_mode: Option<ModeType>,
     /// 当前租户
     pub current_tenant: Option<String>,
+    /// 当前激活的 entity_id (注销时用)
+    #[serde(default)]
+    pub active_entity_id: Option<String>,
     /// Server 模式配置
     pub server_config: ServerModeConfig,
     /// Client 模式配置
@@ -65,8 +68,9 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            current_mode: ModeType::Disconnected,
+            current_mode: None,
             current_tenant: None,
+            active_entity_id: None,
             server_config: ServerModeConfig::default(),
             client_config: None,
             known_tenants: Vec::new(),

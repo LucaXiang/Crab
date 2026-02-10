@@ -23,6 +23,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "decimal.js": "^10.6.0",
     "jsbarcode": "^3.12.1",
     "lucide-react": "^0.563.0",

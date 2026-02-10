@@ -24,9 +24,7 @@ function getReasonMessage(reason: ActivationRequiredReason): string {
 
 /** 获取恢复建议的 i18n 消息 */
 function getHintMessage(hintCode: string): string {
-  // hintCode 格式: "hint.xxx" -> 转换为 "activation.hint.xxx"
-  const key = hintCode.replace('hint.', 'activation.hint.');
-  return t(key);
+  return t(`activation.hint.${hintCode}`);
 }
 
 export const ActivationRequiredScreen: React.FC = () => {
@@ -34,7 +32,7 @@ export const ActivationRequiredScreen: React.FC = () => {
   const appState = useAppState();
   const isLoading = useBridgeStore((state) => state.isLoading);
 
-  if (appState?.type !== 'ServerNeedActivation') {
+  if (appState?.type !== 'ServerNeedActivation' && appState?.type !== 'ClientNeedActivation') {
     return null;
   }
 
@@ -57,7 +55,7 @@ export const ActivationRequiredScreen: React.FC = () => {
   };
 
   const handleReactivate = () => {
-    navigate('/activate', { replace: true });
+    navigate('/setup', { replace: true });
   };
 
   return (

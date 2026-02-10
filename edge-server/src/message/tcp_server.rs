@@ -12,13 +12,14 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use shared::message::{BusMessage, EventType, HandshakePayload, PROTOCOL_VERSION, ResponsePayload};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::broadcast;
+use tokio::sync::{RwLock, broadcast};
 use tokio_rustls::TlsAcceptor;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::bus::MessageBus;
 use super::transport::{TcpTransport, TlsTransport, Transport};
+use crate::services::tenant_binding::TenantBinding;
 use crate::utils::AppError;
 
 impl MessageBus {
@@ -32,6 +33,7 @@ impl MessageBus {
     pub async fn start_tcp_server(
         &self,
         tls_config_override: Option<Arc<rustls::ServerConfig>>,
+        credential_cache: Arc<RwLock<Option<TenantBinding>>>,
     ) -> Result<(), AppError> {
         let listener = TcpListener::bind(&self.config.tcp_listen_addr)
             .await
@@ -56,7 +58,7 @@ impl MessageBus {
             ));
         };
 
-        self.accept_loop(listener, tls_acceptor).await
+        self.accept_loop(listener, tls_acceptor, credential_cache).await
     }
 
     /// Main accept loop
@@ -64,6 +66,7 @@ impl MessageBus {
         &self,
         listener: TcpListener,
         tls_acceptor: Option<TlsAcceptor>,
+        credential_cache: Arc<RwLock<Option<TenantBinding>>>,
     ) -> Result<(), AppError> {
         loop {
             tokio::select! {
@@ -76,7 +79,7 @@ impl MessageBus {
                     match result {
                         Ok((stream, addr)) => {
                             tracing::debug!("Client connected: {}", addr);
-                            self.spawn_client_handler(stream, addr, tls_acceptor.clone());
+                            self.spawn_client_handler(stream, addr, tls_acceptor.clone(), credential_cache.clone());
                         }
                         Err(e) => {
                             tracing::error!("Failed to accept connection: {}", e);
@@ -95,6 +98,7 @@ impl MessageBus {
         stream: TcpStream,
         addr: SocketAddr,
         tls_acceptor: Option<TlsAcceptor>,
+        credential_cache: Arc<RwLock<Option<TenantBinding>>>,
     ) {
         let server_tx = self.sender().clone();
         let client_tx = self.sender_to_server().clone();
@@ -110,6 +114,7 @@ impl MessageBus {
                 client_tx,
                 shutdown_token,
                 clients,
+                credential_cache,
             )
             .await
             {
@@ -120,6 +125,7 @@ impl MessageBus {
 }
 
 /// Handle a single client connection
+#[allow(clippy::too_many_arguments)]
 async fn handle_client_connection(
     stream: TcpStream,
     addr: SocketAddr,
@@ -128,6 +134,7 @@ async fn handle_client_connection(
     client_tx: broadcast::Sender<BusMessage>,
     shutdown_token: CancellationToken,
     clients: Arc<DashMap<String, Arc<dyn Transport>>>,
+    credential_cache: Arc<RwLock<Option<TenantBinding>>>,
 ) -> Result<(), AppError> {
     // TLS handshake if configured
     let transport: Arc<dyn Transport> = if let Some(acceptor) = tls_acceptor {
@@ -147,6 +154,12 @@ async fn handle_client_connection(
 
     // Protocol handshake
     let client_id = perform_handshake(&transport, addr).await?;
+
+    // Check client connection quota before registering
+    if let Err(e) = check_client_quota(&credential_cache, &clients, &transport, &client_id).await {
+        let _ = transport.close().await;
+        return Err(e);
+    }
 
     // Register client
     clients.insert(client_id.clone(), transport.clone());
@@ -181,6 +194,50 @@ async fn handle_client_connection(
     let _ = transport.close().await;
     clients.remove(&client_id);
     tracing::debug!(client_id = %client_id, "Client removed from registry");
+
+    Ok(())
+}
+
+/// Check client connection quota from cached SubscriptionInfo
+async fn check_client_quota(
+    credential_cache: &Arc<RwLock<Option<TenantBinding>>>,
+    clients: &Arc<DashMap<String, Arc<dyn Transport>>>,
+    transport: &Arc<dyn Transport>,
+    client_id: &str,
+) -> Result<(), AppError> {
+    let max_clients = {
+        let cache = credential_cache.read().await;
+        cache
+            .as_ref()
+            .and_then(|tb| tb.subscription.as_ref())
+            .map(|sub| sub.max_clients)
+            .unwrap_or(0)
+    };
+
+    // max_clients = 0 means unlimited
+    if max_clients == 0 {
+        return Ok(());
+    }
+
+    let current_count = clients.len() as u32;
+    if current_count >= max_clients {
+        tracing::warn!(
+            client_id = %client_id,
+            current = current_count,
+            max = max_clients,
+            "Client connection quota exceeded"
+        );
+
+        // Send error response before closing
+        let error_msg = BusMessage::response(&ResponsePayload::error(
+            format!("Client limit reached ({}/{})", current_count, max_clients),
+            None,
+        ));
+        let _ = transport.write_message(&error_msg).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        return Err(AppError::invalid("Client limit reached"));
+    }
 
     Ok(())
 }

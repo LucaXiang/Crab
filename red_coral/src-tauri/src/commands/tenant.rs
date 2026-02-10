@@ -18,12 +18,12 @@ pub async fn list_tenants(
     }))
 }
 
-/// 激活新租户 (设备激活)
+/// 激活 Server 模式设备
 ///
-/// 同时预激活 edge-server，为 Server 模式做准备。
+/// 调用 /api/server/activate，保存 Server 证书到磁盘。
 /// auth_url 从 AppConfig 全局配置获取，前端不再传递。
 #[tauri::command]
-pub async fn activate_tenant(
+pub async fn activate_server_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
     username: String,
     password: String,
@@ -48,7 +48,6 @@ pub async fn activate_tenant(
         Err(crate::core::bridge::BridgeError::Tenant(
             crate::core::tenant_manager::TenantError::DeviceLimitReached(quota_info),
         )) => {
-            // Put quota_info into details so ApiError carries it to frontend
             let mut details = std::collections::HashMap::new();
             details.insert(
                 "quota_info".to_string(),
@@ -63,6 +62,86 @@ pub async fn activate_tenant(
         }
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::ActivationFailed,
+            e.to_string(),
+        )),
+    }
+}
+
+/// 激活 Client 模式设备
+///
+/// 调用 /api/client/activate，保存 Client 证书到磁盘。
+#[tauri::command]
+pub async fn activate_client_tenant(
+    bridge: State<'_, Arc<ClientBridge>>,
+    username: String,
+    password: String,
+    replace_entity_id: Option<String>,
+) -> Result<ApiResponse<ActivationResultData>, String> {
+    let auth_url = bridge.get_auth_url().await;
+
+    match bridge
+        .handle_client_activation_with_replace(
+            &auth_url,
+            &username,
+            &password,
+            replace_entity_id.as_deref(),
+        )
+        .await
+    {
+        Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
+            tenant_id,
+            subscription_status,
+            quota_info: None,
+        })),
+        Err(crate::core::bridge::BridgeError::Tenant(
+            crate::core::tenant_manager::TenantError::ClientLimitReached(quota_info),
+        )) => {
+            let mut details = std::collections::HashMap::new();
+            details.insert(
+                "quota_info".to_string(),
+                serde_json::to_value(&quota_info).unwrap_or_default(),
+            );
+            Ok(ApiResponse {
+                code: Some(ErrorCode::ClientLimitReached.code()),
+                message: ErrorCode::ClientLimitReached.message().to_string(),
+                data: None,
+                details: Some(details),
+            })
+        }
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::ActivationFailed,
+            e.to_string(),
+        )),
+    }
+}
+
+/// 验证租户凭据 (不签发证书，返回租户信息和配额)
+#[tauri::command]
+pub async fn verify_tenant(
+    bridge: State<'_, Arc<ClientBridge>>,
+    username: String,
+    password: String,
+) -> Result<ApiResponse<shared::activation::TenantVerifyData>, String> {
+    match bridge.verify_tenant(&username, &password).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::ActivationFailed,
+            e.to_string(),
+        )),
+    }
+}
+
+/// 注销当前模式 (释放配额 + 删除本地证书)
+#[tauri::command]
+pub async fn deactivate_current_mode(
+    bridge: State<'_, Arc<ClientBridge>>,
+    username: String,
+    password: String,
+) -> Result<ApiResponse<()>, String> {
+    match bridge.deactivate_current_mode(&username, &password).await {
+        Ok(()) => Ok(ApiResponse::success(())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
             e.to_string(),
         )),
     }

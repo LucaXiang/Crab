@@ -5,46 +5,20 @@ import { logger } from '@/utils/logger';
 import type { ApiResponse } from '@/core/domain/types/api';
 import type {
   ActivationRequiredReason,
-  ActivationProgress,
   SubscriptionBlockedInfo,
   HealthStatus,
+  AppState,
+  SubscriptionStatus,
+  PlanType,
 } from '@/core/domain/types/appState';
 import { getActivationReasonMessage } from '@/core/domain/types/appState';
 
 // Types matching Rust definitions
-export type ModeType = 'Server' | 'Client' | 'Disconnected';
+export type ModeType = 'Server' | 'Client';
 export type LoginMode = 'Online' | 'Offline';
 
-/**
- * AppState - 应用状态枚举
- *
- * 与 Rust 定义保持一致: `src-tauri/src/core/bridge/types.rs`
- * 参考设计文档: `docs/plans/2026-01-26-tenant-auth-detailed-status-design.md`
- */
-export type AppState =
-  // 通用状态
-  | { type: 'Uninitialized' }
-  // Server 模式专属
-  | { type: 'ServerNoTenant' }
-  | {
-      type: 'ServerNeedActivation';
-      data: {
-        reason: ActivationRequiredReason;
-        can_auto_recover: boolean;
-        recovery_hint: string;
-      };
-    }
-  | { type: 'ServerActivating'; data: { progress: ActivationProgress } }
-  | { type: 'ServerCheckingSubscription' }
-  | { type: 'ServerSubscriptionBlocked'; data: { info: SubscriptionBlockedInfo } }
-  | { type: 'ServerReady' }
-  | { type: 'ServerAuthenticated' }
-  // Client 模式专属
-  | { type: 'ClientDisconnected' }
-  | { type: 'ClientNeedSetup' }
-  | { type: 'ClientConnecting'; data: { server_url: string } }
-  | { type: 'ClientConnected' }
-  | { type: 'ClientAuthenticated' };
+// Re-export AppState from the canonical source
+export type { AppState };
 
 /**
  * AppState 辅助函数
@@ -62,61 +36,30 @@ export const AppStateHelpers = {
     return state.type === 'ServerReady' || state.type === 'ClientConnected';
   },
 
-  /** 是否需要设置/激活 */
-  needsSetup: (state: AppState | null): boolean => {
-    if (!state) return true;
-    return [
-      'Uninitialized',
-      'ServerNoTenant',
-      'ServerNeedActivation',
-      'ClientDisconnected',
-      'ClientNeedSetup',
-    ].includes(state.type);
-  },
-
-  /** 是否被订阅阻止 */
-  isSubscriptionBlocked: (state: AppState | null): boolean => {
-    if (!state) return false;
-    return state.type === 'ServerSubscriptionBlocked';
-  },
-
   /** 获取推荐路由 */
   getRouteForState: (state: AppState | null): string => {
-    if (!state) return '/activate';
+    if (!state) return '/setup';
 
     switch (state.type) {
-      // 需要激活（首次设置 / 无租户）
-      case 'ServerNoTenant':
-        return '/activate';
+      // 无租户 / 租户已验证待选模式
+      case 'NeedTenantLogin':
+      case 'TenantReady':
+        return '/setup';
 
-      // 需要激活
+      // 需要激活（证书过期/设备不匹配等）
       case 'ServerNeedActivation':
-        // FirstTimeSetup 直接进入激活页面，其他问题显示具体原因
+      case 'ClientNeedActivation':
         if (state.data.reason.code === 'FirstTimeSetup') {
-          return '/activate';
+          return '/setup';
         }
         return '/status/activation-required';
-
-      // 激活中 - 显示进度
-      case 'ServerActivating':
-        return '/status/activating';
-
-      // 检查订阅
-      case 'ServerCheckingSubscription':
-        return '/status/checking';
 
       // 订阅阻止
       case 'ServerSubscriptionBlocked':
         return '/status/subscription-blocked';
 
-      // 未初始化 - 需要激活
-      case 'Uninitialized':
-        return '/activate';
-
-      // 需要模式选择/配置
+      // Client 断连
       case 'ClientDisconnected':
-      case 'ClientNeedSetup':
-      case 'ClientConnecting':
         return '/setup';
 
       // 需要登录
@@ -130,7 +73,7 @@ export const AppStateHelpers = {
         return '/pos';
 
       default:
-        return '/activate';
+        return '/setup';
     }
   },
 
@@ -139,7 +82,7 @@ export const AppStateHelpers = {
 };
 
 export interface ModeInfo {
-  mode: ModeType;
+  mode: ModeType | null;
   is_connected: boolean;
   is_authenticated: boolean;
   tenant_id: string | null;
@@ -208,9 +151,19 @@ export interface ActivationResult {
 }
 
 export interface AppConfigResponse {
-  current_mode: ModeType;
+  current_mode: ModeType | null;
   current_tenant: string | null;
   known_tenants: string[];
+}
+
+export interface TenantVerifyData {
+  tenant_id: string;
+  subscription_status: SubscriptionStatus;
+  plan: PlanType;
+  server_slots_remaining: number;
+  client_slots_remaining: number;
+  has_active_server: boolean;
+  has_active_client: boolean;
 }
 
 interface BridgeStore {
@@ -238,10 +191,14 @@ interface BridgeStore {
   updateClientConfig: (edgeUrl: string, messageAddr: string) => Promise<void>;
 
   // Tenant Actions
+  verifyTenant: (username: string, password: string) => Promise<TenantVerifyData>;
   fetchTenants: () => Promise<void>;
-  activateTenant: (username: string, password: string, replaceEntityId?: string) => Promise<ActivationResult>;
+  activateServerTenant: (username: string, password: string, replaceEntityId?: string) => Promise<ActivationResult>;
+  activateClientTenant: (username: string, password: string, replaceEntityId?: string) => Promise<ActivationResult>;
+  deactivateCurrentMode: (username: string, password: string) => Promise<void>;
   switchTenant: (tenantId: string) => Promise<void>;
   removeTenant: (tenantId: string) => Promise<void>;
+  exitTenant: () => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
 
   // Auth Actions (unified - ClientBridge based)
@@ -333,11 +290,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true });
           await invokeApi('stop_mode');
-          set({
-            appState: { type: 'Uninitialized' },
-            modeInfo: null,
-            currentSession: null
-          });
+          set({ modeInfo: null, currentSession: null });
+          await get().fetchAppState();
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
         } finally {
@@ -371,6 +325,21 @@ export const useBridgeStore = create<BridgeStore>()(
       },
 
       // Tenant Actions
+      verifyTenant: async (username, password) => {
+        try {
+          set({ isLoading: true, error: null });
+          const data = await invokeApi<TenantVerifyData>('verify_tenant', { username, password });
+          await get().fetchTenants();
+          await get().fetchAppState();
+          return data;
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Verification failed' });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       fetchTenants: async () => {
         try {
           // TenantListData wrapper
@@ -381,10 +350,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateTenant: async (username, password, replaceEntityId?) => {
+      activateServerTenant: async (username, password, replaceEntityId?) => {
         try {
           set({ isLoading: true, error: null });
-          const result = await invokeApi<ActivationResult>('activate_tenant', {
+          const result = await invokeApi<ActivationResult>('activate_server_tenant', {
             username,
             password,
             replaceEntityId: replaceEntityId ?? null,
@@ -394,6 +363,43 @@ export const useBridgeStore = create<BridgeStore>()(
           return result;
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      activateClientTenant: async (username, password, replaceEntityId?) => {
+        try {
+          set({ isLoading: true, error: null });
+          const result = await invokeApi<ActivationResult>('activate_client_tenant', {
+            username,
+            password,
+            replaceEntityId: replaceEntityId ?? null,
+          });
+          await get().fetchTenants();
+          await get().fetchAppState();
+          return result;
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      deactivateCurrentMode: async (username, password) => {
+        try {
+          set({ isLoading: true, error: null });
+          await invokeApi('deactivate_current_mode', { username, password });
+          set({
+            appState: { type: 'TenantReady' },
+            modeInfo: null,
+            currentSession: null,
+          });
+          await get().fetchAppState();
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Deactivation failed' });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -420,6 +426,24 @@ export const useBridgeStore = create<BridgeStore>()(
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
+        }
+      },
+
+      exitTenant: async () => {
+        try {
+          set({ isLoading: true, error: null });
+          await invokeApi('exit_tenant');
+          set({
+            appState: { type: 'NeedTenantLogin' },
+            modeInfo: null,
+            currentSession: null,
+          });
+          await get().fetchAppState();
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
+          throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 

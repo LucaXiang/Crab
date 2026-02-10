@@ -9,6 +9,7 @@ pub struct Subscription {
     pub status: String,
     pub plan: String,
     pub max_edge_servers: i32,
+    pub max_clients: i32,
     pub features: Vec<String>,
     pub current_period_end: Option<i64>,
 }
@@ -19,7 +20,7 @@ pub async fn get_active_subscription(
     tenant_id: &str,
 ) -> Result<Option<Subscription>, sqlx::Error> {
     sqlx::query_as::<_, Subscription>(
-        "SELECT id, tenant_id, status, plan, max_edge_servers,
+        "SELECT id, tenant_id, status, plan, max_edge_servers, max_clients,
             features, current_period_end
             FROM subscriptions
             WHERE tenant_id = $1

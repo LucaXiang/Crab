@@ -1,8 +1,12 @@
 mod activate;
+mod activate_client;
 mod binding;
+mod deactivate;
+mod deactivate_client;
 mod p12;
 mod pki;
 mod subscription;
+mod verify;
 
 use crate::state::AppState;
 use axum::extract::DefaultBodyLimit;
@@ -20,6 +24,10 @@ pub fn router(state: Arc<AppState>) -> Router {
 
     Router::new()
         .route("/api/server/activate", post(activate::activate))
+        .route("/api/client/activate", post(activate_client::activate_client))
+        .route("/api/tenant/verify", post(verify::verify_tenant))
+        .route("/api/server/deactivate", post(deactivate::deactivate_server))
+        .route("/api/client/deactivate", post(deactivate_client::deactivate_client))
         .route(
             "/api/tenant/subscription",
             post(subscription::get_subscription_status),

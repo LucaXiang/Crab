@@ -71,10 +71,7 @@ export const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPay
       });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
-    const derivedSurcharge = Currency.sub(Currency.add(payload.total, payload.discount), payload.subtotal).toNumber();
-    if (Currency.gt(derivedSurcharge, 0.005)) {
-      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(derivedSurcharge)}`);
-    }
+    details.push(`${t('timeline.labels.discount')}: -${formatCurrency(payload.discount)}`);
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
 
     return {
@@ -109,10 +106,7 @@ export const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedP
       });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
-    const derivedDiscount = Currency.sub(Currency.add(payload.subtotal, payload.surcharge), payload.total).toNumber();
-    if (Currency.gt(derivedDiscount, 0.005)) {
-      details.push(`${t('timeline.labels.discount')}: -${formatCurrency(derivedDiscount)}`);
-    }
+    details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge)}`);
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
 
     return {

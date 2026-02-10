@@ -36,6 +36,7 @@ export const ErrorCode = {
   LicenseExpired: 3005,
   SubscriptionBlocked: 3006,
   DeviceLimitReached: 3007,
+  ClientLimitReached: 3008,
 
   // 4xxx: Order
   OrderNotFound: 4001,

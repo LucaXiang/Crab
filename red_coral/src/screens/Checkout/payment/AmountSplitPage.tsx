@@ -54,7 +54,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
     });
   }, [onComplete]);
 
-  // Auto-enter AA mode
+  // Auto-enter AA mode when locked (already has AA shares from prior split)
   React.useEffect(() => {
     if (isAALocked) {
       setSplitMode('AA');
@@ -66,10 +66,6 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
       if (pay > maxPay && maxPay > 0) {
         setAAPayStr(maxPay.toString());
       }
-    } else {
-      setSplitMode('AA');
-      setActiveInput('AA_TOTAL');
-      replaceMode.current = true;
     }
   }, [isAALocked, order.aa_total_shares, aaRemainingShares]);
 
@@ -309,13 +305,12 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
             </button>
           </div>
 
-          <div className="flex-1 flex overflow-hidden z-10 p-6 gap-6">
-            {/* Left Column: Split Configuration */}
-            <div className="flex-1 flex flex-col gap-6">
-
+          <div className="flex-1 flex flex-col overflow-hidden z-10 p-6 gap-6">
+            {/* Top Row: Info Card + Custom Amount (aligned height) */}
+            <div className="flex gap-6">
                 {/* Info Card */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div className="flex items-center justify-between">
+                <div className="flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center">
+                    <div className="flex items-center justify-between w-full">
                         <div>
                             <div className="text-gray-500 font-medium mb-1">{t('checkout.split.total')}</div>
                             <div className="text-3xl font-bold text-gray-900">{formatCurrency(order.total)}</div>
@@ -338,6 +333,36 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
                         </div>
                     </div>
                 </div>
+
+                {/* Custom Amount Display */}
+                <div
+                    onClick={() => handleFocus('CUSTOM')}
+                    className={`
+                        w-[380px] p-6 bg-white rounded-2xl shadow-sm border-2 transition-all flex flex-col items-end justify-center
+                        ${isAALocked
+                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                            : activeInput === 'CUSTOM'
+                                ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100 cursor-pointer'
+                                : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50 cursor-pointer'
+                        }
+                    `}
+                >
+                    <div className="text-sm font-bold text-gray-400 uppercase mb-2">
+                        {isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.custom_amount')}
+                    </div>
+                    <div className="text-5xl font-bold text-gray-800 tabular-nums break-all text-right w-full">
+                        {activeInput === 'CUSTOM' && !isAALocked
+                            ? (amountSplitValue || <span className="text-gray-300">0.00</span>)
+                            : <span className="text-gray-400">{amountSplitValue || '0.00'}</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom Row: Split Controls + Numpad & Actions */}
+            <div className="flex-1 flex gap-6 overflow-hidden">
+            {/* Left Column: Split Configuration */}
+            <div className="flex-1 flex flex-col">
 
                 {/* Split Controls */}
                 <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-6">
@@ -454,31 +479,6 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
 
             {/* Right Column: Numpad & Actions */}
             <div className="w-[380px] flex flex-col gap-6">
-
-                {/* Custom Amount Display */}
-                <div
-                    onClick={() => handleFocus('CUSTOM')}
-                    className={`
-                        p-6 bg-white rounded-2xl shadow-sm border-2 transition-all flex flex-col items-end justify-center min-h-[120px]
-                        ${isAALocked
-                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-                            : activeInput === 'CUSTOM'
-                                ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100 cursor-pointer'
-                                : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50 cursor-pointer'
-                        }
-                    `}
-                >
-                    <div className="text-sm font-bold text-gray-400 uppercase mb-2">
-                        {isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.custom_amount')}
-                    </div>
-                    <div className="text-5xl font-bold text-gray-800 tabular-nums break-all text-right w-full">
-                        {activeInput === 'CUSTOM' && !isAALocked
-                            ? (amountSplitValue || <span className="text-gray-300">0.00</span>)
-                            : <span className="text-gray-400">{amountSplitValue || '0.00'}</span>
-                        }
-                    </div>
-                </div>
-
                 {/* Numpad */}
                 <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                     <Numpad
@@ -514,6 +514,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
                         {t('checkout.split.pay_card')}
                     </button>
                 </div>
+            </div>
             </div>
           </div>
         </div>

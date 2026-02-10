@@ -121,6 +121,7 @@ fn tenant_error_to_code(err: &super::tenant_manager::TenantError) -> ErrorCode {
         TenantError::Network(_) => ErrorCode::NetworkError,
         TenantError::AuthFailed(_) => ErrorCode::ActivationFailed,
         TenantError::DeviceLimitReached(_) => ErrorCode::DeviceLimitReached,
+        TenantError::ClientLimitReached(_) => ErrorCode::ClientLimitReached,
         TenantError::OfflineNotAvailable(_) => ErrorCode::NotAuthenticated,
         TenantError::SessionCache(_) | TenantError::Io(_) => ErrorCode::InternalError,
     }
@@ -371,7 +372,7 @@ pub struct TenantListData {
 /// 应用配置响应
 #[derive(Debug, Clone, Serialize)]
 pub struct AppConfigResponse {
-    pub current_mode: super::ModeType,
+    pub current_mode: Option<super::ModeType>,
     pub current_tenant: Option<String>,
     pub server_config: super::ServerModeConfig,
     pub client_config: Option<super::ClientModeConfig>,

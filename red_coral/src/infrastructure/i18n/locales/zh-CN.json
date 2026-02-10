@@ -215,7 +215,19 @@
         "button_replace": "替换此设备",
         "button_cancel": "取消",
         "replacing": "正在替换..."
-      }
+      },
+      "client_limit": {
+        "title": "客户端数量已达上限",
+        "description": "您的订阅计划最多允许 {{max}} 个客户端，当前已有 {{count}} 个。请选择一个客户端进行替换。",
+        "device_id": "设备 ID",
+        "activated_at": "激活时间",
+        "last_refreshed": "最近刷新",
+        "button_replace": "替换此客户端",
+        "button_cancel": "取消",
+        "replacing": "正在替换..."
+      },
+      "no_account": "还没有账户？",
+      "register": "立即注册"
     },
     "login": {
       "title": "登录",
@@ -280,7 +292,13 @@
       "edge_url_label": "Edge Server 地址",
       "edge_url_help": "Edge Server 的 HTTPS 地址",
       "message_addr_label": "消息服务器地址",
-      "message_addr_help": "实时消息的 Host:Port"
+      "message_addr_help": "实时消息的 Host:Port",
+      "auth_section": "账户验证",
+      "auth_section_help": "输入管理员账户以注册此客户端",
+      "username_label": "用户名",
+      "username_placeholder": "管理员用户名",
+      "password_label": "密码",
+      "password_placeholder": "管理员密码"
     },
     "button_back": "返回",
     "button_start_server": "启动服务器模式",
@@ -290,7 +308,17 @@
     "complete_mode_server": "服务器模式",
     "complete_mode_client": "客户端模式",
     "button_continue": "继续登录",
+    "button_verify": "验证身份",
+    "credentials_title": "登录租户",
+    "credentials_desc": "输入您的租户凭证以验证身份",
+    "tenant_verified": "租户 {tenant_id} 已验证",
+    "slots_remaining": "剩余配额: {count}",
+    "activate_title": "激活设备",
+    "activate_desc": "输入您的租户凭证以激活此设备",
+    "activate_server_desc": "激活 Server 模式设备，获取服务器证书",
+    "activate_client_desc": "激活 Client 模式设备，获取客户端证书",
     "step": {
+      "credentials": "登录",
       "mode": "模式",
       "configure": "配置",
       "complete": "完成"
@@ -1630,7 +1658,10 @@
       "virtual_keyboard_desc": "为触摸屏用户提供应用内虚拟键盘",
       "virtual_keyboard_always": "始终开启",
       "virtual_keyboard_auto": "自动",
-      "virtual_keyboard_never": "关闭"
+      "virtual_keyboard_never": "关闭",
+      "button_exit_tenant": "退出当前租户",
+      "exit_tenant_desc": "停止服务并退出当前租户，返回租户选择页面",
+      "confirm_exit_tenant": "确定退出当前租户？服务器将停止运行，需要重新选择租户。"
     },
     "permissions": {
       "menu_manage": "菜单管理",

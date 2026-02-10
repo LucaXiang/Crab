@@ -116,7 +116,7 @@ export function useOrderEventListener() {
 
   // Reset on logout/disconnect
   useEffect(() => {
-    if (appState?.type === 'Uninitialized' || appState?.type === 'ServerNoTenant') {
+    if (appState?.type === 'NeedTenantLogin' || appState?.type === 'TenantReady') {
       isInitializedRef.current = false;
       useActiveOrdersStore.getState()._reset();
     }

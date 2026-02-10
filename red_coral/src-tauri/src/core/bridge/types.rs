@@ -3,14 +3,13 @@
 use serde::{Deserialize, Serialize};
 
 use crab_client::{Authenticated, Connected, CrabClient, Local, Remote};
-use shared::app_state::{ActivationProgress, ActivationRequiredReason, SubscriptionBlockedInfo};
+use shared::app_state::{ActivationRequiredReason, SubscriptionBlockedInfo};
 
-/// 运行模式类型
+/// 运行模式类型 (公开枚举，仅 Server/Client)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModeType {
     Server,
     Client,
-    Disconnected,
 }
 
 impl std::fmt::Display for ModeType {
@@ -18,7 +17,6 @@ impl std::fmt::Display for ModeType {
         match self {
             ModeType::Server => write!(f, "server"),
             ModeType::Client => write!(f, "client"),
-            ModeType::Disconnected => write!(f, "disconnected"),
         }
     }
 }
@@ -26,30 +24,23 @@ impl std::fmt::Display for ModeType {
 /// 应用状态 (统一 Server/Client 模式)
 ///
 /// 用于前端路由守卫和状态展示。
-/// 参考设计文档: `docs/plans/2026-01-26-tenant-auth-detailed-status-design.md`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum AppState {
-    // === 通用状态 ===
-    /// 未初始化
-    Uninitialized,
+    // === 前置状态 (未选模式) ===
+    /// 无租户 → 需要输入凭据
+    NeedTenantLogin,
+
+    /// 租户已验证 → 选模式
+    TenantReady,
 
     // === Server 模式专属 ===
-    /// Server: 无租户
-    ServerNoTenant,
-
     /// Server: 需要激活 - 携带详细原因
     ServerNeedActivation {
         reason: ActivationRequiredReason,
         can_auto_recover: bool,
         recovery_hint: String,
     },
-
-    /// Server: 正在激活 - 携带进度
-    ServerActivating { progress: ActivationProgress },
-
-    /// Server: 已激活，验证订阅中
-    ServerCheckingSubscription,
 
     /// Server: 订阅无效 - 携带详细信息
     ServerSubscriptionBlocked { info: SubscriptionBlockedInfo },
@@ -61,14 +52,15 @@ pub enum AppState {
     ServerAuthenticated,
 
     // === Client 模式专属 ===
-    /// Client: 未连接
+    /// Client: 需要激活 - 携带详细原因
+    ClientNeedActivation {
+        reason: ActivationRequiredReason,
+        can_auto_recover: bool,
+        recovery_hint: String,
+    },
+
+    /// Client: 有证书但连不上
     ClientDisconnected,
-
-    /// Client: 需要设置 (无缓存证书)
-    ClientNeedSetup,
-
-    /// Client: 正在连接
-    ClientConnecting { server_url: String },
 
     /// Client: 已连接，等待员工登录
     ClientConnected,
@@ -95,11 +87,11 @@ impl AppState {
     pub fn needs_setup(&self) -> bool {
         matches!(
             self,
-            AppState::Uninitialized
-                | AppState::ServerNoTenant
+            AppState::NeedTenantLogin
+                | AppState::TenantReady
                 | AppState::ServerNeedActivation { .. }
+                | AppState::ClientNeedActivation { .. }
                 | AppState::ClientDisconnected
-                | AppState::ClientNeedSetup
         )
     }
 
@@ -112,7 +104,7 @@ impl AppState {
 /// 模式信息 (用于前端显示)
 #[derive(Debug, Clone, Serialize)]
 pub struct ModeInfo {
-    pub mode: ModeType,
+    pub mode: Option<ModeType>,
     pub is_connected: bool,
     pub is_authenticated: bool,
     pub tenant_id: Option<String>,
@@ -156,6 +148,6 @@ pub(crate) enum ClientMode {
         message_addr: String,
         shutdown_token: CancellationToken,
     },
-    /// 未连接状态
+    /// 未连接状态 (内部运行时状态)
     Disconnected,
 }

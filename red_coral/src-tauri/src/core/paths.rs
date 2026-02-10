@@ -245,6 +245,30 @@ impl TenantPaths {
     pub fn is_server_activated(&self) -> bool {
         self.has_server_certificates() && self.has_server_credential()
     }
+
+    // ============ 证书删除 ============
+
+    /// 删除 Server 模式证书和凭证
+    pub fn delete_server_certs(&self) -> std::io::Result<()> {
+        let certs_dir = self.server_certs_dir();
+        if certs_dir.exists() {
+            std::fs::remove_dir_all(&certs_dir)?;
+        }
+        let cred = self.credential_file();
+        if cred.exists() {
+            std::fs::remove_file(&cred)?;
+        }
+        Ok(())
+    }
+
+    /// 删除 Client 模式证书
+    pub fn delete_client_certs(&self) -> std::io::Result<()> {
+        let certs_dir = self.certs_dir();
+        if certs_dir.exists() {
+            std::fs::remove_dir_all(&certs_dir)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

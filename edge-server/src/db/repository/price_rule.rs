@@ -6,7 +6,7 @@ use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<PriceRule>> {
     let rules = sqlx::query_as::<_, PriceRule>(
-        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 ORDER BY created_at DESC",
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
@@ -21,7 +21,7 @@ pub async fn find_by_zone(
 ) -> RepoResult<Vec<PriceRule>> {
     let zone_id_str = zone_id.map(|id| id.to_string()).unwrap_or_default();
     let rules = sqlx::query_as::<_, PriceRule>(
-        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND (zone_scope = 'all' OR (zone_scope = 'retail' AND ?1 = 1) OR zone_scope = ?2) ORDER BY created_at DESC",
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND (zone_scope = 'all' OR (zone_scope = 'retail' AND ?1 = 1) OR zone_scope = ?2) ORDER BY created_at DESC",
     )
     .bind(is_retail)
     .bind(&zone_id_str)
@@ -32,7 +32,7 @@ pub async fn find_by_zone(
 
 pub async fn find_by_scope(pool: &SqlitePool, scope: ProductScope) -> RepoResult<Vec<PriceRule>> {
     let rules = sqlx::query_as::<_, PriceRule>(
-        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND product_scope = ? ORDER BY created_at DESC",
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND product_scope = ? ORDER BY created_at DESC",
     )
     .bind(scope)
     .fetch_all(pool)
@@ -42,7 +42,7 @@ pub async fn find_by_scope(pool: &SqlitePool, scope: ProductScope) -> RepoResult
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<PriceRule>> {
     let rule = sqlx::query_as::<_, PriceRule>(
-        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE id = ?",
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -52,7 +52,7 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<PriceRu
 
 pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<PriceRule>> {
     let rule = sqlx::query_as::<_, PriceRule>(
-        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE name = ? LIMIT 1",
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE name = ? LIMIT 1",
     )
     .bind(name)
     .fetch_optional(pool)

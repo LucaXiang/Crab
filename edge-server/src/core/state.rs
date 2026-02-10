@@ -389,8 +389,9 @@ impl ServerState {
     ) {
         // MessageBus TCP Server (mTLS)
         let message_bus_service = self.message_bus.clone();
+        let credential_cache = self.activation.credential_cache.clone();
         tasks.spawn("message_bus_tcp_server", TaskKind::Worker, async move {
-            if let Err(e) = message_bus_service.start_tcp_server(tls_config).await {
+            if let Err(e) = message_bus_service.start_tcp_server(tls_config, credential_cache).await {
                 tracing::error!("Message Bus TCP server failed: {}", e);
             }
         });

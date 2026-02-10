@@ -9,10 +9,10 @@ impl ClientBridge {
         let tenant_manager = self.tenant_manager.read().await;
 
         let (mode, is_connected, is_authenticated, client_check_info) = match &*mode_guard {
-            ClientMode::Disconnected => (ModeType::Disconnected, false, false, None),
+            ClientMode::Disconnected => (None, false, false, None),
             ClientMode::Server { client, .. } => {
                 let is_auth = matches!(client, Some(LocalClientState::Authenticated(_)));
-                (ModeType::Server, true, is_auth, None)
+                (Some(ModeType::Server), true, is_auth, None)
             }
             ClientMode::Client {
                 client, edge_url, ..
@@ -27,14 +27,14 @@ impl ClientBridge {
                 } else {
                     None
                 };
-                (ModeType::Client, false, is_auth, check_info)
+                (Some(ModeType::Client), false, is_auth, check_info)
             }
         };
 
         drop(mode_guard);
 
         // Perform real network health check for Client mode
-        let final_is_connected = if mode == ModeType::Client {
+        let final_is_connected = if mode == Some(ModeType::Client) {
             if let Some((url, Some(http))) = client_check_info {
                 match http
                     .get(format!("{}/health", url))
@@ -72,24 +72,10 @@ impl ClientBridge {
         match &*mode_guard {
             ClientMode::Disconnected => {
                 if tenant_manager.current_tenant_id().is_none() {
-                    AppState::ServerNoTenant
-                } else {
-                    let has_certs = tenant_manager
-                        .current_paths()
-                        .map(|p| p.is_server_activated())
-                        .unwrap_or(false);
-
-                    if has_certs {
-                        AppState::Uninitialized
-                    } else {
-                        let reason = ActivationRequiredReason::FirstTimeSetup;
-                        AppState::ServerNeedActivation {
-                            can_auto_recover: reason.can_auto_recover(),
-                            recovery_hint: reason.recovery_hint_code().to_string(),
-                            reason,
-                        }
-                    }
+                    return AppState::NeedTenantLogin;
                 }
+                // 有租户但没运行模式 → 选模式
+                AppState::TenantReady
             }
 
             ClientMode::Server {
@@ -101,7 +87,6 @@ impl ClientBridge {
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
-                    // 调用 edge-server 自检获取具体错误
                     let reason = self.detect_activation_reason_from_server(server_state, &tenant_manager).await;
                     return AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
@@ -118,26 +103,22 @@ impl ClientBridge {
                     .flatten();
 
                 if let Some(_cred) = credential {
-                    // 订阅阻止检查 (统一使用 edge-server 判断，包含签名陈旧检查)
+                    // 订阅阻止检查
                     let blocked_info = server_state.get_subscription_blocked_info().await;
                     if let Some(info) = blocked_info {
                         AppState::ServerSubscriptionBlocked { info }
                     } else {
-                        // 2. 检查员工登录状态
-                        // 优先检查 CrabClient 状态（权威）
+                        // 检查员工登录状态
                         if matches!(client, Some(LocalClientState::Authenticated(_))) {
                             return AppState::ServerAuthenticated;
                         }
-                        // 其次检查内存中的 session
                         if tenant_manager.current_session().is_some() {
                             return AppState::ServerAuthenticated;
                         }
-                        // 未登录
                         AppState::ServerReady
                     }
                 } else {
-                    // 无 credential，需要激活
-                    let reason = self.detect_activation_reason(&tenant_manager, true); // Server mode
+                    let reason = self.detect_activation_reason(&tenant_manager, true);
                     AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
                         recovery_hint: reason.recovery_hint_code().to_string(),
@@ -158,7 +139,12 @@ impl ClientBridge {
                     if has_certs {
                         AppState::ClientDisconnected
                     } else {
-                        AppState::ClientNeedSetup
+                        let reason = self.detect_activation_reason(&tenant_manager, false);
+                        AppState::ClientNeedActivation {
+                            can_auto_recover: reason.can_auto_recover(),
+                            recovery_hint: reason.recovery_hint_code().to_string(),
+                            reason,
+                        }
                     }
                 }
             },
@@ -172,15 +158,11 @@ impl ClientBridge {
     }
 
     /// 重新检查订阅状态
-    ///
-    /// 在 Server 模式下，调用 edge-server 的 sync_subscription 从 auth-server 拉取最新订阅，
-    /// 然后返回最新的 AppState。
     pub async fn check_subscription(&self) -> Result<AppState, BridgeError> {
         let mode_guard = self.mode.read().await;
 
         match &*mode_guard {
             ClientMode::Server { server_state, .. } => {
-                // 从 auth-server 同步最新订阅状态
                 server_state.sync_subscription().await;
                 tracing::info!("Subscription re-checked from auth-server");
             }
@@ -189,10 +171,7 @@ impl ClientBridge {
             }
         }
 
-        // 释放 mode_guard 以避免死锁（get_app_state 也需要读锁）
         drop(mode_guard);
-
-        // 返回最新的 AppState
         Ok(self.get_app_state().await)
     }
 
@@ -256,12 +235,11 @@ impl ClientBridge {
                 };
 
                 // === 网络健康状态 ===
-                // 尝试连接 auth server 检查可达性
                 let network = {
                     let auth_url = std::env::var("AUTH_SERVER_URL")
                         .unwrap_or_else(|_| "https://localhost:3001".to_string());
                     let client = reqwest::Client::builder()
-                        .danger_accept_invalid_certs(true) // 开发环境
+                        .danger_accept_invalid_certs(true)
                         .timeout(std::time::Duration::from_secs(3))
                         .build();
 
@@ -290,7 +268,6 @@ impl ClientBridge {
 
                 // === 数据库健康状态 ===
                 let database = {
-                    // 尝试执行简单查询检查数据库是否正常
                     let db_ok: bool = server_state.pool.acquire().await.is_ok();
 
                     DatabaseHealth {
@@ -308,7 +285,6 @@ impl ClientBridge {
             }
 
             ClientMode::Client { client, edge_url, .. } => {
-                // Client 模式: 检查与 edge server 的连接
                 let (network_status, reachable) = if let Some(state) = client {
                     let http = match state {
                         RemoteClientState::Connected(c) => c.edge_http_client().cloned(),
@@ -332,7 +308,7 @@ impl ClientBridge {
                 };
 
                 let subscription = SubscriptionHealth {
-                    status: HealthLevel::Unknown, // Client 模式不直接访问订阅
+                    status: HealthLevel::Unknown,
                     plan: None,
                     subscription_status: None,
                     signature_valid_until: 0,
@@ -350,7 +326,7 @@ impl ClientBridge {
                 };
 
                 let database = DatabaseHealth {
-                    status: HealthLevel::Unknown, // Client 模式不直接访问数据库
+                    status: HealthLevel::Unknown,
                     size_bytes: None,
                     last_write_at: None,
                 };

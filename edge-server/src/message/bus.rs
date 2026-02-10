@@ -197,6 +197,11 @@ impl MessageBus {
         &self.shutdown_token
     }
 
+    /// 获取当前已连接客户端数量
+    pub fn clients_count(&self) -> usize {
+        self.clients.len()
+    }
+
     /// 获取已连接客户端列表
     pub fn get_connected_clients(&self) -> Vec<ConnectedClient> {
         self.clients

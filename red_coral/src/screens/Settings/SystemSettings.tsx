@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useUIScale, useSetUIScale } from '@/core/stores/ui';
+import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
 import type { Locale } from '@/infrastructure/i18n';
-import { Monitor, Zap, Trash2, ZoomIn, Plus, Minus, Languages, Keyboard } from 'lucide-react';
+import { Monitor, Zap, Trash2, ZoomIn, Plus, Minus, Languages, Keyboard, LogOut } from 'lucide-react';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useVirtualKeyboardStore, useVirtualKeyboardMode } from '@/core/stores/ui';
 
@@ -23,6 +24,8 @@ export const SystemSettings: React.FC = () => {
   const setVkbMode = useVirtualKeyboardStore((s) => s.setMode);
 
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
+  const [showExitTenantDialog, setShowExitTenantDialog] = useState(false);
+  const { exitTenant, fetchAppState } = useBridgeStore();
 
   const isDev = import.meta.env.DEV;
 
@@ -30,6 +33,15 @@ export const SystemSettings: React.FC = () => {
 
   const handleClearCache = () => {
     window.location.reload();
+  };
+
+  const handleExitTenant = async () => {
+    setShowExitTenantDialog(false);
+    await exitTenant();
+    await fetchAppState();
+    const appState = useBridgeStore.getState().appState;
+    const route = AppStateHelpers.getRouteForState(appState);
+    navigate(route, { replace: true });
   };
 
   return (
@@ -196,6 +208,23 @@ export const SystemSettings: React.FC = () => {
                 </button>
               </div>
 
+              {/* Exit Tenant */}
+              <div className="flex items-center justify-between p-4 bg-red-50/50 rounded-lg border border-red-100">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <LogOut className="w-4 h-4 text-red-500" />
+                    {t('settings.system.button_exit_tenant')}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 ml-6">{t('settings.system.exit_tenant_desc')}</p>
+                </div>
+                <button
+                  onClick={() => setShowExitTenantDialog(true)}
+                  className="px-3.5 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  {t('settings.system.button_exit_tenant')}
+                </button>
+              </div>
+
               {/* Debug - Dev Only */}
               {isDev && (
                 <div className="flex items-center justify-between p-4 bg-orange-50/50 rounded-lg border border-orange-100">
@@ -228,6 +257,16 @@ export const SystemSettings: React.FC = () => {
         confirmText={t('common.action.confirm')}
         onConfirm={handleClearCache}
         onCancel={() => setShowClearCacheDialog(false)}
+      />
+
+      <ConfirmDialog
+        isOpen={showExitTenantDialog}
+        title={t('settings.system.button_exit_tenant')}
+        description={t('settings.system.confirm_exit_tenant')}
+        variant="danger"
+        confirmText={t('common.action.confirm')}
+        onConfirm={handleExitTenant}
+        onCancel={() => setShowExitTenantDialog(false)}
       />
     </div>
   );

@@ -48,26 +48,6 @@ export interface SubscriptionBlockedInfo {
 }
 
 // =============================================================================
-// 激活进度
-// =============================================================================
-
-export type ActivationStep =
-  | 'authenticating'
-  | 'downloading_certificates'
-  | 'verifying_binding'
-  | 'checking_subscription'
-  | 'starting_server'
-  | 'complete';
-
-export interface ActivationProgress {
-  step: ActivationStep;
-  total_steps: number;
-  current_step: number;
-  message: string;
-  started_at: number;
-}
-
-// =============================================================================
 // 健康检查
 // =============================================================================
 
@@ -126,23 +106,23 @@ export interface HealthStatus {
 // =============================================================================
 
 export type AppState =
-  // 通用状态
-  | { type: 'Uninitialized' }
+  // 前置状态 (未选模式)
+  | { type: 'NeedTenantLogin' }
+  | { type: 'TenantReady' }
   // Server 模式
-  | { type: 'ServerNoTenant' }
   | {
       type: 'ServerNeedActivation';
       data: { reason: ActivationRequiredReason; can_auto_recover: boolean; recovery_hint: string };
     }
-  | { type: 'ServerActivating'; data: { progress: ActivationProgress } }
-  | { type: 'ServerCheckingSubscription' }
   | { type: 'ServerSubscriptionBlocked'; data: { info: SubscriptionBlockedInfo } }
   | { type: 'ServerReady' }
   | { type: 'ServerAuthenticated' }
   // Client 模式
+  | {
+      type: 'ClientNeedActivation';
+      data: { reason: ActivationRequiredReason; can_auto_recover: boolean; recovery_hint: string };
+    }
   | { type: 'ClientDisconnected' }
-  | { type: 'ClientNeedSetup' }
-  | { type: 'ClientConnecting'; data: { server_url: string } }
   | { type: 'ClientConnected' }
   | { type: 'ClientAuthenticated' };
 

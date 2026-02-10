@@ -13,7 +13,7 @@ impl ClientBridge {
         // 注: 租户选择已在构造函数中同步恢复（确保 get_app_state 立即可用）
 
         let result = match mode {
-            ModeType::Server => {
+            Some(ModeType::Server) => {
                 tracing::info!("Restoring Server mode...");
                 if let Err(e) = self.start_server_mode().await {
                     tracing::error!("Failed to restore Server mode: {}", e);
@@ -22,7 +22,7 @@ impl ClientBridge {
                     Ok(())
                 }
             }
-            ModeType::Client => {
+            Some(ModeType::Client) => {
                 if let Some(cfg) = client_config {
                     tracing::info!("Restoring Client mode...");
                     if let Err(e) = self
@@ -39,8 +39,8 @@ impl ClientBridge {
                     Ok(())
                 }
             }
-            ModeType::Disconnected => {
-                tracing::info!("Starting in Disconnected mode");
+            None => {
+                tracing::info!("Starting in Disconnected mode (no mode selected)");
                 Ok(())
             }
         };
@@ -231,7 +231,7 @@ impl ClientBridge {
         drop(config);
         {
             let mut config = self.config.write().await;
-            config.current_mode = ModeType::Server;
+            config.current_mode = Some(ModeType::Server);
         }
         self.save_config().await?;
 
@@ -495,7 +495,7 @@ impl ClientBridge {
 
         {
             let mut config = self.config.write().await;
-            config.current_mode = ModeType::Client;
+            config.current_mode = Some(ModeType::Client);
             config.client_config = Some(ClientModeConfig {
                 edge_url: edge_url.to_string(),
                 message_addr: message_addr.to_string(),
@@ -566,7 +566,7 @@ impl ClientBridge {
         // 4. 更新配置
         {
             let mut config = self.config.write().await;
-            config.current_mode = ModeType::Disconnected;
+            config.current_mode = None;
         }
         self.save_config().await?;
 

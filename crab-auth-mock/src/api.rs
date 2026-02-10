@@ -399,6 +399,7 @@ async fn activate(
         expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
         features: sub_features,
         max_stores: sub_plan.max_stores() as u32,
+        max_clients: 0,
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
@@ -515,6 +516,7 @@ async fn get_subscription_status(
         expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
         features,
         max_stores: plan.max_stores() as u32,
+        max_clients: 0,
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
@@ -821,6 +823,287 @@ fn verify_admin_token(state: &AppState, headers: &HeaderMap) -> bool {
     }
 }
 
+/// POST /api/client/activate — 客户端激活 (签发 Client 证书)
+async fn client_activate(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ActivateRequest>,
+) -> Json<ActivationResponse> {
+    // 1. Authenticate
+    let tenant_id = match state
+        .user_store
+        .authenticate(&req.username, &req.password)
+        .await
+    {
+        Some(id) => id,
+        None => {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some("Invalid credentials".to_string()),
+                data: None,
+                quota_info: None,
+            });
+        }
+    };
+
+    // 2. Load Root CA
+    let root_ca = match state.auth_storage.get_or_create_root_ca() {
+        Ok(ca) => ca,
+        Err(e) => {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some(e.to_string()),
+                data: None,
+                quota_info: None,
+            });
+        }
+    };
+
+    // 3. Ensure Tenant CA exists
+    let tenant_dir = state.auth_storage.get_tenant_dir(&tenant_id);
+    let tenant_ca_name = "tenant_ca";
+    let tenant_ca = if tenant_dir.join(format!("{}.crt", tenant_ca_name)).exists() {
+        match CertificateAuthority::load_from_file(
+            &tenant_dir.join(format!("{}.crt", tenant_ca_name)),
+            &tenant_dir.join(format!("{}.key", tenant_ca_name)),
+        ) {
+            Ok(ca) => ca,
+            Err(e) => {
+                return Json(ActivationResponse {
+                    success: false,
+                    error: Some(format!("Failed to load Tenant CA: {}", e)),
+                    data: None,
+                    quota_info: None,
+                });
+            }
+        }
+    } else {
+        let profile = CaProfile::intermediate(&tenant_id, &format!("Tenant {}", tenant_id));
+        let ca = match CertificateAuthority::new_intermediate(profile, &root_ca) {
+            Ok(ca) => ca,
+            Err(e) => {
+                return Json(ActivationResponse {
+                    success: false,
+                    error: Some(format!("Failed to create Tenant CA: {}", e)),
+                    data: None,
+                    quota_info: None,
+                });
+            }
+        };
+        if let Err(e) = ca.save(&tenant_dir, tenant_ca_name) {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some(format!("Failed to save Tenant CA: {}", e)),
+                data: None,
+                quota_info: None,
+            });
+        }
+        ca
+    };
+
+    // 4. Generate Client ID
+    let client_id = format!("client-{}", uuid::Uuid::new_v4());
+
+    // 5. Issue Client Cert (client-only, no server auth)
+    let profile = CertProfile::new_client(
+        &client_id,
+        Some(tenant_id.clone()),
+        Some(req.device_id.clone()),
+        None,
+    );
+
+    let (entity_cert, entity_key) = match tenant_ca.issue_cert(&profile) {
+        Ok(pair) => pair,
+        Err(e) => {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some(format!("Failed to issue certificate: {}", e)),
+                data: None,
+                quota_info: None,
+            });
+        }
+    };
+
+    // 6. Calculate certificate fingerprint
+    let fingerprint = match CertMetadata::from_pem(&entity_cert) {
+        Ok(meta) => meta.fingerprint_sha256,
+        Err(e) => {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some(format!("Failed to parse certificate metadata: {}", e)),
+                data: None,
+                quota_info: None,
+            });
+        }
+    };
+
+    // 7. Create and sign the binding (EntityType::Client)
+    let binding = SignedBinding::new(
+        &client_id,
+        &tenant_id,
+        &req.device_id,
+        &fingerprint,
+        EntityType::Client,
+    );
+
+    let signed_binding = match binding.sign(&tenant_ca.key_pem()) {
+        Ok(b) => b,
+        Err(e) => {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some(format!("Failed to sign binding: {}", e)),
+                data: None,
+                quota_info: None,
+            });
+        }
+    };
+
+    // 8. Build subscription info (same mock logic as server activate)
+    let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
+    let subscription = SubscriptionInfo {
+        tenant_id: tenant_id.clone(),
+        id: None,
+        status: SubscriptionStatus::Active,
+        plan: PlanType::Pro,
+        starts_at: shared::util::now_millis(),
+        expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
+        features: vec!["audit_log".to_string(), "advanced_reporting".to_string(), "api_access".to_string()],
+        max_stores: PlanType::Pro.max_stores() as u32,
+        max_clients: 0,
+        signature_valid_until,
+        signature: String::new(),
+        last_checked_at: 0,
+    };
+
+    let signed_subscription = match subscription.sign(&tenant_ca.key_pem()) {
+        Ok(s) => s,
+        Err(e) => {
+            return Json(ActivationResponse {
+                success: false,
+                error: Some(format!("Failed to sign subscription: {}", e)),
+                data: None,
+                quota_info: None,
+            });
+        }
+    };
+
+    // 9. Build activation data
+    let data = ActivationData {
+        entity_id: client_id,
+        tenant_id,
+        device_id: req.device_id,
+        root_ca_cert: root_ca.cert_pem().to_string(),
+        tenant_ca_cert: tenant_ca.cert_pem().to_string(),
+        entity_cert,
+        entity_key,
+        binding: signed_binding,
+        subscription: Some(signed_subscription),
+    };
+
+    tracing::info!(
+        "Activated client: entity_id={}, tenant_id={}",
+        data.entity_id,
+        data.tenant_id
+    );
+
+    Json(ActivationResponse {
+        success: true,
+        error: None,
+        data: Some(data),
+        quota_info: None,
+    })
+}
+
+/// POST /api/tenant/verify — 只验证身份，不签发证书
+async fn verify_tenant(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<serde_json::Value>,
+) -> Json<shared::activation::TenantVerifyResponse> {
+    let username = req.get("username").and_then(|v| v.as_str()).unwrap_or("");
+    let password = req.get("password").and_then(|v| v.as_str()).unwrap_or("");
+
+    let tenant_id = match state.user_store.authenticate(username, password).await {
+        Some(id) => id,
+        None => {
+            return Json(shared::activation::TenantVerifyResponse {
+                success: false,
+                error: Some("Invalid credentials".to_string()),
+                data: None,
+            });
+        }
+    };
+
+    // Mock: return tenant info with quota slots
+    let data = shared::activation::TenantVerifyData {
+        tenant_id,
+        subscription_status: SubscriptionStatus::Active,
+        plan: PlanType::Pro,
+        server_slots_remaining: 2,
+        client_slots_remaining: 5,
+        has_active_server: false,
+        has_active_client: false,
+    };
+
+    Json(shared::activation::TenantVerifyResponse {
+        success: true,
+        error: None,
+        data: Some(data),
+    })
+}
+
+/// POST /api/server/deactivate — 注销 Server 激活
+async fn deactivate_server(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<serde_json::Value>,
+) -> Json<shared::activation::DeactivateResponse> {
+    let username = req.get("username").and_then(|v| v.as_str()).unwrap_or("");
+    let password = req.get("password").and_then(|v| v.as_str()).unwrap_or("");
+
+    if state.user_store.authenticate(username, password).await.is_none() {
+        return Json(shared::activation::DeactivateResponse {
+            success: false,
+            error: Some("Invalid credentials".to_string()),
+        });
+    }
+
+    // Mock: always succeed
+    tracing::info!(
+        entity_id = req.get("entity_id").and_then(|v| v.as_str()).unwrap_or("?"),
+        "Server deactivated (mock)"
+    );
+
+    Json(shared::activation::DeactivateResponse {
+        success: true,
+        error: None,
+    })
+}
+
+/// POST /api/client/deactivate — 注销 Client 激活
+async fn deactivate_client(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<serde_json::Value>,
+) -> Json<shared::activation::DeactivateResponse> {
+    let username = req.get("username").and_then(|v| v.as_str()).unwrap_or("");
+    let password = req.get("password").and_then(|v| v.as_str()).unwrap_or("");
+
+    if state.user_store.authenticate(username, password).await.is_none() {
+        return Json(shared::activation::DeactivateResponse {
+            success: false,
+            error: Some("Invalid credentials".to_string()),
+        });
+    }
+
+    // Mock: always succeed
+    tracing::info!(
+        entity_id = req.get("entity_id").and_then(|v| v.as_str()).unwrap_or("?"),
+        "Client deactivated (mock)"
+    );
+
+    Json(shared::activation::DeactivateResponse {
+        success: true,
+        error: None,
+    })
+}
+
 pub fn router(state: Arc<AppState>) -> Router {
     use tower::limit::ConcurrencyLimitLayer;
 
@@ -830,6 +1113,10 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/api/auth/login", post(login))
         .route("/api/server/activate", post(activate))
+        .route("/api/client/activate", post(client_activate))
+        .route("/api/tenant/verify", post(verify_tenant))
+        .route("/api/server/deactivate", post(deactivate_server))
+        .route("/api/client/deactivate", post(deactivate_client))
         .route("/api/cert/issue", post(issue_cert))
         .route("/api/binding/refresh", post(refresh_binding))
         .route("/api/credential/refresh", post(refresh_credential))

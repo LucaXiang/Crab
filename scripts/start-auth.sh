@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     status            TEXT NOT NULL DEFAULT 'active',
     plan              TEXT NOT NULL DEFAULT 'pro',
     max_edge_servers  INT NOT NULL DEFAULT 3,
+    max_clients       INT NOT NULL DEFAULT 10,
     features          TEXT[] NOT NULL DEFAULT '{}',
     current_period_end BIGINT,
     created_at        BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
@@ -133,9 +134,9 @@ VALUES ('demo', 'Demo Restaurant', '${hash}', 'active')
 ON CONFLICT (id) DO UPDATE SET hashed_password = EXCLUDED.hashed_password;
 
 -- 测试订阅 (Pro plan, 有效期 1 年)
-INSERT INTO subscriptions (id, tenant_id, status, plan, max_edge_servers, features, current_period_end)
+INSERT INTO subscriptions (id, tenant_id, status, plan, max_edge_servers, max_clients, features, current_period_end)
 VALUES (
-    'sub_demo', 'demo', 'active', 'pro', 3,
+    'sub_demo', 'demo', 'active', 'pro', 3, 10,
     ARRAY['audit_log', 'advanced_reporting', 'api_access'],
     (EXTRACT(EPOCH FROM NOW() + INTERVAL '365 days') * 1000)::BIGINT
 )

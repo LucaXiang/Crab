@@ -215,7 +215,19 @@
         "button_replace": "Reemplazar",
         "button_cancel": "Cancelar",
         "replacing": "Reemplazando..."
-      }
+      },
+      "client_limit": {
+        "title": "Límite de clientes alcanzado",
+        "description": "Su plan permite hasta {{max}} clientes, actualmente hay {{count}}. Seleccione uno para reemplazar.",
+        "device_id": "ID dispositivo",
+        "activated_at": "Activado el",
+        "last_refreshed": "Último refresco",
+        "button_replace": "Reemplazar",
+        "button_cancel": "Cancelar",
+        "replacing": "Reemplazando..."
+      },
+      "no_account": "¿No tiene cuenta?",
+      "register": "Regístrese"
     },
     "login": {
       "title": "Iniciar sesión",
@@ -280,7 +292,13 @@
       "edge_url_label": "Dirección Edge Server",
       "edge_url_help": "Dirección HTTPS del Edge Server",
       "message_addr_label": "Dirección mensajería",
-      "message_addr_help": "Host:Puerto para mensajes"
+      "message_addr_help": "Host:Puerto para mensajes",
+      "auth_section": "Verificación de cuenta",
+      "auth_section_help": "Introduzca credenciales de administrador para registrar este cliente",
+      "username_label": "Usuario",
+      "username_placeholder": "Usuario administrador",
+      "password_label": "Contraseña",
+      "password_placeholder": "Contraseña de administrador"
     },
     "button_back": "Volver",
     "button_start_server": "Iniciar servidor",
@@ -290,7 +308,17 @@
     "complete_mode_server": "modo servidor",
     "complete_mode_client": "modo cliente",
     "button_continue": "Continuar",
+    "button_verify": "Verificar identidad",
+    "credentials_title": "Iniciar sesión",
+    "credentials_desc": "Introduzca credenciales para verificar su identidad",
+    "tenant_verified": "Establecimiento {tenant_id} verificado",
+    "slots_remaining": "Cuota restante: {count}",
+    "activate_title": "Activar dispositivo",
+    "activate_desc": "Introduzca credenciales de establecimiento para activar",
+    "activate_server_desc": "Activar dispositivo en modo servidor para obtener certificados",
+    "activate_client_desc": "Activar dispositivo en modo cliente para obtener certificados",
     "step": {
+      "credentials": "Sesión",
       "mode": "Modo",
       "configure": "Configurar",
       "complete": "Completar"
@@ -1630,7 +1658,10 @@
       "virtual_keyboard_desc": "Teclado en pantalla para dispositivos táctiles",
       "virtual_keyboard_always": "Siempre",
       "virtual_keyboard_auto": "Auto",
-      "virtual_keyboard_never": "Nunca"
+      "virtual_keyboard_never": "Nunca",
+      "button_exit_tenant": "Salir del establecimiento",
+      "exit_tenant_desc": "Detener servicio y volver a selección de establecimiento",
+      "confirm_exit_tenant": "¿Salir del establecimiento actual? El servidor se detendrá."
     },
     "permissions": {
       "menu_manage": "Gestión carta",

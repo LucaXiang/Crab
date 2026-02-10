@@ -276,6 +276,9 @@ pub struct SubscriptionInfo {
     /// Plan 允许的最大门店数，0 = 无限
     #[serde(default)]
     pub max_stores: u32,
+    /// 每个 edge-server 允许的最大 Client 数，0 = 无限
+    #[serde(default)]
+    pub max_clients: u32,
     /// 签名有效期 (Unix millis，超过此时间需要刷新)
     pub signature_valid_until: i64,
     /// Tenant CA 签名 (base64)
@@ -307,12 +310,13 @@ impl SubscriptionInfo {
     pub fn signable_data(&self) -> String {
         let features_str = self.features.join(",");
         format!(
-            "{}|{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}|{}",
             self.tenant_id,
             self.plan.as_str(),
             self.status.as_str(),
             features_str,
             self.max_stores,
+            self.max_clients,
             self.signature_valid_until
         )
     }
@@ -436,6 +440,44 @@ fn base64_encode(data: &[u8]) -> String {
 fn base64_decode(s: &str) -> Result<Vec<u8>, base64::DecodeError> {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     STANDARD.decode(s)
+}
+
+// === Tenant Verify Types (身份验证，不签发证书) ===
+
+/// 租户验证响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TenantVerifyResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<TenantVerifyData>,
+}
+
+/// 租户验证数据 (仅身份验证，不签发证书)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TenantVerifyData {
+    pub tenant_id: String,
+    pub subscription_status: SubscriptionStatus,
+    pub plan: PlanType,
+    /// 剩余可用 Server 配额
+    pub server_slots_remaining: i32,
+    /// 剩余可用 Client 配额
+    pub client_slots_remaining: i32,
+    /// 当前设备是否已有 Server 激活
+    pub has_active_server: bool,
+    /// 当前设备是否已有 Client 激活
+    pub has_active_client: bool,
+}
+
+// === Deactivate Types (注销证书，释放配额) ===
+
+/// 注销响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeactivateResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[cfg(test)]

@@ -36,8 +36,8 @@ async fn get_image_context(bridge: &ClientBridge) -> Result<ImageContext, String
         .ok_or("No tenant selected")?;
 
     match mode_info.mode {
-        ModeType::Server => Ok(ImageContext::Server { tenant_path }),
-        ModeType::Client => {
+        Some(ModeType::Server) => Ok(ImageContext::Server { tenant_path }),
+        Some(ModeType::Client) => {
             // 获取 mTLS HTTP client
             let (edge_url, http_client, _token) = bridge
                 .get_edge_http_context()
@@ -52,7 +52,7 @@ async fn get_image_context(bridge: &ClientBridge) -> Result<ImageContext, String
                 },
             })
         }
-        ModeType::Disconnected => Err("Not connected".to_string()),
+        None => Err("Not connected".to_string()),
     }
 }
 
@@ -247,15 +247,15 @@ pub async fn save_image(
     }
 
     match mode_info.mode {
-        ModeType::Server => {
+        Some(ModeType::Server) => {
             let paths = TenantPaths::new(&tenant_path);
             save_image_server(&data, &paths.server_images_dir()).await
         }
-        ModeType::Client => {
+        Some(ModeType::Client) => {
             // Client 模式：上传到 EdgeServer (使用 mTLS)
             save_image_client(&data, &source_path, &bridge).await
         }
-        ModeType::Disconnected => Err("Not connected".to_string()),
+        None => Err("Not connected".to_string()),
     }
 }
 

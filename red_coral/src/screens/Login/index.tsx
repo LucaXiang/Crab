@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Lock, AlertCircle, ChevronRight, Store, Terminal, Power, WifiOff, Building2, Server, Monitor } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
-import { useBridgeStore, useAppState, AppStateHelpers, type LoginMode } from '@/core/stores/bridge';
+import { useBridgeStore, useAppState, AppStateHelpers } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
 import { logger } from '@/utils/logger';
 
@@ -22,49 +22,25 @@ export const LoginScreen: React.FC = () => {
 
   // Bridge store for actual login
   const {
-    currentSession,
     modeInfo,
     loginEmployee,
     fetchModeInfo,
-    fetchTenants,
-    checkFirstRun,
     isLoading,
   } = useBridgeStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loginMode, setLoginMode] = useState<LoginMode | null>(null);
   const [focusedField, setFocusedField] = useState<'username' | 'password' | null>(null);
 
-  // Tenant check state
-  const [isCheckingTenants, setIsCheckingTenants] = useState(true);
-
-  // Check if we should be here - redirect if no tenants or subscription blocked
+  // 如果 AppState 不适合登录，重定向到正确路由
+  // App 级 useAppInitialization 已完成所有初始化，直接读 store
   useEffect(() => {
-    const checkAccess = async () => {
-      const isFirst = await checkFirstRun();
-      await fetchTenants();
-      const currentTenants = useBridgeStore.getState().tenants;
-
-      // If no tenants, redirect to activate
-      if (isFirst || currentTenants.length === 0) {
-        navigate('/activate', { replace: true });
-        return;
-      }
-
-      // 检查订阅状态 — 被阻止时不应停留在登录页
-      await useBridgeStore.getState().fetchAppState();
-      const currentState = useBridgeStore.getState().appState;
-      if (AppStateHelpers.isSubscriptionBlocked(currentState)) {
-        navigate(AppStateHelpers.getRouteForState(currentState), { replace: true });
-        return;
-      }
-
-      setIsCheckingTenants(false);
-    };
-    checkAccess();
-  }, [checkFirstRun, fetchTenants, navigate]);
+    const currentState = useBridgeStore.getState().appState;
+    if (!AppStateHelpers.needsEmployeeLogin(currentState)) {
+      navigate(AppStateHelpers.getRouteForState(currentState), { replace: true });
+    }
+  }, [navigate]);
 
   // Fetch mode info on mount
   useEffect(() => {
@@ -85,7 +61,6 @@ export const LoginScreen: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoginMode(null);
 
     if (!username.trim() || !password.trim()) {
       setError(t('auth.login.error.empty_fields'));
@@ -99,8 +74,6 @@ export const LoginScreen: React.FC = () => {
       const response = await loginEmployee(username, password);
 
       if (response.success && response.session) {
-        setLoginMode(response.mode);
-
         const userInfo = response.session.user_info;
 
         // 同步登录状态到 AuthStore
@@ -134,23 +107,7 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  const isDisconnected = modeInfo?.mode === 'Disconnected';
-
-  // Show loading while checking tenants
-  if (isCheckingTenants) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
-        <button
-          onClick={handleCloseApp}
-          className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-          title={t('common.dialog.close_app')}
-        >
-          <Power size={24} />
-        </button>
-        <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const isDisconnected = modeInfo?.mode == null;
 
   return (
     <div className="min-h-screen w-full flex font-sans overflow-hidden bg-gray-50">

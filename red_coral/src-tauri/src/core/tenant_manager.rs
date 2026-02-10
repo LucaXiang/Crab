@@ -46,6 +46,9 @@ pub enum TenantError {
     #[error("Device limit reached")]
     DeviceLimitReached(shared::activation::QuotaInfo),
 
+    #[error("Client limit reached")]
+    ClientLimitReached(shared::activation::QuotaInfo),
+
     #[error("Offline login not available for user: {0}")]
     OfflineNotAvailable(String),
 }
@@ -230,7 +233,7 @@ impl TenantManager {
         username: &str,
         password: &str,
         replace_entity_id: Option<&str>,
-    ) -> Result<String, TenantError> {
+    ) -> Result<(String, String), TenantError> {
         // 1. 生成 Hardware ID
         let device_id = crab_cert::generate_hardware_id();
         tracing::info!("Activating device with ID: {}", device_id);
@@ -283,6 +286,7 @@ impl TenantManager {
             .ok_or_else(|| TenantError::AuthFailed("Missing activation data".to_string()))?;
 
         let tenant_id = data.tenant_id.clone();
+        let entity_id = data.entity_id.clone();
 
         // 4. 准备租户目录 (使用 TenantPaths)
         let tenant_path = self.base_path.join(&tenant_id);
@@ -294,15 +298,9 @@ impl TenantManager {
         // 5. 验证证书链 (简化版，完整验证由 edge-server 启动时进行)
         // 这里主要确保我们拿到了看起来正确的东西
 
-        // 6. 保存客户端证书到 {tenant}/certs/ (用于 mTLS Client Mode)
-        // 使用 CertManager 兼容的文件名: entity.crt, entity.key, tenant_ca.crt
-        paths.ensure_client_dirs()?;
-        std::fs::write(paths.client_cert(), &data.entity_cert)?;
-        std::fs::write(paths.client_key(), &data.entity_key)?;
-        std::fs::write(paths.client_tenant_ca(), &data.tenant_ca_cert)?;
-
-        // 7. 保存 Edge Server 证书到 {tenant}/server/certs/
+        // 6. 保存 Edge Server 证书到 {tenant}/server/certs/
         // edge-server 的 work_dir = {tenant}/server/，从 work_dir/certs/ 读取
+        // 注意：不再写 client 路径，Client 模式需要调用 activate_client() 获取专用证书
         std::fs::write(paths.edge_cert(), &data.entity_cert)?;
         std::fs::write(paths.edge_key(), &data.entity_key)?;
         std::fs::write(paths.server_tenant_ca(), &data.tenant_ca_cert)?;
@@ -338,9 +336,260 @@ impl TenantManager {
         // 9. 自动切换
         self.switch_tenant(&tenant_id)?;
 
-        tracing::info!(tenant_id = %tenant_id, "Device activated successfully");
+        tracing::info!(tenant_id = %tenant_id, entity_id = %entity_id, "Device activated successfully");
 
-        Ok(tenant_id)
+        Ok((tenant_id, entity_id))
+    }
+
+    /// 激活客户端 (获取 Client 证书)
+    ///
+    /// 这是一个 "Client Activation" 流程，获取的证书用于：
+    /// 1. 以 Client 身份连接远程 Edge Server (mTLS)
+    ///
+    /// 与 activate_device 的区别:
+    /// - 调用 `/api/client/activate` 而非 `/api/server/activate`
+    /// - 获取 EntityType::Client 证书
+    /// - 只保存到 client cert 路径，不保存 server cert
+    pub async fn activate_client(
+        &mut self,
+        auth_url: &str,
+        username: &str,
+        password: &str,
+        replace_entity_id: Option<&str>,
+    ) -> Result<(String, String), TenantError> {
+        // 1. 生成 Hardware ID
+        let device_id = crab_cert::generate_hardware_id();
+        tracing::info!("Activating client with device ID: {}", device_id);
+
+        // 2. 调用 Auth Server 客户端激活接口
+        let mut body = serde_json::json!({
+            "username": username,
+            "password": password,
+            "device_id": device_id,
+        });
+        if let Some(replace_id) = replace_entity_id {
+            body["replace_entity_id"] = serde_json::json!(replace_id);
+        }
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!("{}/api/client/activate", auth_url))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| TenantError::Network(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_else(|e| format!("<failed to read body: {}>", e));
+            return Err(TenantError::AuthFailed(format!(
+                "Client activation failed: {}",
+                text
+            )));
+        }
+
+        // 3. 解析响应
+        let resp_data: shared::activation::ActivationResponse = resp
+            .json()
+            .await
+            .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
+
+        if !resp_data.success {
+            // Check for client_limit_reached with quota_info
+            if resp_data.error.as_deref() == Some("client_limit_reached") {
+                if let Some(quota_info) = resp_data.quota_info {
+                    return Err(TenantError::ClientLimitReached(quota_info));
+                }
+            }
+            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
+            return Err(TenantError::AuthFailed(msg.to_string()));
+        }
+
+        let data = resp_data
+            .data
+            .ok_or_else(|| TenantError::AuthFailed("Missing activation data".to_string()))?;
+
+        let tenant_id = data.tenant_id.clone();
+        let entity_id = data.entity_id.clone();
+
+        // 4. 准备租户目录
+        let tenant_path = self.base_path.join(&tenant_id);
+        let paths = TenantPaths::new(&tenant_path);
+
+        // 5. 保存客户端证书到 {tenant}/certs/ (用于 mTLS Client Mode)
+        paths.ensure_client_dirs()?;
+        std::fs::write(paths.client_cert(), &data.entity_cert)?;
+        std::fs::write(paths.client_key(), &data.entity_key)?;
+        std::fs::write(paths.client_tenant_ca(), &data.tenant_ca_cert)?;
+
+        // 6. 保存 Credential
+        let credential_path = paths.credential_file();
+        tracing::info!("Saving credential to: {:?}", credential_path);
+
+        let mut tenant_binding =
+            edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
+
+        if let Some(mut sub_info) = data.subscription.clone() {
+            sub_info.last_checked_at = shared::util::now_millis();
+            tenant_binding.subscription = Some(sub_info);
+        }
+        let credential_json = serde_json::to_string_pretty(&tenant_binding).map_err(|e| {
+            tracing::error!("Failed to serialize credential: {}", e);
+            TenantError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        })?;
+
+        std::fs::write(&credential_path, &credential_json).map_err(|e| {
+            tracing::error!("Failed to write credential to {:?}: {}", credential_path, e);
+            TenantError::Io(e)
+        })?;
+
+        tracing::info!("Credential saved successfully ({} bytes)", credential_json.len());
+
+        // 7. 更新内存状态
+        self.load_tenant(&tenant_id)?;
+
+        // 8. 自动切换
+        self.switch_tenant(&tenant_id)?;
+
+        tracing::info!(tenant_id = %tenant_id, entity_id = %entity_id, "Client activated successfully");
+
+        Ok((tenant_id, entity_id))
+    }
+
+    /// 验证租户凭据 (不签发证书)
+    pub async fn verify_tenant(
+        &self,
+        auth_url: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<shared::activation::TenantVerifyData, TenantError> {
+        let device_id = crab_cert::generate_hardware_id();
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!("{}/api/tenant/verify", auth_url))
+            .json(&serde_json::json!({
+                "username": username,
+                "password": password,
+                "device_id": device_id,
+            }))
+            .send()
+            .await
+            .map_err(|e| TenantError::Network(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(TenantError::AuthFailed(format!("Verify failed: {}", text)));
+        }
+
+        let resp_data: shared::activation::TenantVerifyResponse = resp
+            .json()
+            .await
+            .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
+
+        if !resp_data.success {
+            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
+            return Err(TenantError::AuthFailed(msg.to_string()));
+        }
+
+        resp_data
+            .data
+            .ok_or_else(|| TenantError::AuthFailed("Missing verify data".to_string()))
+    }
+
+    /// 注销 Server 激活记录 (释放配额)
+    pub async fn deactivate_server(
+        &self,
+        auth_url: &str,
+        username: &str,
+        password: &str,
+        entity_id: &str,
+    ) -> Result<(), TenantError> {
+        let device_id = crab_cert::generate_hardware_id();
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!("{}/api/server/deactivate", auth_url))
+            .json(&serde_json::json!({
+                "username": username,
+                "password": password,
+                "device_id": device_id,
+                "entity_id": entity_id,
+            }))
+            .send()
+            .await
+            .map_err(|e| TenantError::Network(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(TenantError::AuthFailed(format!("Deactivate server failed: {}", text)));
+        }
+
+        let resp_data: shared::activation::DeactivateResponse = resp
+            .json()
+            .await
+            .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
+
+        if !resp_data.success {
+            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
+            return Err(TenantError::AuthFailed(msg.to_string()));
+        }
+
+        Ok(())
+    }
+
+    /// 注销 Client 激活记录 (释放配额)
+    pub async fn deactivate_client(
+        &self,
+        auth_url: &str,
+        username: &str,
+        password: &str,
+        entity_id: &str,
+    ) -> Result<(), TenantError> {
+        let device_id = crab_cert::generate_hardware_id();
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!("{}/api/client/deactivate", auth_url))
+            .json(&serde_json::json!({
+                "username": username,
+                "password": password,
+                "device_id": device_id,
+                "entity_id": entity_id,
+            }))
+            .send()
+            .await
+            .map_err(|e| TenantError::Network(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(TenantError::AuthFailed(format!("Deactivate client failed: {}", text)));
+        }
+
+        let resp_data: shared::activation::DeactivateResponse = resp
+            .json()
+            .await
+            .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
+
+        if !resp_data.success {
+            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
+            return Err(TenantError::AuthFailed(msg.to_string()));
+        }
+
+        Ok(())
+    }
+
+    /// 删除 Server 模式证书
+    pub fn delete_server_certs(&self) -> Result<(), TenantError> {
+        let paths = self.current_paths().ok_or(TenantError::NoTenantSelected)?;
+        paths.delete_server_certs()?;
+        Ok(())
+    }
+
+    /// 删除 Client 模式证书
+    pub fn delete_client_certs(&self) -> Result<(), TenantError> {
+        let paths = self.current_paths().ok_or(TenantError::NoTenantSelected)?;
+        paths.delete_client_certs()?;
+        Ok(())
     }
 
     /// 切换当前租户
@@ -511,6 +760,11 @@ impl TenantManager {
     }
 
     // ============ 状态查询 ============
+
+    /// 获取基础路径
+    pub fn base_path(&self) -> &std::path::Path {
+        &self.base_path
+    }
 
     /// 获取当前租户ID
     pub fn current_tenant_id(&self) -> Option<&str> {

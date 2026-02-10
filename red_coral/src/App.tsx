@@ -25,7 +25,6 @@ import { useVirtualKeyboardStore } from '@/core/stores/ui';
 import { LoginScreen } from '@/screens/Login';
 import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
-import { ActivateScreen } from '@/screens/Activate';
 
 import { OrderDebug } from '@/screens/Debug';
 import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
@@ -383,8 +382,7 @@ const App: React.FC = () => {
         <SystemIssueDialog issue={currentIssue} onResolve={resolveIssue} />
 
         <Routes>
-        {/* Activate & Setup Routes */}
-        <Route path="/activate" element={<ActivateScreen />} />
+        {/* Setup Route (模式选择 → 激活 → 配置 → 完成) */}
         <Route path="/setup" element={<SetupScreen />} />
 
         {/* Status Routes */}

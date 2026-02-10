@@ -27,7 +27,7 @@ pub use error::{ApiResponse as UnifiedApiResponse, AppError, AppResult, ErrorCat
 
 // App state re-exports
 pub use app_state::{
-    ActivationProgress, ActivationRequiredReason, ActivationStep, CertificateHealth,
-    ClockDirection, ComponentsHealth, DatabaseHealth, DeviceInfo, HealthLevel, HealthStatus,
-    NetworkHealth, SubscriptionBlockedInfo, SubscriptionHealth,
+    ActivationRequiredReason, CertificateHealth, ClockDirection, ComponentsHealth, DatabaseHealth,
+    DeviceInfo, HealthLevel, HealthStatus, NetworkHealth, SubscriptionBlockedInfo,
+    SubscriptionHealth,
 };

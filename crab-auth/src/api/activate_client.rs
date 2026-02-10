@@ -1,25 +1,25 @@
-use crate::db::{activations, subscriptions, tenants};
+use crate::db::{client_connections, subscriptions, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
 use crab_cert::{CertMetadata, CertProfile};
 use shared::activation::{
-    ActiveDevice, ActivationData, ActivationResponse, EntityType, PlanType, QuotaInfo,
+    ActiveDevice, ActivationData, ActivationResponse, EntityType, QuotaInfo,
     SignedBinding, SubscriptionInfo, SubscriptionStatus,
 };
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
-pub struct ActivateRequest {
+pub struct ActivateClientRequest {
     pub username: String,
     pub password: String,
     pub device_id: String,
     pub replace_entity_id: Option<String>,
 }
 
-pub async fn activate(
+pub async fn activate_client(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<ActivateRequest>,
+    Json(req): Json<ActivateClientRequest>,
 ) -> Json<ActivationResponse> {
     // 1. Authenticate
     let tenant = match tenants::authenticate(&state.db, &req.username, &req.password).await {
@@ -45,59 +45,59 @@ pub async fn activate(
         }
     };
 
-    // Check subscription status
     let sub_status = parse_subscription_status(&sub.status);
     if sub_status.is_blocked() {
         return Json(fail(&format!("Subscription {}", sub.status)));
     }
 
     let plan = parse_plan_type(&sub.plan);
-    let max_edge_servers = sub.max_edge_servers;
+    let max_clients = sub.max_clients;
 
-    // 3. Check device quota
-    let existing = match activations::find_by_device(&state.db, &tenant.id, &req.device_id).await {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::error!(error = %e, "Database error checking existing device");
-            return Json(fail("Internal error"));
-        }
-    };
+    // 3. Check client quota
+    let existing =
+        match client_connections::find_by_device(&state.db, &tenant.id, &req.device_id).await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(error = %e, "Database error checking existing client");
+                return Json(fail("Internal error"));
+            }
+        };
 
     let (entity_id, is_reactivation) = if let Some(ref existing) = existing {
         if existing.status == "active" || existing.status == "deactivated" {
             (existing.entity_id.clone(), true)
         } else {
-            (format!("edge-server-{}", uuid::Uuid::new_v4()), false)
+            (format!("client-{}", uuid::Uuid::new_v4()), false)
         }
     } else {
-        (format!("edge-server-{}", uuid::Uuid::new_v4()), false)
+        (format!("client-{}", uuid::Uuid::new_v4()), false)
     };
 
     // If not a re-activation, check quota
     if !is_reactivation {
-        let active_count = match activations::count_active(&state.db, &tenant.id).await {
+        let active_count = match client_connections::count_active(&state.db, &tenant.id).await {
             Ok(n) => n,
             Err(e) => {
-                tracing::error!(error = %e, "Database error counting active devices");
+                tracing::error!(error = %e, "Database error counting active clients");
                 return Json(fail("Internal error"));
             }
         };
 
-        // max_edge_servers = 0 means unlimited
-        if max_edge_servers > 0 && active_count >= max_edge_servers as i64 {
-            // Quota full — do we have a replace request?
+        // max_clients = 0 means unlimited
+        if max_clients > 0 && active_count >= max_clients as i64 {
             if let Some(ref replace_id) = req.replace_entity_id {
                 let replace_target =
-                    activations::find_by_entity(&state.db, replace_id).await;
+                    client_connections::find_by_entity(&state.db, replace_id).await;
                 match replace_target {
                     Ok(Some(target))
                         if target.tenant_id == tenant.id && target.status == "active" =>
                     {
                         if let Err(e) =
-                            activations::mark_replaced(&state.db, replace_id, &entity_id).await
+                            client_connections::mark_replaced(&state.db, replace_id, &entity_id)
+                                .await
                         {
-                            tracing::error!(error = %e, "Failed to mark device as replaced");
-                            return Json(fail("Failed to replace device"));
+                            tracing::error!(error = %e, "Failed to mark client as replaced");
+                            return Json(fail("Failed to replace client"));
                         }
                     }
                     _ => {
@@ -105,31 +105,31 @@ pub async fn activate(
                     }
                 }
             } else {
-                // Return quota info so frontend can show device list
-                let active_devices = match activations::list_active(&state.db, &tenant.id).await {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|a| ActiveDevice {
-                            entity_id: a.entity_id,
-                            device_id: a.device_id,
-                            activated_at: a.activated_at,
-                            last_refreshed_at: a.last_refreshed_at,
-                        })
-                        .collect(),
-                    Err(e) => {
-                        tracing::error!(error = %e, "Database error listing active devices");
-                        return Json(fail("Internal error"));
-                    }
-                };
+                let active_clients =
+                    match client_connections::list_active(&state.db, &tenant.id).await {
+                        Ok(list) => list
+                            .into_iter()
+                            .map(|c| ActiveDevice {
+                                entity_id: c.entity_id,
+                                device_id: c.device_id,
+                                activated_at: c.activated_at,
+                                last_refreshed_at: c.last_refreshed_at,
+                            })
+                            .collect(),
+                        Err(e) => {
+                            tracing::error!(error = %e, "Database error listing active clients");
+                            return Json(fail("Internal error"));
+                        }
+                    };
 
                 return Json(ActivationResponse {
                     success: false,
-                    error: Some("device_limit_reached".to_string()),
+                    error: Some("client_limit_reached".to_string()),
                     data: None,
                     quota_info: Some(QuotaInfo {
-                        max_edge_servers: max_edge_servers as u32,
+                        max_edge_servers: max_clients as u32,
                         active_count: active_count as u32,
-                        active_devices,
+                        active_devices: active_clients,
                     }),
                 });
             }
@@ -153,10 +153,10 @@ pub async fn activate(
         }
     };
 
-    // Issue server cert
+    // Issue client cert (mTLS)
     let mut profile = CertProfile::new_server(
         &entity_id,
-        vec![entity_id.clone(), "localhost".to_string()],
+        vec![entity_id.clone()],
         Some(tenant.id.clone()),
         req.device_id.clone(),
     );
@@ -169,7 +169,6 @@ pub async fn activate(
         }
     };
 
-    // Certificate fingerprint
     let fingerprint = match CertMetadata::from_pem(&entity_cert) {
         Ok(meta) => meta.fingerprint_sha256,
         Err(e) => {
@@ -183,7 +182,7 @@ pub async fn activate(
         &tenant.id,
         &req.device_id,
         &fingerprint,
-        EntityType::Server,
+        EntityType::Client,
     );
 
     let signed_binding = match binding.sign(&tenant_ca.key_pem()) {
@@ -203,8 +202,8 @@ pub async fn activate(
         starts_at: shared::util::now_millis(),
         expires_at: sub.current_period_end,
         features: sub.features.clone(),
-        max_stores: max_edge_servers as u32,
-        max_clients: sub.max_clients as u32,
+        max_stores: sub.max_edge_servers as u32,
+        max_clients: max_clients as u32,
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
@@ -217,19 +216,24 @@ pub async fn activate(
         }
     };
 
-    // 7. Write activation record
-    if let Err(e) =
-        activations::insert(&state.db, &entity_id, &tenant.id, &req.device_id, &fingerprint)
-            .await
+    // 7. Write connection record
+    if let Err(e) = client_connections::insert(
+        &state.db,
+        &entity_id,
+        &tenant.id,
+        &req.device_id,
+        &fingerprint,
+    )
+    .await
     {
-        tracing::error!(error = %e, "Failed to write activation record");
-        return Json(fail("Failed to save activation"));
+        tracing::error!(error = %e, "Failed to write client connection record");
+        return Json(fail("Failed to save connection"));
     }
 
     tracing::info!(
         entity_id = %entity_id,
         tenant_id = %tenant.id,
-        "Activated server"
+        "Activated client"
     );
 
     // 8. Return response
@@ -271,10 +275,10 @@ fn parse_subscription_status(s: &str) -> SubscriptionStatus {
     }
 }
 
-fn parse_plan_type(s: &str) -> PlanType {
+fn parse_plan_type(s: &str) -> shared::activation::PlanType {
     match s {
-        "pro" => PlanType::Pro,
-        "enterprise" => PlanType::Enterprise,
-        _ => PlanType::Basic,
+        "pro" => shared::activation::PlanType::Pro,
+        "enterprise" => shared::activation::PlanType::Enterprise,
+        _ => shared::activation::PlanType::Basic,
     }
 }

@@ -146,6 +146,7 @@ pub async fn run() {
             tracing::info!("Second instance detected, focusing existing window");
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             // Generic API commands
             commands::api_get,
@@ -168,7 +169,10 @@ pub async fn run() {
             commands::update_client_config,
             // Tenant commands
             commands::list_tenants,
-            commands::activate_tenant,
+            commands::verify_tenant,
+            commands::activate_server_tenant,
+            commands::activate_client_tenant,
+            commands::deactivate_current_mode,
             commands::switch_tenant,
             commands::remove_tenant,
             commands::exit_tenant,

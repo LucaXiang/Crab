@@ -14,7 +14,7 @@ use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
     let mut attrs = sqlx::query_as::<_, Attribute>(
-        "SELECT id, name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE is_active = 1 ORDER BY display_order",
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_indices, 'null') as default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE is_active = 1 ORDER BY display_order",
     )
     .fetch_all(pool)
     .await?;
@@ -25,7 +25,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Attribute>> {
     let mut attr = sqlx::query_as::<_, Attribute>(
-        "SELECT id, name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id = ?",
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_indices, 'null') as default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -207,7 +207,7 @@ async fn batch_find_attributes(pool: &SqlitePool, ids: &[i64]) -> RepoResult<std
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT id, name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id IN ({placeholders})"
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_indices, 'null') as default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id IN ({placeholders})"
     );
     let mut query = sqlx::query_as::<_, Attribute>(&sql);
     for id in ids {
@@ -273,7 +273,7 @@ pub async fn unlink(
 
 pub async fn find_binding_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<AttributeBinding>> {
     let binding = sqlx::query_as::<_, AttributeBinding>(
-        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices FROM attribute_binding WHERE id = ?",
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_indices, 'null') as default_option_indices FROM attribute_binding WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -343,7 +343,7 @@ pub async fn find_bindings_for_owner(
     owner_id: i64,
 ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
     let bindings = sqlx::query_as::<_, AttributeBinding>(
-        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices FROM attribute_binding WHERE owner_type = ? AND owner_id = ? ORDER BY display_order",
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_indices, 'null') as default_option_indices FROM attribute_binding WHERE owner_type = ? AND owner_id = ? ORDER BY display_order",
     )
     .bind(owner_type)
     .bind(owner_id)
@@ -374,7 +374,7 @@ pub async fn find_all_bindings_with_attributes(
     pool: &SqlitePool,
 ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
     let bindings = sqlx::query_as::<_, AttributeBinding>(
-        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_indices FROM attribute_binding ORDER BY display_order",
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_indices, 'null') as default_option_indices FROM attribute_binding ORDER BY display_order",
     )
     .fetch_all(pool)
     .await?;
