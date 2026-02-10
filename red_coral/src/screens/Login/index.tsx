@@ -20,13 +20,10 @@ export const LoginScreen: React.FC = () => {
   const setAuthUser = useAuthStore((state) => state.setUser);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
-  // Bridge store for actual login
-  const {
-    modeInfo,
-    loginEmployee,
-    fetchModeInfo,
-    isLoading,
-  } = useBridgeStore();
+  // Bridge store - precise selectors to avoid re-renders from unrelated state changes
+  const modeInfo = useBridgeStore((state) => state.modeInfo);
+  const loginEmployee = useBridgeStore((state) => state.loginEmployee);
+  const isLoading = useBridgeStore((state) => state.isLoading);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -40,12 +37,14 @@ export const LoginScreen: React.FC = () => {
     if (!AppStateHelpers.needsEmployeeLogin(currentState)) {
       navigate(AppStateHelpers.getRouteForState(currentState), { replace: true });
     }
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
+  }, []);
 
   // Fetch mode info on mount
   useEffect(() => {
-    fetchModeInfo();
-  }, [fetchModeInfo]);
+    useBridgeStore.getState().fetchModeInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
+  }, []);
 
   // Use appState for navigation decisions (consistent with ProtectedRoute)
   const appState = useAppState();
@@ -56,7 +55,8 @@ export const LoginScreen: React.FC = () => {
       const from = (location.state as LocationState)?.from?.pathname || '/pos';
       navigate(from, { replace: true });
     }
-  }, [appState, isAuthenticated, navigate, location]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate/location are read-only refs, not reactive triggers
+  }, [appState, isAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

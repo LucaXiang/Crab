@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
 import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -77,26 +77,40 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     setPendingDelete(null);
   }, [order, pendingDelete]);
 
-  // Use server-provided financial totals (authoritative)
-  const displayOriginalPrice = order.original_total;
-  // Combined item+orderRule discount/surcharge (excluding order manual)
-  const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
-  const displayItemSurcharge = Currency.sub(order.total_surcharge, order.order_manual_surcharge_amount).toNumber();
+  // Derived financial breakdown — only recalculate when order changes,
+  // not on tab switches or modal open/close
+  const {
+    displayOriginalPrice,
+    displayItemDiscount,
+    totalRuleDiscount,
+    totalRuleSurcharge,
+    manualItemDiscount,
+    displayFinalTotal,
+    displayRemainingAmount,
+  } = useMemo(() => {
+    const origPrice = order.original_total;
+    const itemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
 
-  // Split: rule discount/surcharge (item-level + order-level rules)
-  const itemRuleDiscount = order.items
-    .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0);
-  const itemRuleSurcharge = order.items
-    .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0);
-  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
-  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
-  // Manual item discount = total item discount - rule discount
-  const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
+    const itemRuleDiscount = order.items
+      .filter(i => !i._removed)
+      .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0);
+    const itemRuleSurcharge = order.items
+      .filter(i => !i._removed)
+      .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0);
+    const ruleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
+    const ruleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
+    const manualDiscount = Currency.sub(itemDiscount, ruleDiscount).toNumber();
 
-  const displayFinalTotal = order.total;
-  const displayRemainingAmount = order.remaining_amount;
+    return {
+      displayOriginalPrice: origPrice,
+      displayItemDiscount: itemDiscount,
+      totalRuleDiscount: ruleDiscount,
+      totalRuleSurcharge: ruleSurcharge,
+      manualItemDiscount: manualDiscount,
+      displayFinalTotal: order.total,
+      displayRemainingAmount: order.remaining_amount,
+    };
+  }, [order]);
 
   // Timeline 现在直接从 store 获取，不需要 useEffect
 
