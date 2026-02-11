@@ -151,6 +151,15 @@ impl ClientBridge {
                             shared::order::OrderCommandPayload::AddOrderNote { .. } => {
                                 "order.add_order_note"
                             }
+                            shared::order::OrderCommandPayload::LinkMember { .. } => {
+                                "order.link_member"
+                            }
+                            shared::order::OrderCommandPayload::UnlinkMember { .. } => {
+                                "order.unlink_member"
+                            }
+                            shared::order::OrderCommandPayload::RedeemStamp { .. } => {
+                                "order.redeem_stamp"
+                            }
                         };
 
                         // Build RequestCommand message with full command (preserves command_id, operator info)

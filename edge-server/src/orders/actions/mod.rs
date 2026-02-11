@@ -347,6 +347,15 @@ impl From<&OrderCommand> for CommandAction {
                     note: note.clone(),
                 })
             }
+            OrderCommandPayload::LinkMember { .. } => {
+                todo!("LinkMember will be implemented in Phase 7")
+            }
+            OrderCommandPayload::UnlinkMember { .. } => {
+                todo!("UnlinkMember will be implemented in Phase 7")
+            }
+            OrderCommandPayload::RedeemStamp { .. } => {
+                todo!("RedeemStamp will be implemented in Phase 7")
+            }
         }
     }
 }

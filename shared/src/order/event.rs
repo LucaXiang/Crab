@@ -81,6 +81,11 @@ pub enum OrderEventType {
 
     // Order Note
     OrderNoteAdded,
+
+    // Member
+    MemberLinked,
+    MemberUnlinked,
+    StampRedeemed,
 }
 
 impl std::fmt::Display for OrderEventType {
@@ -111,6 +116,9 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::OrderDiscountApplied => write!(f, "ORDER_DISCOUNT_APPLIED"),
             OrderEventType::OrderSurchargeApplied => write!(f, "ORDER_SURCHARGE_APPLIED"),
             OrderEventType::OrderNoteAdded => write!(f, "ORDER_NOTE_ADDED"),
+            OrderEventType::MemberLinked => write!(f, "MEMBER_LINKED"),
+            OrderEventType::MemberUnlinked => write!(f, "MEMBER_UNLINKED"),
+            OrderEventType::StampRedeemed => write!(f, "STAMP_REDEEMED"),
         }
     }
 }
@@ -443,6 +451,26 @@ pub enum EventPayload {
         /// 之前的备注（用于审计）
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_note: Option<String>,
+    },
+
+    // ========== Member ==========
+    MemberLinked {
+        member_id: i64,
+        member_name: String,
+        marketing_group_id: i64,
+        marketing_group_name: String,
+    },
+
+    MemberUnlinked {
+        previous_member_id: i64,
+        previous_member_name: String,
+    },
+
+    StampRedeemed {
+        stamp_activity_id: i64,
+        stamp_activity_name: String,
+        reward_item_id: String,
+        reward_strategy: String,
     },
 }
 

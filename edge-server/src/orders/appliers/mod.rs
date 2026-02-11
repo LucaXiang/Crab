@@ -159,6 +159,10 @@ impl From<&OrderEvent> for EventAction {
             EventPayload::OrderMovedOut { .. } | EventPayload::TableReassigned { .. } => {
                 EventAction::RecordOnly
             }
+            // Member events: will be implemented in Phase 7
+            EventPayload::MemberLinked { .. }
+            | EventPayload::MemberUnlinked { .. }
+            | EventPayload::StampRedeemed { .. } => EventAction::RecordOnly,
         }
     }
 }

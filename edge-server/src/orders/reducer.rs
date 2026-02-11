@@ -198,6 +198,7 @@ pub fn input_to_snapshot_with_rules(
             0.0
         },
         applied_rules: calc_result.applied_rules,
+        applied_mg_rules: vec![],
         unit_price: 0.0,   // Computed by recalculate_totals
         line_total: 0.0,   // Computed by recalculate_totals
         tax: 0.0,          // Computed by recalculate_totals

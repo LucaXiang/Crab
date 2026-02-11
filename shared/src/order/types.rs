@@ -93,6 +93,9 @@ pub struct CartItemSnapshot {
     pub rule_surcharge_amount: f64,
     /// Applied rules list
     pub applied_rules: Vec<AppliedRule>,
+    /// Applied MG rules list
+    #[serde(default)]
+    pub applied_mg_rules: Vec<crate::order::AppliedMgRule>,
 
     // === Computed Fields (all server-computed) ===
     /// Unit price for display (computed by backend: price with manual discount and surcharge)
@@ -442,6 +445,7 @@ mod tests {
             rule_discount_amount: 5.0,
             rule_surcharge_amount: 3.0,
             applied_rules: vec![],
+            applied_mg_rules: vec![],
             unit_price: 0.0,
             line_total: 0.0,
             tax: 0.0,
