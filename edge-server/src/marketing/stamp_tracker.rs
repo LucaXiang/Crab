@@ -22,7 +22,11 @@ pub struct StampItemInfo<'a> {
 ///
 /// For each non-comped item, check if it matches any stamp target.
 /// Sum up quantities of matching items.
-pub fn count_stamps_for_order(items: &[StampItemInfo<'_>], stamp_targets: &[StampTarget]) -> i32 {
+/// Comped items never count — "买二送一带走三个 ≠ 买二带走两个".
+pub fn count_stamps_for_order(
+    items: &[StampItemInfo<'_>],
+    stamp_targets: &[StampTarget],
+) -> i32 {
     items
         .iter()
         .filter(|info| !info.item.is_comped && matches_stamp_target(info, stamp_targets))
@@ -258,5 +262,102 @@ mod tests {
 
         // Designated strategy returns None (handled at action level)
         assert_eq!(result, None);
+    }
+
+    // ========== Edge Cases ==========
+
+    #[test]
+    fn test_count_stamps_empty_order() {
+        let items: Vec<StampItemInfo<'_>> = vec![];
+        let targets = vec![make_stamp_target(StampTargetType::Product, 1)];
+        assert_eq!(count_stamps_for_order(&items, &targets), 0);
+    }
+
+    #[test]
+    fn test_count_stamps_empty_targets() {
+        let item = make_item(1, "inst-1", 5, 10.0, false);
+        let items = vec![make_stamp_info(&item, Some(100))];
+        assert_eq!(count_stamps_for_order(&items, &[]), 0);
+    }
+
+    #[test]
+    fn test_count_stamps_all_comped() {
+        let item1 = make_item(1, "inst-1", 3, 10.0, true);
+        let item2 = make_item(2, "inst-2", 2, 10.0, true);
+        let items = vec![
+            make_stamp_info(&item1, Some(100)),
+            make_stamp_info(&item2, Some(100)),
+        ];
+        let targets = vec![make_stamp_target(StampTargetType::Category, 100)];
+        assert_eq!(count_stamps_for_order(&items, &targets), 0);
+    }
+
+    #[test]
+    fn test_count_stamps_multiple_targets_product_and_category() {
+        let item1 = make_item(1, "inst-1", 2, 10.0, false); // cat 100
+        let item2 = make_item(2, "inst-2", 3, 15.0, false); // cat 200
+        let item3 = make_item(3, "inst-3", 1, 5.0, false);  // cat 300
+        let items = vec![
+            make_stamp_info(&item1, Some(100)),
+            make_stamp_info(&item2, Some(200)),
+            make_stamp_info(&item3, Some(300)),
+        ];
+        // Target: product 2 OR category 100
+        let targets = vec![
+            make_stamp_target(StampTargetType::Product, 2),
+            make_stamp_target(StampTargetType::Category, 100),
+        ];
+        // item1 matches cat 100 (qty=2), item2 matches product 2 (qty=3)
+        assert_eq!(count_stamps_for_order(&items, &targets), 5);
+    }
+
+    #[test]
+    fn test_count_stamps_large_quantities() {
+        let item = make_item(1, "inst-1", 100, 10.0, false);
+        let items = vec![make_stamp_info(&item, Some(100))];
+        let targets = vec![make_stamp_target(StampTargetType::Category, 100)];
+        assert_eq!(count_stamps_for_order(&items, &targets), 100);
+    }
+
+    #[test]
+    fn test_count_stamps_item_without_category_matches_product_target() {
+        // item has no category_id but matches product target
+        let item = make_item(42, "inst-1", 3, 10.0, false);
+        let items = vec![make_stamp_info(&item, None)]; // no category
+        let targets = vec![make_stamp_target(StampTargetType::Product, 42)];
+        assert_eq!(count_stamps_for_order(&items, &targets), 3);
+    }
+
+    #[test]
+    fn test_count_stamps_item_without_category_no_match_category_target() {
+        // item has no category_id, category target can't match
+        let item = make_item(1, "inst-1", 5, 10.0, false);
+        let items = vec![make_stamp_info(&item, None)];
+        let targets = vec![make_stamp_target(StampTargetType::Category, 100)];
+        assert_eq!(count_stamps_for_order(&items, &targets), 0);
+    }
+
+    #[test]
+    fn test_find_reward_all_comped_returns_none() {
+        let mut item = make_item(1, "inst-1", 1, 10.0, true);
+        item.is_comped = true;
+        let items = vec![make_stamp_info(&item, Some(100))];
+        let targets = vec![make_reward_target(StampTargetType::Category, 100)];
+        assert_eq!(find_reward_item(&items, &targets, &RewardStrategy::Economizador), None);
+    }
+
+    #[test]
+    fn test_find_reward_same_price_picks_first() {
+        let item1 = make_item(1, "inst-1", 1, 10.0, false);
+        let item2 = make_item(2, "inst-2", 1, 10.0, false);
+        let items = vec![
+            make_stamp_info(&item1, Some(100)),
+            make_stamp_info(&item2, Some(100)),
+        ];
+        let targets = vec![make_reward_target(StampTargetType::Category, 100)];
+
+        // Same price → min_by returns first match
+        let result = find_reward_item(&items, &targets, &RewardStrategy::Economizador);
+        assert_eq!(result, Some("inst-1".to_string()));
     }
 }

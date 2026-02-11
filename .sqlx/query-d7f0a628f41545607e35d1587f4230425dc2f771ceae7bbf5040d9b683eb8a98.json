@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO stamp_target (stamp_activity_id, target_type, target_id) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "d7f0a628f41545607e35d1587f4230425dc2f771ceae7bbf5040d9b683eb8a98"
+}

@@ -782,7 +782,8 @@ export type CommandErrorCode =
   | 'DUPLICATE_COMMAND'
   | 'INTERNAL_ERROR'
   | 'INVALID_OPERATION'
-  | 'TABLE_OCCUPIED';
+  | 'TABLE_OCCUPIED'
+  | 'INSUFFICIENT_STAMPS';
 
 // ============================================================================
 // Sync Types

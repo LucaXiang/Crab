@@ -36,6 +36,9 @@ pub enum ManagerError {
     #[error("Table is already occupied: {0}")]
     TableOccupied(String),
 
+    #[error("Insufficient stamps: {current}/{required}")]
+    InsufficientStamps { current: i32, required: i32 },
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -112,6 +115,10 @@ impl From<ManagerError> for CommandError {
             ),
             ManagerError::InvalidOperation(msg) => (CommandErrorCode::InvalidOperation, msg),
             ManagerError::TableOccupied(msg) => (CommandErrorCode::TableOccupied, msg),
+            ManagerError::InsufficientStamps { current, required } => (
+                CommandErrorCode::InsufficientStamps,
+                format!("{}/{}", current, required),
+            ),
             ManagerError::Internal(msg) => (CommandErrorCode::InternalError, msg),
         };
         CommandError::new(code, message)
@@ -130,6 +137,7 @@ impl From<OrderError> for ManagerError {
             OrderError::InvalidAmount => ManagerError::InvalidAmount,
             OrderError::InvalidOperation(msg) => ManagerError::InvalidOperation(msg),
             OrderError::TableOccupied(msg) => ManagerError::TableOccupied(msg),
+            OrderError::InsufficientStamps { current, required } => ManagerError::InsufficientStamps { current, required },
             OrderError::Storage(msg) => ManagerError::Internal(msg),
         }
     }

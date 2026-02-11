@@ -41,6 +41,9 @@ pub enum OrderError {
     #[error("Table is already occupied: {0}")]
     TableOccupied(String),
 
+    #[error("Insufficient stamps: {current}/{required}")]
+    InsufficientStamps { current: i32, required: i32 },
+
     #[error("Storage error: {0}")]
     Storage(String),
 }

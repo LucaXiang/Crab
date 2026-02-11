@@ -495,9 +495,13 @@ impl OrdersManager {
                     OrderError::InvalidOperation("Database not available for stamp queries".to_string())
                 })?;
 
-                // Query the stamp activity by iterating activities of the group
-                // (there is no find_activity_by_id, so we query by looking up via all activities)
-                // Actually, we need a simpler approach: query activity directly
+                // Load snapshot to get member_id for stamp validation
+                let snapshot = self.storage.get_snapshot(order_id)?
+                    .ok_or_else(|| OrderError::OrderNotFound(order_id.clone()))?;
+                let member_id = snapshot.member_id.ok_or_else(|| {
+                    OrderError::InvalidOperation("Must have a member linked to redeem stamps".to_string())
+                })?;
+
                 let activity = futures::executor::block_on(
                     sqlx::query_as::<_, shared::models::StampActivity>(
                         "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ? AND is_active = 1",
@@ -507,6 +511,50 @@ impl OrdersManager {
                 )
                 .map_err(|e| OrderError::InvalidOperation(format!("Failed to query stamp activity: {e}")))?
                 .ok_or_else(|| OrderError::InvalidOperation(format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
+
+                // Validate member has enough stamps (DB stamps + order bonus)
+                let stamp_progress = futures::executor::block_on(
+                    crate::db::repository::stamp::find_progress(pool, member_id, *stamp_activity_id),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query stamp progress: {e}")))?;
+                let current_stamps = stamp_progress.map(|p| p.current_stamps).unwrap_or(0);
+
+                // Count order bonus: qualifying non-comped items in the order
+                let stamp_targets = futures::executor::block_on(
+                    crate::db::repository::marketing_group::find_stamp_targets(pool, *stamp_activity_id),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query stamp targets: {e}")))?;
+                let items_with_category: Vec<_> = snapshot.items.iter()
+                    .map(|item| crate::marketing::stamp_tracker::StampItemInfo {
+                        item,
+                        category_id: item.category_id,
+                    })
+                    .collect();
+                let order_bonus = crate::marketing::stamp_tracker::count_stamps_for_order(
+                    &items_with_category, &stamp_targets,
+                );
+                let effective_stamps = current_stamps + order_bonus;
+
+                if effective_stamps < activity.stamps_required {
+                    return Err(ManagerError::InsufficientStamps {
+                        current: effective_stamps,
+                        required: activity.stamps_required,
+                    });
+                }
+
+                // Match mode requires excess: after comping the item, stamps must still meet threshold.
+                // e.g. 9 DB + 1 order = 10/10 → NO excess → must use selection mode (add new item).
+                if let Some(cid) = &comp_existing_instance_id {
+                    let comp_item = snapshot.items.iter().find(|i| i.instance_id == *cid);
+                    let comp_qty = comp_item.map(|i| i.quantity).unwrap_or(1);
+                    let post_comp_effective = effective_stamps - comp_qty;
+                    if post_comp_effective < activity.stamps_required {
+                        return Err(ManagerError::InsufficientStamps {
+                            current: post_comp_effective,
+                            required: activity.stamps_required,
+                        });
+                    }
+                }
 
                 let mut reward_targets = futures::executor::block_on(
                     crate::db::repository::marketing_group::find_reward_targets(pool, *stamp_activity_id),
@@ -714,8 +762,9 @@ impl OrdersManager {
                 }
             };
 
-            let earned =
-                crate::marketing::stamp_tracker::count_stamps_for_order(&items_with_category, &stamp_targets);
+            let earned = crate::marketing::stamp_tracker::count_stamps_for_order(
+                &items_with_category, &stamp_targets,
+            );
 
             if earned > 0 {
                 match futures::executor::block_on(crate::db::repository::stamp::add_stamps(
@@ -759,6 +808,7 @@ impl OrdersManager {
                 pool,
                 member_id,
                 activity.id,
+                activity.stamps_required,
                 activity.is_cyclic,
                 now,
             )) {

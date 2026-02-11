@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO member_stamp_progress (member_id, stamp_activity_id, current_stamps, completed_cycles, updated_at) VALUES (?1, ?2, 0, 0, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "496860ef88b6369af15220116324100ddfe3a27f6076e5bce24b4c6e354252ef"
+}

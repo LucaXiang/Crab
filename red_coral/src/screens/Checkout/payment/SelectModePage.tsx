@@ -6,6 +6,7 @@ import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensil
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { CommandFailedError } from '@/core/stores/order/commands/sendCommand';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
 import { useRetailServiceType, setRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
@@ -21,6 +22,7 @@ import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { ConfirmDialog } from '@/shared/components';
 import { MemberLinkModal } from '../MemberLinkModal';
 import { StampRewardPickerModal } from './StampRewardPickerModal';
+import { StampRedeemModal } from './StampRedeemModal';
 
 /** Find order items matching stamp reward_targets that are not comped */
 function getMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
@@ -78,6 +80,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [stampProgress, setStampProgress] = useState<MemberStampProgressDetail[]>([]);
   const [rewardPickerActivity, setRewardPickerActivity] = useState<MemberStampProgressDetail | null>(null);
+  const [stampRedeemActivity, setStampRedeemActivity] = useState<MemberStampProgressDetail | null>(null);
 
   // Fetch stamp progress when member is linked
   useEffect(() => {
@@ -104,8 +107,10 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         const detail = await getMemberDetail(order.member_id);
         setStampProgress(detail.stamp_progress);
       }
-    } catch {
-      toast.error(t('checkout.stamp.redeem_failed'));
+    } catch (e) {
+      toast.error(e instanceof CommandFailedError && e.code === 'INSUFFICIENT_STAMPS'
+        ? t('checkout.stamp.insufficient_stamps')
+        : t('checkout.stamp.redeem_failed'));
     }
   }, [order.order_id, order.items, order.member_id, t]);
 
@@ -119,8 +124,10 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         const detail = await getMemberDetail(order.member_id);
         setStampProgress(detail.stamp_progress);
       }
-    } catch {
-      toast.error(t('checkout.stamp.redeem_failed'));
+    } catch (e) {
+      toast.error(e instanceof CommandFailedError && e.code === 'INSUFFICIENT_STAMPS'
+        ? t('checkout.stamp.insufficient_stamps')
+        : t('checkout.stamp.redeem_failed'));
     }
   }, [order.order_id, order.member_id, t]);
 
@@ -133,8 +140,10 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         const detail = await getMemberDetail(order.member_id);
         setStampProgress(detail.stamp_progress);
       }
-    } catch {
-      toast.error(t('checkout.stamp.redeem_failed'));
+    } catch (e) {
+      toast.error(e instanceof CommandFailedError && e.code === 'INSUFFICIENT_STAMPS'
+        ? t('checkout.stamp.insufficient_stamps')
+        : t('checkout.stamp.redeem_failed'));
     }
   }, [order.order_id, order.member_id, t]);
 
@@ -504,7 +513,6 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 const alreadyRedeemed = order.stamp_redemptions?.some(
                   (r) => r.stamp_activity_id === sp.stamp_activity_id
                 );
-                // Count matching items from current order for dynamic progress
                 const orderBonus = order.items
                   .filter((item) => !item.is_comped && sp.stamp_targets.some((t) =>
                     t.target_type === 'PRODUCT' ? t.target_id === item.id
@@ -516,30 +524,24 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 const canRedeem = effectiveStamps >= sp.stamps_required && !alreadyRedeemed;
                 const progressPercent = Math.min(100, Math.round((effectiveStamps / sp.stamps_required) * 100));
 
-                // Dual-mode logic for Eco/Gen strategies
-                const isDesignated = sp.reward_strategy === 'DESIGNATED';
-                const matchingItems = !isDesignated ? getMatchingItems(order.items, sp) : [];
-                const hasExcess = orderBonus > Math.max(0, sp.stamps_required - sp.current_stamps);
-                // Match mode available when order has matching items with excess stamps
-                const showMatchButton = !isDesignated && canRedeem && hasExcess && matchingItems.length > 0;
-                // Selection mode always available for Eco/Gen
-                const showSelectButton = !isDesignated && canRedeem && (sp.reward_targets?.length > 0);
-
                 return (
                   <div
                     key={sp.stamp_activity_id}
+                    onClick={() => {
+                      if (canRedeem) setStampRedeemActivity(sp);
+                    }}
                     className={`h-40 rounded-2xl shadow-xl transition-all relative flex flex-col items-center justify-center gap-2 ${
                       alreadyRedeemed
                         ? 'bg-violet-100 text-violet-600'
                         : canRedeem
-                          ? 'bg-violet-500 text-white hover:shadow-2xl'
+                          ? 'bg-violet-500 text-white hover:shadow-2xl hover:scale-[1.02] cursor-pointer'
                           : 'bg-gray-100 text-gray-600'
                     }`}
                   >
                     {/* Cancel button for redeemed */}
                     {alreadyRedeemed && (
                       <button
-                        onClick={() => handleCancelStampRedemption(sp.stamp_activity_id)}
+                        onClick={(e) => { e.stopPropagation(); handleCancelStampRedemption(sp.stamp_activity_id); }}
                         disabled={isProcessing}
                         className="absolute top-2 right-2 p-1.5 rounded-full bg-violet-200 hover:bg-violet-300 text-violet-700 transition-colors disabled:opacity-50"
                         title={t('checkout.stamp.cancel')}
@@ -570,50 +572,15 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                       />
                     </div>
 
-                    {/* Action buttons */}
+                    {/* Status label */}
                     {alreadyRedeemed ? (
                       <div className="text-xs font-medium bg-violet-200/50 px-3 py-0.5 rounded-full">
                         {t('checkout.stamp.already_redeemed')}
                       </div>
                     ) : canRedeem ? (
-                      isDesignated ? (
-                        <button
-                          onClick={() => handleDirectRedeem(sp.stamp_activity_id)}
-                          disabled={isProcessing}
-                          className="text-xs font-medium bg-white/20 hover:bg-white/30 px-3 py-0.5 rounded-full transition-colors disabled:opacity-50"
-                        >
-                          {t('checkout.stamp.redeem')}
-                        </button>
-                      ) : (
-                        <div className="flex gap-1.5">
-                          {showMatchButton ? (
-                            <button
-                              onClick={() => handleMatchRedeem(sp)}
-                              disabled={isProcessing}
-                              className="text-xs font-medium bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full transition-colors disabled:opacity-50"
-                            >
-                              {t('checkout.stamp.match_redeem')}
-                            </button>
-                          ) : matchingItems.length > 0 ? (
-                            <button
-                              onClick={() => handleMatchRedeem(sp)}
-                              disabled={isProcessing}
-                              className="text-xs font-medium bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full transition-colors disabled:opacity-50"
-                            >
-                              {t('checkout.stamp.redeem')}
-                            </button>
-                          ) : null}
-                          {showSelectButton && (
-                            <button
-                              onClick={() => setRewardPickerActivity(sp)}
-                              disabled={isProcessing}
-                              className="text-xs font-medium bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full transition-colors disabled:opacity-50"
-                            >
-                              {t('checkout.stamp.select_redeem')}
-                            </button>
-                          )}
-                        </div>
-                      )
+                      <div className="text-xs font-medium bg-white/20 px-3 py-0.5 rounded-full">
+                        {t('checkout.stamp.redeem')}
+                      </div>
                     ) : null}
                   </div>
                 );
@@ -686,6 +653,37 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
           onClose={() => setRewardPickerActivity(null)}
         />
       )}
+
+      {stampRedeemActivity && (() => {
+        const spa = stampRedeemActivity;
+        const isDesignated = spa.reward_strategy === 'DESIGNATED';
+        const matchingItems = !isDesignated ? getMatchingItems(order.items, spa) : [];
+        const oBonus = order.items
+          .filter((item) => !item.is_comped && spa.stamp_targets.some((t) =>
+            t.target_type === 'PRODUCT' ? t.target_id === item.id
+            : t.target_type === 'CATEGORY' ? t.target_id === item.category_id
+            : false
+          ))
+          .reduce((sum, item) => sum + item.quantity, 0);
+        const excess = (spa.current_stamps + oBonus) > spa.stamps_required;
+        const eff = spa.current_stamps + oBonus;
+
+        return (
+          <StampRedeemModal
+            isOpen={!!stampRedeemActivity}
+            activity={spa}
+            matchingItems={matchingItems}
+            hasExcess={excess}
+            effectiveStamps={eff}
+            orderBonus={oBonus}
+            isProcessing={isProcessing}
+            onMatchRedeem={() => handleMatchRedeem(spa)}
+            onSelectRedeem={() => setRewardPickerActivity(spa)}
+            onDirectRedeem={() => handleDirectRedeem(spa.stamp_activity_id)}
+            onClose={() => setStampRedeemActivity(null)}
+          />
+        );
+      })()}
     </>
   );
 };

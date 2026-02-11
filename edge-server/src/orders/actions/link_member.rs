@@ -7,11 +7,10 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::marketing::mg_calculator;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::services::catalog_service::ProductMeta;
 use shared::models::MgDiscountRule;
-use shared::order::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType, OrderStatus};
+use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// LinkMember action
 #[derive(Debug, Clone)]
@@ -66,24 +65,9 @@ impl CommandHandler for LinkMemberAction {
             ));
         }
 
-        // 4. Calculate MG discounts for existing items
-        let mut mg_item_discounts = Vec::new();
-        if !self.mg_rules.is_empty() {
-            for item in &snapshot.items {
-                if item.is_comped {
-                    continue;
-                }
-                let category_id = self.product_metadata.get(&item.id).map(|m| m.category_id);
-                let result =
-                    mg_calculator::calculate_mg_discount(item.unit_price, item.id, category_id, &self.mg_rules);
-                if !result.applied_rules.is_empty() {
-                    mg_item_discounts.push(MgItemDiscount {
-                        instance_id: item.instance_id.clone(),
-                        applied_mg_rules: result.applied_rules,
-                    });
-                }
-            }
-        }
+        // 4. MG discounts are NOT applied retroactively to existing items.
+        // Only items added after member link will get MG discounts (via AddItems).
+        let mg_item_discounts = Vec::new();
 
         // 5. Generate event
         let seq = ctx.next_sequence();
@@ -197,13 +181,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_link_member_with_mg_discounts() {
+    async fn test_link_member_no_retroactive_mg_discounts() {
+        // MG discounts are NOT applied retroactively to existing items.
+        // Only items added after member link get MG discounts (via AddItems).
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        // Add an item to the order
         snapshot.items.push(shared::order::CartItemSnapshot {
             id: 100,
             instance_id: "inst-100".to_string(),
@@ -259,10 +244,7 @@ mod tests {
             mg_item_discounts, ..
         } = &events[0].payload
         {
-            assert_eq!(mg_item_discounts.len(), 1);
-            assert_eq!(mg_item_discounts[0].instance_id, "inst-100");
-            assert_eq!(mg_item_discounts[0].applied_mg_rules.len(), 1);
-            assert_eq!(mg_item_discounts[0].applied_mg_rules[0].calculated_amount, 5.0);
+            assert!(mg_item_discounts.is_empty());
         } else {
             panic!("Expected MemberLinked payload");
         }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE member_stamp_progress SET current_stamps = current_stamps + ?1, last_stamp_at = ?2, updated_at = ?2 WHERE member_id = ?3 AND stamp_activity_id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "cef9a06349e902de82d84c338374fa4563f58b56e57d28ac1485ef5726efe057"
+}

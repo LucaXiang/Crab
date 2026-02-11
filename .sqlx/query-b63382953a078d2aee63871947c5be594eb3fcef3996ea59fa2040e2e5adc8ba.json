@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM stamp_reward_target WHERE stamp_activity_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b63382953a078d2aee63871947c5be594eb3fcef3996ea59fa2040e2e5adc8ba"
+}

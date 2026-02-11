@@ -374,6 +374,7 @@ pub enum CommandErrorCode {
     DuplicateCommand,
     InternalError,
     TableOccupied,
+    InsufficientStamps,
     // Storage errors (maps to ErrorCode 94xx)
     StorageFull,
     OutOfMemory,

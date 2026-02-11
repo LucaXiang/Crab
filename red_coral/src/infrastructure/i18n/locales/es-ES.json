@@ -624,6 +624,7 @@
       "redeem": "Canjear recompensa",
       "redeemed": "Recompensa canjeada",
       "redeem_failed": "Error al canjear",
+      "insufficient_stamps": "Sellos insuficientes para canjear",
       "already_redeemed": "Ya canjeado",
       "cancel": "Cancelar canje",
       "cancel_success": "Canje cancelado",
@@ -631,8 +632,11 @@
       "match_redeem": "Invitar existente",
       "select_redeem": "Elegir producto",
       "select_reward": "Seleccionar producto de recompensa",
-      "reward_quantity": "Canjear {{count}} ud.",
-      "no_reward_products": "No hay productos de recompensa disponibles"
+      "reward_quantity": "Canjear {count} ud.",
+      "no_reward_products": "No hay productos de recompensa disponibles",
+      "progress_detail": "{effective} / {required} sellos (+{bonus} del pedido)",
+      "match_desc": "Invitar {name} ({price})",
+      "select_desc": "Elegir de la lista de productos de recompensa"
     },
     "breakdown": {
       "comp": "Invitaciones",

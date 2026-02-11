@@ -55,7 +55,12 @@ export const useCartStore = create<CartStore>((set, get) => ({
       if (existingIndex >= 0) {
         const newCart = [...state.cart];
         const item = newCart[existingIndex];
-        newCart[existingIndex] = { ...item, quantity: item.quantity + quantity };
+        const newQty = item.quantity + quantity;
+        newCart[existingIndex] = {
+          ...item,
+          quantity: newQty,
+          line_total: Currency.round2(Currency.mul(item.unit_price, newQty)).toNumber(),
+        };
         return { cart: newCart };
       }
 
@@ -97,11 +102,15 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   incrementItemQuantity: (instanceId: string, delta: number) => {
     set((state) => ({
-      cart: state.cart.map((item) =>
-        item.instance_id === instanceId
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
-      ),
+      cart: state.cart.map((item) => {
+        if (item.instance_id !== instanceId) return item;
+        const newQty = Math.max(1, item.quantity + delta);
+        return {
+          ...item,
+          quantity: newQty,
+          line_total: Currency.round2(Currency.mul(item.unit_price, newQty)).toNumber(),
+        };
+      }),
     }));
     get().calculateTotal();
   },
@@ -110,9 +119,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
   setItemQuantity: (instanceId: string, quantity: number) => {
     const safeQty = Math.max(1, Math.floor(quantity));
     set((state) => ({
-      cart: state.cart.map((item) =>
-        item.instance_id === instanceId ? { ...item, quantity: safeQty } : item
-      ),
+      cart: state.cart.map((item) => {
+        if (item.instance_id !== instanceId) return item;
+        return {
+          ...item,
+          quantity: safeQty,
+          line_total: Currency.round2(Currency.mul(item.unit_price, safeQty)).toNumber(),
+        };
+      }),
     }));
     get().calculateTotal();
   },

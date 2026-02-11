@@ -8,7 +8,17 @@
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { checkCommandLock } from '@/core/hooks/useCommandLock';
 import { logger } from '@/utils/logger';
-import type { OrderCommand, CommandResponse } from '@/core/domain/types/orderEvent';
+import type { OrderCommand, CommandResponse, CommandErrorCode } from '@/core/domain/types/orderEvent';
+
+/** Error thrown by ensureSuccess with the backend error code preserved. */
+export class CommandFailedError extends Error {
+  code: CommandErrorCode;
+  constructor(code: CommandErrorCode, message: string) {
+    super(message);
+    this.name = 'CommandFailedError';
+    this.code = code;
+  }
+}
 
 /**
  * Send an order command to the backend.
@@ -50,8 +60,9 @@ export async function sendCommand(command: OrderCommand): Promise<CommandRespons
  */
 export function ensureSuccess(response: CommandResponse, context: string): void {
   if (!response.success) {
+    const code = response.error?.code ?? 'INTERNAL_ERROR';
     const message = response.error?.message || `${context} failed`;
-    logger.error(`OrderOps ${context}: ${message}`);
-    throw new Error(message);
+    logger.error(`OrderOps ${context}: [${code}] ${message}`);
+    throw new CommandFailedError(code, message);
   }
 }

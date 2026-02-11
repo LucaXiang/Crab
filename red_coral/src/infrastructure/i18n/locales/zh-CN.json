@@ -627,6 +627,7 @@
       "redeem": "兑换奖励",
       "redeemed": "集章奖励已兑换",
       "redeem_failed": "兑换失败",
+      "insufficient_stamps": "集章数量不足，无法兑换",
       "already_redeemed": "已兑换",
       "cancel": "取消兑换",
       "cancel_success": "已取消集章兑换",
@@ -634,8 +635,11 @@
       "match_redeem": "匹配赠送",
       "select_redeem": "选择赠送",
       "select_reward": "选择奖励商品",
-      "reward_quantity": "可兑换 {{count}} 件",
-      "no_reward_products": "暂无可兑换商品"
+      "reward_quantity": "可兑换 {count} 件",
+      "no_reward_products": "暂无可兑换商品",
+      "progress_detail": "{effective} / {required} 章（本单 +{bonus}）",
+      "match_desc": "赠送 {name}（{price}）",
+      "select_desc": "从奖励商品列表中选择"
     },
     "breakdown": {
       "comp": "赠送减免",

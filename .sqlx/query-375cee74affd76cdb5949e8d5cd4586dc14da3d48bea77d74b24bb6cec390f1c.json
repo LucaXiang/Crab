@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mg_discount_rule SET is_active = 0, updated_at = ? WHERE id = ? AND is_active = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "375cee74affd76cdb5949e8d5cd4586dc14da3d48bea77d74b24bb6cec390f1c"
+}
