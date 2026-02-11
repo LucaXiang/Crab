@@ -70,6 +70,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
           rule_discount_amount: 0,
           rule_surcharge_amount: 0,
           applied_rules: [],
+          applied_mg_rules: [],
           unit_price: effectivePrice,
           line_total: Currency.round2(Currency.mul(effectivePrice, quantity)).toNumber(),
           tax: 0,

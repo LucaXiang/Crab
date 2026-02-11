@@ -48,6 +48,9 @@ export type {
   TableReassignedPayload,
   OrderInfoUpdatedPayload,
   RuleSkipToggledPayload,
+  MemberLinkedPayload,
+  MemberUnlinkedPayload,
+  StampRedeemedPayload,
   // Command types
   OrderCommand,
   OrderCommandPayload,
@@ -68,6 +71,9 @@ export type {
   MergeOrdersCommand,
   UpdateOrderInfoCommand,
   ToggleRuleSkipCommand,
+  LinkMemberCommand,
+  UnlinkMemberCommand,
+  RedeemStampCommand,
   // Response types
   CommandResponse,
   CommandError,

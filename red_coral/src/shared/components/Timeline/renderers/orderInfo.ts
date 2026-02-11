@@ -4,10 +4,13 @@ import type {
   OrderDiscountAppliedPayload,
   OrderSurchargeAppliedPayload,
   OrderNoteAddedPayload,
+  MemberLinkedPayload,
+  MemberUnlinkedPayload,
+  StampRedeemedPayload,
 } from '@/core/domain/types/orderEvent';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { Currency } from '@/utils/currency';
-import { Edit3, Tag } from 'lucide-react';
+import { Edit3, Tag, UserPlus, UserMinus, Award } from 'lucide-react';
 import type { EventRenderer, DetailTag } from './types';
 
 export const OrderInfoUpdatedRenderer: EventRenderer<OrderInfoUpdatedPayload> = {
@@ -137,6 +140,49 @@ export const OrderNoteAddedRenderer: EventRenderer<OrderNoteAddedPayload> = {
       details,
       icon: Edit3,
       colorClass: 'bg-blue-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+export const MemberLinkedRenderer: EventRenderer<MemberLinkedPayload> = {
+  render(event, payload, t) {
+    return {
+      title: t('timeline.member_linked'),
+      summary: payload.member_name,
+      details: [
+        `${t('timeline.labels.marketing_group')}: ${payload.marketing_group_name}`,
+      ],
+      icon: UserPlus,
+      colorClass: 'bg-teal-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+export const MemberUnlinkedRenderer: EventRenderer<MemberUnlinkedPayload> = {
+  render(event, payload, t) {
+    return {
+      title: t('timeline.member_unlinked'),
+      summary: payload.previous_member_name,
+      details: [],
+      icon: UserMinus,
+      colorClass: 'bg-gray-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+export const StampRedeemedRenderer: EventRenderer<StampRedeemedPayload> = {
+  render(event, payload, t) {
+    return {
+      title: t('timeline.stamp_redeemed'),
+      summary: payload.stamp_activity_name,
+      details: [
+        `${t('timeline.labels.reward_strategy')}: ${payload.reward_strategy}`,
+      ],
+      icon: Award,
+      colorClass: 'bg-amber-400',
       timestamp: event.timestamp,
     };
   }

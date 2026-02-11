@@ -19,7 +19,7 @@ import { ItemsAddedRenderer, ItemModifiedRenderer, ItemRemovedRenderer, ItemComp
 import { PaymentAddedRenderer, PaymentCancelledRenderer } from './payments';
 import { ItemSplitRenderer, AmountSplitRenderer, AaSplitStartedRenderer, AaSplitPaidRenderer, AaSplitCancelledRenderer } from './splits';
 import { OrderMergedRenderer, OrderMovedRenderer, OrderMovedOutRenderer, OrderMergedOutRenderer, TableReassignedRenderer } from './tableAndMerge';
-import { OrderInfoUpdatedRenderer, RuleSkipToggledRenderer, OrderDiscountAppliedRenderer, OrderSurchargeAppliedRenderer, OrderNoteAddedRenderer } from './orderInfo';
+import { OrderInfoUpdatedRenderer, RuleSkipToggledRenderer, OrderDiscountAppliedRenderer, OrderSurchargeAppliedRenderer, OrderNoteAddedRenderer, MemberLinkedRenderer, MemberUnlinkedRenderer, StampRedeemedRenderer } from './orderInfo';
 
 import type { EventRenderer as EventRendererType } from './types';
 import type { TranslateFn } from './types';
@@ -52,6 +52,9 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRendererType<any>> = {
   ORDER_DISCOUNT_APPLIED: OrderDiscountAppliedRenderer,
   ORDER_SURCHARGE_APPLIED: OrderSurchargeAppliedRenderer,
   ORDER_NOTE_ADDED: OrderNoteAddedRenderer,
+  MEMBER_LINKED: MemberLinkedRenderer,
+  MEMBER_UNLINKED: MemberUnlinkedRenderer,
+  STAMP_REDEEMED: StampRedeemedRenderer,
 };
 
 /**
