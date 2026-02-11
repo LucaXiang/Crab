@@ -1,15 +1,17 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
-import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp } from 'lucide-react';
+import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp, Crown, UserCheck, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
 import { DeleteReasonModal } from '@/screens/Checkout/DeleteReasonModal';
+import { MemberLinkModal } from '@/screens/Checkout/MemberLinkModal';
 import * as orderOps from '@/core/stores/order/commands';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
 import { formatCurrency, Currency } from '@/utils/currency';
+import { toast } from '@/presentation/components/Toast';
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
 const TimelineList = lazy(() =>
@@ -33,7 +35,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const [editingItem, setEditingItem] = useState<{ item: CartItem; index: number } | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ index: number; item: CartItem; authorizer?: { id: number; name: string } } | null>(null);
-  
+  const [showMemberModal, setShowMemberModal] = useState(false);
+
   // 直接从 store 获取 timeline（不依赖 order.timeline）
   const timeline = useOrderTimeline(order.order_id);
 
@@ -165,6 +168,43 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         </div>
       </div>
 
+      {/* Member Strip */}
+      <div className="px-4 py-2.5 border-b border-gray-200 bg-gray-50/80">
+        {order.member_id ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <Crown size={16} className="text-violet-500 shrink-0" />
+              <span className="font-bold text-sm text-gray-800 truncate">{order.member_name}</span>
+              <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+                {order.marketing_group_name}
+              </span>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await orderOps.unlinkMember(order.order_id);
+                  toast.success(t('checkout.member.unlinked'));
+                } catch {
+                  toast.error(t('checkout.member.unlink_failed'));
+                }
+              }}
+              className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0 ml-2"
+              title={t('checkout.member.unlink')}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowMemberModal(true)}
+            className="w-full flex items-center justify-center gap-2 py-1 text-sm font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
+          >
+            <UserCheck size={16} />
+            {t('checkout.member.link')}
+          </button>
+        )}
+      </div>
+
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
         <button
@@ -248,6 +288,19 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             </span>
             <span className="text-sm font-medium text-amber-600">
               -{formatCurrency(totalRuleDiscount)}
+            </span>
+          </div>
+        )}
+
+        {/* 4b. MG discount (会员折扣) */}
+        {order.mg_discount_amount > 0 && (
+          <div className="flex justify-between items-center">
+            <span className="text-violet-600 font-medium text-sm flex items-center gap-1">
+              <Crown size={12} />
+              {order.marketing_group_name ?? t('checkout.member.link')}
+            </span>
+            <span className="text-sm font-medium text-violet-600">
+              -{formatCurrency(order.mg_discount_amount)}
             </span>
           </div>
         )}
@@ -350,6 +403,13 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         itemName={pendingDelete?.item.name ?? ''}
         onClose={() => setPendingDelete(null)}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* Member Link Modal */}
+      <MemberLinkModal
+        isOpen={showMemberModal}
+        orderId={order.order_id}
+        onClose={() => setShowMemberModal(false)}
       />
     </div>
   );

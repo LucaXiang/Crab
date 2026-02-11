@@ -626,6 +626,7 @@
       "manual_discount": "手动折扣",
       "rule_discount": "规则折扣",
       "rule_surcharge": "规则附加费",
+      "mg_discount": "会员折扣",
       "order_discount": "整单折扣",
       "order_surcharge": "整单附加费"
     },
