@@ -4,6 +4,7 @@ use super::types::{
     CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentRecord,
     PaymentSummaryItem, ServiceType, SplitItem, VoidType,
 };
+use super::AppliedMgRule;
 use serde::{Deserialize, Serialize};
 
 /// Order event - immutable audit record
@@ -459,6 +460,9 @@ pub enum EventPayload {
         member_name: String,
         marketing_group_id: i64,
         marketing_group_name: String,
+        /// Pre-calculated MG discounts for existing items
+        #[serde(default)]
+        mg_item_discounts: Vec<MgItemDiscount>,
     },
 
     MemberUnlinked {
@@ -472,6 +476,13 @@ pub enum EventPayload {
         reward_item_id: String,
         reward_strategy: String,
     },
+}
+
+/// Pre-calculated MG discount for a single item (carried in MemberLinked event)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MgItemDiscount {
+    pub instance_id: String,
+    pub applied_mg_rules: Vec<AppliedMgRule>,
 }
 
 impl OrderEvent {

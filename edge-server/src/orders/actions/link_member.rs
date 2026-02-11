@@ -1,13 +1,17 @@
 //! LinkMember command handler
 //!
-//! Links a member to an order and records the association.
-//! MG discount calculation is done by the applier via recalculate_totals.
+//! Links a member to an order and calculates MG discounts for existing items.
+//! MG discount calculation is done here (CommandHandler = can access metadata),
+//! results are stored in the event payload for the pure-function applier.
 
 use async_trait::async_trait;
+use std::collections::HashMap;
 
+use crate::marketing::mg_calculator;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::services::catalog_service::ProductMeta;
 use shared::models::MgDiscountRule;
-use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
+use shared::order::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType, OrderStatus};
 
 /// LinkMember action
 #[derive(Debug, Clone)]
@@ -19,6 +23,8 @@ pub struct LinkMemberAction {
     pub marketing_group_name: String,
     /// Active MG discount rules, injected by OrdersManager
     pub mg_rules: Vec<MgDiscountRule>,
+    /// Product metadata for MG rule scope matching (category_id)
+    pub product_metadata: HashMap<i64, ProductMeta>,
 }
 
 #[async_trait]
@@ -60,7 +66,26 @@ impl CommandHandler for LinkMemberAction {
             ));
         }
 
-        // 4. Generate event
+        // 4. Calculate MG discounts for existing items
+        let mut mg_item_discounts = Vec::new();
+        if !self.mg_rules.is_empty() {
+            for item in &snapshot.items {
+                if item.is_comped {
+                    continue;
+                }
+                let category_id = self.product_metadata.get(&item.id).map(|m| m.category_id);
+                let result =
+                    mg_calculator::calculate_mg_discount(item.unit_price, item.id, category_id, &self.mg_rules);
+                if !result.applied_rules.is_empty() {
+                    mg_item_discounts.push(MgItemDiscount {
+                        instance_id: item.instance_id.clone(),
+                        applied_mg_rules: result.applied_rules,
+                    });
+                }
+            }
+        }
+
+        // 5. Generate event
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
@@ -75,6 +100,7 @@ impl CommandHandler for LinkMemberAction {
                 member_name: self.member_name.clone(),
                 marketing_group_id: self.marketing_group_id,
                 marketing_group_name: self.marketing_group_name.clone(),
+                mg_item_discounts,
             },
         );
 
@@ -87,6 +113,7 @@ mod tests {
     use super::*;
     use crate::orders::storage::OrderStorage;
     use crate::orders::traits::CommandContext;
+    use shared::models::price_rule::{AdjustmentType, ProductScope};
     use shared::order::OrderSnapshot;
 
     fn create_test_metadata() -> CommandMetadata {
@@ -95,6 +122,29 @@ mod tests {
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
+        }
+    }
+
+    fn make_mg_rule(
+        id: i64,
+        product_scope: ProductScope,
+        target_id: Option<i64>,
+        adjustment_type: AdjustmentType,
+        adjustment_value: f64,
+    ) -> MgDiscountRule {
+        MgDiscountRule {
+            id,
+            marketing_group_id: 1,
+            name: format!("rule_{}", id),
+            display_name: format!("Rule {}", id),
+            receipt_name: format!("R{}", id),
+            product_scope,
+            target_id,
+            adjustment_type,
+            adjustment_value,
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
         }
     }
 
@@ -117,6 +167,7 @@ mod tests {
             marketing_group_id: 1,
             marketing_group_name: "VIP".to_string(),
             mg_rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -132,12 +183,84 @@ mod tests {
             member_name,
             marketing_group_id,
             marketing_group_name,
+            mg_item_discounts,
         } = &event.payload
         {
             assert_eq!(*member_id, 42);
             assert_eq!(member_name, "Alice");
             assert_eq!(*marketing_group_id, 1);
             assert_eq!(marketing_group_name, "VIP");
+            assert!(mg_item_discounts.is_empty());
+        } else {
+            panic!("Expected MemberLinked payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_link_member_with_mg_discounts() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        // Add an item to the order
+        snapshot.items.push(shared::order::CartItemSnapshot {
+            id: 100,
+            instance_id: "inst-100".to_string(),
+            name: "Steak".to_string(),
+            price: 50.0,
+            original_price: 50.0,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            applied_mg_rules: vec![],
+            unit_price: 50.0,
+            line_total: 50.0,
+            tax: 0.0,
+            tax_rate: 0,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        });
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = LinkMemberAction {
+            order_id: "order-1".to_string(),
+            member_id: 42,
+            member_name: "Alice".to_string(),
+            marketing_group_id: 1,
+            marketing_group_name: "VIP".to_string(),
+            mg_rules: vec![make_mg_rule(
+                1,
+                ProductScope::Global,
+                None,
+                AdjustmentType::Percentage,
+                10.0,
+            )],
+            product_metadata: HashMap::new(),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::MemberLinked {
+            mg_item_discounts, ..
+        } = &events[0].payload
+        {
+            assert_eq!(mg_item_discounts.len(), 1);
+            assert_eq!(mg_item_discounts[0].instance_id, "inst-100");
+            assert_eq!(mg_item_discounts[0].applied_mg_rules.len(), 1);
+            assert_eq!(mg_item_discounts[0].applied_mg_rules[0].calculated_amount, 5.0);
         } else {
             panic!("Expected MemberLinked payload");
         }
@@ -162,6 +285,7 @@ mod tests {
             marketing_group_id: 1,
             marketing_group_name: "VIP".to_string(),
             mg_rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -188,6 +312,7 @@ mod tests {
             marketing_group_id: 1,
             marketing_group_name: "VIP".to_string(),
             mg_rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -215,6 +340,7 @@ mod tests {
             marketing_group_id: 1,
             marketing_group_name: "VIP".to_string(),
             mg_rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -242,6 +368,7 @@ mod tests {
             marketing_group_id: 1,
             marketing_group_name: "VIP".to_string(),
             mg_rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -264,6 +391,7 @@ mod tests {
             marketing_group_id: 1,
             marketing_group_name: "VIP".to_string(),
             mg_rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();

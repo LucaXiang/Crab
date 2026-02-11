@@ -318,9 +318,34 @@ fn effective_order_rule_surcharge(snapshot: &OrderSnapshot, subtotal: Decimal) -
     }
 }
 
+/// Compute effective MG discount by re-applying multiplicative stacking from `adjustment_value`.
+/// `after_rules` is the per-unit price after manual discount and price rule adjustments.
+fn effective_mg_discount(item: &CartItemSnapshot, after_rules: Decimal) -> Decimal {
+    if item.applied_mg_rules.is_empty() {
+        return Decimal::ZERO;
+    }
+
+    let mut running = after_rules;
+    for rule in &item.applied_mg_rules {
+        if rule.skipped {
+            continue;
+        }
+        match rule.adjustment_type {
+            AdjustmentType::Percentage => {
+                let rate = to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED;
+                running *= Decimal::ONE - rate;
+            }
+            AdjustmentType::FixedAmount => {
+                running = (running - to_decimal(rule.adjustment_value)).max(Decimal::ZERO);
+            }
+        }
+    }
+    (after_rules - running).max(Decimal::ZERO)
+}
+
 /// Calculate item unit price with precise decimal arithmetic
 ///
-/// Formula: base_price * (1 - manual_discount_percent/100) - rule_discount + rule_surcharge
+/// Formula: base_price * (1 - manual_discount_percent/100) - rule_discount + rule_surcharge - mg_discount
 /// where base_price = original_price (base price for calculations, updated on manual repricing)
 ///
 /// This is the final per-unit price shown to customers
@@ -358,8 +383,14 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     let rule_discount = effective_rule_discount(item, after_manual);
     let rule_surcharge = effective_rule_surcharge(item, base_with_options);
 
-    // Final unit price = base_with_options - discounts + rule surcharges
-    let unit_price = base_with_options - manual_discount - rule_discount + rule_surcharge;
+    // Price after manual + rule adjustments
+    let after_rules = base_with_options - manual_discount - rule_discount + rule_surcharge;
+
+    // MG discount (applied multiplicatively after price rules)
+    let mg_discount = effective_mg_discount(item, after_rules);
+
+    // Final unit price
+    let unit_price = after_rules - mg_discount;
 
     unit_price
         .max(Decimal::ZERO) // Ensure non-negative
@@ -395,6 +426,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let mut subtotal = Decimal::ZERO;
     let mut item_discount_total = Decimal::ZERO;
     let mut item_surcharge_total = Decimal::ZERO;
+    let mut item_mg_discount_total = Decimal::ZERO;
     let mut comp_total = Decimal::ZERO;
     let mut total_tax = Decimal::ZERO;
 
@@ -441,6 +473,34 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         let rule_surcharge = effective_rule_surcharge(item, base_with_options);
         if !item.is_comped {
             item_surcharge_total += rule_surcharge * quantity;
+        }
+
+        // Calculate MG discount (applied after price rules)
+        let after_rules = base_with_options - manual_discount - rule_discount + rule_surcharge;
+        let mg_discount = effective_mg_discount(item, after_rules);
+        if !item.is_comped {
+            item_mg_discount_total += mg_discount * quantity;
+        }
+
+        // Sync calculated_amount in applied_mg_rules
+        {
+            let mut running = after_rules;
+            for rule in item.applied_mg_rules.iter_mut() {
+                if rule.skipped {
+                    continue;
+                }
+                let price_before = running;
+                match rule.adjustment_type {
+                    AdjustmentType::Percentage => {
+                        let rate = to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED;
+                        running *= Decimal::ONE - rate;
+                    }
+                    AdjustmentType::FixedAmount => {
+                        running = (running - to_decimal(rule.adjustment_value)).max(Decimal::ZERO);
+                    }
+                }
+                rule.calculated_amount = to_f64(price_before - running);
+            }
         }
 
         // Sync calculated_amount in applied_rules so snapshot stays consistent
@@ -528,8 +588,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         });
     }
 
-    // Total discount and surcharge (item-level + order-level)
-    let total_discount = item_discount_total + order_discount;
+    // Total discount and surcharge (item-level + MG + order-level)
+    let total_discount = item_discount_total + item_mg_discount_total + order_discount;
     let total_surcharge = item_surcharge_total + order_surcharge;
 
     // Final total (Spanish IVA: tax is already included in subtotal)
@@ -550,6 +610,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.order_manual_surcharge_amount = to_f64(order_manual_surcharge);
     snapshot.order_rule_discount_amount = to_f64(eff_order_rule_discount);
     snapshot.order_rule_surcharge_amount = to_f64(eff_order_rule_surcharge);
+    snapshot.mg_discount_amount = to_f64(item_mg_discount_total);
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);
 

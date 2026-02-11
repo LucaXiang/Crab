@@ -16,6 +16,6 @@ pub mod types;
 pub use applied_mg_rule::AppliedMgRule;
 pub use applied_rule::AppliedRule;
 pub use command::{OrderCommand, OrderCommandPayload};
-pub use event::{EventPayload, OrderEvent, OrderEventType};
+pub use event::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};
 pub use types::*;

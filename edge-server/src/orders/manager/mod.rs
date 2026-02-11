@@ -412,11 +412,31 @@ impl OrdersManager {
                     .filter(|r| is_time_valid(r, now, self.tz))
                     .collect();
                 let product_metadata = self.get_product_metadata_for_items(items);
+
+                // If member is linked, get MG rules for discount calculation
+                let mg_rules = if let Some(pool) = &self.pool {
+                    if let Ok(Some(snapshot)) = self.storage.get_snapshot(order_id) {
+                        if let Some(mg_id) = snapshot.marketing_group_id {
+                            futures::executor::block_on(
+                                crate::db::repository::marketing_group::find_active_rules_by_group(pool, mg_id),
+                            )
+                            .unwrap_or_default()
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                };
+
                 CommandAction::AddItems(super::actions::AddItemsAction {
                     order_id: order_id.clone(),
                     items: items.clone(),
                     rules,
                     product_metadata,
+                    mg_rules,
                 })
             }
             shared::order::OrderCommandPayload::LinkMember { order_id, member_id } => {
@@ -447,6 +467,18 @@ impl OrdersManager {
                 )
                 .map_err(|e| OrderError::InvalidOperation(format!("Failed to query MG rules: {e}")))?;
 
+                // Get product metadata for existing items' MG scope matching
+                let product_metadata = if let Some(catalog) = &self.catalog_service {
+                    if let Ok(Some(snapshot)) = self.storage.get_snapshot(order_id) {
+                        let product_ids: Vec<i64> = snapshot.items.iter().map(|i| i.id).collect();
+                        catalog.get_product_meta_batch(&product_ids)
+                    } else {
+                        HashMap::new()
+                    }
+                } else {
+                    HashMap::new()
+                };
+
                 CommandAction::LinkMember(super::actions::LinkMemberAction {
                     order_id: order_id.clone(),
                     member_id: *member_id,
@@ -454,6 +486,7 @@ impl OrdersManager {
                     marketing_group_id: member.marketing_group_id,
                     marketing_group_name: mg.display_name,
                     mg_rules,
+                    product_metadata,
                 })
             }
             shared::order::OrderCommandPayload::RedeemStamp { order_id, stamp_activity_id, product_id } => {

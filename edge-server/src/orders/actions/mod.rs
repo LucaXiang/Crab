@@ -126,13 +126,9 @@ impl From<&OrderCommand> for CommandAction {
                 // This path should never be reached
                 unreachable!("OpenTable should be handled by OrdersManager, not From<&OrderCommand>")
             }
-            OrderCommandPayload::AddItems { order_id, items } => {
-                CommandAction::AddItems(AddItemsAction {
-                    order_id: order_id.clone(),
-                    items: items.clone(),
-                    rules: vec![], // Rules will be injected by OrdersManager
-                    product_metadata: std::collections::HashMap::new(), // Metadata will be injected by OrdersManager
-                })
+            OrderCommandPayload::AddItems { .. } => {
+                // AddItems is handled specially in OrdersManager to inject rules and metadata
+                unreachable!("AddItems should be handled by OrdersManager, not From<&OrderCommand>")
             }
             OrderCommandPayload::ModifyItem {
                 order_id,

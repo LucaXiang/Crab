@@ -50,6 +50,7 @@ pub(crate) fn add_or_merge_item(snapshot: &mut OrderSnapshot, item: &CartItemSna
         existing.rule_discount_amount = item.rule_discount_amount;
         existing.rule_surcharge_amount = item.rule_surcharge_amount;
         existing.applied_rules = item.applied_rules.clone();
+        existing.applied_mg_rules = item.applied_mg_rules.clone();
     } else {
         // Add new item
         snapshot.items.push(item.clone());

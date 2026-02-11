@@ -133,17 +133,3 @@ pub async fn deactivate(pool: &PgPool, entity_id: &str) -> Result<bool, sqlx::Er
     .await?;
     Ok(result.rows_affected() > 0)
 }
-
-/// 更新 last_refreshed_at
-pub async fn update_last_refreshed(
-    pool: &PgPool,
-    entity_id: &str,
-) -> Result<(), sqlx::Error> {
-    let now = shared::util::now_millis();
-    sqlx::query("UPDATE client_connections SET last_refreshed_at = $1 WHERE entity_id = $2")
-        .bind(now)
-        .bind(entity_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}

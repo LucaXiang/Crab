@@ -404,6 +404,12 @@ export interface OrderNoteAddedPayload {
   previous_note?: string | null;
 }
 
+/** MG 折扣预计算结果 (按商品) */
+export interface MgItemDiscount {
+  instance_id: string;
+  applied_mg_rules: AppliedMgRule[];
+}
+
 /** 会员已关联 */
 export interface MemberLinkedPayload {
   type: 'MEMBER_LINKED';
@@ -411,6 +417,8 @@ export interface MemberLinkedPayload {
   member_name: string;
   marketing_group_id: number;
   marketing_group_name: string;
+  /** 预计算的 MG 折扣 (每个商品) */
+  mg_item_discounts: MgItemDiscount[];
 }
 
 /** 会员已取消关联 */
