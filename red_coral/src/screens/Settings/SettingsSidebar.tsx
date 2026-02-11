@@ -14,13 +14,15 @@ import {
   Users,
   Percent,
   Clock,
+  Crown,
+  UserCheck,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsCategory, useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 
-type SettingsCategory = 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
+type SettingsCategory = 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'MARKETING_GROUPS' | 'MEMBERS' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -133,6 +135,24 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
             category="PRICE_RULES"
             icon={Percent}
             label={t('settings.price_rule.title')}
+          />
+        </ProtectedGate>
+
+        <Divider />
+
+        {/* 营销管理 */}
+        <ProtectedGate permission={Permission.MARKETING_MANAGE}>
+          <CategoryItem
+            category="MARKETING_GROUPS"
+            icon={Crown}
+            label={t('settings.marketing_group.title')}
+          />
+        </ProtectedGate>
+        <ProtectedGate permission={Permission.MARKETING_MANAGE}>
+          <CategoryItem
+            category="MEMBERS"
+            icon={UserCheck}
+            label={t('settings.member.title')}
           />
         </ProtectedGate>
 

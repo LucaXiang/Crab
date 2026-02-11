@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, UserX } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -11,11 +11,12 @@ import { OrderDiscountModal } from '../OrderDiscountModal';
 import { OrderSurchargeModal } from '../OrderSurchargeModal';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { openCashDrawer } from '@/core/services/order/paymentService';
-import { completeOrder, updateOrderInfo } from '@/core/stores/order/commands';
+import { completeOrder, updateOrderInfo, linkMember, unlinkMember } from '@/core/stores/order/commands';
 import { CashPaymentModal } from './CashPaymentModal';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { ConfirmDialog } from '@/shared/components';
+import { MemberLinkModal } from '../MemberLinkModal';
 
 type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL';
 
@@ -59,6 +60,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showSurchargeModal, setShowSurchargeModal] = useState(false);
+  const [showMemberModal, setShowMemberModal] = useState(false);
 
   const handleComplete = useCallback(() => {
     requestAnimationFrame(() => {
@@ -352,6 +354,38 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               </button>
             </div>
 
+            {/* Member Management */}
+            <div className="grid grid-cols-3 gap-6">
+              {order.member_id ? (
+                <button
+                  onClick={async () => {
+                    try {
+                      await unlinkMember(order.order_id);
+                      toast.success(t('checkout.member.unlinked'));
+                    } catch (e) {
+                      toast.error(t('checkout.member.unlink_failed'));
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className="h-40 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <UserX size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.member.unlink')}</div>
+                  <div className="text-sm opacity-90">{order.member_name}</div>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowMemberModal(true)}
+                  disabled={isProcessing}
+                  className="h-40 bg-teal-500 hover:bg-teal-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <UserCheck size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.member.link')}</div>
+                  <div className="text-sm opacity-90">{t('checkout.member.link_desc')}</div>
+                </button>
+              )}
+            </div>
+
             {/* Order Adjustments: Comp, Discount, Surcharge */}
             <div className="grid grid-cols-3 gap-6">
               <button
@@ -431,6 +465,12 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         isOpen={showSurchargeModal}
         order={order}
         onClose={() => setShowSurchargeModal(false)}
+      />
+
+      <MemberLinkModal
+        isOpen={showMemberModal}
+        orderId={order.order_id}
+        onClose={() => setShowMemberModal(false)}
       />
     </>
   );

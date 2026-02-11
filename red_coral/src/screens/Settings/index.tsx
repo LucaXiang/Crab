@@ -13,6 +13,8 @@ import { DataTransfer } from './DataTransfer';
 import { StoreSettings } from './StoreSettings';
 import { SystemSettings } from './SystemSettings';
 import { UserManagement } from '@/features/user';
+import { MarketingGroupManagement } from '@/features/marketing-group';
+import { MemberManagement } from '@/features/member';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 import { TableModal } from '@/features/table';
@@ -59,6 +61,16 @@ const SettingsContent: React.FC = React.memo(() => {
         {activeCategory === 'PRICE_RULES' && (
           <ProtectedGate permission={Permission.PRICE_RULES_MANAGE}>
             <PriceRuleManagement />
+          </ProtectedGate>
+        )}
+        {activeCategory === 'MARKETING_GROUPS' && (
+          <ProtectedGate permission={Permission.MARKETING_MANAGE}>
+            <MarketingGroupManagement />
+          </ProtectedGate>
+        )}
+        {activeCategory === 'MEMBERS' && (
+          <ProtectedGate permission={Permission.MARKETING_MANAGE}>
+            <MemberManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'SHIFTS' && (

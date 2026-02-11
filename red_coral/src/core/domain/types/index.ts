@@ -144,6 +144,9 @@ export const Permission = {
   ORDERS_MODIFY_PRICE: 'orders:modify_price' as Permission, // 修改价格
   CASH_DRAWER_OPEN: 'cash_drawer:open' as Permission, // 打开钱箱
 
+  // === 营销管理 ===
+  MARKETING_MANAGE: 'marketing:manage' as Permission,  // 营销组+会员管理
+
   // === 管理员专属 ===
   USERS_MANAGE: 'users:manage' as Permission,         // 用户管理 (仅 admin)
 
