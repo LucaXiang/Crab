@@ -31,7 +31,6 @@ interface GroupDetailPanelProps {
   onAddStamp: () => void;
   onEditStamp: (activity: StampActivityDetail) => void;
   onToggleStamp: (activity: StampActivityDetail) => void;
-  onDeleteStamp: (activity: StampActivityDetail) => void;
 }
 
 export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
@@ -44,7 +43,6 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
   onAddStamp,
   onEditStamp,
   onToggleStamp,
-  onDeleteStamp,
 }) => {
   const { t } = useI18n();
   const categories = useCategoryStore((s) => s.items);
@@ -250,12 +248,6 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
                           className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
                         >
                           <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => onDeleteStamp(activity)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={14} />
                         </button>
                       </div>
                     </ProtectedGate>

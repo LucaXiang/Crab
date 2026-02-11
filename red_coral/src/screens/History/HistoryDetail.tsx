@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent } from '@/core/domain/types';
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
+import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp } from 'lucide-react';
@@ -48,12 +49,39 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
 export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const products = useProductStore((s) => s.items);
+  const categories = useCategoryStore((s) => s.items);
 
   // Convert archived events to OrderEvent format for TimelineList
   const timelineEvents = useMemo(() => {
     if (!order?.timeline) return [];
     return order.timeline.map((event, index) => convertArchivedEventToOrderEvent(event, index));
   }, [order?.timeline]);
+
+  // Sort items: category sort_order → paid/comped sink → external_id → name
+  const sortedItems = useMemo(() => {
+    if (!order) return [];
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    return [...order.items].sort((a, b) => {
+      const catA = productMap.get(a.id)?.category_id;
+      const catB = productMap.get(b.id)?.category_id;
+      const sortA = catA ? (categoryMap.get(catA)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      const sortB = catB ? (categoryMap.get(catB)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      if (sortA !== sortB) return sortA - sortB;
+
+      const sinkA = a.is_comped ? 2 : a.unpaid_quantity === 0 ? 1 : 0;
+      const sinkB = b.is_comped ? 2 : b.unpaid_quantity === 0 ? 1 : 0;
+      if (sinkA !== sinkB) return sinkA - sinkB;
+
+      const extA = productMap.get(a.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+      const extB = productMap.get(b.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+      if (extA !== extB) return extA - extB;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [order, products, categories]);
 
   // 按 category_name 出现顺序分配颜色（不依赖当前分类表）
   const itemColorMap = useMemo(() => {
@@ -87,10 +115,10 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
 
   const toggleAll = () => {
     if (!order) return;
-    if (expandedItems.size === order.items.length) {
+    if (expandedItems.size === sortedItems.length) {
       setExpandedItems(new Set());
     } else {
-      setExpandedItems(new Set(order.items.map((_, i) => i)));
+      setExpandedItems(new Set(sortedItems.map((_, i) => i)));
     }
   };
 
@@ -200,14 +228,14 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               </div>
               <button
                 onClick={toggleAll}
-                title={expandedItems.size === order.items.length ? t('common.action.collapse_all') : t('common.action.expand_all')}
+                title={expandedItems.size === sortedItems.length ? t('common.action.collapse_all') : t('common.action.expand_all')}
                 className="p-1.5 text-gray-500 hover:text-gray-700 transition-colors rounded hover:bg-gray-200"
               >
-                {expandedItems.size === order.items.length ? <ChevronsUp size={18} /> : <ChevronsDown size={18} />}
+                {expandedItems.size === sortedItems.length ? <ChevronsUp size={18} /> : <ChevronsDown size={18} />}
               </button>
             </div>
             <div className="divide-y divide-gray-100">
-              {order.items.map((item, idx) => (
+              {sortedItems.map((item, idx) => (
                 <OrderItemRow
                   key={item.id || idx}
                   item={item}
@@ -333,6 +361,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
   const totalRuleSurcharge = item.rule_surcharge_amount;
   const manualDiscount = Currency.sub(item.discount_amount, item.rule_discount_amount).toNumber();
   const isFullyPaid = item.unpaid_quantity === 0;
+  const isPartiallyPaid = !isFullyPaid && item.unpaid_quantity < item.quantity;
 
   return (
     <div>
@@ -345,7 +374,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
         <div className="flex items-center gap-3 flex-1">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor || '#d1d5db' }} />
           <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm shrink-0
-            ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : isFullyPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}
+            ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : isFullyPaid ? 'bg-green-100 text-green-600' : isPartiallyPaid ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500'}
           `}>
             x{item.quantity}
           </div>

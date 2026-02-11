@@ -484,6 +484,7 @@
         "customer_cancelled": "Cliente cancela",
         "system_test": "Prueba sistema",
         "duplicate_order": "Pedido duplicado",
+        "retail_checkout_cancelled": "Venta rápida cancelada",
         "other": "Otro motivo"
       },
       "loss_reason": {
@@ -2578,7 +2579,11 @@
       "label_template": "Plantilla etiqueta",
       "store_info": "Info establecimiento",
       "system_issue": "Incidencia",
-      "upload": "Subida"
+      "upload": "Subida",
+      "member": "Miembro",
+      "marketing_group": "Grupo marketing",
+      "mg_discount_rule": "Regla descuento",
+      "stamp_activity": "Actividad sellos"
     },
     "group": {
       "system": "Sistema",
@@ -2640,7 +2645,14 @@
       "label_template_deleted": "Plantilla eliminada",
       "print_destination_created": "Destino creado",
       "print_destination_updated": "Destino actualizado",
-      "print_destination_deleted": "Destino eliminado"
+      "print_destination_deleted": "Destino eliminado",
+      "member_created": "Miembro creado",
+      "member_updated": "Miembro actualizado",
+      "member_deleted": "Miembro eliminado",
+      "marketing_group_created": "Grupo creado",
+      "marketing_group_updated": "Grupo actualizado",
+      "marketing_group_deleted": "Grupo eliminado",
+      "shift_updated": "Turno actualizado"
     }
   },
   "commandError": {

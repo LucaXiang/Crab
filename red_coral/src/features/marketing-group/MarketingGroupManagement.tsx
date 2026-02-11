@@ -12,7 +12,6 @@ import {
   deleteMarketingGroup,
   getMarketingGroupDetail,
   deleteDiscountRule,
-  deleteStampActivity,
   toggleStampActivity,
 } from './mutations';
 import { GroupListPanel, GroupDetailPanel, StampEditModal } from './components';
@@ -48,7 +47,7 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
   const [showStampForm, setShowStampForm] = useState(false);
   const [editingStamp, setEditingStamp] = useState<StampActivityDetail | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
-    type: 'group' | 'rule' | 'stamp';
+    type: 'group' | 'rule';
     id: number;
     name: string;
   } | null>(null);
@@ -117,9 +116,6 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
         if (selectedGroupId === deleteConfirm.id) setSelectedGroupId(null);
       } else if (deleteConfirm.type === 'rule' && selectedGroupId) {
         await deleteDiscountRule(selectedGroupId, deleteConfirm.id);
-        await refreshDetail();
-      } else if (deleteConfirm.type === 'stamp' && selectedGroupId) {
-        await deleteStampActivity(selectedGroupId, deleteConfirm.id);
         await refreshDetail();
       }
       toast.success(t('common.message.delete_success'));
@@ -256,7 +252,7 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
                     toast.error(t('common.message.save_failed'));
                   }
                 }}
-                onDeleteStamp={(activity) => setDeleteConfirm({ type: 'stamp', id: activity.id, name: activity.display_name })}
+
               />
             </div>
           ) : (

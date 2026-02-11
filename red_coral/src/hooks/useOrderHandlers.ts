@@ -157,7 +157,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     // Retail orders should not remain active when user exits checkout
     if (checkoutOrder?.is_retail) {
       try {
-        await voidOrder(checkoutOrder.order_id, { voidType: 'CANCELLED', note: 'Retail checkout cancelled' });
+        await voidOrder(checkoutOrder.order_id, { voidType: 'CANCELLED', note: 'retail_checkout_cancelled' });
         // Clear pending retail order tracker after successful void
         clearPendingRetailOrder();
       } catch (error) {

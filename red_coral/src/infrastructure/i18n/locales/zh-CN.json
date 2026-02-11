@@ -484,6 +484,7 @@
         "customer_cancelled": "顾客取消",
         "system_test": "系统测试",
         "duplicate_order": "重复下单",
+        "retail_checkout_cancelled": "零售结账取消",
         "other": "其他原因"
       },
       "loss_reason": {
@@ -2625,7 +2626,11 @@
       "label_template": "标签模板",
       "store_info": "门店信息",
       "system_issue": "系统问题",
-      "upload": "文件上传"
+      "upload": "文件上传",
+      "member": "会员",
+      "marketing_group": "营销组",
+      "mg_discount_rule": "折扣规则",
+      "stamp_activity": "集章活动"
     },
     "group": {
       "system": "系统",
@@ -2688,7 +2693,14 @@
       "label_template_deleted": "删除标签模板",
       "print_destination_created": "创建打印目的地",
       "print_destination_updated": "更新打印目的地",
-      "print_destination_deleted": "删除打印目的地"
+      "print_destination_deleted": "删除打印目的地",
+      "member_created": "创建会员",
+      "member_updated": "更新会员",
+      "member_deleted": "删除会员",
+      "marketing_group_created": "创建营销组",
+      "marketing_group_updated": "更新营销组",
+      "marketing_group_deleted": "删除营销组",
+      "shift_updated": "更新班次"
     }
   },
   "commandError": {

@@ -262,6 +262,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
   const totalRuleSurcharge = item.rule_surcharge_amount;
   const discountPercent = item.manual_discount_percent || 0;
   const isFullyPaid = item.unpaid_quantity === 0;
+  const isPartiallyPaid = !isFullyPaid && item.unpaid_quantity < item.quantity;
 
   return (
     <div>
@@ -274,7 +275,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
         <div className="flex items-center gap-3 flex-1">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor || '#d1d5db' }} />
           <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm shrink-0
-            ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : isFullyPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}
+            ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : isFullyPaid ? 'bg-green-100 text-green-600' : isPartiallyPaid ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500'}
           `}>
             x{item.quantity}
           </div>
