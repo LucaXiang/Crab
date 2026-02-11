@@ -124,6 +124,7 @@ pub struct StampActivityDetail {
 
 /// Member stamp progress with activity info (for member detail view)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct MemberStampProgressDetail {
     pub stamp_activity_id: i64,
     pub stamp_activity_name: String,
