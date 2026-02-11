@@ -22,6 +22,9 @@ pub mod system_state;
 pub mod tag;
 pub mod zone;
 pub mod image_ref;
+pub mod marketing_group;
+pub mod member;
+pub mod stamp;
 
 // Re-exports
 pub use attribute::*;
@@ -42,3 +45,6 @@ pub use system_issue::*;
 pub use system_state::*;
 pub use tag::*;
 pub use zone::*;
+pub use marketing_group::*;
+pub use member::*;
+pub use stamp::*;
