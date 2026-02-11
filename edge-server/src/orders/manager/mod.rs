@@ -66,6 +66,8 @@ pub struct OrdersManager {
     rule_cache: Arc<RwLock<HashMap<String, Vec<PriceRule>>>>,
     /// Catalog service for product metadata lookup
     catalog_service: Option<Arc<crate::services::CatalogService>>,
+    /// SQLite pool for member/marketing queries (optional, only set when SQLite is available)
+    pool: Option<sqlx::SqlitePool>,
     /// Archive service for completed orders (optional, only set when SQLite is available)
     archive_service: Option<super::OrderArchiveService>,
     /// 业务时区
@@ -95,6 +97,7 @@ impl OrdersManager {
             epoch,
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
             catalog_service: None,
+            pool: None,
             archive_service: None,
             tz,
         })
@@ -107,6 +110,7 @@ impl OrdersManager {
 
     /// Set the archive service for SQLite integration
     pub fn set_archive_service(&mut self, pool: sqlx::SqlitePool) {
+        self.pool = Some(pool.clone());
         self.archive_service = Some(super::OrderArchiveService::new(pool, self.tz));
     }
 
@@ -128,6 +132,7 @@ impl OrdersManager {
             epoch,
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
             catalog_service: None,
+            pool: None,
             archive_service: None,
             tz: chrono_tz::Europe::Madrid,
         }
@@ -414,6 +419,75 @@ impl OrdersManager {
                     product_metadata,
                 })
             }
+            shared::order::OrderCommandPayload::LinkMember { order_id, member_id } => {
+                // Query member info and MG rules from SQLite
+                let pool = self.pool.as_ref().ok_or_else(|| {
+                    OrderError::InvalidOperation("Database not available for member queries".to_string())
+                })?;
+                let member = futures::executor::block_on(
+                    crate::db::repository::member::find_member_by_id(pool, *member_id),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query member: {e}")))?
+                .ok_or_else(|| OrderError::InvalidOperation(format!("Member {} not found", member_id)))?;
+
+                if !member.is_active {
+                    return Err(ManagerError::from(OrderError::InvalidOperation(
+                        format!("Member {} is not active", member_id),
+                    )));
+                }
+
+                let mg = futures::executor::block_on(
+                    crate::db::repository::marketing_group::find_by_id(pool, member.marketing_group_id),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query marketing group: {e}")))?
+                .ok_or_else(|| OrderError::InvalidOperation(format!("Marketing group {} not found", member.marketing_group_id)))?;
+
+                let mg_rules = futures::executor::block_on(
+                    crate::db::repository::marketing_group::find_active_rules_by_group(pool, member.marketing_group_id),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query MG rules: {e}")))?;
+
+                CommandAction::LinkMember(super::actions::LinkMemberAction {
+                    order_id: order_id.clone(),
+                    member_id: *member_id,
+                    member_name: member.name,
+                    marketing_group_id: member.marketing_group_id,
+                    marketing_group_name: mg.display_name,
+                    mg_rules,
+                })
+            }
+            shared::order::OrderCommandPayload::RedeemStamp { order_id, stamp_activity_id, product_id } => {
+                // Query stamp activity and reward targets from SQLite
+                let pool = self.pool.as_ref().ok_or_else(|| {
+                    OrderError::InvalidOperation("Database not available for stamp queries".to_string())
+                })?;
+
+                // Query the stamp activity by iterating activities of the group
+                // (there is no find_activity_by_id, so we query by looking up via all activities)
+                // Actually, we need a simpler approach: query activity directly
+                let activity = futures::executor::block_on(
+                    sqlx::query_as::<_, shared::models::StampActivity>(
+                        "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ? AND is_active = 1",
+                    )
+                    .bind(*stamp_activity_id)
+                    .fetch_optional(pool),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query stamp activity: {e}")))?
+                .ok_or_else(|| OrderError::InvalidOperation(format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
+
+                let reward_targets = futures::executor::block_on(
+                    crate::db::repository::marketing_group::find_reward_targets(pool, *stamp_activity_id),
+                )
+                .map_err(|e| OrderError::InvalidOperation(format!("Failed to query reward targets: {e}")))?;
+
+                CommandAction::RedeemStamp(super::actions::RedeemStampAction {
+                    order_id: order_id.clone(),
+                    stamp_activity_id: *stamp_activity_id,
+                    product_id: *product_id,
+                    activity,
+                    reward_targets,
+                })
+            }
             _ => (&cmd).into(),
         };
         let events = futures::executor::block_on(action.execute(&mut ctx, &metadata))
@@ -567,6 +641,7 @@ impl Clone for OrdersManager {
             epoch: self.epoch.clone(),
             rule_cache: self.rule_cache.clone(),
             catalog_service: self.catalog_service.clone(),
+            pool: self.pool.clone(),
             archive_service: self.archive_service.clone(),
             tz: self.tz,
         }
