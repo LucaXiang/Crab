@@ -87,6 +87,8 @@ pub enum ErrorCode {
     DeviceLimitReached = 3007,
     /// Client limit reached (quota full, need to replace an existing client)
     ClientLimitReached = 3008,
+    /// Feature not available in current subscription plan
+    FeatureNotAvailable = 3010,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -276,6 +278,7 @@ impl ErrorCode {
             ErrorCode::LicenseExpired => "License has expired",
             ErrorCode::DeviceLimitReached => "Device limit reached",
             ErrorCode::ClientLimitReached => "Client limit reached",
+            ErrorCode::FeatureNotAvailable => "Feature not available in current subscription plan",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -415,6 +418,7 @@ impl TryFrom<u16> for ErrorCode {
             3005 => Ok(ErrorCode::LicenseExpired),
             3007 => Ok(ErrorCode::DeviceLimitReached),
             3008 => Ok(ErrorCode::ClientLimitReached),
+            3010 => Ok(ErrorCode::FeatureNotAvailable),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),

@@ -58,7 +58,8 @@ impl ErrorCode {
             | Self::CertificateInvalid
             | Self::LicenseExpired
             | Self::DeviceLimitReached
-            | Self::ClientLimitReached => StatusCode::FORBIDDEN,
+            | Self::ClientLimitReached
+            | Self::FeatureNotAvailable => StatusCode::FORBIDDEN,
 
             // 402 Payment Required
             Self::PaymentInsufficientAmount => StatusCode::PAYMENT_REQUIRED,

@@ -88,6 +88,15 @@ impl ActivationService {
         &self.auth_server_url
     }
 
+    /// Check if a subscription feature is enabled
+    pub async fn has_feature(&self, feature: &str) -> bool {
+        let cache = self.credential_cache.read().await;
+        match cache.as_ref().and_then(|c| c.subscription.as_ref()) {
+            Some(sub) => sub.features.iter().any(|f| f == feature),
+            None => false,
+        }
+    }
+
     /// 检查订阅是否被阻止
     ///
     /// 阻止条件 (任一满足):
