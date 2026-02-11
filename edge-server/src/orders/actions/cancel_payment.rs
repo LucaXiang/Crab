@@ -4,6 +4,8 @@
 
 use async_trait::async_trait;
 
+use shared::order::types::CommandErrorCode;
+
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, SplitType};
 
@@ -37,7 +39,7 @@ impl CommandHandler for CancelPaymentAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
                     "Cannot cancel payment on order with status {:?}",
                     snapshot.status
                 )));

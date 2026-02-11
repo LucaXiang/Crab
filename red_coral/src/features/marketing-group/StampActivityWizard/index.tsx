@@ -4,12 +4,11 @@ import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import type {
-  StampActivityDetail,
   StampActivityCreate,
   StampTargetInput,
   RewardStrategy,
 } from '@/core/domain/types/api';
-import { createStampActivity, updateStampActivity } from '../mutations';
+import { createStampActivity } from '../mutations';
 import { WizardProgress } from '@/features/price-rule/PriceRuleWizard/WizardProgress';
 import { Step1Naming } from './Step1Naming';
 import { Step2Config } from './Step2Config';
@@ -28,37 +27,16 @@ export interface StampWizardState {
   reward_targets: StampTargetInput[];
 }
 
-const getInitialState = (activity?: StampActivityDetail | null): StampWizardState => {
-  if (activity) {
-    return {
-      name: activity.name,
-      display_name: activity.display_name,
-      stamps_required: activity.stamps_required,
-      reward_quantity: activity.reward_quantity,
-      is_cyclic: activity.is_cyclic,
-      reward_strategy: activity.reward_strategy,
-      designated_product_id: activity.designated_product_id ?? null,
-      stamp_targets: activity.stamp_targets.map((st) => ({
-        target_type: st.target_type,
-        target_id: st.target_id,
-      })),
-      reward_targets: activity.reward_targets.map((rt) => ({
-        target_type: rt.target_type,
-        target_id: rt.target_id,
-      })),
-    };
-  }
-  return {
-    name: '',
-    display_name: '',
-    stamps_required: 10,
-    reward_quantity: 1,
-    is_cyclic: true,
-    reward_strategy: 'ECONOMIZADOR',
-    designated_product_id: null,
-    stamp_targets: [],
-    reward_targets: [],
-  };
+const INITIAL_STATE: StampWizardState = {
+  name: '',
+  display_name: '',
+  stamps_required: 10,
+  reward_quantity: 1,
+  is_cyclic: true,
+  reward_strategy: 'ECONOMIZADOR',
+  designated_product_id: null,
+  stamp_targets: [],
+  reward_targets: [],
 };
 
 interface StampActivityWizardProps {
@@ -66,7 +44,6 @@ interface StampActivityWizardProps {
   groupId: number;
   onClose: () => void;
   onSuccess: () => void;
-  editingActivity?: StampActivityDetail | null;
 }
 
 export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
@@ -74,15 +51,13 @@ export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
   groupId,
   onClose,
   onSuccess,
-  editingActivity,
 }) => {
   const { t } = useI18n();
   const [currentStep, setCurrentStep] = useState(1);
-  const [state, setState] = useState<StampWizardState>(() => getInitialState(editingActivity));
+  const [state, setState] = useState<StampWizardState>(() => ({ ...INITIAL_STATE }));
   const [saving, setSaving] = useState(false);
 
   const totalSteps = 4;
-  const isEditing = !!editingActivity;
 
   const updateState = useCallback((updates: Partial<StampWizardState>) => {
     setState((prev) => ({ ...prev, ...updates }));
@@ -129,19 +104,14 @@ export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
         designated_product_id: state.reward_strategy === 'DESIGNATED' ? state.designated_product_id : null,
         is_cyclic: state.is_cyclic,
         stamp_targets: state.stamp_targets,
-        reward_targets: state.reward_targets,
+        reward_targets: state.reward_strategy === 'DESIGNATED' ? [] : state.reward_targets,
       };
 
-      if (isEditing && editingActivity) {
-        await updateStampActivity(groupId, editingActivity.id, payload);
-        toast.success(t('settings.marketing_group.message.stamp_updated'));
-      } else {
-        await createStampActivity(groupId, payload);
-        toast.success(t('settings.marketing_group.message.stamp_created'));
-      }
+      await createStampActivity(groupId, payload);
+      toast.success(t('settings.marketing_group.message.stamp_created'));
       onSuccess();
     } catch (e) {
-      logger.error('Failed to save stamp activity', e);
+      logger.error('Failed to create stamp activity', e);
       toast.error(t('common.message.save_failed'));
     } finally {
       setSaving(false);
@@ -164,7 +134,7 @@ export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
         <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-white">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">
-              {isEditing ? t('settings.marketing_group.edit_stamp') : t('settings.marketing_group.add_stamp')}
+              {t('settings.marketing_group.add_stamp')}
             </h2>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
               <X size={18} className="text-gray-500" />
@@ -204,7 +174,7 @@ export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
                 ) : (
                   <Check size={18} />
                 )}
-                {isEditing ? t('settings.price_rule.wizard.save') : t('settings.price_rule.wizard.finish')}
+                {t('settings.price_rule.wizard.finish')}
               </button>
             ) : (
               <button

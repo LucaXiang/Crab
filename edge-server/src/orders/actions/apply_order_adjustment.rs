@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use crate::orders::money::{recalculate_totals, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::prelude::*;
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// ApplyOrderDiscount action — 应用/清除订单级手动折扣
@@ -32,6 +33,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
         // 2. Validate: order must be Active
         if !matches!(snapshot.status, OrderStatus::Active) {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::OrderNotActive,
                 "Cannot apply discount on non-active order".to_string(),
             ));
         }
@@ -39,6 +41,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
         // 2b. Validate: no payments made yet
         if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::HasPayments,
                 "Cannot apply order-level adjustments after payments have been made".to_string(),
             ));
         }
@@ -46,6 +49,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
         // 3. Validate: percent 和 fixed 互斥
         if self.discount_percent.is_some() && self.discount_fixed.is_some() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::MutuallyExclusiveAdjustment,
                 "discount_percent and discount_fixed are mutually exclusive".to_string(),
             ));
         }
@@ -53,19 +57,19 @@ impl CommandHandler for ApplyOrderDiscountAction {
         // 4. Validate: percent 范围 0-100
         if let Some(pct) = self.discount_percent
             && (!pct.is_finite() || !(0.0..=100.0).contains(&pct)) {
-                return Err(OrderError::InvalidOperation(format!(
-                    "discount_percent must be between 0 and 100, got {}",
-                    pct
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::InvalidAdjustmentValue,
+                    format!("discount_percent must be between 0 and 100, got {}", pct),
+                ));
             }
 
         // 5. Validate: fixed 必须为正
         if let Some(fixed) = self.discount_fixed
             && (!fixed.is_finite() || fixed <= 0.0) {
-                return Err(OrderError::InvalidOperation(format!(
-                    "discount_fixed must be positive, got {}",
-                    fixed
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::InvalidAdjustmentValue,
+                    format!("discount_fixed must be positive, got {}", fixed),
+                ));
             }
 
         // 6. Record previous values
@@ -129,6 +133,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         // 2. Validate: order must be Active
         if !matches!(snapshot.status, OrderStatus::Active) {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::OrderNotActive,
                 "Cannot apply surcharge on non-active order".to_string(),
             ));
         }
@@ -136,6 +141,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         // 2b. Validate: no payments made yet
         if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::HasPayments,
                 "Cannot apply order-level adjustments after payments have been made".to_string(),
             ));
         }
@@ -143,6 +149,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         // 3. Validate: percent 和 fixed 互斥
         if self.surcharge_percent.is_some() && self.surcharge_amount.is_some() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::MutuallyExclusiveAdjustment,
                 "surcharge_percent and surcharge_amount are mutually exclusive".to_string(),
             ));
         }
@@ -150,19 +157,19 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         // 4. Validate: percent 范围 0-100
         if let Some(pct) = self.surcharge_percent
             && (!pct.is_finite() || pct <= 0.0 || pct > 100.0) {
-                return Err(OrderError::InvalidOperation(format!(
-                    "surcharge_percent must be between 0 and 100, got {}",
-                    pct
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::InvalidAdjustmentValue,
+                    format!("surcharge_percent must be between 0 and 100, got {}", pct),
+                ));
             }
 
         // 5. Validate: surcharge_amount 必须为正（如果有值）
         if let Some(amount) = self.surcharge_amount
             && (!amount.is_finite() || amount <= 0.0) {
-                return Err(OrderError::InvalidOperation(format!(
-                    "surcharge_amount must be positive, got {}",
-                    amount
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::InvalidAdjustmentValue,
+                    format!("surcharge_amount must be positive, got {}", amount),
+                ));
             }
 
         // 6. Record previous values
@@ -417,8 +424,8 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("mutually exclusive"));
         }
     }
@@ -439,7 +446,7 @@ mod tests {
             authorizer_name: None,
         };
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -458,7 +465,7 @@ mod tests {
             authorizer_name: None,
         };
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -479,7 +486,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -507,8 +514,8 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("after payments have been made"));
         }
     }
@@ -536,7 +543,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -714,8 +721,8 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("after payments have been made"));
         }
     }
@@ -738,7 +745,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -764,7 +771,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -853,7 +860,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -874,7 +881,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]

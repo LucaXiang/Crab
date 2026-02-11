@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use crate::orders::money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, LossReason, OrderEvent, OrderEventType, OrderStatus, VoidType};
 
 /// VoidOrder action
@@ -41,10 +42,13 @@ impl CommandHandler for VoidOrderAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Cannot void order in {:?} status",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot void order in {:?} status",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -254,7 +258,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]

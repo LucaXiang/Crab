@@ -455,6 +455,7 @@ export interface StampRedemptionCancelledPayload {
   stamp_activity_name: string;
   reward_instance_id: string;
   /** Whether the redemption was match-mode (comp existing item) */
+  comp_source_instance_id?: string;
   is_comp_existing?: boolean;
 }
 
@@ -772,6 +773,7 @@ export interface CommandError {
 }
 
 export type CommandErrorCode =
+  // Original
   | 'ORDER_NOT_FOUND'
   | 'ORDER_ALREADY_COMPLETED'
   | 'ORDER_ALREADY_VOIDED'
@@ -779,11 +781,67 @@ export type CommandErrorCode =
   | 'PAYMENT_NOT_FOUND'
   | 'INSUFFICIENT_QUANTITY'
   | 'INVALID_AMOUNT'
+  | 'INVALID_OPERATION'
   | 'DUPLICATE_COMMAND'
   | 'INTERNAL_ERROR'
-  | 'INVALID_OPERATION'
   | 'TABLE_OCCUPIED'
-  | 'INSUFFICIENT_STAMPS';
+  | 'INSUFFICIENT_STAMPS'
+  // Storage errors
+  | 'STORAGE_FULL'
+  | 'OUT_OF_MEMORY'
+  | 'STORAGE_CORRUPTED'
+  | 'SYSTEM_BUSY'
+  // Order Status
+  | 'ORDER_NOT_ACTIVE'
+  | 'ORDER_ALREADY_MERGED'
+  // Member
+  | 'MEMBER_ALREADY_LINKED'
+  | 'NO_MEMBER_LINKED'
+  | 'MEMBER_REQUIRED'
+  | 'MEMBER_LINKED_CANNOT_MERGE'
+  // Split Blocks
+  | 'AA_SPLIT_ACTIVE'
+  | 'AMOUNT_SPLIT_ACTIVE'
+  | 'ITEM_SPLIT_BLOCKED'
+  // Item
+  | 'EMPTY_ITEMS'
+  | 'TOO_MANY_ITEMS'
+  | 'ITEM_IS_COMPED'
+  | 'ITEM_NOT_COMPED'
+  | 'ITEM_ALREADY_COMPED'
+  | 'NO_CHANGES_DETECTED'
+  | 'INVALID_QUANTITY'
+  | 'EMPTY_COMP_REASON'
+  | 'ITEM_FULLY_PAID'
+  // Payment
+  | 'PAYMENT_EXCEEDS_REMAINING'
+  | 'INSUFFICIENT_TENDER'
+  | 'PAYMENT_INSUFFICIENT'
+  | 'HAS_PAYMENTS'
+  // Merge
+  | 'CANNOT_MERGE_SELF'
+  // AA Split
+  | 'AA_SPLIT_ALREADY_STARTED'
+  | 'AA_SPLIT_NOT_STARTED'
+  | 'INVALID_SHARES'
+  | 'SPLIT_EXCEEDS_REMAINING'
+  // Split Items
+  | 'DUPLICATE_SPLIT_ITEM'
+  | 'CANNOT_SPLIT_COMPED'
+  // Adjustment
+  | 'MUTUALLY_EXCLUSIVE_ADJUSTMENT'
+  | 'INVALID_ADJUSTMENT_VALUE'
+  // Stamp
+  | 'STAMP_ALREADY_REDEEMED'
+  | 'STAMP_NO_MATCH'
+  | 'STAMP_REDEMPTION_NOT_FOUND'
+  | 'STAMP_TARGET_MISMATCH'
+  | 'STAMP_PRODUCT_NOT_AVAILABLE'
+  // Rule
+  | 'RULE_NOT_FOUND_IN_ORDER'
+  // Order Info
+  | 'NO_FIELDS_TO_UPDATE'
+  | 'INVALID_GUEST_COUNT';
 
 // ============================================================================
 // Sync Types
@@ -1040,6 +1098,8 @@ export interface StampRedemptionState {
   reward_instance_id: string;
   /** Whether the redemption was match-mode (comp existing item) */
   is_comp_existing?: boolean;
+  /** Source item instance_id for partial comp-existing reversal */
+  comp_source_instance_id?: string;
 }
 
 /**

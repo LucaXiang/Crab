@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 
 use crate::orders::money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// MergeOrders action
@@ -43,10 +44,10 @@ impl CommandHandler for MergeOrdersAction {
                 return Err(OrderError::OrderAlreadyVoided(self.source_order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Source order {} is already merged",
-                    self.source_order_id
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderAlreadyMerged,
+                    format!("Source order {} is already merged", self.source_order_id),
+                ));
             }
         }
 
@@ -65,16 +66,17 @@ impl CommandHandler for MergeOrdersAction {
                 return Err(OrderError::OrderAlreadyVoided(self.target_order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Target order {} is already merged",
-                    self.target_order_id
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderAlreadyMerged,
+                    format!("Target order {} is already merged", self.target_order_id),
+                ));
             }
         }
 
         // 5. Cannot merge order into itself
         if self.source_order_id == self.target_order_id {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::CannotMergeSelf,
                 "Cannot merge order into itself".to_string(),
             ));
         }
@@ -82,11 +84,13 @@ impl CommandHandler for MergeOrdersAction {
         // 6. Reject if either order has payments
         if to_decimal(source_snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::HasPayments,
                 "Cannot merge order with existing payments".to_string(),
             ));
         }
         if to_decimal(target_snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::HasPayments,
                 "Target order has existing payments, cannot merge".to_string(),
             ));
         }
@@ -94,12 +98,22 @@ impl CommandHandler for MergeOrdersAction {
         // 7. Reject if either order has active AA split
         if source_snapshot.aa_total_shares.is_some() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitActive,
                 "Source order has active AA split, cannot merge".to_string(),
             ));
         }
         if target_snapshot.aa_total_shares.is_some() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitActive,
                 "Target order has active AA split, cannot merge".to_string(),
+            ));
+        }
+
+        // 8. Reject if either order has a member linked
+        if source_snapshot.member_id.is_some() || target_snapshot.member_id.is_some() {
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::MemberLinkedCannotMerge,
+                "Cannot merge orders when a member is linked. Unlink the member first.".to_string(),
             ));
         }
 
@@ -442,7 +456,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -520,7 +534,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -671,7 +685,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -698,7 +712,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -723,8 +737,8 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("AA split"));
         }
     }
@@ -751,8 +765,8 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("AA split"));
         }
     }

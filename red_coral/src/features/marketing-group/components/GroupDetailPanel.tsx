@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pencil, Trash2, Plus, Globe, Layers, Package, Stamp, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, Plus, Globe, Layers, Package, Stamp, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
 import { Permission } from '@/core/domain/types';
@@ -30,6 +30,7 @@ interface GroupDetailPanelProps {
   onDeleteRule: (rule: MgDiscountRule) => void;
   onAddStamp: () => void;
   onEditStamp: (activity: StampActivityDetail) => void;
+  onToggleStamp: (activity: StampActivityDetail) => void;
   onDeleteStamp: (activity: StampActivityDetail) => void;
 }
 
@@ -42,6 +43,7 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
   onDeleteRule,
   onAddStamp,
   onEditStamp,
+  onToggleStamp,
   onDeleteStamp,
 }) => {
   const { t } = useI18n();
@@ -232,6 +234,17 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
                     </div>
                     <ProtectedGate permission={Permission.MARKETING_MANAGE}>
                       <div className="flex gap-1 shrink-0 ml-2">
+                        <button
+                          onClick={() => onToggleStamp(activity)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            a.is_active
+                              ? 'text-teal-500 hover:text-orange-600 hover:bg-orange-50'
+                              : 'text-gray-400 hover:text-teal-600 hover:bg-teal-50'
+                          }`}
+                          title={a.is_active ? t('common.action.disable') : t('common.action.enable')}
+                        >
+                          {a.is_active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                        </button>
                         <button
                           onClick={() => onEditStamp(activity)}
                           className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"

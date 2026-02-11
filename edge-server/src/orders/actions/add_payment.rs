@@ -4,6 +4,8 @@
 
 use async_trait::async_trait;
 
+use shared::order::types::CommandErrorCode;
+
 use crate::orders::money::{to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
@@ -39,7 +41,7 @@ impl CommandHandler for AddPaymentAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
                     "Cannot add payment to order with status {:?}",
                     snapshot.status
                 )));
@@ -49,7 +51,7 @@ impl CommandHandler for AddPaymentAction {
         // 4. Overpayment guard: reject if amount exceeds remaining
         let remaining = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
         if to_decimal(self.payment.amount) > remaining + MONEY_TOLERANCE {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::PaymentExceedsRemaining, format!(
                 "Payment amount ({:.2}) exceeds remaining unpaid ({:.2})",
                 self.payment.amount,
                 to_f64(remaining)
@@ -65,7 +67,7 @@ impl CommandHandler for AddPaymentAction {
         // 7. Validate tendered amount
         if let Some(t) = self.payment.tendered
             && to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::InsufficientTender, format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, self.payment.amount
                 )));
@@ -354,8 +356,8 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("exceeds remaining unpaid"));
         }
     }

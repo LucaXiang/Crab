@@ -500,6 +500,9 @@ pub enum EventPayload {
         /// Whether the original redemption comped an existing item (vs adding a new one)
         #[serde(default)]
         is_comp_existing: bool,
+        /// Source item instance_id for partial comp-existing reversal
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        comp_source_instance_id: Option<String>,
     },
 }
 

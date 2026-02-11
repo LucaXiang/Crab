@@ -17,6 +17,7 @@ pub use aa_split::{StartAaSplitAction, PayAaSplitAction};
 use crate::orders::money::{calculate_unit_price, to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::OrderError;
 use rust_decimal::Decimal;
+use shared::order::types::CommandErrorCode;
 use shared::order::{OrderSnapshot, OrderStatus, SplitItem};
 
 // ============================================================================
@@ -50,6 +51,7 @@ pub(super) fn validate_split_mode_allowed(
     if snapshot.aa_total_shares.is_some() {
         if !matches!(mode, SplitMode::Aa) {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitActive,
                 "AA split is active. Only AA share payments are allowed".to_string(),
             ));
         }
@@ -60,6 +62,7 @@ pub(super) fn validate_split_mode_allowed(
     if snapshot.has_amount_split {
         if matches!(mode, SplitMode::Item) {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::ItemSplitBlocked,
                 "Item-based split is disabled while amount-based split payments exist"
                     .to_string(),
             ));
@@ -84,7 +87,7 @@ pub(super) fn validate_items_and_calculate(
         let mut seen = std::collections::HashSet::new();
         for item in items {
             if !seen.insert(&item.instance_id) {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::DuplicateSplitItem, format!(
                     "Duplicate instance_id '{}' in split items",
                     item.instance_id
                 )));
@@ -102,7 +105,7 @@ pub(super) fn validate_items_and_calculate(
 
         // Reject comped items — they are free and cannot be split
         if order_item.is_comped {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::CannotSplitComped, format!(
                 "Cannot split comped item '{}'",
                 order_item.name
             )));
@@ -133,7 +136,7 @@ pub(super) fn validate_tendered_and_change(
     if let Some(t) = tendered
         && to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE
     {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InsufficientTender, format!(
             "Tendered {:.2} is less than required {:.2}",
             t, amount_f64
         )));

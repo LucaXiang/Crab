@@ -7,6 +7,7 @@
 use crate::orders::storage::OrderStorage;
 use async_trait::async_trait;
 use redb::WriteTransaction;
+use shared::order::types::CommandErrorCode;
 use shared::order::{OrderEvent, OrderSnapshot};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -35,8 +36,8 @@ pub enum OrderError {
     #[error("Invalid amount")]
     InvalidAmount,
 
-    #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
+    #[error("Invalid operation [{0:?}]: {1}")]
+    InvalidOperation(CommandErrorCode, String),
 
     #[error("Table is already occupied: {0}")]
     TableOccupied(String),

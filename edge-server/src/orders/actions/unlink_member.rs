@@ -4,6 +4,8 @@
 
 use async_trait::async_trait;
 
+use shared::order::types::CommandErrorCode;
+
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -33,7 +35,7 @@ impl CommandHandler for UnlinkMemberAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
                     "Cannot unlink member on order with status: {:?}",
                     snapshot.status
                 )));
@@ -42,19 +44,19 @@ impl CommandHandler for UnlinkMemberAction {
 
         // 3. Must have a member linked
         if snapshot.member_id.is_none() {
-            return Err(OrderError::InvalidOperation(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::NoMemberLinked,
                 "No member linked to this order".to_string(),
             ));
         }
 
         // 4. Block during active split payments
         if snapshot.aa_total_shares.is_some() {
-            return Err(OrderError::InvalidOperation(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::AaSplitActive,
                 "Cannot unlink member during AA split".to_string(),
             ));
         }
         if snapshot.has_amount_split {
-            return Err(OrderError::InvalidOperation(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::AmountSplitActive,
                 "Cannot unlink member during amount split".to_string(),
             ));
         }
@@ -158,7 +160,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -204,6 +206,6 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 }

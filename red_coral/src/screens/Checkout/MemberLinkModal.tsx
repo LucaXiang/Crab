@@ -2,8 +2,8 @@
  * MemberLinkModal - 搜索并关联会员到订单
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Search, UserCheck } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Search, UserCheck, Loader2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { searchMembers } from '@/features/member/mutations';
 import { linkMember } from '@/core/stores/order/commands';
@@ -23,6 +23,7 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
   const [results, setResults] = useState<MemberWithGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [linking, setLinking] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (!isOpen) {
@@ -31,11 +32,14 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
     }
   }, [isOpen]);
 
-  const handleSearch = useCallback(async () => {
-    if (!query.trim()) return;
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
     setLoading(true);
     try {
-      const members = await searchMembers(query.trim());
+      const members = await searchMembers(q.trim());
       setResults(members);
     } catch (e) {
       logger.error('Member search failed', e);
@@ -43,7 +47,20 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
     } finally {
       setLoading(false);
     }
-  }, [query, t]);
+  }, [t]);
+
+  // Auto-search on input change with debounce
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      doSearch(query);
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, doSearch]);
 
   const handleLink = useCallback(async (member: MemberWithGroup) => {
     setLinking(true);
@@ -63,11 +80,11 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-gray-200 flex items-center justify-between shrink-0">
           <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <UserCheck size={24} className="text-teal-500" />
+            <UserCheck size={24} className="text-gray-600" />
             {t('checkout.member.search_title')}
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -77,25 +94,18 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
 
         {/* Search */}
         <div className="p-4 border-b border-gray-100 shrink-0">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder={t('checkout.member.search_placeholder')}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-lg"
-                autoFocus
-              />
-            </div>
-            <button
-              onClick={handleSearch}
-              disabled={loading || !query.trim()}
-              className="px-6 py-3 bg-teal-500 text-white rounded-xl font-bold hover:bg-teal-600 disabled:opacity-50 transition-colors"
-            >
-              {loading ? t('common.loading') : t('common.action.search')}
-            </button>
+          <div className="relative">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('checkout.member.search_placeholder')}
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+              autoFocus
+            />
+            {loading && (
+              <Loader2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
+            )}
           </div>
         </div>
 
@@ -106,13 +116,15 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
               {query.trim() ? t('checkout.member.no_results') : t('checkout.member.search_hint')}
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {results.map((member) => (
+            <div className="py-1">
+              {results.map((member, idx) => (
                 <button
                   key={member.id}
                   onClick={() => handleLink(member)}
                   disabled={linking || !member.is_active}
-                  className="w-full text-left p-4 hover:bg-teal-50 transition-colors flex items-center justify-between disabled:opacity-50"
+                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between disabled:opacity-50 ${
+                    idx === results.length - 1 ? 'rounded-b-2xl' : ''
+                  }`}
                 >
                   <div>
                     <div className="font-medium text-gray-800 flex items-center gap-2">
@@ -126,7 +138,7 @@ export const MemberLinkModal: React.FC<MemberLinkModalProps> = ({ isOpen, orderI
                       {member.card_number && <span>{member.card_number}</span>}
                     </div>
                   </div>
-                  <UserCheck size={20} className="text-teal-500 shrink-0" />
+                  <UserCheck size={20} className="text-gray-400 shrink-0" />
                 </button>
               ))}
             </div>

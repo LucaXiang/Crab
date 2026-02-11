@@ -30,8 +30,8 @@ pub enum ManagerError {
     #[error("Invalid amount")]
     InvalidAmount,
 
-    #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
+    #[error("Invalid operation [{0:?}]: {1}")]
+    InvalidOperation(CommandErrorCode, String),
 
     #[error("Table is already occupied: {0}")]
     TableOccupied(String),
@@ -113,7 +113,7 @@ impl From<ManagerError> for CommandError {
                 CommandErrorCode::InvalidAmount,
                 "Invalid amount".to_string(),
             ),
-            ManagerError::InvalidOperation(msg) => (CommandErrorCode::InvalidOperation, msg),
+            ManagerError::InvalidOperation(code, msg) => (code, msg),
             ManagerError::TableOccupied(msg) => (CommandErrorCode::TableOccupied, msg),
             ManagerError::InsufficientStamps { current, required } => (
                 CommandErrorCode::InsufficientStamps,
@@ -135,7 +135,7 @@ impl From<OrderError> for ManagerError {
             OrderError::PaymentNotFound(id) => ManagerError::PaymentNotFound(id),
             OrderError::InsufficientQuantity => ManagerError::InsufficientQuantity,
             OrderError::InvalidAmount => ManagerError::InvalidAmount,
-            OrderError::InvalidOperation(msg) => ManagerError::InvalidOperation(msg),
+            OrderError::InvalidOperation(code, msg) => ManagerError::InvalidOperation(code, msg),
             OrderError::TableOccupied(msg) => ManagerError::TableOccupied(msg),
             OrderError::InsufficientStamps { current, required } => ManagerError::InsufficientStamps { current, required },
             OrderError::Storage(msg) => ManagerError::Internal(msg),

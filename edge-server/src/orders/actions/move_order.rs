@@ -8,6 +8,7 @@ use rust_decimal::Decimal;
 
 use crate::orders::money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// MoveOrder action
@@ -49,6 +50,7 @@ impl CommandHandler for MoveOrderAction {
         // 3. Reject if order has any payments
         if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::HasPayments,
                 "Cannot move order with existing payments".to_string(),
             ));
         }
@@ -517,6 +519,6 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 }

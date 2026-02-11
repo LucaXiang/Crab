@@ -240,15 +240,19 @@ export const Step4Targets: React.FC<Step4TargetsProps> = ({ state, updateState }
           setStampTab,
         )}
 
-        <div className="border-t border-gray-200" />
+        {state.reward_strategy !== 'DESIGNATED' && (
+          <>
+            <div className="border-t border-gray-200" />
 
-        {renderTargetSection(
-          'reward_targets',
-          t('settings.marketing_group.stamp.reward_targets'),
-          t('settings.marketing_group.stamp_wizard.reward_targets_desc'),
-          false,
-          rewardTab,
-          setRewardTab,
+            {renderTargetSection(
+              'reward_targets',
+              t('settings.marketing_group.stamp.reward_targets'),
+              t('settings.marketing_group.stamp_wizard.reward_targets_desc'),
+              false,
+              rewardTab,
+              setRewardTab,
+            )}
+          </>
         )}
       </div>
     </FormSection>

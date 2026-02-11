@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// AddOrderNote action
@@ -35,10 +36,10 @@ impl CommandHandler for AddOrderNoteAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Cannot add note to order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!("Cannot add note to order with status: {:?}", snapshot.status),
+                ));
             }
         }
 

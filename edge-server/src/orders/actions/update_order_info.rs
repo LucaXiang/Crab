@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// UpdateOrderInfo action
@@ -48,6 +49,7 @@ impl CommandHandler for UpdateOrderInfoAction {
             && self.is_pre_payment.is_none()
         {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::NoFieldsToUpdate,
                 "No fields to update".to_string(),
             ));
         }
@@ -57,6 +59,7 @@ impl CommandHandler for UpdateOrderInfoAction {
             && count < 1
         {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidGuestCount,
                 "guest_count must be at least 1".to_string(),
             ));
         }
@@ -205,7 +208,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -229,7 +232,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -253,7 +256,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]

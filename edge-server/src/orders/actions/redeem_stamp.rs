@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use crate::marketing::stamp_tracker::{self, StampItemInfo};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::models::{RewardStrategy, StampActivity, StampRewardTarget};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// Product info for the reward item (injected by OrdersManager)
@@ -60,7 +61,7 @@ impl CommandHandler for RedeemStampAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
                     "Cannot redeem stamp on order with status: {:?}",
                     snapshot.status
                 )));
@@ -70,6 +71,7 @@ impl CommandHandler for RedeemStampAction {
         // 3. Must have a member linked
         if snapshot.member_id.is_none() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::MemberRequired,
                 "Must have a member linked to redeem stamps".to_string(),
             ));
         }
@@ -80,7 +82,7 @@ impl CommandHandler for RedeemStampAction {
             .iter()
             .any(|r| r.stamp_activity_id == self.stamp_activity_id)
         {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::StampAlreadyRedeemed, format!(
                 "Stamp activity {} already redeemed in this order",
                 self.stamp_activity_id
             )));
@@ -96,35 +98,42 @@ impl CommandHandler for RedeemStampAction {
 
         let comp_existing = self.comp_existing_instance_id.clone();
 
-        let (info, reward_instance_id) = if let Some(ref existing_id) = comp_existing {
+        // Returns (product_info, reward_instance_id, comp_qty_override)
+        // comp_qty_override: Some for comp-existing (capped to item qty), None for add-new
+        let (info, reward_instance_id, comp_qty_override) = if let Some(ref existing_id) = comp_existing {
             // Match mode: comp an existing item
             let item = snapshot
                 .items
                 .iter()
                 .find(|i| i.instance_id == *existing_id)
                 .ok_or_else(|| {
-                    OrderError::InvalidOperation(format!(
+                    OrderError::InvalidOperation(CommandErrorCode::StampTargetMismatch, format!(
                         "Item {} not found in order",
                         existing_id
                     ))
                 })?;
 
             if item.is_comped {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::ItemAlreadyComped, format!(
                     "Item {} is already comped",
                     existing_id
                 )));
             }
 
-            // Validate the item matches reward_targets
-            let matches_target = self.reward_targets.iter().any(|t| match t.target_type {
-                shared::models::StampTargetType::Product => t.target_id == item.id,
-                shared::models::StampTargetType::Category => {
-                    item.category_id == Some(t.target_id)
-                }
-            });
+            // Validate the item matches: designated_product_id for Designated, reward_targets otherwise
+            let matches_target = if self.activity.reward_strategy == RewardStrategy::Designated {
+                self.activity.designated_product_id == Some(item.id)
+            } else {
+                self.reward_targets.iter().any(|t| match t.target_type {
+                    shared::models::StampTargetType::Product => t.target_id == item.id,
+                    shared::models::StampTargetType::Category => {
+                        item.category_id == Some(t.target_id)
+                    }
+                })
+            };
             if !matches_target {
                 return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::StampTargetMismatch,
                     "Item does not match reward targets".to_string(),
                 ));
             }
@@ -137,17 +146,30 @@ impl CommandHandler for RedeemStampAction {
                 category_id: item.category_id,
                 category_name: item.category_name.clone(),
             };
-            // Use existing item's instance_id as reward_instance_id
-            (product_info, existing_id.clone())
+
+            // Cap reward_quantity to actual item quantity
+            let capped_qty = self.activity.reward_quantity.min(item.quantity);
+
+            // Full vs partial comp: if item has more quantity than reward,
+            // we need a new instance_id for the split-off comped portion.
+            let rid = if item.quantity > capped_qty {
+                // Partial comp: generate new instance_id for the comped split
+                format!("stamp_reward::{}", metadata.command_id)
+            } else {
+                // Full comp: use existing item's instance_id
+                existing_id.clone()
+            };
+            (product_info, rid, Some(capped_qty))
         } else if self.product_id.is_some() && self.activity.reward_strategy != RewardStrategy::Designated {
             // Selection mode (Eco/Gen + explicit product_id): add a new item
             let info = self.reward_product_info.clone().ok_or_else(|| {
                 OrderError::InvalidOperation(
+                    CommandErrorCode::StampProductNotAvailable,
                     "Product info not available for selection mode".to_string(),
                 )
             })?;
             let rid = format!("stamp_reward::{}", metadata.command_id);
-            (info, rid)
+            (info, rid, None)
         } else if self.activity.reward_strategy == RewardStrategy::Designated {
             // Direct mode: designated product
             let product_id = self
@@ -155,17 +177,18 @@ impl CommandHandler for RedeemStampAction {
                 .or(self.activity.designated_product_id)
                 .ok_or_else(|| {
                     OrderError::InvalidOperation(
+                        CommandErrorCode::StampProductNotAvailable,
                         "Designated strategy requires a product_id".to_string(),
                     )
                 })?;
             let info = self.reward_product_info.clone().ok_or_else(|| {
-                OrderError::InvalidOperation(format!(
+                OrderError::InvalidOperation(CommandErrorCode::StampProductNotAvailable, format!(
                     "Product info not available for designated product {}",
                     product_id
                 ))
             })?;
             let rid = format!("stamp_reward::{}", metadata.command_id);
-            (info, rid)
+            (info, rid, None)
         } else {
             // Auto-match mode (Eco/Gen, no explicit selection): find best match from order
             let items_with_category: Vec<StampItemInfo<'_>> = snapshot
@@ -184,6 +207,7 @@ impl CommandHandler for RedeemStampAction {
             )
             .ok_or_else(|| {
                 OrderError::InvalidOperation(
+                    CommandErrorCode::StampNoMatch,
                     "No qualifying item found for stamp reward".to_string(),
                 )
             })?;
@@ -194,6 +218,7 @@ impl CommandHandler for RedeemStampAction {
                 .find(|i| i.instance_id == found_id)
                 .ok_or_else(|| {
                     OrderError::InvalidOperation(
+                        CommandErrorCode::InternalError,
                         "Reward item not found in snapshot".to_string(),
                     )
                 })?;
@@ -207,10 +232,11 @@ impl CommandHandler for RedeemStampAction {
                 category_name: item.category_name.clone(),
             };
             let rid = format!("stamp_reward::{}", metadata.command_id);
-            (product_info, rid)
+            (product_info, rid, None)
         };
 
-        let comp_qty = self.activity.reward_quantity;
+        // comp_qty_override is set for comp-existing (capped to item qty), otherwise use reward_quantity
+        let comp_qty = comp_qty_override.unwrap_or(self.activity.reward_quantity);
 
         let strategy_str = serde_json::to_value(&self.activity.reward_strategy)
             .ok()
@@ -405,7 +431,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -436,7 +462,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -612,7 +638,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -770,6 +796,7 @@ mod tests {
             stamp_activity_id: 1,
             reward_instance_id: "stamp_reward::prev-cmd".to_string(),
             is_comp_existing: false,
+            comp_source_instance_id: None,
         });
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -797,11 +824,223 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 
         // Verify error message mentions "already redeemed"
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("already redeemed"), "Expected 'already redeemed' in: {msg}");
+        }
+    }
+
+    // =========================================================================
+    // Comp-existing action tests: full comp vs partial comp
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_comp_existing_full_comp_uses_existing_instance_id() {
+        // Item qty=1, reward_qty=1 → full comp, reward_instance_id = existing_id
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.member_id = Some(42);
+        snapshot.member_name = Some("Alice".to_string());
+        snapshot.items.push(create_test_item(50, "potato-1", 4.50, Some(1)));
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let mut activity = create_test_activity(RewardStrategy::Designated);
+        activity.designated_product_id = Some(50);
+        activity.reward_quantity = 1;
+
+        let action = RedeemStampAction {
+            order_id: "order-1".to_string(),
+            stamp_activity_id: 1,
+            product_id: None,
+            comp_existing_instance_id: Some("potato-1".to_string()),
+            activity,
+            reward_targets: vec![],
+            reward_product_info: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::StampRedeemed {
+            reward_instance_id,
+            comp_existing_instance_id,
+            quantity,
+            ..
+        } = &events[0].payload
+        {
+            // Full comp: reward_instance_id == existing item's instance_id
+            assert_eq!(reward_instance_id, "potato-1");
+            assert_eq!(comp_existing_instance_id.as_deref(), Some("potato-1"));
+            assert_eq!(*quantity, 1);
+        } else {
+            panic!("Expected StampRedeemed payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_comp_existing_partial_comp_generates_new_instance_id() {
+        // Item qty=7, reward_qty=1 → partial comp, new reward_instance_id
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.member_id = Some(42);
+        snapshot.member_name = Some("Alice".to_string());
+        let mut item = create_test_item(50, "potato-1", 4.50, Some(1));
+        item.quantity = 7;
+        item.unpaid_quantity = 7;
+        snapshot.items.push(item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let mut activity = create_test_activity(RewardStrategy::Designated);
+        activity.designated_product_id = Some(50);
+        activity.reward_quantity = 1;
+
+        let action = RedeemStampAction {
+            order_id: "order-1".to_string(),
+            stamp_activity_id: 1,
+            product_id: None,
+            comp_existing_instance_id: Some("potato-1".to_string()),
+            activity,
+            reward_targets: vec![],
+            reward_product_info: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::StampRedeemed {
+            reward_instance_id,
+            comp_existing_instance_id,
+            quantity,
+            ..
+        } = &events[0].payload
+        {
+            // Partial comp: reward_instance_id is new, comp_existing still points to source
+            assert!(reward_instance_id.starts_with("stamp_reward::"));
+            assert_ne!(reward_instance_id, "potato-1");
+            assert_eq!(comp_existing_instance_id.as_deref(), Some("potato-1"));
+            assert_eq!(*quantity, 1);
+        } else {
+            panic!("Expected StampRedeemed payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_comp_existing_caps_quantity_to_item() {
+        // Item qty=2, reward_qty=5 → caps to 2, full comp
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.member_id = Some(42);
+        snapshot.member_name = Some("Alice".to_string());
+        let mut item = create_test_item(50, "potato-1", 4.50, Some(1));
+        item.quantity = 2;
+        item.unpaid_quantity = 2;
+        snapshot.items.push(item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let mut activity = create_test_activity(RewardStrategy::Designated);
+        activity.designated_product_id = Some(50);
+        activity.reward_quantity = 5; // More than item qty
+
+        let action = RedeemStampAction {
+            order_id: "order-1".to_string(),
+            stamp_activity_id: 1,
+            product_id: None,
+            comp_existing_instance_id: Some("potato-1".to_string()),
+            activity,
+            reward_targets: vec![],
+            reward_product_info: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::StampRedeemed {
+            reward_instance_id,
+            quantity,
+            ..
+        } = &events[0].payload
+        {
+            // Capped to 2, full comp (reward_id == existing_id)
+            assert_eq!(*quantity, 2);
+            assert_eq!(reward_instance_id, "potato-1");
+        } else {
+            panic!("Expected StampRedeemed payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_comp_existing_eco_gen_partial_comp() {
+        // Eco/Gen comp-existing with partial comp
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.member_id = Some(42);
+        snapshot.member_name = Some("Alice".to_string());
+        let mut item = create_test_item(20, "item-1", 5.00, Some(100));
+        item.quantity = 3;
+        item.unpaid_quantity = 3;
+        snapshot.items.push(item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let mut activity = create_test_activity(RewardStrategy::Economizador);
+        activity.reward_quantity = 1;
+
+        let action = RedeemStampAction {
+            order_id: "order-1".to_string(),
+            stamp_activity_id: 1,
+            product_id: None,
+            comp_existing_instance_id: Some("item-1".to_string()),
+            activity,
+            reward_targets: vec![StampRewardTarget {
+                id: 1,
+                stamp_activity_id: 1,
+                target_type: StampTargetType::Category,
+                target_id: 100,
+            }],
+            reward_product_info: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::StampRedeemed {
+            reward_instance_id,
+            comp_existing_instance_id,
+            quantity,
+            ..
+        } = &events[0].payload
+        {
+            // Partial comp: item qty=3 > reward_qty=1
+            assert!(reward_instance_id.starts_with("stamp_reward::"));
+            assert_eq!(comp_existing_instance_id.as_deref(), Some("item-1"));
+            assert_eq!(*quantity, 1);
+        } else {
+            panic!("Expected StampRedeemed payload");
         }
     }
 }

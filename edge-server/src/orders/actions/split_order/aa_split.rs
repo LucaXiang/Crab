@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use crate::orders::money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType};
 
 use super::{validate_active_order, validate_split_mode_allowed, validate_tendered_and_change, SplitMode};
@@ -39,12 +40,14 @@ impl CommandHandler for StartAaSplitAction {
         // Must not already be in AA mode
         if snapshot.aa_total_shares.is_some() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitAlreadyStarted,
                 "AA split already started. Use PayAaSplit for subsequent payments".to_string(),
             ));
         }
 
         if self.total_shares < 2 {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidShares,
                 "AA total shares must be at least 2".to_string(),
             ));
         }
@@ -52,7 +55,7 @@ impl CommandHandler for StartAaSplitAction {
             return Err(OrderError::InvalidAmount);
         }
         if self.shares > self.total_shares {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidShares, format!(
                 "Shares ({}) exceeds total shares ({})",
                 self.shares, self.total_shares
             )));
@@ -145,6 +148,7 @@ impl CommandHandler for PayAaSplitAction {
         // Must already be in AA mode
         let total_shares = snapshot.aa_total_shares.ok_or_else(|| {
             OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitNotStarted,
                 "AA split not started. Use StartAaSplit first".to_string(),
             )
         })?;
@@ -155,7 +159,7 @@ impl CommandHandler for PayAaSplitAction {
 
         let remaining_shares = total_shares - snapshot.aa_paid_shares;
         if self.shares > remaining_shares {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidShares, format!(
                 "AA shares ({}) exceeds remaining shares ({})",
                 self.shares, remaining_shares
             )));

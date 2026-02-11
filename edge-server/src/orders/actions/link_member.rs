@@ -7,10 +7,12 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
+use shared::order::types::CommandErrorCode;
+
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::services::catalog_service::ProductMeta;
 use shared::models::MgDiscountRule;
-use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
+use shared::order::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType, OrderStatus};
 
 /// LinkMember action
 #[derive(Debug, Clone)]
@@ -46,30 +48,64 @@ impl CommandHandler for LinkMemberAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
                     "Cannot link member on order with status: {:?}",
                     snapshot.status
                 )));
             }
         }
 
-        // 3. Block during active split payments
+        // 3. Block if a member is already linked (must unlink first)
+        if snapshot.member_id.is_some() {
+            return Err(OrderError::InvalidOperation(CommandErrorCode::MemberAlreadyLinked,
+                "A member is already linked to this order. Unlink first.".to_string(),
+            ));
+        }
+
+        // 4. Block during active split payments
         if snapshot.aa_total_shares.is_some() {
-            return Err(OrderError::InvalidOperation(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::AaSplitActive,
                 "Cannot link member during AA split".to_string(),
             ));
         }
         if snapshot.has_amount_split {
-            return Err(OrderError::InvalidOperation(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::AmountSplitActive,
                 "Cannot link member during amount split".to_string(),
             ));
         }
 
-        // 4. MG discounts are NOT applied retroactively to existing items.
-        // Only items added after member link will get MG discounts (via AddItems).
-        let mg_item_discounts = Vec::new();
+        // 5. Calculate MG discounts for existing items
+        let mg_item_discounts: Vec<MgItemDiscount> = if self.mg_rules.is_empty() {
+            vec![]
+        } else {
+            snapshot
+                .items
+                .iter()
+                .filter(|item| !item.is_comped)
+                .filter_map(|item| {
+                    let category_id = self
+                        .product_metadata
+                        .get(&item.id)
+                        .map(|m| m.category_id);
+                    let result = crate::marketing::mg_calculator::calculate_mg_discount(
+                        item.unit_price,
+                        item.id,
+                        category_id,
+                        &self.mg_rules,
+                    );
+                    if result.applied_rules.is_empty() {
+                        None
+                    } else {
+                        Some(MgItemDiscount {
+                            instance_id: item.instance_id.clone(),
+                            applied_mg_rules: result.applied_rules,
+                        })
+                    }
+                })
+                .collect()
+        };
 
-        // 5. Generate event
+        // 6. Generate event
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
@@ -244,7 +280,11 @@ mod tests {
             mg_item_discounts, ..
         } = &events[0].payload
         {
-            assert!(mg_item_discounts.is_empty());
+            // Global 10% rule applies to existing item (unit_price=50 → discount=5)
+            assert_eq!(mg_item_discounts.len(), 1);
+            assert_eq!(mg_item_discounts[0].instance_id, "inst-100");
+            assert_eq!(mg_item_discounts[0].applied_mg_rules.len(), 1);
+            assert_eq!(mg_item_discounts[0].applied_mg_rules[0].calculated_amount, 5.0);
         } else {
             panic!("Expected MemberLinked payload");
         }
@@ -329,7 +369,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -357,7 +397,36 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+    }
+
+    #[tokio::test]
+    async fn test_link_member_blocked_when_already_linked() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.member_id = Some(10);
+        snapshot.member_name = Some("Bob".to_string());
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = LinkMemberAction {
+            order_id: "order-1".to_string(),
+            member_id: 42,
+            member_name: "Alice".to_string(),
+            marketing_group_id: 1,
+            marketing_group_name: "VIP".to_string(),
+            mg_rules: vec![],
+            product_metadata: HashMap::new(),
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]

@@ -143,6 +143,11 @@ export const CartItem = React.memo<CartItemProps>(({
               -{discountPercent}%
             </span>
           )}
+          {item.mg_discount_amount > 0 && (
+            <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">
+              -{formatCurrency(item.mg_discount_amount)}
+            </span>
+          )}
           <div className="font-bold text-gray-700 text-lg">
             {formatCurrency(finalLineTotal)}
           </div>

@@ -2,7 +2,8 @@
  * StampRedeemModal - Smart stamp redemption modal.
  *
  * Shows different options based on strategy and order state:
- * - Designated: single "redeem" action
+ * - Designated + matching item in order: "comp existing" + "add new" options
+ * - Designated + no matching item: "add new" only
  * - Eco/Gen with excess + matching items: "match" + "select" options
  * - Eco/Gen without excess or no matching: "select" only
  */
@@ -46,6 +47,7 @@ export const StampRedeemModal: React.FC<StampRedeemModalProps> = ({
 
   const sp = activity;
   const isDesignated = sp.reward_strategy === 'DESIGNATED';
+  const hasDesignatedMatch = isDesignated && matchingItems.length > 0;
   const showMatchOption = !isDesignated && hasExcess && matchingItems.length > 0;
   const showSelectOption = !isDesignated && (sp.reward_targets?.length > 0);
 
@@ -54,7 +56,9 @@ export const StampRedeemModal: React.FC<StampRedeemModalProps> = ({
     ? sp.reward_strategy === 'ECONOMIZADOR'
       ? matchingItems.reduce((a, b) => a.original_price <= b.original_price ? a : b)
       : matchingItems.reduce((a, b) => a.original_price >= b.original_price ? a : b)
-    : null;
+    : hasDesignatedMatch
+      ? matchingItems[0]
+      : null;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
@@ -79,22 +83,41 @@ export const StampRedeemModal: React.FC<StampRedeemModalProps> = ({
         {/* Options */}
         <div className="p-5 space-y-3">
           {isDesignated ? (
-            /* Designated: single action */
-            <button
-              onClick={() => { onDirectRedeem(); onClose(); }}
-              disabled={isProcessing}
-              className="w-full p-5 bg-violet-50 hover:bg-violet-100 border-2 border-violet-200 hover:border-violet-400 rounded-xl text-left transition-all disabled:opacity-50 flex items-center gap-4"
-            >
-              <div className="w-12 h-12 bg-violet-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Gift size={24} className="text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="font-bold text-gray-900">{t('checkout.stamp.redeem')}</div>
-                <div className="text-sm text-gray-500 mt-0.5">
-                  {t('checkout.stamp.reward_quantity', { count: sp.reward_quantity })}
+            /* Designated: comp existing + add new (or just add new if no match) */
+            <>
+              {hasDesignatedMatch && bestMatch && (
+                <button
+                  onClick={() => { onMatchRedeem(); onClose(); }}
+                  disabled={isProcessing}
+                  className="w-full p-5 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-400 rounded-xl text-left transition-all disabled:opacity-50 flex items-center gap-4"
+                >
+                  <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Target size={24} className="text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-gray-900">{t('checkout.stamp.comp_existing')}</div>
+                    <div className="text-sm text-gray-500 mt-0.5">
+                      {t('checkout.stamp.comp_existing_desc', { name: bestMatch.name, price: formatCurrency(bestMatch.original_price) })}
+                    </div>
+                  </div>
+                </button>
+              )}
+              <button
+                onClick={() => { onDirectRedeem(); onClose(); }}
+                disabled={isProcessing}
+                className="w-full p-5 bg-violet-50 hover:bg-violet-100 border-2 border-violet-200 hover:border-violet-400 rounded-xl text-left transition-all disabled:opacity-50 flex items-center gap-4"
+              >
+                <div className="w-12 h-12 bg-violet-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Gift size={24} className="text-white" />
                 </div>
-              </div>
-            </button>
+                <div className="flex-1">
+                  <div className="font-bold text-gray-900">{t('checkout.stamp.add_new')}</div>
+                  <div className="text-sm text-gray-500 mt-0.5">
+                    {t('checkout.stamp.add_new_desc')}
+                  </div>
+                </div>
+              </button>
+            </>
           ) : (
             /* Eco/Gen: match and/or select */
             <>

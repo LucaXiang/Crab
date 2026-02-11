@@ -9,6 +9,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// RemoveItem action
@@ -42,10 +43,13 @@ impl CommandHandler for RemoveItemAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Cannot remove item from order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot remove item from order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -59,6 +63,7 @@ impl CommandHandler for RemoveItemAction {
         // 4. Reject removal of comped items (locked)
         if item.is_comped {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::ItemIsComped,
                 "Cannot remove a comped item".to_string(),
             ));
         }
@@ -76,6 +81,7 @@ impl CommandHandler for RemoveItemAction {
             Some(qty) => {
                 if qty <= 0 {
                     return Err(OrderError::InvalidOperation(
+                        CommandErrorCode::InvalidQuantity,
                         "quantity must be positive".to_string(),
                     ));
                 }
@@ -87,6 +93,7 @@ impl CommandHandler for RemoveItemAction {
             None => {
                 if unpaid_qty <= 0 {
                     return Err(OrderError::InvalidOperation(
+                        CommandErrorCode::ItemFullyPaid,
                         "Fully paid item cannot be removed".to_string(),
                     ));
                 }
@@ -353,7 +360,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -380,7 +387,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -534,8 +541,8 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
         }
     }
@@ -601,7 +608,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     /// quantity=Some(qty) where qty > unpaid → rejected

@@ -70,6 +70,13 @@ export async function updateStampActivity(groupId: number, activityId: number, d
   });
 }
 
+export async function toggleStampActivity(groupId: number, activityId: number, isActive: boolean): Promise<StampActivityDetail> {
+  return invokeApi<StampActivityDetail>('api_put', {
+    path: `/api/marketing-groups/${groupId}/stamp-activities/${activityId}`,
+    body: { is_active: isActive },
+  });
+}
+
 export async function deleteStampActivity(groupId: number, activityId: number): Promise<void> {
   await invokeApi<void>('api_delete', { path: `/api/marketing-groups/${groupId}/stamp-activities/${activityId}` });
 }

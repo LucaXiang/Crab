@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 use crate::orders::money::{to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType};
 
 use super::{validate_active_order, validate_split_mode_allowed, validate_tendered_and_change, SplitMode};
@@ -33,7 +34,7 @@ impl CommandHandler for SplitByAmountAction {
 
         let remaining = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
         if to_decimal(self.split_amount) > remaining + MONEY_TOLERANCE {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::SplitExceedsRemaining, format!(
                 "Split amount ({:.2}) exceeds remaining unpaid ({:.2})",
                 self.split_amount,
                 to_f64(remaining)

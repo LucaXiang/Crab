@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// UncompItem action
@@ -37,10 +38,13 @@ impl CommandHandler for UncompItemAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Cannot uncomp item on order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot uncomp item on order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -54,6 +58,7 @@ impl CommandHandler for UncompItemAction {
         // 4. Item must be comped
         if !item.is_comped {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::ItemNotComped,
                 "Item is not comped".to_string(),
             ));
         }
@@ -67,6 +72,7 @@ impl CommandHandler for UncompItemAction {
             .find(|c| c.instance_id == self.instance_id)
             .ok_or_else(|| {
                 OrderError::InvalidOperation(
+                    CommandErrorCode::InternalError,
                     "CompRecord not found for this item".to_string(),
                 )
             })?;
@@ -334,7 +340,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -386,7 +392,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
         // With i64 authorizer_id, "empty" validation no longer applies
-        assert!(result.is_ok() || matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(result.is_ok() || matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]

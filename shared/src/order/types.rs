@@ -363,6 +363,7 @@ impl CommandError {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CommandErrorCode {
+    // === Original ===
     OrderNotFound,
     OrderAlreadyCompleted,
     OrderAlreadyVoided,
@@ -380,6 +381,69 @@ pub enum CommandErrorCode {
     OutOfMemory,
     StorageCorrupted,
     SystemBusy,
+
+    // === Order Status ===
+    OrderNotActive,
+    OrderAlreadyMerged,
+
+    // === Member ===
+    MemberAlreadyLinked,
+    NoMemberLinked,
+    MemberRequired,
+    MemberLinkedCannotMerge,
+
+    // === Split Blocks ===
+    AaSplitActive,
+    AmountSplitActive,
+    ItemSplitBlocked,
+
+    // === Item ===
+    EmptyItems,
+    TooManyItems,
+    ItemIsComped,
+    ItemNotComped,
+    ItemAlreadyComped,
+    NoChangesDetected,
+    InvalidQuantity,
+    EmptyCompReason,
+    ItemFullyPaid,
+
+    // === Payment ===
+    PaymentExceedsRemaining,
+    InsufficientTender,
+    PaymentInsufficient,
+    HasPayments,
+
+    // === Merge ===
+    CannotMergeSelf,
+
+    // === AA Split ===
+    AaSplitAlreadyStarted,
+    AaSplitNotStarted,
+    InvalidShares,
+    SplitExceedsRemaining,
+
+    // === Split Items ===
+    DuplicateSplitItem,
+    CannotSplitComped,
+
+    // === Adjustment ===
+    MutuallyExclusiveAdjustment,
+    InvalidAdjustmentValue,
+
+    // === Stamp ===
+    StampAlreadyRedeemed,
+    StampNoMatch,
+    StampRedemptionNotFound,
+    StampTargetMismatch,
+    StampProductNotAvailable,
+
+    // === Rule ===
+    RuleNotFoundInOrder,
+
+    // === Order Info ===
+    NoFieldsToUpdate,
+    InvalidGuestCount,
 }
 
 /// Sync request for reconnection
@@ -429,6 +493,10 @@ pub struct StampRedemptionState {
     /// Whether this redemption comped an existing item (vs adding a new one)
     #[serde(default)]
     pub is_comp_existing: bool,
+    /// Source item instance_id for partial comp-existing (split case).
+    /// When set, reversal merges the comped quantity back into this source item.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comp_source_instance_id: Option<String>,
 }
 
 /// Item modification result

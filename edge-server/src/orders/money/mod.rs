@@ -8,6 +8,7 @@ use crate::orders::traits::OrderError;
 use rust_decimal::prelude::*;
 use shared::models::price_rule::{AdjustmentType, RuleType};
 use shared::order::{CartItemInput, CartItemSnapshot, ItemChanges, OrderSnapshot, PaymentInput, MAX_OPTION_QUANTITY};
+use shared::order::types::CommandErrorCode;
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
 const DECIMAL_PLACES: u32 = 2;
@@ -26,7 +27,7 @@ const MAX_PAYMENT_AMOUNT: f64 = 1_000_000.0;
 #[inline]
 fn require_finite(value: f64, field_name: &str) -> Result<(), OrderError> {
     if !value.is_finite() {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
             "{} must be a finite number, got {}",
             field_name, value
         )));
@@ -39,13 +40,13 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
     // Price must be finite and non-negative
     require_finite(item.price, "price")?;
     if item.price < 0.0 {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
             "price must be non-negative, got {}",
             item.price
         )));
     }
     if item.price > MAX_PRICE {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
             "price exceeds maximum allowed ({}), got {}",
             MAX_PRICE, item.price
         )));
@@ -55,13 +56,13 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
     if let Some(op) = item.original_price {
         require_finite(op, "original_price")?;
         if op < 0.0 {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
                 "original_price must be non-negative, got {}",
                 op
             )));
         }
         if op > MAX_PRICE {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
                 "original_price exceeds maximum allowed ({}), got {}",
                 MAX_PRICE, op
             )));
@@ -70,13 +71,13 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
 
     // Quantity must be positive and within bounds
     if item.quantity <= 0 {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
             "quantity must be positive, got {}",
             item.quantity
         )));
     }
     if item.quantity > MAX_QUANTITY {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
             "quantity exceeds maximum allowed ({}), got {}",
             MAX_QUANTITY, item.quantity
         )));
@@ -86,7 +87,7 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
     if let Some(d) = item.manual_discount_percent {
         require_finite(d, "manual_discount_percent")?;
         if !(0.0..=100.0).contains(&d) {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAdjustmentValue, format!(
                 "manual_discount_percent must be between 0 and 100, got {}",
                 d
             )));
@@ -99,7 +100,7 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
             if let Some(pm) = opt.price_modifier {
                 require_finite(pm, "option price_modifier")?;
                 if pm.abs() > MAX_PRICE {
-                    return Err(OrderError::InvalidOperation(format!(
+                    return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
                         "option price_modifier exceeds maximum allowed, got {}",
                         pm
                     )));
@@ -107,14 +108,14 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
             }
             // Validate option quantity
             if opt.quantity <= 0 {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
                     "option quantity must be positive, got {} for option '{}'",
                     opt.quantity, opt.option_name
                 )));
             }
             // Use shared constant for max option quantity
             if opt.quantity > MAX_OPTION_QUANTITY {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
                     "option quantity exceeds maximum allowed ({}), got {} for option '{}'",
                     MAX_OPTION_QUANTITY, opt.quantity, opt.option_name
                 )));
@@ -133,7 +134,7 @@ pub fn validate_payment(payment: &PaymentInput) -> Result<(), OrderError> {
         return Err(OrderError::InvalidAmount);
     }
     if payment.amount > MAX_PAYMENT_AMOUNT {
-        return Err(OrderError::InvalidOperation(format!(
+        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
             "payment amount exceeds maximum allowed ({}), got {}",
             MAX_PAYMENT_AMOUNT, payment.amount
         )));
@@ -144,6 +145,7 @@ pub fn validate_payment(payment: &PaymentInput) -> Result<(), OrderError> {
         require_finite(t, "tendered")?;
         if t < 0.0 {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAmount,
                 "tendered amount must be non-negative".to_string(),
             ));
         }
@@ -157,12 +159,12 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
     if let Some(p) = changes.price {
         require_finite(p, "price")?;
         if p < 0.0 {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
                 "price must be non-negative, got {}", p
             )));
         }
         if p > MAX_PRICE {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
                 "price exceeds maximum allowed ({}), got {}", MAX_PRICE, p
             )));
         }
@@ -170,12 +172,12 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
 
     if let Some(q) = changes.quantity {
         if q <= 0 {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
                 "quantity must be positive, got {}", q
             )));
         }
         if q > MAX_QUANTITY {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
                 "quantity exceeds maximum allowed ({}), got {}", MAX_QUANTITY, q
             )));
         }
@@ -184,7 +186,7 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
     if let Some(d) = changes.manual_discount_percent {
         require_finite(d, "manual_discount_percent")?;
         if !(0.0..=100.0).contains(&d) {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAdjustmentValue, format!(
                 "manual_discount_percent must be between 0 and 100, got {}", d
             )));
         }
@@ -196,7 +198,7 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
             if let Some(pm) = opt.price_modifier {
                 require_finite(pm, "option price_modifier")?;
                 if pm.abs() > MAX_PRICE {
-                    return Err(OrderError::InvalidOperation(format!(
+                    return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
                         "option price_modifier exceeds maximum allowed, got {}", pm
                     )));
                 }
@@ -589,8 +591,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         });
     }
 
-    // Total discount and surcharge (item-level + MG + order-level)
-    let total_discount = item_discount_total + item_mg_discount_total + order_discount;
+    // Total discount and surcharge (item-level + order-level, MG tracked separately in mg_discount_amount)
+    let total_discount = item_discount_total + order_discount;
     let total_surcharge = item_surcharge_total + order_surcharge;
 
     // Final total (Spanish IVA: tax is already included in subtotal)

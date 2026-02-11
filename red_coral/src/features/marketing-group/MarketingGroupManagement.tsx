@@ -13,8 +13,9 @@ import {
   getMarketingGroupDetail,
   deleteDiscountRule,
   deleteStampActivity,
+  toggleStampActivity,
 } from './mutations';
-import { GroupListPanel, GroupDetailPanel } from './components';
+import { GroupListPanel, GroupDetailPanel, StampEditModal } from './components';
 import { DiscountRuleWizard } from './DiscountRuleWizard';
 import { StampActivityWizard } from './StampActivityWizard';
 import { toast } from '@/presentation/components/Toast';
@@ -244,7 +245,17 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
                 onEditRule={(rule) => { setEditingRule(rule); setShowRuleForm(true); }}
                 onDeleteRule={(rule) => setDeleteConfirm({ type: 'rule', id: rule.id, name: rule.display_name })}
                 onAddStamp={() => { setEditingStamp(null); setShowStampForm(true); }}
-                onEditStamp={(activity) => { setEditingStamp(activity); setShowStampForm(true); }}
+                onEditStamp={(activity) => { setEditingStamp(activity); }}
+                onToggleStamp={async (activity) => {
+                  try {
+                    await toggleStampActivity(selectedGroupId!, activity.id, !activity.is_active);
+                    await refreshDetail();
+                    toast.success(t(activity.is_active ? 'common.message.disabled' : 'common.message.enabled'));
+                  } catch (e) {
+                    logger.error('Failed to toggle stamp activity', e);
+                    toast.error(t('common.message.save_failed'));
+                  }
+                }}
                 onDeleteStamp={(activity) => setDeleteConfirm({ type: 'stamp', id: activity.id, name: activity.display_name })}
               />
             </div>
@@ -280,13 +291,21 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
         />
       )}
 
-      {selectedGroupId && (
+      {selectedGroupId && showStampForm && !editingStamp && (
         <StampActivityWizard
           isOpen={showStampForm}
           groupId={selectedGroupId}
-          editingActivity={editingStamp}
-          onClose={() => { setShowStampForm(false); setEditingStamp(null); }}
-          onSuccess={() => { setShowStampForm(false); setEditingStamp(null); refreshDetail(); }}
+          onClose={() => { setShowStampForm(false); }}
+          onSuccess={() => { setShowStampForm(false); refreshDetail(); }}
+        />
+      )}
+
+      {selectedGroupId && editingStamp && (
+        <StampEditModal
+          activity={editingStamp}
+          groupId={selectedGroupId}
+          onClose={() => { setEditingStamp(null); }}
+          onSuccess={() => { setEditingStamp(null); refreshDetail(); }}
         />
       )}
 

@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use tracing::{debug, info};
 
 use shared::models::{MgDiscountRule, PriceRule};
+use shared::order::types::CommandErrorCode;
 use crate::marketing::mg_calculator;
 use crate::services::catalog_service::ProductMeta;
 use crate::orders::reducer::input_to_snapshot_with_rules;
@@ -38,12 +39,12 @@ impl CommandHandler for AddItemsAction {
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 0. Validate items count
         if self.items.is_empty() {
-            return Err(OrderError::InvalidOperation(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::EmptyItems,
                 "Items cannot be empty".to_string(),
             ));
         }
         if self.items.len() > MAX_ITEMS_PER_COMMAND {
-            return Err(OrderError::InvalidOperation(format!(
+            return Err(OrderError::InvalidOperation(CommandErrorCode::TooManyItems, format!(
                 "Too many items ({}), maximum is {}",
                 self.items.len(),
                 MAX_ITEMS_PER_COMMAND

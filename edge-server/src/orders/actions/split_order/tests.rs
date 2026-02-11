@@ -146,7 +146,7 @@ async fn test_split_by_items_empty_fails() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }
 
 // ========== SplitByAmount tests ==========
@@ -288,7 +288,7 @@ async fn test_start_aa_split_invalid_total_shares() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }
 
 // ========== PayAASplit tests ==========
@@ -356,7 +356,7 @@ async fn test_pay_aa_split_not_started_fails() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }
 
 // ========== Mutual exclusion tests ==========
@@ -449,7 +449,7 @@ async fn test_amount_split_then_item_split_blocked() {
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
     assert!(
-        matches!(result, Err(OrderError::InvalidOperation(_))),
+        matches!(result, Err(OrderError::InvalidOperation(..))),
         "Item split should be blocked after amount split"
     );
 }
@@ -510,7 +510,7 @@ async fn test_aa_active_blocks_item_split() {
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
     assert!(
-        matches!(result, Err(OrderError::InvalidOperation(_))),
+        matches!(result, Err(OrderError::InvalidOperation(..))),
         "Item split should be blocked while AA is active"
     );
 }
@@ -539,7 +539,7 @@ async fn test_aa_active_blocks_amount_split() {
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
     assert!(
-        matches!(result, Err(OrderError::InvalidOperation(_))),
+        matches!(result, Err(OrderError::InvalidOperation(..))),
         "Amount split should be blocked while AA is active"
     );
 }
@@ -569,5 +569,5 @@ async fn test_pay_aa_split_exceeds_remaining_fails() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }

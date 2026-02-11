@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// CancelStampRedemption action
@@ -34,7 +35,7 @@ impl CommandHandler for CancelStampRedemptionAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
+                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
                     "Cannot cancel stamp redemption on order with status: {:?}",
                     snapshot.status
                 )));
@@ -47,7 +48,7 @@ impl CommandHandler for CancelStampRedemptionAction {
             .iter()
             .find(|r| r.stamp_activity_id == self.stamp_activity_id)
             .ok_or_else(|| {
-                OrderError::InvalidOperation(format!(
+                OrderError::InvalidOperation(CommandErrorCode::StampRedemptionNotFound, format!(
                     "No stamp redemption found for activity {} in this order",
                     self.stamp_activity_id
                 ))
@@ -65,6 +66,7 @@ impl CommandHandler for CancelStampRedemptionAction {
 
         let reward_instance_id = redemption.reward_instance_id.clone();
         let is_comp_existing = redemption.is_comp_existing;
+        let comp_source_instance_id = redemption.comp_source_instance_id.clone();
 
         let event = OrderEvent::new(
             ctx.next_sequence(),
@@ -79,6 +81,7 @@ impl CommandHandler for CancelStampRedemptionAction {
                 stamp_activity_name,
                 reward_instance_id,
                 is_comp_existing,
+                comp_source_instance_id,
             },
         );
 
@@ -145,6 +148,7 @@ mod tests {
             stamp_activity_id: 1,
             reward_instance_id: "stamp_reward::prev-cmd".to_string(),
             is_comp_existing: false,
+            comp_source_instance_id: None,
         });
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -193,7 +197,7 @@ mod tests {
         };
 
         let result = action.execute(&mut ctx, &create_test_metadata()).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]

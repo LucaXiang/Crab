@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// ToggleRuleSkip action
@@ -26,6 +27,7 @@ impl CommandHandler for ToggleRuleSkipAction {
         // 2. Validate status
         if !matches!(snapshot.status, OrderStatus::Active) {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::OrderNotActive,
                 "Cannot toggle rule on non-active order".to_string(),
             ));
         }
@@ -35,11 +37,13 @@ impl CommandHandler for ToggleRuleSkipAction {
         // or per-split amounts inconsistent.
         if snapshot.aa_total_shares.is_some() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitActive,
                 "Cannot toggle rule during AA split".to_string(),
             ));
         }
         if snapshot.has_amount_split {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AmountSplitActive,
                 "Cannot toggle rule during amount split".to_string(),
             ));
         }
@@ -59,10 +63,10 @@ impl CommandHandler for ToggleRuleSkipAction {
             .map(|r| r.display_name.clone());
 
         let Some(rule_name) = rule_name else {
-            return Err(OrderError::InvalidOperation(format!(
-                "Rule {} not found in order",
-                self.rule_id
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::RuleNotFoundInOrder,
+                format!("Rule {} not found in order", self.rule_id),
+            ));
         };
 
         // 4. Generate event (actual toggle and recalculation will be done by applier)
@@ -259,8 +263,8 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("not found in order"));
         }
     }
@@ -288,8 +292,8 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("non-active order"));
         }
     }
@@ -582,8 +586,8 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("AA split"));
         }
     }
@@ -612,8 +616,8 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("amount split"));
         }
     }

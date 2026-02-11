@@ -97,6 +97,11 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
               -{formatCurrency(totalRuleDiscount)}
             </span>
           )}
+          {item.mg_discount_amount > 0 && (
+            <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">
+              -{formatCurrency(item.mg_discount_amount)}
+            </span>
+          )}
           {totalRuleSurcharge > 0 && (
             <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
               +{formatCurrency(totalRuleSurcharge)}

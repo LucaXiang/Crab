@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use crate::orders::money::{is_payment_sufficient, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use shared::order::types::ServiceType;
+use shared::order::types::{CommandErrorCode, ServiceType};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, PaymentSummaryItem};
 
 /// CompleteOrder action
@@ -39,10 +39,13 @@ impl CommandHandler for CompleteOrderAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Cannot complete order in {:?} status",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot complete order in {:?} status",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -62,10 +65,13 @@ impl CommandHandler for CompleteOrderAction {
         // 4. Validate payment is sufficient (using precise comparison with tolerance)
         let total_paid_f64 = to_f64(total_paid);
         if !is_payment_sufficient(total_paid_f64, snapshot.total) {
-            return Err(OrderError::InvalidOperation(format!(
-                "Payment insufficient: paid {:.2}, required {:.2}",
-                total_paid_f64, snapshot.total
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::PaymentInsufficient,
+                format!(
+                    "Payment insufficient: paid {:.2}, required {:.2}",
+                    total_paid_f64, snapshot.total
+                ),
+            ));
         }
 
         // 5. Convert payment summary to Vec<PaymentSummaryItem>
@@ -289,8 +295,8 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("Payment insufficient"));
         }
     }

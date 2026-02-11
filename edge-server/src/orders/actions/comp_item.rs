@@ -13,6 +13,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// CompItem action
@@ -36,6 +37,7 @@ impl CommandHandler for CompItemAction {
         // 1. Validate reason is non-empty
         if self.reason.trim().is_empty() {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::EmptyCompReason,
                 "comp reason must not be empty".to_string(),
             ));
         }
@@ -43,6 +45,7 @@ impl CommandHandler for CompItemAction {
         // 2. Validate quantity
         if self.quantity <= 0 {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidQuantity,
                 "quantity must be positive".to_string(),
             ));
         }
@@ -60,10 +63,13 @@ impl CommandHandler for CompItemAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(format!(
-                    "Cannot comp item on order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot comp item on order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -77,6 +83,7 @@ impl CommandHandler for CompItemAction {
         // 6. Cannot comp an already comped item
         if item.is_comped {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::ItemAlreadyComped,
                 "Item is already comped".to_string(),
             ));
         }
@@ -423,7 +430,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -449,7 +456,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -477,7 +484,7 @@ mod tests {
         let result = action.execute(&mut ctx, &metadata).await;
         // With i64 authorizer_id, "empty" validation no longer applies
         // This test may need revisiting for semantic correctness
-        assert!(result.is_ok() || matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(result.is_ok() || matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -530,7 +537,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     /// Test: comp all unpaid items on a partially paid item → full comp (not split).

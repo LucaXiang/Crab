@@ -13,6 +13,7 @@ mod add_order_note;
 mod add_payment;
 mod apply_order_adjustment;
 mod cancel_payment;
+mod cancel_stamp_redemption;
 mod comp_item;
 mod complete_order;
 mod link_member;
@@ -20,7 +21,6 @@ mod merge_orders;
 mod modify_item;
 mod move_order;
 pub mod open_table;
-mod cancel_stamp_redemption;
 mod redeem_stamp;
 mod remove_item;
 mod split_order;
@@ -35,6 +35,7 @@ pub use add_order_note::AddOrderNoteAction;
 pub use add_payment::AddPaymentAction;
 pub use apply_order_adjustment::{ApplyOrderDiscountAction, ApplyOrderSurchargeAction};
 pub use cancel_payment::CancelPaymentAction;
+pub use cancel_stamp_redemption::CancelStampRedemptionAction;
 pub use comp_item::CompItemAction;
 pub use complete_order::CompleteOrderAction;
 pub use link_member::LinkMemberAction;
@@ -42,11 +43,12 @@ pub use merge_orders::MergeOrdersAction;
 pub use modify_item::ModifyItemAction;
 pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
-pub use cancel_stamp_redemption::CancelStampRedemptionAction;
 pub use redeem_stamp::{RedeemStampAction, RewardProductInfo};
 
 pub use remove_item::RemoveItemAction;
-pub use split_order::{PayAaSplitAction, SplitByAmountAction, SplitByItemsAction, StartAaSplitAction};
+pub use split_order::{
+    PayAaSplitAction, SplitByAmountAction, SplitByItemsAction, StartAaSplitAction,
+};
 pub use toggle_rule_skip::ToggleRuleSkipAction;
 pub use uncomp_item::UncompItemAction;
 pub use unlink_member::UnlinkMemberAction;
@@ -129,7 +131,9 @@ impl From<&OrderCommand> for CommandAction {
             OrderCommandPayload::OpenTable { .. } => {
                 // OpenTable is handled specially in OrdersManager to generate receipt_number
                 // This path should never be reached
-                unreachable!("OpenTable should be handled by OrdersManager, not From<&OrderCommand>")
+                unreachable!(
+                    "OpenTable should be handled by OrdersManager, not From<&OrderCommand>"
+                )
             }
             OrderCommandPayload::AddItems { .. } => {
                 // AddItems is handled specially in OrdersManager to inject rules and metadata
@@ -363,7 +367,9 @@ impl From<&OrderCommand> for CommandAction {
             OrderCommandPayload::LinkMember { .. } => {
                 // LinkMember requires data injection (member info, MG rules)
                 // Handled specially in OrdersManager, not via From<&OrderCommand>
-                unreachable!("LinkMember should be handled by OrdersManager, not From<&OrderCommand>")
+                unreachable!(
+                    "LinkMember should be handled by OrdersManager, not From<&OrderCommand>"
+                )
             }
             OrderCommandPayload::UnlinkMember { order_id } => {
                 CommandAction::UnlinkMember(UnlinkMemberAction {
@@ -373,7 +379,9 @@ impl From<&OrderCommand> for CommandAction {
             OrderCommandPayload::RedeemStamp { .. } => {
                 // RedeemStamp requires data injection (activity, reward targets, product info)
                 // Handled specially in OrdersManager, not via From<&OrderCommand>
-                unreachable!("RedeemStamp should be handled by OrdersManager, not From<&OrderCommand>")
+                unreachable!(
+                    "RedeemStamp should be handled by OrdersManager, not From<&OrderCommand>"
+                )
             }
             OrderCommandPayload::CancelStampRedemption {
                 order_id,

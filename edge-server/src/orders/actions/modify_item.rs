@@ -10,6 +10,7 @@ use async_trait::async_trait;
 
 use crate::orders::reducer::generate_instance_id_from_parts;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::CommandErrorCode;
 use shared::order::{
     CartItemSnapshot, EventPayload, ItemChanges, ItemModificationResult, OrderEvent,
     OrderEventType, OrderStatus,
@@ -60,6 +61,7 @@ impl CommandHandler for ModifyItemAction {
         // 5. Reject modifications to comped items (locked)
         if item.is_comped {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::ItemIsComped,
                 "Cannot modify a comped item".to_string(),
             ));
         }
@@ -67,6 +69,7 @@ impl CommandHandler for ModifyItemAction {
         // 6. Reject no-op modifications (all specified changes match current state)
         if !has_actual_changes(item, &self.changes) {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::NoChangesDetected,
                 "No actual changes detected".to_string(),
             ));
         }
@@ -75,6 +78,7 @@ impl CommandHandler for ModifyItemAction {
         let affected_qty = self.affected_quantity.unwrap_or(item.quantity);
         if affected_qty <= 0 {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidQuantity,
                 "affected_quantity must be positive".to_string(),
             ));
         }
@@ -87,6 +91,7 @@ impl CommandHandler for ModifyItemAction {
             && new_qty <= 0
         {
             return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidQuantity,
                 "quantity must be positive".to_string(),
             ));
         }
@@ -99,10 +104,13 @@ impl CommandHandler for ModifyItemAction {
             .copied()
             .unwrap_or(0);
         if paid_qty > 0 && affected_qty > item.unpaid_quantity && affected_qty < item.quantity {
-            return Err(OrderError::InvalidOperation(format!(
-                "affected_quantity ({}) exceeds unpaid quantity ({})",
-                affected_qty, item.unpaid_quantity
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidQuantity,
+                format!(
+                    "affected_quantity ({}) exceeds unpaid quantity ({})",
+                    affected_qty, item.unpaid_quantity
+                ),
+            ));
         }
 
         // 9. Calculate previous values for audit trail
@@ -702,7 +710,7 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
 
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -941,7 +949,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -971,7 +979,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -1002,7 +1010,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -1042,7 +1050,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[tokio::test]
@@ -1080,7 +1088,7 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     #[test]
@@ -1344,8 +1352,8 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
+        assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
+        if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
         }
     }

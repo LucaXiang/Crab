@@ -1,298 +1,557 @@
-import React, { useState } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import {
+  X, Check, FileText, Settings, Award, Crosshair,
+  RefreshCw, Coins, Crown, Package, LayoutGrid, Search,
+} from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useCategoryStore } from '@/features/category/store';
 import { useProductStore } from '@/core/stores/resources';
+import { toast } from '@/presentation/components/Toast';
+import { logger } from '@/utils/logger';
+import { FormSection, FormField, inputClass, selectClass } from '@/shared/components/FormField';
+import { updateStampActivity } from '../mutations';
 import type {
   StampActivityDetail,
   StampActivityCreate,
   StampTargetInput,
-  RewardStrategy,
   StampTargetType,
+  RewardStrategy,
 } from '@/core/domain/types/api';
 
-interface StampFormModalProps {
-  activity: StampActivityDetail | null;
-  onSave: (data: StampActivityCreate) => void;
-  onClose: () => void;
+// ── Shared: Strategy card options ──
+
+const strategyOptions: { value: RewardStrategy; icon: typeof Coins; variant: 'green' | 'amber' | 'blue' }[] = [
+  { value: 'ECONOMIZADOR', icon: Coins, variant: 'green' },
+  { value: 'GENEROSO', icon: Crown, variant: 'amber' },
+  { value: 'DESIGNATED', icon: Package, variant: 'blue' },
+];
+
+const variantStyles = {
+  green: {
+    border: 'border-green-500', bg: 'bg-green-50', ring: 'ring-green-100',
+    iconBg: 'bg-green-100', iconText: 'text-green-600', titleText: 'text-green-700',
+    checkBg: 'bg-green-500',
+  },
+  amber: {
+    border: 'border-amber-500', bg: 'bg-amber-50', ring: 'ring-amber-100',
+    iconBg: 'bg-amber-100', iconText: 'text-amber-600', titleText: 'text-amber-700',
+    checkBg: 'bg-amber-500',
+  },
+  blue: {
+    border: 'border-blue-500', bg: 'bg-blue-50', ring: 'ring-blue-100',
+    iconBg: 'bg-blue-100', iconText: 'text-blue-600', titleText: 'text-blue-700',
+    checkBg: 'bg-blue-500',
+  },
+};
+
+// ── Multi-select card grid (reused from wizard) ──
+
+function MultiCardGridSelector<T extends { id: number; name: string }>({
+  items,
+  selectedIds,
+  onToggle,
+  searchPlaceholder,
+  emptyText,
+  accentColor = 'teal',
+  renderExtra,
+}: {
+  items: T[];
+  selectedIds: Set<number>;
+  onToggle: (id: number) => void;
+  searchPlaceholder: string;
+  emptyText: string;
+  accentColor?: 'teal' | 'violet';
+  renderExtra?: (item: T) => React.ReactNode;
+}) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return items;
+    const lower = search.toLowerCase();
+    return items.filter((item) => item.name.toLowerCase().includes(lower));
+  }, [items, search]);
+
+  const colors = accentColor === 'teal'
+    ? { border: 'border-teal-500', bg: 'bg-teal-50', ring: 'ring-teal-200', text: 'text-teal-800', check: 'bg-teal-500', hover: 'hover:border-teal-300 hover:bg-teal-50/30', focus: 'focus:ring-teal-500/20 focus:border-teal-500' }
+    : { border: 'border-violet-500', bg: 'bg-violet-50', ring: 'ring-violet-200', text: 'text-violet-800', check: 'bg-violet-500', hover: 'hover:border-violet-300 hover:bg-violet-50/30', focus: 'focus:ring-violet-500/20 focus:border-violet-500' };
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={searchPlaceholder}
+          className={`w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 ${colors.focus} bg-white`}
+        />
+      </div>
+      <div className="grid grid-cols-3 gap-2 max-h-[14rem] overflow-y-auto custom-scrollbar content-start">
+        {filtered.length === 0 ? (
+          <div className="col-span-3 text-center py-6 text-sm text-gray-400">{emptyText}</div>
+        ) : (
+          filtered.map((item) => {
+            const isSelected = selectedIds.has(item.id);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onToggle(item.id)}
+                className={`relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[3.5rem] justify-center ${
+                  isSelected
+                    ? `${colors.border} ${colors.bg} ring-2 ${colors.ring}`
+                    : `bg-white text-gray-700 border-gray-200 ${colors.hover}`
+                }`}
+              >
+                <span className={`text-xs font-bold leading-tight ${isSelected ? colors.text : 'text-gray-900'}`}>
+                  {item.name}
+                </span>
+                {renderExtra?.(item)}
+                {isSelected && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <div className={`w-4 h-4 ${colors.check} rounded-full flex items-center justify-center`}>
+                      <Check size={10} className="text-white" strokeWidth={3} />
+                    </div>
+                  </div>
+                )}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 }
 
-export const StampFormModal: React.FC<StampFormModalProps> = ({ activity, onSave, onClose }) => {
+// ── Target section with tab toggle ──
+
+type TargetTab = 'CATEGORY' | 'PRODUCT';
+
+function TargetSection({
+  field,
+  label,
+  description,
+  required,
+  targets,
+  onToggle,
+  categories,
+  products,
+  categoryMap,
+  getSelectedIds,
+}: {
+  field: string;
+  label: string;
+  description: string;
+  required: boolean;
+  targets: StampTargetInput[];
+  onToggle: (type: StampTargetType, id: number) => void;
+  categories: { id: number; name: string }[];
+  products: { id: number; name: string; category_id?: number }[];
+  categoryMap: Map<number, string>;
+  getSelectedIds: (targets: StampTargetInput[], type: StampTargetType) => Set<number>;
+}) {
   const { t } = useI18n();
-  const categories = useCategoryStore((s) => s.items);
-  const products = useProductStore((s) => s.items);
+  const [activeTab, setTab] = useState<TargetTab>('CATEGORY');
 
-  const [name, setName] = useState(activity?.name || '');
-  const [displayName, setDisplayName] = useState(activity?.display_name || '');
-  const [stampsRequired, setStampsRequired] = useState(activity?.stamps_required || 10);
-  const [rewardQuantity, setRewardQuantity] = useState(activity?.reward_quantity || 1);
-  const [rewardStrategy, setRewardStrategy] = useState<RewardStrategy>(
-    activity?.reward_strategy || 'ECONOMIZADOR'
-  );
-  const [designatedProductId, setDesignatedProductId] = useState<number | null>(
-    activity?.designated_product_id || null
-  );
-  const [isCyclic, setIsCyclic] = useState(activity?.is_cyclic ?? true);
-  const [stampTargets, setStampTargets] = useState<StampTargetInput[]>(
-    activity?.stamp_targets.map((st) => ({ target_type: st.target_type, target_id: st.target_id })) || []
-  );
-  const [rewardTargets, setRewardTargets] = useState<StampTargetInput[]>(
-    activity?.reward_targets.map((rt) => ({ target_type: rt.target_type, target_id: rt.target_id })) || []
-  );
+  const catIds = getSelectedIds(targets, 'CATEGORY');
+  const prodIds = getSelectedIds(targets, 'PRODUCT');
+  const totalCount = catIds.size + prodIds.size;
 
-  const canSave = name.trim() && displayName.trim() && stampsRequired > 0 && stampTargets.length > 0;
-
-  const handleSubmit = () => {
-    onSave({
-      name,
-      display_name: displayName,
-      stamps_required: stampsRequired,
-      reward_quantity: rewardQuantity,
-      reward_strategy: rewardStrategy,
-      designated_product_id: rewardStrategy === 'DESIGNATED' ? designatedProductId : null,
-      is_cyclic: isCyclic,
-      stamp_targets: stampTargets,
-      reward_targets: rewardTargets,
-    });
-  };
-
-  const addTarget = (list: StampTargetInput[], setList: React.Dispatch<React.SetStateAction<StampTargetInput[]>>) => {
-    const firstCat = categories[0];
-    if (firstCat) {
-      setList([...list, { target_type: 'CATEGORY', target_id: firstCat.id }]);
-    }
-  };
-
-  const removeTarget = (list: StampTargetInput[], setList: React.Dispatch<React.SetStateAction<StampTargetInput[]>>, idx: number) => {
-    setList(list.filter((_, i) => i !== idx));
-  };
-
-  const updateTarget = (
-    list: StampTargetInput[],
-    setList: React.Dispatch<React.SetStateAction<StampTargetInput[]>>,
-    idx: number,
-    updates: Partial<StampTargetInput>
-  ) => {
-    setList(list.map((item, i) => (i === idx ? { ...item, ...updates } : item)));
-  };
-
-  const renderTargetRows = (
-    list: StampTargetInput[],
-    setList: React.Dispatch<React.SetStateAction<StampTargetInput[]>>,
-    label: string
-  ) => (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-700">{label}</label>
-        <button
-          type="button"
-          onClick={() => addTarget(list, setList)}
-          className="text-xs text-violet-600 hover:text-violet-700 flex items-center gap-1"
-        >
-          <Plus size={12} />
-          {t('settings.marketing_group.stamp.add_target')}
-        </button>
-      </div>
-      {list.length === 0 ? (
-        <p className="text-xs text-gray-400">{t('settings.marketing_group.stamp.no_targets')}</p>
-      ) : (
-        <div className="space-y-2">
-          {list.map((target, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <select
-                value={target.target_type}
-                onChange={(e) => {
-                  const newType = e.target.value as StampTargetType;
-                  const firstEntity = newType === 'CATEGORY' ? categories[0] : products[0];
-                  updateTarget(list, setList, idx, {
-                    target_type: newType,
-                    target_id: firstEntity?.id || 0,
-                  });
-                }}
-                className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm w-24"
-              >
-                <option value="CATEGORY">{t('settings.marketing_group.stamp.target_type.category')}</option>
-                <option value="PRODUCT">{t('settings.marketing_group.stamp.target_type.product')}</option>
-              </select>
-              <select
-                value={target.target_id}
-                onChange={(e) =>
-                  updateTarget(list, setList, idx, { target_id: Number(e.target.value) })
-                }
-                className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm"
-              >
-                {(target.target_type === 'CATEGORY' ? categories : products).map((entity) => (
-                  <option key={entity.id} value={entity.id}>
-                    {entity.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => removeTarget(list, setList, idx)}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">{label}</label>
+          {required && <span className="text-red-400">*</span>}
+          {totalCount > 0 && (
+            <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
+              {totalCount}
+            </span>
+          )}
         </div>
+        <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+      </div>
+
+      <div className="flex gap-2">
+        {(['CATEGORY', 'PRODUCT'] as const).map((tab) => {
+          const count = tab === 'CATEGORY' ? catIds.size : prodIds.size;
+          const Icon = tab === 'CATEGORY' ? LayoutGrid : Package;
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setTab(tab)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                activeTab === tab
+                  ? 'bg-teal-50 text-teal-700 border-2 border-teal-500'
+                  : 'bg-gray-50 text-gray-600 border-2 border-transparent hover:bg-gray-100'
+              }`}
+            >
+              <Icon size={16} />
+              {t(`settings.marketing_group.stamp.target_type.${tab.toLowerCase()}`)}
+              {count > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  activeTab === tab ? 'bg-teal-200 text-teal-800' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'CATEGORY' ? (
+        <MultiCardGridSelector
+          key={`${field}-cat`}
+          items={categories}
+          selectedIds={catIds}
+          onToggle={(id) => onToggle('CATEGORY', id)}
+          searchPlaceholder={t('common.action.search')}
+          emptyText={t('common.empty.no_results')}
+        />
+      ) : (
+        <MultiCardGridSelector
+          key={`${field}-prod`}
+          items={products}
+          selectedIds={prodIds}
+          onToggle={(id) => onToggle('PRODUCT', id)}
+          searchPlaceholder={t('common.action.search')}
+          emptyText={t('common.empty.no_results')}
+          renderExtra={(prod) => {
+            const catName = 'category_id' in prod ? categoryMap.get(prod.category_id as number) : undefined;
+            return catName ? (
+              <span className="text-[0.625rem] text-gray-400 mt-0.5 leading-tight">{catName}</span>
+            ) : null;
+          }}
+        />
       )}
     </div>
   );
+}
+
+// ── Main Edit Modal ──
+
+interface StampEditModalProps {
+  activity: StampActivityDetail;
+  groupId: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export const StampEditModal: React.FC<StampEditModalProps> = ({
+  activity,
+  groupId,
+  onClose,
+  onSuccess,
+}) => {
+  const { t } = useI18n();
+  const categories = useCategoryStore((s) => s.items);
+  const products = useProductStore((s) => s.items);
+  const [saving, setSaving] = useState(false);
+
+  // ── Form state ──
+  const [name, setName] = useState(activity.name);
+  const [displayName, setDisplayName] = useState(activity.display_name);
+  const [stampsRequired, setStampsRequired] = useState(activity.stamps_required);
+  const [rewardQuantity, setRewardQuantity] = useState(activity.reward_quantity);
+  const [isCyclic, setIsCyclic] = useState(activity.is_cyclic);
+  const [rewardStrategy, setRewardStrategy] = useState<RewardStrategy>(activity.reward_strategy);
+  const [designatedProductId, setDesignatedProductId] = useState<number | null>(
+    activity.designated_product_id ?? null,
+  );
+  const [stampTargets, setStampTargets] = useState<StampTargetInput[]>(
+    activity.stamp_targets.map((st) => ({ target_type: st.target_type, target_id: st.target_id })),
+  );
+  const [rewardTargets, setRewardTargets] = useState<StampTargetInput[]>(
+    activity.reward_targets.map((rt) => ({ target_type: rt.target_type, target_id: rt.target_id })),
+  );
+
+  const categoryMap = useMemo(() => {
+    const map = new Map<number, string>();
+    categories.forEach((cat) => map.set(cat.id, cat.name));
+    return map;
+  }, [categories]);
+
+  const getSelectedIds = useCallback((targets: StampTargetInput[], type: StampTargetType): Set<number> => {
+    return new Set(targets.filter((t) => t.target_type === type).map((t) => t.target_id));
+  }, []);
+
+  const toggleTarget = useCallback(
+    (field: 'stamp' | 'reward', type: StampTargetType, id: number) => {
+      const setFn = field === 'stamp' ? setStampTargets : setRewardTargets;
+      setFn((prev) => {
+        const exists = prev.some((t) => t.target_type === type && t.target_id === id);
+        if (exists) {
+          return prev.filter((t) => !(t.target_type === type && t.target_id === id));
+        }
+        return [...prev, { target_type: type, target_id: id }];
+      });
+    },
+    [],
+  );
+
+  const canSave =
+    name.trim() !== '' &&
+    displayName.trim() !== '' &&
+    stampsRequired > 0 &&
+    rewardQuantity > 0 &&
+    stampTargets.length > 0 &&
+    (rewardStrategy !== 'DESIGNATED' || designatedProductId != null);
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      const payload: StampActivityCreate = {
+        name: name.trim(),
+        display_name: displayName.trim(),
+        stamps_required: stampsRequired,
+        reward_quantity: rewardQuantity,
+        reward_strategy: rewardStrategy,
+        designated_product_id: rewardStrategy === 'DESIGNATED' ? designatedProductId : null,
+        is_cyclic: isCyclic,
+        stamp_targets: stampTargets,
+        reward_targets: rewardStrategy === 'DESIGNATED' ? [] : rewardTargets,
+      };
+      await updateStampActivity(groupId, activity.id, payload);
+      toast.success(t('settings.marketing_group.message.stamp_updated'));
+      onSuccess();
+    } catch (e) {
+      logger.error('Failed to update stamp activity', e);
+      toast.error(t('common.message.save_failed'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
+    <div className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h3 className="text-xl font-bold text-gray-800">
-            {activity ? t('settings.marketing_group.edit_stamp') : t('settings.marketing_group.add_stamp')}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X size={20} className="text-gray-400" />
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-white flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">
+            {t('settings.marketing_group.edit_stamp')}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <X size={18} className="text-gray-500" />
           </button>
         </div>
 
-        {/* Form */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Name fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('settings.marketing_group.field.name')}
-              </label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-                placeholder="coffee_stamp"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('settings.marketing_group.field.display_name')}
-              </label>
-              <input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-                placeholder={t('settings.marketing_group.stamp.display_name_placeholder')}
-              />
-            </div>
-          </div>
+        {/* Scrollable content - all sections flat */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
 
-          {/* Stamps & Reward count */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('settings.marketing_group.stamp.stamps_required')}
-              </label>
-              <input
-                type="number"
-                value={stampsRequired}
-                onChange={(e) => setStampsRequired(Number(e.target.value) || 0)}
-                min={1}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-              />
+          {/* ── Section 1: Naming ── */}
+          <FormSection title={t('settings.marketing_group.stamp_wizard.step1_section')} icon={FileText}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label={t('settings.marketing_group.field.name')} required>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={inputClass}
+                  placeholder="coffee_stamp"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('settings.marketing_group.stamp_wizard.name_hint')}
+                </p>
+              </FormField>
+              <FormField label={t('settings.marketing_group.field.display_name')} required>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className={inputClass}
+                  placeholder={t('settings.marketing_group.stamp.display_name_placeholder')}
+                />
+              </FormField>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('settings.marketing_group.stamp.reward_quantity')}
-              </label>
-              <input
-                type="number"
-                value={rewardQuantity}
-                onChange={(e) => setRewardQuantity(Number(e.target.value) || 0)}
-                min={1}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-              />
-            </div>
-          </div>
+          </FormSection>
 
-          {/* Reward Strategy */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('settings.marketing_group.stamp.reward_strategy')}
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['ECONOMIZADOR', 'GENEROSO', 'DESIGNATED'] as RewardStrategy[]).map((strategy) => (
-                <button
-                  key={strategy}
-                  type="button"
-                  onClick={() => setRewardStrategy(strategy)}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                    rewardStrategy === strategy
-                      ? 'bg-violet-50 text-violet-700 ring-2 ring-violet-400'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {t(`settings.marketing_group.stamp.strategy.${strategy.toLowerCase()}`)}
-                </button>
-              ))}
+          {/* ── Section 2: Config ── */}
+          <FormSection title={t('settings.marketing_group.stamp_wizard.step2_section')} icon={Settings}>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <FormField label={t('settings.marketing_group.stamp.stamps_required')} required>
+                <input
+                  type="number"
+                  value={stampsRequired}
+                  onChange={(e) => setStampsRequired(Number(e.target.value) || 0)}
+                  min={1}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('settings.marketing_group.stamp_wizard.stamps_required_hint')}
+                </p>
+              </FormField>
+              <FormField label={t('settings.marketing_group.stamp.reward_quantity')} required>
+                <input
+                  type="number"
+                  value={rewardQuantity}
+                  onChange={(e) => setRewardQuantity(Number(e.target.value) || 0)}
+                  min={1}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('settings.marketing_group.stamp_wizard.reward_quantity_hint')}
+                </p>
+              </FormField>
             </div>
-          </div>
 
-          {/* Designated Product (only if DESIGNATED) */}
-          {rewardStrategy === 'DESIGNATED' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('settings.marketing_group.stamp.designated_product')}
-              </label>
-              <select
-                value={designatedProductId || ''}
-                onChange={(e) => setDesignatedProductId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            {/* Cyclic Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
+                  <RefreshCw size={20} className="text-teal-600" />
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-700 block">
+                    {t('settings.marketing_group.stamp.is_cyclic')}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {t('settings.marketing_group.stamp.cyclic_hint')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCyclic(!isCyclic)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  isCyclic
+                    ? 'bg-teal-100 text-teal-700'
+                    : 'bg-gray-200 text-gray-500'
+                }`}
               >
-                <option value="">{t('common.hint.select')}</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                {isCyclic ? t('common.status.enabled') : t('common.status.disabled')}
+              </button>
             </div>
-          )}
 
-          {/* Cyclic toggle */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
-            <div>
-              <span className="text-sm font-medium text-gray-700">
-                {t('settings.marketing_group.stamp.is_cyclic')}
-              </span>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {t('settings.marketing_group.stamp.cyclic_hint')}
+            {/* Preview */}
+            <div className="p-4 bg-violet-50 rounded-xl border border-violet-100 mt-4">
+              <p className="text-sm text-violet-700">
+                <span className="font-medium">{t('settings.price_rule.wizard.preview')}: </span>
+                {t('settings.marketing_group.stamp_wizard.config_preview', {
+                  stamps: stampsRequired,
+                  reward: rewardQuantity,
+                  cyclic: isCyclic
+                    ? t('settings.marketing_group.stamp.cyclic')
+                    : t('settings.marketing_group.stamp_wizard.one_time'),
+                })}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsCyclic(!isCyclic)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                isCyclic ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              {isCyclic ? t('common.status.enabled') : t('common.status.disabled')}
-            </button>
-          </div>
+          </FormSection>
 
-          {/* Stamp targets */}
-          {renderTargetRows(stampTargets, setStampTargets, t('settings.marketing_group.stamp.stamp_targets'))}
+          {/* ── Section 3: Strategy ── */}
+          <FormSection title={t('settings.marketing_group.stamp_wizard.step3_section')} icon={Award}>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              {strategyOptions.map(({ value, icon: Icon, variant }) => {
+                const styles = variantStyles[variant];
+                const isSelected = rewardStrategy === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRewardStrategy(value)}
+                    className={`relative flex flex-col items-center p-5 rounded-xl border-2 transition-all ${
+                      isSelected
+                        ? `${styles.border} ${styles.bg} ring-4 ${styles.ring}`
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${
+                      isSelected ? styles.iconBg : 'bg-gray-100'
+                    }`}>
+                      <Icon size={28} className={isSelected ? styles.iconText : 'text-gray-400'} />
+                    </div>
+                    <h4 className={`text-sm font-bold mb-1 ${isSelected ? styles.titleText : 'text-gray-700'}`}>
+                      {t(`settings.marketing_group.stamp.strategy.${value.toLowerCase()}`)}
+                    </h4>
+                    <p className="text-xs text-gray-500 text-center">
+                      {t(`settings.marketing_group.stamp_wizard.strategy_${value.toLowerCase()}_desc`)}
+                    </p>
+                    {isSelected && (
+                      <div className={`absolute top-2 right-2 w-5 h-5 rounded-full ${styles.checkBg} flex items-center justify-center`}>
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Reward targets */}
-          {renderTargetRows(rewardTargets, setRewardTargets, t('settings.marketing_group.stamp.reward_targets'))}
+            {rewardStrategy === 'DESIGNATED' && (
+              <FormField label={t('settings.marketing_group.stamp.designated_product')} required>
+                <select
+                  value={designatedProductId ?? ''}
+                  onChange={(e) => setDesignatedProductId(e.target.value ? Number(e.target.value) : null)}
+                  className={selectClass}
+                >
+                  <option value="">{t('common.hint.select')}</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </FormField>
+            )}
+          </FormSection>
+
+          {/* ── Section 4: Targets ── */}
+          <FormSection title={t('settings.marketing_group.stamp_wizard.step4_section')} icon={Crosshair}>
+            <div className="space-y-8">
+              <TargetSection
+                field="stamp"
+                label={t('settings.marketing_group.stamp.stamp_targets')}
+                description={t('settings.marketing_group.stamp_wizard.stamp_targets_desc')}
+                required
+                targets={stampTargets}
+                onToggle={(type, id) => toggleTarget('stamp', type, id)}
+                categories={categories}
+                products={products}
+                categoryMap={categoryMap}
+                getSelectedIds={getSelectedIds}
+              />
+
+              {rewardStrategy !== 'DESIGNATED' && (
+                <>
+                  <div className="border-t border-gray-200" />
+                  <TargetSection
+                    field="reward"
+                    label={t('settings.marketing_group.stamp.reward_targets')}
+                    description={t('settings.marketing_group.stamp_wizard.reward_targets_desc')}
+                    required={false}
+                    targets={rewardTargets}
+                    onToggle={(type, id) => toggleTarget('reward', type, id)}
+                    categories={categories}
+                    products={products}
+                    categoryMap={categoryMap}
+                    getSelectedIds={getSelectedIds}
+                  />
+                </>
+              )}
+            </div>
+          </FormSection>
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-gray-100 flex gap-3 shrink-0">
+        <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-colors"
+            className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium transition-colors"
           >
             {t('common.action.cancel')}
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={!canSave}
-            className="flex-1 px-4 py-3 bg-violet-500 text-white rounded-xl font-bold hover:bg-violet-600 disabled:opacity-50 transition-colors"
+            onClick={handleSave}
+            disabled={saving || !canSave}
+            className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20 disabled:opacity-50"
           >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Check size={18} />
+            )}
             {t('common.action.save')}
           </button>
         </div>

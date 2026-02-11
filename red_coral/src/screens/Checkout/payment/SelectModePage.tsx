@@ -2,11 +2,12 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
 import type { MemberStampProgressDetail } from '@/core/domain/types/api';
 import type { CartItemSnapshot } from '@/core/domain/types/orderEvent';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, UserX, Stamp, X } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { CommandFailedError } from '@/core/stores/order/commands/sendCommand';
+import { commandErrorMessage } from '@/utils/error/commandError';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
 import { useRetailServiceType, setRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
@@ -14,7 +15,7 @@ import { OrderDiscountModal } from '../OrderDiscountModal';
 import { OrderSurchargeModal } from '../OrderSurchargeModal';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { openCashDrawer } from '@/core/services/order/paymentService';
-import { completeOrder, updateOrderInfo, linkMember, unlinkMember, redeemStamp, cancelStampRedemption } from '@/core/stores/order/commands';
+import { completeOrder, updateOrderInfo, redeemStamp, cancelStampRedemption } from '@/core/stores/order/commands';
 import { getMemberDetail } from '@/features/member/mutations';
 import { CashPaymentModal } from './CashPaymentModal';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
@@ -35,7 +36,13 @@ function getMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDeta
   );
 }
 
-type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL';
+/** Find order items matching designated_product_id that are not comped */
+function getDesignatedMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
+  if (!sp.designated_product_id) return [];
+  return items.filter(item => !item.is_comped && item.id === sp.designated_product_id);
+}
+
+type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL' | 'MEMBER_DETAIL';
 
 interface SelectModePageProps {
   order: HeldOrder;
@@ -93,13 +100,18 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
     }
   }, [order.member_id]);
 
-  // Match mode: comp existing item from order (Eco/Gen)
+  // Match mode: comp existing item from order (Eco/Gen/Designated)
   const handleMatchRedeem = useCallback(async (sp: MemberStampProgressDetail) => {
-    const matchingItems = getMatchingItems(order.items, sp);
+    const isDesignated = sp.reward_strategy === 'DESIGNATED';
+    const matchingItems = isDesignated
+      ? getDesignatedMatchingItems(order.items, sp)
+      : getMatchingItems(order.items, sp);
     if (matchingItems.length === 0) return;
-    const bestMatch = sp.reward_strategy === 'ECONOMIZADOR'
-      ? matchingItems.reduce((a, b) => a.original_price <= b.original_price ? a : b)
-      : matchingItems.reduce((a, b) => a.original_price >= b.original_price ? a : b);
+    const bestMatch = isDesignated
+      ? matchingItems[0]
+      : sp.reward_strategy === 'ECONOMIZADOR'
+        ? matchingItems.reduce((a, b) => a.original_price <= b.original_price ? a : b)
+        : matchingItems.reduce((a, b) => a.original_price >= b.original_price ? a : b);
     try {
       await redeemStamp(order.order_id, sp.stamp_activity_id, null, bestMatch.instance_id);
       toast.success(t('checkout.stamp.redeemed'));
@@ -108,8 +120,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         setStampProgress(detail.stamp_progress);
       }
     } catch (e) {
-      toast.error(e instanceof CommandFailedError && e.code === 'INSUFFICIENT_STAMPS'
-        ? t('checkout.stamp.insufficient_stamps')
+      toast.error(e instanceof CommandFailedError
+        ? commandErrorMessage(e.code)
         : t('checkout.stamp.redeem_failed'));
     }
   }, [order.order_id, order.items, order.member_id, t]);
@@ -125,8 +137,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         setStampProgress(detail.stamp_progress);
       }
     } catch (e) {
-      toast.error(e instanceof CommandFailedError && e.code === 'INSUFFICIENT_STAMPS'
-        ? t('checkout.stamp.insufficient_stamps')
+      toast.error(e instanceof CommandFailedError
+        ? commandErrorMessage(e.code)
         : t('checkout.stamp.redeem_failed'));
     }
   }, [order.order_id, order.member_id, t]);
@@ -141,8 +153,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         setStampProgress(detail.stamp_progress);
       }
     } catch (e) {
-      toast.error(e instanceof CommandFailedError && e.code === 'INSUFFICIENT_STAMPS'
-        ? t('checkout.stamp.insufficient_stamps')
+      toast.error(e instanceof CommandFailedError
+        ? commandErrorMessage(e.code)
         : t('checkout.stamp.redeem_failed'));
     }
   }, [order.order_id, order.member_id, t]);
@@ -481,26 +493,19 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               {/* Trailing: Member + Stamp Cards */}
               {order.member_id ? (
                 <button
-                  onClick={async () => {
-                    try {
-                      await unlinkMember(order.order_id);
-                      toast.success(t('checkout.member.unlinked'));
-                    } catch {
-                      toast.error(t('checkout.member.unlink_failed'));
-                    }
-                  }}
+                  onClick={() => onNavigate('MEMBER_DETAIL')}
                   disabled={isProcessing}
-                  className="h-40 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                  className="h-40 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
                 >
-                  <UserX size={48} />
-                  <div className="text-2xl font-bold">{t('checkout.member.unlink')}</div>
-                  <div className="text-sm opacity-90">{order.member_name}</div>
+                  <Crown size={48} />
+                  <div className="text-2xl font-bold">{order.member_name}</div>
+                  <div className="text-sm opacity-90">{order.marketing_group_name}</div>
                 </button>
               ) : (
                 <button
                   onClick={() => setShowMemberModal(true)}
                   disabled={isProcessing}
-                  className="h-40 bg-teal-500 hover:bg-teal-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                  className="h-40 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
                 >
                   <UserCheck size={48} />
                   <div className="text-2xl font-bold">{t('checkout.member.link')}</div>
@@ -508,7 +513,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 </button>
               )}
 
-              {/* Stamp cards (dynamic progress with order items) */}
+              {/* Stamp cards: only show redeemable or already redeemed */}
               {order.member_id && stampProgress.map((sp) => {
                 const alreadyRedeemed = order.stamp_redemptions?.some(
                   (r) => r.stamp_activity_id === sp.stamp_activity_id
@@ -524,6 +529,9 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 const canRedeem = effectiveStamps >= sp.stamps_required && !alreadyRedeemed;
                 const progressPercent = Math.min(100, Math.round((effectiveStamps / sp.stamps_required) * 100));
 
+                // Only show redeemable or already-redeemed cards
+                if (!canRedeem && !alreadyRedeemed) return null;
+
                 return (
                   <div
                     key={sp.stamp_activity_id}
@@ -533,9 +541,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     className={`h-40 rounded-2xl shadow-xl transition-all relative flex flex-col items-center justify-center gap-2 ${
                       alreadyRedeemed
                         ? 'bg-violet-100 text-violet-600'
-                        : canRedeem
-                          ? 'bg-violet-500 text-white hover:shadow-2xl hover:scale-[1.02] cursor-pointer'
-                          : 'bg-gray-100 text-gray-600'
+                        : 'bg-violet-500 text-white hover:shadow-2xl hover:scale-[1.02] cursor-pointer'
                     }`}
                   >
                     {/* Cancel button for redeemed */}
@@ -558,16 +564,16 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                       <span className="text-xl font-black tabular-nums">{effectiveStamps}</span>
                       <span className="text-xs opacity-75">/ {sp.stamps_required}</span>
                       {orderBonus > 0 && (
-                        <span className={`text-xs ml-1 ${alreadyRedeemed ? 'text-violet-400' : canRedeem ? 'text-white/70' : 'text-gray-400'}`}>
+                        <span className={`text-xs ml-1 ${alreadyRedeemed ? 'text-violet-400' : 'text-white/70'}`}>
                           (+{orderBonus})
                         </span>
                       )}
                     </div>
 
                     {/* Progress bar */}
-                    <div className={`w-3/4 h-1.5 rounded-full overflow-hidden ${alreadyRedeemed ? 'bg-violet-200' : canRedeem ? 'bg-white/20' : 'bg-gray-200'}`}>
+                    <div className={`w-3/4 h-1.5 rounded-full overflow-hidden ${alreadyRedeemed ? 'bg-violet-200' : 'bg-white/20'}`}>
                       <div
-                        className={`h-full rounded-full transition-all ${alreadyRedeemed ? 'bg-violet-400' : canRedeem ? 'bg-white' : 'bg-gray-400'}`}
+                        className={`h-full rounded-full transition-all ${alreadyRedeemed ? 'bg-violet-400' : 'bg-white'}`}
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>
@@ -577,11 +583,11 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                       <div className="text-xs font-medium bg-violet-200/50 px-3 py-0.5 rounded-full">
                         {t('checkout.stamp.already_redeemed')}
                       </div>
-                    ) : canRedeem ? (
+                    ) : (
                       <div className="text-xs font-medium bg-white/20 px-3 py-0.5 rounded-full">
                         {t('checkout.stamp.redeem')}
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 );
               })}
@@ -657,7 +663,9 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
       {stampRedeemActivity && (() => {
         const spa = stampRedeemActivity;
         const isDesignated = spa.reward_strategy === 'DESIGNATED';
-        const matchingItems = !isDesignated ? getMatchingItems(order.items, spa) : [];
+        const matchingItems = isDesignated
+          ? getDesignatedMatchingItems(order.items, spa)
+          : getMatchingItems(order.items, spa);
         const oBonus = order.items
           .filter((item) => !item.is_comped && spa.stamp_targets.some((t) =>
             t.target_type === 'PRODUCT' ? t.target_id === item.id

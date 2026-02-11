@@ -155,7 +155,7 @@ export const MemberLinkedRenderer: EventRenderer<MemberLinkedPayload> = {
         `${t('timeline.labels.marketing_group')}: ${payload.marketing_group_name}`,
       ],
       icon: UserPlus,
-      colorClass: 'bg-teal-400',
+      colorClass: 'bg-red-400',
       timestamp: event.timestamp,
     };
   }
@@ -168,7 +168,7 @@ export const MemberUnlinkedRenderer: EventRenderer<MemberUnlinkedPayload> = {
       summary: payload.previous_member_name,
       details: [],
       icon: UserMinus,
-      colorClass: 'bg-gray-400',
+      colorClass: 'bg-red-400',
       timestamp: event.timestamp,
     };
   }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HeldOrder } from '@/core/domain/types';
 import { CompItemMode } from '../CompItemMode';
 import { OrderDetailMode } from '../OrderDetailMode';
+import { MemberDetailMode } from '../MemberDetailMode';
 import { SelectModePage } from './SelectModePage';
 import { ItemSplitPage } from './ItemSplitPage';
 import { AmountSplitPage } from './AmountSplitPage';
@@ -15,7 +16,7 @@ interface PaymentFlowProps {
   onManageTable?: () => void;
 }
 
-type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL';
+type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL' | 'MEMBER_DETAIL';
 
 export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onVoid, onManageTable }) => {
   const [mode, setMode] = useState<PaymentMode>('SELECT');
@@ -79,6 +80,16 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     case 'ORDER_DETAIL':
       return (
         <OrderDetailMode
+          order={order}
+          totalPaid={totalPaid}
+          remaining={remaining}
+          onBack={() => setMode('SELECT')}
+          onManageTable={onManageTable}
+        />
+      );
+    case 'MEMBER_DETAIL':
+      return (
+        <MemberDetailMode
           order={order}
           totalPaid={totalPaid}
           remaining={remaining}
