@@ -995,6 +995,7 @@ mod tests {
             marketing_group_id: None,
             marketing_group_name: None,
             mg_discount_amount: 0.0,
+            stamp_redemptions: Vec::new(),
             start_time: shared::util::now_millis(),
             end_time: None,
             created_at: shared::util::now_millis(),

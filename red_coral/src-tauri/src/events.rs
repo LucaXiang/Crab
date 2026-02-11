@@ -192,6 +192,12 @@ mod tests {
             has_amount_split: false,
             aa_total_shares: None,
             aa_paid_shares: 0,
+            member_id: None,
+            member_name: None,
+            marketing_group_id: None,
+            marketing_group_name: None,
+            mg_discount_amount: 0.0,
+            stamp_redemptions: vec![],
         };
 
         // Create a Sync message with resource="order_sync" (like edge-server does)

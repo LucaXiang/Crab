@@ -5,7 +5,7 @@ import { formatCurrency } from '@/utils/currency';
 import { calculateOptionsModifier } from '@/utils/pricing';
 import { t } from '@/infrastructure/i18n';
 import { GroupedOptionsList } from '@/shared/components';
-import { Gift } from 'lucide-react';
+import { Gift, Stamp } from 'lucide-react';
 
 interface UnpaidItemRowProps {
   item: CartItem;
@@ -34,6 +34,7 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
   const hasDiscount = discountPercent > 0 || basePrice !== unitPrice;
 
   const isComped = !!item.is_comped;
+  const isStampReward = item.instance_id.startsWith('stamp_reward::');
   const hasMultiSpec = item.selected_specification?.is_multi_spec;
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
@@ -74,10 +75,17 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {isComped && (
-            <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Gift size={10} />
-              {t('checkout.comp.badge')}
-            </span>
+            isStampReward ? (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Stamp size={10} />
+                {t('checkout.stamp_reward')}
+              </span>
+            ) : (
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Gift size={10} />
+                {t('checkout.comp.badge')}
+              </span>
+            )
           )}
           {discountPercent > 0 && (
             <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">

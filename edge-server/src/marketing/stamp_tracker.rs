@@ -114,6 +114,7 @@ mod tests {
             rule_surcharge_amount: 0.0,
             applied_rules: vec![],
             applied_mg_rules: vec![],
+            mg_discount_amount: 0.0,
             unit_price,
             line_total: unit_price * quantity as f64,
             tax: 0.0,
@@ -121,6 +122,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_id: None,
             category_name: None,
             is_comped,
         }

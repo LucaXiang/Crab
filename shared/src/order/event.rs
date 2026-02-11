@@ -87,6 +87,7 @@ pub enum OrderEventType {
     MemberLinked,
     MemberUnlinked,
     StampRedeemed,
+    StampRedemptionCancelled,
 }
 
 impl std::fmt::Display for OrderEventType {
@@ -120,6 +121,7 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::MemberLinked => write!(f, "MEMBER_LINKED"),
             OrderEventType::MemberUnlinked => write!(f, "MEMBER_UNLINKED"),
             OrderEventType::StampRedeemed => write!(f, "STAMP_REDEEMED"),
+            OrderEventType::StampRedemptionCancelled => write!(f, "STAMP_REDEMPTION_CANCELLED"),
         }
     }
 }
@@ -473,8 +475,31 @@ pub enum EventPayload {
     StampRedeemed {
         stamp_activity_id: i64,
         stamp_activity_name: String,
-        reward_item_id: String,
+        reward_instance_id: String,
         reward_strategy: String,
+        /// Product info for the reward item
+        product_id: i64,
+        product_name: String,
+        original_price: f64,
+        quantity: i32,
+        tax_rate: i32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category_id: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        category_name: Option<String>,
+        /// Match mode: comp an existing item instead of adding a new one
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        comp_existing_instance_id: Option<String>,
+    },
+
+    StampRedemptionCancelled {
+        stamp_activity_id: i64,
+        stamp_activity_name: String,
+        /// instance_id of the reward item being removed
+        reward_instance_id: String,
+        /// Whether the original redemption comped an existing item (vs adding a new one)
+        #[serde(default)]
+        is_comp_existing: bool,
     },
 }
 

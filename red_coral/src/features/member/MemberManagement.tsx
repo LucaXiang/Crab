@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { UserCheck, Plus, X } from 'lucide-react';
+import { UserCheck, Plus, X, Phone, Users } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useMemberStore } from './store';
 import { useMarketingGroupStore } from '@/features/marketing-group/store';
@@ -11,6 +11,7 @@ import { usePermission } from '@/hooks/usePermission';
 import type { MemberWithGroup, MemberCreate, MemberUpdate } from '@/core/domain/types/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
+import { FormField, FormSection, SelectField, inputClass } from '@/shared/components/FormField';
 
 export const MemberManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
@@ -47,14 +48,19 @@ export const MemberManagement: React.FC = React.memo(() => {
   const handleSave = async (data: MemberCreate | MemberUpdate, id?: number) => {
     try {
       if (id) {
-        await updateMember(id, data);
+        const updated = await updateMember(id, data);
+        useMemberStore.setState((s) => ({
+          items: s.items.map((i) => (i.id === id ? updated : i)),
+        }));
       } else {
-        await createMember(data as MemberCreate);
+        const created = await createMember(data as MemberCreate);
+        useMemberStore.setState((s) => ({
+          items: [...s.items, created],
+        }));
       }
       toast.success(t('common.message.save_success'));
       setShowForm(false);
       setEditingMember(null);
-      await memberStore.fetchAll();
     } catch (e) {
       logger.error('Failed to save member', e);
       toast.error(t('common.message.save_failed'));
@@ -65,9 +71,11 @@ export const MemberManagement: React.FC = React.memo(() => {
     if (!deleteConfirm) return;
     try {
       await deleteMember(deleteConfirm.id);
+      useMemberStore.setState((s) => ({
+        items: s.items.filter((i) => i.id !== deleteConfirm.id),
+      }));
       toast.success(t('common.message.delete_success'));
       setDeleteConfirm(null);
-      await memberStore.fetchAll();
     } catch (e) {
       logger.error('Failed to delete member', e);
       toast.error(t('common.message.delete_failed'));
@@ -168,13 +176,25 @@ export const MemberManagement: React.FC = React.memo(() => {
 
       {/* Delete Confirm */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">{t('common.action.delete')}</h3>
-            <p className="text-gray-600 mb-6">{t('common.confirm_delete', { name: deleteConfirm.name })}</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold">{t('common.action.cancel')}</button>
-              <button onClick={handleDelete} className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600">{t('common.action.delete')}</button>
+        <div className="fixed inset-0 z-90 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('common.action.delete')}</h3>
+              <p className="text-sm text-gray-600 mb-6">{t('common.confirm_delete', { name: deleteConfirm.name })}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  {t('common.action.cancel')}
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="w-full py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
+                >
+                  {t('common.action.delete')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -204,46 +224,88 @@ const MemberFormModal: React.FC<{
   const [notes, setNotes] = useState(member?.notes || '');
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-gray-800">
-            {member ? t('settings.member.edit') : t('settings.member.add')}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.member.field.name')} *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.member.field.phone')}</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.member.field.card_number')}</label>
-            <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.member.field.group')} *</label>
-            <select value={groupId} onChange={(e) => setGroupId(Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.display_name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.member.field.birthday')}</label>
-            <input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.member.field.notes')}</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+    <div className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">
+              {member ? t('settings.member.edit') : t('settings.member.add')}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <X size={18} className="text-gray-500" />
+            </button>
           </div>
         </div>
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold">{t('common.action.cancel')}</button>
+
+        {/* Content */}
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <FormField label={t('settings.member.field.name')} required>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormSection title={t('settings.member.section.contact')} icon={Phone}>
+            <FormField label={t('settings.member.field.phone')}>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label={t('settings.member.field.card_number')}>
+              <input
+                value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+          </FormSection>
+
+          <FormSection title={t('settings.member.section.membership')} icon={Users}>
+            <SelectField
+              label={t('settings.member.field.group')}
+              required
+              value={groupId}
+              onChange={(v) => setGroupId(Number(v))}
+              options={groups.map((g) => ({ value: g.id, label: g.display_name }))}
+            />
+
+            <FormField label={t('settings.member.field.birthday')}>
+              <input
+                type="date"
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label={t('settings.member.field.notes')}>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                className={inputClass}
+              />
+            </FormField>
+          </FormSection>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 bg-white flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            {t('common.action.cancel')}
+          </button>
           <button
             onClick={() => onSave({
               name,
@@ -254,7 +316,7 @@ const MemberFormModal: React.FC<{
               notes: notes || null,
             }, member?.id)}
             disabled={!name.trim() || !groupId}
-            className="flex-1 px-4 py-3 bg-teal-500 text-white rounded-xl font-bold hover:bg-teal-600 disabled:opacity-50"
+            className="px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.action.save')}
           </button>

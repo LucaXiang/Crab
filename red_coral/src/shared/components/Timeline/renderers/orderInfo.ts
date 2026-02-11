@@ -7,6 +7,7 @@ import type {
   MemberLinkedPayload,
   MemberUnlinkedPayload,
   StampRedeemedPayload,
+  StampRedemptionCancelledPayload,
 } from '@/core/domain/types/orderEvent';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { Currency } from '@/utils/currency';
@@ -183,6 +184,19 @@ export const StampRedeemedRenderer: EventRenderer<StampRedeemedPayload> = {
       ],
       icon: Award,
       colorClass: 'bg-amber-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+export const StampRedemptionCancelledRenderer: EventRenderer<StampRedemptionCancelledPayload> = {
+  render(event, payload, t) {
+    return {
+      title: t('timeline.stamp_redemption_cancelled'),
+      summary: payload.stamp_activity_name,
+      details: [],
+      icon: Award,
+      colorClass: 'bg-gray-400',
       timestamp: event.timestamp,
     };
   }

@@ -25,6 +25,26 @@ impl EventApplier for MemberUnlinkedApplier {
             }
             snapshot.mg_discount_amount = 0.0;
 
+            // Reverse any pending stamp redemptions
+            if !snapshot.stamp_redemptions.is_empty() {
+                let mut remove_ids = Vec::new();
+                for r in &snapshot.stamp_redemptions {
+                    if r.is_comp_existing {
+                        // Match mode: uncomp the existing item
+                        if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == r.reward_instance_id) {
+                            item.is_comped = false;
+                        }
+                    } else {
+                        // Add-new mode: collect for removal
+                        remove_ids.push(r.reward_instance_id.clone());
+                    }
+                }
+                if !remove_ids.is_empty() {
+                    snapshot.items.retain(|item| !remove_ids.contains(&item.instance_id));
+                }
+                snapshot.stamp_redemptions.clear();
+            }
+
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -75,6 +95,7 @@ mod tests {
             rule_surcharge_amount: 0.0,
             applied_rules: vec![],
             applied_mg_rules: vec![],
+            mg_discount_amount: 0.0,
             unit_price: price,
             line_total: price,
             tax: 0.0,
@@ -82,6 +103,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_id: None,
             category_name: None,
             is_comped: false,
         }

@@ -4,7 +4,7 @@ import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/typ
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
-import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift } from 'lucide-react';
+import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { TimelineList } from '@/shared/components/TimelineList';
@@ -359,10 +359,17 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                 <span className="text-xs text-gray-500">({item.spec_name})</span>
               )}
               {item.is_comped && (
-                <span className="text-[0.625rem] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                  <Gift size={10} />
-                  {t('checkout.comp.badge')}
-                </span>
+                item.instance_id.startsWith('stamp_reward::') ? (
+                  <span className="text-[0.625rem] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <Stamp size={10} />
+                    {t('checkout.stamp_reward')}
+                  </span>
+                ) : (
+                  <span className="text-[0.625rem] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <Gift size={10} />
+                    {t('checkout.comp.badge')}
+                  </span>
+                )
               )}
               {manualDiscount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">

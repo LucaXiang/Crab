@@ -96,6 +96,9 @@ pub struct CartItemSnapshot {
     /// Applied MG rules list
     #[serde(default)]
     pub applied_mg_rules: Vec<crate::order::AppliedMgRule>,
+    /// MG discount amount (server-computed, sum of applied_mg_rules)
+    #[serde(default)]
+    pub mg_discount_amount: f64,
 
     // === Computed Fields (all server-computed) ===
     /// Unit price for display (computed by backend: price with manual discount and surcharge)
@@ -117,6 +120,9 @@ pub struct CartItemSnapshot {
     /// Authorizer name snapshot
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorizer_name: Option<String>,
+    /// Category ID (for stamp target matching)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category_id: Option<i64>,
     /// Category name snapshot (for statistics)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category_name: Option<String>,
@@ -413,6 +419,17 @@ pub struct CompRecord {
     pub timestamp: i64,
 }
 
+/// Stamp redemption state tracked in snapshot (for reversal on member unlink)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StampRedemptionState {
+    pub stamp_activity_id: i64,
+    /// instance_id of the reward item added to the order
+    pub reward_instance_id: String,
+    /// Whether this redemption comped an existing item (vs adding a new one)
+    #[serde(default)]
+    pub is_comp_existing: bool,
+}
+
 /// Item modification result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemModificationResult {
@@ -446,6 +463,7 @@ mod tests {
             rule_surcharge_amount: 3.0,
             applied_rules: vec![],
             applied_mg_rules: vec![],
+            mg_discount_amount: 0.0,
             unit_price: 0.0,
             line_total: 0.0,
             tax: 0.0,
@@ -453,6 +471,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_id: None,
             category_name: None,
             is_comped: false,
         };

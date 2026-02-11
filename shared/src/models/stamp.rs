@@ -133,4 +133,7 @@ pub struct MemberStampProgressDetail {
     pub completed_cycles: i32,
     pub is_redeemable: bool,
     pub is_cyclic: bool,
+    pub reward_strategy: RewardStrategy,
+    pub reward_quantity: i32,
+    pub designated_product_id: Option<i64>,
 }

@@ -76,9 +76,9 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
     });
   }, [order.items, order.paid_item_quantities]);
 
-  // Already comped items
+  // Already comped items (exclude stamp reward items — those are system-managed)
   const compedItems = useMemo(() => {
-    return order.items.filter(item => !item._removed && item.is_comped);
+    return order.items.filter(item => !item._removed && item.is_comped && !item.instance_id.startsWith('stamp_reward::'));
   }, [order.items]);
 
   // Group compable items by category (sorted same as ItemSplitPage)

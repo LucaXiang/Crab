@@ -25,6 +25,7 @@ mod payment_added;
 mod payment_cancelled;
 mod rule_skip_toggled;
 mod stamp_redeemed;
+mod stamp_redemption_cancelled;
 mod table_opened;
 
 pub use item_comped::ItemCompedApplier;
@@ -49,6 +50,7 @@ pub use payment_added::PaymentAddedApplier;
 pub use payment_cancelled::PaymentCancelledApplier;
 pub use rule_skip_toggled::RuleSkipToggledApplier;
 pub use stamp_redeemed::StampRedeemedApplier;
+pub use stamp_redemption_cancelled::StampRedemptionCancelledApplier;
 pub use table_opened::TableOpenedApplier;
 
 /// EventAction enum - dispatches to concrete applier implementations
@@ -79,6 +81,7 @@ pub enum EventAction {
     MemberLinked(MemberLinkedApplier),
     MemberUnlinked(MemberUnlinkedApplier),
     StampRedeemed(StampRedeemedApplier),
+    StampRedemptionCancelled(StampRedemptionCancelledApplier),
     /// Record-only events: persisted for timeline display, no snapshot mutation
     RecordOnly,
 }
@@ -113,6 +116,7 @@ impl EventApplier for EventAction {
             EventAction::MemberLinked(applier) => applier.apply(snapshot, event),
             EventAction::MemberUnlinked(applier) => applier.apply(snapshot, event),
             EventAction::StampRedeemed(applier) => applier.apply(snapshot, event),
+            EventAction::StampRedemptionCancelled(applier) => applier.apply(snapshot, event),
             EventAction::RecordOnly => {}
         }
     }
@@ -178,6 +182,9 @@ impl From<&OrderEvent> for EventAction {
             }
             EventPayload::StampRedeemed { .. } => {
                 EventAction::StampRedeemed(StampRedeemedApplier)
+            }
+            EventPayload::StampRedemptionCancelled { .. } => {
+                EventAction::StampRedemptionCancelled(StampRedemptionCancelledApplier)
             }
         }
     }

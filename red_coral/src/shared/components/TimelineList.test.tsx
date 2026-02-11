@@ -115,6 +115,7 @@ describe('TimelineList Integration Tests', () => {
               rule_surcharge_amount: 0,
               applied_rules: [],
               applied_mg_rules: [],
+              mg_discount_amount: 0,
               unit_price: 1000,
               line_total: 2000,
               tax: 0,

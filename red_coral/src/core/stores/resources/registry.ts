@@ -17,6 +17,8 @@ import { usePriceRuleStore } from '@/features/price-rule';
 import { usePrintDestinationStore } from './usePrintDestinationStore';
 import { useStoreInfoStore } from '../settings/useStoreInfoStore';
 import { useLabelTemplateStore } from '../printer/useLabelTemplateStore';
+import { useMarketingGroupStore } from '@/features/marketing-group/store';
+import { useMemberStore } from '@/features/member/store';
 
 // Store interface for registry
 interface RegistryStore {
@@ -36,10 +38,10 @@ interface RegistryStore {
  *
  * key 必须与后端 broadcast_sync 的 resource 参数完全一致！
  *
- * 10 种资源类型:
+ * 14 种资源类型:
  * - 菜单相关: product, category, tag, attribute
  * - 位置相关: zone, dining_table
- * - 人员相关: employee, role (role 无 sync，只读)
+ * - 人员相关: employee, role (role 无 sync，只读), member
  * - 其他: price_rule, print_destination
  */
 export const storeRegistry: Record<string, RegistryStore> = {
@@ -55,6 +57,8 @@ export const storeRegistry: Record<string, RegistryStore> = {
   print_destination: usePrintDestinationStore,
   store_info: useStoreInfoStore,        // 店铺信息
   label_template: useLabelTemplateStore, // 标签模板
+  marketing_group: useMarketingGroupStore, // 营销组
+  member: useMemberStore,              // 会员
 };
 
 /**

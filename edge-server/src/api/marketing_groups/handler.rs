@@ -167,8 +167,7 @@ pub async fn create_rule(
     Path(group_id): Path<i64>,
     Json(payload): Json<MgDiscountRuleCreate>,
 ) -> AppResult<Json<MgDiscountRule>> {
-    // 确认营销组存在
-    marketing_group::find_by_id(&state.pool, group_id)
+    let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", group_id)))?;
 
@@ -186,7 +185,7 @@ pub async fn create_rule(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&rule))
+        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
         .await;
 
     Ok(Json(rule))
@@ -212,9 +211,12 @@ pub async fn update_rule(
         details = create_snapshot(&rule, "mg_discount_rule")
     );
 
-    state
-        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&rule))
-        .await;
+    // Broadcast parent group for store incremental sync
+    if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
+        state
+            .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+            .await;
+    }
 
     Ok(Json(rule))
 }
@@ -239,9 +241,11 @@ pub async fn delete_rule(
             details = serde_json::json!({"action": "rule_deleted", "rule_id": rule_id})
         );
 
-        state
-            .broadcast_sync::<()>(RESOURCE, "updated", &group_id.to_string(), None)
-            .await;
+        if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
+            state
+                .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+                .await;
+        }
     }
 
     Ok(Json(result))
@@ -256,8 +260,7 @@ pub async fn create_activity(
     Path(group_id): Path<i64>,
     Json(payload): Json<shared::models::StampActivityCreate>,
 ) -> AppResult<Json<StampActivityDetail>> {
-    // 确认营销组存在
-    marketing_group::find_by_id(&state.pool, group_id)
+    let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", group_id)))?;
 
@@ -275,7 +278,7 @@ pub async fn create_activity(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&detail))
+        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
         .await;
 
     Ok(Json(detail))
@@ -301,9 +304,12 @@ pub async fn update_activity(
         details = create_snapshot(&detail, "stamp_activity")
     );
 
-    state
-        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&detail))
-        .await;
+    // Broadcast parent group for store incremental sync
+    if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
+        state
+            .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+            .await;
+    }
 
     Ok(Json(detail))
 }
@@ -328,9 +334,11 @@ pub async fn delete_activity(
             details = serde_json::json!({"action": "activity_deleted", "activity_id": activity_id})
         );
 
-        state
-            .broadcast_sync::<()>(RESOURCE, "updated", &group_id.to_string(), None)
-            .await;
+        if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
+            state
+                .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+                .await;
+        }
     }
 
     Ok(Json(result))

@@ -14,4 +14,4 @@ export { partialSettle, cancelPayment, splitByItems, splitByAmount, startAaSplit
 export { applyOrderDiscount, applyOrderSurcharge, addOrderNote, toggleRuleSkip, moveOrder, mergeOrders, updateOrderInfo } from './adjustments';
 
 // Members
-export { linkMember, unlinkMember } from './members';
+export { linkMember, unlinkMember, redeemStamp, cancelStampRedemption } from './members';

@@ -633,6 +633,13 @@ export interface MemberStampProgressDetail {
   completed_cycles: number;
   is_redeemable: boolean;
   is_cyclic: boolean;
+  reward_strategy: RewardStrategy;
+  reward_quantity: number;
+  designated_product_id: number | null;
+  /** Stamp targets for dynamic order progress calculation */
+  stamp_targets: StampTarget[];
+  /** Reward targets for redemption matching */
+  reward_targets: StampRewardTarget[];
 }
 
 // ============ Applied MG Rule ============

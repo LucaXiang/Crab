@@ -4,7 +4,7 @@
 //! Clients can compare their locally computed checksum with the server's
 //! to detect if the reducer logic has diverged.
 
-use super::types::{CartItemSnapshot, CompRecord, LossReason, PaymentRecord, ServiceType, VoidType};
+use super::types::{CartItemSnapshot, CompRecord, LossReason, PaymentRecord, ServiceType, StampRedemptionState, VoidType};
 use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -169,6 +169,10 @@ pub struct OrderSnapshot {
     #[serde(default)]
     pub mg_discount_amount: f64,
 
+    /// Pending stamp redemptions (reversed on member unlink, consumed on order completion)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stamp_redemptions: Vec<StampRedemptionState>,
+
     /// Order start time
     pub start_time: i64,
     /// Order end time
@@ -241,6 +245,7 @@ impl OrderSnapshot {
             marketing_group_id: None,
             marketing_group_name: None,
             mg_discount_amount: 0.0,
+            stamp_redemptions: Vec::new(),
             start_time: now,
             end_time: None,
             created_at: now,

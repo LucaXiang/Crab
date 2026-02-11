@@ -489,7 +489,7 @@ impl OrdersManager {
                     product_metadata,
                 })
             }
-            shared::order::OrderCommandPayload::RedeemStamp { order_id, stamp_activity_id, product_id } => {
+            shared::order::OrderCommandPayload::RedeemStamp { order_id, stamp_activity_id, product_id, comp_existing_instance_id } => {
                 // Query stamp activity and reward targets from SQLite
                 let pool = self.pool.as_ref().ok_or_else(|| {
                     OrderError::InvalidOperation("Database not available for stamp queries".to_string())
@@ -508,17 +508,70 @@ impl OrdersManager {
                 .map_err(|e| OrderError::InvalidOperation(format!("Failed to query stamp activity: {e}")))?
                 .ok_or_else(|| OrderError::InvalidOperation(format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
 
-                let reward_targets = futures::executor::block_on(
+                let mut reward_targets = futures::executor::block_on(
                     crate::db::repository::marketing_group::find_reward_targets(pool, *stamp_activity_id),
                 )
                 .map_err(|e| OrderError::InvalidOperation(format!("Failed to query reward targets: {e}")))?;
+
+                // 留空则同计章对象: if no reward targets configured, use stamp targets
+                if reward_targets.is_empty() {
+                    let stamp_targets = futures::executor::block_on(
+                        crate::db::repository::marketing_group::find_stamp_targets(pool, *stamp_activity_id),
+                    )
+                    .map_err(|e| OrderError::InvalidOperation(format!("Failed to query stamp targets: {e}")))?;
+                    reward_targets = stamp_targets
+                        .into_iter()
+                        .map(|t| shared::models::StampRewardTarget {
+                            id: t.id,
+                            stamp_activity_id: t.stamp_activity_id,
+                            target_type: t.target_type,
+                            target_id: t.target_id,
+                        })
+                        .collect();
+                }
+
+                // Resolve reward product info for add-new modes:
+                // - Designated: use designated_product_id
+                // - Selection mode (Eco/Gen + product_id): use the provided product_id
+                // - Match mode (comp_existing): no product info needed (uses existing item)
+                // - Auto-match mode (Eco/Gen, no product_id): resolved by action from snapshot
+                let reward_product_info = if comp_existing_instance_id.is_some() {
+                    None // Match mode: product info comes from existing item
+                } else {
+                    let pid = match activity.reward_strategy {
+                        shared::models::RewardStrategy::Designated => {
+                            product_id.or(activity.designated_product_id)
+                        }
+                        _ => *product_id, // Selection mode: explicit product_id
+                    };
+                    pid.and_then(|pid| {
+                        let catalog = self.catalog_service.as_ref()?;
+                        let product = catalog.get_product(pid)?;
+                        let meta = catalog.get_product_meta(pid)?;
+                        let price = product.specs.iter()
+                            .find(|s| s.is_default)
+                            .or(product.specs.first())
+                            .map(|s| s.price)
+                            .unwrap_or(0.0);
+                        Some(super::actions::RewardProductInfo {
+                            product_id: pid,
+                            name: product.name,
+                            price,
+                            tax_rate: meta.tax_rate,
+                            category_id: Some(meta.category_id),
+                            category_name: Some(meta.category_name).filter(|s| !s.is_empty()),
+                        })
+                    })
+                };
 
                 CommandAction::RedeemStamp(super::actions::RedeemStampAction {
                     order_id: order_id.clone(),
                     stamp_activity_id: *stamp_activity_id,
                     product_id: *product_id,
+                    comp_existing_instance_id: comp_existing_instance_id.clone(),
                     activity,
                     reward_targets,
+                    reward_product_info,
                 })
             }
             _ => (&cmd).into(),
@@ -584,8 +637,12 @@ impl OrdersManager {
         // 12. Clean up rule cache for terminal orders (Complete/Void/Merge)
         // Note: MoveOrder is NOT terminal — order stays Active, rules handled by callers
         match &cmd.payload {
-            shared::order::OrderCommandPayload::CompleteOrder { order_id, .. }
-            | shared::order::OrderCommandPayload::VoidOrder { order_id, .. } => {
+            shared::order::OrderCommandPayload::CompleteOrder { order_id, .. } => {
+                self.remove_cached_rules(order_id);
+                // Track stamps for completed orders with linked members
+                self.track_stamps_on_completion(order_id);
+            }
+            shared::order::OrderCommandPayload::VoidOrder { order_id, .. } => {
                 self.remove_cached_rules(order_id);
             }
             shared::order::OrderCommandPayload::MergeOrders { source_order_id, .. } => {
@@ -599,6 +656,130 @@ impl OrdersManager {
         let order_id = events.first().map(|e| e.order_id.clone());
         tracing::info!(command_id = %cmd.command_id, order_id = ?order_id, event_count = events.len(), "Command processed successfully");
         Ok((CommandResponse::success(cmd.command_id, order_id), events))
+    }
+
+    // ========== Stamp Tracking ==========
+
+    /// Track stamps for a completed order.
+    ///
+    /// Called after redb commit for CompleteOrder. If the order has a linked member,
+    /// queries active stamp activities for the member's marketing group, counts matching
+    /// items, and adds earned stamps to the member's progress in SQLite.
+    fn track_stamps_on_completion(&self, order_id: &str) {
+        let Some(pool) = &self.pool else { return };
+
+        let snapshot = match self.storage.get_snapshot(order_id) {
+            Ok(Some(s)) => s,
+            _ => return,
+        };
+
+        let Some(member_id) = snapshot.member_id else { return };
+        let Some(mg_id) = snapshot.marketing_group_id else { return };
+
+        // Query active stamp activities for this marketing group
+        let activities = match futures::executor::block_on(
+            crate::db::repository::marketing_group::find_active_activities_by_group(pool, mg_id),
+        ) {
+            Ok(a) => a,
+            Err(e) => {
+                tracing::error!(order_id, error = %e, "Failed to query stamp activities for completion tracking");
+                return;
+            }
+        };
+
+        if activities.is_empty() {
+            return;
+        }
+
+        // Build item info with category IDs from snapshot
+        let items_with_category: Vec<_> = snapshot
+            .items
+            .iter()
+            .map(|item| crate::marketing::stamp_tracker::StampItemInfo {
+                item,
+                category_id: item.category_id,
+            })
+            .collect();
+
+        let now = shared::util::now_millis();
+
+        for activity in &activities {
+            let stamp_targets = match futures::executor::block_on(
+                crate::db::repository::marketing_group::find_stamp_targets(pool, activity.id),
+            ) {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!(activity_id = activity.id, error = %e, "Failed to query stamp targets");
+                    continue;
+                }
+            };
+
+            let earned =
+                crate::marketing::stamp_tracker::count_stamps_for_order(&items_with_category, &stamp_targets);
+
+            if earned > 0 {
+                match futures::executor::block_on(crate::db::repository::stamp::add_stamps(
+                    pool, member_id, activity.id, earned, now,
+                )) {
+                    Ok(progress) => {
+                        tracing::debug!(
+                            member_id,
+                            activity_id = activity.id,
+                            earned,
+                            current = progress.current_stamps,
+                            "Stamps tracked for order completion"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            member_id,
+                            activity_id = activity.id,
+                            error = %e,
+                            "Failed to add stamps on order completion"
+                        );
+                    }
+                }
+            }
+        }
+
+        // Consume stamps for pending redemptions
+        for redemption in &snapshot.stamp_redemptions {
+            let Some(activity) = activities
+                .iter()
+                .find(|a| a.id == redemption.stamp_activity_id)
+            else {
+                tracing::warn!(
+                    stamp_activity_id = redemption.stamp_activity_id,
+                    "Stamp activity not found for redemption consumption, skipping"
+                );
+                continue;
+            };
+
+            match futures::executor::block_on(crate::db::repository::stamp::redeem(
+                pool,
+                member_id,
+                activity.id,
+                activity.is_cyclic,
+                now,
+            )) {
+                Ok(progress) => {
+                    tracing::debug!(
+                        member_id,
+                        activity_id = activity.id,
+                        cycles = progress.completed_cycles,
+                        "Stamp redeemed on order completion"
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        member_id,
+                        activity_id = activity.id,
+                        error = %e,
+                        "Failed to redeem stamp on order completion"
+                    );
+                }
+            }
+        }
     }
 
     // ========== Public Query Methods ==========

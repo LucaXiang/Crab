@@ -3,6 +3,7 @@ import type {
   MemberWithGroup,
   MemberCreate,
   MemberUpdate,
+  MemberStampProgressDetail,
 } from '@/core/domain/types/api';
 
 export async function listMembers(): Promise<MemberWithGroup[]> {
@@ -25,4 +26,12 @@ export async function updateMember(id: number, data: MemberUpdate): Promise<Memb
 
 export async function deleteMember(id: number): Promise<void> {
   await invokeApi<void>('api_delete', { path: `/api/members/${id}` });
+}
+
+interface MemberDetailResponse extends MemberWithGroup {
+  stamp_progress: MemberStampProgressDetail[];
+}
+
+export async function getMemberDetail(id: number): Promise<MemberDetailResponse> {
+  return invokeApi<MemberDetailResponse>('api_get', { path: `/api/members/${id}` });
 }

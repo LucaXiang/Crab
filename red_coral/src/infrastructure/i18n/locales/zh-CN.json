@@ -104,6 +104,7 @@
       "long_press_to_edit": "长按或双击可编辑",
       "tap_to_close": "点击关闭",
       "please_select": "请选择",
+      "select": "请选择",
       "tip": "提示"
     },
     "empty": {
@@ -579,6 +580,7 @@
       "uncomp_confirm": "确定撤销此菜品的赠送？价格将恢复为原价。",
       "uncomp_auth_required": "撤销赠送需要授权"
     },
+    "stamp_reward": "集章奖励",
     "order_discount": {
       "title": "整单折扣",
       "desc": "为整单应用折扣",
@@ -620,6 +622,20 @@
       "link_failed": "关联会员失败",
       "no_results": "未找到匹配的会员",
       "search_hint": "请输入搜索关键词"
+    },
+    "stamp": {
+      "redeem": "兑换奖励",
+      "redeemed": "集章奖励已兑换",
+      "redeem_failed": "兑换失败",
+      "already_redeemed": "已兑换",
+      "cancel": "取消兑换",
+      "cancel_success": "已取消集章兑换",
+      "cancel_failed": "取消兑换失败",
+      "match_redeem": "匹配赠送",
+      "select_redeem": "选择赠送",
+      "select_reward": "选择奖励商品",
+      "reward_quantity": "可兑换 {{count}} 件",
+      "no_reward_products": "暂无可兑换商品"
     },
     "breakdown": {
       "comp": "赠送减免",
@@ -851,7 +867,9 @@
       "previous": "之前",
       "authorizer": "授权人",
       "affected_quantity": "影响数量",
-      "items": "菜品"
+      "items": "菜品",
+      "marketing_group": "营销组",
+      "reward_strategy": "奖励策略"
     },
     "operation": {
       "APPLY_DISCOUNT": "应用折扣",
@@ -867,7 +885,11 @@
     "rule_skipped": "已跳过",
     "rule_applied": "已应用",
     "option_added": "增加了",
-    "option_removed": "移除了"
+    "option_removed": "移除了",
+    "member_linked": "关联会员",
+    "member_unlinked": "取消关联会员",
+    "stamp_redeemed": "集章兑换",
+    "stamp_redemption_cancelled": "取消集章兑换"
   },
   "draft": {
     "action": {
@@ -1134,14 +1156,21 @@
     },
     "marketing_group": {
       "title": "营销组管理",
-      "description": "管理会员等级和折扣规则",
+      "description": "管理会员等级、折扣规则和集章活动",
       "add": "添加营销组",
       "edit": "编辑营销组",
       "unit": "个营销组",
+      "list_title": "营销组列表",
+      "empty": "暂无营销组",
+      "status_label": "状态",
       "rules": "折扣规则",
       "add_rule": "添加规则",
       "edit_rule": "编辑规则",
       "no_rules": "暂无折扣规则",
+      "stamp_activities": "集章活动",
+      "add_stamp": "添加集章",
+      "edit_stamp": "编辑集章",
+      "no_stamps": "暂无集章活动",
       "select_group": "请从左侧选择一个营销组查看详情",
       "receipt_name": "小票名称",
       "field": {
@@ -1158,11 +1187,83 @@
       "scope": {
         "global": "全部菜品",
         "category": "按分类",
+        "tag": "按标签",
         "product": "指定菜品"
       },
       "type": {
         "percentage": "百分比",
         "fixed": "固定金额"
+      },
+      "stamp": {
+        "stamps_required": "所需章数",
+        "reward_quantity": "奖励数量",
+        "reward_strategy": "奖励策略",
+        "strategy": {
+          "economizador": "最便宜优先",
+          "generoso": "最贵优先",
+          "designated": "指定商品"
+        },
+        "designated_product": "指定奖励商品",
+        "is_cyclic": "循环模式",
+        "cyclic": "循环",
+        "cyclic_hint": "完成集章后自动重置，可再次集章",
+        "stamp_targets": "计章对象",
+        "reward_targets": "兑换对象",
+        "add_target": "添加目标",
+        "no_targets": "请添加目标",
+        "target_type": {
+          "category": "分类",
+          "product": "商品"
+        },
+        "display_name_placeholder": "咖啡集章送",
+        "collect_n": "集 {n} 章",
+        "reward_n": "奖 {n} 件"
+      },
+      "rule_wizard": {
+        "step1_title": "调整方式",
+        "step2_title": "适用范围",
+        "step3_title": "命名信息",
+        "step1_section": "设置折扣方式",
+        "step1_desc": "选择折扣类型并设置具体折扣值",
+        "step2_section": "选择适用范围",
+        "step2_desc": "选择此折扣规则适用的菜品范围",
+        "step3_section": "规则命名",
+        "step3_desc": "为规则设置识别名称和小票显示名称",
+        "value_label": "折扣值",
+        "name_hint": "用于系统内部标识，建议使用英文下划线格式",
+        "display_name_placeholder": "VIP 咖啡9折",
+        "receipt_name": "小票名称",
+        "receipt_name_placeholder": "VIP",
+        "receipt_name_hint": "显示在小票上的简短名称"
+      },
+      "stamp_wizard": {
+        "step1_title": "基本信息",
+        "step2_title": "集章配置",
+        "step3_title": "奖励策略",
+        "step4_title": "集章目标",
+        "step1_section": "活动命名",
+        "step1_desc": "为集章活动设置名称",
+        "step2_section": "集章规则配置",
+        "step2_desc": "设置集章所需数量、奖励数量和循环模式",
+        "step3_section": "奖励策略选择",
+        "step3_desc": "选择达成集章后的奖励方式",
+        "step4_section": "集章与兑换目标",
+        "step4_desc": "设置哪些商品可以集章，以及哪些商品可以作为奖励兑换",
+        "stamps_required_hint": "客户需要收集的印章总数",
+        "reward_quantity_hint": "完成集章后可获得的奖励商品数量",
+        "config_preview": "客户消费指定商品集满 {stamps} 章，可兑换 {reward} 件奖品（{cyclic}）",
+        "one_time": "仅一次",
+        "stamp_targets_desc": "购买以下目标中的商品将获得印章",
+        "reward_targets_desc": "兑换奖励时可选择以下商品（留空则同计章对象）",
+        "strategy_economizador_desc": "选择最便宜的匹配商品作为奖励",
+        "strategy_generoso_desc": "选择最贵的匹配商品作为奖励",
+        "strategy_designated_desc": "指定特定商品作为奖励"
+      },
+      "message": {
+        "rule_created": "折扣规则已创建",
+        "rule_updated": "折扣规则已更新",
+        "stamp_created": "集章活动已创建",
+        "stamp_updated": "集章活动已更新"
       }
     },
     "member": {
@@ -1172,6 +1273,10 @@
       "edit": "编辑会员",
       "unit": "个会员",
       "search_placeholder": "搜索姓名、电话、卡号...",
+      "section": {
+        "contact": "联系信息",
+        "membership": "会员设置"
+      },
       "field": {
         "name": "姓名",
         "phone": "电话",

@@ -298,6 +298,15 @@ pub enum OrderCommandPayload {
         stamp_activity_id: i64,
         #[serde(skip_serializing_if = "Option::is_none")]
         product_id: Option<i64>,
+        /// Match mode: comp an existing item instead of adding a new one
+        #[serde(skip_serializing_if = "Option::is_none")]
+        comp_existing_instance_id: Option<String>,
+    },
+
+    /// Cancel a stamp redemption
+    CancelStampRedemption {
+        order_id: String,
+        stamp_activity_id: i64,
     },
 }
 
@@ -346,6 +355,7 @@ impl OrderCommand {
             OrderCommandPayload::LinkMember { order_id, .. } => Some(order_id),
             OrderCommandPayload::UnlinkMember { order_id, .. } => Some(order_id),
             OrderCommandPayload::RedeemStamp { order_id, .. } => Some(order_id),
+            OrderCommandPayload::CancelStampRedemption { order_id, .. } => Some(order_id),
         }
     }
 }

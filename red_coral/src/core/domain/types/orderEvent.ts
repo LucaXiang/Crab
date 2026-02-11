@@ -53,7 +53,8 @@ export type OrderEventType =
   | 'ORDER_NOTE_ADDED'
   | 'MEMBER_LINKED'
   | 'MEMBER_UNLINKED'
-  | 'STAMP_REDEEMED';
+  | 'STAMP_REDEEMED'
+  | 'STAMP_REDEMPTION_CANCELLED';
 
 /**
  * Order event structure (matches Rust OrderEvent)
@@ -118,7 +119,8 @@ export type EventPayload =
   | OrderNoteAddedPayload
   | MemberLinkedPayload
   | MemberUnlinkedPayload
-  | StampRedeemedPayload;
+  | StampRedeemedPayload
+  | StampRedemptionCancelledPayload;
 
 export interface TableOpenedPayload {
   type: 'TABLE_OPENED';
@@ -433,8 +435,27 @@ export interface StampRedeemedPayload {
   type: 'STAMP_REDEEMED';
   stamp_activity_id: number;
   stamp_activity_name: string;
-  reward_item_id: string;
+  reward_instance_id: string;
   reward_strategy: string;
+  product_id: number;
+  product_name: string;
+  original_price: number;
+  quantity: number;
+  tax_rate: number;
+  category_id?: number;
+  category_name?: string;
+  /** Match mode: comp existing item instead of adding new one */
+  comp_existing_instance_id?: string | null;
+}
+
+/** 集章兑换已取消 */
+export interface StampRedemptionCancelledPayload {
+  type: 'STAMP_REDEMPTION_CANCELLED';
+  stamp_activity_id: number;
+  stamp_activity_name: string;
+  reward_instance_id: string;
+  /** Whether the redemption was match-mode (comp existing item) */
+  is_comp_existing?: boolean;
 }
 
 // ============================================================================
@@ -481,7 +502,8 @@ export type OrderCommandPayload =
   | AddOrderNoteCommand
   | LinkMemberCommand
   | UnlinkMemberCommand
-  | RedeemStampCommand;
+  | RedeemStampCommand
+  | CancelStampRedemptionCommand;
 
 export interface OpenTableCommand {
   type: 'OPEN_TABLE';
@@ -718,6 +740,15 @@ export interface RedeemStampCommand {
   order_id: string;
   stamp_activity_id: number;
   product_id?: number | null;
+  /** Match mode: comp existing item instead of adding new */
+  comp_existing_instance_id?: string | null;
+}
+
+/** 取消集章兑换 */
+export interface CancelStampRedemptionCommand {
+  type: 'CANCEL_STAMP_REDEMPTION';
+  order_id: string;
+  stamp_activity_id: number;
 }
 
 // ============================================================================
@@ -901,6 +932,10 @@ export interface OrderSnapshot {
   /** Total MG discount amount */
   mg_discount_amount: number;
 
+  // === Stamp Redemption Tracking ===
+  /** Pending stamp redemptions (consumed on order completion, reversed on member unlink) */
+  stamp_redemptions?: StampRedemptionState[];
+
   start_time: number;
   end_time: number | null;
   created_at: number;
@@ -952,6 +987,8 @@ export interface CartItemSnapshot {
   applied_rules: AppliedRule[];
   /** Applied MG discount rules list */
   applied_mg_rules: AppliedMgRule[];
+  /** MG discount amount (server-computed, sum of applied_mg_rules) */
+  mg_discount_amount: number;
 
   // === Computed Fields ===
   /** Unit price for display (computed by backend: price with manual discount and rule adjustments) */
@@ -966,6 +1003,8 @@ export interface CartItemSnapshot {
   note?: string | null;
   authorizer_id?: number | null;
   authorizer_name?: string | null;
+  /** Category ID (for stamp target matching) */
+  category_id?: number | null;
   /** Category name snapshot (for statistics) */
   category_name?: string | null;
   /** Whether this item has been comped (gifted) */
@@ -992,6 +1031,14 @@ export interface AppliedRule {
   is_stackable: boolean;
   is_exclusive: boolean;
   skipped: boolean;
+}
+
+/** Stamp redemption state (tracked in snapshot for reversal on member unlink) */
+export interface StampRedemptionState {
+  stamp_activity_id: number;
+  reward_instance_id: string;
+  /** Whether the redemption was match-mode (comp existing item) */
+  is_comp_existing?: boolean;
 }
 
 /**

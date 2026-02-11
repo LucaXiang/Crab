@@ -37,7 +37,7 @@ pub async fn find_progress_details_by_member(
     member_id: i64,
 ) -> RepoResult<Vec<MemberStampProgressDetail>> {
     let rows = sqlx::query_as::<_, MemberStampProgressDetail>(
-        "SELECT sa.id as stamp_activity_id, sa.name as stamp_activity_name, sa.stamps_required, COALESCE(msp.current_stamps, 0) as current_stamps, COALESCE(msp.completed_cycles, 0) as completed_cycles, CASE WHEN COALESCE(msp.current_stamps, 0) >= sa.stamps_required THEN 1 ELSE 0 END as is_redeemable, sa.is_cyclic FROM stamp_activity sa LEFT JOIN member_stamp_progress msp ON sa.id = msp.stamp_activity_id AND msp.member_id = ?1 WHERE sa.marketing_group_id IN (SELECT marketing_group_id FROM member WHERE id = ?1) AND sa.is_active = 1",
+        "SELECT sa.id as stamp_activity_id, sa.name as stamp_activity_name, sa.stamps_required, COALESCE(msp.current_stamps, 0) as current_stamps, COALESCE(msp.completed_cycles, 0) as completed_cycles, CASE WHEN COALESCE(msp.current_stamps, 0) >= sa.stamps_required THEN 1 ELSE 0 END as is_redeemable, sa.is_cyclic, sa.reward_strategy, sa.reward_quantity, sa.designated_product_id FROM stamp_activity sa LEFT JOIN member_stamp_progress msp ON sa.id = msp.stamp_activity_id AND msp.member_id = ?1 WHERE sa.marketing_group_id IN (SELECT marketing_group_id FROM member WHERE id = ?1) AND sa.is_active = 1",
     )
     .bind(member_id)
     .fetch_all(pool)

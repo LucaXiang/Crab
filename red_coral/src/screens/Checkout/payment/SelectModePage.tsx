@@ -1,6 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, UserX } from 'lucide-react';
+import type { MemberStampProgressDetail } from '@/core/domain/types/api';
+import type { CartItemSnapshot } from '@/core/domain/types/orderEvent';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, UserX, Stamp, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -11,12 +13,25 @@ import { OrderDiscountModal } from '../OrderDiscountModal';
 import { OrderSurchargeModal } from '../OrderSurchargeModal';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { openCashDrawer } from '@/core/services/order/paymentService';
-import { completeOrder, updateOrderInfo, linkMember, unlinkMember } from '@/core/stores/order/commands';
+import { completeOrder, updateOrderInfo, linkMember, unlinkMember, redeemStamp, cancelStampRedemption } from '@/core/stores/order/commands';
+import { getMemberDetail } from '@/features/member/mutations';
 import { CashPaymentModal } from './CashPaymentModal';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { ConfirmDialog } from '@/shared/components';
 import { MemberLinkModal } from '../MemberLinkModal';
+import { StampRewardPickerModal } from './StampRewardPickerModal';
+
+/** Find order items matching stamp reward_targets that are not comped */
+function getMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
+  return items.filter(item =>
+    !item.is_comped && sp.reward_targets.some(rt =>
+      rt.target_type === 'PRODUCT' ? rt.target_id === item.id
+      : rt.target_type === 'CATEGORY' ? rt.target_id === item.category_id
+      : false
+    ),
+  );
+}
 
 type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL';
 
@@ -61,6 +76,80 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showSurchargeModal, setShowSurchargeModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
+  const [stampProgress, setStampProgress] = useState<MemberStampProgressDetail[]>([]);
+  const [rewardPickerActivity, setRewardPickerActivity] = useState<MemberStampProgressDetail | null>(null);
+
+  // Fetch stamp progress when member is linked
+  useEffect(() => {
+    if (order.member_id) {
+      getMemberDetail(order.member_id)
+        .then((detail) => setStampProgress(detail.stamp_progress))
+        .catch(() => setStampProgress([]));
+    } else {
+      setStampProgress([]);
+    }
+  }, [order.member_id]);
+
+  // Match mode: comp existing item from order (Eco/Gen)
+  const handleMatchRedeem = useCallback(async (sp: MemberStampProgressDetail) => {
+    const matchingItems = getMatchingItems(order.items, sp);
+    if (matchingItems.length === 0) return;
+    const bestMatch = sp.reward_strategy === 'ECONOMIZADOR'
+      ? matchingItems.reduce((a, b) => a.original_price <= b.original_price ? a : b)
+      : matchingItems.reduce((a, b) => a.original_price >= b.original_price ? a : b);
+    try {
+      await redeemStamp(order.order_id, sp.stamp_activity_id, null, bestMatch.instance_id);
+      toast.success(t('checkout.stamp.redeemed'));
+      if (order.member_id) {
+        const detail = await getMemberDetail(order.member_id);
+        setStampProgress(detail.stamp_progress);
+      }
+    } catch {
+      toast.error(t('checkout.stamp.redeem_failed'));
+    }
+  }, [order.order_id, order.items, order.member_id, t]);
+
+  // Selection mode: pick from reward_targets products
+  const handleSelectionRedeem = useCallback(async (activityId: number, productId: number) => {
+    setRewardPickerActivity(null);
+    try {
+      await redeemStamp(order.order_id, activityId, productId);
+      toast.success(t('checkout.stamp.redeemed'));
+      if (order.member_id) {
+        const detail = await getMemberDetail(order.member_id);
+        setStampProgress(detail.stamp_progress);
+      }
+    } catch {
+      toast.error(t('checkout.stamp.redeem_failed'));
+    }
+  }, [order.order_id, order.member_id, t]);
+
+  // Direct mode: Designated strategy (no product_id needed, backend handles it)
+  const handleDirectRedeem = useCallback(async (activityId: number) => {
+    try {
+      await redeemStamp(order.order_id, activityId);
+      toast.success(t('checkout.stamp.redeemed'));
+      if (order.member_id) {
+        const detail = await getMemberDetail(order.member_id);
+        setStampProgress(detail.stamp_progress);
+      }
+    } catch {
+      toast.error(t('checkout.stamp.redeem_failed'));
+    }
+  }, [order.order_id, order.member_id, t]);
+
+  const handleCancelStampRedemption = useCallback(async (activityId: number) => {
+    try {
+      await cancelStampRedemption(order.order_id, activityId);
+      toast.success(t('checkout.stamp.cancel_success'));
+      if (order.member_id) {
+        const detail = await getMemberDetail(order.member_id);
+        setStampProgress(detail.stamp_progress);
+      }
+    } catch {
+      toast.error(t('checkout.stamp.cancel_failed'));
+    }
+  }, [order.order_id, order.member_id, t]);
 
   const handleComplete = useCallback(() => {
     requestAnimationFrame(() => {
@@ -307,9 +396,10 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
             </div>
           </div>
 
-          <div className="flex-1 p-8 overflow-y-auto space-y-6">
-            {/* Payment Method Buttons */}
+          <div className="flex-1 p-8 overflow-y-auto">
+            {/* Single unified 3-column grid */}
             <div className="grid grid-cols-3 gap-6">
+              {/* Row 1: Payment Methods */}
               <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-green-500 hover:bg-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Coins size={48} />
                 <div className="text-2xl font-bold">{t('checkout.method.cash')}</div>
@@ -325,16 +415,13 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 <div className="text-2xl font-bold">{t('checkout.split.title')}</div>
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.locked') : order.has_amount_split ? t('checkout.amount_split.item_split_disabled') : t('checkout.split.desc')}</div>
               </button>
-            </div>
 
-            {/* Amount Split & Payment Records Buttons */}
-            <div className="grid grid-cols-3 gap-6">
+              {/* Row 2: Amount Split, Records, Detail */}
               <button onClick={() => onNavigate('AMOUNT_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Banknote size={48} />
                 <div className="text-2xl font-bold">{isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.title')}</div>
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.desc') : t('checkout.amount_split.desc')}</div>
               </button>
-
               <button
                 onClick={() => onNavigate('PAYMENT_RECORDS')}
                 disabled={activePayments.length === 0}
@@ -352,42 +439,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 <div className="text-2xl font-bold">{t('checkout.order_detail.title')}</div>
                 <div className="text-sm opacity-90">{t('checkout.order_detail.desc')}</div>
               </button>
-            </div>
 
-            {/* Member Management */}
-            <div className="grid grid-cols-3 gap-6">
-              {order.member_id ? (
-                <button
-                  onClick={async () => {
-                    try {
-                      await unlinkMember(order.order_id);
-                      toast.success(t('checkout.member.unlinked'));
-                    } catch (e) {
-                      toast.error(t('checkout.member.unlink_failed'));
-                    }
-                  }}
-                  disabled={isProcessing}
-                  className="h-40 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
-                >
-                  <UserX size={48} />
-                  <div className="text-2xl font-bold">{t('checkout.member.unlink')}</div>
-                  <div className="text-sm opacity-90">{order.member_name}</div>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowMemberModal(true)}
-                  disabled={isProcessing}
-                  className="h-40 bg-teal-500 hover:bg-teal-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
-                >
-                  <UserCheck size={48} />
-                  <div className="text-2xl font-bold">{t('checkout.member.link')}</div>
-                  <div className="text-sm opacity-90">{t('checkout.member.link_desc')}</div>
-                </button>
-              )}
-            </div>
-
-            {/* Order Adjustments: Comp, Discount, Surcharge */}
-            <div className="grid grid-cols-3 gap-6">
+              {/* Row 3: Comp, Discount, Surcharge */}
               <button
                 onClick={() => onNavigate('COMP')}
                 disabled={isPaidInFull || isProcessing}
@@ -415,6 +468,156 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 <div className="text-2xl font-bold">{t('checkout.order_surcharge.title')}</div>
                 <div className="text-sm opacity-90">{t('checkout.order_surcharge.desc')}</div>
               </button>
+
+              {/* Trailing: Member + Stamp Cards */}
+              {order.member_id ? (
+                <button
+                  onClick={async () => {
+                    try {
+                      await unlinkMember(order.order_id);
+                      toast.success(t('checkout.member.unlinked'));
+                    } catch {
+                      toast.error(t('checkout.member.unlink_failed'));
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className="h-40 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <UserX size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.member.unlink')}</div>
+                  <div className="text-sm opacity-90">{order.member_name}</div>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowMemberModal(true)}
+                  disabled={isProcessing}
+                  className="h-40 bg-teal-500 hover:bg-teal-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <UserCheck size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.member.link')}</div>
+                  <div className="text-sm opacity-90">{t('checkout.member.link_desc')}</div>
+                </button>
+              )}
+
+              {/* Stamp cards (dynamic progress with order items) */}
+              {order.member_id && stampProgress.map((sp) => {
+                const alreadyRedeemed = order.stamp_redemptions?.some(
+                  (r) => r.stamp_activity_id === sp.stamp_activity_id
+                );
+                // Count matching items from current order for dynamic progress
+                const orderBonus = order.items
+                  .filter((item) => !item.is_comped && sp.stamp_targets.some((t) =>
+                    t.target_type === 'PRODUCT' ? t.target_id === item.id
+                    : t.target_type === 'CATEGORY' ? t.target_id === item.category_id
+                    : false
+                  ))
+                  .reduce((sum, item) => sum + item.quantity, 0);
+                const effectiveStamps = sp.current_stamps + orderBonus;
+                const canRedeem = effectiveStamps >= sp.stamps_required && !alreadyRedeemed;
+                const progressPercent = Math.min(100, Math.round((effectiveStamps / sp.stamps_required) * 100));
+
+                // Dual-mode logic for Eco/Gen strategies
+                const isDesignated = sp.reward_strategy === 'DESIGNATED';
+                const matchingItems = !isDesignated ? getMatchingItems(order.items, sp) : [];
+                const hasExcess = orderBonus > Math.max(0, sp.stamps_required - sp.current_stamps);
+                // Match mode available when order has matching items with excess stamps
+                const showMatchButton = !isDesignated && canRedeem && hasExcess && matchingItems.length > 0;
+                // Selection mode always available for Eco/Gen
+                const showSelectButton = !isDesignated && canRedeem && (sp.reward_targets?.length > 0);
+
+                return (
+                  <div
+                    key={sp.stamp_activity_id}
+                    className={`h-40 rounded-2xl shadow-xl transition-all relative flex flex-col items-center justify-center gap-2 ${
+                      alreadyRedeemed
+                        ? 'bg-violet-100 text-violet-600'
+                        : canRedeem
+                          ? 'bg-violet-500 text-white hover:shadow-2xl'
+                          : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {/* Cancel button for redeemed */}
+                    {alreadyRedeemed && (
+                      <button
+                        onClick={() => handleCancelStampRedemption(sp.stamp_activity_id)}
+                        disabled={isProcessing}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-violet-200 hover:bg-violet-300 text-violet-700 transition-colors disabled:opacity-50"
+                        title={t('checkout.stamp.cancel')}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+
+                    <Stamp size={28} />
+                    <div className="text-sm font-bold">{sp.stamp_activity_name}</div>
+
+                    {/* Progress display */}
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl font-black tabular-nums">{effectiveStamps}</span>
+                      <span className="text-xs opacity-75">/ {sp.stamps_required}</span>
+                      {orderBonus > 0 && (
+                        <span className={`text-xs ml-1 ${alreadyRedeemed ? 'text-violet-400' : canRedeem ? 'text-white/70' : 'text-gray-400'}`}>
+                          (+{orderBonus})
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className={`w-3/4 h-1.5 rounded-full overflow-hidden ${alreadyRedeemed ? 'bg-violet-200' : canRedeem ? 'bg-white/20' : 'bg-gray-200'}`}>
+                      <div
+                        className={`h-full rounded-full transition-all ${alreadyRedeemed ? 'bg-violet-400' : canRedeem ? 'bg-white' : 'bg-gray-400'}`}
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+
+                    {/* Action buttons */}
+                    {alreadyRedeemed ? (
+                      <div className="text-xs font-medium bg-violet-200/50 px-3 py-0.5 rounded-full">
+                        {t('checkout.stamp.already_redeemed')}
+                      </div>
+                    ) : canRedeem ? (
+                      isDesignated ? (
+                        <button
+                          onClick={() => handleDirectRedeem(sp.stamp_activity_id)}
+                          disabled={isProcessing}
+                          className="text-xs font-medium bg-white/20 hover:bg-white/30 px-3 py-0.5 rounded-full transition-colors disabled:opacity-50"
+                        >
+                          {t('checkout.stamp.redeem')}
+                        </button>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          {showMatchButton ? (
+                            <button
+                              onClick={() => handleMatchRedeem(sp)}
+                              disabled={isProcessing}
+                              className="text-xs font-medium bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full transition-colors disabled:opacity-50"
+                            >
+                              {t('checkout.stamp.match_redeem')}
+                            </button>
+                          ) : matchingItems.length > 0 ? (
+                            <button
+                              onClick={() => handleMatchRedeem(sp)}
+                              disabled={isProcessing}
+                              className="text-xs font-medium bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full transition-colors disabled:opacity-50"
+                            >
+                              {t('checkout.stamp.redeem')}
+                            </button>
+                          ) : null}
+                          {showSelectButton && (
+                            <button
+                              onClick={() => setRewardPickerActivity(sp)}
+                              disabled={isProcessing}
+                              className="text-xs font-medium bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full transition-colors disabled:opacity-50"
+                            >
+                              {t('checkout.stamp.select_redeem')}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -472,6 +675,17 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         orderId={order.order_id}
         onClose={() => setShowMemberModal(false)}
       />
+
+      {rewardPickerActivity && (
+        <StampRewardPickerModal
+          isOpen={!!rewardPickerActivity}
+          activityName={rewardPickerActivity.stamp_activity_name}
+          rewardTargets={rewardPickerActivity.reward_targets}
+          rewardQuantity={rewardPickerActivity.reward_quantity}
+          onSelect={(productId) => handleSelectionRedeem(rewardPickerActivity.stamp_activity_id, productId)}
+          onClose={() => setRewardPickerActivity(null)}
+        />
+      )}
     </>
   );
 };

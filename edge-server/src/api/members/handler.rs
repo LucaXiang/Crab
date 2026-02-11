@@ -35,15 +35,32 @@ pub async fn search(
     Ok(Json(members))
 }
 
+/// Stamp progress with targets (for frontend dynamic progress calculation)
+#[derive(serde::Serialize)]
+pub struct StampProgressWithTargets {
+    pub stamp_activity_id: i64,
+    pub stamp_activity_name: String,
+    pub stamps_required: i32,
+    pub current_stamps: i32,
+    pub completed_cycles: i32,
+    pub is_redeemable: bool,
+    pub is_cyclic: bool,
+    pub reward_strategy: shared::models::RewardStrategy,
+    pub reward_quantity: i32,
+    pub designated_product_id: Option<i64>,
+    pub stamp_targets: Vec<shared::models::StampTarget>,
+    pub reward_targets: Vec<shared::models::StampRewardTarget>,
+}
+
 /// Member detail response (member + stamp progress)
 #[derive(serde::Serialize)]
 pub struct MemberDetail {
     #[serde(flatten)]
     pub member: MemberWithGroup,
-    pub stamp_progress: Vec<shared::models::MemberStampProgressDetail>,
+    pub stamp_progress: Vec<StampProgressWithTargets>,
 }
 
-/// GET /api/members/:id - 获取单个会员（含集章进度）
+/// GET /api/members/:id - 获取单个会员（含集章进度 + 计章对象）
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
@@ -52,7 +69,53 @@ pub async fn get_by_id(
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Member {}", id)))?;
 
-    let stamp_progress = stamp::find_progress_details_by_member(&state.pool, id).await?;
+    let progress_list = stamp::find_progress_details_by_member(&state.pool, id).await?;
+
+    // Enrich each progress with its stamp/reward targets
+    let mut stamp_progress = Vec::with_capacity(progress_list.len());
+    for p in progress_list {
+        let targets = crate::db::repository::marketing_group::find_stamp_targets(
+            &state.pool,
+            p.stamp_activity_id,
+        )
+        .await
+        .unwrap_or_default();
+
+        let mut reward_targets = crate::db::repository::marketing_group::find_reward_targets(
+            &state.pool,
+            p.stamp_activity_id,
+        )
+        .await
+        .unwrap_or_default();
+
+        // If no explicit reward targets, fall back to stamp targets
+        if reward_targets.is_empty() {
+            reward_targets = targets
+                .iter()
+                .map(|t| shared::models::StampRewardTarget {
+                    id: t.id,
+                    stamp_activity_id: t.stamp_activity_id,
+                    target_type: t.target_type.clone(),
+                    target_id: t.target_id,
+                })
+                .collect();
+        }
+
+        stamp_progress.push(StampProgressWithTargets {
+            stamp_activity_id: p.stamp_activity_id,
+            stamp_activity_name: p.stamp_activity_name,
+            stamps_required: p.stamps_required,
+            current_stamps: p.current_stamps,
+            completed_cycles: p.completed_cycles,
+            is_redeemable: p.is_redeemable,
+            is_cyclic: p.is_cyclic,
+            reward_strategy: p.reward_strategy,
+            reward_quantity: p.reward_quantity,
+            designated_product_id: p.designated_product_id,
+            stamp_targets: targets,
+            reward_targets,
+        });
+    }
 
     Ok(Json(MemberDetail {
         member,

@@ -199,6 +199,7 @@ pub fn input_to_snapshot_with_rules(
         },
         applied_rules: calc_result.applied_rules,
         applied_mg_rules: vec![],
+        mg_discount_amount: 0.0,
         unit_price: 0.0,   // Computed by recalculate_totals
         line_total: 0.0,   // Computed by recalculate_totals
         tax: 0.0,          // Computed by recalculate_totals
@@ -206,6 +207,7 @@ pub fn input_to_snapshot_with_rules(
         note: input.note.clone(),
         authorizer_id: input.authorizer_id,
         authorizer_name: input.authorizer_name.clone(),
+        category_id: None, // Set by AddItemsAction from ProductMeta
         category_name: None,
         is_comped: false,
     }

@@ -84,6 +84,7 @@
       "saving": "Guardando...",
       "save_success": "Guardado correctamente",
       "save_failed": "Error al guardar",
+      "delete_success": "Eliminado correctamente",
       "delete_failed": "Error al eliminar",
       "load_failed": "Error al cargar datos",
       "invalid_form": "Formulario inválido",
@@ -95,8 +96,10 @@
       "retail_order_failed": "Error al crear venta directa",
       "cash_drawer_failed": "Error al abrir cajón: {message}"
     },
+    "confirm_delete": "¿Seguro que desea eliminar «{name}»? Esta acción no se puede deshacer.",
     "hint": {
       "search_placeholder": "Buscar...",
+      "select": "Seleccione",
       "name_placeholder": "Introduzca nombre",
       "description_placeholder": "Introduzca descripción",
       "long_press_to_edit": "Mantenga pulsado para editar",
@@ -577,6 +580,7 @@
       "uncomp_confirm": "¿Revertir invitación? Se restaurará el precio.",
       "uncomp_auth_required": "Revertir requiere autorización"
     },
+    "stamp_reward": "Recompensa",
     "order_discount": {
       "title": "Descuento",
       "desc": "Aplicar descuento al pedido",
@@ -605,11 +609,37 @@
       "current_percent": "Suplemento: {value}%",
       "auth_required": "Suplemento requiere autorización"
     },
+    "member": {
+      "linked": "Miembro vinculado",
+      "link": "Vincular miembro",
+      "unlink": "Desvincular",
+      "search_placeholder": "Buscar nombre, teléfono, tarjeta...",
+      "link_success": "Miembro vinculado",
+      "unlink_success": "Miembro desvinculado",
+      "link_failed": "Error al vincular miembro",
+      "no_results": "No se encontraron miembros",
+      "search_hint": "Introduzca un término de búsqueda"
+    },
+    "stamp": {
+      "redeem": "Canjear recompensa",
+      "redeemed": "Recompensa canjeada",
+      "redeem_failed": "Error al canjear",
+      "already_redeemed": "Ya canjeado",
+      "cancel": "Cancelar canje",
+      "cancel_success": "Canje cancelado",
+      "cancel_failed": "Error al cancelar canje",
+      "match_redeem": "Invitar existente",
+      "select_redeem": "Elegir producto",
+      "select_reward": "Seleccionar producto de recompensa",
+      "reward_quantity": "Canjear {{count}} ud.",
+      "no_reward_products": "No hay productos de recompensa disponibles"
+    },
     "breakdown": {
       "comp": "Invitaciones",
       "manual_discount": "Dto. manual",
       "rule_discount": "Dto. regla",
       "rule_surcharge": "Suplemento regla",
+      "mg_discount": "Dto. miembro",
       "order_discount": "Dto. pedido",
       "order_surcharge": "Suplemento pedido"
     },
@@ -834,7 +864,9 @@
       "previous": "Anterior",
       "authorizer": "Autorizado por",
       "affected_quantity": "Cantidad afectada",
-      "items": "Platos"
+      "items": "Platos",
+      "marketing_group": "Grupo marketing",
+      "reward_strategy": "Estrategia de premio"
     },
     "operation": {
       "APPLY_DISCOUNT": "Aplicar descuento",
@@ -850,7 +882,11 @@
     "rule_skipped": "Omitida",
     "rule_applied": "Aplicada",
     "option_added": "Añadido",
-    "option_removed": "Eliminado"
+    "option_removed": "Eliminado",
+    "member_linked": "Miembro vinculado",
+    "member_unlinked": "Miembro desvinculado",
+    "stamp_redeemed": "Canje de sellos",
+    "stamp_redemption_cancelled": "Canje cancelado"
   },
   "draft": {
     "action": {
@@ -1113,6 +1149,139 @@
         "prev": "Anterior",
         "finish": "Crear",
         "save": "Guardar"
+      }
+    },
+    "marketing_group": {
+      "title": "Grupos de marketing",
+      "description": "Gestionar niveles de membresía, reglas de descuento y sellos",
+      "add": "Añadir grupo",
+      "edit": "Editar grupo",
+      "unit": "grupos",
+      "list_title": "Lista de grupos",
+      "empty": "Sin grupos de marketing",
+      "status_label": "Estado",
+      "rules": "Reglas de descuento",
+      "add_rule": "Añadir regla",
+      "edit_rule": "Editar regla",
+      "no_rules": "Sin reglas de descuento",
+      "stamp_activities": "Actividades de sellos",
+      "add_stamp": "Añadir sello",
+      "edit_stamp": "Editar sello",
+      "no_stamps": "Sin actividades de sellos",
+      "select_group": "Seleccione un grupo para ver detalles",
+      "receipt_name": "Nombre en ticket",
+      "field": {
+        "name": "Identificador",
+        "display_name": "Nombre visible",
+        "description": "Descripción",
+        "scope": "Ámbito",
+        "category_id": "ID categoría",
+        "product_id": "ID plato",
+        "adjustment_type": "Tipo ajuste",
+        "percent": "Porcentaje (%)",
+        "amount": "Importe"
+      },
+      "scope": {
+        "global": "Todos los platos",
+        "category": "Por categoría",
+        "tag": "Por etiqueta",
+        "product": "Plato específico"
+      },
+      "type": {
+        "percentage": "Porcentaje",
+        "fixed": "Importe fijo"
+      },
+      "stamp": {
+        "stamps_required": "Sellos necesarios",
+        "reward_quantity": "Cantidad premio",
+        "reward_strategy": "Estrategia de premio",
+        "strategy": {
+          "economizador": "El más barato",
+          "generoso": "El más caro",
+          "designated": "Producto designado"
+        },
+        "designated_product": "Producto premio designado",
+        "is_cyclic": "Modo cíclico",
+        "cyclic": "Cíclico",
+        "cyclic_hint": "Reinicio automático al completar, permite repetir",
+        "stamp_targets": "Objetivos de sello",
+        "reward_targets": "Objetivos de premio",
+        "add_target": "Añadir objetivo",
+        "no_targets": "Añada un objetivo",
+        "target_type": {
+          "category": "Categoría",
+          "product": "Producto"
+        },
+        "display_name_placeholder": "Ej: Café 10 sellos",
+        "collect_n": "Recoger {n}",
+        "reward_n": "Premio {n}"
+      },
+      "rule_wizard": {
+        "step1_title": "Tipo de ajuste",
+        "step2_title": "Ámbito",
+        "step3_title": "Nombres",
+        "step1_section": "Configurar descuento",
+        "step1_desc": "Seleccione el tipo de descuento y establezca el valor",
+        "step2_section": "Seleccionar ámbito",
+        "step2_desc": "Elija a qué productos se aplica esta regla",
+        "step3_section": "Nombres de la regla",
+        "step3_desc": "Establezca nombres de identificación y ticket",
+        "value_label": "Valor del descuento",
+        "name_hint": "Identificador interno, use formato snake_case en inglés",
+        "display_name_placeholder": "VIP Café -10%",
+        "receipt_name": "Nombre en ticket",
+        "receipt_name_placeholder": "VIP",
+        "receipt_name_hint": "Nombre corto que aparece en el ticket"
+      },
+      "stamp_wizard": {
+        "step1_title": "Información básica",
+        "step2_title": "Configuración de sellos",
+        "step3_title": "Estrategia de premio",
+        "step4_title": "Objetivos",
+        "step1_section": "Nombre de la actividad",
+        "step1_desc": "Establezca el nombre de la actividad de sellos",
+        "step2_section": "Configuración de reglas",
+        "step2_desc": "Configure la cantidad de sellos, premios y modo cíclico",
+        "step3_section": "Seleccionar estrategia",
+        "step3_desc": "Elija cómo se otorga el premio al completar los sellos",
+        "step4_section": "Objetivos de sellos y premios",
+        "step4_desc": "Configure qué productos dan sellos y cuáles pueden canjearse como premio",
+        "stamps_required_hint": "Número total de sellos que debe recoger el cliente",
+        "reward_quantity_hint": "Cantidad de productos premio al completar los sellos",
+        "config_preview": "El cliente colecciona {stamps} sellos y obtiene {reward} premio(s) ({cyclic})",
+        "one_time": "Solo una vez",
+        "stamp_targets_desc": "Comprar estos productos otorga sellos",
+        "reward_targets_desc": "Productos canjeables como premio (vacío = igual que objetivos de sello)",
+        "strategy_economizador_desc": "El producto más barato como premio",
+        "strategy_generoso_desc": "El producto más caro como premio",
+        "strategy_designated_desc": "Un producto específico como premio"
+      },
+      "message": {
+        "rule_created": "Regla de descuento creada",
+        "rule_updated": "Regla de descuento actualizada",
+        "stamp_created": "Actividad de sellos creada",
+        "stamp_updated": "Actividad de sellos actualizada"
+      }
+    },
+    "member": {
+      "title": "Gestión de miembros",
+      "description": "Gestionar información de miembros",
+      "add": "Añadir miembro",
+      "edit": "Editar miembro",
+      "unit": "miembros",
+      "search_placeholder": "Buscar nombre, teléfono, tarjeta...",
+      "section": {
+        "contact": "Contacto",
+        "membership": "Membresía"
+      },
+      "field": {
+        "name": "Nombre",
+        "phone": "Teléfono",
+        "card_number": "N.º tarjeta",
+        "group": "Grupo marketing",
+        "points": "Puntos",
+        "birthday": "Cumpleaños",
+        "notes": "Notas"
       }
     },
     "zone": {

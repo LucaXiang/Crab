@@ -478,6 +478,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         // Calculate MG discount (applied after price rules)
         let after_rules = base_with_options - manual_discount - rule_discount + rule_surcharge;
         let mg_discount = effective_mg_discount(item, after_rules);
+        item.mg_discount_amount = to_f64(mg_discount);
         if !item.is_comped {
             item_mg_discount_total += mg_discount * quantity;
         }

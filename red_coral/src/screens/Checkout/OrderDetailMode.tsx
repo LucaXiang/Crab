@@ -11,11 +11,11 @@ import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { CATEGORY_ACCENT } from '@/utils/categoryColors';
+import { CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 import {
   ArrowLeft, Receipt, CreditCard, Coins,
   ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban,
-  Gift,
+  Gift, Stamp,
 } from 'lucide-react';
 
 interface OrderDetailModeProps {
@@ -79,19 +79,8 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
     });
   }, [order.items, products, categories]);
 
-  // 按排序后分类顺序分配颜色
-  const itemColorMap = useMemo(() => {
-    const productMap = new Map(products.map(p => [p.id, p]));
-    const map = new Map<string, number>();
-    const seen: string[] = [];
-    for (const item of visibleItems) {
-      const catId = String(productMap.get(item.id)?.category_id ?? 'uncategorized');
-      let idx = seen.indexOf(catId);
-      if (idx === -1) { seen.push(catId); idx = seen.length - 1; }
-      map.set(item.instance_id, idx % CATEGORY_ACCENT.length);
-    }
-    return map;
-  }, [visibleItems, products]);
+  const colorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
+  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
 
   const toggleItem = useCallback((idx: number) => {
     setExpandedItems(prev => {
@@ -171,17 +160,21 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
               </button>
             </div>
             <div className="divide-y divide-gray-100">
-              {visibleItems.map((item, idx) => (
-                <OrderItemRow
-                  key={item.instance_id || idx}
-                  item={item}
-                  index={idx}
-                  isExpanded={expandedItems.has(idx)}
-                  onToggle={toggleItem}
-                  accentColor={CATEGORY_ACCENT[itemColorMap.get(item.instance_id) ?? 0]}
-                  t={t}
-                />
-              ))}
+              {visibleItems.map((item, idx) => {
+                const catId = String(productMap.get(item.id)?.category_id ?? 'uncategorized');
+                const colorIdx = colorMap.get(catId) ?? 0;
+                return (
+                  <OrderItemRow
+                    key={item.instance_id || idx}
+                    item={item}
+                    index={idx}
+                    isExpanded={expandedItems.has(idx)}
+                    onToggle={toggleItem}
+                    accentColor={CATEGORY_ACCENT[colorIdx]}
+                    t={t}
+                  />
+                );
+              })}
             </div>
             {/* Price Breakdown Footer */}
             <div className="p-5 bg-gray-50/80 border-t border-gray-200/60 space-y-2">
@@ -295,10 +288,17 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                 <span className="text-xs text-gray-500">({item.selected_specification.name})</span>
               )}
               {item.is_comped && (
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <Gift size={10} />
-                  {t('checkout.comp.badge')}
-                </span>
+                item.instance_id.startsWith('stamp_reward::') ? (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <Stamp size={10} />
+                    {t('checkout.stamp_reward')}
+                  </span>
+                ) : (
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <Gift size={10} />
+                    {t('checkout.comp.badge')}
+                  </span>
+                )
               )}
               {discountPercent > 0 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
