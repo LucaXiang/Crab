@@ -72,6 +72,35 @@ src/
 9xxx  System      (DatabaseError, InternalError, StorageError)
 ```
 
+### CommandErrorCode (订单命令错误码)
+
+`shared::order::types::CommandErrorCode` — 订单命令执行失败时返回的结构化错误码。
+
+**三层架构**: Rust `CommandErrorCode` enum → TS `CommandErrorCode` union type → i18n `commandError.<CODE>` 翻译
+
+**分组**:
+| 分组 | 错误码 |
+|------|--------|
+| **订单状态** | OrderNotFound, OrderAlreadyCompleted, OrderAlreadyVoided, OrderNotActive, OrderAlreadyMerged |
+| **会员** | MemberAlreadyLinked, NoMemberLinked, MemberRequired, MemberLinkedCannotMerge |
+| **商品** | EmptyItems, TooManyItems, ItemNotFound, ItemIsComped, ItemNotComped, ItemAlreadyComped, NoChangesDetected, InvalidQuantity, EmptyCompReason, ItemFullyPaid |
+| **支付** | PaymentNotFound, PaymentExceedsRemaining, InsufficientTender, PaymentInsufficient, HasPayments, InvalidAmount |
+| **拆单** | AaSplitActive, AmountSplitActive, ItemSplitBlocked, AaSplitAlreadyStarted, AaSplitNotStarted, InvalidShares, SplitExceedsRemaining, DuplicateSplitItem, CannotSplitComped |
+| **调价** | MutuallyExclusiveAdjustment, InvalidAdjustmentValue |
+| **集章** | InsufficientStamps, StampAlreadyRedeemed, StampNoMatch, StampRedemptionNotFound, StampTargetMismatch, StampProductNotAvailable |
+| **规则** | RuleNotFoundInOrder |
+| **订单信息** | NoFieldsToUpdate, InvalidGuestCount |
+| **存储/系统** | StorageFull, OutOfMemory, StorageCorrupted, SystemBusy, InternalError |
+| **通用** | InvalidOperation, DuplicateCommand, TableOccupied, InsufficientQuantity |
+
+**添加新错误码流程**:
+1. `shared/src/order/types.rs` — 添加 `CommandErrorCode` variant
+2. `edge-server/src/orders/manager/error.rs` — 添加 `ManagerError → CommandError` 映射
+3. `red_coral/src/core/domain/types/orderEvent.ts` — 添加 TS union 成员
+4. `red_coral/src/infrastructure/i18n/locales/zh-CN.json` — `commandError.<CODE>` 翻译
+5. `red_coral/src/infrastructure/i18n/locales/es-ES.json` — 同步翻译
+6. 前端使用: `commandErrorMessage(error.code)` 自动查表 + fallback
+
 ### 订单事件溯源
 
 **OrderCommand** → `OrderCommandPayload`:

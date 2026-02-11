@@ -89,7 +89,8 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 | **金额计算** | 后端 `rust_decimal`，前端 `Currency` (decimal.js)，禁止原生浮点 |
 | **货币** | 欧元 (€)，前端用 `formatCurrency()` 格式化 |
 | **支付方式** | 统一大写: `CASH`, `CARD` |
-| **错误码** | `shared::error::ErrorCode` (u16，按领域分区 0xxx-9xxx) |
+| **API 错误码** | `shared::error::ErrorCode` (u16，按领域分区 0xxx-9xxx) |
+| **命令错误码** | `shared::order::types::CommandErrorCode` — 订单命令失败的结构化错误码，详见 [`shared/CLAUDE.md`](shared/CLAUDE.md)；前端 `commandErrorMessage(code)` 自动翻译 |
 | **异步运行时** | `tokio`，trait object 场景用 `#[async_trait]` |
 | **共享状态** | `Arc` 包装，`ServerState` 设计为 clone-cheap |
 | **依赖管理** | 所有依赖在 workspace `Cargo.toml` 统一声明 |

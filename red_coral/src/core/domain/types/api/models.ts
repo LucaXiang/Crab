@@ -1072,6 +1072,7 @@ export type AuditAction =
   | 'login_success'
   | 'login_failed'
   | 'logout'
+  | 'escalation_success'
   // 订单（财务关键 — 仅终结状态，中间操作由 OrderEvents 覆盖）
   | 'order_completed'
   | 'order_voided'
@@ -1115,6 +1116,14 @@ export type AuditAction =
   | 'print_destination_created'
   | 'print_destination_updated'
   | 'print_destination_deleted'
+  // 会员
+  | 'member_created'
+  | 'member_updated'
+  | 'member_deleted'
+  // 营销组
+  | 'marketing_group_created'
+  | 'marketing_group_updated'
+  | 'marketing_group_deleted'
   // 班次
   | 'shift_opened'
   | 'shift_updated'

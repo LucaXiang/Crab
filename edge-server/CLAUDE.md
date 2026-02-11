@@ -209,9 +209,10 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 
 1. `shared/src/order/command.rs` 添加 `OrderCommandPayload` variant
 2. `shared/src/order/event.rs` 添加 `OrderEventType` + `EventPayload` variant
-3. `orders/actions/` 创建 Action 实现 `CommandHandler`
+3. `orders/actions/` 创建 Action 实现 `CommandHandler`（错误使用 `OrderError::InvalidOperation(CommandErrorCode::Xxx, msg)`）
 4. `orders/appliers/` 创建 Applier 实现 `EventApplier`
 5. `orders/actions/mod.rs` + `orders/appliers/mod.rs` 注册分发
+6. 如需新错误码: `shared/src/order/types.rs` 添加 `CommandErrorCode` variant → TS 类型 → zh-CN/es-ES 翻译
 
 ### CatalogService
 

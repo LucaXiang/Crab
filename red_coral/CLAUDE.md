@@ -130,7 +130,7 @@ src/
 │   └── label/              # 标签打印服务
 ├── utils/                  # 工具函数
 │   ├── currency/           # Currency 类 (decimal.js 封装)
-│   ├── error/              # friendlyError (错误码→用户消息)
+│   ├── error/              # friendlyError (API错误码→用户消息) + commandErrorMessage (订单命令错误码→用户消息)
 │   └── formatting/         # thingId 处理等
 └── generated/              # 生成代码
     └── error-codes.ts      # 从 Rust ErrorCode 生成
