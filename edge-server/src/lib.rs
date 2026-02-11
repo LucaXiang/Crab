@@ -29,6 +29,7 @@ pub mod audit;
 pub mod auth;
 pub mod core;
 pub mod db;
+pub mod marketing;
 pub mod message;
 pub mod orders;
 pub mod pricing;

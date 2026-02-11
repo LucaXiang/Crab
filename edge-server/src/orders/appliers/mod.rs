@@ -11,6 +11,8 @@ mod item_modified;
 mod item_uncomped;
 mod item_removed;
 mod items_added;
+mod member_linked;
+mod member_unlinked;
 mod order_adjustment_applied;
 mod order_completed;
 mod order_info_updated;
@@ -22,6 +24,7 @@ mod orders_merged;
 mod payment_added;
 mod payment_cancelled;
 mod rule_skip_toggled;
+mod stamp_redeemed;
 mod table_opened;
 
 pub use item_comped::ItemCompedApplier;
@@ -29,6 +32,8 @@ pub use item_modified::ItemModifiedApplier;
 pub use item_uncomped::ItemUncompedApplier;
 pub use item_removed::ItemRemovedApplier;
 pub use items_added::ItemsAddedApplier;
+pub use member_linked::MemberLinkedApplier;
+pub use member_unlinked::MemberUnlinkedApplier;
 pub use order_adjustment_applied::{OrderDiscountAppliedApplier, OrderSurchargeAppliedApplier};
 pub use order_completed::OrderCompletedApplier;
 pub use order_info_updated::OrderInfoUpdatedApplier;
@@ -43,6 +48,7 @@ pub use orders_merged::{OrderMergedApplier, OrderMergedOutApplier};
 pub use payment_added::PaymentAddedApplier;
 pub use payment_cancelled::PaymentCancelledApplier;
 pub use rule_skip_toggled::RuleSkipToggledApplier;
+pub use stamp_redeemed::StampRedeemedApplier;
 pub use table_opened::TableOpenedApplier;
 
 /// EventAction enum - dispatches to concrete applier implementations
@@ -70,6 +76,9 @@ pub enum EventAction {
     OrderDiscountApplied(OrderDiscountAppliedApplier),
     OrderSurchargeApplied(OrderSurchargeAppliedApplier),
     OrderNoteAdded(OrderNoteAddedApplier),
+    MemberLinked(MemberLinkedApplier),
+    MemberUnlinked(MemberUnlinkedApplier),
+    StampRedeemed(StampRedeemedApplier),
     /// Record-only events: persisted for timeline display, no snapshot mutation
     RecordOnly,
 }
@@ -101,6 +110,9 @@ impl EventApplier for EventAction {
             EventAction::OrderDiscountApplied(applier) => applier.apply(snapshot, event),
             EventAction::OrderSurchargeApplied(applier) => applier.apply(snapshot, event),
             EventAction::OrderNoteAdded(applier) => applier.apply(snapshot, event),
+            EventAction::MemberLinked(applier) => applier.apply(snapshot, event),
+            EventAction::MemberUnlinked(applier) => applier.apply(snapshot, event),
+            EventAction::StampRedeemed(applier) => applier.apply(snapshot, event),
             EventAction::RecordOnly => {}
         }
     }
@@ -158,6 +170,14 @@ impl From<&OrderEvent> for EventAction {
             // Record-only events: persisted for timeline, no snapshot mutation
             EventPayload::OrderMovedOut { .. } | EventPayload::TableReassigned { .. } => {
                 EventAction::RecordOnly
+            }
+            // Member events
+            EventPayload::MemberLinked { .. } => EventAction::MemberLinked(MemberLinkedApplier),
+            EventPayload::MemberUnlinked { .. } => {
+                EventAction::MemberUnlinked(MemberUnlinkedApplier)
+            }
+            EventPayload::StampRedeemed { .. } => {
+                EventAction::StampRedeemed(StampRedeemedApplier)
             }
         }
     }

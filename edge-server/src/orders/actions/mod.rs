@@ -15,14 +15,17 @@ mod apply_order_adjustment;
 mod cancel_payment;
 mod comp_item;
 mod complete_order;
+mod link_member;
 mod merge_orders;
 mod modify_item;
 mod move_order;
 pub mod open_table;
+mod redeem_stamp;
 mod remove_item;
 mod split_order;
 mod toggle_rule_skip;
 mod uncomp_item;
+mod unlink_member;
 mod update_order_info;
 mod void_order;
 
@@ -33,14 +36,17 @@ pub use apply_order_adjustment::{ApplyOrderDiscountAction, ApplyOrderSurchargeAc
 pub use cancel_payment::CancelPaymentAction;
 pub use comp_item::CompItemAction;
 pub use complete_order::CompleteOrderAction;
+pub use link_member::LinkMemberAction;
 pub use merge_orders::MergeOrdersAction;
 pub use modify_item::ModifyItemAction;
 pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
+pub use redeem_stamp::RedeemStampAction;
 pub use remove_item::RemoveItemAction;
 pub use split_order::{PayAaSplitAction, SplitByAmountAction, SplitByItemsAction, StartAaSplitAction};
 pub use toggle_rule_skip::ToggleRuleSkipAction;
 pub use uncomp_item::UncompItemAction;
+pub use unlink_member::UnlinkMemberAction;
 pub use update_order_info::UpdateOrderInfoAction;
 pub use void_order::VoidOrderAction;
 
@@ -67,6 +73,9 @@ pub enum CommandAction {
     ApplyOrderDiscount(ApplyOrderDiscountAction),
     ApplyOrderSurcharge(ApplyOrderSurchargeAction),
     AddOrderNote(AddOrderNoteAction),
+    LinkMember(LinkMemberAction),
+    UnlinkMember(UnlinkMemberAction),
+    RedeemStamp(RedeemStampAction),
 }
 
 /// Manual implementation of CommandHandler for CommandAction
@@ -99,6 +108,9 @@ impl CommandHandler for CommandAction {
             CommandAction::ApplyOrderDiscount(action) => action.execute(ctx, metadata).await,
             CommandAction::ApplyOrderSurcharge(action) => action.execute(ctx, metadata).await,
             CommandAction::AddOrderNote(action) => action.execute(ctx, metadata).await,
+            CommandAction::LinkMember(action) => action.execute(ctx, metadata).await,
+            CommandAction::UnlinkMember(action) => action.execute(ctx, metadata).await,
+            CommandAction::RedeemStamp(action) => action.execute(ctx, metadata).await,
         }
     }
 }
@@ -114,13 +126,9 @@ impl From<&OrderCommand> for CommandAction {
                 // This path should never be reached
                 unreachable!("OpenTable should be handled by OrdersManager, not From<&OrderCommand>")
             }
-            OrderCommandPayload::AddItems { order_id, items } => {
-                CommandAction::AddItems(AddItemsAction {
-                    order_id: order_id.clone(),
-                    items: items.clone(),
-                    rules: vec![], // Rules will be injected by OrdersManager
-                    product_metadata: std::collections::HashMap::new(), // Metadata will be injected by OrdersManager
-                })
+            OrderCommandPayload::AddItems { .. } => {
+                // AddItems is handled specially in OrdersManager to inject rules and metadata
+                unreachable!("AddItems should be handled by OrdersManager, not From<&OrderCommand>")
             }
             OrderCommandPayload::ModifyItem {
                 order_id,
@@ -346,6 +354,21 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     note: note.clone(),
                 })
+            }
+            OrderCommandPayload::LinkMember { .. } => {
+                // LinkMember requires data injection (member info, MG rules)
+                // Handled specially in OrdersManager, not via From<&OrderCommand>
+                unreachable!("LinkMember should be handled by OrdersManager, not From<&OrderCommand>")
+            }
+            OrderCommandPayload::UnlinkMember { order_id } => {
+                CommandAction::UnlinkMember(UnlinkMemberAction {
+                    order_id: order_id.clone(),
+                })
+            }
+            OrderCommandPayload::RedeemStamp { .. } => {
+                // RedeemStamp requires data injection (activity, reward targets)
+                // Handled specially in OrdersManager, not via From<&OrderCommand>
+                unreachable!("RedeemStamp should be handled by OrdersManager, not From<&OrderCommand>")
             }
         }
     }

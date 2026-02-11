@@ -150,6 +150,25 @@ pub struct OrderSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_manual_surcharge_fixed: Option<f64>,
 
+    // === Member Info ===
+    /// Member ID (linked member)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_id: Option<i64>,
+    /// Member name
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_name: Option<String>,
+    /// Marketing group ID
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketing_group_id: Option<i64>,
+    /// Marketing group name
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketing_group_name: Option<String>,
+
+    // === MG Discount Tracking ===
+    /// Total MG discount amount
+    #[serde(default)]
+    pub mg_discount_amount: f64,
+
     /// Order start time
     pub start_time: i64,
     /// Order end time
@@ -217,6 +236,11 @@ impl OrderSnapshot {
             order_manual_discount_fixed: None,
             order_manual_surcharge_percent: None,
             order_manual_surcharge_fixed: None,
+            member_id: None,
+            member_name: None,
+            marketing_group_id: None,
+            marketing_group_name: None,
+            mg_discount_amount: 0.0,
             start_time: now,
             end_time: None,
             created_at: now,

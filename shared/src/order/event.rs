@@ -4,6 +4,7 @@ use super::types::{
     CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentRecord,
     PaymentSummaryItem, ServiceType, SplitItem, VoidType,
 };
+use super::AppliedMgRule;
 use serde::{Deserialize, Serialize};
 
 /// Order event - immutable audit record
@@ -81,6 +82,11 @@ pub enum OrderEventType {
 
     // Order Note
     OrderNoteAdded,
+
+    // Member
+    MemberLinked,
+    MemberUnlinked,
+    StampRedeemed,
 }
 
 impl std::fmt::Display for OrderEventType {
@@ -111,6 +117,9 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::OrderDiscountApplied => write!(f, "ORDER_DISCOUNT_APPLIED"),
             OrderEventType::OrderSurchargeApplied => write!(f, "ORDER_SURCHARGE_APPLIED"),
             OrderEventType::OrderNoteAdded => write!(f, "ORDER_NOTE_ADDED"),
+            OrderEventType::MemberLinked => write!(f, "MEMBER_LINKED"),
+            OrderEventType::MemberUnlinked => write!(f, "MEMBER_UNLINKED"),
+            OrderEventType::StampRedeemed => write!(f, "STAMP_REDEEMED"),
         }
     }
 }
@@ -444,6 +453,36 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_note: Option<String>,
     },
+
+    // ========== Member ==========
+    MemberLinked {
+        member_id: i64,
+        member_name: String,
+        marketing_group_id: i64,
+        marketing_group_name: String,
+        /// Pre-calculated MG discounts for existing items
+        #[serde(default)]
+        mg_item_discounts: Vec<MgItemDiscount>,
+    },
+
+    MemberUnlinked {
+        previous_member_id: i64,
+        previous_member_name: String,
+    },
+
+    StampRedeemed {
+        stamp_activity_id: i64,
+        stamp_activity_name: String,
+        reward_item_id: String,
+        reward_strategy: String,
+    },
+}
+
+/// Pre-calculated MG discount for a single item (carried in MemberLinked event)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MgItemDiscount {
+    pub instance_id: String,
+    pub applied_mg_rules: Vec<AppliedMgRule>,
 }
 
 impl OrderEvent {

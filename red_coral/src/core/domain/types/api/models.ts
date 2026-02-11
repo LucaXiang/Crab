@@ -432,6 +432,223 @@ export interface PriceRuleUpdate {
   is_active?: boolean;
 }
 
+// ============ Marketing Group ============
+
+export interface MarketingGroup {
+  id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  sort_order: number;
+  points_earn_rate: number | null;
+  points_per_unit: number | null;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface MarketingGroupCreate {
+  name: string;
+  display_name: string;
+  description?: string | null;
+  sort_order?: number;
+  points_earn_rate?: number | null;
+  points_per_unit?: number | null;
+}
+
+export interface MarketingGroupUpdate {
+  name?: string;
+  display_name?: string;
+  description?: string | null;
+  sort_order?: number;
+  points_earn_rate?: number | null;
+  points_per_unit?: number | null;
+  is_active?: boolean;
+}
+
+export interface MgDiscountRule {
+  id: number;
+  marketing_group_id: number;
+  name: string;
+  display_name: string;
+  receipt_name: string;
+  product_scope: ProductScope;
+  target_id: number | null;
+  adjustment_type: AdjustmentType;
+  adjustment_value: number;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface MgDiscountRuleCreate {
+  name: string;
+  display_name: string;
+  receipt_name: string;
+  product_scope: ProductScope;
+  target_id?: number | null;
+  adjustment_type: AdjustmentType;
+  adjustment_value: number;
+}
+
+export interface MgDiscountRuleUpdate {
+  name?: string;
+  display_name?: string;
+  receipt_name?: string;
+  product_scope?: ProductScope;
+  target_id?: number | null;
+  adjustment_type?: AdjustmentType;
+  adjustment_value?: number;
+  is_active?: boolean;
+}
+
+export interface MarketingGroupDetail extends MarketingGroup {
+  discount_rules: MgDiscountRule[];
+  stamp_activities: StampActivityDetail[];
+}
+
+// ============ Member ============
+
+export interface Member {
+  id: number;
+  name: string;
+  phone: string | null;
+  card_number: string | null;
+  marketing_group_id: number;
+  birthday: string | null;
+  points_balance: number;
+  notes: string | null;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface MemberCreate {
+  name: string;
+  phone?: string | null;
+  card_number?: string | null;
+  marketing_group_id: number;
+  birthday?: string | null;
+  notes?: string | null;
+}
+
+export interface MemberUpdate {
+  name?: string;
+  phone?: string | null;
+  card_number?: string | null;
+  marketing_group_id?: number;
+  birthday?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
+}
+
+export interface MemberWithGroup extends Member {
+  marketing_group_name: string;
+}
+
+// ============ Stamp ============
+
+export type RewardStrategy = 'ECONOMIZADOR' | 'GENEROSO' | 'DESIGNATED';
+export type StampTargetType = 'CATEGORY' | 'PRODUCT';
+
+export interface StampActivity {
+  id: number;
+  marketing_group_id: number;
+  name: string;
+  display_name: string;
+  stamps_required: number;
+  reward_quantity: number;
+  reward_strategy: RewardStrategy;
+  designated_product_id: number | null;
+  is_cyclic: boolean;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface StampActivityCreate {
+  name: string;
+  display_name: string;
+  stamps_required: number;
+  reward_quantity?: number;
+  reward_strategy?: RewardStrategy;
+  designated_product_id?: number | null;
+  is_cyclic?: boolean;
+  stamp_targets: StampTargetInput[];
+  reward_targets: StampTargetInput[];
+}
+
+export interface StampActivityUpdate {
+  name?: string;
+  display_name?: string;
+  stamps_required?: number;
+  reward_quantity?: number;
+  reward_strategy?: RewardStrategy;
+  designated_product_id?: number | null;
+  is_cyclic?: boolean;
+  is_active?: boolean;
+  stamp_targets?: StampTargetInput[];
+  reward_targets?: StampTargetInput[];
+}
+
+export interface StampTargetInput {
+  target_type: StampTargetType;
+  target_id: number;
+}
+
+export interface StampTarget {
+  id: number;
+  stamp_activity_id: number;
+  target_type: StampTargetType;
+  target_id: number;
+}
+
+export interface StampRewardTarget {
+  id: number;
+  stamp_activity_id: number;
+  target_type: StampTargetType;
+  target_id: number;
+}
+
+export interface MemberStampProgress {
+  id: number;
+  member_id: number;
+  stamp_activity_id: number;
+  current_stamps: number;
+  completed_cycles: number;
+  last_stamp_at: number | null;
+  updated_at: number;
+}
+
+export interface StampActivityDetail extends StampActivity {
+  stamp_targets: StampTarget[];
+  reward_targets: StampRewardTarget[];
+}
+
+export interface MemberStampProgressDetail {
+  stamp_activity_id: number;
+  stamp_activity_name: string;
+  stamps_required: number;
+  current_stamps: number;
+  completed_cycles: number;
+  is_redeemable: boolean;
+  is_cyclic: boolean;
+}
+
+// ============ Applied MG Rule ============
+
+export interface AppliedMgRule {
+  rule_id: number;
+  name: string;
+  display_name: string;
+  receipt_name: string;
+  product_scope: ProductScope;
+  adjustment_type: AdjustmentType;
+  adjustment_value: number;
+  calculated_amount: number;
+  skipped: boolean;
+}
+
 // ============ Employee ============
 
 export interface Employee {

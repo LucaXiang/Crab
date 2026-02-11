@@ -125,6 +125,22 @@ pub enum AuditAction {
     /// 打印目的地删除
     PrintDestinationDeleted,
 
+    // ═══ 会员 ═══
+    /// 会员创建
+    MemberCreated,
+    /// 会员更新
+    MemberUpdated,
+    /// 会员删除
+    MemberDeleted,
+
+    // ═══ 营销组 ═══
+    /// 营销组创建
+    MarketingGroupCreated,
+    /// 营销组更新
+    MarketingGroupUpdated,
+    /// 营销组删除
+    MarketingGroupDeleted,
+
     // ═══ 日结报告 ═══
     /// 日结报告生成
     DailyReportGenerated,

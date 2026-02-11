@@ -198,6 +198,7 @@ mod tests {
             rule_discount_amount: 0.0,
             rule_surcharge_amount: 0.0,
             applied_rules: vec![],
+            applied_mg_rules: vec![],
             unit_price: 0.0,
             line_total: 0.0,
             tax: 0.0,

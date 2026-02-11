@@ -41,6 +41,10 @@ pub mod tables;
 pub mod tags;
 pub mod zones;
 
+// Membership & Marketing
+pub mod marketing_groups;
+pub mod members;
+
 // Operations (班次与日结)
 pub mod shifts;
 pub mod daily_reports;

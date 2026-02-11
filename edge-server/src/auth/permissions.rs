@@ -8,7 +8,7 @@
 //! - 敏感操作：单独控制高风险操作
 //! - 用户管理：仅 admin 角色可用（is_system 保护）
 
-/// 可配置权限列表（12 项）
+/// 可配置权限列表（16 项）
 /// 不包含 "all" 和 "users:manage"，这些是系统级权限
 pub const ALL_PERMISSIONS: &[&str] = &[
     // === 模块化权限 (6) ===
@@ -18,6 +18,12 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "reports:view",        // 报表查看
     "price_rules:manage",  // 价格规则管理
     "settings:manage",     // 系统设置
+
+    // === 营销与会员 (4) ===
+    "members:manage",           // 会员管理
+    "marketing_groups:manage",  // 营销组管理
+    "orders:link_member",       // 订单关联会员
+    "orders:redeem_stamp",      // 订单兑换印花
 
     // === 敏感操作 (6) ===
     "orders:void",         // 作废订单

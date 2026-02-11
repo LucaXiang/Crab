@@ -279,6 +279,26 @@ pub enum OrderCommandPayload {
         /// 备注内容，空字符串 = 清除备注
         note: String,
     },
+
+    // ========== Member ==========
+    /// Link a member to the order
+    LinkMember {
+        order_id: String,
+        member_id: i64,
+    },
+
+    /// Unlink the member from the order
+    UnlinkMember {
+        order_id: String,
+    },
+
+    /// Redeem a stamp reward
+    RedeemStamp {
+        order_id: String,
+        stamp_activity_id: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        product_id: Option<i64>,
+    },
 }
 
 fn default_guest_count() -> i32 {
@@ -323,6 +343,9 @@ impl OrderCommand {
             OrderCommandPayload::ApplyOrderDiscount { order_id, .. } => Some(order_id),
             OrderCommandPayload::ApplyOrderSurcharge { order_id, .. } => Some(order_id),
             OrderCommandPayload::AddOrderNote { order_id, .. } => Some(order_id),
+            OrderCommandPayload::LinkMember { order_id, .. } => Some(order_id),
+            OrderCommandPayload::UnlinkMember { order_id, .. } => Some(order_id),
+            OrderCommandPayload::RedeemStamp { order_id, .. } => Some(order_id),
         }
     }
 }

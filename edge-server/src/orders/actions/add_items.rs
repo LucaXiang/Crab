@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
-use shared::models::PriceRule;
+use shared::models::{MgDiscountRule, PriceRule};
+use crate::marketing::mg_calculator;
 use crate::services::catalog_service::ProductMeta;
 use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
@@ -24,6 +25,8 @@ pub struct AddItemsAction {
     pub rules: Vec<PriceRule>,
     /// Product metadata for rule matching (category_id, tags) from backend cache
     pub product_metadata: HashMap<i64, ProductMeta>,
+    /// MG discount rules (non-empty when a member is linked)
+    pub mg_rules: Vec<MgDiscountRule>,
 }
 
 #[async_trait]
@@ -155,6 +158,19 @@ impl CommandHandler for AddItemsAction {
                     }
                 }
 
+                // Apply MG discounts if member is linked
+                if !self.mg_rules.is_empty() && !snapshot.is_comped {
+                    let result = mg_calculator::calculate_mg_discount(
+                        snapshot.unit_price,
+                        snapshot.id,
+                        category_id,
+                        &self.mg_rules,
+                    );
+                    if !result.applied_rules.is_empty() {
+                        snapshot.applied_mg_rules = result.applied_rules;
+                    }
+                }
+
                 snapshot
             })
             .collect();
@@ -233,6 +249,7 @@ mod tests {
             items: vec![create_cart_item_input(1, "Test Product", 10.0, 2)],
             rules: vec![],
             product_metadata: HashMap::new(),
+            mg_rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -274,6 +291,7 @@ mod tests {
             items: vec![create_cart_item_input(1, "Test", 10.0, 1)],
             rules: vec![],
             product_metadata: HashMap::new(),
+            mg_rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -301,6 +319,7 @@ mod tests {
             items: vec![create_cart_item_input(1, "Test", 10.0, 1)],
             rules: vec![],
             product_metadata: HashMap::new(),
+            mg_rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -322,6 +341,7 @@ mod tests {
             items: vec![create_cart_item_input(1, "Test", 10.0, 1)],
             rules: vec![],
             product_metadata: HashMap::new(),
+            mg_rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -352,6 +372,7 @@ mod tests {
             ],
             rules: vec![],
             product_metadata: HashMap::new(),
+            mg_rules: vec![],
         };
 
         let metadata = create_test_metadata();

@@ -34,6 +34,11 @@ pub mod system_issue;
 // Image
 pub mod image_ref;
 
+// Marketing & Membership
+pub mod marketing_group;
+pub mod member;
+pub mod stamp;
+
 // Operations (班次与日结)
 pub mod shift;
 pub mod daily_report;

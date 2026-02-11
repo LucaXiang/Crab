@@ -10,6 +10,8 @@
  * - Snapshots: Computed state from events
  */
 
+import type { AppliedMgRule } from './api/models';
+
 // ============================================================================
 // Service Type (零售订单的服务类型)
 // ============================================================================
@@ -48,7 +50,10 @@ export type OrderEventType =
   | 'RULE_SKIP_TOGGLED'
   | 'ORDER_DISCOUNT_APPLIED'
   | 'ORDER_SURCHARGE_APPLIED'
-  | 'ORDER_NOTE_ADDED';
+  | 'ORDER_NOTE_ADDED'
+  | 'MEMBER_LINKED'
+  | 'MEMBER_UNLINKED'
+  | 'STAMP_REDEEMED';
 
 /**
  * Order event structure (matches Rust OrderEvent)
@@ -110,7 +115,10 @@ export type EventPayload =
   | RuleSkipToggledPayload
   | OrderDiscountAppliedPayload
   | OrderSurchargeAppliedPayload
-  | OrderNoteAddedPayload;
+  | OrderNoteAddedPayload
+  | MemberLinkedPayload
+  | MemberUnlinkedPayload
+  | StampRedeemedPayload;
 
 export interface TableOpenedPayload {
   type: 'TABLE_OPENED';
@@ -396,6 +404,39 @@ export interface OrderNoteAddedPayload {
   previous_note?: string | null;
 }
 
+/** MG 折扣预计算结果 (按商品) */
+export interface MgItemDiscount {
+  instance_id: string;
+  applied_mg_rules: AppliedMgRule[];
+}
+
+/** 会员已关联 */
+export interface MemberLinkedPayload {
+  type: 'MEMBER_LINKED';
+  member_id: number;
+  member_name: string;
+  marketing_group_id: number;
+  marketing_group_name: string;
+  /** 预计算的 MG 折扣 (每个商品) */
+  mg_item_discounts: MgItemDiscount[];
+}
+
+/** 会员已取消关联 */
+export interface MemberUnlinkedPayload {
+  type: 'MEMBER_UNLINKED';
+  previous_member_id: number;
+  previous_member_name: string;
+}
+
+/** 集章奖励已兑换 */
+export interface StampRedeemedPayload {
+  type: 'STAMP_REDEEMED';
+  stamp_activity_id: number;
+  stamp_activity_name: string;
+  reward_item_id: string;
+  reward_strategy: string;
+}
+
 // ============================================================================
 // Command Types
 // ============================================================================
@@ -437,7 +478,10 @@ export type OrderCommandPayload =
   | UncompItemCommand
   | ApplyOrderDiscountCommand
   | ApplyOrderSurchargeCommand
-  | AddOrderNoteCommand;
+  | AddOrderNoteCommand
+  | LinkMemberCommand
+  | UnlinkMemberCommand
+  | RedeemStampCommand;
 
 export interface OpenTableCommand {
   type: 'OPEN_TABLE';
@@ -655,6 +699,27 @@ export interface AddOrderNoteCommand {
   note: string;
 }
 
+/** 关联会员到订单 */
+export interface LinkMemberCommand {
+  type: 'LINK_MEMBER';
+  order_id: string;
+  member_id: number;
+}
+
+/** 取消关联会员 */
+export interface UnlinkMemberCommand {
+  type: 'UNLINK_MEMBER';
+  order_id: string;
+}
+
+/** 兑换集章奖励 */
+export interface RedeemStampCommand {
+  type: 'REDEEM_STAMP';
+  order_id: string;
+  stamp_activity_id: number;
+  product_id?: number | null;
+}
+
 // ============================================================================
 // Response Types
 // ============================================================================
@@ -822,6 +887,20 @@ export interface OrderSnapshot {
   /** Order-level manual surcharge fixed amount */
   order_manual_surcharge_fixed?: number | null;
 
+  // === Member Info ===
+  /** Member ID (linked member) */
+  member_id?: number | null;
+  /** Member name */
+  member_name?: string | null;
+  /** Marketing group ID */
+  marketing_group_id?: number | null;
+  /** Marketing group name */
+  marketing_group_name?: string | null;
+
+  // === MG Discount Tracking ===
+  /** Total MG discount amount */
+  mg_discount_amount: number;
+
   start_time: number;
   end_time: number | null;
   created_at: number;
@@ -871,6 +950,8 @@ export interface CartItemSnapshot {
   rule_surcharge_amount: number;
   /** Applied price rules list */
   applied_rules: AppliedRule[];
+  /** Applied MG discount rules list */
+  applied_mg_rules: AppliedMgRule[];
 
   // === Computed Fields ===
   /** Unit price for display (computed by backend: price with manual discount and rule adjustments) */

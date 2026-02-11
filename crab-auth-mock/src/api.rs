@@ -380,6 +380,7 @@ async fn activate(
         "audit_log".to_string(),
         "advanced_reporting".to_string(),
         "api_access".to_string(),
+        "marketing".to_string(),
     ];
     let (sub_status, sub_plan, sub_features) = match tenant_id.as_str() {
         "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Basic, vec![]),
@@ -493,6 +494,7 @@ async fn get_subscription_status(
         "audit_log".to_string(),
         "advanced_reporting".to_string(),
         "api_access".to_string(),
+        "marketing".to_string(),
     ];
     let (status, plan, features) = match tenant_id.as_str() {
         "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Basic, vec![]),
