@@ -186,7 +186,7 @@ export const DailyReportManagement: React.FC = React.memo(() => {
         icon={FileText}
         title={t('settings.daily_report.title')}
         description={t('settings.daily_report.description')}
-        addButtonText={t('settings.daily_report.generate')}
+        addButtonText={t('settings.daily_report.generate_button')}
         onAdd={handleGenerate}
         themeColor="purple"
       />

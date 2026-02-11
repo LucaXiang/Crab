@@ -15,7 +15,11 @@
     "tauri:build": "tauri build",
     "tsc": "tsc",
     "lint": "eslint src/",
-    "deadcode": "knip --exports"
+    "deadcode": "knip --exports",
+    "i18n:sync": "node scripts/i18n/sync-check.mjs",
+    "i18n:dynamic": "node scripts/i18n/dynamic-keys.mjs",
+    "i18n:static": "node scripts/i18n/static-keys.mjs",
+    "i18n:check": "node scripts/i18n/report.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

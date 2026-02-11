@@ -10,6 +10,11 @@
     "loading": "加载中...",
     "close": "关闭",
     "actions": "操作",
+    "all": "全部",
+    "yes": "是",
+    "no": "否",
+    "optional": "可选",
+    "uncategorized": "未分类",
     "action": {
       "save": "保存",
       "cancel": "取消",
@@ -47,9 +52,9 @@
       "cancelled": "已取消",
       "enabled": "已启用",
       "disabled": "已禁用",
-      "disabled_global": "禁用 (全局关闭)",
       "show": "显示",
-      "hide": "隐藏"
+      "hide": "隐藏",
+      "saving": "保存中..."
     },
     "label": {
       "name": "名称",
@@ -57,8 +62,6 @@
       "total": "合计",
       "details": "详情",
       "default": "默认",
-      "required": "必填",
-      "optional": "可选",
       "date": "日期",
       "page": "页",
       "entries": "条",
@@ -72,9 +75,9 @@
       "system": "系统",
       "status": "状态",
       "is_active": "启用状态",
-      "paidQuantity": "已付 {qty} 份",
       "retail": "零售",
-      "loss_amount": "损失金额"
+      "loss_amount": "损失金额",
+      "suggestion": "建议"
     },
     "message": {
       "loading": "加载中...",
@@ -88,25 +91,20 @@
       "delete_failed": "删除失败",
       "load_failed": "加载数据失败",
       "invalid_form": "表单无效",
-      "sent_to_printer": "已发送至打印机",
       "exported": "已导出",
       "operation_failed": "操作失败",
       "table_occupied_refresh": "桌台 {table} 已被占用，请刷新列表",
       "order_load_failed": "订单创建成功但加载失败，请重试",
       "retail_order_failed": "创建零售订单失败",
       "cash_drawer_failed": "打开钱箱失败: {message}",
-      "delete_success": "删除成功",
-      "enabled": "已启用",
-      "disabled": "已停用"
+      "not_implemented": "功能开发中",
+      "delete_success": "删除成功"
     },
     "confirm_delete": "确定要删除「{name}」吗？此操作无法撤销。",
     "hint": {
       "search_placeholder": "搜索...",
-      "name_placeholder": "请输入名称",
       "description_placeholder": "请输入描述",
-      "long_press_to_edit": "长按或双击可编辑",
       "tap_to_close": "点击关闭",
-      "please_select": "请选择",
       "select": "请选择",
       "tip": "提示"
     },
@@ -122,22 +120,12 @@
     },
     "selection": {
       "selected": "已选择",
-      "select_mode": "多选模式",
       "showing": "显示"
     },
     "dialog": {
       "ok": "确定",
       "close_app": "关闭应用",
-      "confirm_delete": "确认删除吗？",
-      "yes": "是",
-      "no": "否",
-      "none": "无"
-    },
-    "resource": {
-      "zone": "区域",
-      "table": "桌台",
-      "category": "分类",
-      "product": "菜品"
+      "confirm_delete": "确认删除吗？"
     },
     "unit": {
       "person": "人"
@@ -201,36 +189,12 @@
       "admin": "管理员"
     },
     "activate": {
-      "title": "激活设备",
-      "description": "输入您的租户凭证以激活此设备",
       "username_label": "租户用户名",
       "username_placeholder": "请输入租户用户名",
       "password_label": "密码",
       "password_placeholder": "请输入密码",
-      "button_submit": "激活设备",
       "error": {
-        "empty_fields": "请输入用户名和密码",
-        "failed": "激活失败"
-      },
-      "device_limit": {
-        "title": "设备数量已达上限",
-        "description": "您的订阅计划最多允许 {{max}} 台设备，当前已有 {{count}} 台。请选择一台设备进行替换。",
-        "device_id": "设备 ID",
-        "activated_at": "激活时间",
-        "last_refreshed": "最近刷新",
-        "button_replace": "替换此设备",
-        "button_cancel": "取消",
-        "replacing": "正在替换..."
-      },
-      "client_limit": {
-        "title": "客户端数量已达上限",
-        "description": "您的订阅计划最多允许 {{max}} 个客户端，当前已有 {{count}} 个。请选择一个客户端进行替换。",
-        "device_id": "设备 ID",
-        "activated_at": "激活时间",
-        "last_refreshed": "最近刷新",
-        "button_replace": "替换此客户端",
-        "button_cancel": "取消",
-        "replacing": "正在替换..."
+        "empty_fields": "请输入用户名和密码"
       },
       "no_account": "还没有账户？",
       "register": "立即注册"
@@ -298,13 +262,7 @@
       "edge_url_label": "Edge Server 地址",
       "edge_url_help": "Edge Server 的 HTTPS 地址",
       "message_addr_label": "消息服务器地址",
-      "message_addr_help": "实时消息的 Host:Port",
-      "auth_section": "账户验证",
-      "auth_section_help": "输入管理员账户以注册此客户端",
-      "username_label": "用户名",
-      "username_placeholder": "管理员用户名",
-      "password_label": "密码",
-      "password_placeholder": "管理员密码"
+      "message_addr_help": "实时消息的 Host:Port"
     },
     "button_back": "返回",
     "button_start_server": "启动服务器模式",
@@ -319,10 +277,6 @@
     "credentials_desc": "输入您的租户凭证以验证身份",
     "tenant_verified": "租户 {tenant_id} 已验证",
     "slots_remaining": "剩余配额: {count}",
-    "activate_title": "激活设备",
-    "activate_desc": "输入您的租户凭证以激活此设备",
-    "activate_server_desc": "激活 Server 模式设备，获取服务器证书",
-    "activate_client_desc": "激活 Client 模式设备，获取客户端证书",
     "step": {
       "credentials": "登录",
       "mode": "模式",
@@ -330,26 +284,9 @@
       "complete": "完成"
     }
   },
-  "tenant_select": {
-    "title": "选择租户",
-    "description": "选择一个租户继续，或添加新租户",
-    "empty_state": "暂无已激活的租户",
-    "button_select": "选择",
-    "button_remove": "移除租户",
-    "button_add": "添加新租户",
-    "confirm_remove": "确定移除此租户？",
-    "confirm_cancel": "取消",
-    "confirm_remove_button": "移除",
-    "error": {
-      "switch_failed": "切换租户失败",
-      "remove_failed": "移除租户失败"
-    }
-  },
   "pos": {
     "loading_core_data": "正在加载核心数据...",
-    "search_product": "搜索菜品...",
     "attributeRequired": "请选择 {name}",
-    "all_categories": "全部分类",
     "sidebar": {
       "get_order": "取单",
       "drafts": "草稿",
@@ -365,18 +302,13 @@
       "uncategorized": "未分类",
       "unknown_category": "未知分类",
       "original": "原价",
-      "surcharge": "附加费",
-      "unit_price": "单价",
       "base_price": "基础价",
       "final_price": "最终价格",
-      "custom": "自定义",
-      "subtotal": "小计",
       "enter_discount": "输入折扣金额",
       "edit_item": "编辑菜品",
       "edit_final_price": "点击编辑最终价格",
       "input": {
         "quantity": "输入数量",
-        "price": "输入价格",
         "discount": "输入折扣百分比",
         "final_price": "输入最终价格",
         "base_price": "输入基础价格"
@@ -391,10 +323,7 @@
     },
     "quick_add": {
       "title": "添加",
-      "no_products": "暂无可用菜品",
-      "selected_items": "已选菜品",
       "select_prompt": "请从右侧选择菜品",
-      "per_unit": "/份",
       "confirm": "确认添加"
     },
     "error": {
@@ -448,12 +377,7 @@
     "amount_split": {
       "title": "金额分单",
       "desc": "指定金额支付",
-      "aa_divide": "AA 平分",
-      "people": "人",
       "custom_amount": "自定义金额",
-      "enter_amount": "输入金额",
-      "full_amount": "全部",
-      "split_amount": "分单金额",
       "invalid_amount": "请输入有效金额",
       "exceeds_remaining": "金额超出剩余应付",
       "failed": "金额分单失败",
@@ -515,11 +439,10 @@
       "cancel_confirm": "确认作废"
     },
     "error": {
-      "title": "结账错误",
-      "hint": "结账区域加载失败，请重试",
+      "no_receipt_number": "订单缺少单号",
       "insufficient": "金额不足",
       "merge_failed": "合并订单失败",
-      "move_failed": "转台失败"
+      "move_failed": "转移订单失败"
     },
     "table_order": "桌台订单",
     "retail_order": "零售订单",
@@ -532,8 +455,6 @@
       "method": "选择支付方式",
       "success": "支付成功",
       "records": "支付记录",
-      "record_singular": "笔",
-      "record_plural": "笔",
       "record_count": "笔记录",
       "change": "找零",
       "tendered": "收款",
@@ -547,17 +468,10 @@
       "remaining": "待付金额"
     },
     "items": {
-      "paid": "已付菜品",
       "unpaid": "未付菜品"
     },
     "cart": {
       "discount": "折扣"
-    },
-    "void_reason": {
-      "runaway": "逃单",
-      "dine_and_dash": "霸王餐",
-      "system_test": "系统测试",
-      "owner_treat": "老板请客"
     },
     "timeline": {
       "label": "操作记录",
@@ -581,7 +495,6 @@
       "no_items": "没有可赠送的菜品",
       "select_item": "请选择要赠送的菜品",
       "uncomp": "撤销赠送",
-      "uncomp_confirm": "确定撤销此菜品的赠送？价格将恢复为原价。",
       "uncomp_auth_required": "撤销赠送需要授权"
     },
     "stamp_reward": "集章奖励",
@@ -590,13 +503,8 @@
       "desc": "为整单应用折扣",
       "type_percent": "百分比折扣",
       "type_fixed": "固定金额",
-      "percent_placeholder": "输入折扣百分比",
-      "fixed_placeholder": "输入折扣金额",
-      "reason_placeholder": "输入折扣原因（可选）",
       "confirm": "应用折扣",
       "clear": "清除折扣",
-      "current_percent": "当前折扣: {value}%",
-      "current_fixed": "当前折扣: {value}",
       "auth_required": "整单折扣需要授权"
     },
     "order_surcharge": {
@@ -604,13 +512,8 @@
       "desc": "为整单应用附加费",
       "type_percent": "百分比",
       "type_fixed": "固定金额",
-      "percent_placeholder": "输入附加费百分比",
-      "amount_placeholder": "输入附加费金额",
-      "reason_placeholder": "输入附加费原因（可选）",
       "confirm": "应用附加费",
       "clear": "清除附加费",
-      "current": "当前附加费: {value}",
-      "current_percent": "当前附加费: {value}%",
       "auth_required": "整单附加费需要授权"
     },
     "member": {
@@ -622,7 +525,6 @@
       "detail_title": "会员信息",
       "stamp_progress": "集章进度",
       "stamps_remaining": "章待集",
-      "redeemable": "可兑换奖励",
       "discount_rules": "会员折扣规则",
       "order_mg_discount": "本单会员折扣",
       "points_balance": "积分余额",
@@ -643,7 +545,6 @@
       "redeem": "兑换奖励",
       "redeemed": "集章奖励已兑换",
       "redeem_failed": "兑换失败",
-      "insufficient_stamps": "集章数量不足，无法兑换",
       "already_redeemed": "已兑换",
       "cancel": "取消兑换",
       "cancel_success": "已取消集章兑换",
@@ -666,21 +567,12 @@
       "manual_discount": "手动折扣",
       "rule_discount": "规则折扣",
       "rule_surcharge": "规则附加费",
-      "mg_discount": "会员折扣",
       "order_discount": "整单折扣",
       "order_surcharge": "整单附加费"
     },
     "order_detail": {
       "title": "订单详情",
       "desc": "查看完整订单信息"
-    },
-    "error": {
-      "no_receipt_number": "订单缺少单号",
-      "insufficient": "金额不足",
-      "title": "结账失败",
-      "hint": "请重试或联系管理员",
-      "merge_failed": "合并订单失败",
-      "move_failed": "转移订单失败"
     },
     "paidQty": "{qty} 份已付"
   },
@@ -728,7 +620,6 @@
     "select_target": "选择目标桌台",
     "zones": "区域",
     "guests": "位客人",
-    "ghost_orders": "零售订单",
     "add_items": "加单",
     "open_table": "开台",
     "confirm_add": "确认加单",
@@ -763,7 +654,6 @@
       "table": "桌台",
       "total_amount": "总金额",
       "order_items": "订单菜品",
-      "removed_items": "已删除菜品",
       "order_id": "订单号",
       "status": "状态",
       "operator": "操作员"
@@ -771,16 +661,6 @@
     "payment": {
       "details": "支付详情",
       "no_payments": "暂无支付记录",
-      "cancel": "取消支付",
-      "confirm_cancel": "确定要取消此支付记录吗？",
-      "confirm_cancel_split": "确定要取消此分账支付吗？取消后相关菜品将恢复到订单中。",
-      "cancel_success": "支付记录已取消",
-      "cancel_failed": "取消支付失败",
-      "split_type": {
-        "item": "菜品分单",
-        "amount": "金额分单",
-        "aa": "AA"
-      },
       "aa_shares_unit": "份"
     }
   },
@@ -804,8 +684,7 @@
       "load": "加载统计数据失败"
     },
     "report": {
-      "sales": "销售报告",
-      "detailed_coming_soon": "详细报告即将推出"
+      "sales": "销售报告"
     },
     "chart": {
       "revenue_trend": "收入趋势",
@@ -840,7 +719,6 @@
     "guests_count": "{n} 位客人",
     "receipt_no": "小票号: {n}",
     "payment": "支付",
-    "split_bill": "分单",
     "item_split": "菜品分单",
     "amount_split": "金额分单",
     "aa_split_started": "AA分账",
@@ -852,21 +730,14 @@
     "order_completed": "订单完成",
     "order_voided": "订单作废",
     "table_order": "桌台订单",
-    "item_restored": "恢复菜品",
     "payment_cancelled": "取消支付",
     "order_merged": "合并订单",
-    "order_moved": "转移订单",
-    "order_moved_out": "转出订单",
-    "order_merged_out": "转出合并",
-    "pre_payment_printed": "预付小票",
-    "pre_payment_note": "预付备注",
     "item_comped": "赠送菜品",
     "item_uncomped": "撤销赠送",
     "discount_applied": "应用整单折扣",
     "discount_cleared": "清除整单折扣",
     "surcharge_applied": "应用整单附加费",
     "surcharge_cleared": "清除整单附加费",
-    "surcharge_exempt": "免除附加费",
     "from": "从",
     "to": "至",
     "table_moved": "桌台转移",
@@ -890,19 +761,9 @@
       "loss_amount": "损失金额",
       "previous": "之前",
       "authorizer": "授权人",
-      "affected_quantity": "影响数量",
       "items": "菜品",
       "marketing_group": "营销组",
       "reward_strategy": "奖励策略"
-    },
-    "operation": {
-      "APPLY_DISCOUNT": "应用折扣",
-      "MODIFY_PRICE": "修改价格",
-      "MODIFY_QUANTITY": "修改数量",
-      "APPLY_SURCHARGE": "应用附加费",
-      "MODIFY_OPTIONS": "修改属性",
-      "MODIFY_NOTE": "修改备注",
-      "MODIFY_ITEM": "修改菜品"
     },
     "retail_mode": "零售模式",
     "rule_toggled": "价格规则切换",
@@ -958,19 +819,13 @@
       "unit": "条规则",
       "search_placeholder": "搜索规则名称...",
       "column": {
-        "name": "规则名称",
         "type": "类型",
-        "value": "调整值",
-        "scope": "适用范围",
-        "time": "生效时间",
-        "status": "状态"
+        "value": "调整值"
       },
       "add_rule": "添加规则",
       "test_rules": "规则测试",
       "test_rules_description": "选择区域和商品，查看哪些规则会生效",
       "edit_rule": "编辑规则",
-      "delete_rule": "删除规则",
-      "rule_deleted": "规则已删除",
       "type": {
         "discount": "折扣",
         "surcharge": "加价"
@@ -1002,12 +857,8 @@
         "display_name": "显示名称",
         "receipt_name": "小票名称",
         "description": "规则描述",
-        "priority": "优先级",
         "is_stackable": "可叠加",
         "is_exclusive": "互斥规则"
-      },
-      "confirm": {
-        "delete": "确定要删除此规则吗？"
       },
       "message": {
         "created": "规则创建成功",
@@ -1021,7 +872,6 @@
       "hint": {
         "select_rule": "请从左侧选择一个规则查看详情"
       },
-      "priority": "优先级",
       "stacking": {
         "exclusive": "独占",
         "stackable": "可叠加",
@@ -1063,15 +913,6 @@
         "custom_time": "自定义时间",
         "ignore_time": "忽略时间"
       },
-      "conflict": {
-        "title": "规则交互",
-        "no_related": "没有相关规则",
-        "priority_order": "同时生效的规则（按优先级排序）",
-        "current": "当前",
-        "blocked_by_exclusive": "将被「{name}」独占规则阻止",
-        "will_block": "将阻止 {count} 条其他规则",
-        "help": "独占规则生效时会阻止所有优先级更低的规则"
-      },
       "picker": {
         "select_zone": "选择区域",
         "select_product": "选择商品",
@@ -1108,8 +949,6 @@
         "tag": "标签"
       },
       "wizard": {
-        "title": "创建价格规则",
-        "edit_title": "编辑价格规则",
         "step1_title": "选择类型",
         "step2_title": "设置金额",
         "step3_title": "适用范围",
@@ -1128,9 +967,6 @@
         "step4_desc": "设置规则的生效时间条件",
         "step5_desc": "为规则设置名称和描述信息",
         "step6_desc": "配置规则的优先级和叠加行为",
-        "rule_type": "选择规则类型",
-        "discount_option": "折扣优惠",
-        "surcharge_option": "附加收费",
         "discount_desc": "降低菜品价格，如促销折扣、会员优惠等",
         "surcharge_desc": "增加额外费用，如服务费、打包费等",
         "adjustment_type": "计算方式",
@@ -1168,7 +1004,6 @@
         "receipt_name_hint": "打印在小票上的名称",
         "description_placeholder": "添加规则说明...",
         "summary_title": "规则概要",
-        "priority_hint": "数字越大优先级越高，相同优先级按创建时间排序",
         "stackable_hint": "允许与其他规则同时生效",
         "exclusive_hint": "启用后，此规则不会与其他规则同时生效",
         "advanced_tip": "大多数情况下保持默认设置即可。只有在需要精细控制规则行为时才需要调整这些选项。",
@@ -1196,17 +1031,10 @@
       "edit_stamp": "编辑集章",
       "no_stamps": "暂无集章活动",
       "select_group": "请从左侧选择一个营销组查看详情",
-      "receipt_name": "小票名称",
       "field": {
         "name": "标识名称",
         "display_name": "显示名称",
-        "description": "描述",
-        "scope": "适用范围",
-        "category_id": "分类 ID",
-        "product_id": "菜品 ID",
-        "adjustment_type": "调整方式",
-        "percent": "百分比 (%)",
-        "amount": "金额"
+        "description": "描述"
       },
       "scope": {
         "global": "全部菜品",
@@ -1214,14 +1042,9 @@
         "tag": "按标签",
         "product": "指定菜品"
       },
-      "type": {
-        "percentage": "百分比",
-        "fixed": "固定金额"
-      },
       "stamp": {
         "stamps_required": "所需章数",
         "reward_quantity": "奖励数量",
-        "reward_strategy": "奖励策略",
         "strategy": {
           "economizador": "最便宜优先",
           "generoso": "最贵优先",
@@ -1233,8 +1056,6 @@
         "cyclic_hint": "完成集章后自动重置，可再次集章",
         "stamp_targets": "计章对象",
         "reward_targets": "兑换对象",
-        "add_target": "添加目标",
-        "no_targets": "请添加目标",
         "target_type": {
           "category": "分类",
           "product": "商品"
@@ -1331,17 +1152,12 @@
       "title": "店铺信息",
       "description": "管理您的店铺基本信息和联系方式",
       "form": {
-        "basic_info": "基本信息",
         "establishment_name": "店铺名称",
-        "logo_url": "Logo 地址",
-        "logo_help": "输入本地文件路径（如 C:\\Users\\Admin\\logo.png）或网络地址（http://...）",
-        "contact_info": "联系方式",
         "address": "店铺地址",
         "tax_id": "税号 / 营业执照",
         "phone": "联系电话",
         "email": "电子邮箱",
         "website": "官方网站",
-        "business_settings": "营业设置",
         "business_day_cutoff": "营业日分界时间",
         "business_day_cutoff_help": "用于班次跨天判断和日结报告。普通餐厅设为 00:00，酒吧/夜店设为 06:00",
         "cutoff_presets": {
@@ -1351,10 +1167,7 @@
       }
     },
     "batch_delete": {
-      "confirm_title": "确认批量删除",
-      "zones_blocked": "无法删除包含桌台的区域",
-      "zones_failed": "批量删除区域失败",
-      "failed": "批量删除失败"
+      "confirm_title": "确认批量删除"
     },
     "batchDelete": {
       "confirmDeleteZones": "确定要删除选中的 {count} 个区域吗？此操作无法撤销。",
@@ -1369,7 +1182,10 @@
         "delete": "确定要删除该菜品吗？此操作无法撤销。"
       },
       "list": {
-        "confirmBatchDelete": "确定要删除选中的 {count} 个菜品吗？此操作无法撤销。"
+        "batch_delete_title": "确认批量删除",
+        "confirmBatchDelete": "确定要删除选中的 {count} 个菜品吗？此操作无法撤销。",
+        "batch_delete_success": "批量删除成功",
+        "batch_delete_failed": "批量删除失败"
       },
       "form": {
         "name": "菜品名称",
@@ -1378,7 +1194,6 @@
         "category": "分类",
         "select_category": "选择分类",
         "price": "价格",
-        "price_base_hint": "此价格将作为默认规格的价格",
         "tax_rate": "税率 (%)",
         "tax_rate_general": "标准税率 (21%)",
         "tax_rate_reduced": "降低税率 (10%)",
@@ -1404,11 +1219,6 @@
         "receipt_name_placeholder": "如为空则使用菜品名称"
       },
       "specification": {
-        "title": "菜品规格",
-        "manage": "管理规格",
-        "no_configured": "暂无规格配置",
-        "disabled": "多规格功能未启用",
-        "hint": "请点击上方\"管理规格\"按钮进行配置",
         "label": {
           "default": "默认"
         }
@@ -1420,13 +1230,7 @@
         "add": "添加属性",
         "select": "选择属性",
         "inherited": "继承自分类",
-        "description": "配置菜品的可选规格和属性",
-        "hint": {
-          "multi_select": "可多选",
-          "single_select": "单选",
-          "no_default": "未设置默认",
-          "default_set": "已设默认"
-        }
+        "description": "配置菜品的可选规格和属性"
       },
       "tags": {
         "title": "标签",
@@ -1434,11 +1238,6 @@
         "manage": "管理标签",
         "no_selected": "未选择任何标签",
         "system_tag_hint": "系统标签，不可手动编辑"
-      },
-      "list": {
-        "batch_delete_title": "确认批量删除",
-        "batch_delete_success": "批量删除成功",
-        "batch_delete_failed": "批量删除失败"
       },
       "add_product": "添加菜品",
       "edit_product": "编辑菜品",
@@ -1518,7 +1317,8 @@
     "attribute": {
       "title": "属性管理",
       "description": "管理菜品属性和选项",
-      "unit": "个属性",
+      "show_on_receipt": "显示在小票",
+      "show_on_kitchen_print": "显示在厨房打印",
       "hint": {
         "add_first": "请点击上方按钮添加第一个属性",
         "select_attribute": "请从左侧选择一个属性查看选项"
@@ -1532,17 +1332,11 @@
         "name": "属性名称",
         "name_placeholder": "请输入属性名称",
         "name_required": "请输入属性名称",
-        "type": "属性类型",
         "receipt_name": "小票名称",
         "receipt_name_placeholder": "如为空则使用属性名称",
         "sort": "排序",
-        "is_global": "全局属性",
-        "is_global_desc": "全局属性将自动应用到所有菜品",
-        "kitchen_printer": "厨房打印机",
         "show_on_receipt": "显示在小票",
         "show_on_receipt_hint": "选择此项后，该属性的选项将显示在收据上",
-        "status": "状态",
-        "status_hint": "禁用后该属性将不会显示在 POS",
         "is_multi_select": "多选",
         "is_multi_select_desc": "允许选择多个选项",
         "max_selections": "最大选择数",
@@ -1550,7 +1344,6 @@
         "max_selections_hint": "限制用户最多可以选择的选项数量，0 或留空表示无限制",
         "kitchen_print_name": "厨房打印名称",
         "kitchen_print_name_placeholder": "如为空则使用属性名称",
-        "scope": "作用范围",
         "show_on_kitchen_print": "显示在厨房打印",
         "show_on_kitchen_print_hint": "选择此项后，该属性的选项将显示在厨房小票上"
       },
@@ -1577,14 +1370,9 @@
           "name_required": "请输入选项名称",
           "receipt_name": "小票名称",
           "receipt_name_placeholder": "如为空则使用选项名称",
-          "value_code": "选项编码",
-          "value_code_placeholder": "请输入编码",
           "price": "加价金额",
           "price_hint": "可正可负，例如：+1.50 或 -0.50",
           "sort": "排序",
-          "default": "默认选项",
-          "set_as_default": "设为默认",
-          "status": "状态",
           "kitchen_print_name": "厨房打印名称",
           "kitchen_print_name_placeholder": "如为空则使用选项名称",
           "enable_quantity": "启用数量控制",
@@ -1598,10 +1386,6 @@
         "set_default": "设为默认",
         "unset_default": "取消默认",
         "quantity_control": "数量控制"
-      },
-      "scope": {
-        "global": "全局",
-        "inherited": "继承自分类"
       },
       "error": {
         "max_defaults": "最多只能设置 {n} 个默认选项"
@@ -1704,6 +1488,7 @@
     "printer": {
       "title": "打印机设置",
       "description": "管理硬件打印机、厨房路由和标签模板",
+      "templates": "标签模板",
       "kitchen_printing": {
         "title": "厨房打印",
         "disabled": "厨房打印已关闭",
@@ -1750,8 +1535,7 @@
         "title": "厨房工位",
         "no_data": "创建您的第一个厨房工位",
         "default_name": "工位",
-        "add_station": "添加工位",
-        "edit_station": "编辑工位"
+        "add_station": "添加工位"
       },
       "form": {
         "target_printer": "目标打印机",
@@ -1839,10 +1623,6 @@
         "description": "调整界面元素大小，适配不同显示设备",
         "reset": "恢复默认"
       },
-      "font_optimization": {
-        "title": "字体优化",
-        "description": "优化字体渲染，提升显示效果"
-      },
       "clear_cache": {
         "title": "清除缓存",
         "description": "清除本地缓存数据",
@@ -1858,7 +1638,8 @@
       "virtual_keyboard_never": "关闭",
       "button_exit_tenant": "退出当前租户",
       "exit_tenant_desc": "停止服务并退出当前租户，返回租户选择页面",
-      "confirm_exit_tenant": "确定退出当前租户？服务器将停止运行，需要重新选择租户。"
+      "confirm_exit_tenant": "确定退出当前租户？服务器将停止运行，需要重新选择租户。",
+      "debug_orders": "订单调试"
     },
     "permissions": {
       "menu_manage": "菜单管理",
@@ -1916,13 +1697,10 @@
         "capacity": "4",
         "price": "0.00",
         "sort_order": "0"
-      },
-      "basic_info": "基本信息",
-      "extended_info": "扩展信息"
+      }
     },
     "specification": {
       "list": "规格列表",
-      "loading": "正在加载规格...",
       "no_specs": "暂无规格",
       "create_first": "创建您的第一个规格",
       "add_new": "添加新规格",
@@ -1931,8 +1709,6 @@
         "name": "规格名称",
         "name_placeholder": "例如：大份、微辣",
         "price": "价格",
-        "external_id": "POS 编号",
-        "external_id_placeholder": "输入编号",
         "base_spec_price_hint": "基础规格价格请在菜品信息中修改",
         "set_default": "设为默认规格",
         "set_default_hint": "点单时将作为默认选项",
@@ -1944,14 +1720,10 @@
         "is_root_hint": "基础规格不能删除，通常是标准规格"
       },
       "action": {
-        "save": "创建规格",
-        "update": "保存修改",
         "delete": "删除"
       },
       "message": {
-        "load_failed": "加载规格失败",
         "root_cannot_delete": "基础规格不能删除",
-        "partial_create_failed": "规格创建失败，但菜品已成功创建",
         "updated": "规格已更新",
         "created": "规格已创建",
         "deleted": "规格已删除"
@@ -1965,16 +1737,9 @@
         "set_default": "设为默认",
         "cancel_default": "取消默认"
       },
-      "manage": "管理规格",
-      "multi_disabled": "多规格功能未启用",
-      "enable_multi_hint": "启用后可添加多个规格",
-      "enable_multi": "启用多规格"
-    },
-    "status": {
-      "saved": "已保存"
+      "manage": "管理规格"
     },
     "label": {
-      "templates": "模板",
       "width": "宽度",
       "height": "高度",
       "layers": "图层",
@@ -2052,7 +1817,6 @@
     "supported_fields": "支持的字段",
     "all_attributes_selected": "已选择所有属性",
     "external_id_required": "请输入编号",
-    "external_id_exists": "编号已存在",
     "unsaved_confirm": "有未保存的更改",
     "unsaved_confirm_hint": "确定要离开吗？",
     "kitchen_printer": "厨房打印机",
@@ -2090,8 +1854,6 @@
         "operator": "操作员",
         "start_time": "开始时间",
         "end_time": "结束时间",
-        "duration": "时长",
-        "starting_cash": "备用金",
         "expected_cash": "应结现金",
         "actual_cash": "实收现金",
         "variance": "差异",
@@ -2105,20 +1867,12 @@
       "open_shift": "开班",
       "close_shift": "收班",
       "force_close_shift": "强制关闭",
-      "no_active_shift": "当前没有进行中的班次",
-      "no_active_shift_hint": "请点击开班按钮开始新的班次",
-      "active_shift_warning": "存在进行中的班次",
-      "active_shift_hint": "请先收班后再开始新班次",
-      "stale_shift_warning": "检测到异常关闭的班次",
-      "stale_shift_hint": "系统检测到有班次未正常关闭，可能是由于断电或系统崩溃导致",
-      "recover_stale": "处理异常班次",
       "checking": "正在检查班次状态...",
       "check_failed": "班次检查失败",
       "open_success": "开班成功",
       "close_success_balanced": "收班成功，现金无差异",
       "close_success_variance": "收班成功，差异: {variance}",
       "force_close_success": "班次已强制关闭",
-      "stale_shifts_closed": "检测到 {count} 个跨营业日未结班次，已自动关闭",
       "force_closed_notice_title": "班次异常关闭",
       "force_closed_notice_hint": "请开启新班次以继续使用 POS 系统。",
       "open_new_shift": "开启新班次",
@@ -2128,9 +1882,7 @@
       "action_failed": "操作失败",
       "invalid_amount": "请输入有效金额",
       "variance": {
-        "balanced": "平衡",
-        "over": "长款",
-        "short": "短款"
+        "balanced": "平衡"
       },
       "modal": {
         "open_title": "开班",
@@ -2144,15 +1896,7 @@
         "variance": "差异",
         "note": "备注",
         "note_placeholder": "输入备注信息（可选）",
-        "force_close_warning_title": "确认强制关闭？",
-        "force_close_warning": "强制关闭将跳过现金盘点，通常用于系统异常恢复场景。此操作不可撤销。",
-        "force_close_default_note": "系统异常恢复"
-      },
-      "exit_guard": {
-        "title": "班次未结束",
-        "message": "当前有进行中的班次，是否收班后再退出？",
-        "close_and_exit": "收班后退出",
-        "exit_directly": "直接退出"
+        "force_close_warning": "强制关闭将跳过现金盘点，通常用于系统异常恢复场景。此操作不可撤销。"
       }
     },
     "daily_report": {
@@ -2173,7 +1917,7 @@
       },
       "no_today_report": "今日尚未生成日结报告",
       "no_today_report_hint": "建议在每日营业结束后生成日结报告",
-      "generate": "生成报告",
+      "generate_button": "生成报告",
       "generate_today": "生成今日报告",
       "detail_title": "日结报告详情",
       "summary": {
@@ -2272,6 +2016,8 @@
     "3003": "激活失败",
     "3004": "证书无效",
     "3005": "许可证已过期",
+    "3006": "订阅已被暂停",
+    "3007": "设备数量已达上限，请选择要替换的设备",
     "4001": "订单不存在",
     "4002": "订单已支付",
     "4003": "订单已完成",
@@ -2328,8 +2074,6 @@
     "9202": "打印失败",
     "9203": "标签打印功能正在开发中",
     "9301": "客户端已断开连接",
-    "3006": "订阅已被暂停",
-    "3007": "设备数量已达上限，请选择要替换的设备",
     "9401": "存储空间不足",
     "9402": "内存不足",
     "9403": "存储数据损坏",
@@ -2518,7 +2262,6 @@
         "requester_name": "请求人",
         "required_permission": "所需权限",
         "authorizer_username": "授权人",
-        "description": "描述",
         "width": "宽度",
         "height": "高度",
         "padding": "内边距",
@@ -2535,8 +2278,6 @@
         "email": "邮箱",
         "website": "网站",
         "business_day_cutoff": "营业日截止时间",
-        "default_kitchen_printer": "默认厨房打印机",
-        "default_label_printer": "默认标签打印机",
         "attribute_name": "属性名称",
         "op": "操作",
         "product_id": "商品ID",
@@ -2590,13 +2331,10 @@
       "empty": "无详情"
     },
     "filter": {
-      "all_actions": "全部操作",
-      "all_resources": "全部资源类型",
       "search_operator": "搜索操作人 ID...",
       "title": "筛选条件",
       "button": "筛选",
       "reset": "重置",
-      "selected": "已选",
       "resource_type_label": "资源类型",
       "action_optional": "具体操作（可选）"
     },
