@@ -73,6 +73,12 @@ type AuditActionType =
   | 'print_destination_created'
   | 'print_destination_updated'
   | 'print_destination_deleted'
+  | 'member_created'
+  | 'member_updated'
+  | 'member_deleted'
+  | 'marketing_group_created'
+  | 'marketing_group_updated'
+  | 'marketing_group_deleted'
   | 'daily_report_generated'
   | 'print_config_changed'
   | 'store_info_changed';
@@ -158,6 +164,16 @@ export const AUDIT_RENDERERS: Partial<Record<AuditActionType, AuditDetailsRender
   print_destination_created: createSnapshotRenderer(),
   print_destination_updated: createDiffRenderer(),
   print_destination_deleted: createDeleteRenderer(),
+
+  // 会员
+  member_created: createSnapshotRenderer(),
+  member_updated: createDiffRenderer(),
+  member_deleted: createDeleteRenderer(),
+
+  // 营销组
+  marketing_group_created: createSnapshotRenderer(),
+  marketing_group_updated: createDiffRenderer(),
+  marketing_group_deleted: createDeleteRenderer(),
 
   // 日结
   daily_report_generated: createSnapshotRenderer(),

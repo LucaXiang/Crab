@@ -1,10 +1,11 @@
 import type React from 'react';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
+import { i18n } from '@/infrastructure/i18n';
 import type { TranslateFn } from './types';
 
 /** 格式化时间戳 */
 export function formatTimestamp(ts: number): string {
-  return new Date(ts).toLocaleString('zh-CN', {
+  return new Date(ts).toLocaleString(i18n.getLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -73,7 +74,6 @@ const PERCENT_FIELDS = new Set([
   'tax_rate',
   'discount_percent',
   'surcharge_percent',
-  'value', // price_rule value when mode is PERCENTAGE
 ]);
 
 /** 布尔字段 */
@@ -91,8 +91,19 @@ const ENUM_FIELDS = new Set([
   'mode',
   'rule_type',
   'scope',
-  'printer_type',
+  'connection',
+  'protocol',
+  'purpose',
 ]);
+
+/**
+ * 提取 dotted path 的最后一段字段名
+ * e.g. "specs.0.price" → "price", "name" → "name"
+ */
+function leafField(field: string): string {
+  const dot = field.lastIndexOf('.');
+  return dot >= 0 ? field.slice(dot + 1) : field;
+}
 
 /**
  * 格式化单个字段值
@@ -106,35 +117,38 @@ export function formatFieldValue(
     return t('audit.detail.value.none');
   }
 
+  // 嵌套 diff 产生 dotted path（如 "specs.0.price"），提取叶子字段做类型匹配
+  const leaf = leafField(field);
+
   // 时间戳
-  if (TIMESTAMP_FIELDS.has(field) && typeof value === 'number') {
+  if (TIMESTAMP_FIELDS.has(leaf) && typeof value === 'number') {
     return formatTimestamp(value);
   }
 
   // 货币
-  if (CURRENCY_FIELDS.has(field) && typeof value === 'number') {
+  if (CURRENCY_FIELDS.has(leaf) && typeof value === 'number') {
     return formatCurrency(value);
   }
 
   // 百分比
-  if (PERCENT_FIELDS.has(field) && typeof value === 'number') {
+  if (PERCENT_FIELDS.has(leaf) && typeof value === 'number') {
     return `${value}%`;
   }
 
   // 布尔
-  if (BOOLEAN_FIELDS.has(field) && typeof value === 'boolean') {
+  if (BOOLEAN_FIELDS.has(leaf) && typeof value === 'boolean') {
     return formatBoolean(value, t);
   }
 
   // 枚举
-  if (ENUM_FIELDS.has(field) && typeof value === 'string') {
+  if (ENUM_FIELDS.has(leaf) && typeof value === 'string') {
     const translated = t(`audit.detail.value.${value.toLowerCase()}`);
     return translated.startsWith('audit.detail.value.') ? value : translated;
   }
 
   // 数组
   if (Array.isArray(value)) {
-    return formatArray(value, field, t);
+    return formatArray(value, leaf, t);
   }
 
   // 对象（如 selected_specification）

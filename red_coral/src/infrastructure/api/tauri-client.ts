@@ -512,7 +512,7 @@ export class TauriApiClient {
     from?: number;
     to?: number;
     action?: string;
-    operator_id?: string;
+    operator_name?: string;
     resource_type?: string;
     offset?: number;
     limit?: number;

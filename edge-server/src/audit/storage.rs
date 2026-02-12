@@ -218,6 +218,10 @@ impl AuditStorage {
             conditions.push("operator_id = ?");
             bind_values.push(BindValue::Int(operator_id));
         }
+        if let Some(ref operator_name) = q.operator_name {
+            conditions.push("operator_name LIKE ?");
+            bind_values.push(BindValue::Str(format!("%{}%", operator_name)));
+        }
         if let Some(ref resource_type) = q.resource_type {
             conditions.push("resource_type = ?");
             bind_values.push(BindValue::Str(resource_type.clone()));

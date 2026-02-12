@@ -7,7 +7,7 @@ import type { AuditAction } from '@/core/domain/types/api';
  */
 const RESOURCE_ACTIONS: Record<string, AuditAction[]> = {
   system: ['system_startup', 'system_shutdown', 'system_abnormal_shutdown', 'system_long_downtime'],
-  auth: ['login_success', 'login_failed', 'logout'],
+  auth: ['login_success', 'login_failed', 'logout', 'escalation_success'],
   system_issue: ['resolve_system_issue'],
   order: ['order_completed', 'order_voided', 'order_merged'],
   employee: ['employee_created', 'employee_updated', 'employee_deleted'],

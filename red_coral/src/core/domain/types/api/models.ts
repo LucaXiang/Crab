@@ -273,15 +273,20 @@ export interface AttributeBinding {
 
 // ============ Printer ============
 
-export type PrinterType = 'network' | 'driver';
-export type PrinterFormat = 'escpos' | 'label';
+/** Physical connection method */
+export type PrinterConnection = 'network' | 'driver';
+/** Communication protocol */
+export type PrinterProtocol = 'escpos' | 'tspl';
+/** Print destination purpose */
+export type PrintPurpose = 'kitchen' | 'label';
 
 export interface Printer {
   id?: number;
   print_destination_id?: number;
-  printer_type: PrinterType;
-  /** Printer format: escpos (厨房单/小票) | label (标签) */
-  printer_format: PrinterFormat;
+  /** Physical connection method */
+  connection: PrinterConnection;
+  /** Communication protocol */
+  protocol: PrinterProtocol;
   ip?: string;
   port?: number;
   driver_name?: string;
@@ -295,6 +300,8 @@ export interface PrintDestination {
   id: number;
   name: string;
   description?: string;
+  /** Purpose: kitchen or label */
+  purpose: PrintPurpose;
   printers: Printer[];
   is_active: boolean;
 }
@@ -302,6 +309,7 @@ export interface PrintDestination {
 export interface PrintDestinationCreate {
   name: string;
   description?: string;
+  purpose?: PrintPurpose;
   printers?: Printer[];
   is_active?: boolean;
 }
@@ -309,6 +317,7 @@ export interface PrintDestinationCreate {
 export interface PrintDestinationUpdate {
   name?: string;
   description?: string;
+  purpose?: PrintPurpose;
   printers?: Printer[];
   is_active?: boolean;
 }
@@ -1078,7 +1087,6 @@ export type AuditAction =
   | 'order_completed'
   | 'order_voided'
   | 'order_merged'
-  | 'order_moved'
   // 管理操作
   | 'employee_created'
   | 'employee_updated'
@@ -1148,7 +1156,7 @@ export interface AuditEntry {
   /** 资源 ID */
   resource_id: string;
   /** 操作人 ID (系统事件为 null) */
-  operator_id: string | null;
+  operator_id: number | null;
   /** 操作人名称 */
   operator_name: string | null;
   /** 结构化详情 */

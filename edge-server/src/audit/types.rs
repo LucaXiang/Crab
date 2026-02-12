@@ -201,6 +201,8 @@ pub struct AuditQuery {
     pub action: Option<AuditAction>,
     /// 操作人 ID 过滤
     pub operator_id: Option<i64>,
+    /// 操作人名称模糊搜索
+    pub operator_name: Option<String>,
     /// 资源类型过滤
     pub resource_type: Option<String>,
     /// 分页偏移

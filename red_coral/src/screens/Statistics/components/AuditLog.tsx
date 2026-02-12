@@ -85,17 +85,9 @@ function getActionColor(action: string): string {
   return 'bg-gray-100 text-gray-800';
 }
 
-/** 格式化时间戳为本地日期字符串 */
-function formatTs(v: number): string {
-  return new Date(v).toLocaleString('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
-}
-
 
 export const AuditLog: React.FC = () => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const api = createTauriClient();
 
   // Data
@@ -165,11 +157,11 @@ export const AuditLog: React.FC = () => {
       }
       if (actionFilter) query.action = actionFilter;
       if (resourceTypeFilter) query.resource_type = resourceTypeFilter;
-      if (debouncedSearch) query.operator_id = debouncedSearch;
+      if (debouncedSearch) query.operator_name = debouncedSearch;
 
       const result = await api.listAuditLogs(query as {
         from?: number; to?: number; action?: string;
-        operator_id?: string; resource_type?: string;
+        operator_name?: string; resource_type?: string;
         offset?: number; limit?: number;
       });
       setItems(result.items);
@@ -188,7 +180,7 @@ export const AuditLog: React.FC = () => {
   }, [fetchLogs]);
 
   const formatTimestamp = (ts: number) => {
-    return new Date(ts).toLocaleString('zh-CN', {
+    return new Date(ts).toLocaleString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
