@@ -9,6 +9,7 @@ import type { PrintState } from '@/core/domain/types';
 interface CategoryFormData {
   name: string;
   print_destinations?: number[];
+  label_print_destinations?: number[];
   is_kitchen_print_enabled?: PrintState;  // 0=disabled, 1=enabled
   is_label_print_enabled?: PrintState;    // 0=disabled, 1=enabled
   selected_attribute_ids?: number[];
@@ -41,9 +42,9 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
   const selectedTagIds = formData.tag_ids || [];
   const matchMode = formData.match_mode || 'any';
 
-  // Kitchen print state - PrintState: 0=disabled, 1=enabled
+  // Print state - PrintState: 0=disabled, 1=enabled
   const printDestinations = formData.print_destinations ?? [];
-  const kitchenPrinterId = printDestinations[0];
+  const labelPrintDestinations = formData.label_print_destinations ?? [];
   // Default enabled(1), 0 is disabled so can't use ?? since 0 is falsy
   const isKitchenPrintEnabled: PrintState = formData.is_kitchen_print_enabled === 0 ? 0 : (formData.is_kitchen_print_enabled ?? 1);
   const isLabelPrintEnabled: PrintState = formData.is_label_print_enabled === 0 ? 0 : (formData.is_label_print_enabled ?? 1);
@@ -160,8 +161,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
 
         <SubField show={isKitchenPrintEnabled === 1}>
           <KitchenPrinterSelector
-            value={kitchenPrinterId}
-            onChange={(value) => onFieldChange('print_destinations', value ? [value] : [])}
+            value={printDestinations}
+            onChange={(value) => onFieldChange('print_destinations', value)}
             t={t}
           />
         </SubField>
@@ -176,6 +177,15 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
               { value: '0', label: t('common.status.disabled') }
             ]}
           />
+
+          <SubField show={isLabelPrintEnabled === 1}>
+            <KitchenPrinterSelector
+              value={labelPrintDestinations}
+              onChange={(value) => onFieldChange('label_print_destinations', value)}
+              label={t('settings.product.print.label_printer')}
+              t={t}
+            />
+          </SubField>
         </div>
       </FormSection>
       )}

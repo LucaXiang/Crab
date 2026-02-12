@@ -1224,7 +1224,9 @@
         "kitchen_print_name_placeholder": "如为空则使用菜品名称",
         "effective_state": "当前生效",
         "receipt_name": "小票名称",
-        "receipt_name_placeholder": "如为空则使用菜品名称"
+        "receipt_name_placeholder": "如为空则使用菜品名称",
+        "label_printer": "标签打印机",
+        "no_printers": "暂无可用打印机"
       },
       "specification": {
         "label": {

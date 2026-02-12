@@ -1224,7 +1224,9 @@
         "kitchen_print_name_placeholder": "Vacío = nombre plato",
         "effective_state": "Activo",
         "receipt_name": "Nombre ticket",
-        "receipt_name_placeholder": "Vacío = nombre plato"
+        "receipt_name_placeholder": "Vacío = nombre plato",
+        "label_printer": "Impresora etiquetas",
+        "no_printers": "No hay impresoras disponibles"
       },
       "specification": {
         "label": {

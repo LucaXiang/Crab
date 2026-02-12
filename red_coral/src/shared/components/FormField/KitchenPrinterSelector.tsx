@@ -1,18 +1,17 @@
 import React from 'react';
+import { Printer } from 'lucide-react';
 import { FormField } from './FormField';
-import { selectClass } from './FormField';
 import { usePrintDestinationStore } from '@/core/stores/resources';
 
 export interface KitchenPrinterSelectorProps {
-  value: number | null | undefined;
-  onChange: (value: number | null) => void;
+  value: number[];
+  onChange: (value: number[]) => void;
   label?: string;
   t: (key: string) => string;
 }
 
 /**
- * Reusable print destination selector component
- * Automatically fetches and displays available print destinations
+ * Multi-select print destination selector (toggle chips)
  */
 export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
   value,
@@ -22,36 +21,43 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
 }) => {
   const items = usePrintDestinationStore((state) => state.items);
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    onChange(val ? Number(val) : null);
+  const handleToggle = (id: number) => {
+    if (value.includes(id)) {
+      onChange(value.filter((v) => v !== id));
+    } else {
+      onChange([...value, id]);
+    }
   };
+
+  if (items.length === 0) {
+    return (
+      <FormField label={label || t('settings.kitchen_printer')}>
+        <p className="text-sm text-gray-400 py-2">{t('settings.product.print.no_printers')}</p>
+      </FormField>
+    );
+  }
 
   return (
     <FormField label={label || t('settings.kitchen_printer')}>
-      <div className="relative">
-        <select
-          value={value || ''}
-          onChange={handleChange}
-          className={selectClass}
-        >
-          <option value="">{t('common.label.default')}</option>
-          {items.map((p) => (
-            <option key={p.id} value={p.id}>
+      <div className="flex flex-wrap gap-2">
+        {items.map((p) => {
+          const selected = value.includes(p.id);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => handleToggle(p.id)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
+                selected
+                  ? 'bg-teal-50 border-teal-300 text-teal-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Printer size={14} className={selected ? 'text-teal-500' : 'text-gray-400'} />
               {p.name}
-            </option>
-          ))}
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
-          <svg
-            className="h-4 w-4 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+            </button>
+          );
+        })}
       </div>
     </FormField>
   );
