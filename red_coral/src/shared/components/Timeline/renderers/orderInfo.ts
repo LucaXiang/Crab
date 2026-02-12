@@ -176,11 +176,13 @@ export const MemberUnlinkedRenderer: EventRenderer<MemberUnlinkedPayload> = {
 
 export const StampRedeemedRenderer: EventRenderer<StampRedeemedPayload> = {
   render(event, payload, t) {
+    const strategyKey = `settings.marketing_group.stamp.strategy.${payload.reward_strategy.toLowerCase()}`;
+    const strategyLabel = t(strategyKey);
     return {
       title: t('timeline.stamp_redeemed'),
       summary: payload.stamp_activity_name,
       details: [
-        `${t('timeline.labels.reward_strategy')}: ${payload.reward_strategy}`,
+        `${t('timeline.labels.reward_strategy')}: ${strategyLabel}`,
       ],
       icon: Award,
       colorClass: 'bg-amber-400',

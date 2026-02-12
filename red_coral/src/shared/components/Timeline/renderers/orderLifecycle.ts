@@ -21,7 +21,7 @@ export const TableOpenedRenderer: EventRenderer<TableOpenedPayload> = {
       details.push(`${t('timeline.labels.receipt')}: ${payload.receipt_number}`);
     }
     if (payload.is_retail) {
-      details.push(t('timeline.retail_mode'));
+      details.push(`${t('timeline.labels.type')}: ${t('timeline.retail_mode')}`);
     }
 
     return {

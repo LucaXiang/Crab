@@ -86,7 +86,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
       />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-8 min-w-0">
+      <div className="flex-1 overflow-y-auto p-8 min-w-0" style={{ scrollbarGutter: 'stable' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-bold text-gray-800">

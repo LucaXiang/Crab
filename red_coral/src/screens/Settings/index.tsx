@@ -31,7 +31,7 @@ const SettingsContent: React.FC = React.memo(() => {
   const activeCategory = useSettingsCategory();
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50/50">
+    <div className="flex-1 overflow-y-auto bg-gray-50/50" style={{ scrollbarGutter: 'stable' }}>
       <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-6">
         {activeCategory === 'TABLES' && (
           <ProtectedGate permission={Permission.TABLES_MANAGE}>
