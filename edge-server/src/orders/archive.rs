@@ -184,11 +184,12 @@ impl OrderArchiveService {
     /// Archive a completed order with its events (with retry logic and concurrency limit)
     /// Uses a single atomic transaction - either everything succeeds or nothing is written.
     /// On complete failure, saves data to bad archive file for manual recovery.
+    /// Archive an order. Returns `Ok(true)` if newly archived, `Ok(false)` if already existed (idempotency).
     pub async fn archive_order(
         &self,
         snapshot: &OrderSnapshot,
         events: Vec<OrderEvent>,
-    ) -> ArchiveResult<()> {
+    ) -> ArchiveResult<bool> {
         // Acquire semaphore permit to limit concurrent archives
         let _permit = self
             .archive_semaphore
@@ -200,7 +201,7 @@ impl OrderArchiveService {
 
         for attempt in 0..MAX_RETRY_ATTEMPTS {
             match self.archive_order_internal(snapshot, &events).await {
-                Ok(()) => return Ok(()),
+                Ok(newly_archived) => return Ok(newly_archived),
                 Err(e) => {
                     tracing::error!(
                         order_id = %snapshot.order_id,
@@ -279,11 +280,12 @@ impl OrderArchiveService {
     }
 
     /// Internal archive implementation (single attempt, atomic transaction)
+    /// Returns `Ok(true)` if newly archived, `Ok(false)` if already existed (idempotency).
     async fn archive_order_internal(
         &self,
         snapshot: &OrderSnapshot,
         events: &[OrderEvent],
-    ) -> ArchiveResult<()> {
+    ) -> ArchiveResult<bool> {
         // 0. Idempotency check
         let exists: bool = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM archived_order WHERE receipt_number = ?)",
@@ -294,8 +296,8 @@ impl OrderArchiveService {
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         if exists {
-            tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
-            return Ok(());
+            tracing::debug!(order_id = %snapshot.order_id, "Order already archived, skipping");
+            return Ok(false);
         }
 
         // Acquire hash chain lock to prevent concurrent hash chain corruption
@@ -650,7 +652,7 @@ impl OrderArchiveService {
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         tracing::info!(order_id = %snapshot.order_id, "Order archived successfully");
-        Ok(())
+        Ok(true)
     }
 
     fn compute_order_hash(

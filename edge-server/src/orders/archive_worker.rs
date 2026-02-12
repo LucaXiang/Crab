@@ -194,22 +194,23 @@ impl ArchiveWorker {
 
         // 2. Archive to SQLite (async)
         match self.archive_service.archive_order(&snapshot, events.clone()).await {
-            Ok(()) => {
-                tracing::info!(order_id = %order_id, "Order archived successfully");
+            Ok(newly_archived) => {
+                // Only run post-processing for newly archived orders (skip on idempotency hit)
+                if newly_archived {
+                    // 3. Update shift expected_cash for cash payments
+                    self.update_shift_cash(&snapshot).await;
 
-                // 3. Update shift expected_cash for cash payments
-                self.update_shift_cash(&snapshot).await;
+                    // 4. Write payment records to independent payment table
+                    self.write_payment_records(&snapshot, &events).await;
 
-                // 4. Write payment records to independent payment table
-                self.write_payment_records(&snapshot, &events).await;
+                    // 5. Update member stats (points + total_spent) for completed orders
+                    self.update_member_stats(&snapshot).await;
 
-                // 5. Update member stats (points + total_spent) for completed orders
-                self.update_member_stats(&snapshot).await;
+                    // 6. Write audit log for terminal event
+                    self.write_order_audit(&snapshot, &events).await;
+                }
 
-                // 6. Write audit log for terminal event
-                self.write_order_audit(&snapshot, &events).await;
-
-                // 7. Cleanup redb (synchronous)
+                // 7. Cleanup redb (synchronous) — always run to clear the queue
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
@@ -457,7 +458,7 @@ impl ArchiveWorker {
         let spent_f64 = to_f64(to_decimal(spent_amount));
         match member::update_member_stats(&self.pool, member_id, spent_f64, points_earned).await {
             Ok(()) => {
-                tracing::info!(
+                tracing::debug!(
                     order_id = %snapshot.order_id,
                     member_id = member_id,
                     spent = spent_f64,
