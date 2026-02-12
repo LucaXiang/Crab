@@ -31,8 +31,8 @@ interface OrderDetailModeProps {
 // =============================================================================
 
 const SPLIT_TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ITEM_SPLIT: { label: 'history.payment.split_type.item', bg: 'bg-violet-100', text: 'text-violet-600' },
-  AMOUNT_SPLIT: { label: 'history.payment.split_type.amount', bg: 'bg-amber-100', text: 'text-amber-600' },
+  ITEM_SPLIT: { label: 'history.payment.split_type.item', bg: 'bg-indigo-100', text: 'text-indigo-600' },
+  AMOUNT_SPLIT: { label: 'history.payment.split_type.amount', bg: 'bg-cyan-100', text: 'text-cyan-600' },
   AA_SPLIT: { label: 'history.payment.split_type.aa', bg: 'bg-cyan-100', text: 'text-cyan-600' },
 };
 

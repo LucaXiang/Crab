@@ -86,11 +86,18 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
             <div className="space-y-4 max-w-3xl mx-auto">
               {activePayments.map((payment) => {
-                const isSplit = Array.isArray(payment.split_items);
-                const isAmountSplit = isSplit && payment.split_items!.length === 0;
-                const isItemSplit = isSplit && payment.split_items!.length > 0;
+                const hasItems = payment.split_items && payment.split_items.length > 0;
+                const effectiveSplitType = payment.split_type ?? (hasItems ? 'ITEM_SPLIT' : null);
                 const isCash = /cash/i.test(payment.method);
                 const isCancelling = cancellingPaymentId === payment.payment_id;
+
+                const splitBadge = effectiveSplitType === 'ITEM_SPLIT'
+                  ? { label: t('checkout.split.label'), bg: 'bg-indigo-100 text-indigo-600' }
+                  : effectiveSplitType === 'AMOUNT_SPLIT'
+                  ? { label: t('checkout.amount_split.title'), bg: 'bg-cyan-100 text-cyan-600' }
+                  : effectiveSplitType === 'AA_SPLIT'
+                  ? { label: t('checkout.aa_split.title'), bg: 'bg-cyan-100 text-cyan-600' }
+                  : null;
 
                 return (
                   <div
@@ -106,14 +113,9 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
                         <div>
                           <div className="font-bold text-gray-800 text-lg flex items-center gap-2">
                             {isCash ? t('checkout.method.cash') : payment.method}
-                            {isAmountSplit && (
-                              <span className="text-xs bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-medium">
-                                {t('checkout.amount_split.title')}
-                              </span>
-                            )}
-                            {isItemSplit && (
-                              <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">
-                                {t('checkout.split.label')}
+                            {splitBadge && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${splitBadge.bg}`}>
+                                {splitBadge.label}
                               </span>
                             )}
                           </div>
@@ -147,11 +149,11 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
                           description={t('checkout.payment.cancel')}
                           onAuthorized={(user) => {
                             setCancelAuthorizer({ id: user.id, name: user.display_name });
-                            handleCancelPayment(payment.payment_id, isSplit);
+                            handleCancelPayment(payment.payment_id, effectiveSplitType !== null);
                           }}
                         >
                           <button
-                            onClick={() => handleCancelPayment(payment.payment_id, isSplit)}
+                            onClick={() => handleCancelPayment(payment.payment_id, effectiveSplitType !== null)}
                             disabled={isCancelling}
                             className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
                             title={t('checkout.payment.cancel')}

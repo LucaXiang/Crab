@@ -454,7 +454,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               </button>
               <button
                 onClick={() => onNavigate('ORDER_DETAIL')}
-                className="h-40 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
+                className="h-40 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
               >
                 <ClipboardList size={48} />
                 <div className="text-2xl font-bold">{t('checkout.order_detail.title')}</div>
