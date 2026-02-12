@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Printer, ChefHat, Trash2, Edit2, Plus } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
@@ -11,7 +11,8 @@ interface KitchenPrinterListProps {
 
 export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPrinters }) => {
   const { t } = useI18n();
-  const items = usePrintDestinationStore((state) => state.items);
+  const allItems = usePrintDestinationStore((state) => state.items);
+  const items = useMemo(() => allItems.filter((p) => p.purpose === 'kitchen'), [allItems]);
   const isLoading = usePrintDestinationStore((state) => state.isLoading);
   const { fetchAll, create, update, remove } = usePrintDestinationStore.getState();
 
@@ -44,8 +45,8 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
         data.printerType === 'driver'
           ? data.driverName
             ? [{
-                printer_type: 'driver' as const,
-                printer_format: 'escpos' as const,
+                connection: 'driver' as const,
+                protocol: 'escpos' as const,
                 driver_name: data.driverName,
                 priority: 1,
                 is_active: true,
@@ -53,8 +54,8 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
             : []
           : data.ip
             ? [{
-                printer_type: 'network' as const,
-                printer_format: 'escpos' as const,
+                connection: 'network' as const,
+                protocol: 'escpos' as const,
                 ip: data.ip,
                 port: data.port || 9100,
                 priority: 1,
@@ -63,9 +64,9 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
             : [];
 
       if (editingItem?.id) {
-        await update(editingItem.id, { name: data.name, description: data.description, printers });
+        await update(editingItem.id, { name: data.name, description: data.description, purpose: 'kitchen', printers });
       } else {
-        await create({ name: data.name, description: data.description, printers });
+        await create({ name: data.name, description: data.description, purpose: 'kitchen', printers });
       }
       setModalOpen(false);
       setEditingItem(null);
@@ -81,16 +82,16 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
 
   const openEdit = (item: typeof items[0]) => {
     const activePrinter = item.printers?.find(p => p.is_active);
-    const printerType = activePrinter?.printer_type === 'network' ? 'network' : 'driver';
+    const printerType = activePrinter?.connection === 'network' ? 'network' : 'driver';
 
     setEditingItem({
       id: item.id,
       name: item.name,
       description: item.description,
       printerType,
-      driverName: activePrinter?.printer_type === 'driver' ? activePrinter.driver_name : undefined,
-      ip: activePrinter?.printer_type === 'network' ? activePrinter.ip : undefined,
-      port: activePrinter?.printer_type === 'network' ? activePrinter.port : undefined,
+      driverName: activePrinter?.connection === 'driver' ? activePrinter.driver_name : undefined,
+      ip: activePrinter?.connection === 'network' ? activePrinter.ip : undefined,
+      port: activePrinter?.connection === 'network' ? activePrinter.port : undefined,
     });
     setModalOpen(true);
   };
@@ -106,7 +107,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
     }
     // Return the first active printer's name
     const first = activePrinters[0];
-    if (first.printer_type === 'driver') {
+    if (first.connection === 'driver') {
       return first.driver_name;
     }
     return first.ip ? `${first.ip}:${first.port || 9100}` : null;

@@ -459,7 +459,7 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'CATEGORY') {
     const keys: (keyof FormData)[] = [
-      'name', 'sort_order', 'print_destinations',
+      'name', 'sort_order', 'print_destinations', 'label_print_destinations',
       'is_kitchen_print_enabled', 'is_label_print_enabled',
       'is_active', 'is_virtual', 'tag_ids', 'match_mode',
       'selected_attribute_ids', 'attribute_default_options',

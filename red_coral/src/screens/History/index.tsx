@@ -65,7 +65,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
         onBack={onBack}
         onOpenStatistics={onOpenStatistics}
       />
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-6" style={{ scrollbarGutter: 'stable' }}>
+      <div className="flex-1 overflow-y-auto bg-gray-50 p-4" style={{ scrollbarGutter: 'stable' }}>
         {detailLoading ? (
           <div className="h-full flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>

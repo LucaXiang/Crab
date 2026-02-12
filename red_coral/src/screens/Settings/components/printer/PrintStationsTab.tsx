@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Server, Printer, Trash2, Edit2, Plus, Wifi, Monitor, ChefHat, Receipt, Tag } from 'lucide-react';
+import { Server, Printer, Trash2, Edit2, Plus, Wifi, Monitor, ChefHat, Tag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
 import { logger } from '@/utils/logger';
 import { PrinterEditModal } from './PrinterEditModal';
-import type { PrintDestination, Printer as PrinterModel } from '@/core/domain/types/api';
+import type { PrintDestination, PrintPurpose, Printer as PrinterModel } from '@/core/domain/types/api';
 
 interface PrintStationsTabProps {
   systemPrinters: string[];
@@ -12,7 +12,7 @@ interface PrintStationsTabProps {
 
 // 获取打印机类型图标
 const getPrinterTypeIcon = (printer: PrinterModel) => {
-  if (printer.printer_type === 'network') {
+  if (printer.connection === 'network') {
     return <Wifi size={12} className="text-blue-500" />;
   }
   return <Monitor size={12} className="text-green-500" />;
@@ -20,25 +20,34 @@ const getPrinterTypeIcon = (printer: PrinterModel) => {
 
 // 获取打印机显示名称
 const getPrinterDisplayName = (printer: PrinterModel) => {
-  if (printer.printer_type === 'driver') {
+  if (printer.connection === 'driver') {
     return printer.driver_name || 'Unknown Driver';
   }
   return printer.ip ? `${printer.ip}:${printer.port || 9100}` : 'Unknown';
 };
 
-// 获取用途图标
-const getUsageIcon = (dest: PrintDestination) => {
-  const name = dest.name.toLowerCase();
-  if (name.includes('kitchen') || name.includes('厨房') || name.includes('后厨')) {
-    return <ChefHat size={20} className="text-orange-600" />;
-  }
-  if (name.includes('receipt') || name.includes('收据') || name.includes('小票')) {
-    return <Receipt size={20} className="text-blue-600" />;
-  }
-  if (name.includes('label') || name.includes('标签')) {
+// 获取用途图标 (based on purpose field)
+const getPurposeIcon = (dest: PrintDestination) => {
+  if (dest.purpose === 'label') {
     return <Tag size={20} className="text-amber-600" />;
   }
-  return <Server size={20} className="text-indigo-600" />;
+  return <ChefHat size={20} className="text-orange-600" />;
+};
+
+// 获取用途标签
+const getPurposeBadge = (dest: PrintDestination, t: (key: string) => string) => {
+  if (dest.purpose === 'label') {
+    return (
+      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+        {t('settings.printer.purpose.label')}
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
+      {t('settings.printer.purpose.kitchen')}
+    </span>
+  );
 };
 
 export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinters }) => {
@@ -52,6 +61,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
     id?: number;
     name?: string;
     description?: string;
+    purpose?: PrintPurpose;
     printerType?: 'driver' | 'network';
     driverName?: string;
     ip?: string;
@@ -65,6 +75,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
   const handleSave = async (data: {
     name: string;
     description: string;
+    purpose: PrintPurpose;
     printerType: 'driver' | 'network';
     driverName: string;
     ip: string;
@@ -72,13 +83,14 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
   }) => {
     try {
       // Build printers array based on type
+      const protocol = data.purpose === 'label' ? 'tspl' as const : 'escpos' as const;
       const printers =
         data.printerType === 'driver'
           ? data.driverName
             ? [
                 {
-                  printer_type: 'driver' as const,
-                  printer_format: 'escpos' as const,
+                  connection: 'driver' as const,
+                  protocol,
                   driver_name: data.driverName,
                   priority: 1,
                   is_active: true,
@@ -88,8 +100,8 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
           : data.ip
             ? [
                 {
-                  printer_type: 'network' as const,
-                  printer_format: 'escpos' as const,
+                  connection: 'network' as const,
+                  protocol,
                   ip: data.ip,
                   port: data.port || 9100,
                   priority: 1,
@@ -99,9 +111,9 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
             : [];
 
       if (editingItem?.id) {
-        await update(editingItem.id, { name: data.name, description: data.description, printers });
+        await update(editingItem.id, { name: data.name, description: data.description, purpose: data.purpose, printers });
       } else {
-        await create({ name: data.name, description: data.description, printers });
+        await create({ name: data.name, description: data.description, purpose: data.purpose, printers });
       }
       setModalOpen(false);
       setEditingItem(null);
@@ -117,16 +129,17 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
 
   const openEdit = (item: PrintDestination) => {
     const activePrinter = item.printers?.find((p) => p.is_active);
-    const printerType = activePrinter?.printer_type === 'network' ? 'network' : 'driver';
+    const printerType = activePrinter?.connection === 'network' ? 'network' : 'driver';
 
     setEditingItem({
       id: item.id,
       name: item.name,
       description: item.description,
+      purpose: item.purpose,
       printerType,
-      driverName: activePrinter?.printer_type === 'driver' ? activePrinter.driver_name : undefined,
-      ip: activePrinter?.printer_type === 'network' ? activePrinter.ip : undefined,
-      port: activePrinter?.printer_type === 'network' ? activePrinter.port : undefined,
+      driverName: activePrinter?.connection === 'driver' ? activePrinter.driver_name : undefined,
+      ip: activePrinter?.connection === 'network' ? activePrinter.ip : undefined,
+      port: activePrinter?.connection === 'network' ? activePrinter.port : undefined,
     });
     setModalOpen(true);
   };
@@ -181,7 +194,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
                       hasActivePrinter ? 'bg-indigo-50' : 'bg-amber-100'
                     }`}
                   >
-                    {getUsageIcon(dest)}
+                    {getPurposeIcon(dest)}
                   </div>
                   <div>
                     <h4 className="font-bold text-gray-900">{dest.name}</h4>
@@ -226,7 +239,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
                           {getPrinterDisplayName(printer)}
                         </span>
                         <span className="text-xs text-gray-400 ml-auto">
-                          {printer.printer_type === 'driver'
+                          {printer.connection === 'driver'
                             ? t('settings.printer.print_stations.type_local')
                             : t('settings.printer.print_stations.type_network')}
                         </span>
@@ -243,6 +256,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
 
               {/* 状态标签 */}
               <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                {getPurposeBadge(dest, t)}
                 <span
                   className={`text-xs font-medium px-2 py-1 rounded-full ${
                     dest.is_active

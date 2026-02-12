@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT cpd.print_destination_id FROM category_print_dest cpd JOIN print_destination pd ON pd.id = cpd.print_destination_id WHERE cpd.category_id = ? AND pd.purpose = 'label'",
+  "describe": {
+    "columns": [
+      {
+        "name": "print_destination_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fa83aaf56f02375c8c00031dc2b62971d5849f7c86ca3f581bb71a7ab71f0fcc"
+}

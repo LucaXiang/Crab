@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Server, X, Monitor, Wifi } from 'lucide-react';
+import { Server, X, Monitor, Wifi, ChefHat, Tag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { FormField, FormSection, inputClass, selectClass } from '@/shared/components/FormField';
+import type { PrintPurpose } from '@/core/domain/types/api';
 
 type PrinterType = 'driver' | 'network';
 
 interface PrinterFormData {
   name: string;
   description: string;
+  purpose: PrintPurpose;
   printerType: PrinterType;
   // Driver printer fields
   driverName: string;
@@ -23,6 +25,7 @@ interface PrinterEditModalProps {
     id?: number;
     name?: string;
     description?: string;
+    purpose?: PrintPurpose;
     printerType?: PrinterType;
     driverName?: string;
     ip?: string;
@@ -45,6 +48,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
   const [formData, setFormData] = useState<PrinterFormData>({
     name: '',
     description: '',
+    purpose: 'kitchen',
     printerType: 'driver',
     driverName: '',
     ip: '',
@@ -65,6 +69,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
       setFormData({
         name: initialData?.name || '',
         description: initialData?.description || '',
+        purpose: initialData?.purpose || 'kitchen',
         printerType,
         driverName: initialData?.driverName || '',
         ip: initialData?.ip || '',
@@ -143,6 +148,36 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
                 placeholder={t('common.hint.description_placeholder')}
                 className={inputClass}
               />
+            </FormField>
+
+            {/* Purpose selector */}
+            <FormField label={t('settings.printer.purpose.title')}>
+              <div className="flex bg-gray-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, purpose: 'kitchen' })}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    formData.purpose === 'kitchen'
+                      ? 'bg-white text-orange-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <ChefHat size={16} />
+                  {t('settings.printer.purpose.kitchen')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, purpose: 'label' })}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    formData.purpose === 'label'
+                      ? 'bg-white text-amber-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Tag size={16} />
+                  {t('settings.printer.purpose.label')}
+                </button>
+              </div>
             </FormField>
           </FormSection>
 

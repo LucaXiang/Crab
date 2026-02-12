@@ -110,6 +110,7 @@ export const CategoryModal: React.FC = React.memo(() => {
         await createCategory({
           name: formData.name,
           print_destinations: formData.print_destinations,
+          label_print_destinations: formData.label_print_destinations,
           is_kitchen_print_enabled: formData.is_kitchen_print_enabled,
           is_label_print_enabled: formData.is_label_print_enabled,
           selected_attribute_ids: formData.selected_attribute_ids,
@@ -125,6 +126,7 @@ export const CategoryModal: React.FC = React.memo(() => {
         await updateCategory(data.id, {
           name: formData.name,
           print_destinations: formData.print_destinations,
+          label_print_destinations: formData.label_print_destinations,
           is_kitchen_print_enabled: formData.is_kitchen_print_enabled,
           is_label_print_enabled: formData.is_label_print_enabled,
           selected_attribute_ids: formData.selected_attribute_ids,
@@ -161,6 +163,7 @@ export const CategoryModal: React.FC = React.memo(() => {
         formData={{
           name: formData.name,
           print_destinations: formData.print_destinations,
+          label_print_destinations: formData.label_print_destinations,
           is_kitchen_print_enabled: formData.is_kitchen_print_enabled,
           is_label_print_enabled: formData.is_label_print_enabled,
           selected_attribute_ids: formData.selected_attribute_ids,

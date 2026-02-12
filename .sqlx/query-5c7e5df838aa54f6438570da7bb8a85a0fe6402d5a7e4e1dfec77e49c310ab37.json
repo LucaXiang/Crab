@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM category_print_dest WHERE category_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "5c7e5df838aa54f6438570da7bb8a85a0fe6402d5a7e4e1dfec77e49c310ab37"
+}

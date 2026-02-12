@@ -163,6 +163,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
           <KitchenPrinterSelector
             value={printDestinations}
             onChange={(value) => onFieldChange('print_destinations', value)}
+            purpose="kitchen"
             t={t}
           />
         </SubField>
@@ -182,6 +183,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
             <KitchenPrinterSelector
               value={labelPrintDestinations}
               onChange={(value) => onFieldChange('label_print_destinations', value)}
+              purpose="label"
               label={t('settings.product.print.label_printer')}
               t={t}
             />

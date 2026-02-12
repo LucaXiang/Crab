@@ -161,13 +161,13 @@ impl PrintExecutor {
         printer: &Printer,
         data: &[u8],
     ) -> PrintExecutorResult<()> {
-        match printer.printer_type.as_str() {
+        match printer.connection.as_str() {
             "driver" => self.send_to_driver_printer(printer, data).await,
             "network" => self.send_to_network_printer(printer, data).await,
             other => {
-                warn!(printer_type = other, "Unknown printer type");
+                warn!(connection = other, "Unknown printer connection type");
                 Err(PrintExecutorError::PrintFailed(format!(
-                    "Unknown printer type: {}",
+                    "Unknown printer connection: {}",
                     other
                 )))
             }

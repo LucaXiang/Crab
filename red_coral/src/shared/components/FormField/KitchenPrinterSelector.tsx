@@ -2,10 +2,13 @@ import React from 'react';
 import { Printer } from 'lucide-react';
 import { FormField } from './FormField';
 import { usePrintDestinationStore } from '@/core/stores/resources';
+import type { PrintPurpose } from '@/core/domain/types/api';
 
 export interface KitchenPrinterSelectorProps {
   value: number[];
   onChange: (value: number[]) => void;
+  /** Filter by purpose (default: show all) */
+  purpose?: PrintPurpose;
   label?: string;
   t: (key: string) => string;
 }
@@ -16,10 +19,12 @@ export interface KitchenPrinterSelectorProps {
 export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
   value,
   onChange,
+  purpose,
   label,
   t
 }) => {
-  const items = usePrintDestinationStore((state) => state.items);
+  const allItems = usePrintDestinationStore((state) => state.items);
+  const items = purpose ? allItems.filter((p) => p.purpose === purpose) : allItems;
 
   const handleToggle = (id: number) => {
     if (value.includes(id)) {

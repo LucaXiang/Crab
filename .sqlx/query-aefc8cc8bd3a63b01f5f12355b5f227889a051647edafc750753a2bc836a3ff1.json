@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO print_destination (name, description, is_active) VALUES (?, ?, ?) RETURNING id as \"id!\"",
+  "query": "INSERT INTO print_destination (name, description, purpose, is_active) VALUES (?, ?, ?, ?) RETURNING id as \"id!\"",
   "describe": {
     "columns": [
       {
@@ -10,11 +10,11 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false
     ]
   },
-  "hash": "928bd5bb95b5e3b6bcc930e8c205eb80febe3066214adca6feda502c9f496184"
+  "hash": "aefc8cc8bd3a63b01f5f12355b5f227889a051647edafc750753a2bc836a3ff1"
 }

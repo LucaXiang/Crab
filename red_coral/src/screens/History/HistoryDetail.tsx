@@ -126,9 +126,9 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
   const isVoid = order.status === 'VOID';
   const isMerged = order.status === 'MERGED';
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 flex justify-between items-start">
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className={`text-2xl font-bold ${isVoid || isMerged ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
@@ -209,8 +209,8 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 space-y-4">
           {/* Items */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between font-bold text-gray-700">
@@ -239,7 +239,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 />
               ))}
             </div>
-            <div className="p-5 bg-gray-50 border-t border-gray-200 space-y-2">
+            <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-2">
               {order.comp_total_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-emerald-600">{t('checkout.breakdown.comp')}</span>
@@ -358,7 +358,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
   return (
     <div>
       <div
-        className="p-4 flex justify-between items-center cursor-pointer transition-colors select-none hover:bg-gray-50/50"
+        className="px-4 py-3 flex justify-between items-center cursor-pointer transition-colors select-none hover:bg-gray-50/50"
         onClick={() => onToggle(index)}
       >
         <div className="flex items-center gap-3 flex-1">
@@ -489,7 +489,7 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
   return (
     <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>
       <div
-        className={`p-4 flex justify-between items-center ${hasItems ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+        className={`px-4 py-3 flex justify-between items-center ${hasItems ? 'cursor-pointer hover:bg-gray-50' : ''}`}
         onClick={() => hasItems && setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">

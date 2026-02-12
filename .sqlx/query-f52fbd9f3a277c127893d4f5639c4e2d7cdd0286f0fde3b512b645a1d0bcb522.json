@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f52fbd9f3a277c127893d4f5639c4e2d7cdd0286f0fde3b512b645a1d0bcb522"
+}

@@ -1541,6 +1541,11 @@
         "no_printer": "未分配打印机",
         "printer_unavailable": "所选打印机不可用"
       },
+      "purpose": {
+        "title": "用途",
+        "kitchen": "厨房打印",
+        "label": "标签打印"
+      },
       "kitchen_station": {
         "title": "厨房工位",
         "no_data": "创建您的第一个厨房工位",
@@ -2270,7 +2275,9 @@
         "zone_id": "所属区域",
         "opened_at": "开启时间",
         "closed_at": "关闭时间",
-        "printer_type": "打印机类型",
+        "connection": "连接方式",
+        "protocol": "通信协议",
+        "purpose": "用途",
         "address": "地址",
         "port": "端口",
         "requester_name": "请求人",
@@ -2333,7 +2340,12 @@
         "tag": "标签",
         "product": "菜品",
         "usb": "USB",
+        "driver": "驱动",
         "network": "网络",
+        "escpos": "ESC/POS",
+        "tspl": "TSPL",
+        "kitchen": "厨房",
+        "label": "标签",
         "default_spec": "默认",
         "bind_attribute": "绑定属性",
         "update_binding": "更新绑定",

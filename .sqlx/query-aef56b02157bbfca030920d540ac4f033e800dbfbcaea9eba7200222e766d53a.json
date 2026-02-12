@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) FROM category_kitchen_print_dest WHERE print_destination_id = ?",
+  "query": "SELECT COUNT(*) FROM category_print_dest WHERE print_destination_id = ?",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "a71a941240f5c5ab8584cce6422010f1a13177647f8f552900808f909c86331f"
+  "hash": "aef56b02157bbfca030920d540ac4f033e800dbfbcaea9eba7200222e766d53a"
 }

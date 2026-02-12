@@ -98,23 +98,13 @@ pub async fn delete(
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     // 检查是否有分类正在使用此打印目标
-    let kitchen_count = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM category_kitchen_print_dest WHERE print_destination_id = ?",
+    let total_refs = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM category_print_dest WHERE print_destination_id = ?",
         id
     )
     .fetch_one(&state.pool)
     .await
-    .unwrap_or(0);
-
-    let label_count = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM category_label_print_dest WHERE print_destination_id = ?",
-        id
-    )
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0);
-
-    let total_refs = kitchen_count + label_count;
+    .map_err(|e| AppError::internal(e.to_string()))?;
     if total_refs > 0 {
         return Err(AppError::validation(format!(
             "Cannot delete print destination: {} category reference(s) exist",

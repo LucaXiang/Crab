@@ -1540,6 +1540,11 @@
         "no_printer": "Sin impresora",
         "printer_unavailable": "Impresora no disponible"
       },
+      "purpose": {
+        "title": "Uso",
+        "kitchen": "Cocina",
+        "label": "Etiqueta"
+      },
       "kitchen_station": {
         "title": "Estaciones cocina",
         "no_data": "Cree su primera estación",
@@ -2270,7 +2275,9 @@
         "zone_id": "Zona",
         "opened_at": "Abierto",
         "closed_at": "Cerrado",
-        "printer_type": "Tipo impresora",
+        "connection": "Conexión",
+        "protocol": "Protocolo",
+        "purpose": "Uso",
         "address": "Dirección",
         "port": "Puerto",
         "attribute_id": "ID atributo",
@@ -2333,7 +2340,12 @@
         "tag": "Etiqueta",
         "product": "Plato",
         "usb": "USB",
+        "driver": "Controlador",
         "network": "Red",
+        "escpos": "ESC/POS",
+        "tspl": "TSPL",
+        "kitchen": "Cocina",
+        "label": "Etiqueta",
         "default_spec": "Defecto",
         "add_option": "Añadir opción",
         "bind_attribute": "Vincular atributo",

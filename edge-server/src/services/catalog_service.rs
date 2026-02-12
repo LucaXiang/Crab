@@ -29,6 +29,7 @@ pub struct ProductMeta {
     pub category_name: String,
     pub tags: Vec<i64>,
     pub tax_rate: i32,
+    pub specs_count: usize,
 }
 
 /// Kitchen print configuration (computed result with fallback chain applied)
@@ -114,18 +115,18 @@ impl CatalogService {
         for mut cat in categories {
             let cat_id = cat.id;
 
-            // Kitchen print destinations
+            // Kitchen print destinations (joined via purpose)
             cat.kitchen_print_destinations = sqlx::query_scalar!(
-                "SELECT print_destination_id FROM category_kitchen_print_dest WHERE category_id = ?",
+                "SELECT cpd.print_destination_id FROM category_print_dest cpd JOIN print_destination pd ON pd.id = cpd.print_destination_id WHERE cpd.category_id = ? AND pd.purpose = 'kitchen'",
                 cat_id
             )
             .fetch_all(&self.pool)
             .await
             .unwrap_or_default();
 
-            // Label print destinations
+            // Label print destinations (joined via purpose)
             cat.label_print_destinations = sqlx::query_scalar!(
-                "SELECT print_destination_id FROM category_label_print_dest WHERE category_id = ?",
+                "SELECT cpd.print_destination_id FROM category_print_dest cpd JOIN print_destination pd ON pd.id = cpd.print_destination_id WHERE cpd.category_id = ? AND pd.purpose = 'label'",
                 cat_id
             )
             .fetch_all(&self.pool)
@@ -822,18 +823,9 @@ impl CatalogService {
         .fetch_one(&self.pool)
         .await?;
 
-        // Insert kitchen print destinations
-        for dest_id in &data.kitchen_print_destinations {
-            sqlx::query!("INSERT OR IGNORE INTO category_kitchen_print_dest (category_id, print_destination_id) VALUES (?, ?)",
-                category_id, dest_id,
-            )
-            .execute(&self.pool)
-            .await?;
-        }
-
-        // Insert label print destinations
-        for dest_id in &data.label_print_destinations {
-            sqlx::query!("INSERT OR IGNORE INTO category_label_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+        // Insert print destinations (unified junction table)
+        for dest_id in data.kitchen_print_destinations.iter().chain(data.label_print_destinations.iter()) {
+            sqlx::query!("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)",
                 category_id, dest_id,
             )
             .execute(&self.pool)
@@ -897,27 +889,19 @@ impl CatalogService {
         .execute(&self.pool)
         .await?;
 
-        // Replace kitchen print destinations if provided
-        if let Some(ref dests) = data.kitchen_print_destinations {
-            sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", id)
+        // Replace print destinations if either kitchen or label changed
+        if data.kitchen_print_destinations.is_some() || data.label_print_destinations.is_some() {
+            // Rebuild from scratch: delete all, re-insert
+            sqlx::query!("DELETE FROM category_print_dest WHERE category_id = ?", id)
                 .execute(&self.pool)
                 .await?;
-            for dest_id in dests {
-                sqlx::query!("INSERT OR IGNORE INTO category_kitchen_print_dest (category_id, print_destination_id) VALUES (?, ?)",
-                    id, dest_id,
-                )
-                .execute(&self.pool)
-                .await?;
-            }
-        }
 
-        // Replace label print destinations if provided
-        if let Some(ref dests) = data.label_print_destinations {
-            sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", id)
-                .execute(&self.pool)
-                .await?;
-            for dest_id in dests {
-                sqlx::query!("INSERT OR IGNORE INTO category_label_print_dest (category_id, print_destination_id) VALUES (?, ?)",
+            // Get current values for unchanged side
+            let kitchen_dests = data.kitchen_print_destinations.unwrap_or_else(|| existing.kitchen_print_destinations.clone());
+            let label_dests = data.label_print_destinations.unwrap_or_else(|| existing.label_print_destinations.clone());
+
+            for dest_id in kitchen_dests.iter().chain(label_dests.iter()) {
+                sqlx::query!("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)",
                     id, dest_id,
                 )
                 .execute(&self.pool)
@@ -972,11 +956,8 @@ impl CatalogService {
             .execute(&self.pool)
             .await?;
 
-        // Clean up junction tables
-        sqlx::query!("DELETE FROM category_kitchen_print_dest WHERE category_id = ?", id)
-            .execute(&self.pool)
-            .await?;
-        sqlx::query!("DELETE FROM category_label_print_dest WHERE category_id = ?", id)
+        // Clean up junction table
+        sqlx::query!("DELETE FROM category_print_dest WHERE category_id = ?", id)
             .execute(&self.pool)
             .await?;
         sqlx::query!("DELETE FROM category_tag WHERE category_id = ?", id)
@@ -1008,7 +989,7 @@ impl CatalogService {
         .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", category_id)))?;
 
         cat.kitchen_print_destinations = sqlx::query_scalar!(
-            "SELECT print_destination_id FROM category_kitchen_print_dest WHERE category_id = ?",
+            "SELECT cpd.print_destination_id FROM category_print_dest cpd JOIN print_destination pd ON pd.id = cpd.print_destination_id WHERE cpd.category_id = ? AND pd.purpose = 'kitchen'",
             category_id,
         )
         .fetch_all(&self.pool)
@@ -1072,6 +1053,7 @@ impl CatalogService {
                             category_name,
                             tags: p.tags.iter().map(|t| t.id).collect(),
                             tax_rate: p.tax_rate,
+                            specs_count: p.specs.len(),
                         },
                     )
                 })
