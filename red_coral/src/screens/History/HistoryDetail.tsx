@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent } from '@/core/domain/types';
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
-import { useProductStore, useCategoryStore } from '@/core/stores/resources';
+import { useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp } from 'lucide-react';
@@ -49,7 +49,6 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
 export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
-  const products = useProductStore((s) => s.items);
   const categories = useCategoryStore((s) => s.items);
 
   // Convert archived events to OrderEvent format for TimelineList
@@ -58,40 +57,33 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     return order.timeline.map((event, index) => convertArchivedEventToOrderEvent(event, index));
   }, [order?.timeline]);
 
-  // Sort items: category sort_order → paid/comped sink → external_id → name
+  // Sort items: category sort_order → paid/comped sink → name
   const sortedItems = useMemo(() => {
     if (!order) return [];
     const categoryMap = new Map(categories.map(c => [c.id, c]));
-    const productMap = new Map(products.map(p => [p.id, p]));
 
     return [...order.items].sort((a, b) => {
-      const catA = productMap.get(a.id)?.category_id;
-      const catB = productMap.get(b.id)?.category_id;
-      const sortA = catA ? (categoryMap.get(catA)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
-      const sortB = catB ? (categoryMap.get(catB)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      const sortA = a.category_id != null ? (categoryMap.get(a.category_id)?.sort_order ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      const sortB = b.category_id != null ? (categoryMap.get(b.category_id)?.sort_order ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
       if (sortA !== sortB) return sortA - sortB;
 
       const sinkA = a.is_comped ? 2 : a.unpaid_quantity === 0 ? 1 : 0;
       const sinkB = b.is_comped ? 2 : b.unpaid_quantity === 0 ? 1 : 0;
       if (sinkA !== sinkB) return sinkA - sinkB;
 
-      const extA = productMap.get(a.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
-      const extB = productMap.get(b.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
-      if (extA !== extB) return extA - extB;
-
       return a.name.localeCompare(b.name);
     });
-  }, [order, products, categories]);
+  }, [order, categories]);
 
-  // 按 category_name 出现顺序分配颜色（不依赖当前分类表）
+  // 按 category_id 出现顺序分配颜色（不依赖当前分类表）
   const itemColorMap = useMemo(() => {
     if (!order) return new Map<string, number>();
     const map = new Map<string, number>();
-    const seen: string[] = [];
+    const seen: (number | null)[] = [];
     for (const item of order.items) {
-      const catName = item.category_name ?? 'uncategorized';
-      let idx = seen.indexOf(catName);
-      if (idx === -1) { seen.push(catName); idx = seen.length - 1; }
+      const catId = item.category_id;
+      let idx = seen.indexOf(catId);
+      if (idx === -1) { seen.push(catId); idx = seen.length - 1; }
       map.set(item.instance_id, idx % CATEGORY_ACCENT.length);
     }
     return map;
@@ -366,9 +358,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
   return (
     <div>
       <div
-        className={`p-4 flex justify-between items-center cursor-pointer transition-colors select-none ${
-          item.is_comped ? 'bg-emerald-50/60' : 'hover:bg-gray-50/50'
-        }`}
+        className="p-4 flex justify-between items-center cursor-pointer transition-colors select-none hover:bg-gray-50/50"
         onClick={() => onToggle(index)}
       >
         <div className="flex items-center gap-3 flex-1">
@@ -380,10 +370,10 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
-              <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200">
+              <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
                 #{item.instance_id.slice(-5)}
               </span>
-              <span>{item.name}</span>
+              <span className="shrink-0">{item.name}</span>
               {item.spec_name && item.spec_name !== 'default' && (
                 <span className="text-xs text-gray-500">({item.spec_name})</span>
               )}
@@ -479,8 +469,8 @@ interface PaymentRowProps {
 }
 
 const SPLIT_TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ITEM_SPLIT: { label: 'history.payment.split_type.item', bg: 'bg-violet-100', text: 'text-violet-600' },
-  AMOUNT_SPLIT: { label: 'history.payment.split_type.amount', bg: 'bg-amber-100', text: 'text-amber-600' },
+  ITEM_SPLIT: { label: 'history.payment.split_type.item', bg: 'bg-indigo-100', text: 'text-indigo-600' },
+  AMOUNT_SPLIT: { label: 'history.payment.split_type.amount', bg: 'bg-cyan-100', text: 'text-cyan-600' },
   AA_SPLIT: { label: 'history.payment.split_type.aa', bg: 'bg-cyan-100', text: 'text-cyan-600' },
 };
 

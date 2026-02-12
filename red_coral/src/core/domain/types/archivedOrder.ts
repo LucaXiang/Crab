@@ -61,6 +61,7 @@ export interface ArchivedOrderItem {
   instance_id: string;
   name: string;
   spec_name: string | null;
+  category_id: number | null;
   category_name: string | null;
   price: number;
   quantity: number;

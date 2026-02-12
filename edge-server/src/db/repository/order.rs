@@ -44,6 +44,7 @@ pub struct OrderDetailItem {
     pub instance_id: String,
     pub name: String,
     pub spec_name: Option<String>,
+    pub category_id: Option<i64>,
     pub category_name: Option<String>,
     pub price: f64,
     pub quantity: i32,
@@ -156,6 +157,7 @@ struct ItemRow {
     instance_id: String,
     name: String,
     spec_name: Option<String>,
+    category_id: Option<i64>,
     category_name: Option<String>,
     price: f64,
     quantity: i32,
@@ -186,7 +188,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
 
     // 2. Get items
     let item_rows: Vec<ItemRow> = sqlx::query_as::<_, ItemRow>(
-        "SELECT id, instance_id, name, spec_name, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, applied_rules, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
+        "SELECT id, instance_id, name, spec_name, category_id, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, applied_rules, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_id)
     .fetch_all(pool)
@@ -225,6 +227,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
                 instance_id: row.instance_id,
                 name: row.name,
                 spec_name: row.spec_name,
+                category_id: row.category_id,
                 category_name: row.category_name,
                 price: row.price,
                 quantity: row.quantity,

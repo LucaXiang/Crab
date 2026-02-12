@@ -473,13 +473,13 @@ impl OrderArchiveService {
                     quantity, unpaid_quantity, unit_price, line_total, \
                     discount_amount, surcharge_amount, \
                     rule_discount_amount, rule_surcharge_amount, \
-                    tax, tax_rate, category_name, applied_rules, note, is_comped\
+                    tax, tax_rate, category_id, category_name, applied_rules, note, is_comped\
                 ) VALUES (\
                     ?1, ?2, ?3, ?4, ?5, ?6, \
                     ?7, ?8, ?9, ?10, \
                     ?11, ?12, \
                     ?13, ?14, \
-                    ?15, ?16, ?17, ?18, ?19, ?20\
+                    ?15, ?16, ?17, ?18, ?19, ?20, ?21\
                 ) RETURNING id",
             )
             .bind(order_pk)
@@ -498,6 +498,7 @@ impl OrderArchiveService {
             .bind(rule_surcharge_total)
             .bind(item.tax)
             .bind(item.tax_rate)
+            .bind(item.category_id)
             .bind(&item.category_name)
             .bind(
                 if item.applied_rules.is_empty() {
