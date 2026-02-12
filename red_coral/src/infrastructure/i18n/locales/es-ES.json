@@ -661,7 +661,12 @@
     "payment": {
       "details": "Detalle pagos",
       "no_payments": "Sin pagos",
-      "aa_shares_unit": "partes"
+      "aa_shares_unit": "partes",
+      "split_type": {
+        "item": "Por plato",
+        "amount": "Por importe",
+        "aa": "A partes iguales"
+      }
     }
   },
   "statistics": {
@@ -763,7 +768,8 @@
       "authorizer": "Autorizado por",
       "items": "Platos",
       "marketing_group": "Grupo marketing",
-      "reward_strategy": "Estrategia de premio"
+      "reward_strategy": "Estrategia de premio",
+      "type": "Tipo"
     },
     "retail_mode": "Venta",
     "rule_toggled": "Regla cambiada",
@@ -2018,6 +2024,10 @@
     "3005": "Licencia expirada",
     "3006": "Suscripción pausada",
     "3007": "Límite de dispositivos alcanzado, seleccione uno para reemplazar",
+    "3008": "Límite de clientes alcanzado, seleccione uno para reemplazar",
+    "3009": "Credenciales inválidas, verifique usuario y contraseña",
+    "3011": "Sin suscripción activa",
+    "3012": "Error del servidor de autenticación, intente más tarde",
     "4001": "Pedido no existe",
     "4002": "Pedido ya pagado",
     "4003": "Pedido completado",

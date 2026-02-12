@@ -77,7 +77,7 @@ pub enum ErrorCode {
     TenantNotSelected = 3001,
     /// Tenant not found
     TenantNotFound = 3002,
-    /// Activation failed
+    /// Activation failed (generic activation process failure)
     ActivationFailed = 3003,
     /// Certificate is invalid
     CertificateInvalid = 3004,
@@ -87,8 +87,14 @@ pub enum ErrorCode {
     DeviceLimitReached = 3007,
     /// Client limit reached (quota full, need to replace an existing client)
     ClientLimitReached = 3008,
+    /// Tenant credentials invalid (wrong username/password)
+    TenantCredentialsInvalid = 3009,
     /// Feature not available in current subscription plan
     FeatureNotAvailable = 3010,
+    /// No active subscription for tenant
+    TenantNoSubscription = 3011,
+    /// Auth server internal error
+    AuthServerError = 3012,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -278,7 +284,10 @@ impl ErrorCode {
             ErrorCode::LicenseExpired => "License has expired",
             ErrorCode::DeviceLimitReached => "Device limit reached",
             ErrorCode::ClientLimitReached => "Client limit reached",
+            ErrorCode::TenantCredentialsInvalid => "Invalid tenant username or password",
             ErrorCode::FeatureNotAvailable => "Feature not available in current subscription plan",
+            ErrorCode::TenantNoSubscription => "No active subscription",
+            ErrorCode::AuthServerError => "Auth server internal error",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -418,7 +427,10 @@ impl TryFrom<u16> for ErrorCode {
             3005 => Ok(ErrorCode::LicenseExpired),
             3007 => Ok(ErrorCode::DeviceLimitReached),
             3008 => Ok(ErrorCode::ClientLimitReached),
+            3009 => Ok(ErrorCode::TenantCredentialsInvalid),
             3010 => Ok(ErrorCode::FeatureNotAvailable),
+            3011 => Ok(ErrorCode::TenantNoSubscription),
+            3012 => Ok(ErrorCode::AuthServerError),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
@@ -548,6 +560,9 @@ mod tests {
         assert_eq!(ErrorCode::LicenseExpired.code(), 3005);
         assert_eq!(ErrorCode::DeviceLimitReached.code(), 3007);
         assert_eq!(ErrorCode::ClientLimitReached.code(), 3008);
+        assert_eq!(ErrorCode::TenantCredentialsInvalid.code(), 3009);
+        assert_eq!(ErrorCode::TenantNoSubscription.code(), 3011);
+        assert_eq!(ErrorCode::AuthServerError.code(), 3012);
 
         // Order
         assert_eq!(ErrorCode::OrderNotFound.code(), 4001);

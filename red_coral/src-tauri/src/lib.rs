@@ -168,13 +168,10 @@ pub async fn run() {
             commands::update_server_config,
             commands::update_client_config,
             // Tenant commands
-            commands::list_tenants,
             commands::verify_tenant,
             commands::activate_server_tenant,
             commands::activate_client_tenant,
             commands::deactivate_current_mode,
-            commands::switch_tenant,
-            commands::remove_tenant,
             commands::exit_tenant,
             commands::get_current_tenant,
             commands::check_subscription,

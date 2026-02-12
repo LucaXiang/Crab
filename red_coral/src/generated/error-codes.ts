@@ -37,6 +37,10 @@ export const ErrorCode = {
   SubscriptionBlocked: 3006,
   DeviceLimitReached: 3007,
   ClientLimitReached: 3008,
+  TenantCredentialsInvalid: 3009,
+  FeatureNotAvailable: 3010,
+  TenantNoSubscription: 3011,
+  AuthServerError: 3012,
 
   // 4xxx: Order
   OrderNotFound: 4001,

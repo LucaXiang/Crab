@@ -20,7 +20,7 @@ pub use bridge::{
 };
 pub use response::{
     ApiResponse, AppConfigResponse, AuthData, DeleteData, RolePermission,
-    ActivationResultData, TenantListData,
+    ActivationResultData,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};
 pub use paths::TenantPaths;

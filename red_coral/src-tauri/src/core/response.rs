@@ -119,6 +119,9 @@ fn tenant_error_to_code(err: &super::tenant_manager::TenantError) -> ErrorCode {
         TenantError::NoTenantSelected => ErrorCode::TenantNotSelected,
         TenantError::Certificate(_) => ErrorCode::CertificateInvalid,
         TenantError::Network(_) => ErrorCode::NetworkError,
+        TenantError::CredentialsInvalid(_) => ErrorCode::TenantCredentialsInvalid,
+        TenantError::NoSubscription(_) => ErrorCode::TenantNoSubscription,
+        TenantError::AuthServerError(_) => ErrorCode::AuthServerError,
         TenantError::AuthFailed(_) => ErrorCode::ActivationFailed,
         TenantError::DeviceLimitReached(_) => ErrorCode::DeviceLimitReached,
         TenantError::ClientLimitReached(_) => ErrorCode::ClientLimitReached,
@@ -241,12 +244,6 @@ pub struct ActivationResultData {
     /// Quota 信息 (设备数已满时返回)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quota_info: Option<shared::activation::QuotaInfo>,
-}
-
-/// Tenants 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct TenantListData {
-    pub tenants: Vec<super::TenantInfo>,
 }
 
 // ============ App Config ============

@@ -170,7 +170,6 @@ interface BridgeStore {
   // State
   appState: AppState | null;
   modeInfo: ModeInfo | null;
-  tenants: TenantInfo[];
   currentSession: EmployeeSession | null;
   isFirstRun: boolean;
   isLoading: boolean;
@@ -192,12 +191,9 @@ interface BridgeStore {
 
   // Tenant Actions
   verifyTenant: (username: string, password: string) => Promise<TenantVerifyData>;
-  fetchTenants: () => Promise<void>;
   activateServerTenant: (username: string, password: string, replaceEntityId?: string) => Promise<ActivationResult>;
   activateClientTenant: (username: string, password: string, replaceEntityId?: string) => Promise<ActivationResult>;
   deactivateCurrentMode: (username: string, password: string) => Promise<void>;
-  switchTenant: (tenantId: string) => Promise<void>;
-  removeTenant: (tenantId: string) => Promise<void>;
   exitTenant: () => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
 
@@ -214,7 +210,6 @@ export const useBridgeStore = create<BridgeStore>()(
       // Initial State
       appState: null as AppState | null,
       modeInfo: null as ModeInfo | null,
-      tenants: [] as TenantInfo[],
       currentSession: null as EmployeeSession | null,
       isFirstRun: true,
       isLoading: false,
@@ -329,7 +324,6 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true, error: null });
           const data = await invokeApi<TenantVerifyData>('verify_tenant', { username, password });
-          await get().fetchTenants();
           await get().fetchAppState();
           return data;
         } catch (error: unknown) {
@@ -337,16 +331,6 @@ export const useBridgeStore = create<BridgeStore>()(
           throw error;
         } finally {
           set({ isLoading: false });
-        }
-      },
-
-      fetchTenants: async () => {
-        try {
-          // TenantListData wrapper
-          const data = await invokeApi<{ tenants: TenantInfo[] }>('list_tenants');
-          set({ tenants: data.tenants });
-        } catch (error) {
-          logger.error('Failed to fetch tenants', error);
         }
       },
 
@@ -358,7 +342,6 @@ export const useBridgeStore = create<BridgeStore>()(
             password,
             replaceEntityId: replaceEntityId ?? null,
           });
-          await get().fetchTenants();
           await get().fetchAppState();
           return result;
         } catch (error: unknown) {
@@ -377,7 +360,6 @@ export const useBridgeStore = create<BridgeStore>()(
             password,
             replaceEntityId: replaceEntityId ?? null,
           });
-          await get().fetchTenants();
           await get().fetchAppState();
           return result;
         } catch (error: unknown) {
@@ -403,29 +385,6 @@ export const useBridgeStore = create<BridgeStore>()(
           throw error;
         } finally {
           set({ isLoading: false });
-        }
-      },
-
-      switchTenant: async (tenantId) => {
-        try {
-          set({ isLoading: true });
-          await invokeApi('switch_tenant', { tenantId });
-          await get().fetchAppState();
-        } catch (error: unknown) {
-          set({ error: error instanceof Error ? error.message : 'Operation failed' });
-          throw error;
-        } finally {
-          set({ isLoading: false });
-        }
-      },
-
-      removeTenant: async (tenantId) => {
-        try {
-          await invokeApi('remove_tenant', { tenantId });
-          await get().fetchTenants();
-        } catch (error: unknown) {
-          set({ error: error instanceof Error ? error.message : 'Operation failed' });
-          throw error;
         }
       },
 
@@ -526,7 +485,6 @@ export const useBridgeStore = create<BridgeStore>()(
 export const useAppState = () => useBridgeStore((state) => state.appState);
 export const useIsFirstRun = () => useBridgeStore((state) => state.isFirstRun);
 export const useModeInfo = () => useBridgeStore((state) => state.modeInfo);
-export const useTenants = () => useBridgeStore((state) => state.tenants);
 export const useCurrentSession = () => useBridgeStore((state) => state.currentSession);
 export const useBridgeLoading = () => useBridgeStore((state) => state.isLoading);
 export const useBridgeError = () => useBridgeStore((state) => state.error);

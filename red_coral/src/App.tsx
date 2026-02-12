@@ -43,7 +43,7 @@ const KEYBOARD_FOCUSOUT_DELAY_MS = 100;
  * 这样无论用户刷新哪个页面，session 都会被正确恢复。
  */
 const useAppInitialization = () => {
-  const { fetchTenants, fetchAppState, fetchCurrentSession } = useBridgeStore();
+  const { fetchAppState, fetchCurrentSession } = useBridgeStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,8 +83,7 @@ const useAppInitialization = () => {
         }
       }
 
-      // 2. 后端就绪，获取租户列表和应用状态
-      await fetchTenants();
+      // 2. 后端就绪，获取应用状态
       await fetchAppState();
 
       // 3. 尝试恢复缓存的员工会话 (从后端获取)

@@ -3,20 +3,8 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::core::response::{ActivationResultData, ApiResponse, ErrorCode, TenantListData};
+use crate::core::response::{ActivationResultData, ApiResponse, ErrorCode};
 use crate::core::{AppState, ClientBridge};
-use crate::core::DeleteData;
-
-/// 获取已激活的租户列表
-#[tauri::command]
-pub async fn list_tenants(
-    bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<TenantListData>, String> {
-    let tenant_manager = bridge.tenant_manager().read().await;
-    Ok(ApiResponse::success(TenantListData {
-        tenants: tenant_manager.list_tenants(),
-    }))
-}
 
 /// 激活 Server 模式设备
 ///
@@ -142,41 +130,6 @@ pub async fn deactivate_current_mode(
         Ok(()) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::InternalError,
-            e.to_string(),
-        )),
-    }
-}
-
-/// 切换当前租户
-#[tauri::command]
-pub async fn switch_tenant(
-    bridge: State<'_, Arc<ClientBridge>>,
-    tenant_id: String,
-) -> Result<ApiResponse<()>, String> {
-
-    // 使用 ClientBridge 的 switch_tenant 方法
-    // 它会自动更新 TenantManager 和 Config
-    match bridge.switch_tenant(&tenant_id).await {
-        Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::TenantNotFound,
-            e.to_string(),
-        )),
-    }
-}
-
-/// 移除租户
-#[tauri::command]
-pub async fn remove_tenant(
-    bridge: State<'_, Arc<ClientBridge>>,
-    tenant_id: String,
-) -> Result<ApiResponse<DeleteData>, String> {
-    let mut tenant_manager = bridge.tenant_manager().write().await;
-
-    match tenant_manager.remove_tenant(&tenant_id) {
-        Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::TenantNotFound,
             e.to_string(),
         )),
     }

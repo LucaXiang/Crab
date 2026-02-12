@@ -40,6 +40,7 @@ impl ErrorCode {
             // 401 Unauthorized
             Self::NotAuthenticated
             | Self::InvalidCredentials
+            | Self::TenantCredentialsInvalid
             | Self::TokenExpired
             | Self::TokenInvalid
             | Self::SessionExpired
@@ -59,6 +60,7 @@ impl ErrorCode {
             | Self::LicenseExpired
             | Self::DeviceLimitReached
             | Self::ClientLimitReached
+            | Self::TenantNoSubscription
             | Self::FeatureNotAvailable => StatusCode::FORBIDDEN,
 
             // 402 Payment Required
@@ -72,6 +74,7 @@ impl ErrorCode {
             Self::InternalError
             | Self::DatabaseError
             | Self::ConfigError
+            | Self::AuthServerError
             | Self::BridgeNotInitialized
             | Self::BridgeNotConnected
             | Self::BridgeConnectionFailed

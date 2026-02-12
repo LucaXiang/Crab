@@ -40,7 +40,16 @@ pub enum TenantError {
     #[error("Network error: {0}")]
     Network(String),
 
-    #[error("Authentication failed: {0}")]
+    #[error("Invalid credentials: {0}")]
+    CredentialsInvalid(String),
+
+    #[error("No active subscription: {0}")]
+    NoSubscription(String),
+
+    #[error("Auth server error: {0}")]
+    AuthServerError(String),
+
+    #[error("Activation failed: {0}")]
     AuthFailed(String),
 
     #[error("Device limit reached")]
@@ -51,6 +60,17 @@ pub enum TenantError {
 
     #[error("Offline login not available for user: {0}")]
     OfflineNotAvailable(String),
+}
+
+/// Classify auth server error response into specific TenantError variant
+fn classify_auth_error(error_msg: &str) -> TenantError {
+    match error_msg {
+        "Invalid credentials" => TenantError::CredentialsInvalid(error_msg.to_string()),
+        "No active subscription" => TenantError::NoSubscription(error_msg.to_string()),
+        "Internal error" => TenantError::AuthServerError(error_msg.to_string()),
+        s if s.starts_with("Subscription ") => TenantError::NoSubscription(s.to_string()),
+        _ => TenantError::AuthFailed(error_msg.to_string()),
+    }
 }
 
 /// 使用 TenantPaths 构建 mTLS HTTP 客户端
@@ -278,7 +298,7 @@ impl TenantManager {
                 }
             }
             let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(TenantError::AuthFailed(msg.to_string()));
+            return Err(classify_auth_error(msg));
         }
 
         let data = resp_data
@@ -401,7 +421,7 @@ impl TenantManager {
                 }
             }
             let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(TenantError::AuthFailed(msg.to_string()));
+            return Err(classify_auth_error(msg));
         }
 
         let data = resp_data
@@ -488,7 +508,7 @@ impl TenantManager {
 
         if !resp_data.success {
             let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(TenantError::AuthFailed(msg.to_string()));
+            return Err(classify_auth_error(msg));
         }
 
         resp_data
@@ -531,7 +551,7 @@ impl TenantManager {
 
         if !resp_data.success {
             let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(TenantError::AuthFailed(msg.to_string()));
+            return Err(classify_auth_error(msg));
         }
 
         Ok(())
@@ -572,7 +592,7 @@ impl TenantManager {
 
         if !resp_data.success {
             let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(TenantError::AuthFailed(msg.to_string()));
+            return Err(classify_auth_error(msg));
         }
 
         Ok(())
