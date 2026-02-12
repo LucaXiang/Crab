@@ -53,6 +53,14 @@ const TIMESTAMP_FIELDS = new Set([
   'closed_at',
   'valid_from',
   'valid_until',
+  'start_time',
+  'end_time',
+  'last_active_at',
+  'last_activity_timestamp',
+  'generated_at',
+  'resolved_at',
+  'last_sync_time',
+  'last_stamp_at',
 ]);
 
 /** 货币字段 */
@@ -84,6 +92,7 @@ const BOOLEAN_FIELDS = new Set([
   'is_exclusive',
   'is_kitchen_print_enabled',
   'is_label_print_enabled',
+  'forced',
 ]);
 
 /** 枚举字段 */
@@ -94,6 +103,10 @@ const ENUM_FIELDS = new Set([
   'connection',
   'protocol',
   'purpose',
+  'kind',
+  'response',
+  'source',
+  'reason',
 ]);
 
 /**
