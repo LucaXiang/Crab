@@ -14,7 +14,7 @@ import {
   deleteDiscountRule,
   toggleStampActivity,
 } from './mutations';
-import { GroupListPanel, GroupDetailPanel, StampEditModal } from './components';
+import { GroupListPanel, GroupDetailPanel, StampEditModal, DiscountRuleEditModal } from './components';
 import { DiscountRuleWizard } from './DiscountRuleWizard';
 import { StampActivityWizard } from './StampActivityWizard';
 import { toast } from '@/presentation/components/Toast';
@@ -277,13 +277,21 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
         />
       )}
 
-      {selectedGroupId && (
+      {selectedGroupId && showRuleForm && !editingRule && (
         <DiscountRuleWizard
           isOpen={showRuleForm}
           groupId={selectedGroupId}
-          editingRule={editingRule}
-          onClose={() => { setShowRuleForm(false); setEditingRule(null); }}
-          onSuccess={() => { setShowRuleForm(false); setEditingRule(null); refreshDetail(); }}
+          onClose={() => { setShowRuleForm(false); }}
+          onSuccess={() => { setShowRuleForm(false); refreshDetail(); }}
+        />
+      )}
+
+      {selectedGroupId && editingRule && (
+        <DiscountRuleEditModal
+          rule={editingRule}
+          groupId={selectedGroupId}
+          onClose={() => { setEditingRule(null); }}
+          onSuccess={() => { setEditingRule(null); refreshDetail(); }}
         />
       )}
 
