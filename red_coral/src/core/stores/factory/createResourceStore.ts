@@ -269,7 +269,15 @@ export function createCrudResourceStore<
     // CRUD 操作
     create: async (data) => {
       const newItem = await crudOps.create(data);
-      set((state) => ({ items: [...state.items, newItem] }));
+      // 去重：sync 事件可能先于 API 响应到达，已经添加过
+      set((state) => {
+        const exists = state.items.some((item) => item.id === newItem.id);
+        return {
+          items: exists
+            ? state.items.map((item) => (item.id === newItem.id ? newItem : item))
+            : [...state.items, newItem],
+        };
+      });
       return newItem;
     },
 

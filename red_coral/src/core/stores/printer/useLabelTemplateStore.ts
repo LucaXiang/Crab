@@ -126,10 +126,16 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
       const createData = toCreatePayload(templateData);
       const rawCreated = await getApi().createLabelTemplate(createData);
       const created = mapApiToFrontend(rawCreated as unknown as Record<string, unknown>);
-      set((state) => ({
-        templates: [...state.templates, created],
-        isLoading: false,
-      }));
+      // 去重：sync 事件可能先于 API 响应到达，已经添加过
+      set((state) => {
+        const exists = state.templates.some((t) => t.id === created.id);
+        return {
+          templates: exists
+            ? state.templates.map((t) => (t.id === created.id ? created : t))
+            : [...state.templates, created],
+          isLoading: false,
+        };
+      });
       return created;
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to create label template';
@@ -243,11 +249,9 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     const { templates } = get();
 
     if (templates.length === 0) {
-      const defaultData: Partial<LabelTemplate> = {
-        ...DEFAULT_LABEL_TEMPLATES[0],
-        is_default: false,
-      };
-      await get().createTemplate(defaultData);
+      for (const preset of DEFAULT_LABEL_TEMPLATES) {
+        await get().createTemplate(preset);
+      }
     }
   },
 }));

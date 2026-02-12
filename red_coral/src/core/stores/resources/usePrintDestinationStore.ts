@@ -120,11 +120,16 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     set({ isLoading: true, error: null });
     try {
       const newDestination = await getApi().createPrintDestination(data);
-      // 直接更新 items，不依赖 fetchAll（避免 isLoading 互锁）
-      set((state) => ({
-        items: [...state.items, newDestination],
-        isLoading: false,
-      }));
+      // 去重：sync 事件可能先于 API 响应到达，已经添加过
+      set((state) => {
+        const exists = state.items.some((item) => item.id === newDestination.id);
+        return {
+          items: exists
+            ? state.items.map((item) => (item.id === newDestination.id ? newDestination : item))
+            : [...state.items, newDestination],
+          isLoading: false,
+        };
+      });
       return newDestination;
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to create print destination';
