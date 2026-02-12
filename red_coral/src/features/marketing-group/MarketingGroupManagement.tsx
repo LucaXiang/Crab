@@ -89,9 +89,14 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
         }));
       } else {
         const created = await createMarketingGroup(data);
-        useMarketingGroupStore.setState((s) => ({
-          items: [...s.items, created],
-        }));
+        useMarketingGroupStore.setState((s) => {
+          const exists = s.items.some((g) => g.id === created.id);
+          return {
+            items: exists
+              ? s.items.map((g) => (g.id === created.id ? created : g))
+              : [...s.items, created],
+          };
+        });
         setSelectedGroupId(created.id);
       }
       toast.success(t('common.message.save_success'));

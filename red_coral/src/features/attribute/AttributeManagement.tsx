@@ -200,9 +200,9 @@ export const AttributeManagement: React.FC = React.memo(() => {
     }
   };
 
-  // Check if attribute has special features
+  // Check if attribute has special features (use attr.options directly, not lazy-loaded store)
   const getAttributeFeatures = (attr: Attribute) => {
-    const options = allOptions.get(attr.id) || [];
+    const options = attr.options ?? [];
     const hasPrice = options.some(o => o.price_modifier !== 0);
     const hasQuantity = options.some(o => o.enable_quantity);
     return { hasPrice, hasQuantity };
@@ -333,13 +333,19 @@ export const AttributeManagement: React.FC = React.memo(() => {
                           {selectedAttribute.show_on_receipt && (
                             <span className="flex items-center gap-1 text-blue-600">
                               <ReceiptText size={12} />
-                              {selectedAttribute.receipt_name || t('settings.attribute.show_on_receipt')}
+                              {t('settings.attribute.show_on_receipt')}
+                              {selectedAttribute.receipt_name && (
+                                <span className="text-gray-400">({selectedAttribute.receipt_name})</span>
+                              )}
                             </span>
                           )}
                           {selectedAttribute.show_on_kitchen_print && (
                             <span className="flex items-center gap-1 text-purple-600">
                               <ChefHat size={12} />
-                              {selectedAttribute.kitchen_print_name || t('settings.attribute.show_on_kitchen_print')}
+                              {t('settings.attribute.show_on_kitchen_print')}
+                              {selectedAttribute.kitchen_print_name && (
+                                <span className="text-gray-400">({selectedAttribute.kitchen_print_name})</span>
+                              )}
                             </span>
                           )}
                         </div>
