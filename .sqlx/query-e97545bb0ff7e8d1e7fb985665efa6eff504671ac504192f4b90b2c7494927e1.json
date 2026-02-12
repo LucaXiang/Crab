@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE member SET total_spent = total_spent + ?1, points_balance = points_balance + ?2, updated_at = ?3 WHERE id = ?4 AND is_active = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "e97545bb0ff7e8d1e7fb985665efa6eff504671ac504192f4b90b2c7494927e1"
+}

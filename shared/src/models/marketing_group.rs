@@ -13,8 +13,8 @@ pub struct MarketingGroup {
     pub display_name: String,
     pub description: Option<String>,
     pub sort_order: i32,
+    /// 积分倍率: 消费金额 × rate = 积分 (null = 不累积积分)
     pub points_earn_rate: Option<f64>,
-    pub points_per_unit: Option<f64>,
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
@@ -28,7 +28,6 @@ pub struct MarketingGroupCreate {
     pub description: Option<String>,
     pub sort_order: Option<i32>,
     pub points_earn_rate: Option<f64>,
-    pub points_per_unit: Option<f64>,
 }
 
 /// Update marketing group payload
@@ -39,7 +38,6 @@ pub struct MarketingGroupUpdate {
     pub description: Option<String>,
     pub sort_order: Option<i32>,
     pub points_earn_rate: Option<f64>,
-    pub points_per_unit: Option<f64>,
     pub is_active: Option<bool>,
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE member SET name = COALESCE(?1, name), phone = COALESCE(?2, phone), card_number = COALESCE(?3, card_number), marketing_group_id = COALESCE(?4, marketing_group_id), birthday = COALESCE(?5, birthday), email = COALESCE(?6, email), notes = COALESCE(?7, notes), is_active = COALESCE(?8, is_active), updated_at = ?9 WHERE id = ?10",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "5dc82d040f2ad44dcbdff93e0e5cab1e496d33d6d9506469fe7abaf156034429"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE marketing_group SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), sort_order = COALESCE(?4, sort_order), points_earn_rate = COALESCE(?5, points_earn_rate), is_active = COALESCE(?6, is_active), updated_at = ?7 WHERE id = ?8",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "3f84cdff8a2a708cd80c7b4323f2873d2b2c67e47b8d067cf1af8b598b0319a0"
+}

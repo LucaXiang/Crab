@@ -441,7 +441,6 @@ export interface MarketingGroup {
   description: string | null;
   sort_order: number;
   points_earn_rate: number | null;
-  points_per_unit: number | null;
   is_active: boolean;
   created_at: number;
   updated_at: number;
@@ -453,7 +452,6 @@ export interface MarketingGroupCreate {
   description?: string | null;
   sort_order?: number;
   points_earn_rate?: number | null;
-  points_per_unit?: number | null;
 }
 
 export interface MarketingGroupUpdate {
@@ -462,7 +460,6 @@ export interface MarketingGroupUpdate {
   description?: string | null;
   sort_order?: number;
   points_earn_rate?: number | null;
-  points_per_unit?: number | null;
   is_active?: boolean;
 }
 
@@ -516,7 +513,9 @@ export interface Member {
   card_number: string | null;
   marketing_group_id: number;
   birthday: string | null;
+  email: string | null;
   points_balance: number;
+  total_spent: number;
   notes: string | null;
   is_active: boolean;
   created_at: number;
@@ -529,6 +528,7 @@ export interface MemberCreate {
   card_number?: string | null;
   marketing_group_id: number;
   birthday?: string | null;
+  email?: string | null;
   notes?: string | null;
 }
 
@@ -538,6 +538,7 @@ export interface MemberUpdate {
   card_number?: string | null;
   marketing_group_id?: number;
   birthday?: string | null;
+  email?: string | null;
   notes?: string | null;
   is_active?: boolean;
 }

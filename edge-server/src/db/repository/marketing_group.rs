@@ -12,7 +12,7 @@ use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MarketingGroup>> {
     let rows = sqlx::query_as::<_, MarketingGroup>(
-        "SELECT id, name, display_name, description, sort_order, points_earn_rate, points_per_unit, is_active, created_at, updated_at FROM marketing_group WHERE is_active = 1 ORDER BY sort_order",
+        "SELECT id, name, display_name, description, sort_order, points_earn_rate, is_active, created_at, updated_at FROM marketing_group WHERE is_active = 1 ORDER BY sort_order",
     )
     .fetch_all(pool)
     .await?;
@@ -21,7 +21,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MarketingGroup>> {
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<MarketingGroup>> {
     let row = sqlx::query_as::<_, MarketingGroup>(
-        "SELECT id, name, display_name, description, sort_order, points_earn_rate, points_per_unit, is_active, created_at, updated_at FROM marketing_group WHERE id = ?",
+        "SELECT id, name, display_name, description, sort_order, points_earn_rate, is_active, created_at, updated_at FROM marketing_group WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -33,13 +33,12 @@ pub async fn create(pool: &SqlitePool, data: MarketingGroupCreate) -> RepoResult
     let now = shared::util::now_millis();
     let sort_order = data.sort_order.unwrap_or(0);
     let id = sqlx::query_scalar!(
-        r#"INSERT INTO marketing_group (name, display_name, description, sort_order, points_earn_rate, points_per_unit, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?7) RETURNING id as "id!""#,
+        r#"INSERT INTO marketing_group (name, display_name, description, sort_order, points_earn_rate, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?6) RETURNING id as "id!""#,
         data.name,
         data.display_name,
         data.description,
         sort_order,
         data.points_earn_rate,
-        data.points_per_unit,
         now
     )
     .fetch_one(pool)
@@ -56,13 +55,12 @@ pub async fn update(
 ) -> RepoResult<MarketingGroup> {
     let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE marketing_group SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), sort_order = COALESCE(?4, sort_order), points_earn_rate = COALESCE(?5, points_earn_rate), points_per_unit = COALESCE(?6, points_per_unit), is_active = COALESCE(?7, is_active), updated_at = ?8 WHERE id = ?9",
+        "UPDATE marketing_group SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), sort_order = COALESCE(?4, sort_order), points_earn_rate = COALESCE(?5, points_earn_rate), is_active = COALESCE(?6, is_active), updated_at = ?7 WHERE id = ?8",
         data.name,
         data.display_name,
         data.description,
         data.sort_order,
         data.points_earn_rate,
-        data.points_per_unit,
         data.is_active,
         now,
         id

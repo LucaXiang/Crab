@@ -1133,8 +1133,10 @@
         "name": "Nombre",
         "phone": "Teléfono",
         "card_number": "N.º tarjeta",
+        "email": "Correo",
         "group": "Grupo marketing",
         "points": "Puntos",
+        "total_spent": "Total gastado",
         "birthday": "Cumpleaños",
         "notes": "Notas"
       }

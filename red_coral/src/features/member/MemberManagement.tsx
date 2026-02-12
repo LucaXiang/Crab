@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { UserCheck, Plus, X, Phone, Users } from 'lucide-react';
+import { UserCheck, Plus, X, Phone, Users, CreditCard, Star, Calendar, Mail, Wallet } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useMemberStore } from './store';
 import { useMarketingGroupStore } from '@/features/marketing-group/store';
@@ -12,6 +12,7 @@ import type { MemberWithGroup, MemberCreate, MemberUpdate } from '@/core/domain/
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
 import { FormField, FormSection, SelectField, inputClass } from '@/shared/components/FormField';
+import { formatCurrency } from '@/utils/currency';
 
 export const MemberManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
@@ -86,25 +87,46 @@ export const MemberManagement: React.FC = React.memo(() => {
     {
       key: 'name',
       header: t('settings.member.field.name'),
-      render: (m) => (
-        <div>
-          <div className="font-medium text-gray-800">{m.name}</div>
-          {m.card_number && <div className="text-xs text-gray-400">{m.card_number}</div>}
-        </div>
-      ),
+      render: (m) => {
+        const initial = m.name.charAt(0).toUpperCase();
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
+              {initial}
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-gray-900 truncate">{m.name}</div>
+              {m.card_number && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <CreditCard size={10} className="text-gray-400 shrink-0" />
+                  <span className="text-[0.6875rem] text-gray-400 font-mono">{m.card_number}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: 'phone',
       header: t('settings.member.field.phone'),
-      width: '140px',
-      render: (m) => <span className="text-sm text-gray-600">{m.phone || '-'}</span>,
+      width: '150px',
+      render: (m) => m.phone ? (
+        <div className="flex items-center gap-1.5">
+          <Phone size={13} className="text-gray-400 shrink-0" />
+          <span className="text-sm text-gray-700 font-medium">{m.phone}</span>
+        </div>
+      ) : (
+        <span className="text-sm text-gray-300">-</span>
+      ),
     },
     {
       key: 'group',
       header: t('settings.member.field.group'),
       width: '160px',
       render: (m) => (
-        <span className="text-sm bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">
+        <span className="inline-flex items-center gap-1 text-xs bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full font-semibold">
+          <Users size={12} className="shrink-0" />
           {m.marketing_group_name}
         </span>
       ),
@@ -114,7 +136,23 @@ export const MemberManagement: React.FC = React.memo(() => {
       header: t('settings.member.field.points'),
       width: '100px',
       align: 'center',
-      render: (m) => <span className="text-sm font-mono text-gray-600">{m.points_balance}</span>,
+      render: (m) => (
+        <div className="flex items-center justify-center gap-1">
+          <Star size={13} className="text-amber-400 shrink-0" />
+          <span className="text-sm font-bold text-gray-700 tabular-nums">{m.points_balance}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'total_spent',
+      header: t('settings.member.field.total_spent'),
+      width: '120px',
+      align: 'right',
+      render: (m) => (
+        <span className="text-sm font-semibold text-gray-700 tabular-nums">
+          {formatCurrency(m.total_spent)}
+        </span>
+      ),
     },
     {
       key: 'status',
@@ -122,9 +160,10 @@ export const MemberManagement: React.FC = React.memo(() => {
       width: '80px',
       align: 'center',
       render: (m) => (
-        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-          m.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${
+          m.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
         }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${m.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
           {m.is_active ? t('common.status.active') : t('common.status.inactive')}
         </span>
       ),
@@ -219,6 +258,7 @@ const MemberFormModal: React.FC<{
   const [name, setName] = useState(member?.name || '');
   const [phone, setPhone] = useState(member?.phone || '');
   const [cardNumber, setCardNumber] = useState(member?.card_number || '');
+  const [email, setEmail] = useState(member?.email || '');
   const [groupId, setGroupId] = useState<number>(member?.marketing_group_id || groups[0]?.id || 0);
   const [birthday, setBirthday] = useState(member?.birthday || '');
   const [notes, setNotes] = useState(member?.notes || '');
@@ -267,6 +307,15 @@ const MemberFormModal: React.FC<{
                 className={inputClass}
               />
             </FormField>
+
+            <FormField label={t('settings.member.field.email')}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
           </FormSection>
 
           <FormSection title={t('settings.member.section.membership')} icon={Users}>
@@ -311,6 +360,7 @@ const MemberFormModal: React.FC<{
               name,
               phone: phone || null,
               card_number: cardNumber || null,
+              email: email || null,
               marketing_group_id: groupId,
               birthday: birthday || null,
               notes: notes || null,

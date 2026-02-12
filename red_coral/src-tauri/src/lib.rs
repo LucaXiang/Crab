@@ -235,6 +235,7 @@ pub async fn run() {
             commands::delete_table,
             // Order commands (Query)
             commands::fetch_order_list,
+            commands::fetch_member_order_history,
             commands::fetch_order_detail,
             // Order Event Sourcing commands
             commands::order_execute_command,

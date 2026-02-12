@@ -97,6 +97,35 @@ pub async fn fetch_order_list(
     }
 }
 
+/// Fetch member spending history (archived orders for a specific member)
+#[tauri::command]
+pub async fn fetch_member_order_history(
+    bridge: State<'_, Arc<ClientBridge>>,
+    member_id: i64,
+    page: Option<i32>,
+    limit: Option<i32>,
+) -> Result<ApiResponse<FetchOrderListSummaryResponse>, String> {
+    let limit = limit.unwrap_or(50);
+    let page_num = page.unwrap_or(1).max(1);
+    let offset = (page_num - 1) * limit;
+
+    let query = format!(
+        "/api/orders/member/{}/history?limit={}&offset={}",
+        member_id, limit, offset
+    );
+
+    match bridge.get::<OrderListApiResponse>(&query).await {
+        Ok(response) => {
+            Ok(ApiResponse::success(FetchOrderListSummaryResponse {
+                orders: response.orders,
+                total: response.total,
+                page: response.page,
+            }))
+        }
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+    }
+}
+
 /// Fetch archived order detail by ID (graph model)
 /// Uses serde_json::Value to transparently pass through all fields from edge-server
 #[tauri::command]

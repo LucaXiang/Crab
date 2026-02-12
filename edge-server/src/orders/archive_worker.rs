@@ -11,7 +11,7 @@ use super::money::{to_decimal, to_f64};
 use super::storage::{OrderStorage, PendingArchive};
 use crate::audit::{AuditAction, AuditService};
 use crate::core::state::ServerState;
-use crate::db::repository::{payment, shift};
+use crate::db::repository::{marketing_group, member, payment, shift};
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
 use sqlx::SqlitePool;
@@ -203,10 +203,13 @@ impl ArchiveWorker {
                 // 4. Write payment records to independent payment table
                 self.write_payment_records(&snapshot, &events).await;
 
-                // 5. Write audit log for terminal event
+                // 5. Update member stats (points + total_spent) for completed orders
+                self.update_member_stats(&snapshot).await;
+
+                // 6. Write audit log for terminal event
                 self.write_order_audit(&snapshot, &events).await;
 
-                // 6. Cleanup redb (synchronous)
+                // 7. Cleanup redb (synchronous)
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
@@ -394,6 +397,84 @@ impl ArchiveWorker {
                 target,
             )
             .await;
+    }
+
+    /// Update member stats (total_spent + points_balance) for completed orders with a linked member
+    ///
+    /// Uses rust_decimal for precise calculation: points = floor(paid_amount × points_earn_rate)
+    async fn update_member_stats(&self, snapshot: &OrderSnapshot) {
+        use shared::order::OrderStatus;
+
+        // Only completed orders contribute to member stats
+        if snapshot.status != OrderStatus::Completed {
+            return;
+        }
+
+        let Some(member_id) = snapshot.member_id else {
+            return;
+        };
+
+        let Some(mg_id) = snapshot.marketing_group_id else {
+            return;
+        };
+
+        let spent_amount = snapshot.paid_amount;
+        if spent_amount <= 0.0 {
+            return;
+        }
+
+        // Load marketing group to get points_earn_rate
+        let points_earned = match marketing_group::find_by_id(&self.pool, mg_id).await {
+            Ok(Some(mg)) => {
+                if let Some(rate) = mg.points_earn_rate {
+                    let d_spent = to_decimal(spent_amount);
+                    let d_rate = to_decimal(rate);
+                    let d_points = (d_spent * d_rate).floor();
+                    d_points.to_i64().unwrap_or(0)
+                } else {
+                    0
+                }
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    order_id = %snapshot.order_id,
+                    marketing_group_id = mg_id,
+                    "Marketing group not found for member stats update"
+                );
+                0
+            }
+            Err(e) => {
+                tracing::warn!(
+                    order_id = %snapshot.order_id,
+                    error = %e,
+                    "Failed to load marketing group for points calculation"
+                );
+                0
+            }
+        };
+
+        // Atomically update member stats (total_spent and points_balance)
+        let spent_f64 = to_f64(to_decimal(spent_amount));
+        match member::update_member_stats(&self.pool, member_id, spent_f64, points_earned).await {
+            Ok(()) => {
+                tracing::info!(
+                    order_id = %snapshot.order_id,
+                    member_id = member_id,
+                    spent = spent_f64,
+                    points = points_earned,
+                    "Member stats updated"
+                );
+            }
+            Err(e) => {
+                // Non-fatal: member stats update is a projection
+                tracing::warn!(
+                    order_id = %snapshot.order_id,
+                    member_id = member_id,
+                    error = %e,
+                    "Failed to update member stats"
+                );
+            }
+        }
     }
 
     /// Update shift expected_cash for cash payments in the order

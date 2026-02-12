@@ -328,3 +328,59 @@ pub async fn fetch_order_list(
         limit,
     }))
 }
+
+// =========================================================================
+// Member Spending History (Archived)
+// =========================================================================
+
+/// Query params for member spending history
+#[derive(Debug, Deserialize)]
+pub struct MemberHistoryQuery {
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+/// Member spending summary (aggregated stats from archived_order)
+#[derive(Debug, Serialize)]
+pub struct MemberSpendingResponse {
+    pub orders: Vec<OrderSummary>,
+    pub total: i64,
+    pub page: i32,
+    pub limit: i32,
+}
+
+/// Fetch archived orders for a specific member
+pub async fn fetch_member_history(
+    State(state): State<ServerState>,
+    Path(member_id): Path<i64>,
+    Query(params): Query<MemberHistoryQuery>,
+) -> AppResult<Json<MemberSpendingResponse>> {
+    let limit = params.limit.unwrap_or(50);
+    let offset = params.offset.unwrap_or(0);
+    let page = if limit > 0 { offset / limit + 1 } else { 1 };
+
+    let total: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM archived_order WHERE member_id = ?1 AND UPPER(status) = 'COMPLETED'",
+        member_id,
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
+    let rows = sqlx::query_as::<_, OrderSummary>(
+        "SELECT id AS order_id, receipt_number, table_name, UPPER(status) AS status, is_retail, total_amount AS total, guest_count, start_time, end_time, void_type, loss_reason, loss_amount FROM archived_order WHERE member_id = ?1 AND UPPER(status) = 'COMPLETED' ORDER BY end_time DESC LIMIT ?2 OFFSET ?3",
+    )
+    .bind(member_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    Ok(Json(MemberSpendingResponse {
+        orders: rows,
+        total,
+        page,
+        limit,
+    }))
+}

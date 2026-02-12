@@ -12,7 +12,9 @@ pub struct Member {
     pub card_number: Option<String>,
     pub marketing_group_id: i64,
     pub birthday: Option<String>,
+    pub email: Option<String>,
     pub points_balance: i64,
+    pub total_spent: f64,
     pub notes: Option<String>,
     pub is_active: bool,
     pub created_at: i64,
@@ -27,6 +29,7 @@ pub struct MemberCreate {
     pub card_number: Option<String>,
     pub marketing_group_id: i64,
     pub birthday: Option<String>,
+    pub email: Option<String>,
     pub notes: Option<String>,
 }
 
@@ -38,6 +41,7 @@ pub struct MemberUpdate {
     pub card_number: Option<String>,
     pub marketing_group_id: Option<i64>,
     pub birthday: Option<String>,
+    pub email: Option<String>,
     pub notes: Option<String>,
     pub is_active: Option<bool>,
 }
@@ -53,7 +57,9 @@ pub struct MemberWithGroup {
     pub marketing_group_id: i64,
     pub marketing_group_name: String,
     pub birthday: Option<String>,
+    pub email: Option<String>,
     pub points_balance: i64,
+    pub total_spent: f64,
     pub notes: Option<String>,
     pub is_active: bool,
     pub created_at: i64,

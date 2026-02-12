@@ -372,6 +372,7 @@ impl OrderArchiveService {
                 tax, start_time, end_time, \
                 operator_id, operator_name, \
                 void_type, loss_reason, loss_amount, void_note, \
+                member_id, member_name, \
                 prev_hash, curr_hash, created_at\
             ) VALUES (\
                 ?1, ?2, ?3, ?4, ?5, ?6, \
@@ -382,7 +383,8 @@ impl OrderArchiveService {
                 ?18, ?19, ?20, \
                 ?21, ?22, \
                 ?23, ?24, ?25, ?26, \
-                ?27, ?28, ?29\
+                ?27, ?28, \
+                ?29, ?30, ?31\
             ) RETURNING id",
         )
         .bind(&snapshot.receipt_number)
@@ -421,6 +423,8 @@ impl OrderArchiveService {
         }))
         .bind(snapshot.loss_amount)
         .bind(&snapshot.void_note)
+        .bind(snapshot.member_id)
+        .bind(&snapshot.member_name)
         .bind(&prev_hash)
         .bind(&order_hash)
         .bind(now)

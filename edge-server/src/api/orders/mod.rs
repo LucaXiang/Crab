@@ -21,6 +21,8 @@ fn routes() -> Router<ServerState> {
     Router::new()
         // Order history (archived orders)
         .route("/history", get(handler::fetch_order_list))
+        // Member spending history
+        .route("/member/{member_id}/history", get(handler::fetch_member_history))
         // Order detail (archived)
         .route("/{id}", get(handler::get_by_id))
 }
