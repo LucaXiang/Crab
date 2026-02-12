@@ -294,7 +294,7 @@ impl ServerState {
             "server:main",
             None,
             None,
-            serde_json::json!({"epoch": &state.epoch}),
+            serde_json::json!({"source": "local", "epoch": &state.epoch}),
         ).await;
 
         Ok(state)

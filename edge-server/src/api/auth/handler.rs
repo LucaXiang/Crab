@@ -50,7 +50,7 @@ pub async fn login(
                 state.audit_service.log(
                     AuditAction::LoginFailed, "auth", format!("employee:{}", username),
                     None, None,
-                    serde_json::json!({"reason": "invalid_credentials"}),
+                    serde_json::json!({"reason": "invalid_credentials", "username": &username}),
                 ).await;
                 tracing::warn!(username = %username, "Login failed - invalid credentials");
                 return Err(AppError::invalid_credentials());
@@ -62,7 +62,7 @@ pub async fn login(
             state.audit_service.log(
                 AuditAction::LoginFailed, "auth", format!("employee:{}", username),
                 None, None,
-                serde_json::json!({"reason": "user_not_found"}),
+                serde_json::json!({"reason": "user_not_found", "username": &username}),
             ).await;
             tracing::warn!(username = %username, "Login failed - user not found");
             return Err(AppError::invalid_credentials());

@@ -28,6 +28,14 @@ export const ShiftClosedRenderer: AuditDetailsRenderer = {
   render(_entry, details, t) {
     const lines: AuditDetailLine[] = [];
 
+    if (details.forced) {
+      lines.push({
+        label: t('audit.detail.field.forced'),
+        value: t('audit.detail.value.true'),
+        valueClass: 'text-orange-600',
+      });
+    }
+
     if (details.expected_cash != null) {
       lines.push({
         label: t('audit.detail.field.expected_cash'),

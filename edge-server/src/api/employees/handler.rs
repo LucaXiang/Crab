@@ -103,20 +103,22 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    // 删除前查名称用于审计
-    let name_for_audit = employee::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|e| e.username.clone()).unwrap_or_default();
+    // 删除前查信息用于审计
+    let emp_for_audit = employee::find_by_id(&state.pool, id).await.ok().flatten();
     let result = employee::delete(&state.pool, id).await?;
 
     if result {
         let id_str = id.to_string();
+        let (name, username) = emp_for_audit
+            .map(|e| (e.display_name, e.username))
+            .unwrap_or_default();
         audit_log!(
             state.audit_service,
             AuditAction::EmployeeDeleted,
             "employee", &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
-            details = serde_json::json!({"username": name_for_audit})
+            details = serde_json::json!({"name": name, "username": username})
         );
 
         state
