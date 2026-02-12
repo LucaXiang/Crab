@@ -759,6 +759,7 @@ mod tests {
             name: "Large".to_string(),
             receipt_name: Some("L".to_string()),
             price: Some(15.0),
+            is_multi_spec: false,
         };
 
         let changes = ItemChanges {

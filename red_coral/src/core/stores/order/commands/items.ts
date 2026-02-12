@@ -38,6 +38,7 @@ export function toCartItemInput(item: CartItem): CartItemInput {
       name: item.selected_specification.name,
       receipt_name: item.selected_specification.receipt_name ?? null,
       price: item.selected_specification.price ?? null,
+      is_multi_spec: item.selected_specification.is_multi_spec ?? false,
     } : null,
     authorizer_id: item.authorizer_id ?? null,
     authorizer_name: item.authorizer_name ?? null,

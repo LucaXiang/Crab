@@ -725,6 +725,7 @@ fn make_spec(id: i64, name: &str, price: Option<f64>) -> shared::order::Specific
         name: name.to_string(),
         receipt_name: None,
         price,
+        is_multi_spec: false,
     }
 }
 

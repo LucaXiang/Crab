@@ -46,6 +46,7 @@ pub struct ReceiptItem {
     pub discount_percent: Option<f64>,
     pub original_price: Option<f64>,
     pub selected_options: Option<Vec<SelectedOption>>,
+    pub spec_name: Option<String>,
 }
 
 /// 收据数据

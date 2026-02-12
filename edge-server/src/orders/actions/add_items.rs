@@ -134,6 +134,11 @@ impl CommandHandler for AddItemsAction {
                 snapshot.category_id = meta.map(|m| m.category_id);
                 snapshot.category_name = meta.map(|m| m.category_name.clone()).filter(|s| !s.is_empty());
 
+                // Set is_multi_spec from product metadata
+                if let Some(ref mut spec) = snapshot.selected_specification {
+                    spec.is_multi_spec = meta.map(|m| m.specs_count > 1).unwrap_or(false);
+                }
+
                 info!(
                     item_idx = idx,
                     product_id = %item.product_id,

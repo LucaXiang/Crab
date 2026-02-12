@@ -1016,7 +1016,7 @@ impl CatalogService {
         .unwrap_or_default();
 
         cat.label_print_destinations = sqlx::query_scalar!(
-            "SELECT print_destination_id FROM category_label_print_dest WHERE category_id = ?",
+            "SELECT cpd.print_destination_id FROM category_print_dest cpd JOIN print_destination pd ON pd.id = cpd.print_destination_id WHERE cpd.category_id = ? AND pd.purpose = 'label'",
             category_id,
         )
         .fetch_all(&self.pool)
@@ -1051,6 +1051,7 @@ impl CatalogService {
                 category_name,
                 tags: p.tags.iter().map(|t| t.id).collect(),
                 tax_rate: p.tax_rate,
+                specs_count: p.specs.len(),
             }
         })
     }

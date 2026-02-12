@@ -805,9 +805,9 @@ mod tests {
                 selected_specification: Some(shared::order::SpecificationInfo {
                     id: 1,
                     name: "Large".to_string(),
-
                     receipt_name: None,
                     price: None,
+                    is_multi_spec: false,
                 }),
                 ..Default::default()
             }),
@@ -887,6 +887,7 @@ mod tests {
             name: "Large".to_string(),
             receipt_name: Some("L".to_string()),
             price: Some(15.0),
+            is_multi_spec: false,
         };
 
         let action = ModifyItemAction {
@@ -1063,6 +1064,7 @@ mod tests {
             name: "CCC".to_string(),
             receipt_name: None,
             price: Some(10.0),
+            is_multi_spec: false,
         };
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
@@ -1136,9 +1138,9 @@ mod tests {
                 selected_specification: Some(shared::order::SpecificationInfo {
                     id: 0,
                     name: "Large".to_string(),
-
                     receipt_name: None,
                     price: Some(15.0),
+                    is_multi_spec: false,
                 }),
                 ..Default::default()
             }
