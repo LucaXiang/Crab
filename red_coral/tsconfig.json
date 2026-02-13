@@ -38,7 +38,7 @@
     // 严格模式配置
     "strict": true,
 
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": false,

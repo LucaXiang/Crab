@@ -56,7 +56,7 @@ export function useDraftHandlers(params: UseDraftHandlersParams) {
       order_rule_surcharge_amount: 0,
       order_applied_rules: [],
       mg_discount_amount: 0,
-      receipt_number: null,
+      receipt_number: '',
       is_pre_payment: false,
       start_time: now,
       end_time: null,

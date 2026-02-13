@@ -31,7 +31,7 @@ interface StoreInfoState {
 }
 
 const defaultStoreInfo: StoreInfo = {
-  id: null,
+  id: 0,
   name: '',
   address: '',
   nif: '',

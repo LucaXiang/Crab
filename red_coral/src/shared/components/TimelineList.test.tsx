@@ -87,8 +87,8 @@ describe('TimelineList Integration Tests', () => {
       ];
 
       const { container } = render(<TimelineList events={events} />);
-      // Should have multiple timeline items (check for timestamp elements)
-      const timeElements = container.querySelectorAll('.font-mono');
+      // Should have multiple timeline items (check for timestamp elements — use specific selector to avoid matching tag badges)
+      const timeElements = container.querySelectorAll('.text-gray-400.font-mono');
       expect(timeElements.length).toBe(2);
       // Should have multiple icon containers
       const iconElements = container.querySelectorAll('.rounded-full');

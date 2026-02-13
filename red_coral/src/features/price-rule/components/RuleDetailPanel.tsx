@@ -199,16 +199,16 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
       adjustment_type: rule.adjustment_type,
       adjustment_value: rule.adjustment_value,
       product_scope: rule.product_scope,
-      target_id: rule.target_id,
+      target_id: rule.target_id ?? undefined,
       zone_scope: rule.zone_scope,
       is_stackable: rule.is_stackable,
       is_exclusive: rule.is_exclusive,
       is_active: rule.is_active,
-      active_days: rule.active_days,
-      active_start_time: rule.active_start_time,
-      active_end_time: rule.active_end_time,
-      valid_from: rule.valid_from,
-      valid_until: rule.valid_until,
+      active_days: rule.active_days ?? undefined,
+      active_start_time: rule.active_start_time ?? undefined,
+      active_end_time: rule.active_end_time ?? undefined,
+      valid_from: rule.valid_from ?? undefined,
+      valid_until: rule.valid_until ?? undefined,
     });
     setIsEditing(true);
   };
@@ -661,11 +661,11 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
       <TimeConditionEditor
         isOpen={showTimeEditor}
         value={{
-          active_days: currentActiveDays,
-          active_start_time: currentActiveStartTime,
-          active_end_time: currentActiveEndTime,
-          valid_from: currentValidFrom,
-          valid_until: currentValidUntil,
+          active_days: currentActiveDays ?? undefined,
+          active_start_time: currentActiveStartTime ?? undefined,
+          active_end_time: currentActiveEndTime ?? undefined,
+          valid_from: currentValidFrom ?? undefined,
+          valid_until: currentValidUntil ?? undefined,
         }}
         onChange={updateEditData}
         onClose={() => setShowTimeEditor(false)}

@@ -114,7 +114,7 @@ impl ClientBridge {
 
     /// 查询后端初始化状态
     pub fn get_init_status(&self) -> InitStatus {
-        let state = self.init_state.lock().unwrap();
+        let state = self.init_state.lock().unwrap_or_else(|e| e.into_inner());
         match &*state {
             InitState::Pending => InitStatus { ready: false, error: None },
             InitState::Ok => InitStatus { ready: true, error: None },
@@ -124,7 +124,7 @@ impl ClientBridge {
 
     /// 标记初始化完成
     pub(crate) fn mark_initialized(&self, error: Option<String>) {
-        let mut state = self.init_state.lock().unwrap();
+        let mut state = self.init_state.lock().unwrap_or_else(|e| e.into_inner());
         *state = match error {
             None => InitState::Ok,
             Some(e) => InitState::Failed(e),
@@ -133,7 +133,7 @@ impl ClientBridge {
 
     /// 重置初始化状态为 Pending (retry 前调用)
     pub(crate) fn reset_init_state(&self) {
-        let mut state = self.init_state.lock().unwrap();
+        let mut state = self.init_state.lock().unwrap_or_else(|e| e.into_inner());
         *state = InitState::Pending;
     }
 

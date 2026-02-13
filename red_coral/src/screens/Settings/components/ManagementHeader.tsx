@@ -8,7 +8,7 @@ interface ManagementHeaderProps {
   title: string;
   description: string;
   addButtonText: string;
-  onAdd: () => void;
+  onAdd?: () => void;
   themeColor?: 'blue' | 'purple' | 'orange' | 'teal' | 'indigo';
   /**
    * Optional permission required to show the add button
@@ -78,13 +78,13 @@ export const ManagementHeader: React.FC<ManagementHeaderProps> = ({
             <p className="text-sm text-gray-500">{description}</p>
           </div>
         </div>
-        {permission ? (
+        {onAdd && (permission ? (
           <ProtectedGate permission={permission}>
             {addButton}
           </ProtectedGate>
         ) : (
           addButton
-        )}
+        ))}
       </div>
     </div>
   );

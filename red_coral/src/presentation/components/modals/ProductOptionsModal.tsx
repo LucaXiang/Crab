@@ -162,7 +162,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
     // Get selected specification details (use stable spec.id)
     // Use currentPrice (which may be user-overridden) instead of spec.price
-    let selectedSpec: { id: number; name: string; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
+    let selectedSpec: { id: number; name: string; receipt_name?: string; price?: number; is_multi_spec?: boolean } | undefined;
     if (hasMultiSpec && selectedSpecId !== null && specifications) {
       const spec = specifications.find(s => s.id === selectedSpecId);
       if (spec) {

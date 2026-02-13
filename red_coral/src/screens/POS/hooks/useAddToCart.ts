@@ -109,7 +109,7 @@ export function useAddToCart() {
           const defaults = binding.default_option_ids
             ?? binding.attribute?.default_option_ids;
           if (!defaults || defaults.length === 0) return false;
-          const attrOpts = optionsMap.get(binding.attribute?.id) || [];
+          const attrOpts = binding.attribute ? optionsMap.get(binding.attribute.id) || [] : [];
           return defaults.some(id => attrOpts.some(o => o.id === id));
         });
 

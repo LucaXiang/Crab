@@ -10,7 +10,7 @@ export const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
   render(event, payload, t) {
     const method = payload.method || 'unknown';
     const methodLower = method.toLowerCase();
-    let methodDisplay = method;
+    let methodDisplay: string = method;
     if (methodLower === 'cash') {
       methodDisplay = t('checkout.method.cash');
     } else if (methodLower === 'card') {

@@ -193,10 +193,11 @@ export const useAuthStore = create<AuthStore>()(
           display_name: data.displayName || result.display_name,
           role_id: result.role_id,
           role_name: '',
-          permissions: [],
+          permissions: [] as string[],
           is_active: result.is_active,
           is_system: result.is_system,
-        } as User;
+          created_at: 0,
+        } satisfies User;
       },
 
       updateUser: async (userId: number, data: { displayName?: string; role_id?: number; isActive?: boolean }) => {
@@ -210,10 +211,11 @@ export const useAuthStore = create<AuthStore>()(
           display_name: data.displayName || result.display_name,
           role_id: result.role_id,
           role_name: '',
-          permissions: [],
+          permissions: [] as string[],
           is_active: result.is_active,
           is_system: result.is_system,
-        } as User;
+          created_at: 0,
+        } satisfies User;
       },
 
       resetPassword: async (userId: number, newPassword: string) => {
