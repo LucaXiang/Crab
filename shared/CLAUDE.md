@@ -145,14 +145,11 @@ src/
 
 ## 类型对齐
 
-修改 `models/` 时，必须同步更新:
-- 前端: `red_coral/src/core/domain/types/api/models.ts`
-- 验证: `cargo check && npx tsc --noEmit`
+修改 `models/` 时，必须同步更新前端 `red_coral/src/core/domain/types/api/models.ts`，验证: `cargo check && npx tsc --noEmit`。
 
-**关键约定**:
-- 时间戳: `i64` Unix 毫秒 (非 string)
-- ID: `i64` 整数 (SQLite INTEGER PRIMARY KEY)
-- 金额: 服务端 `rust_decimal`，前端 `decimal.js`
+全栈约定（ID、时间戳、金额等）见 [`docs/claude/conventions.md`](../docs/claude/conventions.md)。
+
+shared 专属序列化约定:
 - 枚举序列化: `SCREAMING_SNAKE_CASE`
 - 可选字段: `#[serde(skip_serializing_if = "Option::is_none")]`
 

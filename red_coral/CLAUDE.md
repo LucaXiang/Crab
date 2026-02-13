@@ -235,17 +235,17 @@ features/<name>/
 
 ## 关键约束
 
+跨前后端通用约定（金额、时间戳、类型对齐、Tauri 命令参数等）见 [`docs/claude/conventions.md`](../docs/claude/conventions.md)。
+
+以下为 red_coral 前端专属约束：
+
 | 约束 | 说明 |
 |------|------|
-| **金额计算** | 必须使用 `Currency` 类 (decimal.js)，禁止浮点运算 |
 | **货币格式** | 使用 `formatCurrency()` 统一格式化，禁止硬编码货币符号 |
-| **服务端权威** | 不做乐观更新，所有状态以服务端响应为准 |
-| **类型对齐** | `core/domain/types/api/` 必须与 Rust `shared/models` 对齐 |
 | **snake_case** | 表单字段和 API 数据统一使用 snake_case |
-| **Tauri 命令参数** | Tauri 2 **仅自动映射顶层命令参数名** (camelCase↔snake_case)，不要加 `rename_all`；`invokeApi` 顶层参数用 camelCase（如 `sinceSequence`, `orderId`）；**嵌套 struct/数组内的字段由 serde 反序列化，前端必须手动转为 snake_case 发送**（如 `LabelField.dataSource` → `data_source`），接收时手动转回 camelCase |
+| **Tauri 命令参数** | `invokeApi` 顶层参数用 camelCase（如 `sinceSequence`, `orderId`）；**嵌套 struct/数组内的字段由 serde 反序列化，前端必须手动转为 snake_case 发送**（如 `LabelField.dataSource` → `data_source`），接收时手动转回 camelCase |
 | **懒加载** | Tauri Client 使用懒加载，禁止模块作用域直接创建 |
 | **错误处理** | 关键加载失败使用 dialog 阻断，禁止静默错误 |
-| **时间戳** | `number` 类型 (i64 Unix 毫秒)，禁止 string 格式 |
 | **Zustand Selector** | selector 必须返回稳定引用；需要派生数据时先选原始数据再用 `useMemo`，禁止在 selector 内 `new Map()`/`.filter()`/`.map()` |
 
 ## 颜色语言 (价格明细)
