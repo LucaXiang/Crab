@@ -12,6 +12,7 @@ import type { MemberWithGroup, MemberCreate, MemberUpdate } from '@/core/domain/
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
 import { FormField, FormSection, SelectField, inputClass } from '@/shared/components/FormField';
+import { MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_NOTE_LEN } from '@/shared/constants/validation';
 import { formatCurrency } from '@/utils/currency';
 
 export const MemberManagement: React.FC = React.memo(() => {
@@ -287,6 +288,7 @@ const MemberFormModal: React.FC<{
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              maxLength={MAX_NAME_LEN}
               className={inputClass}
             />
           </FormField>
@@ -296,6 +298,7 @@ const MemberFormModal: React.FC<{
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                maxLength={MAX_SHORT_TEXT_LEN}
                 className={inputClass}
               />
             </FormField>
@@ -304,6 +307,7 @@ const MemberFormModal: React.FC<{
               <input
                 value={cardNumber}
                 onChange={(e) => setCardNumber(e.target.value)}
+                maxLength={MAX_SHORT_TEXT_LEN}
                 className={inputClass}
               />
             </FormField>
@@ -313,6 +317,7 @@ const MemberFormModal: React.FC<{
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                maxLength={MAX_EMAIL_LEN}
                 className={inputClass}
               />
             </FormField>
@@ -340,6 +345,7 @@ const MemberFormModal: React.FC<{
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                maxLength={MAX_NOTE_LEN}
                 rows={2}
                 className={inputClass}
               />

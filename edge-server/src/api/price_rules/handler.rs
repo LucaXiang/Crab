@@ -11,10 +11,39 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::price_rule;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN};
 use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 use shared::models::price_rule::AdjustmentType;
 
 const RESOURCE: &str = "price_rule";
+
+fn validate_create(payload: &PriceRuleCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_required_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    validate_optional_text(&payload.zone_scope, "zone_scope", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.active_start_time, "active_start_time", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.active_end_time, "active_end_time", MAX_SHORT_TEXT_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &PriceRuleUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    if let Some(display_name) = &payload.display_name {
+        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
+    }
+    if let Some(receipt_name) = &payload.receipt_name {
+        validate_required_text(receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    validate_optional_text(&payload.zone_scope, "zone_scope", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.active_start_time, "active_start_time", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.active_end_time, "active_end_time", MAX_SHORT_TEXT_LEN)?;
+    Ok(())
+}
 
 fn validate_adjustment_value(
     adjustment_type: &AdjustmentType,
@@ -103,6 +132,7 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<PriceRuleCreate>,
 ) -> AppResult<Json<PriceRule>> {
+    validate_create(&payload)?;
     validate_adjustment_value(&payload.adjustment_type, payload.adjustment_value)?;
     let rule = price_rule::create(&state.pool, payload).await?;
 
@@ -131,6 +161,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<PriceRuleUpdate>,
 ) -> AppResult<Json<PriceRule>> {
+    validate_update(&payload)?;
+
     // 查询旧值（用于审计 diff + 部分更新验证）
     let old_rule = price_rule::find_by_id(&state.pool, id)
         .await?

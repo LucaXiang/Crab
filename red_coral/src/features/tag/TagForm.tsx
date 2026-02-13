@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tag, Palette } from 'lucide-react';
 import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
+import { MAX_NAME_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
 
 interface TagFormData {
   name: string;
@@ -40,6 +41,7 @@ export const TagForm: React.FC<TagFormProps> = ({ formData, onFieldChange, t }) 
             value={formData.name}
             onChange={(e) => onFieldChange('name', e.target.value)}
             placeholder={t('settings.tag.name_placeholder')}
+            maxLength={MAX_NAME_LEN}
             className={inputClass}
           />
         </FormField>
@@ -83,6 +85,7 @@ export const TagForm: React.FC<TagFormProps> = ({ formData, onFieldChange, t }) 
               }
             }}
             placeholder="#3B82F6"
+            maxLength={MAX_SHORT_TEXT_LEN}
             className={`${inputClass} flex-1 font-mono`}
           />
         </div>

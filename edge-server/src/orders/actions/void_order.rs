@@ -6,6 +6,7 @@ use async_trait::async_trait;
 
 use crate::orders::money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NOTE_LEN, MAX_NAME_LEN};
 use rust_decimal::Decimal;
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, LossReason, OrderEvent, OrderEventType, OrderStatus, VoidType};
@@ -29,10 +30,14 @@ impl CommandHandler for VoidOrderAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate text lengths
+        validate_order_optional_text(&self.note, "note", MAX_NOTE_LEN)?;
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status (must be Active)
+        // 3. Validate order status (must be Active)
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
@@ -52,7 +57,7 @@ impl CommandHandler for VoidOrderAction {
             }
         }
 
-        // 3. Sanitize loss fields based on void_type:
+        // 4. Sanitize loss fields based on void_type:
         //    - CANCELLED: 正常取消，无损失，强制清空 loss 字段
         //    - LOSS_SETTLED: 损失结算，自动计算未付金额作为损失
         let (loss_reason, loss_amount) = match self.void_type {
@@ -68,10 +73,10 @@ impl CommandHandler for VoidOrderAction {
             }
         };
 
-        // 4. Allocate sequence number
+        // 5. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 5. Create event
+        // 6. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),

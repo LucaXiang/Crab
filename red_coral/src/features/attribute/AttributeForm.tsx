@@ -6,6 +6,7 @@ import type { Attribute } from '@/core/domain/types/api';
 import { FormField, FormSection, CheckboxField, SubField, inputClass } from '@/shared/components/FormField';
 import { useFormInitialization } from '@/hooks/useFormInitialization';
 import { useFormSubmit } from '@/shared/hooks/useFormSubmit';
+import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN } from '@/shared/constants/validation';
 
 // Form state uses camelCase internally, converted to snake_case on submit
 interface AttributeFormData {
@@ -157,6 +158,7 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
                 value={formData.name}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
                 placeholder={t('settings.attribute.form.name_placeholder')}
+                maxLength={MAX_NAME_LEN}
                 className={inputClass}
                 autoFocus
               />
@@ -203,6 +205,7 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
                   value={formData.kitchenPrintName}
                   onChange={(e) => handleFieldChange('kitchenPrintName', e.target.value)}
                   placeholder={t('settings.attribute.form.kitchen_print_name_placeholder')}
+                  maxLength={MAX_RECEIPT_NAME_LEN}
                   className={inputClass}
                 />
               </FormField>
@@ -221,6 +224,7 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
                   value={formData.receiptName}
                   onChange={(e) => handleFieldChange('receiptName', e.target.value)}
                   placeholder={t('settings.attribute.form.receipt_name_placeholder')}
+                  maxLength={MAX_RECEIPT_NAME_LEN}
                   className={inputClass}
                 />
               </FormField>

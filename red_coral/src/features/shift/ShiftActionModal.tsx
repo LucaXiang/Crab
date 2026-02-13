@@ -20,6 +20,7 @@ import { useShiftStore } from '@/core/stores/shift';
 import { Currency, formatCurrency } from '@/utils/currency';
 import { Numpad } from '@/presentation/components/ui/Numpad';
 import type { Shift } from '@/core/domain/types/api';
+import { MAX_NOTE_LEN } from '@/shared/constants/validation';
 
 const getApi = () => createTauriClient();
 
@@ -198,6 +199,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={t('settings.shift.modal.note_placeholder')}
+                maxLength={MAX_NOTE_LEN}
                 rows={2}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 resize-none"
               />

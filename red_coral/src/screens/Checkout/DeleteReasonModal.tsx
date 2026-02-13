@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, Trash2 } from 'lucide-react';
+import { MAX_NOTE_LEN } from '@/shared/constants/validation';
 
 const DELETE_REASONS = ['customer_changed_mind', 'wrong_item', 'kitchen_issue', 'other'] as const;
 type DeleteReasonKey = typeof DELETE_REASONS[number];
@@ -106,6 +107,7 @@ export const DeleteReasonModal: React.FC<DeleteReasonModalProps> = ({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('checkout.delete_item.note_placeholder')}
+              maxLength={MAX_NOTE_LEN}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
               rows={2}
             />

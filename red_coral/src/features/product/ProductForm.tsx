@@ -6,6 +6,7 @@ import { TagSelectionModal, useTags } from '@/features/tag';
 import { ProductImage } from './ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
 import { usePriceInput } from '@/hooks/usePriceInput';
+import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN } from '@/shared/constants/validation';
 import { Category, ProductSpec, PrintState } from '@/core/domain/types';
 
 interface ProductFormData {
@@ -142,6 +143,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 value={formData.name}
                 onChange={(e) => onFieldChange('name', e.target.value)}
                 placeholder={t('settings.product.form.name_placeholder')}
+                maxLength={MAX_NAME_LEN}
                 className={inputClass}
               />
             </FormField>
@@ -265,6 +267,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 value={formData.receipt_name || ''}
                 onChange={(e) => onFieldChange('receipt_name', e.target.value)}
                 placeholder={t('settings.product.print.receipt_name_placeholder')}
+                maxLength={MAX_RECEIPT_NAME_LEN}
                 className={`${inputClass} pl-9`}
               />
             </div>
@@ -322,6 +325,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   value={formData.kitchen_print_name || ''}
                   onChange={(e) => onFieldChange('kitchen_print_name', e.target.value)}
                   placeholder={t('settings.product.print.kitchen_print_name_placeholder')}
+                  maxLength={MAX_RECEIPT_NAME_LEN}
                   className={inputClass}
                 />
               </FormField>
@@ -529,6 +533,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         onFieldChange('specs', newSpecs);
                       }}
                       placeholder={t('settings.specification.form.receipt_name_placeholder')}
+                      maxLength={MAX_RECEIPT_NAME_LEN}
                       className={inputClass}
                     />
                   </FormField>

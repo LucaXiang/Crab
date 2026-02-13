@@ -11,9 +11,32 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{member, stamp};
 use crate::utils::AppResult;
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_NOTE_LEN};
 use shared::models::MemberWithGroup;
 
 const RESOURCE: &str = "member";
+
+fn validate_create(payload: &shared::models::MemberCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.phone, "phone", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.card_number, "card_number", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.birthday, "birthday", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.email, "email", MAX_EMAIL_LEN)?;
+    validate_optional_text(&payload.notes, "notes", MAX_NOTE_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &shared::models::MemberUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.phone, "phone", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.card_number, "card_number", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.birthday, "birthday", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.email, "email", MAX_EMAIL_LEN)?;
+    validate_optional_text(&payload.notes, "notes", MAX_NOTE_LEN)?;
+    Ok(())
+}
 
 #[derive(serde::Deserialize)]
 pub struct SearchQuery {
@@ -129,6 +152,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<shared::models::MemberCreate>,
 ) -> AppResult<Json<MemberWithGroup>> {
+    validate_create(&payload)?;
+
     let member = member::create(&state.pool, payload).await?;
 
     let id = member.id.to_string();
@@ -156,6 +181,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<shared::models::MemberUpdate>,
 ) -> AppResult<Json<MemberWithGroup>> {
+    validate_update(&payload)?;
+
     let old_member = member::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Member {}", id)))?;

@@ -526,8 +526,8 @@ pub fn calculate_item_price(
     let manual_pct = to_decimal(manual_discount_percent);
     let hundred = Decimal::ONE_HUNDRED;
 
-    // Step 1: Calculate base price
-    let base = original + modifier;
+    // Step 1: Calculate base price (clamped to >= 0)
+    let base = (original + modifier).max(Decimal::ZERO);
     debug!(
         original = %original,
         modifier = %modifier,

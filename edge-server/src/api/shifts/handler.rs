@@ -13,9 +13,21 @@ use crate::core::ServerState;
 use crate::db::repository::{shift, store_info};
 use crate::utils::{AppError, AppResult};
 use crate::utils::time;
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 
 const RESOURCE: &str = "shift";
+
+/// Validate a cash amount is finite and non-negative
+fn validate_cash(value: f64, field: &str) -> AppResult<()> {
+    if !value.is_finite() {
+        return Err(AppError::validation(format!("{field} must be a finite number")));
+    }
+    if value < 0.0 {
+        return Err(AppError::validation(format!("{field} must be non-negative, got {value}")));
+    }
+    Ok(())
+}
 
 /// Query params for listing shifts
 #[derive(Debug, Deserialize)]
@@ -79,6 +91,10 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ShiftCreate>,
 ) -> AppResult<Json<Shift>> {
+    validate_cash(payload.starting_cash, "starting_cash")?;
+    validate_required_text(&payload.operator_name, "operator_name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.note, "note", MAX_NOTE_LEN)?;
+
     let s = shift::create(&state.pool, payload).await?;
 
     let id = s.id.to_string();
@@ -109,6 +125,11 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<ShiftUpdate>,
 ) -> AppResult<Json<Shift>> {
+    if let Some(cash) = payload.starting_cash {
+        validate_cash(cash, "starting_cash")?;
+    }
+    validate_optional_text(&payload.note, "note", MAX_NOTE_LEN)?;
+
     let old = shift::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Shift {} not found", id)))?;
@@ -140,6 +161,9 @@ pub async fn close(
     Path(id): Path<i64>,
     Json(payload): Json<ShiftClose>,
 ) -> AppResult<Json<Shift>> {
+    validate_cash(payload.actual_cash, "actual_cash")?;
+    validate_optional_text(&payload.note, "note", MAX_NOTE_LEN)?;
+
     let s = shift::close(&state.pool, id, payload).await?;
 
     let id_str = id.to_string();
@@ -173,6 +197,8 @@ pub async fn force_close(
     Path(id): Path<i64>,
     Json(payload): Json<ShiftForceClose>,
 ) -> AppResult<Json<Shift>> {
+    validate_optional_text(&payload.note, "note", MAX_NOTE_LEN)?;
+
     let s = shift::force_close(&state.pool, id, payload).await?;
 
     let id_str = id.to_string();

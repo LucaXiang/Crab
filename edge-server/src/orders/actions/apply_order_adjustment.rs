@@ -6,6 +6,7 @@ use async_trait::async_trait;
 
 use crate::orders::money::{recalculate_totals, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
 use rust_decimal::prelude::*;
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
@@ -27,6 +28,8 @@ impl CommandHandler for ApplyOrderDiscountAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
         // 1. Load snapshot
         let mut snapshot = ctx.load_snapshot(&self.order_id)?;
 
@@ -127,6 +130,8 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
         // 1. Load snapshot
         let mut snapshot = ctx.load_snapshot(&self.order_id)?;
 

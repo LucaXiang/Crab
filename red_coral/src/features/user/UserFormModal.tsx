@@ -9,6 +9,7 @@ import { User, Role } from '@/core/domain/types';
 
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
 import { FormField, FormSection, CheckboxField, inputClass, selectClass } from '@/shared/components/FormField';
+import { MAX_NAME_LEN, MAX_PASSWORD_LEN } from '@/shared/constants/validation';
 
 interface UserFormModalProps {
   isOpen: boolean;
@@ -162,6 +163,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 disabled={!!editingUser}
                 className={inputClass}
                 placeholder={t('settings.user.form.username_placeholder')}
+                maxLength={MAX_NAME_LEN}
               />
               {editingUser && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -179,6 +181,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className={`${inputClass} pr-10`}
                     placeholder={t('settings.user.form.password_placeholder')}
+                    maxLength={MAX_PASSWORD_LEN}
                   />
                   <button
                     type="button"
@@ -205,6 +208,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                 className={inputClass}
                 placeholder={t('settings.user.form.display_name_placeholder')}
+                maxLength={MAX_NAME_LEN}
               />
             </FormField>
 

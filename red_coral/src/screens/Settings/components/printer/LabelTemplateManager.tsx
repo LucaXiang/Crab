@@ -11,6 +11,7 @@ import type { LabelTemplate } from '@/core/domain/types/print';
 import { LabelEditorScreen } from '../LabelEditorScreen';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';
+import { MAX_NAME_LEN } from '@/shared/constants/validation';
 
 export const LabelTemplateManager: React.FC = () => {
   const { t } = useI18n();
@@ -275,6 +276,7 @@ export const LabelTemplateManager: React.FC = () => {
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder={t('settings.printer.template.form.name_placeholder')}
+                  maxLength={MAX_NAME_LEN}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                   autoFocus
                 />

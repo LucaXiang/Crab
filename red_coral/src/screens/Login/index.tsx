@@ -6,6 +6,7 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore, useAppState, AppStateHelpers } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
 import { logger } from '@/utils/logger';
+import { MAX_NAME_LEN, MAX_PASSWORD_LEN } from '@/shared/constants/validation';
 
 interface LocationState {
   from?: { pathname: string };
@@ -282,6 +283,7 @@ export const LoginScreen: React.FC = () => {
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
                   placeholder={t('auth.login.username_placeholder')}
+                  maxLength={MAX_NAME_LEN}
                   className="w-full px-4 py-3.5 bg-transparent focus:outline-none text-gray-900 placeholder-gray-400"
                   disabled={isLoading}
                 />
@@ -321,6 +323,7 @@ export const LoginScreen: React.FC = () => {
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
                   placeholder={t('auth.login.password_placeholder')}
+                  maxLength={MAX_PASSWORD_LEN}
                   className="w-full px-4 py-3.5 bg-transparent focus:outline-none text-gray-900 placeholder-gray-400"
                   disabled={isLoading}
                 />

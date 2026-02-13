@@ -7,6 +7,7 @@ import { FormField, FormSection, CheckboxField, inputClass } from '@/shared/comp
 import { useFormInitialization } from '@/hooks/useFormInitialization';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { useFormSubmit } from '@/shared/hooks/useFormSubmit';
+import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN } from '@/shared/constants/validation';
 
 // Extended option type with index for UI (matches store type)
 interface AttributeOptionWithIndex extends AttributeOption {
@@ -105,6 +106,12 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         if (!data.name.trim()) {
           return t('settings.attribute.option.form.name_required');
         }
+        if (!Number.isFinite(data.priceModifier)) {
+          return t('settings.attribute.option.form.invalid_price');
+        }
+        if (data.enableQuantity && data.maxQuantity !== null && data.maxQuantity < 1) {
+          return t('settings.attribute.option.form.invalid_max_quantity');
+        }
         return null;
       },
       onCreate: async (data) => {
@@ -184,6 +191,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                 value={formData.name}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
                 placeholder={t('settings.attribute.option.form.name_placeholder')}
+                maxLength={MAX_NAME_LEN}
                 className={inputClass}
                 autoFocus
               />
@@ -217,6 +225,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                 value={formData.receiptName}
                 onChange={(e) => handleFieldChange('receiptName', e.target.value)}
                 placeholder={t('settings.attribute.option.form.receipt_name_placeholder')}
+                maxLength={MAX_RECEIPT_NAME_LEN}
                 className={inputClass}
               />
             </FormField>
@@ -226,6 +235,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                 value={formData.kitchenPrintName}
                 onChange={(e) => handleFieldChange('kitchenPrintName', e.target.value)}
                 placeholder={t('settings.attribute.option.form.kitchen_print_name_placeholder')}
+                maxLength={MAX_RECEIPT_NAME_LEN}
                 className={inputClass}
               />
             </FormField>

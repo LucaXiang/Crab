@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { ProductImage } from '@/features/product/ProductImage';
 import { getErrorMessage } from '@/utils/error';
+import { MAX_NAME_LEN, MAX_ADDRESS_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_URL_LEN } from '@/shared/constants/validation';
 
 export const StoreSettings: React.FC = () => {
   const info = useStoreInfo();
@@ -149,12 +150,12 @@ export const StoreSettings: React.FC = () => {
           {/* Name */}
           <div>
             <label className={labelClass}>{t('settings.store.form.establishment_name')}</label>
-            <input type="text" name="name" value={formData.name} onChange={onInputChange} autoComplete="new-password" className={inputClass} />
+            <input type="text" name="name" value={formData.name} onChange={onInputChange} autoComplete="new-password" maxLength={MAX_NAME_LEN} className={inputClass} />
           </div>
           {/* Address */}
           <div>
             <label className={labelClass}>{t('settings.store.form.address')}</label>
-            <input type="text" name="address" value={formData.address} onChange={onInputChange} autoComplete="new-password" className={inputClass} />
+            <input type="text" name="address" value={formData.address} onChange={onInputChange} autoComplete="new-password" maxLength={MAX_ADDRESS_LEN} className={inputClass} />
           </div>
         </div>
 
@@ -166,25 +167,25 @@ export const StoreSettings: React.FC = () => {
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1"><CreditCard className="w-3 h-3 text-gray-400" />{t('settings.store.form.tax_id')}</span>
             </label>
-            <input type="text" name="nif" value={formData.nif} onChange={onInputChange} autoComplete="new-password" className={inputClass} />
+            <input type="text" name="nif" value={formData.nif} onChange={onInputChange} autoComplete="new-password" maxLength={MAX_SHORT_TEXT_LEN} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{t('settings.store.form.phone')}</span>
             </label>
-            <input type="text" name="phone" value={formData.phone || ''} onChange={onInputChange} autoComplete="new-password" className={inputClass} />
+            <input type="text" name="phone" value={formData.phone || ''} onChange={onInputChange} autoComplete="new-password" maxLength={MAX_SHORT_TEXT_LEN} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3 text-gray-400" />{t('settings.store.form.email')}</span>
             </label>
-            <input type="email" name="email" value={formData.email || ''} onChange={onInputChange} autoComplete="new-password" className={inputClass} />
+            <input type="email" name="email" value={formData.email || ''} onChange={onInputChange} autoComplete="new-password" maxLength={MAX_EMAIL_LEN} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1"><Globe className="w-3 h-3 text-gray-400" />{t('settings.store.form.website')}</span>
             </label>
-            <input type="text" name="website" value={formData.website || ''} onChange={onInputChange} autoComplete="new-password" className={inputClass} />
+            <input type="text" name="website" value={formData.website || ''} onChange={onInputChange} autoComplete="new-password" maxLength={MAX_URL_LEN} className={inputClass} />
           </div>
         </div>
 

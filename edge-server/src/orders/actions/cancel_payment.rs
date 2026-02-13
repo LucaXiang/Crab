@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use shared::order::types::CommandErrorCode;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, SplitType};
 
 /// CancelPayment action
@@ -26,10 +27,14 @@ impl CommandHandler for CancelPaymentAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate text lengths
+        validate_order_optional_text(&self.reason, "reason", MAX_NOTE_LEN)?;
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status - must be Active
+        // 3. Validate order status - must be Active
         match snapshot.status {
             OrderStatus::Active => {} // OK - continue with cancellation
             OrderStatus::Completed => {
@@ -46,14 +51,14 @@ impl CommandHandler for CancelPaymentAction {
             }
         }
 
-        // 3. Find the payment (must exist and not already cancelled)
+        // 4. Find the payment (must exist and not already cancelled)
         let payment = snapshot
             .payments
             .iter()
             .find(|p| p.payment_id == self.payment_id && !p.cancelled)
             .ok_or_else(|| OrderError::PaymentNotFound(self.payment_id.clone()))?;
 
-        // 4. Check if this is an AA payment that would zero-out AA shares
+        // 5. Check if this is an AA payment that would zero-out AA shares
         let is_aa_zero_out =
             if let (Some(SplitType::AaSplit), Some(shares)) = (&payment.split_type, payment.aa_shares) {
                 let other_active_aa_shares: i32 = snapshot
@@ -73,7 +78,7 @@ impl CommandHandler for CancelPaymentAction {
 
         let aa_total_for_cancel = snapshot.aa_total_shares;
 
-        // 5. Allocate sequence number and create event
+        // 6. Allocate sequence number and create event
         let seq = ctx.next_sequence();
 
         let event = OrderEvent::new(
@@ -96,7 +101,7 @@ impl CommandHandler for CancelPaymentAction {
 
         let mut events = vec![event];
 
-        // 6. If AA zero-out, produce extra AaSplitCancelled event
+        // 7. If AA zero-out, produce extra AaSplitCancelled event
         if is_aa_zero_out
             && let Some(total_shares) = aa_total_for_cancel
         {

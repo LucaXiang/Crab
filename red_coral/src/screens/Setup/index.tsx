@@ -12,6 +12,7 @@ import { ApiError } from '@/infrastructure/api/tauri-client';
 import { ErrorCode } from '@/generated/error-codes';
 import { logger } from '@/utils/logger';
 import { useI18n } from '@/hooks/useI18n';
+import { MAX_NAME_LEN, MAX_PASSWORD_LEN, MAX_URL_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
 
 const REGISTER_URL = 'https://auth.redcoral.cloud/register';
 
@@ -342,6 +343,7 @@ export const SetupScreen: React.FC = () => {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder={t('auth.activate.username_placeholder')}
+            maxLength={MAX_NAME_LEN}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             disabled={isLoading}
           />
@@ -354,6 +356,7 @@ export const SetupScreen: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={t('auth.activate.password_placeholder')}
+            maxLength={MAX_PASSWORD_LEN}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             disabled={isLoading}
           />
@@ -532,6 +535,7 @@ export const SetupScreen: React.FC = () => {
                 value={edgeUrl}
                 onChange={(e) => setEdgeUrl(e.target.value)}
                 placeholder="https://edge.example.com"
+                maxLength={MAX_URL_LEN}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 disabled={isLoading}
               />
@@ -544,6 +548,7 @@ export const SetupScreen: React.FC = () => {
                 value={messageAddr}
                 onChange={(e) => setMessageAddr(e.target.value)}
                 placeholder="edge.example.com:9626"
+                maxLength={MAX_SHORT_TEXT_LEN}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 disabled={isLoading}
               />

@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::db::repository::price_rule;
 use shared::models::PriceRule;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// 加载匹配区域的价格规则（静态缓存）
@@ -92,6 +93,10 @@ impl CommandHandler for OpenTableAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
+        // Validate text lengths
+        validate_order_optional_text(&self.table_name, "table_name", MAX_NAME_LEN)?;
+        validate_order_optional_text(&self.zone_name, "zone_name", MAX_NAME_LEN)?;
+
         debug!(
             table_id = ?self.table_id,
             table_name = ?self.table_name,

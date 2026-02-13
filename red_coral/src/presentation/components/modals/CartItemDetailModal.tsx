@@ -16,7 +16,6 @@ interface CartItemDetailModalProps {
 
 export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
   const { t } = useI18n();
-  const productExternalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
   const unpaidQuantity = item.unpaid_quantity;
   const [quantity, setQuantity] = useState(unpaidQuantity);
   const [discount, setDiscount] = useState(item.manual_discount_percent || 0);
@@ -260,7 +259,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       isOpen={true}
       onClose={onClose}
       title={t('pos.cart.edit_item')}
-      productName={productExternalId != null ? `${productExternalId} ${item.name}` : item.name}
+      productName={item.name}
       isLoading={isLoadingAttributes}
       attributes={attributes}
       allOptions={allOptions}

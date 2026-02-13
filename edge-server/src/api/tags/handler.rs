@@ -11,9 +11,24 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::tag;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN};
 use shared::models::{Tag, TagCreate, TagUpdate};
 
 const RESOURCE: &str = "tag";
+
+fn validate_create(payload: &TagCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.color, "color", MAX_SHORT_TEXT_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &TagUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.color, "color", MAX_SHORT_TEXT_LEN)?;
+    Ok(())
+}
 
 /// GET /api/tags - 获取所有标签
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Tag>>> {
@@ -38,6 +53,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<TagCreate>,
 ) -> AppResult<Json<Tag>> {
+    validate_create(&payload)?;
+
     let t = tag::create(&state.pool, payload).await?;
 
     let id = t.id.to_string();
@@ -65,6 +82,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<TagUpdate>,
 ) -> AppResult<Json<Tag>> {
+    validate_update(&payload)?;
+
     // 查询旧值（用于审计 diff）
     let old_tag = tag::find_by_id(&state.pool, id)
         .await?

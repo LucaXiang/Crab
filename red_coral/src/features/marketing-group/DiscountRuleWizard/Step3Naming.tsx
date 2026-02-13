@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { RuleWizardState } from './index';
 import { FormSection, FormField, inputClass } from '@/shared/components/FormField';
+import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN } from '@/shared/constants/validation';
 
 interface Step3NamingProps {
   state: RuleWizardState;
@@ -25,6 +26,7 @@ export const Step3Naming: React.FC<Step3NamingProps> = ({ state, updateState }) 
             value={state.name}
             onChange={(e) => updateState({ name: e.target.value })}
             className={inputClass}
+            maxLength={MAX_NAME_LEN}
             placeholder="mg_coffee_10off"
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -38,6 +40,7 @@ export const Step3Naming: React.FC<Step3NamingProps> = ({ state, updateState }) 
             value={state.display_name}
             onChange={(e) => updateState({ display_name: e.target.value })}
             className={inputClass}
+            maxLength={MAX_NAME_LEN}
             placeholder={t('settings.marketing_group.rule_wizard.display_name_placeholder')}
           />
         </FormField>
@@ -48,6 +51,7 @@ export const Step3Naming: React.FC<Step3NamingProps> = ({ state, updateState }) 
             value={state.receipt_name}
             onChange={(e) => updateState({ receipt_name: e.target.value })}
             className={inputClass}
+            maxLength={MAX_RECEIPT_NAME_LEN}
             placeholder={t('settings.marketing_group.rule_wizard.receipt_name_placeholder')}
           />
           <p className="mt-1 text-xs text-gray-500">

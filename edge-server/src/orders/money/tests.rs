@@ -2142,3 +2142,275 @@ fn test_recalculate_totals_with_option_quantity() {
     assert_eq!(snapshot.subtotal, 32.0);
     assert_eq!(snapshot.total, 32.0);
 }
+
+// ========================================================================
+// 负数选项修改器防护测试 (price_modifier bug fix)
+// ========================================================================
+
+fn make_item_with_options(
+    original_price: f64,
+    options: Vec<shared::order::ItemOption>,
+) -> CartItemSnapshot {
+    CartItemSnapshot {
+        id: 1,
+        instance_id: "i1".to_string(),
+        name: "Item".to_string(),
+        price: original_price,
+        original_price,
+        quantity: 1,
+        unpaid_quantity: 1,
+        selected_options: Some(options),
+        selected_specification: None,
+        manual_discount_percent: None,
+        rule_discount_amount: 0.0,
+        rule_surcharge_amount: 0.0,
+        applied_rules: vec![],
+        applied_mg_rules: vec![],
+        mg_discount_amount: 0.0,
+        unit_price: 0.0,
+        line_total: 0.0,
+        tax: 0.0,
+        tax_rate: 0,
+        note: None,
+        authorizer_id: None,
+        authorizer_name: None,
+        category_id: None,
+        category_name: None,
+        is_comped: false,
+    }
+}
+
+fn make_option(name: &str, price_modifier: f64, quantity: i32) -> shared::order::ItemOption {
+    shared::order::ItemOption {
+        attribute_id: 1,
+        attribute_name: "Attr".to_string(),
+        option_id: 0,
+        option_name: name.to_string(),
+        price_modifier: Some(price_modifier),
+        quantity,
+    }
+}
+
+#[test]
+fn test_negative_option_modifier_exceeding_base_price_clamps_unit_price() {
+    // Bug scenario: Cortado 3.50€ with option -100€ → unit_price must be 0, not -96.50
+    let item = make_item_with_options(3.50, vec![
+        make_option("Avena", -100.0, 1),
+    ]);
+    let up = calculate_unit_price(&item);
+    assert_eq!(up, Decimal::ZERO, "Negative option exceeding base must clamp unit_price to 0");
+}
+
+#[test]
+fn test_negative_option_modifier_within_base_price() {
+    // Valid scenario: -0.50€ discount option on 3.50€ item → 3.00€
+    let item = make_item_with_options(3.50, vec![
+        make_option("No cream", -0.50, 1),
+    ]);
+    let up = calculate_unit_price(&item);
+    assert_eq!(to_f64(up), 3.0, "Small negative option within base price should work");
+}
+
+#[test]
+fn test_negative_option_modifier_exactly_equals_base_price() {
+    // Edge case: option modifier exactly negates base price → 0
+    let item = make_item_with_options(5.0, vec![
+        make_option("Free modifier", -5.0, 1),
+    ]);
+    let up = calculate_unit_price(&item);
+    assert_eq!(up, Decimal::ZERO, "Option modifier equal to base price should yield 0");
+}
+
+#[test]
+fn test_multiple_negative_options_exceed_base() {
+    // Multiple negative options that together exceed base price
+    let item = make_item_with_options(10.0, vec![
+        make_option("Discount A", -4.0, 1),
+        make_option("Discount B", -4.0, 1),
+        make_option("Discount C", -4.0, 1),
+    ]);
+    let up = calculate_unit_price(&item);
+    // base=10, options=-12, base_with_options=max(-2, 0)=0
+    assert_eq!(up, Decimal::ZERO, "Combined negative options exceeding base must clamp to 0");
+}
+
+#[test]
+fn test_negative_option_with_quantity_exceeds_base() {
+    // -2€ × quantity 10 = -20€ on 5€ item
+    let item = make_item_with_options(5.0, vec![
+        make_option("Discount", -2.0, 10),
+    ]);
+    let up = calculate_unit_price(&item);
+    // base=5, options=-2*10=-20, base_with_options=max(-15,0)=0
+    assert_eq!(up, Decimal::ZERO, "Negative option * quantity exceeding base must clamp to 0");
+}
+
+#[test]
+fn test_recalculate_totals_negative_option_original_total_never_negative() {
+    // The original bug: original_total was -85.50€
+    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+
+    // Normal item
+    snapshot.items.push(make_item_with_options(5.50, vec![]));
+    snapshot.items[0].selected_options = None;
+
+    // Item with absurd negative modifier
+    let mut bad_item = make_item_with_options(3.50, vec![
+        make_option("Avena", -100.0, 1),
+    ]);
+    bad_item.id = 2;
+    bad_item.instance_id = "i2".to_string();
+    snapshot.items.push(bad_item);
+
+    recalculate_totals(&mut snapshot);
+
+    assert!(snapshot.original_total >= 0.0, "original_total must never be negative, got {}", snapshot.original_total);
+    assert!(snapshot.subtotal >= 0.0, "subtotal must never be negative, got {}", snapshot.subtotal);
+    assert!(snapshot.total >= 0.0, "total must never be negative, got {}", snapshot.total);
+    // original_total = 5.50 + max(3.50-100, 0) = 5.50 + 0 = 5.50
+    assert_eq!(snapshot.original_total, 5.5);
+}
+
+#[test]
+fn test_recalculate_totals_all_items_negative_options() {
+    // Every item has options that exceed base price
+    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+
+    let mut item1 = make_item_with_options(3.50, vec![make_option("Bad", -100.0, 1)]);
+    item1.instance_id = "i1".to_string();
+    snapshot.items.push(item1);
+
+    let mut item2 = make_item_with_options(5.50, vec![make_option("Bad2", -200.0, 1)]);
+    item2.id = 2;
+    item2.instance_id = "i2".to_string();
+    snapshot.items.push(item2);
+
+    recalculate_totals(&mut snapshot);
+
+    assert_eq!(snapshot.original_total, 0.0, "All-negative items should yield 0 original_total");
+    assert_eq!(snapshot.subtotal, 0.0);
+    assert_eq!(snapshot.total, 0.0);
+    assert_eq!(snapshot.remaining_amount, 0.0);
+}
+
+#[test]
+fn test_recalculate_totals_comped_item_with_negative_option() {
+    // Comped item with negative option modifier — comp_total must not go negative
+    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+
+    let mut item = make_item_with_options(3.50, vec![make_option("Avena", -100.0, 1)]);
+    item.is_comped = true;
+    snapshot.items.push(item);
+
+    recalculate_totals(&mut snapshot);
+
+    assert!(snapshot.comp_total_amount >= 0.0,
+        "comp_total_amount must never be negative, got {}", snapshot.comp_total_amount);
+    assert_eq!(snapshot.comp_total_amount, 0.0);
+}
+
+#[test]
+fn test_recalculate_totals_negative_option_with_multiple_quantity() {
+    // Item quantity > 1 with negative option
+    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+
+    let mut item = make_item_with_options(3.50, vec![make_option("Bad", -100.0, 1)]);
+    item.quantity = 5;
+    item.unpaid_quantity = 5;
+    snapshot.items.push(item);
+
+    recalculate_totals(&mut snapshot);
+
+    // base_with_options = max(3.50 - 100, 0) = 0
+    // original_total = 0 * 5 = 0
+    assert_eq!(snapshot.original_total, 0.0);
+    assert_eq!(snapshot.subtotal, 0.0);
+    assert_eq!(snapshot.total, 0.0);
+}
+
+#[test]
+fn test_validate_cart_item_option_quantity_must_be_positive() {
+    use shared::order::CartItemInput;
+
+    let input = CartItemInput {
+        product_id: 1,
+        name: "Item".to_string(),
+        price: 10.0,
+        original_price: None,
+        quantity: 1,
+        selected_options: Some(vec![shared::order::ItemOption {
+            attribute_id: 1,
+            attribute_name: "Attr".to_string(),
+            option_id: 0,
+            option_name: "Opt".to_string(),
+            price_modifier: Some(1.0),
+            quantity: 0, // Invalid!
+        }]),
+        selected_specification: None,
+        manual_discount_percent: None,
+        note: None,
+        authorizer_id: None,
+        authorizer_name: None,
+    };
+
+    let result = validate_cart_item(&input);
+    assert!(result.is_err(), "Option quantity=0 must be rejected");
+}
+
+#[test]
+fn test_validate_cart_item_option_quantity_negative() {
+    use shared::order::CartItemInput;
+
+    let input = CartItemInput {
+        product_id: 1,
+        name: "Item".to_string(),
+        price: 10.0,
+        original_price: None,
+        quantity: 1,
+        selected_options: Some(vec![shared::order::ItemOption {
+            attribute_id: 1,
+            attribute_name: "Attr".to_string(),
+            option_id: 0,
+            option_name: "Opt".to_string(),
+            price_modifier: Some(1.0),
+            quantity: -1, // Invalid!
+        }]),
+        selected_specification: None,
+        manual_discount_percent: None,
+        note: None,
+        authorizer_id: None,
+        authorizer_name: None,
+    };
+
+    let result = validate_cart_item(&input);
+    assert!(result.is_err(), "Option quantity=-1 must be rejected");
+}
+
+#[test]
+fn test_validate_cart_item_option_exceeds_max_quantity() {
+    use shared::order::CartItemInput;
+
+    let input = CartItemInput {
+        product_id: 1,
+        name: "Item".to_string(),
+        price: 10.0,
+        original_price: None,
+        quantity: 1,
+        selected_options: Some(vec![shared::order::ItemOption {
+            attribute_id: 1,
+            attribute_name: "Attr".to_string(),
+            option_id: 0,
+            option_name: "Opt".to_string(),
+            price_modifier: Some(1.0),
+            quantity: MAX_OPTION_QUANTITY + 1, // Exceeds max
+        }]),
+        selected_specification: None,
+        manual_discount_percent: None,
+        note: None,
+        authorizer_id: None,
+        authorizer_name: None,
+    };
+
+    let result = validate_cart_item(&input);
+    assert!(result.is_err(), "Option quantity exceeding MAX must be rejected");
+}

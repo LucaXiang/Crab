@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 
 use crate::orders::money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -29,7 +30,10 @@ impl CommandHandler for MergeOrdersAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load source snapshot
+        // 1. Validate text lengths
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
+        // 2. Load source snapshot
         let source_snapshot = ctx.load_snapshot(&self.source_order_id)?;
 
         // 2. Validate source order status - must be Active

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, AlertTriangle, Ban, FileWarning } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency';
+import { MAX_NOTE_LEN } from '@/shared/constants/validation';
 
 /** 作废类型 */
 export type VoidType = 'CANCELLED' | 'LOSS_SETTLED';
@@ -248,6 +249,7 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={t('checkout.void.note_placeholder')}
+                maxLength={MAX_NOTE_LEN}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-base"
                 rows={3}
               />

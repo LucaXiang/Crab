@@ -1,4 +1,5 @@
 import type { ItemOption } from '@/core/domain/types';
+import { Currency } from '@/utils/currency';
 
 /**
  * 计算选项加价总额（考虑选项数量）
@@ -10,6 +11,40 @@ export function calculateOptionsModifier(options: ItemOption[] | undefined | nul
     (sum, opt) => sum + (opt.price_modifier ?? 0) * (opt.quantity ?? 1),
     0
   );
+}
+
+/**
+ * 计算草稿购物车项目的 unit_price 和 line_total
+ *
+ * 与后端 calculate_unit_price 的公式对齐（不含 rule discount/surcharge，
+ * 那些由服务端在 AddItems 时计算）:
+ *   base_with_options = (original_price || price) + options_modifier
+ *   manual_discount = base_with_options × (manual_discount_percent / 100)
+ *   unit_price = base_with_options - manual_discount
+ *   line_total = unit_price × quantity
+ */
+export function computeDraftItemPrices(item: {
+  price: number;
+  original_price?: number;
+  quantity: number;
+  manual_discount_percent?: number | null;
+  selected_options?: ItemOption[] | null;
+}): { unit_price: number; line_total: number } {
+  const basePrice = item.original_price || item.price;
+  const optionsModifier = calculateOptionsModifier(item.selected_options);
+  const baseWithOptions = basePrice + optionsModifier;
+
+  const discountPercent = item.manual_discount_percent || 0;
+  let unitPrice: number;
+  if (discountPercent > 0) {
+    const discountFactor = Currency.sub(1, Currency.div(discountPercent, 100));
+    unitPrice = Currency.round2(Currency.mul(baseWithOptions, discountFactor)).toNumber();
+  } else {
+    unitPrice = baseWithOptions;
+  }
+
+  const lineTotal = Currency.round2(Currency.mul(unitPrice, item.quantity)).toNumber();
+  return { unit_price: unitPrice, line_total: lineTotal };
 }
 
 /**

@@ -11,9 +11,45 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN};
 use shared::models::{Attribute, AttributeCreate, AttributeOptionInput, AttributeUpdate};
 
 const RESOURCE: &str = "attribute";
+
+fn validate_create(payload: &AttributeCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &AttributeUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    Ok(())
+}
+
+/// Validate an option input before saving
+fn validate_option(opt: &AttributeOptionInput) -> AppResult<()> {
+    validate_required_text(&opt.name, "option name", MAX_NAME_LEN)?;
+    validate_optional_text(&opt.receipt_name, "option receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&opt.kitchen_print_name, "option kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    if !opt.price_modifier.is_finite() {
+        return Err(AppError::validation("price_modifier must be a finite number".to_string()));
+    }
+    if let Some(mq) = opt.max_quantity
+        && mq < 1
+    {
+        return Err(AppError::validation(format!(
+            "max_quantity must be at least 1, got {}",
+            mq
+        )));
+    }
+    Ok(())
+}
 
 /// GET /api/attributes - 获取所有属性
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Attribute>>> {
@@ -38,6 +74,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<AttributeCreate>,
 ) -> AppResult<Json<Attribute>> {
+    validate_create(&payload)?;
+
     let attr = attribute::create(&state.pool, payload).await?;
 
     let id = attr.id.to_string();
@@ -65,6 +103,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<AttributeUpdate>,
 ) -> AppResult<Json<Attribute>> {
+    validate_update(&payload)?;
+
     // 查询旧值（用于审计 diff）
     let old_attr = attribute::find_by_id(&state.pool, id)
         .await?
@@ -157,6 +197,8 @@ pub async fn add_option(
     Path(id): Path<i64>,
     Json(option): Json<AttributeOptionInput>,
 ) -> AppResult<Json<Attribute>> {
+    validate_option(&option)?;
+
     // 读取当前属性，将新选项追加到现有选项列表后，整体替换
     let current = attribute::find_by_id(&state.pool, id)
         .await?
@@ -216,6 +258,8 @@ pub async fn update_option(
     Path((id, idx)): Path<(i64, usize)>,
     Json(option): Json<AttributeOptionInput>,
 ) -> AppResult<Json<Attribute>> {
+    validate_option(&option)?;
+
     let current = attribute::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;

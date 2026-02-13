@@ -91,7 +91,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
 
   useEffect(() => {
     setExpandedItems(new Set());
-  }, [order]);
+  }, [order?.order_id]);
 
   const toggleItem = useCallback((idx: number) => {
     setExpandedItems((prev) => {
@@ -105,12 +105,22 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     });
   }, []);
 
+  // 只有有详情（options）的 item 才算可展开
+  const expandableIndices = useMemo(
+    () => sortedItems.reduce<number[]>((acc, item, i) => {
+      if (item.selected_options && item.selected_options.length > 0) acc.push(i);
+      return acc;
+    }, []),
+    [sortedItems],
+  );
+  const allExpanded = expandableIndices.length > 0 && expandableIndices.every((i) => expandedItems.has(i));
+
   const toggleAll = () => {
     if (!order) return;
-    if (expandedItems.size === sortedItems.length) {
+    if (allExpanded) {
       setExpandedItems(new Set());
     } else {
-      setExpandedItems(new Set(sortedItems.map((_, i) => i)));
+      setExpandedItems(new Set(expandableIndices));
     }
   };
 
@@ -220,10 +230,10 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               </div>
               <button
                 onClick={toggleAll}
-                title={expandedItems.size === sortedItems.length ? t('common.action.collapse_all') : t('common.action.expand_all')}
+                title={allExpanded ? t('common.action.collapse_all') : t('common.action.expand_all')}
                 className="p-1.5 text-gray-500 hover:text-gray-700 transition-colors rounded hover:bg-gray-200"
               >
-                {expandedItems.size === sortedItems.length ? <ChevronsUp size={18} /> : <ChevronsDown size={18} />}
+                {allExpanded ? <ChevronsUp size={18} /> : <ChevronsDown size={18} />}
               </button>
             </div>
             <div className="divide-y divide-gray-100">

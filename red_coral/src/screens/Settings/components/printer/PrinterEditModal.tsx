@@ -3,6 +3,7 @@ import { Server, X, Monitor, Wifi, ChefHat, Tag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { FormField, FormSection, inputClass, selectClass } from '@/shared/components/FormField';
 import type { PrintPurpose } from '@/core/domain/types/api';
+import { MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
 
 type PrinterType = 'driver' | 'network';
 
@@ -136,6 +137,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('settings.printer.print_stations.name_placeholder')}
+                maxLength={MAX_NAME_LEN}
                 className={inputClass}
                 autoFocus
               />
@@ -146,6 +148,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder={t('common.hint.description_placeholder')}
+                maxLength={MAX_NOTE_LEN}
                 className={inputClass}
               />
             </FormField>
@@ -247,6 +250,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
                     value={formData.ip}
                     onChange={(e) => setFormData({ ...formData, ip: e.target.value })}
                     placeholder="192.168.1.100"
+                    maxLength={MAX_SHORT_TEXT_LEN}
                     className={inputClass}
                     pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
                   />

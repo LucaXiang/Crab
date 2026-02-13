@@ -13,6 +13,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -34,13 +35,15 @@ impl CommandHandler for CompItemAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Validate reason is non-empty
+        // 1. Validate reason is non-empty and within length
         if self.reason.trim().is_empty() {
             return Err(OrderError::InvalidOperation(
                 CommandErrorCode::EmptyCompReason,
                 "comp reason must not be empty".to_string(),
             ));
         }
+        validate_order_text(&self.reason, "reason", MAX_NOTE_LEN)?;
+        validate_order_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 2. Validate quantity
         if self.quantity <= 0 {

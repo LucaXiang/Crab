@@ -10,13 +10,111 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::marketing_group;
-use crate::utils::AppResult;
+use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN, MAX_RECEIPT_NAME_LEN};
 use shared::models::{
     MarketingGroup, MgDiscountRule, MgDiscountRuleCreate, MgDiscountRuleUpdate,
     StampActivityDetail,
 };
+use shared::models::price_rule::AdjustmentType;
 
 const RESOURCE: &str = "marketing_group";
+
+fn validate_group_create(payload: &shared::models::MarketingGroupCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
+
+fn validate_group_update(payload: &shared::models::MarketingGroupUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    if let Some(display_name) = &payload.display_name {
+        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
+
+fn validate_rule_create(payload: &MgDiscountRuleCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_required_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    Ok(())
+}
+
+fn validate_rule_update(payload: &MgDiscountRuleUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    if let Some(display_name) = &payload.display_name {
+        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
+    }
+    if let Some(receipt_name) = &payload.receipt_name {
+        validate_required_text(receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    }
+    Ok(())
+}
+
+fn validate_activity_create(payload: &shared::models::StampActivityCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    Ok(())
+}
+
+fn validate_activity_update(payload: &shared::models::StampActivityUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    if let Some(display_name) = &payload.display_name {
+        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
+    }
+    Ok(())
+}
+
+/// Validate points_earn_rate
+fn validate_points_earn_rate(rate: Option<f64>) -> AppResult<()> {
+    if let Some(r) = rate {
+        if !r.is_finite() {
+            return Err(AppError::validation("points_earn_rate must be a finite number"));
+        }
+        if r < 0.0 {
+            return Err(AppError::validation(format!(
+                "points_earn_rate must be non-negative, got {r}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Validate MG discount rule adjustment_value
+fn validate_mg_adjustment(adjustment_type: &AdjustmentType, value: f64) -> AppResult<()> {
+    if !value.is_finite() {
+        return Err(AppError::validation("adjustment_value must be a finite number"));
+    }
+    if value < 0.0 {
+        return Err(AppError::validation("adjustment_value must be non-negative"));
+    }
+    match adjustment_type {
+        AdjustmentType::Percentage => {
+            if value > 100.0 {
+                return Err(AppError::validation(
+                    "Percentage adjustment_value must be between 0 and 100",
+                ));
+            }
+        }
+        AdjustmentType::FixedAmount => {
+            if value > 1_000_000.0 {
+                return Err(AppError::validation(
+                    "FixedAmount adjustment_value must not exceed 1,000,000",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
 
 /// Marketing group detail response
 #[derive(serde::Serialize)]
@@ -72,6 +170,9 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<shared::models::MarketingGroupCreate>,
 ) -> AppResult<Json<MarketingGroup>> {
+    validate_group_create(&payload)?;
+    validate_points_earn_rate(payload.points_earn_rate)?;
+
     let group = marketing_group::create(&state.pool, payload).await?;
 
     let id = group.id.to_string();
@@ -99,6 +200,9 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<shared::models::MarketingGroupUpdate>,
 ) -> AppResult<Json<MarketingGroup>> {
+    validate_group_update(&payload)?;
+    validate_points_earn_rate(payload.points_earn_rate)?;
+
     let old_group = marketing_group::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", id)))?;
@@ -167,6 +271,9 @@ pub async fn create_rule(
     Path(group_id): Path<i64>,
     Json(payload): Json<MgDiscountRuleCreate>,
 ) -> AppResult<Json<MgDiscountRule>> {
+    validate_rule_create(&payload)?;
+    validate_mg_adjustment(&payload.adjustment_type, payload.adjustment_value)?;
+
     let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", group_id)))?;
@@ -198,6 +305,20 @@ pub async fn update_rule(
     Path((group_id, rule_id)): Path<(i64, i64)>,
     Json(payload): Json<MgDiscountRuleUpdate>,
 ) -> AppResult<Json<MgDiscountRule>> {
+    validate_rule_update(&payload)?;
+
+    if let (Some(at), Some(av)) = (&payload.adjustment_type, payload.adjustment_value) {
+        validate_mg_adjustment(at, av)?;
+    } else if let Some(av) = payload.adjustment_value {
+        // Basic validation when type is not changing
+        if !av.is_finite() {
+            return Err(AppError::validation("adjustment_value must be a finite number"));
+        }
+        if av < 0.0 {
+            return Err(AppError::validation("adjustment_value must be non-negative"));
+        }
+    }
+
     let rule = marketing_group::update_rule(&state.pool, rule_id, payload).await?;
 
     let id_str = rule_id.to_string();
@@ -260,6 +381,8 @@ pub async fn create_activity(
     Path(group_id): Path<i64>,
     Json(payload): Json<shared::models::StampActivityCreate>,
 ) -> AppResult<Json<StampActivityDetail>> {
+    validate_activity_create(&payload)?;
+
     let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
         .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", group_id)))?;
@@ -291,6 +414,8 @@ pub async fn update_activity(
     Path((group_id, activity_id)): Path<(i64, i64)>,
     Json(payload): Json<shared::models::StampActivityUpdate>,
 ) -> AppResult<Json<StampActivityDetail>> {
+    validate_activity_update(&payload)?;
+
     let detail = marketing_group::update_activity(&state.pool, activity_id, payload).await?;
 
     let id_str = activity_id.to_string();

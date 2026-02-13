@@ -11,9 +11,24 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{dining_table, zone};
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{DiningTable, Zone, ZoneCreate, ZoneUpdate};
 
 const RESOURCE: &str = "zone";
+
+fn validate_create(payload: &ZoneCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &ZoneUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
 
 /// GET /api/zones - 获取所有区域
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Zone>>> {
@@ -38,6 +53,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ZoneCreate>,
 ) -> AppResult<Json<Zone>> {
+    validate_create(&payload)?;
+
     let z = zone::create(&state.pool, payload).await?;
 
     let id = z.id.to_string();
@@ -65,6 +82,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<ZoneUpdate>,
 ) -> AppResult<Json<Zone>> {
+    validate_update(&payload)?;
+
     // 查询旧值（用于审计 diff）
     let old_zone = zone::find_by_id(&state.pool, id)
         .await?

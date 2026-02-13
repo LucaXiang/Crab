@@ -12,9 +12,51 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult, ErrorCode};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_URL_LEN};
 use shared::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 
 const RESOURCE_PRODUCT: &str = "product";
+
+fn validate_create(payload: &ProductCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.image, "image", MAX_URL_LEN)?;
+    validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_specs(&payload.specs)?;
+    Ok(())
+}
+
+fn validate_update(payload: &ProductUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.image, "image", MAX_URL_LEN)?;
+    validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    if let Some(specs) = &payload.specs {
+        validate_specs(specs)?;
+    }
+    Ok(())
+}
+
+/// Validate product spec prices and text fields
+fn validate_specs(specs: &[shared::models::ProductSpecInput]) -> AppResult<()> {
+    for spec in specs {
+        validate_required_text(&spec.name, "spec name", MAX_NAME_LEN)?;
+        validate_optional_text(&spec.receipt_name, "spec receipt_name", MAX_RECEIPT_NAME_LEN)?;
+        if !spec.price.is_finite() {
+            return Err(AppError::validation(format!(
+                "spec '{}': price must be a finite number", spec.name
+            )));
+        }
+        if spec.price < 0.0 {
+            return Err(AppError::validation(format!(
+                "spec '{}': price must be non-negative, got {}", spec.name, spec.price
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// 检查 external_id 是否已被其他商品使用
 async fn check_duplicate_external_id(
@@ -94,6 +136,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ProductCreate>,
 ) -> AppResult<Json<ProductFull>> {
+    validate_create(&payload)?;
+
     // 检查 external_id 是否已提供 (必填)
     let eid = payload.external_id.ok_or_else(|| {
         AppError::new(ErrorCode::ProductExternalIdRequired)
@@ -136,6 +180,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<ProductUpdate>,
 ) -> AppResult<Json<ProductFull>> {
+    validate_update(&payload)?;
+
     let id_str = id.to_string();
 
     tracing::debug!(

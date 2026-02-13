@@ -12,7 +12,24 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::role;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{Role, RoleCreate, RoleUpdate};
+
+fn validate_create(payload: &RoleCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &RoleUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
 
 /// 权限天花板校验：操作者只能分配自己拥有的权限
 fn validate_permission_ceiling(
@@ -90,6 +107,8 @@ pub async fn create(
         "Creating role"
     );
 
+    validate_create(&payload)?;
+
     // 权限天花板校验
     validate_permission_ceiling(&current_user, &payload.permissions)?;
 
@@ -121,6 +140,8 @@ pub async fn update(
         role_id = %id,
         "Updating role"
     );
+
+    validate_update(&payload)?;
 
     // 权限天花板校验（仅当 payload 包含 permissions 时）
     if let Some(ref permissions) = payload.permissions {

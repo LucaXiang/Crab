@@ -10,6 +10,7 @@ use async_trait::async_trait;
 
 use crate::orders::reducer::generate_instance_id_from_parts;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
 use shared::order::types::CommandErrorCode;
 use shared::order::{
     CartItemSnapshot, EventPayload, ItemChanges, ItemModificationResult, OrderEvent,
@@ -34,7 +35,8 @@ impl CommandHandler for ModifyItemAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Validate changes
+        // 1. Validate text lengths + changes
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
         crate::orders::money::validate_item_changes(&self.changes)?;
 
         // 2. Load existing snapshot

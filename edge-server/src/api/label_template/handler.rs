@@ -11,9 +11,25 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::label_template;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 
 const RESOURCE: &str = "label_template";
+
+fn validate_create(payload: &LabelTemplateCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    // test_data can be large (JSON), use a generous limit
+    Ok(())
+}
+
+fn validate_update(payload: &LabelTemplateUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
+    Ok(())
+}
 
 /// GET /api/label-templates - List all active label templates
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<LabelTemplate>>> {
@@ -50,6 +66,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<LabelTemplateCreate>,
 ) -> AppResult<Json<LabelTemplate>> {
+    validate_create(&payload)?;
+
     let template = label_template::create(&state.pool, payload).await?;
 
     let id = template.id.to_string();
@@ -77,6 +95,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<LabelTemplateUpdate>,
 ) -> AppResult<Json<LabelTemplate>> {
+    validate_update(&payload)?;
+
     let old_template = label_template::get(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Label template {} not found", id)))?;

@@ -7,6 +7,7 @@ import { logger } from '@/utils/logger';
 import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react';
 import { Role, RolePermission } from '@/core/domain/types';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { MAX_NAME_LEN, MAX_NOTE_LEN } from '@/shared/constants/validation';
 
 // Simplified permission labels (12 configurable permissions)
 const usePermissionLabels = () => {
@@ -395,6 +396,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value.toLowerCase())}
                   placeholder={t('settings.roles.form.id_placeholder')}
+                  maxLength={MAX_NAME_LEN}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 />
                 <p className="text-xs text-gray-500 mt-1">{t('settings.roles.form.id_hint')}</p>
@@ -408,6 +410,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   value={newRoleDisplayName}
                   onChange={(e) => setNewRoleDisplayName(e.target.value)}
                   placeholder={t('settings.roles.form.name_placeholder')}
+                  maxLength={MAX_NAME_LEN}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 />
               </div>
@@ -419,6 +422,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   value={newRoleDesc}
                   onChange={(e) => setNewRoleDesc(e.target.value)}
                   placeholder={t('settings.roles.form.desc_placeholder')}
+                  maxLength={MAX_NOTE_LEN}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none"
                 />

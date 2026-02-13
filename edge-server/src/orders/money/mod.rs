@@ -5,6 +5,9 @@
 //! for storage/serialization.
 
 use crate::orders::traits::OrderError;
+use crate::utils::validation::{
+    validate_order_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN,
+};
 use rust_decimal::prelude::*;
 use shared::models::price_rule::{AdjustmentType, RuleType};
 use shared::order::{CartItemInput, CartItemSnapshot, ItemChanges, OrderSnapshot, PaymentInput, MAX_OPTION_QUANTITY};
@@ -122,6 +125,10 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
             }
         }
     }
+
+    // Note and authorizer_name must be within length limits
+    validate_order_optional_text(&item.note, "note", MAX_NOTE_LEN)?;
+    validate_order_optional_text(&item.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
     Ok(())
 }
@@ -371,8 +378,8 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
         })
         .unwrap_or(Decimal::ZERO);
 
-    // Base with options = spec price + options
-    let base_with_options = base_price + options_modifier;
+    // Base with options = spec price + options (clamped to >= 0)
+    let base_with_options = (base_price + options_modifier).max(Decimal::ZERO);
 
     // Manual discount is percentage-based on the full base (including options)
     let manual_discount = item
@@ -455,7 +462,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
                     .sum()
             })
             .unwrap_or(Decimal::ZERO);
-        let base_with_options = base_price + options_modifier;
+        let base_with_options = (base_price + options_modifier).max(Decimal::ZERO);
         original_total += base_with_options * quantity;
 
         // Calculate item-level discount (based on full base including options)
@@ -549,7 +556,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         // Use original_price for comp value since item.price is zeroed on comp
         if item.is_comped {
             let comp_base = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
-            let comp_with_options = comp_base + options_modifier;
+            let comp_with_options = (comp_base + options_modifier).max(Decimal::ZERO);
             comp_total += comp_with_options * quantity;
         }
 
@@ -602,8 +609,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let remaining = (total - paid).max(Decimal::ZERO);
 
     // Update snapshot
-    snapshot.original_total = to_f64(original_total);
-    snapshot.subtotal = to_f64(subtotal);
+    snapshot.original_total = to_f64(original_total.max(Decimal::ZERO));
+    snapshot.subtotal = to_f64(subtotal.max(Decimal::ZERO));
     snapshot.total_discount = to_f64(total_discount);
     snapshot.total_surcharge = to_f64(total_surcharge);
     snapshot.tax = to_f64(total_tax);

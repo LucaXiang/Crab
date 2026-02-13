@@ -11,9 +11,22 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::dining_table;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, MAX_NAME_LEN};
 use shared::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 
 const RESOURCE: &str = "dining_table";
+
+fn validate_create(payload: &DiningTableCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &DiningTableUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    Ok(())
+}
 
 /// GET /api/tables - 获取所有桌台
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<DiningTable>>> {
@@ -38,6 +51,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<DiningTableCreate>,
 ) -> AppResult<Json<DiningTable>> {
+    validate_create(&payload)?;
+
     let table = dining_table::create(&state.pool, payload).await?;
 
     let id = table.id.to_string();
@@ -65,6 +80,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<DiningTableUpdate>,
 ) -> AppResult<Json<DiningTable>> {
+    validate_update(&payload)?;
+
     // 查询旧值（用于审计 diff）
     let old_table = dining_table::find_by_id(&state.pool, id)
         .await?

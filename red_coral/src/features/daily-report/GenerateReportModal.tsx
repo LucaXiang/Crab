@@ -8,6 +8,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { MAX_NOTE_LEN } from '@/shared/constants/validation';
 
 const getApi = () => createTauriClient();
 
@@ -133,6 +134,7 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('settings.daily_report.generate.note_placeholder')}
+              maxLength={MAX_NOTE_LEN}
               rows={3}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none"
             />

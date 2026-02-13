@@ -1,6 +1,7 @@
 import React from 'react';
 import { SquareMenu, Settings } from 'lucide-react';
 import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
+import { MAX_NAME_LEN } from '@/shared/constants/validation';
 import { Zone } from '@/core/domain/types';
 
 interface TableFormData {
@@ -26,6 +27,7 @@ export const TableForm: React.FC<TableFormProps> = ({ formData, zones, onFieldCh
             value={formData.name}
             onChange={(e) => onFieldChange('name', e.target.value)}
             placeholder={t('settings.table.form.name_placeholder')}
+            maxLength={MAX_NAME_LEN}
             className={inputClass}
           />
         </FormField>

@@ -9,6 +9,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -30,10 +31,14 @@ impl CommandHandler for RemoveItemAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate text lengths
+        validate_order_optional_text(&self.reason, "reason", MAX_NOTE_LEN)?;
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status (must be Active)
+        // 3. Validate order status (must be Active)
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
@@ -53,14 +58,14 @@ impl CommandHandler for RemoveItemAction {
             }
         }
 
-        // 3. Find the item
+        // 4. Find the item
         let item = snapshot
             .items
             .iter()
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 4. Reject removal of comped items (locked)
+        // 5. Reject removal of comped items (locked)
         if item.is_comped {
             return Err(OrderError::InvalidOperation(
                 CommandErrorCode::ItemIsComped,
@@ -68,7 +73,7 @@ impl CommandHandler for RemoveItemAction {
             ));
         }
 
-        // 5. Compute unpaid quantity (protect paid items)
+        // 6. Compute unpaid quantity (protect paid items)
         let paid_qty = snapshot
             .paid_item_quantities
             .get(&self.instance_id)
@@ -76,7 +81,7 @@ impl CommandHandler for RemoveItemAction {
             .unwrap_or(0);
         let unpaid_qty = item.quantity - paid_qty;
 
-        // 6. Determine effective removal quantity
+        // 7. Determine effective removal quantity
         let effective_qty = match self.quantity {
             Some(qty) => {
                 if qty <= 0 {
@@ -107,10 +112,10 @@ impl CommandHandler for RemoveItemAction {
             }
         };
 
-        // 7. Allocate sequence number
+        // 8. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 8. Create event
+        // 9. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),

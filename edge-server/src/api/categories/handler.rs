@@ -12,9 +12,24 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN};
 use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
 const RESOURCE: &str = "category";
+
+fn validate_create(payload: &CategoryCreate) -> AppResult<()> {
+    validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.match_mode, "match_mode", MAX_NAME_LEN)?;
+    Ok(())
+}
+
+fn validate_update(payload: &CategoryUpdate) -> AppResult<()> {
+    if let Some(name) = &payload.name {
+        validate_required_text(name, "name", MAX_NAME_LEN)?;
+    }
+    validate_optional_text(&payload.match_mode, "match_mode", MAX_NAME_LEN)?;
+    Ok(())
+}
 
 /// GET /api/categories - 获取所有分类
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Category>>> {
@@ -40,6 +55,8 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<CategoryCreate>,
 ) -> AppResult<Json<Category>> {
+    validate_create(&payload)?;
+
     let category = state
         .catalog_service
         .create_category(payload)
@@ -71,6 +88,8 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<CategoryUpdate>,
 ) -> AppResult<Json<Category>> {
+    validate_update(&payload)?;
+
     let id_str = id.to_string();
 
     // 查询旧值（用于审计 diff）

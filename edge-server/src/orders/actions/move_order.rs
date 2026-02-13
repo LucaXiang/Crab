@@ -8,6 +8,7 @@ use rust_decimal::Decimal;
 
 use crate::orders::money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::utils::validation::{validate_order_optional_text, validate_order_text, MAX_NAME_LEN};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -30,10 +31,15 @@ impl CommandHandler for MoveOrderAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate text lengths
+        validate_order_text(&self.target_table_name, "target_table_name", MAX_NAME_LEN)?;
+        validate_order_optional_text(&self.target_zone_name, "target_zone_name", MAX_NAME_LEN)?;
+        validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status - must be Active
+        // 3. Validate order status - must be Active
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {

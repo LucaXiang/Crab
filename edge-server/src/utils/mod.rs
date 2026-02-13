@@ -11,6 +11,7 @@ pub mod logger;
 pub mod result;
 pub mod time;
 pub mod types;
+pub mod validation;
 
 // Re-export error types from the error module (which re-exports from shared)
 pub use error::{ApiResponse, AppError, AppResult, ErrorCategory, ErrorCode};

@@ -3,6 +3,7 @@ import { FileText, Info } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { WizardState } from './index';
 import { FormSection, FormField, inputClass } from '@/shared/components/FormField';
+import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_NOTE_LEN } from '@/shared/constants/validation';
 
 interface Step5NamingProps {
   state: WizardState;
@@ -79,6 +80,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
             value={state.name}
             onChange={(e) => updateState({ name: e.target.value })}
             placeholder="lunch_discount"
+            maxLength={MAX_NAME_LEN}
             className={inputClass}
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -92,6 +94,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
             value={state.display_name}
             onChange={(e) => updateState({ display_name: e.target.value })}
             placeholder={t('settings.price_rule.wizard.display_name_placeholder')}
+            maxLength={MAX_NAME_LEN}
             className={inputClass}
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -105,6 +108,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
             value={state.receipt_name}
             onChange={(e) => updateState({ receipt_name: e.target.value })}
             placeholder={t('settings.price_rule.wizard.receipt_name_placeholder')}
+            maxLength={MAX_RECEIPT_NAME_LEN}
             className={inputClass}
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -117,6 +121,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
             value={state.description}
             onChange={(e) => updateState({ description: e.target.value })}
             placeholder={t('settings.price_rule.wizard.description_placeholder')}
+            maxLength={MAX_NOTE_LEN}
             rows={2}
             className={`${inputClass} resize-none`}
           />

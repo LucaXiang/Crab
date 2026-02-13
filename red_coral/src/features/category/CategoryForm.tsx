@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FormField, FormSection, SubField, inputClass, SelectField, KitchenPrinterSelector, AttributeDisplayTag } from '@/shared/components/FormField';
+import { MAX_NAME_LEN } from '@/shared/constants/validation';
 import { Printer, Filter, Tags } from 'lucide-react';
 import { attributeHelpers, useTags } from '@/core/stores/resources';
 import { AttributeSelectionModal } from '@/features/attribute';
@@ -65,6 +66,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
           value={formData.name}
           onChange={(e) => onFieldChange('name', e.target.value)}
           placeholder={t('settings.category.form.name_placeholder')}
+          maxLength={MAX_NAME_LEN}
           className={inputClass}
         />
       </FormField>

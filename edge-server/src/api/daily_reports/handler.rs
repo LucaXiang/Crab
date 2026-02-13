@@ -13,6 +13,7 @@ use crate::core::ServerState;
 use crate::db::repository::daily_report;
 use crate::utils::{AppError, AppResult};
 use crate::utils::time;
+use crate::utils::validation::{validate_optional_text, validate_required_text, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN};
 use shared::models::{DailyReport, DailyReportGenerate};
 
 const RESOURCE: &str = "daily_report";
@@ -79,6 +80,9 @@ pub async fn generate(
         username = %current_user.username,
         "Generating daily report"
     );
+
+    validate_required_text(&payload.business_date, "business_date", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.note, "note", MAX_NOTE_LEN)?;
 
     // 日期验证 + 时区转换 (handler 层职责)
     let tz = state.config.timezone;
