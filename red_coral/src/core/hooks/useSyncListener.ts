@@ -23,7 +23,7 @@ const PRODUCT_REFRESH_DEBOUNCE_MS = 500;
 interface SyncPayload {
   resource: string;
   action: 'created' | 'updated' | 'deleted' | 'settlement_required';
-  id: number;
+  id: string | number; // Backend sends String, parsed to number before applySync
   version: number;
   data: unknown | null;
 }
@@ -159,7 +159,10 @@ export function useSyncListener() {
 
       // 常规资源同步
       const payload = message.payload as SyncPayload;
-      const { resource, id, version, action, data } = payload;
+      const { resource, id: rawId, version, action, data } = payload;
+      // Backend SyncPayload.id is Rust String → JSON string "1",
+      // but store items use numeric ids. Parse to number for correct === matching.
+      const id = typeof rawId === 'number' ? rawId : Number(rawId);
       logger.debug(`Received sync event: resource=${resource}, action=${action}, id=${id}`, { component: 'SyncListener' });
 
       // 特殊处理: shift 事件

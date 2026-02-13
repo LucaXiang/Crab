@@ -89,6 +89,18 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
     // Sync events will refresh the store automatically
   };
 
+  const handleToggleActive = async (id: number, isActive: boolean) => {
+    try {
+      const updated = await getApi().updatePriceRule(id, { is_active: isActive });
+      usePriceRuleStore.setState((state) => ({
+        items: state.items.map((item) => (item.id === id ? updated : item)),
+      }));
+    } catch (e) {
+      logger.error('Failed to toggle price rule', e);
+      toast.error(t('common.message.save_failed'));
+    }
+  };
+
   // Empty state
   if (!loading && rules.length === 0) {
     return (
@@ -195,6 +207,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
           rules={rules}
           selectedRuleId={selectedRuleId}
           onSelectRule={setSelectedRuleId}
+          onToggleActive={handleToggleActive}
           searchQuery={searchQuery}
         />
 

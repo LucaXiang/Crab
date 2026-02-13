@@ -9,6 +9,7 @@ interface RuleListPanelProps {
   rules: PriceRule[];
   selectedRuleId: number | null;
   onSelectRule: (id: number) => void;
+  onToggleActive: (id: number, isActive: boolean) => void;
   searchQuery: string;
 }
 
@@ -35,6 +36,7 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
   rules,
   selectedRuleId,
   onSelectRule,
+  onToggleActive,
   searchQuery,
 }) => {
   const { t, locale } = useI18n();
@@ -224,15 +226,35 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
                   {formatTimeSummary(rule)}
                 </div>
 
-                {/* Row 4: Priority + Stacking */}
-                <div className="flex items-center gap-2 mt-1.5 text-xs">
-                  <span className="text-gray-400">
-                    P{calculatePriority(rule)}
-                  </span>
-                  <span className="text-gray-300">·</span>
-                  <span className={`${rule.is_exclusive ? 'text-red-500' : rule.is_stackable ? 'text-green-500' : 'text-gray-500'}`}>
-                    {t(`settings.price_rule.stacking.${getStackingMode(rule)}`)}
-                  </span>
+                {/* Row 4: Priority + Stacking + Toggle */}
+                <div className="flex items-center justify-between mt-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">
+                      P{calculatePriority(rule)}
+                    </span>
+                    <span className="text-gray-300">·</span>
+                    <span className={`${rule.is_exclusive ? 'text-red-500' : rule.is_stackable ? 'text-green-500' : 'text-gray-500'}`}>
+                      {t(`settings.price_rule.stacking.${getStackingMode(rule)}`)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleActive(rule.id, !rule.is_active);
+                    }}
+                    className={`
+                      relative w-8 h-[18px] rounded-full transition-colors duration-200 shrink-0
+                      ${rule.is_active ? 'bg-teal-500' : 'bg-gray-300'}
+                    `}
+                  >
+                    <span
+                      className={`
+                        absolute top-[2px] left-[2px] w-[14px] h-[14px] bg-white rounded-full shadow-sm
+                        transition-transform duration-200
+                        ${rule.is_active ? 'translate-x-[14px]' : 'translate-x-0'}
+                      `}
+                    />
+                  </button>
                 </div>
               </button>
             );
