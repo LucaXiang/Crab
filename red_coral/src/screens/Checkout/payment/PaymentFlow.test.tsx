@@ -4,6 +4,18 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PaymentFlow } from './PaymentFlow';
 import type { HeldOrder } from '@/core/domain/types';
 
+// --- Core infrastructure mocks (cut off tauri-client import tree) ---
+
+vi.mock('@/infrastructure/api/tauri-client', () => {
+  const proxy = new Proxy({}, { get: () => vi.fn() });
+  return {
+    invokeApi: vi.fn(),
+    getApi: vi.fn(() => proxy),
+    createTauriClient: vi.fn(() => proxy),
+    TauriApiClient: vi.fn(() => proxy),
+  };
+});
+
 vi.mock('@/hooks/useI18n', () => ({
   useI18n: () => ({
     t: (key: string) => key,
@@ -11,6 +23,22 @@ vi.mock('@/hooks/useI18n', () => ({
     setLocale: () => {}
   })
 }));
+
+vi.mock('@/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('@/infrastructure/i18n', () => ({
+  t: (key: string) => key,
+  i18n: { t: (key: string) => key, getLocale: () => 'zh-CN', setLocale: vi.fn(), subscribe: vi.fn(() => () => {}), getAllTranslations: () => ({}) },
+  getLocale: () => 'zh-CN',
+  setLocale: vi.fn(),
+  initLocale: vi.fn(),
+  DEFAULT_LOCALE: 'zh-CN',
+  SUPPORTED_LOCALES: ['zh-CN', 'es-ES'],
+}));
+
+// --- Store mocks ---
 
 vi.mock('@/core/stores/order/useCheckoutStore', () => ({
   useRetailServiceType: () => 'dineIn',
@@ -38,11 +66,38 @@ vi.mock('@/core/stores/order/commands', () => ({
   payAaSplit: vi.fn(),
   cancelPayment: vi.fn(),
   updateOrderInfo: vi.fn(),
+  redeemStamp: vi.fn(),
+  cancelStampRedemption: vi.fn(),
+}));
+
+vi.mock('@/core/stores/order/commands/sendCommand', () => ({
+  CommandFailedError: class CommandFailedError extends Error {
+    constructor(msg: string) { super(msg); this.name = 'CommandFailedError'; }
+  },
+  sendCommand: vi.fn(),
 }));
 
 vi.mock('@/core/services/order/paymentService', () => ({
   openCashDrawer: vi.fn(),
 }));
+
+// --- Feature mocks ---
+
+vi.mock('@/features/product', () => ({
+  useProductStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
+}));
+
+vi.mock('@/features/category', () => ({
+  useCategoryStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
+}));
+
+vi.mock('@/features/member/mutations', () => ({
+  getMemberDetail: vi.fn(),
+  listMembers: vi.fn(),
+  searchMembers: vi.fn(),
+}));
+
+// --- Heavy sub-component mocks (prevent deep import trees) ---
 
 vi.mock('@/presentation/components/auth/EscalatableGate', () => ({
   EscalatableGate: ({ children }: { children: React.ReactNode }) => <>{children}</>
@@ -53,18 +108,55 @@ vi.mock('@/presentation/components/OrderSidebar', () => ({
 }));
 
 vi.mock('@/presentation/components/Toast', () => ({
-  toast: {
-    error: () => {},
-    success: () => {}
-  }
+  toast: { error: vi.fn(), success: vi.fn() }
 }));
 
-vi.mock('@/features/product', () => ({
-  useProductStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
+vi.mock('../OrderDiscountModal', () => ({
+  OrderDiscountModal: () => null,
 }));
 
-vi.mock('@/features/category', () => ({
-  useCategoryStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
+vi.mock('../OrderSurchargeModal', () => ({
+  OrderSurchargeModal: () => null,
+}));
+
+vi.mock('../MemberLinkModal', () => ({
+  MemberLinkModal: () => null,
+}));
+
+vi.mock('./StampRewardPickerModal', () => ({
+  StampRewardPickerModal: () => null,
+}));
+
+vi.mock('./StampRedeemModal', () => ({
+  StampRedeemModal: () => null,
+}));
+
+vi.mock('./PaymentSuccessModal', () => ({
+  PaymentSuccessModal: () => null,
+}));
+
+vi.mock('./PaymentRecordsPage', () => ({
+  PaymentRecordsPage: () => null,
+}));
+
+vi.mock('../CompItemMode', () => ({
+  CompItemMode: () => null,
+}));
+
+vi.mock('../OrderDetailMode', () => ({
+  OrderDetailMode: () => null,
+}));
+
+vi.mock('../MemberDetailMode', () => ({
+  MemberDetailMode: () => null,
+}));
+
+vi.mock('./ItemSplitPage', () => ({
+  ItemSplitPage: () => null,
+}));
+
+vi.mock('./AmountSplitPage', () => ({
+  AmountSplitPage: () => null,
 }));
 
 const baseOrder = {
