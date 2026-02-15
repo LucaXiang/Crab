@@ -291,7 +291,7 @@ impl ServerState {
         state.audit_service.log(
             crate::audit::AuditAction::SystemStartup,
             "system",
-            "server:main",
+            "main",
             None,
             None,
             serde_json::json!({"source": "local", "epoch": &state.epoch}),

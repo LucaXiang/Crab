@@ -59,8 +59,8 @@ pub use utils::logger::{cleanup_old_logs, init_logger, init_logger_with_file};
 /// audit_log!(
 ///     state.audit_service,
 ///     AuditAction::LoginSuccess,
-///     "auth", "employee:emp1",
-///     operator_id = Some("emp1".into()),
+///     "auth", "1",
+///     operator_id = Some(1),
 ///     operator_name = Some("张三".into()),
 ///     details = serde_json::json!({"ip": "127.0.0.1"})
 /// );

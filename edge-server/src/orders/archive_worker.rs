@@ -386,7 +386,7 @@ impl ArchiveWorker {
             _ => {}
         }
 
-        let resource_id = format!("order:{}", snapshot.order_id);
+        let resource_id = snapshot.order_id.to_string();
         self.audit_service
             .log_with_target(
                 action,

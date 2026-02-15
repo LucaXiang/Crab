@@ -134,7 +134,7 @@ impl AuditService {
                 .append(
                     AuditAction::SystemAbnormalShutdown,
                     "system".to_string(),
-                    "server:main".to_string(),
+                    "main".to_string(),
                     None,
                     None,
                     details,
@@ -208,7 +208,7 @@ impl AuditService {
                     .append(
                         AuditAction::SystemLongDowntime,
                         "system".to_string(),
-                        "server:main".to_string(),
+                        "main".to_string(),
                         None,
                         None,
                         details,

@@ -192,7 +192,7 @@ pub async fn upload(
     state.audit_service.log(
         crate::audit::AuditAction::StoreInfoChanged,
         "upload",
-        format!("image:{}", hash),
+        hash.clone(),
         Some(current_user.id),
         Some(current_user.display_name.clone()),
         serde_json::json!({

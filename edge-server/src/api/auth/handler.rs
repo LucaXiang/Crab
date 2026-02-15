@@ -48,7 +48,7 @@ pub async fn login(
 
             if !password_valid {
                 state.audit_service.log(
-                    AuditAction::LoginFailed, "auth", format!("employee:{}", username),
+                    AuditAction::LoginFailed, "auth", &username,
                     None, None,
                     serde_json::json!({"reason": "invalid_credentials", "username": &username}),
                 ).await;
@@ -60,7 +60,7 @@ pub async fn login(
         }
         None => {
             state.audit_service.log(
-                AuditAction::LoginFailed, "auth", format!("employee:{}", username),
+                AuditAction::LoginFailed, "auth", &username,
                 None, None,
                 serde_json::json!({"reason": "user_not_found", "username": &username}),
             ).await;
@@ -95,7 +95,7 @@ pub async fn login(
 
     // Log successful login
     state.audit_service.log(
-        AuditAction::LoginSuccess, "auth", format!("employee:{}", emp.id),
+        AuditAction::LoginSuccess, "auth", emp.id.to_string(),
         Some(emp.id), Some(emp.display_name.clone()),
         serde_json::json!({"username": &emp.username}),
     ).await;
@@ -158,7 +158,7 @@ pub async fn logout(
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<()>, AppError> {
     state.audit_service.log(
-        AuditAction::Logout, "auth", format!("employee:{}", user.id),
+        AuditAction::Logout, "auth", user.id.to_string(),
         Some(user.id), Some(user.display_name.clone()),
         serde_json::json!({"username": &user.username}),
     ).await;
@@ -258,7 +258,7 @@ pub async fn escalate(
     state.audit_service.log(
         AuditAction::EscalationSuccess,
         "auth",
-        format!("employee:{}", authorizer_id),
+        authorizer_id.to_string(),
         Some(authorizer_id),
         Some(emp.display_name.clone()),
         serde_json::json!({

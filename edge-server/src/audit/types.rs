@@ -173,7 +173,7 @@ pub struct AuditEntry {
     pub action: AuditAction,
     /// 资源类型（如 "order", "employee", "system"）
     pub resource_type: String,
-    /// 资源 ID（如 "order:xxx", "employee:yyy"）
+    /// 资源 ID（纯标识值，如 "uuid", "1", "main"）
     pub resource_id: String,
     /// 操作人 ID（系统事件为 None）
     pub operator_id: Option<i64>,

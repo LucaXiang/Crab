@@ -137,7 +137,7 @@ impl Server {
         if let Err(e) = state.audit_service.log_sync(
             crate::audit::AuditAction::SystemShutdown,
             "system",
-            "server:main",
+            "main",
             serde_json::json!({"epoch": &state.epoch}),
         ).await {
             tracing::error!("Failed to log system shutdown: {:?}", e);

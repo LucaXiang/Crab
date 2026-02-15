@@ -49,7 +49,7 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::PrintConfigChanged,
-        "print_config", "print_config:default",
+        "print_config", "default",
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
