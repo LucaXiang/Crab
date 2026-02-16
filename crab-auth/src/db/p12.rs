@@ -31,6 +31,30 @@ pub async fn find_by_tenant(
     .await
 }
 
+/// 获取租户的 P12 证书状态 (供 SubscriptionInfo 使用)
+///
+/// 查询 `p12_certificates` 表，转为 `shared::activation::P12Info`。
+/// 如果无记录则返回 `has_p12: false`。
+pub async fn get_p12_info(
+    pool: &PgPool,
+    tenant_id: &str,
+) -> Result<shared::activation::P12Info, sqlx::Error> {
+    match find_by_tenant(pool, tenant_id).await? {
+        Some(cert) => Ok(shared::activation::P12Info {
+            has_p12: true,
+            fingerprint: cert.fingerprint,
+            subject: cert.subject,
+            expires_at: cert.expires_at,
+        }),
+        None => Ok(shared::activation::P12Info {
+            has_p12: false,
+            fingerprint: None,
+            subject: None,
+            expires_at: None,
+        }),
+    }
+}
+
 /// 插入或更新 P12 证书记录
 pub async fn upsert(
     pool: &PgPool,

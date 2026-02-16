@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crab_client::{Authenticated, Connected, CrabClient, Local, Remote};
-use shared::app_state::{ActivationRequiredReason, SubscriptionBlockedInfo};
+use shared::app_state::{ActivationRequiredReason, P12BlockedInfo, SubscriptionBlockedInfo};
 
 /// 运行模式类型 (公开枚举，仅 Server/Client)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +44,9 @@ pub enum AppState {
 
     /// Server: 订阅无效 - 携带详细信息
     ServerSubscriptionBlocked { info: SubscriptionBlockedInfo },
+
+    /// Server: P12 证书缺失或过期 - 阻止使用
+    ServerP12Blocked { info: P12BlockedInfo },
 
     /// Server: 服务器就绪，等待员工登录
     ServerReady,

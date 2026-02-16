@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use crate::services::tenant_binding::TenantBinding;
 use crate::utils::AppError;
 use shared::activation::SubscriptionInfo;
-use shared::app_state::SubscriptionBlockedInfo;
+use shared::app_state::{P12BlockedInfo, P12BlockedReason, SubscriptionBlockedInfo};
 
 /// 激活服务 - 管理边缘节点激活状态
 ///
@@ -171,6 +171,72 @@ impl ActivationService {
             support_url: Some("https://support.example.com".to_string()),
             renewal_url: Some("https://billing.example.com/renew".to_string()),
             user_message,
+        })
+    }
+
+    /// 检查 P12 证书是否被阻止
+    ///
+    /// 阻止条件 (任一满足):
+    /// 1. P12 缺失 (`has_p12 == false`)
+    /// 2. P12 过期 (`expires_at < now`)
+    pub async fn is_p12_blocked(&self) -> bool {
+        let cache = self.credential_cache.read().await;
+        let p12 = match cache
+            .as_ref()
+            .and_then(|c| c.subscription.as_ref())
+            .and_then(|s| s.p12.as_ref())
+        {
+            Some(p) => p,
+            None => return false, // 无 P12 数据 = auth-server 未返回 → 不阻止 (向后兼容)
+        };
+
+        if !p12.has_p12 {
+            return true;
+        }
+
+        if let Some(expires_at) = p12.expires_at
+            && shared::util::now_millis() > expires_at
+        {
+            return true;
+        }
+
+        false
+    }
+
+    /// 获取 P12 阻止信息 (供 Bridge 使用)
+    ///
+    /// 返回 `None` 表示未阻止。
+    pub async fn get_p12_blocked_info(&self) -> Option<P12BlockedInfo> {
+        let cache = self.credential_cache.read().await;
+        let cred = cache.as_ref()?;
+        let p12 = cred.subscription.as_ref()?.p12.as_ref()?;
+
+        let now = shared::util::now_millis();
+
+        let reason = if !p12.has_p12 {
+            P12BlockedReason::Missing
+        } else if let Some(expires_at) = p12.expires_at {
+            if now > expires_at {
+                let days_overdue = (now - expires_at) / 86_400_000;
+                P12BlockedReason::Expired {
+                    expired_at: expires_at,
+                    days_overdue,
+                }
+            } else {
+                return None; // 有效，不阻止
+            }
+        } else {
+            return None; // has_p12 == true 且无过期时间 → 不阻止
+        };
+
+        Some(P12BlockedInfo {
+            reason,
+            tenant_id: cred.binding.tenant_id.clone(),
+            upload_url: Some(format!("{}/p12/upload", self.auth_server_url)),
+            user_message: match &p12.has_p12 {
+                false => "p12_missing".to_string(),
+                true => "p12_expired".to_string(),
+            },
         })
     }
 

@@ -1,4 +1,4 @@
-use crate::db::subscriptions;
+use crate::db::{p12, subscriptions};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -60,6 +60,13 @@ pub async fn get_subscription_status(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
+        p12: match p12::get_p12_info(&state.db, &payload.tenant_id).await {
+            Ok(info) => Some(info),
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");
+                None
+            }
+        },
     };
 
     let signed = match subscription.sign(&tenant_ca.key_pem()) {

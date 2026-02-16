@@ -27,7 +27,7 @@ import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
 
 import { OrderDebug } from '@/screens/Debug';
-import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
+import { ActivationRequiredScreen, P12BlockedScreen, SubscriptionBlockedScreen } from '@/screens/Status';
 
 const WINDOW_SHOW_DELAY_MS = 50;
 const KEYBOARD_FOCUSOUT_DELAY_MS = 100;
@@ -395,6 +395,7 @@ const App: React.FC = () => {
         {/* Status Routes */}
         <Route path="/status/activation-required" element={<ActivationRequiredScreen />} />
         <Route path="/status/subscription-blocked" element={<SubscriptionBlockedScreen />} />
+        <Route path="/status/p12-blocked" element={<P12BlockedScreen />} />
 
         {/* Public Routes */}
         <Route path="/login" element={<LoginScreen />} />

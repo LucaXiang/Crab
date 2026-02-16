@@ -2145,6 +2145,25 @@
       "enterprise": "企业版"
     }
   },
+  "p12Blocked": {
+    "title": "电子签名证书异常",
+    "tenant": "租户",
+    "expired_at": "过期时间",
+    "button_upload": "上传 P12 证书",
+    "button_recheck": "重新检查证书状态",
+    "rechecking": "正在检查...",
+    "still_blocked": "证书仍然无效，请上传有效证书后再试",
+    "button_exit_tenant": "退出当前租户",
+    "confirm_exit_tenant": "确定退出当前租户？退出后需要重新激活设备。",
+    "status": {
+      "missing": "未上传",
+      "expired": "已过期"
+    },
+    "message": {
+      "missing": "需要上传 P12 电子签名证书才能使用系统",
+      "expired": "P12 电子签名证书已过期，请上传新证书"
+    }
+  },
   "fonts": {
     "arial": "Arial",
     "microsoft_ya_hei": "微软雅黑",

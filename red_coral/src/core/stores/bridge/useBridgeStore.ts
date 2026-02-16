@@ -58,6 +58,10 @@ export const AppStateHelpers = {
       case 'ServerSubscriptionBlocked':
         return '/status/subscription-blocked';
 
+      // P12 证书阻止
+      case 'ServerP12Blocked':
+        return '/status/p12-blocked';
+
       // Client 断连
       case 'ClientDisconnected':
         return '/setup';

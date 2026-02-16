@@ -48,6 +48,21 @@ export interface SubscriptionBlockedInfo {
 }
 
 // =============================================================================
+// P12 证书阻止信息
+// =============================================================================
+
+export type P12BlockedReason =
+  | { code: 'Missing' }
+  | { code: 'Expired'; details: { expired_at: number; days_overdue: number } };
+
+export interface P12BlockedInfo {
+  reason: P12BlockedReason;
+  tenant_id: string;
+  upload_url?: string;
+  user_message: string;
+}
+
+// =============================================================================
 // 健康检查
 // =============================================================================
 
@@ -115,6 +130,7 @@ export type AppState =
       data: { reason: ActivationRequiredReason; can_auto_recover: boolean; recovery_hint: string };
     }
   | { type: 'ServerSubscriptionBlocked'; data: { info: SubscriptionBlockedInfo } }
+  | { type: 'ServerP12Blocked'; data: { info: P12BlockedInfo } }
   | { type: 'ServerReady' }
   | { type: 'ServerAuthenticated' }
   // Client 模式

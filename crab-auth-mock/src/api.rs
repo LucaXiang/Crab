@@ -410,6 +410,7 @@ async fn activate(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
+        p12: None,
     };
 
     // Sign the subscription with Tenant CA
@@ -534,6 +535,7 @@ async fn get_subscription_status(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
+        p12: None,
     };
 
     // Sign the subscription with Tenant CA
@@ -990,6 +992,7 @@ async fn client_activate(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
+        p12: None,
     };
 
     let signed_subscription = match subscription.sign(&tenant_ca.key_pem()) {

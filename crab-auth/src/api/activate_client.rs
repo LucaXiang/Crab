@@ -1,4 +1,4 @@
-use crate::db::{client_connections, subscriptions, tenants};
+use crate::db::{client_connections, p12, subscriptions, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -211,6 +211,13 @@ pub async fn activate_client(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
+        p12: match p12::get_p12_info(&state.db, &tenant.id).await {
+            Ok(info) => Some(info),
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");
+                None
+            }
+        },
     };
 
     let signed_subscription = match subscription_info.sign(&tenant_ca.key_pem()) {

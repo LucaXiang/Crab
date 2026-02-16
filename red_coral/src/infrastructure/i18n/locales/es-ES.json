@@ -2145,6 +2145,25 @@
       "enterprise": "Empresa"
     }
   },
+  "p12Blocked": {
+    "title": "Certificado de firma electrónica",
+    "tenant": "Inquilino",
+    "expired_at": "Fecha de expiración",
+    "button_upload": "Subir certificado P12",
+    "button_recheck": "Verificar estado del certificado",
+    "rechecking": "Verificando...",
+    "still_blocked": "El certificado sigue siendo inválido. Suba un certificado válido e inténtelo de nuevo",
+    "button_exit_tenant": "Salir del inquilino actual",
+    "confirm_exit_tenant": "¿Seguro que desea salir del inquilino actual? Deberá reactivar el dispositivo.",
+    "status": {
+      "missing": "No subido",
+      "expired": "Expirado"
+    },
+    "message": {
+      "missing": "Se requiere subir un certificado P12 de firma electrónica para usar el sistema",
+      "expired": "El certificado P12 de firma electrónica ha expirado. Por favor, suba uno nuevo"
+    }
+  },
   "fonts": {
     "arial": "Arial",
     "microsoft_ya_hei": "Microsoft YaHei",

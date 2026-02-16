@@ -250,6 +250,25 @@ impl EntityType {
     }
 }
 
+/// P12 电子签名证书状态
+///
+/// 由 crab-auth 在激活/订阅刷新时查询 p12_certificates 表后返回。
+/// edge-server 不直接访问 P12 文件，仅通过此元数据判断状态。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct P12Info {
+    /// 是否已上传 P12 证书
+    pub has_p12: bool,
+    /// 证书指纹 (SHA256)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+    /// 证书主体 (CN)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    /// 证书过期时间 (Unix millis)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
+}
+
 /// 订阅信息
 ///
 /// 订阅信息有独立签名，有效期较短 (默认 7 天)。
@@ -279,6 +298,9 @@ pub struct SubscriptionInfo {
     /// 每个 edge-server 允许的最大 Client 数，0 = 无限
     #[serde(default)]
     pub max_clients: u32,
+    /// P12 电子签名证书状态 (由 crab-auth 返回)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub p12: Option<P12Info>,
     /// 签名有效期 (Unix millis，超过此时间需要刷新)
     pub signature_valid_until: i64,
     /// Tenant CA 签名 (base64)

@@ -8,7 +8,8 @@
 //! 1. ServerState::initialize()      - 初始化服务和数据库
 //! 2. start_background_tasks()       - 启动无需 TLS 的后台任务
 //! 3. wait_for_activation()          - 等待设备激活 + 加载 mTLS 证书
-//! 4. subscription_check()           - 订阅阻止检查 (blocked → 60s 重试循环)
+//! 4. subscription_check()           - 订阅阻止检查 (blocked → 指数退避重试)
+//! 4.5. p12_check()                  - P12 证书阻止检查 (缺失/过期 → 指数退避重试)
 //! 5. start_tls_tasks()              - 启动需要 TLS 的任务
 //! 6. https.start_server()           - 启动 HTTPS 服务
 //! 7. shutdown()                     - Graceful shutdown
@@ -103,7 +104,37 @@ impl Server {
             retry_delay = (retry_delay * 2).min(MAX_DELAY);
             tracing::info!("Re-checked subscription (next retry in {:?})", retry_delay);
         }
-        tracing::info!("Subscription OK, proceeding to start services");
+        tracing::info!("Subscription OK, proceeding to P12 check");
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 4.5: P12 certificate check — 指数退避重试
+        // ═══════════════════════════════════════════════════════════════════
+        let mut p12_retry_delay = std::time::Duration::from_secs(10);
+
+        while state.is_p12_blocked().await {
+            state.print_p12_blocked_banner().await;
+
+            tokio::select! {
+                _ = self.shutdown_token.cancelled() => {
+                    tracing::info!("Shutdown requested during P12 check");
+                    state.audit_service.on_shutdown();
+                    background_tasks.shutdown().await;
+                    return Ok(());
+                }
+                _ = tokio::time::sleep(p12_retry_delay) => {}
+            }
+
+            // Re-sync subscription (includes P12 status) from auth-server
+            state.sync_subscription().await;
+
+            // 指数退避: 10s → 20s → 40s → 80s → 160s → 300s
+            p12_retry_delay = (p12_retry_delay * 2).min(MAX_DELAY);
+            tracing::info!(
+                "Re-checked P12 status (next retry in {:?})",
+                p12_retry_delay
+            );
+        }
+        tracing::info!("P12 OK, proceeding to start services");
 
         // ═══════════════════════════════════════════════════════════════════
         // Phase 5: Start TLS-dependent tasks

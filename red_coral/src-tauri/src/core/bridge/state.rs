@@ -108,17 +108,23 @@ impl ClientBridge {
                     // 订阅阻止检查
                     let blocked_info = server_state.get_subscription_blocked_info().await;
                     if let Some(info) = blocked_info {
-                        AppState::ServerSubscriptionBlocked { info }
-                    } else {
-                        // 检查员工登录状态
-                        if matches!(client, Some(LocalClientState::Authenticated(_))) {
-                            return AppState::ServerAuthenticated;
-                        }
-                        if tenant_manager.current_session().is_some() {
-                            return AppState::ServerAuthenticated;
-                        }
-                        AppState::ServerReady
+                        return AppState::ServerSubscriptionBlocked { info };
                     }
+
+                    // P12 证书阻止检查
+                    let p12_info = server_state.get_p12_blocked_info().await;
+                    if let Some(info) = p12_info {
+                        return AppState::ServerP12Blocked { info };
+                    }
+
+                    // 检查员工登录状态
+                    if matches!(client, Some(LocalClientState::Authenticated(_))) {
+                        return AppState::ServerAuthenticated;
+                    }
+                    if tenant_manager.current_session().is_some() {
+                        return AppState::ServerAuthenticated;
+                    }
+                    AppState::ServerReady
                 } else {
                     let reason = self.detect_activation_reason(&tenant_manager, true);
                     AppState::ServerNeedActivation {

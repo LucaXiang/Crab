@@ -838,6 +838,18 @@ impl ServerState {
         self.activation.sync_subscription().await;
     }
 
+    /// 检查 P12 证书是否被阻止
+    pub async fn is_p12_blocked(&self) -> bool {
+        self.activation.is_p12_blocked().await
+    }
+
+    /// 获取 P12 阻止信息 (供 Bridge 使用)
+    ///
+    /// 返回 None 表示未阻止
+    pub async fn get_p12_blocked_info(&self) -> Option<shared::app_state::P12BlockedInfo> {
+        self.activation.get_p12_blocked_info().await
+    }
+
     /// 创建预配服务 (用于边缘激活)
     pub fn provisioning_service(&self, auth_url: String) -> ProvisioningService {
         ProvisioningService::new(self.clone(), auth_url)
@@ -904,6 +916,42 @@ impl ServerState {
             tracing::warn!("  HTTPS Server : NOT STARTED");
             tracing::warn!("  Message Bus  : NOT STARTED");
             tracing::warn!("  Waiting 60s before re-checking...");
+            tracing::warn!(
+                "════════════════════════════════════════════════════════════════════════"
+            );
+        }
+    }
+
+    pub async fn print_p12_blocked_banner(&self) {
+        let cred = self.activation.get_credential().await.unwrap_or_default();
+        if let Some(c) = cred {
+            tracing::warn!(
+                "╔══════════════════════════════════════════════════════════════════════╗"
+            );
+            tracing::warn!(
+                "║              P12 CERTIFICATE BLOCKED - SERVICES STOPPED              ║"
+            );
+            tracing::warn!(
+                "╚══════════════════════════════════════════════════════════════════════╝"
+            );
+            tracing::warn!("  Tenant ID    : {}", c.binding.tenant_id);
+            if let Some(sub) = &c.subscription
+                && let Some(p12) = &sub.p12
+            {
+                if !p12.has_p12 {
+                    tracing::warn!("  P12 Status   : MISSING (not uploaded)");
+                } else if let Some(expires_at) = p12.expires_at {
+                    let days = (shared::util::now_millis() - expires_at) / 86_400_000;
+                    tracing::warn!("  P12 Status   : EXPIRED ({} days overdue)", days);
+                }
+            }
+            tracing::warn!("  HTTPS Server : NOT STARTED");
+            tracing::warn!("  Message Bus  : NOT STARTED");
+            tracing::warn!(
+                "  Upload P12 at: {}/p12/upload",
+                self.activation.auth_server_url()
+            );
+            tracing::warn!("  Waiting before re-checking...");
             tracing::warn!(
                 "════════════════════════════════════════════════════════════════════════"
             );

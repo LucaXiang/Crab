@@ -133,6 +133,30 @@ pub struct SubscriptionBlockedInfo {
 }
 
 // =============================================================================
+// P12 证书阻止信息
+// =============================================================================
+
+/// P12 证书阻止原因
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "code", content = "details")]
+pub enum P12BlockedReason {
+    /// P12 证书缺失 (未上传)
+    Missing,
+    /// P12 证书已过期
+    Expired { expired_at: i64, days_overdue: i64 },
+}
+
+/// P12 证书阻止详细信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct P12BlockedInfo {
+    pub reason: P12BlockedReason,
+    pub tenant_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upload_url: Option<String>,
+    pub user_message: String,
+}
+
+// =============================================================================
 // 健康检查
 // =============================================================================
 
