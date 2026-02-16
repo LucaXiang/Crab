@@ -4,14 +4,13 @@ use axum::{
     extract::{Extension, Path, State},
     Json,
 };
-use serde::Deserialize;
-
 use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult, ErrorCode};
+use crate::utils::types::{BatchUpdateResponse, SortOrderUpdate};
 use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_URL_LEN};
 use shared::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 
@@ -107,19 +106,6 @@ pub async fn list_by_category(
 
 /// GET /api/products/:id - 获取单个商品 (完整数据)
 pub async fn get_by_id(
-    State(state): State<ServerState>,
-    Path(id): Path<i64>,
-) -> AppResult<Json<ProductFull>> {
-    let product = state
-        .catalog_service
-        .get_product(id)
-        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
-    Ok(Json(product))
-}
-
-/// GET /api/products/:id/full - 获取商品完整信息 (含规格、属性、标签)
-/// Note: Now same as get_by_id since CatalogService always returns ProductFull
-pub async fn get_full(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<ProductFull>> {
@@ -371,19 +357,6 @@ pub async fn remove_product_tag(
 // =============================================================================
 // Batch Sort Order
 // =============================================================================
-
-/// Payload for batch sort order update
-#[derive(Debug, Deserialize)]
-pub struct SortOrderUpdate {
-    pub id: i64,
-    pub sort_order: i32,
-}
-
-/// Response for batch update operation
-#[derive(Debug, serde::Serialize)]
-pub struct BatchUpdateResponse {
-    pub updated: usize,
-}
 
 /// PUT /api/products/sort-order - 批量更新商品排序
 pub async fn batch_update_sort_order(

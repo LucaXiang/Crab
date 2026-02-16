@@ -20,7 +20,6 @@ fn product_routes() -> Router<ServerState> {
     let read_routes = Router::new()
         .route("/", get(handler::list))
         .route("/{id}", get(handler::get_by_id))
-        .route("/{id}/full", get(handler::get_full))
         .route("/{id}/attributes", get(handler::list_product_attributes))
         .route("/by-category/{category_id}", get(handler::list_by_category));
 

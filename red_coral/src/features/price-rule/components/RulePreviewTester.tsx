@@ -9,6 +9,7 @@ import { useTagStore } from '@/features/tag/store';
 import { formatCurrency } from '@/utils/currency';
 import { ZonePicker } from './ZonePicker';
 import { ProductPicker } from './ProductPicker';
+import { WheelTimePicker } from '@/shared/components/FormField';
 
 interface RulePreviewTesterProps {
   rules: PriceRule[];
@@ -316,11 +317,10 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
             </select>
 
             {/* Time selector */}
-            <input
-              type="time"
+            <WheelTimePicker
               value={selectedTime}
-              onChange={(e) => setSelectedTime(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              onChange={setSelectedTime}
+              placeholder="HH:MM"
             />
           </div>
         )}

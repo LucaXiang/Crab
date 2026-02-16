@@ -456,44 +456,6 @@ impl ServerState {
         );
     }
 
-    /// 为单个订单加载并缓存价格规则
-    ///
-    /// 用于：
-    /// - 手动刷新订单规则
-    pub async fn load_rules_for_order(&self, order_id: &str) -> bool {
-        let snapshot = match self.orders_manager.get_snapshot(order_id) {
-            Ok(Some(s)) => s,
-            Ok(None) => {
-                tracing::warn!("Order {} not found for rule loading", order_id);
-                return false;
-            }
-            Err(e) => {
-                tracing::error!("Failed to get order {} for rule loading: {:?}", order_id, e);
-                return false;
-            }
-        };
-
-        let rules = load_matching_rules(
-            &self.pool,
-            snapshot.zone_id,
-            snapshot.is_retail,
-        )
-        .await;
-
-        if !rules.is_empty() {
-            tracing::debug!(
-                order_id = %order_id,
-                rule_count = rules.len(),
-                "Loaded rules for order"
-            );
-            self.orders_manager.cache_rules(order_id, rules);
-            true
-        } else {
-            // No rules to cache, but still valid
-            true
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     // Task Registration Methods
     // ═══════════════════════════════════════════════════════════════════════
@@ -705,19 +667,9 @@ impl ServerState {
     // Getter Methods
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// 获取数据库实例
-    pub fn get_pool(&self) -> SqlitePool {
-        self.pool.clone()
-    }
-
     /// 获取工作目录
     pub fn work_dir(&self) -> PathBuf {
         PathBuf::from(&self.config.work_dir)
-    }
-
-    /// 获取图片目录: {tenant}/server/images/
-    pub fn images_dir(&self) -> PathBuf {
-        self.config.images_dir()
     }
 
     /// 获取 JWT 服务

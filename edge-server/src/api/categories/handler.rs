@@ -4,7 +4,7 @@ use axum::{
     extract::{Extension, Path, State},
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
@@ -12,6 +12,7 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use crate::utils::types::{BatchUpdateResponse, SortOrderUpdate};
 use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN};
 use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
@@ -155,19 +156,6 @@ pub async fn delete(
 // =========================================================================
 // Batch Sort Order Update
 // =========================================================================
-
-/// Payload for batch sort order update
-#[derive(Debug, Deserialize)]
-pub struct SortOrderUpdate {
-    pub id: i64,
-    pub sort_order: i32,
-}
-
-/// Response for batch update operation
-#[derive(Debug, Serialize)]
-pub struct BatchUpdateResponse {
-    pub updated: usize,
-}
 
 /// PUT /api/categories/sort-order - Batch update sort orders
 pub async fn batch_update_sort_order(

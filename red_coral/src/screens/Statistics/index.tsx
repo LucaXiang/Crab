@@ -9,6 +9,7 @@ import { DailyReportManagement } from '@/features/daily-report/DailyReportManage
 import { AuditLog } from './components/AuditLog';
 import { TimeRange, ActiveTab, StatisticsResponse } from '@/core/domain/types';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
+import { WheelDateTimePicker } from '@/shared/components/FormField';
 
 interface StatisticsScreenProps {
   isVisible: boolean;
@@ -99,18 +100,14 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
             <div className="flex items-center gap-3">
               {timeRange === 'custom' && (
                 <div className="flex items-center gap-2 bg-white rounded-md border border-gray-200 p-1 shadow-sm">
-                  <input 
-                    type="datetime-local" 
-                    value={customStartDate} 
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="text-sm border-none focus:ring-0 text-gray-600 p-1 outline-none"
+                  <WheelDateTimePicker
+                    value={customStartDate}
+                    onChange={setCustomStartDate}
                   />
                   <span className="text-gray-400">-</span>
-                  <input 
-                    type="datetime-local" 
-                    value={customEndDate} 
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="text-sm border-none focus:ring-0 text-gray-600 p-1 outline-none"
+                  <WheelDateTimePicker
+                    value={customEndDate}
+                    onChange={setCustomEndDate}
                   />
                 </div>
               )}

@@ -44,6 +44,13 @@
       "actions": "Acciones",
       "done": "Listo"
     },
+    "time_unit": {
+      "year": "Año",
+      "month": "Mes",
+      "day": "Día",
+      "hour": "Hr",
+      "minute": "Min"
+    },
     "status": {
       "all": "Todos",
       "active": "Activo",
@@ -437,6 +444,11 @@
       "cancel_title": "Confirmar volver",
       "cancel_description": "Volver anulará la venta. ¿Continuar?",
       "cancel_confirm": "Confirmar anulación"
+    },
+    "merge_to_table": {
+      "button": "Combinar a Mesa",
+      "success": "Pedido combinado a mesa",
+      "failed": "Error al combinar a mesa"
     },
     "error": {
       "no_receipt_number": "Pedido sin número",

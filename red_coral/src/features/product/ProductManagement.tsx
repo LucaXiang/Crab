@@ -18,6 +18,7 @@ import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/hooks/useConfirmDialog';
 import { ProductImage } from './ProductImage';
 import { formatCurrency } from '@/utils/currency';
 import { SpecificationManagementModal } from './SpecificationManagementModal';
@@ -81,12 +82,7 @@ export const ProductManagement: React.FC = React.memo(() => {
     return result;
   }, [products, categoryFilter, searchQuery]);
 
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-  });
+  const confirmDialog = useConfirmDialog();
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
@@ -111,12 +107,11 @@ export const ProductManagement: React.FC = React.memo(() => {
   }, [filteredProducts.length]);
 
   const handleBatchDelete = (items: ProductItem[]) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: t('settings.product.list.batch_delete_title'),
-      description: t('settings.product.list.confirmBatchDelete', { count: items.length }) || `确定要删除选中的 ${items.length} 个菜品吗？此操作无法撤销。`,
-      onConfirm: async () => {
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+    confirmDialog.show(
+      t('settings.product.list.batch_delete_title'),
+      t('settings.product.list.confirmBatchDelete', { count: items.length }) || `确定要删除选中的 ${items.length} 个菜品吗？此操作无法撤销。`,
+      async () => {
+        confirmDialog.close();
         try {
           const ids = items.map((item) => item.id).filter((id): id is number => id != null);
           await getApi().bulkDeleteProducts(ids);
@@ -130,7 +125,7 @@ export const ProductManagement: React.FC = React.memo(() => {
           toast.error(t('settings.product.list.batch_delete_failed'));
         }
       },
-    });
+    );
   };
 
   const columns: Column<ProductItem>[] = useMemo(
@@ -439,7 +434,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onCancel={confirmDialog.close}
       />
 
       {/* Specification Management Modal */}

@@ -104,6 +104,14 @@ const useAppInitialization = () => {
           };
           useAuthStore.getState().setUser(user);
         } else {
+          // Session 丢失但 appState 仍为 Authenticated → 通知后端登出以同步状态
+          // 避免 appState=Authenticated + isAuthenticated=false 导致重定向循环
+          logger.warn('Session lost while appState is Authenticated, syncing backend state');
+          try {
+            await useBridgeStore.getState().logoutEmployee();
+          } catch {
+            // 忽略登出错误，appState 会在 logoutEmployee 内部被刷新
+          }
           useAuthStore.getState().logout();
         }
       } else {

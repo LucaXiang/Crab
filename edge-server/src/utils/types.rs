@@ -2,7 +2,7 @@
 //!
 //! Common types used across the application
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Pagination query parameters
 #[derive(Debug, Clone, Deserialize)]
@@ -41,5 +41,18 @@ impl PaginationParams {
     pub fn limit(&self) -> u32 {
         self.page_size
     }
+}
+
+/// Batch sort order update payload (used by products and categories)
+#[derive(Debug, Deserialize)]
+pub struct SortOrderUpdate {
+    pub id: i64,
+    pub sort_order: i32,
+}
+
+/// Response for batch update operations
+#[derive(Debug, Serialize)]
+pub struct BatchUpdateResponse {
+    pub updated: usize,
 }
 

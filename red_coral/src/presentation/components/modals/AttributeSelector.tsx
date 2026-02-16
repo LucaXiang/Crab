@@ -111,8 +111,8 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
         </span>
       </div>
 
-      {/* Options Grid - Card Style */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {/* Options */}
+      <div className="flex flex-wrap gap-2">
         {activeOptions.map((option) => {
           const optionIdStr = String(option.id);
           const quantity = selectedOptions.get(optionIdStr) || 0;
@@ -122,16 +122,104 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
           const hasQuantityControl = option.enable_quantity;
           const maxQty = option.max_quantity || 99;
 
+          // Options with quantity control: selected shows stepper, unselected looks normal
+          if (hasQuantityControl) {
+            if (isSelected) {
+              return (
+                <div
+                  key={`${option.name}-${option.id}`}
+                  className="relative rounded-full bg-orange-500 text-white shadow-md shadow-orange-200 transition-all duration-150 flex items-center"
+                >
+                  {/* Label + price: click to +1 */}
+                  <button
+                    onClick={() => {
+                      if (quantity >= maxQty) return;
+                      handleQuantityChange(optionIdStr, 1, option);
+                    }}
+                    disabled={quantity >= maxQty}
+                    className="flex items-center gap-1.5 pl-4 pr-1 py-2 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-sm font-medium whitespace-nowrap">{option.name}</span>
+                    {option.price_modifier !== 0 && (
+                      <span className="text-xs font-medium whitespace-nowrap text-white/80">
+                        {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Quantity stepper */}
+                  <div className="flex items-center gap-0.5 pr-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleQuantityChange(optionIdStr, -1, option);
+                      }}
+                      className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 flex items-center justify-center transition-colors"
+                    >
+                      <Minus size={14} strokeWidth={2.5} />
+                    </button>
+                    <span className="text-sm font-bold w-6 text-center tabular-nums">{quantity}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleQuantityChange(optionIdStr, 1, option);
+                      }}
+                      disabled={quantity >= maxQty}
+                      className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            // Unselected: normal pill, click to +1
+            return (
+              <div
+                key={`${option.name}-${option.id}`}
+                className={`
+                  relative rounded-full transition-all duration-150
+                  ${isDisabled
+                    ? 'bg-gray-100 text-gray-300'
+                    : 'bg-gray-100 text-gray-700 hover:bg-orange-100 hover:text-orange-700'
+                  }
+                `}
+              >
+                <button
+                  onClick={() => {
+                    if (isDisabled) return;
+                    handleQuantityChange(optionIdStr, 1, option);
+                  }}
+                  disabled={isDisabled}
+                  className="flex items-center gap-1.5 px-4 py-2"
+                >
+                  <span className="text-sm font-medium whitespace-nowrap">{option.name}</span>
+                  {option.price_modifier !== 0 && (
+                    <span className={`text-xs font-medium whitespace-nowrap ${
+                      option.price_modifier > 0 ? 'text-orange-500' : 'text-green-600'
+                    }`}>
+                      {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
+                    </span>
+                  )}
+                </button>
+                {isDefault && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full border-2 border-white" />
+                )}
+              </div>
+            );
+          }
+
           return (
             <div
               key={`${option.name}-${option.id}`}
               className={`
-                relative p-2 rounded-xl border-2 transition-all flex flex-col
+                relative rounded-full transition-all duration-150
                 ${isSelected
-                  ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200'
+                  ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
                   : isDisabled
-                    ? 'bg-gray-50 text-gray-300 border-gray-100'
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300 hover:bg-orange-50/30'
+                    ? 'bg-gray-100 text-gray-300'
+                    : 'bg-gray-100 text-gray-700 hover:bg-orange-100 hover:text-orange-700'
                 }
               `}
             >
@@ -142,72 +230,28 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
                   handleOptionToggle(optionIdStr, option);
                 }}
                 disabled={isDisabled}
-                className="flex flex-col items-start text-left w-full min-h-[2.5rem]"
+                className="flex items-center gap-1.5 px-4 py-2"
               >
-                <span className={`text-xs font-bold mb-0.5 leading-tight ${isSelected ? 'text-orange-900' : 'text-gray-900'}`}>
+                {isSelected && (
+                  <Check size={14} strokeWidth={2.5} />
+                )}
+                <span className="text-sm font-medium whitespace-nowrap">
                   {option.name}
                 </span>
-
-                {option.price_modifier !== 0 ? (
-                  <span className={`text-[0.625rem] font-medium ${option.price_modifier > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                {option.price_modifier !== 0 && (
+                  <span className={`text-xs font-medium whitespace-nowrap ${
+                    isSelected
+                      ? 'text-white/80'
+                      : option.price_modifier > 0 ? 'text-orange-500' : 'text-green-600'
+                  }`}>
                     {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
-                    {hasQuantityControl && quantity > 1 && ` ×${quantity}`}
-                  </span>
-                ) : (
-                  <span className="text-[0.625rem] text-gray-400 opacity-50">
-                    {formatCurrency(0)}
-                    {hasQuantityControl && quantity > 1 && <span className="text-orange-600 opacity-100"> ×{quantity}</span>}
                   </span>
                 )}
               </button>
 
-              {/* Quantity control buttons (only when enabled and selected) */}
-              {hasQuantityControl && isSelected && (
-                <div className="flex items-center justify-center gap-1 mt-1.5 pt-1.5 border-t border-orange-200">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuantityChange(optionIdStr, -1, option);
-                    }}
-                    className="w-6 h-6 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
-                  >
-                    <Minus size={12} className="text-gray-600" />
-                  </button>
-                  <span className="text-xs font-bold w-6 text-center text-gray-800">{quantity}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuantityChange(optionIdStr, 1, option);
-                    }}
-                    disabled={quantity >= maxQty}
-                    className="w-6 h-6 rounded-lg bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-              )}
-
-              {/* Selection Checkmark */}
-              {isSelected && !hasQuantityControl && (
-                <div className="absolute top-1.5 right-1.5">
-                  <div className="w-3.5 h-3.5 bg-orange-500 rounded-full flex items-center justify-center">
-                    <Check size={9} className="text-white" strokeWidth={3} />
-                  </div>
-                </div>
-              )}
-
-              {/* Quantity badge (for quantity-enabled selected options) */}
-              {isSelected && hasQuantityControl && (
-                <div className="absolute top-1.5 right-1.5">
-                  <div className="min-w-[1.25rem] h-5 bg-orange-500 rounded-full flex items-center justify-center px-1">
-                    <span className="text-[0.625rem] text-white font-bold">{quantity}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Default Badge */}
+              {/* Default dot */}
               {isDefault && !isSelected && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full border-2 border-white" />
               )}
             </div>
           );

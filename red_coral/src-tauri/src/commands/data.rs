@@ -200,7 +200,7 @@ pub async fn get_product_full(
     id: i64,
 ) -> Result<ApiResponse<ProductFull>, String> {
     match bridge
-        .get::<ProductFull>(&format!("/api/products/{}/full", id))
+        .get::<ProductFull>(&format!("/api/products/{}", id))
         .await
     {
         Ok(product) => Ok(ApiResponse::success(product)),

@@ -2,7 +2,7 @@ import React from 'react';
 import { Clock, Calendar, Repeat, CalendarClock } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { WizardState } from './index';
-import { FormSection, FormField, inputClass, CheckboxField } from '@/shared/components/FormField';
+import { FormSection, FormField, WheelTimePicker, WheelDateTimePicker } from '@/shared/components/FormField';
 
 interface Step4TimeProps {
   state: WizardState;
@@ -126,19 +126,17 @@ export const Step4Time: React.FC<Step4TimeProps> = ({ state, updateState }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <FormField label={t('settings.price_rule.wizard.start_time')}>
-              <input
-                type="time"
+              <WheelTimePicker
                 value={state.active_start_time}
-                onChange={(e) => updateState({ active_start_time: e.target.value })}
-                className={inputClass}
+                onChange={(v) => updateState({ active_start_time: v })}
+                placeholder={t('settings.price_rule.wizard.start_time')}
               />
             </FormField>
             <FormField label={t('settings.price_rule.wizard.end_time')}>
-              <input
-                type="time"
+              <WheelTimePicker
                 value={state.active_end_time}
-                onChange={(e) => updateState({ active_end_time: e.target.value })}
-                className={inputClass}
+                onChange={(v) => updateState({ active_end_time: v })}
+                placeholder={t('settings.price_rule.wizard.end_time')}
               />
             </FormField>
           </div>
@@ -150,19 +148,17 @@ export const Step4Time: React.FC<Step4TimeProps> = ({ state, updateState }) => {
         <div className="space-y-4 p-4 bg-gray-50 rounded-xl">
           <div className="grid grid-cols-2 gap-4">
             <FormField label={t('settings.price_rule.wizard.valid_from')} required>
-              <input
-                type="datetime-local"
+              <WheelDateTimePicker
                 value={state.valid_from}
-                onChange={(e) => updateState({ valid_from: e.target.value })}
-                className={inputClass}
+                onChange={(v) => updateState({ valid_from: v })}
+                placeholder={t('settings.price_rule.wizard.valid_from')}
               />
             </FormField>
             <FormField label={t('settings.price_rule.wizard.valid_until')} required>
-              <input
-                type="datetime-local"
+              <WheelDateTimePicker
                 value={state.valid_until}
-                onChange={(e) => updateState({ valid_until: e.target.value })}
-                className={inputClass}
+                onChange={(v) => updateState({ valid_until: v })}
+                placeholder={t('settings.price_rule.wizard.valid_until')}
               />
             </FormField>
           </div>

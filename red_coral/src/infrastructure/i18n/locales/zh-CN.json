@@ -44,6 +44,13 @@
       "actions": "操作",
       "done": "完成"
     },
+    "time_unit": {
+      "year": "年",
+      "month": "月",
+      "day": "日",
+      "hour": "时",
+      "minute": "分"
+    },
     "status": {
       "all": "全部",
       "active": "已启用",
@@ -437,6 +444,11 @@
       "cancel_title": "确认返回",
       "cancel_description": "返回将作废当前零售订单，所有菜品将被清空。确定要返回吗？",
       "cancel_confirm": "确认作废"
+    },
+    "merge_to_table": {
+      "button": "合并到桌台",
+      "success": "订单已合并到桌台",
+      "failed": "合并到桌台失败"
     },
     "error": {
       "no_receipt_number": "订单缺少单号",

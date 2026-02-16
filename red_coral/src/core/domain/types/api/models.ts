@@ -450,7 +450,6 @@ export interface MarketingGroup {
   description: string | null;
   sort_order: number;
   points_earn_rate: number | null;
-  is_active: boolean;
   created_at: number;
   updated_at: number;
 }
@@ -469,7 +468,6 @@ export interface MarketingGroupUpdate {
   description?: string | null;
   sort_order?: number;
   points_earn_rate?: number | null;
-  is_active?: boolean;
 }
 
 export interface MgDiscountRule {

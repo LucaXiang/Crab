@@ -11,6 +11,7 @@ import { displayId } from '@/utils/formatting';
 const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/hooks/useConfirmDialog';
 import { toast } from '@/presentation/components/Toast';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
@@ -33,12 +34,7 @@ const ZoneList: React.FC = React.memo(() => {
   const { openModal } = useSettingsModal();
   const dataVersion = useDataVersion();
   const [searchQuery, setSearchQuery] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-  });
+  const confirmDialog = useConfirmDialog();
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
@@ -55,12 +51,11 @@ const ZoneList: React.FC = React.memo(() => {
   }, [zones, searchQuery]);
 
   const handleBatchDelete = (items: ZoneItem[]) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: t('settings.batch_delete.confirm_title'),
-      description: t('settings.batchDelete.confirmDeleteZones', { count: items.length }) || `确定要删除选中的 ${items.length} 个区域吗？此操作无法撤销。`,
-      onConfirm: async () => {
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+    confirmDialog.show(
+      t('settings.batch_delete.confirm_title'),
+      t('settings.batchDelete.confirmDeleteZones', { count: items.length }) || `确定要删除选中的 ${items.length} 个区域吗？此操作无法撤销。`,
+      async () => {
+        confirmDialog.close();
         try {
           const results = await Promise.all(
             items.map(async (item) => {
@@ -88,7 +83,7 @@ const ZoneList: React.FC = React.memo(() => {
           toast.error(getErrorMessage(e));
         }
       },
-    });
+    );
   };
 
   const columns: Column<ZoneItem>[] = useMemo(
@@ -174,7 +169,7 @@ const ZoneList: React.FC = React.memo(() => {
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onCancel={confirmDialog.close}
       />
     </div>
   );
@@ -215,12 +210,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   const { openModal } = useSettingsModal();
   const dataVersion = useDataVersion();
   const [searchQuery, setSearchQuery] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-  });
+  const confirmDialog = useConfirmDialog();
 
   const [isTableSelectionMode, setIsTableSelectionMode] = useState(false);
 
@@ -246,12 +236,11 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   }, [tables, zoneFilter]);
 
   const handleBatchDelete = (items: TableItem[]) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: t('settings.batch_delete.confirm_title'),
-      description: t('settings.batchDelete.confirmDeleteTables', { count: items.length }) || `确定要删除选中的 ${items.length} 个桌台吗？此操作无法撤销。`,
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+    confirmDialog.show(
+      t('settings.batch_delete.confirm_title'),
+      t('settings.batchDelete.confirmDeleteTables', { count: items.length }) || `确定要删除选中的 ${items.length} 个桌台吗？此操作无法撤销。`,
+      async () => {
+        confirmDialog.close();
         try {
           await Promise.all(items.map((item) => getApi().deleteTable(item.id)));
           toast.success(t('settings.batchDelete.tablesSuccess', { count: items.length }) || '批量删除成功');
@@ -261,7 +250,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
           toast.error(getErrorMessage(e));
         }
       },
-    });
+    );
   };
 
   const columns: Column<TableItem>[] = useMemo(
@@ -461,7 +450,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onCancel={confirmDialog.close}
       />
     </div>
   );

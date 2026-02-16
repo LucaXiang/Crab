@@ -1,22 +1,24 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import type { MemberStampProgressDetail } from '@/core/domain/types/api';
-import type { CartItemSnapshot } from '@/core/domain/types/orderEvent';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { HeldOrder } from '@/core/domain/types';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { CommandFailedError } from '@/core/stores/order/commands/sendCommand';
 import { commandErrorMessage } from '@/utils/error/commandError';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
-import { Permission } from '@/core/domain/types';
-import { useRetailServiceType, setRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
+import { Permission, Table, Zone } from '@/core/domain/types';
+import { setRetailServiceType } from '@/core/stores/order/useCheckoutStore';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { mergeOrders } from '@/core/stores/order/commands';
+import { createCommand } from '@/core/stores/order/commandUtils';
+import { sendCommand, ensureSuccess } from '@/core/stores/order/commands/sendCommand';
+import { TableSelectionScreen } from '@/screens/TableSelection';
+import { clearPendingRetailOrder } from '@/core/stores/order/retailOrderTracker';
 import { OrderDiscountModal } from '../OrderDiscountModal';
 import { OrderSurchargeModal } from '../OrderSurchargeModal';
-import { formatCurrency, Currency } from '@/utils/currency';
+import { formatCurrency } from '@/utils/currency';
 import { openCashDrawer } from '@/core/services/order/paymentService';
-import { completeOrder, updateOrderInfo, redeemStamp, cancelStampRedemption } from '@/core/stores/order/commands';
-import { getMemberDetail } from '@/features/member/mutations';
 import { CashPaymentModal } from './CashPaymentModal';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
@@ -24,23 +26,9 @@ import { ConfirmDialog } from '@/shared/components';
 import { MemberLinkModal } from '../MemberLinkModal';
 import { StampRewardPickerModal } from './StampRewardPickerModal';
 import { StampRedeemModal } from './StampRedeemModal';
-
-/** Find order items matching stamp reward_targets that are not comped */
-function getMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
-  return items.filter(item =>
-    !item.is_comped && sp.reward_targets.some(rt =>
-      rt.target_type === 'PRODUCT' ? rt.target_id === item.id
-      : rt.target_type === 'CATEGORY' ? rt.target_id === item.category_id
-      : false
-    ),
-  );
-}
-
-/** Find order items matching designated_product_id that are not comped */
-function getDesignatedMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
-  if (!sp.designated_product_id) return [];
-  return items.filter(item => !item.is_comped && item.id === sp.designated_product_id);
-}
+import { getMatchingItems, getDesignatedMatchingItems } from '@/utils/stampMatching';
+import { useStampProgress } from './useStampProgress';
+import { usePaymentActions } from './usePaymentActions';
 
 type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL' | 'MEMBER_DETAIL';
 
@@ -55,7 +43,6 @@ interface SelectModePageProps {
 
 export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplete, onCancel, onVoid, onManageTable, onNavigate }) => {
   const { t } = useI18n();
-  const serviceType = useRetailServiceType();
 
   const totalPaid = order.paid_amount;
   const remaining = order.remaining_amount;
@@ -69,114 +56,16 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
 
   const isAALocked = !!(order.aa_total_shares && order.aa_total_shares > 0);
 
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showCashModal, setShowCashModal] = useState(false);
-  const [successModal, setSuccessModal] = useState<{
-    isOpen: boolean;
-    type: 'NORMAL' | 'CASH';
-    change?: number;
-    onClose: () => void;
-    onPrint?: () => void;
-    autoCloseDelay: number;
-  } | null>(null);
+  // Extracted hooks
+  const stamp = useStampProgress(order);
+  const payment = usePaymentActions(order, onComplete);
 
   const [showRetailCancelConfirm, setShowRetailCancelConfirm] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showSurchargeModal, setShowSurchargeModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
-  const [stampProgress, setStampProgress] = useState<MemberStampProgressDetail[]>([]);
-  const [rewardPickerActivity, setRewardPickerActivity] = useState<MemberStampProgressDetail | null>(null);
-  const [stampRedeemActivity, setStampRedeemActivity] = useState<MemberStampProgressDetail | null>(null);
-
-  // Fetch stamp progress when member is linked
-  useEffect(() => {
-    if (order.member_id) {
-      getMemberDetail(order.member_id)
-        .then((detail) => setStampProgress(detail.stamp_progress))
-        .catch(() => setStampProgress([]));
-    } else {
-      setStampProgress([]);
-    }
-  }, [order.member_id]);
-
-  // Match mode: comp existing item from order (Eco/Gen/Designated)
-  const handleMatchRedeem = useCallback(async (sp: MemberStampProgressDetail) => {
-    const isDesignated = sp.reward_strategy === 'DESIGNATED';
-    const matchingItems = isDesignated
-      ? getDesignatedMatchingItems(order.items, sp)
-      : getMatchingItems(order.items, sp);
-    if (matchingItems.length === 0) return;
-    const bestMatch = isDesignated
-      ? matchingItems[0]
-      : sp.reward_strategy === 'ECONOMIZADOR'
-        ? matchingItems.reduce((a, b) => a.original_price <= b.original_price ? a : b)
-        : matchingItems.reduce((a, b) => a.original_price >= b.original_price ? a : b);
-    try {
-      await redeemStamp(order.order_id, sp.stamp_activity_id, null, bestMatch.instance_id);
-      toast.success(t('checkout.stamp.redeemed'));
-      if (order.member_id) {
-        const detail = await getMemberDetail(order.member_id);
-        setStampProgress(detail.stamp_progress);
-      }
-    } catch (e) {
-      toast.error(e instanceof CommandFailedError
-        ? commandErrorMessage(e.code)
-        : t('checkout.stamp.redeem_failed'));
-    }
-  }, [order.order_id, order.items, order.member_id, t]);
-
-  // Selection mode: pick from reward_targets products
-  const handleSelectionRedeem = useCallback(async (activityId: number, productId: number) => {
-    setRewardPickerActivity(null);
-    try {
-      await redeemStamp(order.order_id, activityId, productId);
-      toast.success(t('checkout.stamp.redeemed'));
-      if (order.member_id) {
-        const detail = await getMemberDetail(order.member_id);
-        setStampProgress(detail.stamp_progress);
-      }
-    } catch (e) {
-      toast.error(e instanceof CommandFailedError
-        ? commandErrorMessage(e.code)
-        : t('checkout.stamp.redeem_failed'));
-    }
-  }, [order.order_id, order.member_id, t]);
-
-  // Direct mode: Designated strategy (no product_id needed, backend handles it)
-  const handleDirectRedeem = useCallback(async (activityId: number) => {
-    try {
-      await redeemStamp(order.order_id, activityId);
-      toast.success(t('checkout.stamp.redeemed'));
-      if (order.member_id) {
-        const detail = await getMemberDetail(order.member_id);
-        setStampProgress(detail.stamp_progress);
-      }
-    } catch (e) {
-      toast.error(e instanceof CommandFailedError
-        ? commandErrorMessage(e.code)
-        : t('checkout.stamp.redeem_failed'));
-    }
-  }, [order.order_id, order.member_id, t]);
-
-  const handleCancelStampRedemption = useCallback(async (activityId: number) => {
-    try {
-      await cancelStampRedemption(order.order_id, activityId);
-      toast.success(t('checkout.stamp.cancel_success'));
-      if (order.member_id) {
-        const detail = await getMemberDetail(order.member_id);
-        setStampProgress(detail.stamp_progress);
-      }
-    } catch {
-      toast.error(t('checkout.stamp.cancel_failed'));
-    }
-  }, [order.order_id, order.member_id, t]);
-
-  const handleComplete = useCallback(() => {
-    requestAnimationFrame(() => {
-      onComplete();
-    });
-  }, [onComplete]);
+  const [showMergeTableModal, setShowMergeTableModal] = useState(false);
 
   const handleBackClick = useCallback(() => {
     if (order.is_retail) {
@@ -186,130 +75,58 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
     }
   }, [order.is_retail, onCancel]);
 
-  const handleManualComplete = useCallback(async () => {
-    setIsProcessing(true);
+  const handleMergeToTable = useCallback(async (table: Table, guestCount: number, zone?: Zone) => {
+    setShowMergeTableModal(false);
+
     try {
-      await completeOrder(order.order_id, [], order.is_retail ? toBackendServiceType(serviceType) : null);
-      setSuccessModal({
-        isOpen: true,
-        type: 'NORMAL',
-        onClose: handleComplete,
-        autoCloseDelay: order.is_retail ? 0 : 5000,
-      });
-    } catch (error) {
-      logger.error('Manual complete failed', error);
-      toast.error(t('checkout.payment.failed'));
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [order, handleComplete, serviceType, t]);
+      const store = useActiveOrdersStore.getState();
+      const targetSnapshot = store.getOrderByTable(table.id);
 
-  const handleFullCashPayment = useCallback(() => {
-    setShowCashModal(true);
-  }, []);
-
-  const handleConfirmFullCash = useCallback(
-    async (tenderedAmount: number) => {
-      if (Currency.lt(tenderedAmount, remaining)) {
-        toast.error(t('settings.payment.amount_insufficient'));
-        return;
-      }
-
-      setIsProcessing(true);
-      try {
-        await openCashDrawer();
-
-        const payment: PaymentRecord = {
-          payment_id: `pay-${Date.now()}`,
-          method: 'CASH',
-          amount: remaining,
-          timestamp: Date.now(),
-          tendered: tenderedAmount,
-          change: Currency.sub(tenderedAmount, remaining).toNumber(),
-        };
-
-        await completeOrder(order.order_id, [payment], order.is_retail ? toBackendServiceType(serviceType) : null);
-        const is_retail = order.is_retail;
-
-        setShowCashModal(false);
-        setSuccessModal({
-          isOpen: true,
-          type: 'CASH',
-          change: payment.change ?? undefined,
-          onClose: handleComplete,
-          autoCloseDelay: is_retail ? 0 : 10000,
+      if (targetSnapshot && targetSnapshot.status === 'ACTIVE') {
+        await mergeOrders(order.order_id, targetSnapshot.order_id);
+      } else {
+        const openCmd = createCommand({
+          type: 'OPEN_TABLE',
+          table_id: table.id,
+          table_name: table.name,
+          zone_id: zone?.id ?? null,
+          zone_name: zone?.name ?? null,
+          guest_count: guestCount,
+          is_retail: false,
         });
-      } catch (error) {
-        logger.error('Cash payment failed', error);
-        toast.error(t('checkout.payment.failed'));
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [remaining, order, handleComplete, t, serviceType]
-  );
-
-  const handleFullCardPayment = useCallback(async () => {
-    if (Currency.lte(remaining, 0)) {
-      toast.error(t('settings.payment.amount_must_be_positive'));
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const payment: PaymentRecord = {
-        payment_id: `pay-${Date.now()}`,
-        method: 'CARD',
-        amount: remaining,
-        timestamp: Date.now(),
-      };
-
-      await completeOrder(order.order_id, [payment], order.is_retail ? toBackendServiceType(serviceType) : null);
-      const is_retail = order.is_retail;
-
-      setSuccessModal({
-        isOpen: true,
-        type: 'NORMAL',
-        onClose: handleComplete,
-        autoCloseDelay: is_retail ? 0 : 5000,
-      });
-    } catch (error) {
-      logger.error('Card payment failed', error);
-      toast.error(t('checkout.payment.failed'));
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [remaining, order, handleComplete, t, serviceType]);
-
-  const handlePrintPrePayment = useCallback(async () => {
-    try {
-      if (!order.receipt_number) {
-        toast.error(t('checkout.error.no_receipt_number'));
-        return;
+        const openRes = await sendCommand(openCmd);
+        ensureSuccess(openRes, 'Open table for merge');
+        const newOrderId = openRes.order_id;
+        if (!newOrderId) {
+          throw new Error('OPEN_TABLE succeeded but no order_id returned');
+        }
+        await mergeOrders(order.order_id, newOrderId);
       }
 
-      await updateOrderInfo(order.order_id, {
-        is_pre_payment: true,
-      });
-
-      toast.success(t('settings.payment.receipt_print_success'));
+      clearPendingRetailOrder();
+      toast.success(t('checkout.merge_to_table.success'));
+      onComplete();
     } catch (error) {
-      logger.error('Pre-payment print failed', error);
-      toast.error(t('settings.payment.receipt_print_failed'));
+      logger.error('Merge to table failed', error);
+      toast.error(
+        error instanceof CommandFailedError
+          ? commandErrorMessage(error.code)
+          : t('checkout.merge_to_table.failed')
+      );
     }
-  }, [order, t]);
+  }, [order.order_id, onComplete, t]);
 
   return (
     <>
       <div className="h-full flex">
-        {successModal && (
+        {payment.successModal && (
           <PaymentSuccessModal
-            isOpen={successModal.isOpen}
-            type={successModal.type}
-            change={successModal.change}
-            onClose={successModal.onClose}
-            autoCloseDelay={successModal.autoCloseDelay}
-            onPrint={successModal.onPrint}
+            isOpen={payment.successModal.isOpen}
+            type={payment.successModal.type}
+            change={payment.successModal.change}
+            onClose={payment.successModal.onClose}
+            autoCloseDelay={payment.successModal.autoCloseDelay}
+            onPrint={payment.successModal.onPrint}
           />
         )}
         <OrderSidebar
@@ -329,7 +146,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                       onClick={() => setRetailServiceType('dineIn')}
                       className={`
                         flex items-center gap-2 px-3 h-full rounded-md text-sm font-medium transition-all
-                        ${serviceType === 'dineIn'
+                        ${payment.serviceType === 'dineIn'
                           ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5'
                           : 'text-gray-500 hover:text-gray-700'}
                       `}
@@ -341,7 +158,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                       onClick={() => setRetailServiceType('takeout')}
                       className={`
                         flex items-center gap-2 px-3 h-full rounded-md text-sm font-medium transition-all
-                        ${serviceType === 'takeout'
+                        ${payment.serviceType === 'takeout'
                           ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5'
                           : 'text-gray-500 hover:text-gray-700'}
                       `}
@@ -352,13 +169,13 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                   </div>
                 )}
                 {!order.is_retail && (
-                  <button onClick={handlePrintPrePayment} className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <button onClick={payment.handlePrintPrePayment} className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition-colors flex items-center gap-2">
                     <Printer size={20} />
                     {t('checkout.pre_payment.receipt')}
                   </button>
                 )}
                 {isPaidInFull && (
-                  <button onClick={() => setShowCompleteConfirm(true)} disabled={isProcessing} className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button onClick={() => setShowCompleteConfirm(true)} disabled={payment.isProcessing} className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                     <Check size={20} />
                     {t('checkout.complete_order')}
                   </button>
@@ -377,7 +194,17 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     {t('app.action.open_cash_drawer')}
                   </button>
                 </EscalatableGate>
-                {onVoid && !order.is_retail && (
+                {order.is_retail && (
+                  <button
+                    onClick={() => setShowMergeTableModal(true)}
+                    disabled={payment.isProcessing}
+                    className="px-4 py-2 bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <LayoutGrid size={20} />
+                    {t('checkout.merge_to_table.button')}
+                  </button>
+                )}
+                {onVoid && (
                   <EscalatableGate
                     permission={Permission.ORDERS_VOID}
                     mode="intercept"
@@ -421,24 +248,24 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
             {/* Single unified 3-column grid */}
             <div className="grid grid-cols-3 gap-6">
               {/* Row 1: Payment Methods */}
-              <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-green-500 hover:bg-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={payment.handleFullCashPayment} disabled={isPaidInFull || payment.isProcessing} className="h-40 bg-green-500 hover:bg-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Coins size={48} />
                 <div className="text-2xl font-bold">{t('checkout.method.cash')}</div>
                 <div className="text-sm opacity-90">{t('checkout.method.cash_desc')}</div>
               </button>
-              <button onClick={handleFullCardPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={payment.handleFullCardPayment} disabled={isPaidInFull || payment.isProcessing} className="h-40 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <CreditCard size={48} />
                 <div className="text-2xl font-bold">{t('checkout.method.card')}</div>
                 <div className="text-sm opacity-90">{t('checkout.method.card_desc')}</div>
               </button>
-              <button onClick={() => onNavigate('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing || order.has_amount_split || isAALocked} className="h-40 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={() => onNavigate('ITEM_SPLIT')} disabled={isPaidInFull || payment.isProcessing || order.has_amount_split || isAALocked} className="h-40 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Split size={48} />
                 <div className="text-2xl font-bold">{t('checkout.split.title')}</div>
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.locked') : order.has_amount_split ? t('checkout.amount_split.item_split_disabled') : t('checkout.split.desc')}</div>
               </button>
 
               {/* Row 2: Amount Split, Records, Detail */}
-              <button onClick={() => onNavigate('AMOUNT_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={() => onNavigate('AMOUNT_SPLIT')} disabled={isPaidInFull || payment.isProcessing} className="h-40 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Banknote size={48} />
                 <div className="text-2xl font-bold">{isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.title')}</div>
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.desc') : t('checkout.amount_split.desc')}</div>
@@ -464,7 +291,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               {/* Row 3: Comp, Discount, Surcharge */}
               <button
                 onClick={() => onNavigate('COMP')}
-                disabled={isPaidInFull || isProcessing}
+                disabled={isPaidInFull || payment.isProcessing}
                 className="h-40 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
               >
                 <Gift size={48} />
@@ -473,7 +300,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               </button>
               <button
                 onClick={() => setShowDiscountModal(true)}
-                disabled={isProcessing}
+                disabled={payment.isProcessing}
                 className="h-40 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
               >
                 <Percent size={48} />
@@ -482,7 +309,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               </button>
               <button
                 onClick={() => setShowSurchargeModal(true)}
-                disabled={isProcessing}
+                disabled={payment.isProcessing}
                 className="h-40 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
               >
                 <TrendingUp size={48} />
@@ -494,7 +321,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               {order.member_id ? (
                 <button
                   onClick={() => onNavigate('MEMBER_DETAIL')}
-                  disabled={isProcessing}
+                  disabled={payment.isProcessing}
                   className="h-40 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
                 >
                   <Crown size={48} />
@@ -504,7 +331,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               ) : (
                 <button
                   onClick={() => setShowMemberModal(true)}
-                  disabled={isProcessing}
+                  disabled={payment.isProcessing}
                   className="h-40 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
                 >
                   <UserCheck size={48} />
@@ -514,7 +341,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               )}
 
               {/* Stamp cards: only show redeemable or already redeemed */}
-              {order.member_id && stampProgress.map((sp) => {
+              {order.member_id && stamp.stampProgress.map((sp) => {
                 const alreadyRedeemed = order.stamp_redemptions?.some(
                   (r) => r.stamp_activity_id === sp.stamp_activity_id
                 );
@@ -536,7 +363,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                   <div
                     key={sp.stamp_activity_id}
                     onClick={() => {
-                      if (canRedeem) setStampRedeemActivity(sp);
+                      if (canRedeem) stamp.setStampRedeemActivity(sp);
                     }}
                     className={`h-40 rounded-2xl shadow-xl transition-all relative flex flex-col items-center justify-center gap-2 ${
                       alreadyRedeemed
@@ -547,8 +374,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     {/* Cancel button for redeemed */}
                     {alreadyRedeemed && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleCancelStampRedemption(sp.stamp_activity_id); }}
-                        disabled={isProcessing}
+                        onClick={(e) => { e.stopPropagation(); stamp.handleCancelStampRedemption(sp.stamp_activity_id); }}
+                        disabled={payment.isProcessing}
                         className="absolute top-2 right-2 p-1.5 rounded-full bg-violet-200 hover:bg-violet-300 text-violet-700 transition-colors disabled:opacity-50"
                         title={t('checkout.stamp.cancel')}
                       >
@@ -604,7 +431,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         confirmText={t('checkout.complete_order')}
         onConfirm={() => {
           setShowCompleteConfirm(false);
-          handleManualComplete();
+          payment.handleManualComplete();
         }}
         onCancel={() => setShowCompleteConfirm(false)}
       />
@@ -624,11 +451,11 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
       />
 
       <CashPaymentModal
-        isOpen={showCashModal}
+        isOpen={payment.showCashModal}
         amountDue={remaining}
-        isProcessing={isProcessing}
-        onConfirm={handleConfirmFullCash}
-        onCancel={() => setShowCashModal(false)}
+        isProcessing={payment.isProcessing}
+        onConfirm={payment.handleConfirmFullCash}
+        onCancel={() => payment.setShowCashModal(false)}
       />
 
       <OrderDiscountModal
@@ -649,19 +476,31 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         onClose={() => setShowMemberModal(false)}
       />
 
-      {rewardPickerActivity && (
+      {stamp.rewardPickerActivity && (
         <StampRewardPickerModal
-          isOpen={!!rewardPickerActivity}
-          activityName={rewardPickerActivity.stamp_activity_name}
-          rewardTargets={rewardPickerActivity.reward_targets}
-          rewardQuantity={rewardPickerActivity.reward_quantity}
-          onSelect={(productId) => handleSelectionRedeem(rewardPickerActivity.stamp_activity_id, productId)}
-          onClose={() => setRewardPickerActivity(null)}
+          isOpen={!!stamp.rewardPickerActivity}
+          activityName={stamp.rewardPickerActivity.stamp_activity_name}
+          rewardTargets={stamp.rewardPickerActivity.reward_targets}
+          rewardQuantity={stamp.rewardPickerActivity.reward_quantity}
+          onSelect={(productId) => stamp.handleSelectionRedeem(stamp.rewardPickerActivity!.stamp_activity_id, productId)}
+          onClose={() => stamp.setRewardPickerActivity(null)}
         />
       )}
 
-      {stampRedeemActivity && (() => {
-        const spa = stampRedeemActivity;
+      {showMergeTableModal && (
+        <div className="fixed inset-0 z-50">
+          <TableSelectionScreen
+            heldOrders={useActiveOrdersStore.getState().getActiveOrders()}
+            onSelectTable={handleMergeToTable}
+            onClose={() => setShowMergeTableModal(false)}
+            mode="HOLD"
+            cart={[]}
+          />
+        </div>
+      )}
+
+      {stamp.stampRedeemActivity && (() => {
+        const spa = stamp.stampRedeemActivity;
         const isDesignated = spa.reward_strategy === 'DESIGNATED';
         const matchingItems = isDesignated
           ? getDesignatedMatchingItems(order.items, spa)
@@ -678,17 +517,17 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
 
         return (
           <StampRedeemModal
-            isOpen={!!stampRedeemActivity}
+            isOpen={!!stamp.stampRedeemActivity}
             activity={spa}
             matchingItems={matchingItems}
             hasExcess={excess}
             effectiveStamps={eff}
             orderBonus={oBonus}
-            isProcessing={isProcessing}
-            onMatchRedeem={() => handleMatchRedeem(spa)}
-            onSelectRedeem={() => setRewardPickerActivity(spa)}
-            onDirectRedeem={() => handleDirectRedeem(spa.stamp_activity_id)}
-            onClose={() => setStampRedeemActivity(null)}
+            isProcessing={payment.isProcessing}
+            onMatchRedeem={() => stamp.handleMatchRedeem(spa)}
+            onSelectRedeem={() => stamp.setRewardPickerActivity(spa)}
+            onDirectRedeem={() => stamp.handleDirectRedeem(spa.stamp_activity_id)}
+            onClose={() => stamp.setStampRedeemActivity(null)}
           />
         );
       })()}

@@ -55,6 +55,21 @@ pub struct PrintDefaults {
 }
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/// Resolve print-enabled flag with product > category fallback
+///
+/// Product values: 1 = enabled, 0 = disabled, -1 = inherit from category
+fn resolve_print_enabled(product_flag: i32, category_flag: Option<bool>) -> bool {
+    match product_flag {
+        1 => true,
+        0 => false,
+        _ => category_flag.unwrap_or(false),
+    }
+}
+
+// =============================================================================
 // CatalogService
 // =============================================================================
 
@@ -1071,18 +1086,12 @@ impl CatalogService {
 
         let categories = self.categories.read();
         let category = categories.get(&product.category_id);
+        let real_category = category.filter(|c| !c.is_virtual);
 
-        // Determine if enabled (product > category)
-        let enabled = match product.is_kitchen_print_enabled {
-            1 => true,   // Explicitly enabled
-            0 => false,  // Explicitly disabled
-            _ => {       // -1: Inherit from category
-                category
-                    .filter(|c| !c.is_virtual)
-                    .map(|c| c.is_kitchen_print_enabled)
-                    .unwrap_or(false)
-            }
-        };
+        let enabled = resolve_print_enabled(
+            product.is_kitchen_print_enabled,
+            real_category.map(|c| c.is_kitchen_print_enabled),
+        );
 
         if !enabled {
             return Some(KitchenPrintConfig {
@@ -1092,18 +1101,10 @@ impl CatalogService {
             });
         }
 
-        // Determine destinations (category > global default)
-        let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
-            if !cat.kitchen_print_destinations.is_empty() {
-                cat.kitchen_print_destinations.iter().map(|id| id.to_string()).collect()
-            } else {
-                let defaults = self.print_defaults.read();
-                defaults.kitchen_destination.iter().cloned().collect()
-            }
-        } else {
-            let defaults = self.print_defaults.read();
-            defaults.kitchen_destination.iter().cloned().collect()
-        };
+        let destinations = self.resolve_destinations(
+            real_category.map(|c| &c.kitchen_print_destinations),
+            |defaults| defaults.kitchen_destination.as_deref(),
+        );
 
         Some(KitchenPrintConfig {
             enabled,
@@ -1119,18 +1120,12 @@ impl CatalogService {
 
         let categories = self.categories.read();
         let category = categories.get(&product.category_id);
+        let real_category = category.filter(|c| !c.is_virtual);
 
-        // Determine if enabled (product > category)
-        let enabled = match product.is_label_print_enabled {
-            1 => true,
-            0 => false,
-            _ => {
-                category
-                    .filter(|c| !c.is_virtual)
-                    .map(|c| c.is_label_print_enabled)
-                    .unwrap_or(false)
-            }
-        };
+        let enabled = resolve_print_enabled(
+            product.is_label_print_enabled,
+            real_category.map(|c| c.is_label_print_enabled),
+        );
 
         if !enabled {
             return Some(LabelPrintConfig {
@@ -1139,23 +1134,29 @@ impl CatalogService {
             });
         }
 
-        // Determine destinations (category > global default)
-        let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
-            if !cat.label_print_destinations.is_empty() {
-                cat.label_print_destinations.iter().map(|id| id.to_string()).collect()
-            } else {
-                let defaults = self.print_defaults.read();
-                defaults.label_destination.iter().cloned().collect()
-            }
-        } else {
-            let defaults = self.print_defaults.read();
-            defaults.label_destination.iter().cloned().collect()
-        };
+        let destinations = self.resolve_destinations(
+            real_category.map(|c| &c.label_print_destinations),
+            |defaults| defaults.label_destination.as_deref(),
+        );
 
         Some(LabelPrintConfig {
             enabled,
             destinations,
         })
+    }
+
+    /// Resolve print destinations: category destinations > global default
+    fn resolve_destinations(
+        &self,
+        category_dests: Option<&Vec<i64>>,
+        get_default: impl FnOnce(&PrintDefaults) -> Option<&str>,
+    ) -> Vec<String> {
+        if let Some(dests) = category_dests.filter(|d| !d.is_empty()) {
+            dests.iter().map(|id| id.to_string()).collect()
+        } else {
+            let defaults = self.print_defaults.read();
+            get_default(&defaults).into_iter().map(String::from).collect()
+        }
     }
 
     /// Check if kitchen printing is enabled (system level)

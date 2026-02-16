@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Calendar, Clock, X, Infinity, CalendarClock, CalendarRange } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { PriceRuleUpdate } from '@/core/domain/types/api';
+import { WheelTimePicker, WheelDatePicker } from '@/shared/components/FormField';
 
 interface TimeConditionEditorProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface TimeConditionEditorProps {
   onClose: () => void;
 }
 
-const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 type TimeMode = 'always' | 'schedule' | 'onetime';
 
@@ -242,7 +243,7 @@ export const TimeConditionEditor: React.FC<TimeConditionEditorProps> = ({
                         }
                       `}
                     >
-                      {DAY_LABELS[dayIndex]}
+                      {t(`calendar.days.${DAY_KEYS[dayIndex]}`)}
                     </button>
                   );
                 })}
@@ -259,27 +260,21 @@ export const TimeConditionEditor: React.FC<TimeConditionEditorProps> = ({
               </label>
 
               <div className="flex items-center gap-3">
-                <input
-                  type="time"
-                  value={value.active_start_time || ''}
-                  onChange={e =>
-                    onChange({
-                      active_start_time: e.target.value || undefined,
-                    })
-                  }
-                  className="flex-1 px-4 py-3 bg-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
-                />
+                <div className="flex-1">
+                  <WheelTimePicker
+                    value={value.active_start_time || ''}
+                    onChange={(v) => onChange({ active_start_time: v || undefined })}
+                    placeholder={t('settings.price_rule.edit.valid_from')}
+                  />
+                </div>
                 <span className="text-gray-400">~</span>
-                <input
-                  type="time"
-                  value={value.active_end_time || ''}
-                  onChange={e =>
-                    onChange({
-                      active_end_time: e.target.value || undefined,
-                    })
-                  }
-                  className="flex-1 px-4 py-3 bg-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
-                />
+                <div className="flex-1">
+                  <WheelTimePicker
+                    value={value.active_end_time || ''}
+                    onChange={(v) => onChange({ active_end_time: v || undefined })}
+                    placeholder={t('settings.price_rule.edit.valid_until')}
+                  />
+                </div>
               </div>
 
               {/* Clear time */}
@@ -312,30 +307,20 @@ export const TimeConditionEditor: React.FC<TimeConditionEditorProps> = ({
                   <label className="text-xs text-gray-500 mb-1 block">
                     {t('settings.price_rule.edit.valid_from')}
                   </label>
-                  <input
-                    type="date"
+                  <WheelDatePicker
                     value={formatDateForInput(value.valid_from)}
-                    onChange={e =>
-                      onChange({
-                        valid_from: parseDateInput(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                    onChange={(v) => onChange({ valid_from: parseDateInput(v) })}
+                    placeholder={t('settings.price_rule.edit.valid_from')}
                   />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">
                     {t('settings.price_rule.edit.valid_until')}
                   </label>
-                  <input
-                    type="date"
+                  <WheelDatePicker
                     value={formatDateForInput(value.valid_until)}
-                    onChange={e =>
-                      onChange({
-                        valid_until: parseDateInput(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                    onChange={(v) => onChange({ valid_until: parseDateInput(v) })}
+                    placeholder={t('settings.price_rule.edit.valid_until')}
                   />
                 </div>
               </div>

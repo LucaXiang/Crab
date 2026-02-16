@@ -17,6 +17,7 @@ import {
   ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban,
   Gift, Stamp,
 } from 'lucide-react';
+import { calculateItemSink } from '@/utils/itemSorting';
 
 interface OrderDetailModeProps {
   order: HeldOrder;
@@ -66,8 +67,8 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
       if (sortA !== sortB) return sortA - sortB;
 
       // Fully-paid & comped items sink to end of each category (paid → comped)
-      const sinkA = a.is_comped ? 2 : a.unpaid_quantity === 0 ? 1 : 0;
-      const sinkB = b.is_comped ? 2 : b.unpaid_quantity === 0 ? 1 : 0;
+      const sinkA = calculateItemSink(a);
+      const sinkB = calculateItemSink(b);
       if (sinkA !== sinkB) return sinkA - sinkB;
 
       // Then by external_id

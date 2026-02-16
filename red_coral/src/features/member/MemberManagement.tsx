@@ -6,12 +6,13 @@ import { useMarketingGroupStore } from '@/features/marketing-group/store';
 import { createMember, updateMember, deleteMember } from './mutations';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { useModalState } from '@/shared/hooks/useModalState';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 import type { MemberWithGroup, MemberCreate, MemberUpdate } from '@/core/domain/types/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
-import { FormField, FormSection, SelectField, inputClass } from '@/shared/components/FormField';
+import { FormField, FormSection, SelectField, inputClass, WheelDatePicker } from '@/shared/components/FormField';
 import { MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_NOTE_LEN } from '@/shared/constants/validation';
 import { formatCurrency } from '@/utils/currency';
 
@@ -27,8 +28,7 @@ export const MemberManagement: React.FC = React.memo(() => {
   const groups = mgStore.items;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editingMember, setEditingMember] = useState<MemberWithGroup | null>(null);
+  const memberForm = useModalState<MemberWithGroup>();
   const [deleteConfirm, setDeleteConfirm] = useState<MemberWithGroup | null>(null);
 
   useEffect(() => {
@@ -61,8 +61,7 @@ export const MemberManagement: React.FC = React.memo(() => {
         }));
       }
       toast.success(t('common.message.save_success'));
-      setShowForm(false);
-      setEditingMember(null);
+      memberForm.close();
     } catch (e) {
       logger.error('Failed to save member', e);
       toast.error(t('common.message.save_failed'));
@@ -178,7 +177,7 @@ export const MemberManagement: React.FC = React.memo(() => {
         title={t('settings.member.title')}
         description={t('settings.member.description')}
         addButtonText={t('settings.member.add')}
-        onAdd={() => { setEditingMember(null); setShowForm(true); }}
+        onAdd={() => memberForm.open()}
         themeColor="teal"
         permission={Permission.MARKETING_MANAGE}
       />
@@ -197,19 +196,19 @@ export const MemberManagement: React.FC = React.memo(() => {
         columns={columns}
         loading={loading}
         getRowKey={(m) => m.id}
-        onEdit={canManage ? (m) => { setEditingMember(m); setShowForm(true); } : undefined}
+        onEdit={canManage ? (m) => memberForm.open(m) : undefined}
         onDelete={canManage ? (m) => setDeleteConfirm(m) : undefined}
         emptyText={t('common.empty.no_data')}
         themeColor="teal"
       />
 
       {/* Member Form Modal */}
-      {showForm && (
+      {memberForm.isOpen && (
         <MemberFormModal
-          member={editingMember}
+          member={memberForm.editing}
           groups={groups}
           onSave={handleSave}
-          onClose={() => { setShowForm(false); setEditingMember(null); }}
+          onClose={memberForm.close}
           t={t}
         />
       )}
@@ -333,11 +332,10 @@ const MemberFormModal: React.FC<{
             />
 
             <FormField label={t('settings.member.field.birthday')}>
-              <input
-                type="date"
+              <WheelDatePicker
                 value={birthday}
-                onChange={(e) => setBirthday(e.target.value)}
-                className={inputClass}
+                onChange={setBirthday}
+                placeholder={t('settings.member.field.birthday')}
               />
             </FormField>
 

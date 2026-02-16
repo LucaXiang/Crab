@@ -9,6 +9,7 @@ import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, Chev
 import { Permission } from '@/core/domain/types';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { TimelineList } from '@/shared/components/TimelineList';
+import { calculateItemSink } from '@/utils/itemSorting';
 
 interface HistoryDetailProps {
   order?: ArchivedOrderDetail;
@@ -67,8 +68,8 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
       const sortB = b.category_id != null ? (categoryMap.get(b.category_id)?.sort_order ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
       if (sortA !== sortB) return sortA - sortB;
 
-      const sinkA = a.is_comped ? 2 : a.unpaid_quantity === 0 ? 1 : 0;
-      const sinkB = b.is_comped ? 2 : b.unpaid_quantity === 0 ? 1 : 0;
+      const sinkA = calculateItemSink(a);
+      const sinkB = calculateItemSink(b);
       if (sinkA !== sinkB) return sinkA - sinkB;
 
       return a.name.localeCompare(b.name);

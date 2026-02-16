@@ -35,6 +35,10 @@ export const LoginScreen: React.FC = () => {
   // App 级 useAppInitialization 已完成所有初始化，直接读 store
   useEffect(() => {
     const currentState = useBridgeStore.getState().appState;
+    const isAuth = useAuthStore.getState().isAuthenticated;
+    // appState 为 Authenticated 但前端未登录 → 状态同步中，留在登录页
+    // 防止 /login → /pos → /login 重定向循环
+    if (AppStateHelpers.canAccessPOS(currentState) && !isAuth) return;
     if (!AppStateHelpers.needsEmployeeLogin(currentState)) {
       navigate(AppStateHelpers.getRouteForState(currentState), { replace: true });
     }

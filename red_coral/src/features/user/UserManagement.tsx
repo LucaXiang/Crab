@@ -7,6 +7,8 @@ import { useRoles } from '@/core/stores/resources';
 import { useCanManageUsers } from '@/hooks/usePermission';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/hooks/useConfirmDialog';
+import { useModalState } from '@/shared/hooks/useModalState';
 import { toast } from '@/presentation/components/Toast';
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
 import { UserFormModal } from './UserFormModal';
@@ -32,16 +34,9 @@ export const UserManagement: React.FC = React.memo(() => {
   const [showInactive, setShowInactive] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   const roles = useRoles() as Role[];
-  const [userFormOpen, setUserFormOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
-  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-  });
+  const userForm = useModalState<User>();
+  const resetPassword = useModalState<User>();
+  const confirmDialog = useConfirmDialog();
 
   // Load users on mount
   useEffect(() => {
@@ -81,18 +76,15 @@ export const UserManagement: React.FC = React.memo(() => {
   }, [users, roleFilter, searchQuery, showInactive]);
 
   const handleAddUser = () => {
-    setEditingUser(null);
-    setUserFormOpen(true);
+    userForm.open();
   };
 
   const handleEditUser = (user: User) => {
-    setEditingUser(user);
-    setUserFormOpen(true);
+    userForm.open(user);
   };
 
   const handleResetPassword = (user: User) => {
-    setResetPasswordUser(user);
-    setResetPasswordOpen(true);
+    resetPassword.open(user);
   };
 
   const handleDeleteUser = (user: User) => {
@@ -110,12 +102,11 @@ export const UserManagement: React.FC = React.memo(() => {
 
     if (user.is_active) {
       // Disable user logic
-      setConfirmDialog({
-        isOpen: true,
-        title: t('settings.user.disable_user'),
-        description: t('settings.user.confirm.disable', { name: user.display_name || user.username }),
-        onConfirm: async () => {
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      confirmDialog.show(
+        t('settings.user.disable_user'),
+        t('settings.user.confirm.disable', { name: user.display_name || user.username }),
+        async () => {
+          confirmDialog.close();
           try {
             await updateUserAction(user.id, { isActive: false });
             toast.success(t('settings.user.message.update_success'));
@@ -125,15 +116,14 @@ export const UserManagement: React.FC = React.memo(() => {
             toast.error(error instanceof Error ? error.message : t('settings.user.message.update_failed'));
           }
         },
-      });
+      );
     } else {
       // Permanent delete logic
-      setConfirmDialog({
-        isOpen: true,
-        title: t('settings.user.delete_permanently_user'),
-        description: t('settings.user.confirm.deletePermanently', { name: user.display_name || user.username }),
-        onConfirm: async () => {
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      confirmDialog.show(
+        t('settings.user.delete_permanently_user'),
+        t('settings.user.confirm.deletePermanently', { name: user.display_name || user.username }),
+        async () => {
+          confirmDialog.close();
           try {
             await deleteUserAction(user.id);
             toast.success(t('settings.user.message.delete_success'));
@@ -143,7 +133,7 @@ export const UserManagement: React.FC = React.memo(() => {
             toast.error(error instanceof Error ? error.message : t('settings.user.message.delete_failed'));
           }
         },
-      });
+      );
     }
   };
 
@@ -437,17 +427,13 @@ export const UserManagement: React.FC = React.memo(() => {
       )}
 
       {/* User Form Modal */}
-      {userFormOpen && (
+      {userForm.isOpen && (
         <UserFormModal
-          isOpen={userFormOpen}
-          onClose={() => {
-            setUserFormOpen(false);
-            setEditingUser(null);
-          }}
-          editingUser={editingUser}
+          isOpen={userForm.isOpen}
+          onClose={userForm.close}
+          editingUser={userForm.editing}
           onSuccess={async () => {
-            setUserFormOpen(false);
-            setEditingUser(null);
+            userForm.close();
             const updatedUsers = await fetchUsers();
             setUsers(updatedUsers);
           }}
@@ -455,14 +441,11 @@ export const UserManagement: React.FC = React.memo(() => {
       )}
 
       {/* Reset Password Modal */}
-      {resetPasswordOpen && resetPasswordUser && (
+      {resetPassword.isOpen && resetPassword.editing && (
         <ResetPasswordModal
-          isOpen={resetPasswordOpen}
-          onClose={() => {
-            setResetPasswordOpen(false);
-            setResetPasswordUser(null);
-          }}
-          user={resetPasswordUser}
+          isOpen={resetPassword.isOpen}
+          onClose={resetPassword.close}
+          user={resetPassword.editing}
         />
       )}
 
@@ -472,7 +455,7 @@ export const UserManagement: React.FC = React.memo(() => {
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onCancel={confirmDialog.close}
       />
     </div>
   );

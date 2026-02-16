@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AuditFilterModal } from './AuditFilterModal';
 import { AuditDetailsView, renderAuditDetails } from './AuditLog/index';
+import { WheelDatePicker } from '@/shared/components/FormField';
 
 const PAGE_SIZE = 10;
 
@@ -351,29 +352,18 @@ export const AuditLog: React.FC = () => {
             ))}
             {/* 自定义日期范围 — 仅在 custom 模式下显示 */}
             {datePreset === 'custom' && (
-              <div className="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-200 px-2 py-0.5 ml-1">
-                <Calendar size={14} className="text-gray-400 shrink-0" />
-                <input
-                  type="date"
+              <div className="flex items-center gap-1 ml-1">
+                <WheelDatePicker
                   value={customFrom}
-                  onChange={(e) => { setCustomFrom(e.target.value); setPage(1); }}
-                  className="text-xs border-none bg-transparent focus:ring-0 text-gray-600 p-0.5 outline-none"
+                  onChange={(v) => { setCustomFrom(v); setPage(1); }}
+                  placeholder="开始日期"
                 />
                 <span className="text-gray-300">-</span>
-                <input
-                  type="date"
+                <WheelDatePicker
                   value={customTo}
-                  onChange={(e) => { setCustomTo(e.target.value); setPage(1); }}
-                  className="text-xs border-none bg-transparent focus:ring-0 text-gray-600 p-0.5 outline-none"
+                  onChange={(v) => { setCustomTo(v); setPage(1); }}
+                  placeholder="结束日期"
                 />
-                {(customFrom || customTo) && (
-                  <button
-                    onClick={() => { setCustomFrom(''); setCustomTo(''); setPage(1); }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
               </div>
             )}
           </div>

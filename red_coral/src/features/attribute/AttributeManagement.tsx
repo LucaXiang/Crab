@@ -3,6 +3,8 @@ import { Settings, Plus, Edit, Trash2, List, Star, ReceiptText, ChefHat, Hash, D
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/hooks/useConfirmDialog';
+import { useModalState } from '@/shared/hooks/useModalState';
 import { useShallow } from 'zustand/react/shallow';
 import { getErrorMessage } from '@/utils/error';
 import { logger } from '@/utils/logger';
@@ -40,10 +42,8 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const { loadOptions, deleteOption } = useOptionActions();
 
   // Modal states
-  const [attributeFormOpen, setAttributeFormOpen] = useState(false);
-  const [optionFormOpen, setOptionFormOpen] = useState(false);
-  const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null);
-  const [editingOption, setEditingOption] = useState<AttributeOptionWithIndex | null>(null);
+  const attributeForm = useModalState<Attribute>();
+  const optionForm = useModalState<AttributeOptionWithIndex>();
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,12 +52,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const [selectedAttributeId, setSelectedAttributeId] = useState<number | null>(null);
 
   // Confirm dialog state
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-  });
+  const confirmDialog = useConfirmDialog();
 
   // Get all options for all attributes
   const allOptions = useAttributeStore(
@@ -113,22 +108,19 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
   // Handlers for Attributes
   const handleAddAttribute = () => {
-    setEditingAttribute(null);
-    setAttributeFormOpen(true);
+    attributeForm.open();
   };
 
   const handleEditAttribute = (attr: Attribute) => {
-    setEditingAttribute(attr);
-    setAttributeFormOpen(true);
+    attributeForm.open(attr);
   };
 
   const handleDeleteAttribute = (attr: Attribute) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: t('settings.attribute.delete_attribute'),
-      description: t('settings.attribute.confirm.delete', { name: attr.name }),
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+    confirmDialog.show(
+      t('settings.attribute.delete_attribute'),
+      t('settings.attribute.confirm.delete', { name: attr.name }),
+      async () => {
+        confirmDialog.close();
         try {
           await deleteAttribute(attr.id);
           toast.success(t('settings.user.message.delete_success'));
@@ -137,28 +129,25 @@ export const AttributeManagement: React.FC = React.memo(() => {
           toast.error(getErrorMessage(error));
         }
       },
-    });
+    );
   };
 
   // Handlers for Options
   const handleAddOption = () => {
     if (!selectedAttributeId) return;
-    setEditingOption(null);
-    setOptionFormOpen(true);
+    optionForm.open();
   };
 
   const handleEditOption = (option: AttributeOptionWithIndex) => {
-    setEditingOption(option);
-    setOptionFormOpen(true);
+    optionForm.open(option);
   };
 
   const handleDeleteOption = (option: AttributeOptionWithIndex) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: t('settings.attribute.option.delete_option'),
-      description: t('settings.attribute.confirm.deleteOption', { name: option.name }),
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+    confirmDialog.show(
+      t('settings.attribute.option.delete_option'),
+      t('settings.attribute.confirm.deleteOption', { name: option.name }),
+      async () => {
+        confirmDialog.close();
         try {
           await deleteOption(option.attributeId, option.index);
           toast.success(t('settings.user.message.delete_success'));
@@ -167,7 +156,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
           toast.error(getErrorMessage(error));
         }
       },
-    });
+    );
   };
 
   const handleToggleDefault = async (attr: Attribute, optionId: number) => {
@@ -504,26 +493,20 @@ export const AttributeManagement: React.FC = React.memo(() => {
       </div>
 
       {/* Modals */}
-      {attributeFormOpen && (
+      {attributeForm.isOpen && (
         <AttributeForm
-          isOpen={attributeFormOpen}
-          onClose={() => {
-            setAttributeFormOpen(false);
-            setEditingAttribute(null);
-          }}
-          editingAttribute={editingAttribute}
+          isOpen={attributeForm.isOpen}
+          onClose={attributeForm.close}
+          editingAttribute={attributeForm.editing}
         />
       )}
 
-      {optionFormOpen && selectedAttributeId && (
+      {optionForm.isOpen && selectedAttributeId && (
         <OptionForm
-          isOpen={optionFormOpen}
-          onClose={() => {
-            setOptionFormOpen(false);
-            setEditingOption(null);
-          }}
+          isOpen={optionForm.isOpen}
+          onClose={optionForm.close}
           attributeId={selectedAttributeId}
-          editingOption={editingOption}
+          editingOption={optionForm.editing}
         />
       )}
 
@@ -533,7 +516,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onCancel={confirmDialog.close}
       />
     </div>
   );

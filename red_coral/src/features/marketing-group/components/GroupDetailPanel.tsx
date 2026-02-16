@@ -90,21 +90,11 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
       </div>
 
       {/* Group Info Card */}
-      <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-        {detail.description && (
+      {detail.description && (
+        <div className="bg-gray-50 rounded-xl p-4">
           <p className="text-sm text-gray-700">{detail.description}</p>
-        )}
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-600">{t('settings.marketing_group.status_label')}:</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-              detail.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {detail.is_active ? t('common.status.enabled') : t('common.status.disabled')}
-          </span>
         </div>
-      </div>
+      )}
 
       {/* ── Discount Rules Section ── */}
       <div>

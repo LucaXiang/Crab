@@ -3,12 +3,13 @@
  */
 
 import React, { useState } from 'react';
-import { X, FileText, Calendar, AlertCircle } from 'lucide-react';
+import { X, FileText, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { MAX_NOTE_LEN } from '@/shared/constants/validation';
+import { WheelDatePicker } from '@/shared/components/FormField';
 
 const getApi = () => createTauriClient();
 
@@ -96,19 +97,11 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {t('settings.daily_report.generate.date_label')}
             </label>
-            <div className="relative">
-              <Calendar
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="date"
-                value={businessDate}
-                onChange={(e) => setBusinessDate(e.target.value)}
-                max={today}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-              />
-            </div>
+            <WheelDatePicker
+              value={businessDate}
+              onChange={setBusinessDate}
+              placeholder={t('settings.daily_report.generate.date_label')}
+            />
             <p className="mt-1 text-xs text-gray-500">
               {t('settings.daily_report.generate.date_hint')}
             </p>

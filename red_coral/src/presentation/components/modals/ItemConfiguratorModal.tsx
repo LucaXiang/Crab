@@ -117,7 +117,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   return createPortal(
     <div className="fixed inset-0 z-100 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div
-        className={`bg-white rounded-2xl w-full ${showAttributesColumn ? 'max-w-4xl' : 'max-w-md'} h-[70vh] overflow-hidden shadow-2xl flex flex-col transition-all duration-300`}
+        className={`bg-white rounded-2xl w-full ${showAttributesColumn ? 'max-w-4xl' : 'max-w-md'} h-[70vh] overflow-hidden shadow-2xl flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -235,7 +235,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
           )}
 
           {/* Right: Action Panel */}
-          <div className={`${showAttributesColumn ? 'w-[27.5rem] border-l border-gray-100' : 'w-full'} bg-white shadow-xl z-20 flex flex-col h-full transition-all duration-300`}>
+          <div className={`${showAttributesColumn ? 'w-[27.5rem] border-l border-gray-100' : 'w-full'} bg-white shadow-xl z-20 flex flex-col h-full`}>
             <ItemActionPanel
               t={t}
               quantity={quantity}

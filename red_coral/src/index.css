@@ -78,6 +78,9 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 /* Custom scrollbar for webkit */
 ::-webkit-scrollbar {
   width: 6px;

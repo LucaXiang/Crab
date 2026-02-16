@@ -11,7 +11,6 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { ArrowLeft, Crown, UserX, Stamp, X, Tag, Percent, Globe, Layers, Package } from 'lucide-react';
 import { HeldOrder } from '@/core/domain/types';
 import type { MemberStampProgressDetail, MarketingGroupDetail, MgDiscountRule, ProductScope } from '@/core/domain/types/api';
-import type { CartItemSnapshot } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
 import { toast } from '@/presentation/components/Toast';
@@ -27,6 +26,7 @@ import { useTagStore } from '@/features/tag/store';
 import { useProductStore } from '@/core/stores/resources';
 import { StampRewardPickerModal } from './payment/StampRewardPickerModal';
 import { StampRedeemModal } from './payment/StampRedeemModal';
+import { getMatchingItems, getDesignatedMatchingItems } from '@/utils/stampMatching';
 
 interface MemberDetailModeProps {
   order: HeldOrder;
@@ -34,21 +34,6 @@ interface MemberDetailModeProps {
   remaining: number;
   onBack: () => void;
   onManageTable?: () => void;
-}
-
-function getMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
-  return items.filter(item =>
-    !item.is_comped && sp.reward_targets.some(rt =>
-      rt.target_type === 'PRODUCT' ? rt.target_id === item.id
-      : rt.target_type === 'CATEGORY' ? rt.target_id === item.category_id
-      : false
-    )
-  );
-}
-
-function getDesignatedMatchingItems(items: CartItemSnapshot[], sp: MemberStampProgressDetail): CartItemSnapshot[] {
-  if (!sp.designated_product_id) return [];
-  return items.filter(item => !item.is_comped && item.id === sp.designated_product_id);
 }
 
 export const MemberDetailMode: React.FC<MemberDetailModeProps> = ({

@@ -51,17 +51,13 @@ export const GroupListPanel: React.FC<GroupListPanelProps> = ({
                   w-full text-left p-3 rounded-xl transition-all duration-150
                   ${isSelected
                     ? 'ring-2 ring-violet-400 bg-violet-50 shadow-md'
-                    : `bg-white hover:bg-gray-50 shadow-sm hover:shadow ${!group.is_active ? 'opacity-50' : ''}`
+                    : 'bg-white hover:bg-gray-50 shadow-sm hover:shadow'
                   }
                 `}
               >
                 {/* Row 1: Status dot + Name */}
                 <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${
-                      !group.is_active ? 'bg-gray-400' : 'bg-violet-500'
-                    }`}
-                  />
+                  <span className="w-2 h-2 rounded-full shrink-0 bg-violet-500" />
                   <span className="font-medium text-gray-900 truncate">
                     {group.display_name}
                   </span>

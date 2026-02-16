@@ -9,6 +9,7 @@ import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { ProductImage } from '@/features/product/ProductImage';
 import { getErrorMessage } from '@/utils/error';
 import { MAX_NAME_LEN, MAX_ADDRESS_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_URL_LEN } from '@/shared/constants/validation';
+import { WheelTimePicker } from '@/shared/components/FormField';
 
 export const StoreSettings: React.FC = () => {
   const info = useStoreInfo();
@@ -197,7 +198,13 @@ export const StoreSettings: React.FC = () => {
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3 text-gray-400" />{t('settings.store.form.business_day_cutoff')}</span>
             </label>
-            <input type="time" name="businessDayCutoff" value={formData.businessDayCutoff} onChange={onInputChange} className={`${inputClass} w-32`} />
+            <div className="w-40">
+              <WheelTimePicker
+                value={formData.businessDayCutoff}
+                onChange={(v) => handleChange('businessDayCutoff', v)}
+                placeholder={t('settings.store.form.business_day_cutoff')}
+              />
+            </div>
           </div>
           <div className="pt-5">
             <div className="flex gap-2">

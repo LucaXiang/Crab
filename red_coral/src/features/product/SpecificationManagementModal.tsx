@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/hooks/useConfirmDialog';
 import { formatCurrency } from '@/utils/currency';
 import { getErrorMessage } from '@/utils/error';
 import { logger } from '@/utils/logger';
@@ -40,12 +41,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // Confirm dialog state
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-  });
+  const confirmDialog = useConfirmDialog();
 
   // Sync specs from store when modal opens or product changes
   useEffect(() => {
@@ -97,19 +93,18 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
       return;
     }
 
-    setConfirmDialog({
-      isOpen: true,
-      title: t('settings.specification.action.delete'),
-      description: t('settings.specification.confirm.delete'),
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+    confirmDialog.show(
+      t('settings.specification.action.delete'),
+      t('settings.specification.confirm.delete'),
+      async () => {
+        confirmDialog.close();
         const newSpecs = specs.filter((_, i) => i !== index);
         const success = await saveSpecs(newSpecs);
         if (success) {
           toast.success(t('settings.specification.message.deleted'));
         }
       },
-    });
+    );
   };
 
   const handleToggleDefault = async (index: number) => {
@@ -318,7 +313,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onCancel={confirmDialog.close}
       />
     </div>
   );
