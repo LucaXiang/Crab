@@ -1,0 +1,53 @@
+# ── Stage 1: Build for Lambda (AL2023 + Graviton) ──
+FROM rust:1.83-bookworm AS builder
+
+# Install cross-compilation toolchain for aarch64 (Graviton)
+RUN apt-get update && apt-get install -y \
+    pkg-config gcc-aarch64-linux-gnu \
+    libssl-dev:arm64 cmake clang \
+    && rm -rf /var/lib/apt/lists/* \
+    || true
+
+# For cross-compilation, use OpenSSL vendored feature
+ENV OPENSSL_STATIC=1
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+
+RUN rustup target add aarch64-unknown-linux-gnu
+
+WORKDIR /app
+
+# Copy workspace manifests for dependency caching
+COPY Cargo.toml Cargo.lock ./
+COPY shared/Cargo.toml shared/Cargo.toml
+COPY crab-cert/Cargo.toml crab-cert/Cargo.toml
+COPY crab-auth/Cargo.toml crab-auth/Cargo.toml
+
+# Create dummy sources
+RUN mkdir -p shared/src crab-cert/src crab-auth/src && \
+    echo "pub fn _dummy() {}" > shared/src/lib.rs && \
+    echo "pub fn _dummy() {}" > crab-cert/src/lib.rs && \
+    echo "fn main() {}" > crab-auth/src/main.rs
+
+# Pre-build dependencies
+RUN cargo build --release --target aarch64-unknown-linux-gnu -p crab-auth 2>/dev/null || true
+
+# Copy real source
+COPY shared/ shared/
+COPY crab-cert/ crab-cert/
+COPY crab-auth/ crab-auth/
+
+RUN touch shared/src/lib.rs crab-cert/src/lib.rs crab-auth/src/main.rs
+
+# Build real binary
+RUN cargo build --release --target aarch64-unknown-linux-gnu -p crab-auth
+
+# Rename to 'bootstrap' (Lambda custom runtime convention)
+RUN cp target/aarch64-unknown-linux-gnu/release/crab-auth /app/bootstrap
+
+# ── Stage 2: Package ──
+FROM public.ecr.aws/lambda/provided:al2023-arm64
+
+COPY --from=builder /app/bootstrap ${LAMBDA_RUNTIME_DIR}/bootstrap
+
+CMD ["bootstrap"]

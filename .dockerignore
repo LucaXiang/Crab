@@ -1,0 +1,11 @@
+target/
+red_coral/node_modules/
+red_coral/dist/
+red_coral/src-tauri/target/
+.git/
+*.pdf
+*.typ
+*.p12
+.env
+.env.*
+crab-report*
