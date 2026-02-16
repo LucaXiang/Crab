@@ -6,23 +6,29 @@ use sqlx::PgPool;
 pub struct P12Certificate {
     pub tenant_id: String,
     pub s3_key: String,
-    pub p12_password: String,
     pub fingerprint: Option<String>,
-    pub subject: Option<String>,
+    pub common_name: Option<String>,
+    pub serial_number: Option<String>,
+    pub organization_id: Option<String>,
+    pub organization: Option<String>,
+    pub issuer: Option<String>,
+    pub country: Option<String>,
     pub expires_at: Option<i64>,
+    pub not_before: Option<i64>,
     pub uploaded_at: i64,
     pub updated_at: i64,
 }
 
-/// 查询租户的 P12 证书记录（签名服务使用）
+/// 查询租户的 P12 证书记录
 #[allow(dead_code)]
 pub async fn find_by_tenant(
     pool: &PgPool,
     tenant_id: &str,
 ) -> Result<Option<P12Certificate>, sqlx::Error> {
     sqlx::query_as::<_, P12Certificate>(
-        "SELECT tenant_id, s3_key, p12_password, fingerprint, subject,
-            expires_at, uploaded_at, updated_at
+        "SELECT tenant_id, s3_key, fingerprint, common_name, serial_number,
+            organization_id, organization, issuer, country,
+            expires_at, not_before, uploaded_at, updated_at
             FROM p12_certificates
             WHERE tenant_id = $1",
     )
@@ -32,9 +38,6 @@ pub async fn find_by_tenant(
 }
 
 /// 获取租户的 P12 证书状态 (供 SubscriptionInfo 使用)
-///
-/// 查询 `p12_certificates` 表，转为 `shared::activation::P12Info`。
-/// 如果无记录则返回 `has_p12: false`。
 pub async fn get_p12_info(
     pool: &PgPool,
     tenant_id: &str,
@@ -43,7 +46,7 @@ pub async fn get_p12_info(
         Some(cert) => Ok(shared::activation::P12Info {
             has_p12: true,
             fingerprint: cert.fingerprint,
-            subject: cert.subject,
+            subject: cert.common_name,
             expires_at: cert.expires_at,
         }),
         None => Ok(shared::activation::P12Info {
@@ -55,30 +58,37 @@ pub async fn get_p12_info(
     }
 }
 
-/// 插入或更新 P12 证书记录
+/// 插入或更新 P12 证书元数据 (密码存储在 Secrets Manager，不在 PG)
 pub async fn upsert(
     pool: &PgPool,
     tenant_id: &str,
     s3_key: &str,
-    p12_password: &str,
-    fingerprint: Option<&str>,
-    subject: Option<&str>,
-    expires_at: Option<i64>,
+    info: &crab_cert::P12CertInfo,
 ) -> Result<(), sqlx::Error> {
     let now = shared::util::now_millis();
     sqlx::query(
-        "INSERT INTO p12_certificates (tenant_id, s3_key, p12_password, fingerprint, subject, expires_at, uploaded_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+        "INSERT INTO p12_certificates
+            (tenant_id, s3_key, fingerprint, common_name, serial_number,
+             organization_id, organization, issuer, country,
+             expires_at, not_before, uploaded_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
             ON CONFLICT (tenant_id)
-            DO UPDATE SET s3_key = $2, p12_password = $3, fingerprint = $4, subject = $5,
-                          expires_at = $6, updated_at = $7",
+            DO UPDATE SET s3_key = $2, fingerprint = $3, common_name = $4,
+                          serial_number = $5, organization_id = $6, organization = $7,
+                          issuer = $8, country = $9, expires_at = $10, not_before = $11,
+                          updated_at = $12",
     )
     .bind(tenant_id)
     .bind(s3_key)
-    .bind(p12_password)
-    .bind(fingerprint)
-    .bind(subject)
-    .bind(expires_at)
+    .bind(&info.fingerprint)
+    .bind(&info.common_name)
+    .bind(&info.serial_number)
+    .bind(&info.organization_id)
+    .bind(&info.organization)
+    .bind(&info.issuer)
+    .bind(&info.country)
+    .bind(info.expires_at)
+    .bind(info.not_before)
     .bind(now)
     .execute(pool)
     .await?;

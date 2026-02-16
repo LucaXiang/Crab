@@ -43,13 +43,14 @@ async fn main() -> Result<(), lambda_http::Error> {
     let s3_client = aws_sdk_s3::Client::new(&aws_config);
 
     // Initialize CA store and verify Root CA is accessible
-    let ca_store = CaStore::new(sm_client);
+    let ca_store = CaStore::new(sm_client.clone());
     ca_store.get_or_create_root_ca().await?;
     info!("Root CA ready");
 
     let state = Arc::new(AppState {
         db: pool,
         ca_store,
+        sm: sm_client,
         s3: s3_client,
         s3_bucket: config.s3_bucket,
         kms_key_id: config.kms_key_id,

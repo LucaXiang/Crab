@@ -6,9 +6,48 @@ use tokio::sync::OnceCell;
 pub struct AppState {
     pub db: PgPool,
     pub ca_store: CaStore,
+    pub sm: SmClient,
     pub s3: aws_sdk_s3::Client,
     pub s3_bucket: String,
     pub kms_key_id: Option<String>,
+}
+
+impl AppState {
+    /// 将 P12 密码存入 Secrets Manager (create or update)
+    pub async fn store_p12_password(
+        &self,
+        tenant_id: &str,
+        password: &str,
+    ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let secret_name = format!("crab-auth/p12/{tenant_id}");
+
+        // 尝试更新已有 secret
+        match self
+            .sm
+            .put_secret_value()
+            .secret_id(&secret_name)
+            .secret_string(password)
+            .send()
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err)
+                if err
+                    .as_service_error()
+                    .is_some_and(|e| e.is_resource_not_found_exception()) =>
+            {
+                // Secret 不存在，创建新的
+                self.sm
+                    .create_secret()
+                    .name(&secret_name)
+                    .secret_string(password)
+                    .send()
+                    .await?;
+                Ok(())
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

@@ -9,6 +9,8 @@ publish = false
 rcgen.workspace = true
 x509-parser.workspace = true
 pem.workspace = true
+p12-keystore.workspace = true
+openssl.workspace = true
 
 # TLS
 rustls.workspace = true

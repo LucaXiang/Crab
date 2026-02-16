@@ -5,6 +5,7 @@ mod crypto;
 mod error;
 mod machine;
 mod metadata;
+mod p12;
 mod profile;
 mod server;
 pub mod signer;
@@ -17,6 +18,7 @@ pub use crypto::{decrypt, encrypt, sign, to_rustls_certs, to_rustls_key, verify}
 pub use error::{CertError, Result};
 pub use machine::{generate_hardware_id, generate_quick_hardware_id};
 pub use metadata::CertMetadata;
+pub use p12::{P12CertInfo, parse_p12};
 pub use profile::{CaProfile, CertProfile, KeyType};
 pub use server::{CertService, CertStorage};
 pub use trust::{get_or_create_root_ca, verify_ca_signature, verify_chain_against_root};

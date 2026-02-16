@@ -89,6 +89,8 @@ rand = "0.8"
 rcgen = "0.14"
 x509-parser = "0.18"
 pem = "3.0"
+p12-keystore = "0.3.0-rc2"
+openssl = "0.10"
 
 # ========== Logging and Tracing ==========
 tracing = "0.1"

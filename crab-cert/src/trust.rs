@@ -35,7 +35,7 @@ pub fn verify_ca_signature(ca_cert_pem: &str, root_ca_pem: &str) -> Result<()> {
     // 2. Extract TBS bytes manually from DER
     // The Certificate is a SEQUENCE of [TBS, Alg, Sig].
     // We parse the outer sequence, then extract the first element as raw bytes.
-    let tbs_bytes = extract_tbs_bytes(&pem.contents)?;
+    let tbs_bytes = extract_tbs_from_der(&pem.contents)?;
 
     // 3. Extract Signature
     // We can use x509-parser to easily get the signature value
@@ -50,7 +50,7 @@ pub fn verify_ca_signature(ca_cert_pem: &str, root_ca_pem: &str) -> Result<()> {
     Ok(())
 }
 
-fn extract_tbs_bytes(der: &[u8]) -> Result<&[u8]> {
+pub(crate) fn extract_tbs_from_der(der: &[u8]) -> Result<&[u8]> {
     // Helper to read header and return (header_len, content_len)
     fn read_header(data: &[u8]) -> Result<(usize, usize)> {
         if data.len() < 2 {
