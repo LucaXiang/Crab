@@ -161,5 +161,4 @@ impl HttpClient for NetworkHttpClient {
         self.token = None;
         Ok(())
     }
-
 }

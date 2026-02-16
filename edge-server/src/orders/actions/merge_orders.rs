@@ -8,9 +8,9 @@
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 
-use crate::orders::money::to_decimal;
+use crate::order_money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -227,7 +227,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -321,7 +321,13 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         // Check items and payment state are included in OrderMerged event
-        if let EventPayload::OrderMerged { items, payments, paid_amount, .. } = &events[1].payload {
+        if let EventPayload::OrderMerged {
+            items,
+            payments,
+            paid_amount,
+            ..
+        } = &events[1].payload
+        {
             assert_eq!(items.len(), 2);
             assert_eq!(items[0].instance_id, "item-1");
             assert_eq!(items[0].name, "Coffee");

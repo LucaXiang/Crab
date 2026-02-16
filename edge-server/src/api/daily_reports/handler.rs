@@ -11,9 +11,11 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::daily_report;
-use crate::utils::{AppError, AppResult};
 use crate::utils::time;
-use crate::utils::validation::{validate_optional_text, validate_required_text, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN};
+use crate::utils::validation::{
+    MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
+};
+use crate::utils::{AppError, AppResult};
 use shared::models::{DailyReport, DailyReportGenerate};
 
 const RESOURCE: &str = "daily_report";
@@ -114,7 +116,8 @@ pub async fn generate(
     audit_log!(
         state.audit_service,
         AuditAction::DailyReportGenerated,
-        "daily_report", &id,
+        "daily_report",
+        &id,
         operator_id = Some(audit_operator_id),
         operator_name = Some(audit_operator_name),
         details = serde_json::json!({

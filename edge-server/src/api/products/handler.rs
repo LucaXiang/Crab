@@ -1,17 +1,19 @@
 //! Product API Handlers
 
-use axum::{
-    extract::{Extension, Path, State},
-    Json,
-};
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
-use crate::utils::{AppError, AppResult, ErrorCode};
 use crate::utils::types::{BatchUpdateResponse, SortOrderUpdate};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_URL_LEN};
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_URL_LEN, validate_optional_text, validate_required_text,
+};
+use crate::utils::{AppError, AppResult, ErrorCode};
+use axum::{
+    Json,
+    extract::{Extension, Path, State},
+};
 use shared::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 
 const RESOURCE_PRODUCT: &str = "product";
@@ -20,7 +22,11 @@ fn validate_create(payload: &ProductCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
     validate_optional_text(&payload.image, "image", MAX_URL_LEN)?;
     validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
-    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(
+        &payload.kitchen_print_name,
+        "kitchen_print_name",
+        MAX_RECEIPT_NAME_LEN,
+    )?;
     validate_specs(&payload.specs)?;
     Ok(())
 }
@@ -31,7 +37,11 @@ fn validate_update(payload: &ProductUpdate) -> AppResult<()> {
     }
     validate_optional_text(&payload.image, "image", MAX_URL_LEN)?;
     validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
-    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(
+        &payload.kitchen_print_name,
+        "kitchen_print_name",
+        MAX_RECEIPT_NAME_LEN,
+    )?;
     if let Some(specs) = &payload.specs {
         validate_specs(specs)?;
     }
@@ -42,15 +52,21 @@ fn validate_update(payload: &ProductUpdate) -> AppResult<()> {
 fn validate_specs(specs: &[shared::models::ProductSpecInput]) -> AppResult<()> {
     for spec in specs {
         validate_required_text(&spec.name, "spec name", MAX_NAME_LEN)?;
-        validate_optional_text(&spec.receipt_name, "spec receipt_name", MAX_RECEIPT_NAME_LEN)?;
+        validate_optional_text(
+            &spec.receipt_name,
+            "spec receipt_name",
+            MAX_RECEIPT_NAME_LEN,
+        )?;
         if !spec.price.is_finite() {
             return Err(AppError::validation(format!(
-                "spec '{}': price must be a finite number", spec.name
+                "spec '{}': price must be a finite number",
+                spec.name
             )));
         }
         if spec.price < 0.0 {
             return Err(AppError::validation(format!(
-                "spec '{}': price must be non-negative, got {}", spec.name, spec.price
+                "spec '{}': price must be non-negative, got {}",
+                spec.name, spec.price
             )));
         }
     }
@@ -66,7 +82,8 @@ async fn check_duplicate_external_id(
     let count: i64 = if let Some(exclude_id) = exclude_product_id {
         sqlx::query_scalar!(
             "SELECT COUNT(*) FROM product WHERE external_id = ?1 AND id != ?2 LIMIT 1",
-            external_id, exclude_id,
+            external_id,
+            exclude_id,
         )
         .fetch_one(&state.pool)
         .await
@@ -98,9 +115,7 @@ pub async fn list_by_category(
     State(state): State<ServerState>,
     Path(category_id): Path<i64>,
 ) -> AppResult<Json<Vec<ProductFull>>> {
-    let products = state
-        .catalog_service
-        .get_products_by_category(category_id);
+    let products = state.catalog_service.get_products_by_category(category_id);
     Ok(Json(products))
 }
 
@@ -125,28 +140,26 @@ pub async fn create(
     validate_create(&payload)?;
 
     // 检查 external_id 是否已提供 (必填)
-    let eid = payload.external_id.ok_or_else(|| {
-        AppError::new(ErrorCode::ProductExternalIdRequired)
-    })?;
+    let eid = payload
+        .external_id
+        .ok_or_else(|| AppError::new(ErrorCode::ProductExternalIdRequired))?;
 
     // 检查 external_id 是否已被其他商品使用
     if check_duplicate_external_id(&state, eid, None).await? {
-        return Err(AppError::new(ErrorCode::ProductExternalIdExists)
-            .with_detail("external_id", eid));
+        return Err(
+            AppError::new(ErrorCode::ProductExternalIdExists).with_detail("external_id", eid)
+        );
     }
 
-    let product = state
-        .catalog_service
-        .create_product(payload)
-        .await
-        ?;
+    let product = state.catalog_service.create_product(payload).await?;
 
     let id_str = product.id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::ProductCreated,
-        "product", &id_str,
+        "product",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&product, "product")
@@ -187,14 +200,12 @@ pub async fn update(
     if let Some(eid) = payload.external_id
         && check_duplicate_external_id(&state, eid, Some(id)).await?
     {
-        return Err(AppError::new(ErrorCode::ProductExternalIdExists)
-            .with_detail("external_id", eid));
+        return Err(
+            AppError::new(ErrorCode::ProductExternalIdExists).with_detail("external_id", eid)
+        );
     }
 
-    let product = state
-        .catalog_service
-        .update_product(id, payload)
-        .await?;
+    let product = state.catalog_service.update_product(id, payload).await?;
 
     tracing::debug!(
         "Product updated - is_kitchen_print_enabled: {}, is_label_print_enabled: {}",
@@ -205,7 +216,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "product", &id_str,
+        "product",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_product, &product, "product")
@@ -232,16 +244,13 @@ pub async fn delete(
         .get_product(id)
         .map(|p| p.name.clone())
         .unwrap_or_default();
-    state
-        .catalog_service
-        .delete_product(id)
-        .await
-        ?;
+    state.catalog_service.delete_product(id).await?;
 
     audit_log!(
         state.audit_service,
         AuditAction::ProductDeleted,
-        "product", &id_str,
+        "product",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": name_for_audit})
@@ -291,15 +300,15 @@ pub async fn add_product_tag(
     let product = state
         .catalog_service
         .add_product_tag(product_id, tag_id)
-        .await
-        ?;
+        .await?;
 
     let product_id_str = product_id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "product", &product_id_str,
+        "product",
+        &product_id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "add_tag", "tag_id": tag_id})
@@ -307,12 +316,7 @@ pub async fn add_product_tag(
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     state
-        .broadcast_sync(
-            RESOURCE_PRODUCT,
-            "updated",
-            &product_id_str,
-            Some(&product),
-        )
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id_str, Some(&product))
         .await;
 
     Ok(Json(product))
@@ -327,15 +331,15 @@ pub async fn remove_product_tag(
     let product = state
         .catalog_service
         .remove_product_tag(product_id, tag_id)
-        .await
-        ?;
+        .await?;
 
     let product_id_str = product_id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "product", &product_id_str,
+        "product",
+        &product_id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "remove_tag", "tag_id": tag_id})
@@ -343,12 +347,7 @@ pub async fn remove_product_tag(
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     state
-        .broadcast_sync(
-            RESOURCE_PRODUCT,
-            "updated",
-            &product_id_str,
-            Some(&product),
-        )
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id_str, Some(&product))
         .await;
 
     Ok(Json(product))

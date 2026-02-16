@@ -22,7 +22,10 @@ fn routes() -> Router<ServerState> {
     // 管理路由：仅管理员可用 (users:manage)
     let manage_routes = Router::new()
         .route("/", axum::routing::post(handler::create))
-        .route("/{id}", axum::routing::put(handler::update).delete(handler::delete))
+        .route(
+            "/{id}",
+            axum::routing::put(handler::update).delete(handler::delete),
+        )
         .layer(middleware::from_fn(require_admin));
 
     read_routes.merge(manage_routes)

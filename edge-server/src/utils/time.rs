@@ -32,7 +32,8 @@ pub fn validate_not_future(date: NaiveDate, tz: Tz) -> AppResult<()> {
 pub fn date_hms_to_millis(date: NaiveDate, hour: u32, min: u32, sec: u32, tz: Tz) -> i64 {
     let Some(naive) = date.and_hms_opt(hour, min, sec) else {
         // Invalid h/m/s — fallback to day start in UTC
-        return date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
+        // SAFETY: (0,0,0) is always valid for NaiveDate::and_hms_opt
+        return date.and_time(NaiveTime::MIN).and_utc().timestamp_millis();
     };
     naive
         .and_local_timezone(tz)

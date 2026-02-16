@@ -117,7 +117,9 @@ impl<T> Message<T> {
     where
         T: Serialize,
     {
-        let payload = serde_json::to_vec(&self.data).expect("Failed to serialize message data");
+        // SAFETY: T: Serialize via derive — serde_json::to_vec cannot fail except on OOM (which aborts)
+        let payload = serde_json::to_vec(&self.data)
+            .expect("derive(Serialize) type serialization is infallible");
 
         BusMessage {
             request_id: self.request_id,
@@ -188,13 +190,15 @@ impl BusMessage {
     pub fn handshake(payload: &HandshakePayload) -> Self {
         Self::new(
             EventType::Handshake,
-            serde_json::to_vec(payload).expect("Failed to serialize handshake payload"),
+            // SAFETY: HandshakePayload derives Serialize — infallible
+            serde_json::to_vec(payload).expect("derive(Serialize) serialization is infallible"),
         )
     }
 
     /// 创建服务器指令消息
     pub fn server_command(payload: &ServerCommandPayload) -> Self {
-        let payload_bytes = serde_json::to_vec(payload).expect("Failed to serialize ServerCommand");
+        let payload_bytes = // SAFETY: derives Serialize — infallible
+        serde_json::to_vec(payload).expect("derive(Serialize) serialization is infallible");
         Self::new(EventType::ServerCommand, payload_bytes)
     }
 
@@ -202,7 +206,8 @@ impl BusMessage {
     pub fn notification(payload: &NotificationPayload) -> Self {
         Self::new(
             EventType::Notification,
-            serde_json::to_vec(payload).expect("Failed to serialize notification"),
+            // SAFETY: derives Serialize — infallible
+            serde_json::to_vec(payload).expect("derive(Serialize) serialization is infallible"),
         )
     }
 
@@ -210,7 +215,8 @@ impl BusMessage {
     pub fn request_command(payload: &RequestCommandPayload) -> Self {
         Self::new(
             EventType::RequestCommand,
-            serde_json::to_vec(payload).expect("Failed to serialize request command"),
+            // SAFETY: derives Serialize — infallible
+            serde_json::to_vec(payload).expect("derive(Serialize) serialization is infallible"),
         )
     }
 
@@ -218,7 +224,8 @@ impl BusMessage {
     pub fn sync(payload: &SyncPayload) -> Self {
         Self::new(
             EventType::Sync,
-            serde_json::to_vec(payload).expect("Failed to serialize sync payload"),
+            // SAFETY: derives Serialize — infallible
+            serde_json::to_vec(payload).expect("derive(Serialize) serialization is infallible"),
         )
     }
 
@@ -226,7 +233,8 @@ impl BusMessage {
     pub fn response(payload: &ResponsePayload) -> Self {
         Self::new(
             EventType::Response,
-            serde_json::to_vec(payload).expect("Failed to serialize response payload"),
+            // SAFETY: derives Serialize — infallible
+            serde_json::to_vec(payload).expect("derive(Serialize) serialization is infallible"),
         )
     }
 

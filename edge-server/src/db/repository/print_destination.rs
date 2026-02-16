@@ -1,9 +1,7 @@
 //! Print Destination Repository
 
 use super::{RepoError, RepoResult};
-use shared::models::{
-    PrintDestination, PrintDestinationCreate, PrintDestinationUpdate, Printer,
-};
+use shared::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate, Printer};
 use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<PrintDestination>> {
@@ -56,7 +54,10 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Pr
     Ok(dest)
 }
 
-pub async fn create(pool: &SqlitePool, data: PrintDestinationCreate) -> RepoResult<PrintDestination> {
+pub async fn create(
+    pool: &SqlitePool,
+    data: PrintDestinationCreate,
+) -> RepoResult<PrintDestination> {
     let mut tx = pool.begin().await?;
 
     let id = sqlx::query_scalar!(

@@ -48,28 +48,34 @@ impl CommandHandler for LinkMemberAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
-                    "Cannot link member on order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot link member on order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
         // 3. Block if a member is already linked (must unlink first)
         if snapshot.member_id.is_some() {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::MemberAlreadyLinked,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::MemberAlreadyLinked,
                 "A member is already linked to this order. Unlink first.".to_string(),
             ));
         }
 
         // 4. Block during active split payments
         if snapshot.aa_total_shares.is_some() {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::AaSplitActive,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitActive,
                 "Cannot link member during AA split".to_string(),
             ));
         }
         if snapshot.has_amount_split {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::AmountSplitActive,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AmountSplitActive,
                 "Cannot link member during amount split".to_string(),
             ));
         }
@@ -83,10 +89,7 @@ impl CommandHandler for LinkMemberAction {
                 .iter()
                 .filter(|item| !item.is_comped)
                 .filter_map(|item| {
-                    let category_id = self
-                        .product_metadata
-                        .get(&item.id)
-                        .map(|m| m.category_id);
+                    let category_id = self.product_metadata.get(&item.id).map(|m| m.category_id);
                     let result = crate::marketing::mg_calculator::calculate_mg_discount(
                         item.unit_price,
                         item.id,
@@ -284,7 +287,10 @@ mod tests {
             assert_eq!(mg_item_discounts.len(), 1);
             assert_eq!(mg_item_discounts[0].instance_id, "inst-100");
             assert_eq!(mg_item_discounts[0].applied_mg_rules.len(), 1);
-            assert_eq!(mg_item_discounts[0].applied_mg_rules[0].calculated_amount, 5.0);
+            assert_eq!(
+                mg_item_discounts[0].applied_mg_rules[0].calculated_amount,
+                5.0
+            );
         } else {
             panic!("Expected MemberLinked payload");
         }

@@ -1,6 +1,5 @@
 use super::*;
 
-
 // ========================================================================
 // ========================================================================
 //  P0: 核心业务流程测试
@@ -45,9 +44,9 @@ fn test_complete_dine_in_flow() {
         OrderCommandPayload::AddItems {
             order_id: order_id.clone(),
             items: vec![
-                simple_item(10, "Coffee", 5.0, 2),      // 10.0
-                simple_item(11, "Tea", 3.0, 3),            // 9.0
-                simple_item(12, "Cake", 12.50, 1),        // 12.50
+                simple_item(10, "Coffee", 5.0, 2), // 10.0
+                simple_item(11, "Tea", 3.0, 3),    // 9.0
+                simple_item(12, "Cake", 12.50, 1), // 12.50
             ],
         },
     );
@@ -59,10 +58,13 @@ fn test_complete_dine_in_flow() {
     assert_eq!(snapshot.subtotal, 31.5); // 10 + 9 + 12.5
 
     // 3. ModifyItem: 减少 Tea 数量 3 → 2
-    let tea_instance_id = snapshot.items.iter()
+    let tea_instance_id = snapshot
+        .items
+        .iter()
         .find(|i| i.name == "Tea")
         .unwrap()
-        .instance_id.clone();
+        .instance_id
+        .clone();
 
     let modify_cmd = OrderCommand::new(
         1,
@@ -103,7 +105,6 @@ fn test_complete_dine_in_flow() {
     assert!(snapshot.end_time.is_some());
 }
 
-
 // ------------------------------------------------------------------------
 // P0.2: 完整零售订单流程 (带 queue_number)
 // ------------------------------------------------------------------------
@@ -116,8 +117,14 @@ fn test_complete_retail_flow_with_queue_number() {
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(snapshot.is_retail);
-    assert!(snapshot.queue_number.is_some(), "Retail order should have queue_number");
-    assert!(snapshot.table_id.is_none(), "Retail order should have no table_id");
+    assert!(
+        snapshot.queue_number.is_some(),
+        "Retail order should have queue_number"
+    );
+    assert!(
+        snapshot.table_id.is_none(),
+        "Retail order should have no table_id"
+    );
 
     // 2. 添加商品
     let add_cmd = OrderCommand::new(
@@ -149,7 +156,6 @@ fn test_complete_retail_flow_with_queue_number() {
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert_eq!(snapshot.service_type, Some(ServiceType::Takeout));
 }
-
 
 // ------------------------------------------------------------------------
 // P0.3: VoidOrder 损失结算
@@ -185,10 +191,12 @@ fn test_void_order_loss_settlement() {
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Void);
     assert_eq!(snapshot.void_type, Some(VoidType::LossSettled));
-    assert_eq!(snapshot.loss_reason, Some(shared::order::LossReason::CustomerFled));
+    assert_eq!(
+        snapshot.loss_reason,
+        Some(shared::order::LossReason::CustomerFled)
+    );
     assert_eq!(snapshot.loss_amount, Some(100.0));
 }
-
 
 // ------------------------------------------------------------------------
 // P0.4: 多次菜品分单后完成
@@ -201,16 +209,28 @@ fn test_split_by_items_multiple_then_complete() {
         &manager,
         249,
         vec![
-            simple_item(1, "Item A", 20.0, 2),  // 40
-            simple_item(2, "Item B", 15.0, 2),  // 30
-            simple_item(3, "Item C", 10.0, 1),  // 10
+            simple_item(1, "Item A", 20.0, 2), // 40
+            simple_item(2, "Item B", 15.0, 2), // 30
+            simple_item(3, "Item C", 10.0, 1), // 10
         ],
     );
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 80.0);
-    let item_a_id = snapshot.items.iter().find(|i| i.name == "Item A").unwrap().instance_id.clone();
-    let item_b_id = snapshot.items.iter().find(|i| i.name == "Item B").unwrap().instance_id.clone();
+    let item_a_id = snapshot
+        .items
+        .iter()
+        .find(|i| i.name == "Item A")
+        .unwrap()
+        .instance_id
+        .clone();
+    let item_b_id = snapshot
+        .items
+        .iter()
+        .find(|i| i.name == "Item B")
+        .unwrap()
+        .instance_id
+        .clone();
 
     // 第一次分单: 支付 Item A 的 1 个 (20.0)
     let split_cmd1 = OrderCommand::new(
@@ -269,7 +289,6 @@ fn test_split_by_items_multiple_then_complete() {
     assert_order_status(&manager, &order_id, OrderStatus::Completed);
 }
 
-
 // ------------------------------------------------------------------------
 // P0.5: 多次金额分单后完成
 // ------------------------------------------------------------------------
@@ -277,11 +296,8 @@ fn test_split_by_items_multiple_then_complete() {
 fn test_split_by_amount_multiple_then_complete() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        250,
-        vec![simple_item(1, "Total Item", 100.0, 1)],
-    );
+    let order_id =
+        open_table_with_items(&manager, 250, vec![simple_item(1, "Total Item", 100.0, 1)]);
 
     // 第一次金额分单: 30%
     let split_cmd1 = OrderCommand::new(
@@ -327,7 +343,6 @@ fn test_split_by_amount_multiple_then_complete() {
     assert_order_status(&manager, &order_id, OrderStatus::Completed);
 }
 
-
 // ------------------------------------------------------------------------
 // P0.6: AA 分单 3 人不能整除场景 (精度测试)
 // ------------------------------------------------------------------------
@@ -336,11 +351,8 @@ fn test_aa_split_three_payers_indivisible() {
     let manager = create_test_manager();
 
     // 100 元订单，3 人 AA
-    let order_id = open_table_with_items(
-        &manager,
-        251,
-        vec![simple_item(1, "Shared Meal", 100.0, 1)],
-    );
+    let order_id =
+        open_table_with_items(&manager, 251, vec![simple_item(1, "Shared Meal", 100.0, 1)]);
 
     // StartAaSplit: 3 人，先付 1 份
     let start_aa = OrderCommand::new(
@@ -362,7 +374,10 @@ fn test_aa_split_three_payers_indivisible() {
     assert_eq!(snapshot.aa_paid_shares, 1);
     // 100 / 3 ≈ 33.33，实际支付第一份
     let first_share = snapshot.paid_amount;
-    assert!(first_share > 33.0 && first_share < 34.0, "First share should be ~33.33");
+    assert!(
+        first_share > 33.0 && first_share < 34.0,
+        "First share should be ~33.33"
+    );
 
     // PayAaSplit: 第二份
     let pay_aa_2 = OrderCommand::new(
@@ -399,13 +414,16 @@ fn test_aa_split_three_payers_indivisible() {
     assert_eq!(snapshot.aa_paid_shares, 3);
     // 精度验证: 总支付应该恰好等于 100.0
     let diff = (snapshot.paid_amount - 100.0).abs();
-    assert!(diff < 0.01, "Total paid should be exactly 100.0, got {}", snapshot.paid_amount);
+    assert!(
+        diff < 0.01,
+        "Total paid should be exactly 100.0, got {}",
+        snapshot.paid_amount
+    );
 
     // 完成
     let complete_resp = complete_order(&manager, &order_id);
     assert!(complete_resp.success);
 }
-
 
 // ------------------------------------------------------------------------
 // P0.7: 合并订单后修改并完成
@@ -447,7 +465,11 @@ fn test_merge_orders_then_modify_then_complete() {
 
     // 验证目标订单
     let target = manager.get_snapshot(&target_id).unwrap().unwrap();
-    assert_eq!(target.items.len(), 2, "Target should have 2 items after merge");
+    assert_eq!(
+        target.items.len(),
+        2,
+        "Target should have 2 items after merge"
+    );
     assert_eq!(target.total, 14.0); // 10 + 4
 
     // 继续在目标订单添加商品
@@ -472,7 +494,6 @@ fn test_merge_orders_then_modify_then_complete() {
     assert!(complete_resp.success);
 }
 
-
 // ------------------------------------------------------------------------
 // P0.8: 移桌后合并再完成
 // ------------------------------------------------------------------------
@@ -481,11 +502,7 @@ fn test_move_then_merge_then_complete() {
     let manager = create_test_manager();
 
     // 订单 1: T1
-    let order1 = open_table_with_items(
-        &manager,
-        401,
-        vec![simple_item(1, "Item 1", 10.0, 1)],
-    );
+    let order1 = open_table_with_items(&manager, 401, vec![simple_item(1, "Item 1", 10.0, 1)]);
 
     // 移桌: T1 → T2
     let move_cmd = OrderCommand::new(
@@ -509,11 +526,7 @@ fn test_move_then_merge_then_complete() {
     assert_eq!(snapshot.zone_id, Some(2));
 
     // 订单 2: T3
-    let order2 = open_table_with_items(
-        &manager,
-        403,
-        vec![simple_item(2, "Item 2", 20.0, 1)],
-    );
+    let order2 = open_table_with_items(&manager, 403, vec![simple_item(2, "Item 2", 20.0, 1)]);
 
     // 合并: T2 (order1) → T3 (order2)
     let merge_cmd = OrderCommand::new(
@@ -542,7 +555,6 @@ fn test_move_then_merge_then_complete() {
     let complete_resp = complete_order(&manager, &order2);
     assert!(complete_resp.success);
 }
-
 
 // ------------------------------------------------------------------------
 // P0.9: 商品添加→修改→移除链条 (金额重算验证)
@@ -625,7 +637,6 @@ fn test_items_add_modify_remove_chain() {
     assert_eq!(snapshot.subtotal, 0.0);
 }
 
-
 // ========================================================================
 // ========================================================================
 //  P1: 金额计算准确性测试
@@ -670,7 +681,6 @@ fn test_remove_item_partial_recalculates() {
     assert_eq!(snapshot.total, 30.0);
 }
 
-
 // ------------------------------------------------------------------------
 // P1.2: 折扣 + 附加费叠加
 // ------------------------------------------------------------------------
@@ -678,11 +688,7 @@ fn test_remove_item_partial_recalculates() {
 fn test_discount_plus_surcharge_calculation() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        256,
-        vec![simple_item(1, "Item", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 256, vec![simple_item(1, "Item", 100.0, 1)]);
 
     // 应用 10% 折扣
     let discount_cmd = OrderCommand::new(
@@ -723,7 +729,6 @@ fn test_discount_plus_surcharge_calculation() {
     // total = 100 - 10 + 15 = 105
     assert_eq!(snapshot.total, 105.0);
 }
-
 
 // ------------------------------------------------------------------------
 // P1.3: 商品级折扣 + 订单级折扣叠加
@@ -781,7 +786,6 @@ fn test_item_level_plus_order_level_discount() {
     // total = 90 - (90 * 5%) = 90 - 4.5 = 85.5
     assert_eq!(snapshot.total, 85.5);
 }
-
 
 // ------------------------------------------------------------------------
 // P1.4: Comp 后 Uncomp 恢复价格
@@ -843,7 +847,6 @@ fn test_comp_then_uncomp_restores_price() {
     assert_eq!(snapshot.comp_total_amount, 0.0);
 }
 
-
 // ------------------------------------------------------------------------
 // P1.5: 部分 Comp 创建拆分商品
 // ------------------------------------------------------------------------
@@ -892,7 +895,6 @@ fn test_comp_partial_creates_split_item() {
     assert_eq!(snapshot.comp_total_amount, 20.0);
 }
 
-
 // ------------------------------------------------------------------------
 // P1.6: 大金额精度测试
 // ------------------------------------------------------------------------
@@ -914,9 +916,13 @@ fn test_large_order_precision() {
     // 验证无精度丢失
     let expected = 99999.99 * 100.0;
     let diff = (snapshot.total - expected).abs();
-    assert!(diff < 0.01, "Precision loss detected: expected {}, got {}", expected, snapshot.total);
+    assert!(
+        diff < 0.01,
+        "Precision loss detected: expected {}, got {}",
+        expected,
+        snapshot.total
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P1.7: 选项价格修改器累加
@@ -979,7 +985,6 @@ fn test_option_price_modifiers_accumulate() {
     assert_eq!(snapshot.subtotal, 22.5);
 }
 
-
 // ========================================================================
 // ========================================================================
 //  P2: 状态转换边界测试
@@ -993,11 +998,7 @@ fn test_option_price_modifiers_accumulate() {
 fn test_all_commands_reject_completed_order() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        260,
-        vec![simple_item(1, "Item", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 260, vec![simple_item(1, "Item", 10.0, 1)]);
 
     // 支付并完成
     pay(&manager, &order_id, 10.0, "CASH");
@@ -1068,7 +1069,6 @@ fn test_all_commands_reject_completed_order() {
     assert!(!resp.success, "MoveOrder should fail on completed order");
 }
 
-
 // ------------------------------------------------------------------------
 // P2.2: 已作废订单拒绝所有修改命令
 // ------------------------------------------------------------------------
@@ -1076,11 +1076,7 @@ fn test_all_commands_reject_completed_order() {
 fn test_all_commands_reject_voided_order() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        261,
-        vec![simple_item(1, "Item", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 261, vec![simple_item(1, "Item", 10.0, 1)]);
 
     // 作废订单
     void_order_helper(&manager, &order_id, VoidType::Cancelled);
@@ -1128,7 +1124,6 @@ fn test_all_commands_reject_voided_order() {
     assert!(!resp.success, "CompleteOrder should fail on voided order");
 }
 
-
 // ------------------------------------------------------------------------
 // P2.3: 已合并订单 - 验证合并后源订单状态
 // 注意: 当前实现对 Merged 状态订单不检查 AddItems，但订单已不在活跃列表
@@ -1137,16 +1132,8 @@ fn test_all_commands_reject_voided_order() {
 fn test_merged_order_not_in_active_list() {
     let manager = create_test_manager();
 
-    let source_id = open_table_with_items(
-        &manager,
-        262,
-        vec![simple_item(1, "Item", 10.0, 1)],
-    );
-    let target_id = open_table_with_items(
-        &manager,
-        263,
-        vec![simple_item(2, "Item 2", 10.0, 1)],
-    );
+    let source_id = open_table_with_items(&manager, 262, vec![simple_item(1, "Item", 10.0, 1)]);
+    let target_id = open_table_with_items(&manager, 263, vec![simple_item(2, "Item 2", 10.0, 1)]);
 
     // 合并前两个订单都在活跃列表
     let active = manager.get_active_orders().unwrap();
@@ -1169,10 +1156,15 @@ fn test_merged_order_not_in_active_list() {
     // 合并后源订单不在活跃列表
     let active = manager.get_active_orders().unwrap();
     assert_eq!(active.len(), 1);
-    assert!(active.iter().all(|o| o.order_id != source_id), "Merged order should not be in active list");
-    assert!(active.iter().any(|o| o.order_id == target_id), "Target order should be in active list");
+    assert!(
+        active.iter().all(|o| o.order_id != source_id),
+        "Merged order should not be in active list"
+    );
+    assert!(
+        active.iter().any(|o| o.order_id == target_id),
+        "Target order should be in active list"
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P2.4: UpdateOrderInfo 不影响金额
@@ -1181,11 +1173,7 @@ fn test_merged_order_not_in_active_list() {
 fn test_update_guest_count_does_not_affect_totals() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        264,
-        vec![simple_item(1, "Item", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 264, vec![simple_item(1, "Item", 100.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.guest_count, 2); // 默认值
@@ -1207,9 +1195,11 @@ fn test_update_guest_count_does_not_affect_totals() {
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.guest_count, 8);
-    assert_eq!(snapshot.total, 100.0, "Total should not change after updating guest_count");
+    assert_eq!(
+        snapshot.total, 100.0,
+        "Total should not change after updating guest_count"
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P2.5: AddOrderNote 覆盖之前的备注
@@ -1249,7 +1239,6 @@ fn test_add_note_overwrites_previous() {
     assert_eq!(snapshot.note, Some("Second note".to_string()));
 }
 
-
 // ------------------------------------------------------------------------
 // P2.6: 空字符串清除备注
 // ------------------------------------------------------------------------
@@ -1288,7 +1277,6 @@ fn test_clear_note_with_empty_string() {
     assert!(snapshot.note.is_none() || snapshot.note.as_deref() == Some(""));
 }
 
-
 // ========================================================================
 // ========================================================================
 //  P3: 边界条件与错误处理测试
@@ -1302,11 +1290,7 @@ fn test_clear_note_with_empty_string() {
 fn test_add_cancel_add_payment_cycle() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        265,
-        vec![simple_item(1, "Item", 30.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 265, vec![simple_item(1, "Item", 30.0, 1)]);
 
     // 第一次支付
     pay(&manager, &order_id, 30.0, "CARD");
@@ -1335,7 +1319,13 @@ fn test_add_cancel_add_payment_cycle() {
     // 第二次支付
     pay(&manager, &order_id, 30.0, "CASH");
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let payment2_id = snapshot.payments.iter().find(|p| !p.cancelled).unwrap().payment_id.clone();
+    let payment2_id = snapshot
+        .payments
+        .iter()
+        .find(|p| !p.cancelled)
+        .unwrap()
+        .payment_id
+        .clone();
     assert_eq!(snapshot.paid_amount, 30.0);
 
     // 取消第二次支付
@@ -1370,7 +1360,6 @@ fn test_add_cancel_add_payment_cycle() {
     assert!(complete_resp.success);
 }
 
-
 // ------------------------------------------------------------------------
 // P3.2: AA 分单不能与菜品分单混用
 // ------------------------------------------------------------------------
@@ -1378,11 +1367,7 @@ fn test_add_cancel_add_payment_cycle() {
 fn test_aa_split_cannot_mix_with_item_split() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        266,
-        vec![simple_item(1, "Item", 100.0, 2)],
-    );
+    let order_id = open_table_with_items(&manager, 266, vec![simple_item(1, "Item", 100.0, 2)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1419,9 +1404,11 @@ fn test_aa_split_cannot_mix_with_item_split() {
         },
     );
     let resp = manager.execute_command(item_split_cmd);
-    assert!(!resp.success, "Item split should fail when AA split is active");
+    assert!(
+        !resp.success,
+        "Item split should fail when AA split is active"
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P3.3: Comp 后支付再完成
@@ -1440,7 +1427,13 @@ fn test_comp_then_pay_then_complete() {
     );
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let item_a_id = snapshot.items.iter().find(|i| i.name == "Item A").unwrap().instance_id.clone();
+    let item_a_id = snapshot
+        .items
+        .iter()
+        .find(|i| i.name == "Item A")
+        .unwrap()
+        .instance_id
+        .clone();
     assert_eq!(snapshot.total, 20.0);
 
     // Comp Item A
@@ -1474,7 +1467,6 @@ fn test_comp_then_pay_then_complete() {
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
-
 // ------------------------------------------------------------------------
 // P3.4: 金额分单后菜品分单被禁用
 // ------------------------------------------------------------------------
@@ -1482,11 +1474,7 @@ fn test_comp_then_pay_then_complete() {
 fn test_amount_split_blocks_item_split() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        268,
-        vec![simple_item(1, "Item", 100.0, 2)],
-    );
+    let order_id = open_table_with_items(&manager, 268, vec![simple_item(1, "Item", 100.0, 2)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1525,9 +1513,11 @@ fn test_amount_split_blocks_item_split() {
         },
     );
     let resp = manager.execute_command(item_split);
-    assert!(!resp.success, "Item split should be blocked when amount split is active");
+    assert!(
+        !resp.success,
+        "Item split should be blocked when amount split is active"
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P3.6: 取消不存在的支付应失败
@@ -1536,11 +1526,7 @@ fn test_amount_split_blocks_item_split() {
 fn test_cancel_nonexistent_payment_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        269,
-        vec![simple_item(1, "Item", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 269, vec![simple_item(1, "Item", 10.0, 1)]);
 
     let cancel_cmd = OrderCommand::new(
         1,
@@ -1554,9 +1540,11 @@ fn test_cancel_nonexistent_payment_fails() {
         },
     );
     let resp = manager.execute_command(cancel_cmd);
-    assert!(!resp.success, "CancelPayment should fail for nonexistent payment");
+    assert!(
+        !resp.success,
+        "CancelPayment should fail for nonexistent payment"
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P3.7: 超额菜品分单应失败
@@ -1565,11 +1553,7 @@ fn test_cancel_nonexistent_payment_fails() {
 fn test_split_by_items_overpay_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        270,
-        vec![simple_item(1, "Item", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 270, vec![simple_item(1, "Item", 10.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1594,7 +1578,6 @@ fn test_split_by_items_overpay_fails() {
     assert!(!resp.success, "Split with excessive quantity should fail");
 }
 
-
 // ------------------------------------------------------------------------
 // P3.8: 移除超过现有数量应失败
 // ------------------------------------------------------------------------
@@ -1602,11 +1585,7 @@ fn test_split_by_items_overpay_fails() {
 fn test_remove_item_excessive_quantity_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        271,
-        vec![simple_item(1, "Item", 10.0, 2)],
-    );
+    let order_id = open_table_with_items(&manager, 271, vec![simple_item(1, "Item", 10.0, 2)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1628,7 +1607,6 @@ fn test_remove_item_excessive_quantity_fails() {
     assert!(!resp.success, "Remove with excessive quantity should fail");
 }
 
-
 // ------------------------------------------------------------------------
 // P3.9: Comp 超过现有数量应失败
 // ------------------------------------------------------------------------
@@ -1636,11 +1614,7 @@ fn test_remove_item_excessive_quantity_fails() {
 fn test_comp_item_excessive_quantity_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        272,
-        vec![simple_item(1, "Item", 10.0, 2)],
-    );
+    let order_id = open_table_with_items(&manager, 272, vec![simple_item(1, "Item", 10.0, 2)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1662,7 +1636,6 @@ fn test_comp_item_excessive_quantity_fails() {
     assert!(!resp.success, "Comp with excessive quantity should fail");
 }
 
-
 // ------------------------------------------------------------------------
 // P3.10: 清除整单折扣
 // ------------------------------------------------------------------------
@@ -1670,11 +1643,7 @@ fn test_comp_item_excessive_quantity_fails() {
 fn test_clear_order_discount() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        273,
-        vec![simple_item(1, "Item", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 273, vec![simple_item(1, "Item", 100.0, 1)]);
 
     // 应用折扣
     let discount_cmd = OrderCommand::new(
@@ -1713,7 +1682,6 @@ fn test_clear_order_discount() {
     assert!(snapshot.order_manual_discount_percent.is_none());
 }
 
-
 // ------------------------------------------------------------------------
 // P3.11: ToggleRuleSkip - 规则不存在时应失败
 // 注意: ToggleRuleSkip 需要订单中有 applied_rules，否则会失败
@@ -1722,11 +1690,7 @@ fn test_clear_order_discount() {
 fn test_toggle_rule_skip_nonexistent_rule_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        274,
-        vec![simple_item(1, "Item", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 274, vec![simple_item(1, "Item", 100.0, 1)]);
 
     // 尝试 toggle 不存在的规则应失败
     let toggle_cmd = OrderCommand::new(
@@ -1739,9 +1703,11 @@ fn test_toggle_rule_skip_nonexistent_rule_fails() {
         },
     );
     let resp = manager.execute_command(toggle_cmd);
-    assert!(!resp.success, "ToggleRuleSkip should fail when rule not found");
+    assert!(
+        !resp.success,
+        "ToggleRuleSkip should fail when rule not found"
+    );
 }
-
 
 // ------------------------------------------------------------------------
 // P3.12: 固定金额折扣
@@ -1750,11 +1716,7 @@ fn test_toggle_rule_skip_nonexistent_rule_fails() {
 fn test_fixed_amount_discount() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        275,
-        vec![simple_item(1, "Item", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 275, vec![simple_item(1, "Item", 100.0, 1)]);
 
     // 应用 25 元固定折扣
     let discount_cmd = OrderCommand::new(
@@ -1776,7 +1738,6 @@ fn test_fixed_amount_discount() {
     assert_eq!(snapshot.total, 75.0);
 }
 
-
 // ------------------------------------------------------------------------
 // P3.13: 百分比附加费
 // ------------------------------------------------------------------------
@@ -1784,11 +1745,7 @@ fn test_fixed_amount_discount() {
 fn test_percentage_surcharge() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        276,
-        vec![simple_item(1, "Item", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 276, vec![simple_item(1, "Item", 100.0, 1)]);
 
     // 应用 10% 附加费
     let surcharge_cmd = OrderCommand::new(
@@ -1809,4 +1766,3 @@ fn test_percentage_surcharge() {
     assert_eq!(snapshot.order_manual_surcharge_percent, Some(10.0));
     assert_eq!(snapshot.total, 110.0);
 }
-

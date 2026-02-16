@@ -98,7 +98,6 @@ pub struct LabelTemplate {
     pub updated_at: Option<i64>,
 
     // -- Relations (populated by application code, skipped by FromRow) --
-
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]
     pub fields: Vec<LabelField>,

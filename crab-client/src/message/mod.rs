@@ -35,13 +35,13 @@ impl Default for MessageClientConfig {
     /// - 网络恢复 1 秒内重连
     fn default() -> Self {
         Self {
-            request_timeout: Duration::from_millis(1500),  // 局域网 1.5 秒足够
+            request_timeout: Duration::from_millis(1500), // 局域网 1.5 秒足够
             auto_reconnect: true,
-            reconnect_delay: Duration::from_millis(500),   // 首次重连 500ms
-            max_reconnect_delay: Duration::from_secs(10),  // 最长 10 秒退避
-            max_reconnect_attempts: 0,                     // 0 = 无限重试，局域网不放弃
-            heartbeat_interval: Duration::from_secs(5),    // 每 5 秒心跳
-            heartbeat_timeout: Duration::from_secs(1),     // 1 秒超时（局域网 RTT <1ms）
+            reconnect_delay: Duration::from_millis(500), // 首次重连 500ms
+            max_reconnect_delay: Duration::from_secs(10), // 最长 10 秒退避
+            max_reconnect_attempts: 0,                   // 0 = 无限重试，局域网不放弃
+            heartbeat_interval: Duration::from_secs(5),  // 每 5 秒心跳
+            heartbeat_timeout: Duration::from_secs(1),   // 1 秒超时（局域网 RTT <1ms）
             reconnect_probe_interval: Duration::from_secs(1), // 每 1 秒探测
         }
     }

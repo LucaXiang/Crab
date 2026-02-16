@@ -40,7 +40,6 @@ pub struct Product {
     pub external_id: Option<i64>,
 
     // -- Relations (populated by application code, skipped by FromRow) --
-
     /// Tag IDs (junction table product_tag)
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]

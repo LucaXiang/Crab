@@ -114,15 +114,7 @@ mod tests {
         assert_eq!(snapshot.table_id, Some(1));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
 
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -163,15 +155,7 @@ mod tests {
         assert_eq!(snapshot.zone_id, Some(1));
 
         // Move without zone info → zone should be cleared
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            3,
-            "Table 3",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 3, "Table 3", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -185,15 +169,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_moved_event(
-            "order-1",
-            10,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 10, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -206,15 +182,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMovedApplier;
@@ -229,15 +197,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -289,19 +249,11 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(item.clone());
 
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![item],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![item]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -316,15 +268,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -367,15 +311,7 @@ mod tests {
     fn test_order_moved_checksum_verifiable() {
         let mut snapshot = create_test_snapshot("order-1");
 
-        let event = create_order_moved_event(
-            "order-1",
-            2,
-            1,
-            "Table 1",
-            2,
-            "Table 2",
-            vec![],
-        );
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -413,8 +349,7 @@ mod tests {
     fn test_order_moved_empty_target_table_name() {
         let mut snapshot = create_test_snapshot("order-1");
 
-        let event =
-            create_order_moved_event("order-1", 2, 1, "Table 1", 2, "", vec![]);
+        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);

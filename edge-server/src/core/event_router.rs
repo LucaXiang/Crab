@@ -148,8 +148,8 @@ impl EventRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::order::types::ServiceType;
     use shared::order::EventPayload;
+    use shared::order::types::ServiceType;
 
     fn make_test_event(event_type: OrderEventType, sequence: u64) -> OrderEvent {
         let payload = match event_type {
@@ -219,11 +219,14 @@ mod tests {
         });
 
         // Fill sync channel (buffer = 1)
-        tx.send(make_test_event(OrderEventType::ItemsAdded, 1)).unwrap();
-        tx.send(make_test_event(OrderEventType::ItemsAdded, 2)).unwrap();
+        tx.send(make_test_event(OrderEventType::ItemsAdded, 1))
+            .unwrap();
+        tx.send(make_test_event(OrderEventType::ItemsAdded, 2))
+            .unwrap();
 
         // Send terminal event - should still reach archive
-        tx.send(make_test_event(OrderEventType::OrderCompleted, 3)).unwrap();
+        tx.send(make_test_event(OrderEventType::OrderCompleted, 3))
+            .unwrap();
 
         // Archive should receive the terminal event
         let archived = channels.archive_rx.recv().await;

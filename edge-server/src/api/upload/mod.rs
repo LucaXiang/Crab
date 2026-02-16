@@ -4,7 +4,14 @@
 
 mod handler;
 
-use axum::{Router, middleware, body::Bytes, extract::{Path, State}, response::IntoResponse, routing::post};
+use axum::{
+    Router,
+    body::Bytes,
+    extract::{Path, State},
+    middleware,
+    response::IntoResponse,
+    routing::post,
+};
 use http::header;
 
 use crate::auth::require_permission;
@@ -67,11 +74,8 @@ pub fn router() -> Router<ServerState> {
         .route("/api/image/upload", post(handler::upload))
         .layer(middleware::from_fn(require_permission("menu:manage")))
         // Serve uploaded images - any authenticated user can read
-        .merge(
-            Router::new()
-                .route(
-                    "/api/image/{filename}",
-                    axum::routing::get(serve_uploaded_file),
-                )
-        )
+        .merge(Router::new().route(
+            "/api/image/{filename}",
+            axum::routing::get(serve_uploaded_file),
+        ))
 }

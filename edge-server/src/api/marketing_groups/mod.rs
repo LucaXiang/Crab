@@ -2,7 +2,10 @@
 
 mod handler;
 
-use axum::{middleware, routing::{get, post, put}, Router};
+use axum::{
+    Router, middleware,
+    routing::{get, post, put},
+};
 
 use crate::auth::require_permission;
 use crate::core::ServerState;
@@ -23,11 +26,19 @@ fn routes() -> Router<ServerState> {
         .route("/{id}", put(handler::update).delete(handler::delete))
         // 嵌套资源: 折扣规则
         .route("/{id}/discount-rules", post(handler::create_rule))
-        .route("/{id}/discount-rules/{rule_id}", put(handler::update_rule).delete(handler::delete_rule))
+        .route(
+            "/{id}/discount-rules/{rule_id}",
+            put(handler::update_rule).delete(handler::delete_rule),
+        )
         // 嵌套资源: 集章活动
         .route("/{id}/stamp-activities", post(handler::create_activity))
-        .route("/{id}/stamp-activities/{activity_id}", put(handler::update_activity).delete(handler::delete_activity))
-        .layer(middleware::from_fn(require_permission("marketing_groups:manage")));
+        .route(
+            "/{id}/stamp-activities/{activity_id}",
+            put(handler::update_activity).delete(handler::delete_activity),
+        )
+        .layer(middleware::from_fn(require_permission(
+            "marketing_groups:manage",
+        )));
 
     read_routes.merge(manage_routes)
 }

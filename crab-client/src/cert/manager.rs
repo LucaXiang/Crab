@@ -353,10 +353,7 @@ impl CertManager {
                 metadata.not_after
             );
         } else {
-            tracing::info!(
-                "Certificate validity OK (expires: {})",
-                metadata.not_after
-            );
+            tracing::info!("Certificate validity OK (expires: {})", metadata.not_after);
         }
 
         // Step 6: 验证硬件 ID 绑定

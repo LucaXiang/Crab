@@ -37,7 +37,6 @@ pub struct PrintDestination {
     pub is_active: bool,
 
     // -- Relations (populated by application code, skipped by FromRow) --
-
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]
     pub printers: Vec<Printer>,

@@ -7,8 +7,8 @@
 //!
 //! Uses functions from item_calculator for rule application logic.
 
-use shared::models::PriceRule;
 use rust_decimal::prelude::*;
+use shared::models::PriceRule;
 use shared::order::AppliedRule;
 
 use super::item_calculator::{apply_discount_rules, apply_surcharge_rules, to_decimal, to_f64};

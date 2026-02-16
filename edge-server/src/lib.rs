@@ -21,21 +21,27 @@
 //! ├── utils/         # 工具函数
 //! ├── db/            # 数据库层
 //! ├── message/       # 消息总线
-//! └── orders/        # 订单事件溯源
+//! ├── orders/        # 订单事件溯源 (核心引擎)
+//! ├── archiving/     # 归档系统 (SQLite + 哈希链验证)
+//! ├── order_money/   # 金额计算 (rust_decimal)
+//! └── order_sync     # 重连同步协议
 //! ```
 
 pub mod api;
+pub mod archiving;
 pub mod audit;
 pub mod auth;
 pub mod core;
 pub mod db;
 pub mod marketing;
 pub mod message;
+pub mod order_money;
+pub mod order_sync;
 pub mod orders;
 pub mod pricing;
-pub mod shifts;
 pub mod printing;
 pub mod services;
+pub mod shifts;
 pub mod utils;
 
 // Re-export 公共类型
@@ -71,7 +77,9 @@ macro_rules! audit_log {
     ($service:expr, $action:expr, $res_type:expr, $res_id:expr,
      operator_id = $op_id:expr, operator_name = $op_name:expr, details = $details:expr, target = $target:expr) => {
         $service
-            .log_with_target($action, $res_type, $res_id, $op_id, $op_name, $details, $target)
+            .log_with_target(
+                $action, $res_type, $res_id, $op_id, $op_name, $details, $target,
+            )
             .await;
     };
     // 标准版（无 target）

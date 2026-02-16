@@ -2,9 +2,9 @@
 //!
 //! 数据统计相关的 Tauri 命令
 
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
-use serde::{Deserialize, Serialize};
 
 use crate::core::response::ApiResponse;
 use crate::core::ClientBridge;
@@ -88,10 +88,11 @@ pub async fn get_statistics(
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<StatisticsResponse>, String> {
-
-
     // Build query string
-    let mut path = format!("/api/statistics?timeRange={}", urlencoding::encode(&time_range));
+    let mut path = format!(
+        "/api/statistics?timeRange={}",
+        urlencoding::encode(&time_range)
+    );
     if let Some(start) = start_date {
         path.push_str(&format!("&startDate={}", urlencoding::encode(&start)));
     }
@@ -114,8 +115,6 @@ pub async fn get_sales_report(
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<SalesReportResponse>, String> {
-
-
     // Build query string
     let page = page.unwrap_or(1);
     let mut path = format!(

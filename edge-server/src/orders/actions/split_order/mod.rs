@@ -6,15 +6,15 @@
 //! - **StartAASplit** (AA 开始): lock headcount + pay first share
 //! - **PayAASplit** (AA 后续支付): pay additional shares
 
-mod split_by_items;
-mod split_by_amount;
 mod aa_split;
+mod split_by_amount;
+mod split_by_items;
 
-pub use split_by_items::SplitByItemsAction;
+pub use aa_split::{PayAaSplitAction, StartAaSplitAction};
 pub use split_by_amount::SplitByAmountAction;
-pub use aa_split::{StartAaSplitAction, PayAaSplitAction};
+pub use split_by_items::SplitByItemsAction;
 
-use crate::orders::money::{calculate_unit_price, to_decimal, to_f64, MONEY_TOLERANCE};
+use crate::order_money::{MONEY_TOLERANCE, calculate_unit_price, to_decimal, to_f64};
 use crate::orders::traits::OrderError;
 use rust_decimal::Decimal;
 use shared::order::types::CommandErrorCode;
@@ -63,8 +63,7 @@ pub(super) fn validate_split_mode_allowed(
         if matches!(mode, SplitMode::Item) {
             return Err(OrderError::InvalidOperation(
                 CommandErrorCode::ItemSplitBlocked,
-                "Item-based split is disabled while amount-based split payments exist"
-                    .to_string(),
+                "Item-based split is disabled while amount-based split payments exist".to_string(),
             ));
         }
         return Ok(()); // Amount and AA both OK
@@ -87,10 +86,13 @@ pub(super) fn validate_items_and_calculate(
         let mut seen = std::collections::HashSet::new();
         for item in items {
             if !seen.insert(&item.instance_id) {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::DuplicateSplitItem, format!(
-                    "Duplicate instance_id '{}' in split items",
-                    item.instance_id
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::DuplicateSplitItem,
+                    format!(
+                        "Duplicate instance_id '{}' in split items",
+                        item.instance_id
+                    ),
+                ));
             }
         }
     }
@@ -105,10 +107,10 @@ pub(super) fn validate_items_and_calculate(
 
         // Reject comped items — they are free and cannot be split
         if order_item.is_comped {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::CannotSplitComped, format!(
-                "Cannot split comped item '{}'",
-                order_item.name
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::CannotSplitComped,
+                format!("Cannot split comped item '{}'", order_item.name),
+            ));
         }
 
         let paid_qty = snapshot
@@ -136,10 +138,10 @@ pub(super) fn validate_tendered_and_change(
     if let Some(t) = tendered
         && to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE
     {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InsufficientTender, format!(
-            "Tendered {:.2} is less than required {:.2}",
-            t, amount_f64
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InsufficientTender,
+            format!("Tendered {:.2} is less than required {:.2}", t, amount_f64),
+        ));
     }
     let change = tendered.map(|t| {
         let diff = to_decimal(t) - to_decimal(amount_f64);

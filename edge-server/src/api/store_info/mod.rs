@@ -2,11 +2,7 @@
 
 mod handler;
 
-use axum::{
-    Router,
-    middleware,
-    routing::get,
-};
+use axum::{Router, middleware, routing::get};
 
 use crate::auth::require_permission;
 use crate::core::ServerState;
@@ -18,8 +14,7 @@ pub fn router() -> Router<ServerState> {
 
 fn routes() -> Router<ServerState> {
     // 读取路由：无需权限检查
-    let read_routes = Router::new()
-        .route("/", get(handler::get));
+    let read_routes = Router::new().route("/", get(handler::get));
 
     // 写入路由：需要 settings:manage 权限
     let write_routes = Router::new()

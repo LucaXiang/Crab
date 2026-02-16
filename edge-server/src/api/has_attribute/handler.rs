@@ -60,7 +60,8 @@ pub async fn create(
         && attribute::has_binding(&state.pool, "category", cat_id, payload.attribute_id).await?
     {
         return Err(AppError::validation(
-            "This attribute is already inherited from the category, cannot add duplicate binding".to_string(),
+            "This attribute is already inherited from the category, cannot add duplicate binding"
+                .to_string(),
         ));
     }
 
@@ -87,7 +88,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "attribute_binding", &binding_id,
+        "attribute_binding",
+        &binding_id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
@@ -100,8 +102,16 @@ pub async fn create(
     );
 
     // Refresh product cache (attribute bindings changed)
-    if let Err(e) = state.catalog_service.refresh_product_cache(payload.product_id).await {
-        tracing::warn!("Failed to refresh product cache for {}: {}", payload.product_id, e);
+    if let Err(e) = state
+        .catalog_service
+        .refresh_product_cache(payload.product_id)
+        .await
+    {
+        tracing::warn!(
+            "Failed to refresh product cache for {}: {}",
+            payload.product_id,
+            e
+        );
     }
 
     Ok(Json(binding))
@@ -146,7 +156,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "attribute_binding", &id_str,
+        "attribute_binding",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
@@ -189,7 +200,8 @@ pub async fn delete(
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "attribute_binding", &id_str,
+        "attribute_binding",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({

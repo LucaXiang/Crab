@@ -41,7 +41,10 @@ pub async fn run() {
     // Install default crypto provider for rustls
     // This is required to prevent panic: "Could not automatically determine the process-level CryptoProvider"
     // Err(()) means provider was already installed — safe to ignore
-    if rustls::crypto::ring::default_provider().install_default().is_err() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed by another component — this is expected and harmless
     }
 

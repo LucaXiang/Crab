@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn test_cache_rules_persists_to_redb() {
     let manager = create_test_manager();
@@ -20,7 +19,6 @@ fn test_cache_rules_persists_to_redb() {
     assert_eq!(persisted.unwrap().len(), 2);
 }
 
-
 #[test]
 fn test_remove_cached_rules_cleans_redb() {
     let manager = create_test_manager();
@@ -28,16 +26,27 @@ fn test_remove_cached_rules_cleans_redb() {
 
     manager.cache_rules(order_id, vec![create_test_rule("Rule")]);
     assert!(manager.get_cached_rules(order_id).is_some());
-    assert!(manager.storage().get_rule_snapshot(order_id).unwrap().is_some());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(order_id)
+            .unwrap()
+            .is_some()
+    );
 
     // 清除
     manager.remove_cached_rules(order_id);
 
     // 内存和 redb 都应该被清除
     assert!(manager.get_cached_rules(order_id).is_none());
-    assert!(manager.storage().get_rule_snapshot(order_id).unwrap().is_none());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(order_id)
+            .unwrap()
+            .is_none()
+    );
 }
-
 
 #[test]
 fn test_restore_rule_snapshots_from_redb() {
@@ -52,8 +61,15 @@ fn test_restore_rule_snapshots_from_redb() {
     }
 
     // 写入规则快照（模拟上次运行遗留的快照）
-    storage.store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")]).unwrap();
-    storage.store_rule_snapshot("order-b", &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")]).unwrap();
+    storage
+        .store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")])
+        .unwrap();
+    storage
+        .store_rule_snapshot(
+            "order-b",
+            &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")],
+        )
+        .unwrap();
 
     // 创建新 manager（模拟重启，内存缓存为空）
     let manager = OrdersManager::with_storage(storage);
@@ -73,7 +89,6 @@ fn test_restore_rule_snapshots_from_redb() {
     assert_eq!(rules_b.len(), 2);
 }
 
-
 #[test]
 fn test_restore_rule_snapshots_cleans_orphans() {
     let storage = OrderStorage::open_in_memory().unwrap();
@@ -85,8 +100,12 @@ fn test_restore_rule_snapshots_cleans_orphans() {
         txn.commit().unwrap();
     }
 
-    storage.store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")]).unwrap();
-    storage.store_rule_snapshot("order-orphan", &vec![create_test_rule("Orphan Rule")]).unwrap();
+    storage
+        .store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")])
+        .unwrap();
+    storage
+        .store_rule_snapshot("order-orphan", &vec![create_test_rule("Orphan Rule")])
+        .unwrap();
 
     let manager = OrdersManager::with_storage(storage);
     let count = manager.restore_rule_snapshots_from_redb();
@@ -97,9 +116,14 @@ fn test_restore_rule_snapshots_cleans_orphans() {
     assert!(manager.get_cached_rules("order-orphan").is_none());
 
     // 孤儿快照应该已从 redb 中清除
-    assert!(manager.storage().get_rule_snapshot("order-orphan").unwrap().is_none());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot("order-orphan")
+            .unwrap()
+            .is_none()
+    );
 }
-
 
 #[test]
 fn test_complete_order_cleans_rules() {
@@ -159,9 +183,14 @@ fn test_complete_order_cleans_rules() {
 
     // 规则缓存和 redb 快照都应该被清除
     assert!(manager.get_cached_rules(&order_id).is_none());
-    assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_none());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(&order_id)
+            .unwrap()
+            .is_none()
+    );
 }
-
 
 #[test]
 fn test_void_order_cleans_rules() {
@@ -194,24 +223,31 @@ fn test_void_order_cleans_rules() {
 
     // 规则缓存和 redb 快照都应该被清除
     assert!(manager.get_cached_rules(&order_id).is_none());
-    assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_none());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(&order_id)
+            .unwrap()
+            .is_none()
+    );
 }
-
 
 #[test]
 fn test_move_order_preserves_rules() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        245,
-        vec![simple_item(1, "Coffee", 5.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 245, vec![simple_item(1, "Coffee", 5.0, 1)]);
 
     // 缓存规则
     manager.cache_rules(&order_id, vec![create_test_rule("Rule")]);
     assert!(manager.get_cached_rules(&order_id).is_some());
-    assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_some());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(&order_id)
+            .unwrap()
+            .is_some()
+    );
 
     // 换桌 — 订单保持 Active，规则不清除
     // （实际场景中由调用方按新区域重新加载规则）
@@ -233,32 +269,35 @@ fn test_move_order_preserves_rules() {
 
     // MoveOrder 不是 terminal 操作，规则保留（由调用方用新区域重载）
     assert!(manager.get_cached_rules(&order_id).is_some());
-    assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_some());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(&order_id)
+            .unwrap()
+            .is_some()
+    );
 }
-
 
 #[test]
 fn test_merge_orders_cleans_source_rules() {
     let manager = create_test_manager();
 
     // 源订单
-    let source_id = open_table_with_items(
-        &manager,
-        246,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let source_id = open_table_with_items(&manager, 246, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // 目标订单
-    let target_id = open_table_with_items(
-        &manager,
-        247,
-        vec![simple_item(2, "Tea", 8.0, 1)],
-    );
+    let target_id = open_table_with_items(&manager, 247, vec![simple_item(2, "Tea", 8.0, 1)]);
 
     // 给源订单缓存规则
     manager.cache_rules(&source_id, vec![create_test_rule("SourceRule")]);
     assert!(manager.get_cached_rules(&source_id).is_some());
-    assert!(manager.storage().get_rule_snapshot(&source_id).unwrap().is_some());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(&source_id)
+            .unwrap()
+            .is_some()
+    );
 
     // 合并 source → target
     let merge_cmd = OrderCommand::new(
@@ -276,9 +315,14 @@ fn test_merge_orders_cleans_source_rules() {
 
     // 源订单的规则缓存和 redb 快照都应该被清除
     assert!(manager.get_cached_rules(&source_id).is_none());
-    assert!(manager.storage().get_rule_snapshot(&source_id).unwrap().is_none());
+    assert!(
+        manager
+            .storage()
+            .get_rule_snapshot(&source_id)
+            .unwrap()
+            .is_none()
+    );
 }
-
 
 /// valid_from 在未来 → 规则不应用，商品原价
 #[test]
@@ -298,7 +342,6 @@ fn test_add_items_filters_rule_valid_from_future() {
     assert_eq!(s.subtotal, 100.0);
 }
 
-
 /// valid_until 已过期 → 规则不应用
 #[test]
 fn test_add_items_filters_rule_valid_until_expired() {
@@ -316,7 +359,6 @@ fn test_add_items_filters_rule_valid_until_expired() {
     // 过期规则不生效，50×2=100
     assert_eq!(s.subtotal, 100.0);
 }
-
 
 /// valid_from ≤ now ≤ valid_until → 规则生效
 #[test]
@@ -344,7 +386,6 @@ fn test_add_items_applies_rule_within_valid_range() {
     assert_eq!(s.subtotal, 90.0);
 }
 
-
 /// active_days 不匹配当前星期几 → 规则不应用
 #[test]
 fn test_add_items_filters_rule_wrong_day() {
@@ -368,7 +409,6 @@ fn test_add_items_filters_rule_wrong_day() {
     assert_eq!(s.subtotal, 40.0);
 }
 
-
 /// active_days 匹配当前星期几 → 规则生效
 #[test]
 fn test_add_items_applies_rule_matching_day() {
@@ -388,7 +428,6 @@ fn test_add_items_applies_rule_matching_day() {
     // 20% 折扣: 50×2=100 → 80
     assert_eq!(s.subtotal, 80.0);
 }
-
 
 /// active_start_time/active_end_time 不在当前时间范围 → 规则不应用
 #[test]
@@ -413,7 +452,6 @@ fn test_add_items_filters_rule_outside_time_window() {
     // 不在时间窗口，20×3=60 原价
     assert_eq!(s.subtotal, 60.0);
 }
-
 
 /// 混合规则: 一个过期 + 一个有效 → 只有有效的应用
 #[test]
@@ -450,7 +488,6 @@ fn test_add_items_mixed_expired_and_active_rules() {
     assert_eq!(s.subtotal, 180.0);
 }
 
-
 /// 无时间约束的规则始终生效
 #[test]
 fn test_add_items_no_time_constraint_always_applies() {
@@ -468,7 +505,6 @@ fn test_add_items_no_time_constraint_always_applies() {
     // 10% 折扣: 10×5=50 → 45
     assert_eq!(s.subtotal, 45.0);
 }
-
 
 /// valid_from + active_days 组合: valid_from 有效但 active_days 不匹配 → 不应用
 #[test]
@@ -499,7 +535,6 @@ fn test_add_items_valid_from_ok_but_wrong_day() {
     // active_days 不匹配，30×2=60 原价
     assert_eq!(s.subtotal, 60.0);
 }
-
 
 /// 第二次加菜时规则也需要实时检查时间
 #[test]
@@ -533,4 +568,3 @@ fn test_add_items_second_batch_also_checks_time() {
     // A: 90, B: 45×2=90 → 180
     assert_eq!(s.subtotal, 180.0);
 }
-

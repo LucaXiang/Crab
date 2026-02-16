@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM member_stamp_progress WHERE stamp_activity_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "bd2e6e01dfa5abd04ce8306446ab95f718d91e741b5edbd62fb5ab11c593a243"
+}

@@ -21,7 +21,10 @@ fn routes() -> Router<ServerState> {
     // 管理路由：需要 tables:manage 权限
     let manage_routes = Router::new()
         .route("/", axum::routing::post(handler::create))
-        .route("/{id}", axum::routing::put(handler::update).delete(handler::delete))
+        .route(
+            "/{id}",
+            axum::routing::put(handler::update).delete(handler::delete),
+        )
         .layer(middleware::from_fn(require_permission("tables:manage")));
 
     read_routes.merge(manage_routes)

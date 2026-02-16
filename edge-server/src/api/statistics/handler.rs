@@ -4,13 +4,13 @@ use axum::{
     Json,
     extract::{Query, State},
 };
-use chrono::{Duration, Datelike};
+use chrono::{Datelike, Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
 use crate::db::repository::store_info;
-use crate::utils::{AppError, AppResult};
 use crate::utils::time;
+use crate::utils::{AppError, AppResult};
 
 // ============================================================================
 // Response Types
@@ -155,35 +155,46 @@ fn calculate_time_range(
     };
 
     match time_range {
-        "today" => {
-            (cutoff_millis(today), cutoff_millis(today + Duration::days(1)))
-        }
+        "today" => (
+            cutoff_millis(today),
+            cutoff_millis(today + Duration::days(1)),
+        ),
         "week" => {
             let weekday = today.weekday().num_days_from_monday();
             let week_start = today - Duration::days(weekday as i64);
-            (cutoff_millis(week_start), cutoff_millis(today + Duration::days(1)))
+            (
+                cutoff_millis(week_start),
+                cutoff_millis(today + Duration::days(1)),
+            )
         }
         "month" => {
             let month_start = today.with_day(1).unwrap_or(today);
-            (cutoff_millis(month_start), cutoff_millis(today + Duration::days(1)))
+            (
+                cutoff_millis(month_start),
+                cutoff_millis(today + Duration::days(1)),
+            )
         }
         "custom" => {
             if let (Some(s), Some(e)) = (custom_start, custom_end) {
                 (parse_datetime(s), parse_datetime(e))
             } else {
-                (cutoff_millis(today), cutoff_millis(today + Duration::days(1)))
+                (
+                    cutoff_millis(today),
+                    cutoff_millis(today + Duration::days(1)),
+                )
             }
         }
-        _ => {
-            (cutoff_millis(today), cutoff_millis(today + Duration::days(1)))
-        }
+        _ => (
+            cutoff_millis(today),
+            cutoff_millis(today + Duration::days(1)),
+        ),
     }
 }
 
 /// Predefined colors for category chart
 const CATEGORY_COLORS: &[&str] = &[
-    "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
-    "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1",
+    "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16",
+    "#F97316", "#6366F1",
 ];
 
 // ============================================================================
@@ -237,8 +248,16 @@ pub async fn get_statistics(
     .bind(start_dt).bind(end_dt)
     .fetch_one(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
-    let average_order_value = if total_orders > 0 { revenue / total_orders as f64 } else { 0.0 };
-    let avg_guest_spend = if total_customers > 0 { revenue / total_customers as f64 } else { 0.0 };
+    let average_order_value = if total_orders > 0 {
+        revenue / total_orders as f64
+    } else {
+        0.0
+    };
+    let avg_guest_spend = if total_customers > 0 {
+        revenue / total_customers as f64
+    } else {
+        0.0
+    };
 
     // Payment breakdown: single query (was 2 separate queries)
     let (cash_revenue, card_revenue): (f64, f64) = sqlx::query_as(
@@ -249,8 +268,11 @@ pub async fn get_statistics(
          JOIN archived_order o ON p.order_pk = o.id \
          WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0",
     )
-    .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.map_err(|e| AppError::database(e.to_string()))?;
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
 
     let other_revenue = revenue - cash_revenue - card_revenue;
 
@@ -278,7 +300,9 @@ pub async fn get_statistics(
         .bind(start_dt).bind(end_dt)
         .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
-        rows.into_iter().map(|(t, v)| RevenueTrendPoint { time: t, value: v }).collect()
+        rows.into_iter()
+            .map(|(t, v)| RevenueTrendPoint { time: t, value: v })
+            .collect()
     } else {
         // Daily trend
         let rows: Vec<(String, f64)> = sqlx::query_as(
@@ -287,7 +311,9 @@ pub async fn get_statistics(
         .bind(start_dt).bind(end_dt)
         .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
-        rows.into_iter().map(|(t, v)| RevenueTrendPoint { time: t, value: v }).collect()
+        rows.into_iter()
+            .map(|(t, v)| RevenueTrendPoint { time: t, value: v })
+            .collect()
     };
 
     // Category sales from archived_order_item
@@ -303,7 +329,8 @@ pub async fn get_statistics(
         .map(|(i, (name, value))| CategorySale {
             name: name.unwrap_or_else(|| "Unknown".to_string()),
             value,
-            color: CATEGORY_COLORS.get(i % CATEGORY_COLORS.len())
+            color: CATEGORY_COLORS
+                .get(i % CATEGORY_COLORS.len())
                 .unwrap_or(&"#6B7280")
                 .to_string(),
         })
@@ -356,12 +383,19 @@ pub async fn get_sales_report(
 
     let total_i64: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
-        start_dt, end_dt,
+        start_dt,
+        end_dt,
     )
-    .fetch_one(pool).await.unwrap_or(0);
-    let total = total_i64 as i32;
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    let total = i32::try_from(total_i64).unwrap_or(i32::MAX);
 
-    let total_pages = if total > 0 { (total + page_size - 1) / page_size } else { 1 };
+    let total_pages = if total > 0 {
+        (total + page_size - 1) / page_size
+    } else {
+        1
+    };
 
     let items: Vec<SalesReportItem> = sqlx::query_as(
         "SELECT id AS order_id, receipt_number, STRFTIME('%Y-%m-%d %H:%M', end_time / 1000, 'unixepoch') AS date, total_amount AS total, UPPER(status) AS status FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 ORDER BY end_time DESC LIMIT ?3 OFFSET ?4",

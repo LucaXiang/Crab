@@ -8,9 +8,9 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::db::repository::price_rule;
-use shared::models::PriceRule;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
+use shared::models::PriceRule;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// 加载匹配区域的价格规则（静态缓存）

@@ -2,7 +2,7 @@
 //!
 //! Applies the PaymentAdded event to add a payment to the snapshot.
 
-use crate::orders::money::{self, to_decimal, to_f64, MONEY_TOLERANCE};
+use crate::order_money::{self, MONEY_TOLERANCE, to_decimal, to_f64};
 use crate::orders::traits::EventApplier;
 use rust_decimal::Decimal;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
@@ -63,7 +63,7 @@ impl EventApplier for PaymentAddedApplier {
                     }
                 }
                 // Recalculate to update unpaid_quantity per item
-                money::recalculate_totals(snapshot);
+                order_money::recalculate_totals(snapshot);
             }
 
             // Update sequence and timestamp
@@ -116,16 +116,8 @@ mod tests {
         snapshot.total = 100.0;
         snapshot.last_sequence = 0;
 
-        let event = create_payment_added_event(
-            "order-1",
-            1,
-            "payment-1",
-            "CARD",
-            50.0,
-            None,
-            None,
-            None,
-        );
+        let event =
+            create_payment_added_event("order-1", 1, "payment-1", "CARD", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -197,16 +189,8 @@ mod tests {
         snapshot.total = 100.0;
 
         // First payment
-        let event1 = create_payment_added_event(
-            "order-1",
-            1,
-            "payment-1",
-            "CARD",
-            30.0,
-            None,
-            None,
-            None,
-        );
+        let event1 =
+            create_payment_added_event("order-1", 1, "payment-1", "CARD", 30.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event1);
@@ -288,16 +272,8 @@ mod tests {
         snapshot.total = 100.0;
 
         // Partial payment
-        let event = create_payment_added_event(
-            "order-1",
-            1,
-            "payment-1",
-            "CARD",
-            40.0,
-            None,
-            None,
-            None,
-        );
+        let event =
+            create_payment_added_event("order-1", 1, "payment-1", "CARD", 40.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -312,16 +288,8 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.total = 100.0;
 
-        let event = create_payment_added_event(
-            "order-1",
-            1,
-            "payment-1",
-            "CARD",
-            100.0,
-            None,
-            None,
-            None,
-        );
+        let event =
+            create_payment_added_event("order-1", 1, "payment-1", "CARD", 100.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);

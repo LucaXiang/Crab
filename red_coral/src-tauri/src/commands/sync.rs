@@ -20,7 +20,6 @@ pub struct SyncStatusResponse {
 pub async fn get_sync_status(
     bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<SyncStatusResponse>, String> {
-
     match bridge.get::<SyncStatusResponse>("/api/sync/status").await {
         Ok(data) => Ok(ApiResponse::success(data)),
         Err(e) => Ok(ApiResponse::error_with_code(

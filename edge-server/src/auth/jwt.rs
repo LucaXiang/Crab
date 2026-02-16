@@ -139,7 +139,12 @@ pub fn generate_secure_printable_jwt_secret() -> String {
             return "CrabEdgeServerDevelopmentSecureKey2024!".to_string();
         }
         let idx = (byte[0] as usize) % allowed_chars.len();
-        key.push(allowed_chars.chars().nth(idx).expect("idx is bounded by modulo"));
+        key.push(
+            allowed_chars
+                .chars()
+                .nth(idx)
+                .expect("idx is bounded by modulo"),
+        );
     }
 
     key
@@ -159,9 +164,7 @@ fn load_jwt_secret() -> Result<Vec<u8>, JwtError> {
         Err(_) => {
             #[cfg(debug_assertions)]
             {
-                tracing::warn!(
-                    "JWT_SECRET not set, using fixed development key"
-                );
+                tracing::warn!("JWT_SECRET not set, using fixed development key");
             }
             // 局域网 + mTLS 保护的 POS 系统，使用固定密钥确保重启后 token 有效
             Ok("CrabEdgeServerDevelopmentSecureKey2024!"
@@ -446,15 +449,7 @@ mod tests {
         let permissions = vec!["products:read".to_string(), "products:write".to_string()];
 
         let token = service
-            .generate_token(
-                123,
-                "john_doe",
-                "John Doe",
-                1,
-                "user",
-                &permissions,
-                false,
-            )
+            .generate_token(123, "john_doe", "John Doe", 1, "user", &permissions, false)
             .expect("Failed to generate test token");
 
         let claims = service
@@ -526,15 +521,7 @@ mod tests {
         let permissions = vec!["products:read".to_string(), "products:write".to_string()];
 
         let token = service
-            .generate_token(
-                123,
-                "john_doe",
-                "John Doe",
-                1,
-                "user",
-                &permissions,
-                false,
-            )
+            .generate_token(123, "john_doe", "John Doe", 1, "user", &permissions, false)
             .expect("Failed to generate test token");
 
         let claims = service

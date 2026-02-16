@@ -223,5 +223,3 @@ pub struct AuditListResponse {
     pub items: Vec<AuditEntry>,
     pub total: u64,
 }
-
-

@@ -235,10 +235,7 @@ impl OrderStorage {
     pub fn next_order_count(&self) -> StorageResult<u64> {
         let txn = self.db.begin_write()?;
         let mut table = txn.open_table(SEQUENCE_TABLE)?;
-        let current = table
-            .get(ORDER_COUNT_KEY)?
-            .map(|g| g.value())
-            .unwrap_or(0);
+        let current = table.get(ORDER_COUNT_KEY)?.map(|g| g.value()).unwrap_or(0);
         let next = current + 1;
         table.insert(ORDER_COUNT_KEY, next)?;
         drop(table);
@@ -250,10 +247,7 @@ impl OrderStorage {
     pub fn get_order_count(&self) -> StorageResult<u64> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(SEQUENCE_TABLE)?;
-        Ok(table
-            .get(ORDER_COUNT_KEY)?
-            .map(|g| g.value())
-            .unwrap_or(0))
+        Ok(table.get(ORDER_COUNT_KEY)?.map(|g| g.value()).unwrap_or(0))
     }
 
     /// Get next queue number for retail orders (叫号)
@@ -263,9 +257,13 @@ impl OrderStorage {
     pub fn next_queue_number(&self, tz: chrono_tz::Tz) -> StorageResult<u32> {
         use rand::Rng;
 
-        let today = chrono::Utc::now().with_timezone(&tz).format("%Y%m%d").to_string();
-        // SAFETY: chrono %Y%m%d always produces a valid u64 like "20260208"
-        let today_u64: u64 = today.parse().expect("chrono %Y%m%d format is always a valid u64");
+        let today = chrono::Utc::now()
+            .with_timezone(&tz)
+            .format("%Y%m%d")
+            .to_string();
+        // SAFETY: chrono %Y%m%d always produces exactly 8 ASCII digits (e.g. "20260208")
+        // which is always a valid u64 — str::parse cannot fail for this format
+        let today_u64: u64 = today.parse().expect("chrono %Y%m%d produces valid u64");
 
         let txn = self.db.begin_write()?;
         let mut table = txn.open_table(SEQUENCE_TABLE)?;
@@ -281,10 +279,7 @@ impl OrderStorage {
             start
         } else {
             // Same day: increment, wrap at 1000
-            let current = table
-                .get(QUEUE_NUMBER_KEY)?
-                .map(|g| g.value())
-                .unwrap_or(0);
+            let current = table.get(QUEUE_NUMBER_KEY)?.map(|g| g.value()).unwrap_or(0);
             let next = (current + 1) % 1000;
             table.insert(QUEUE_NUMBER_KEY, next)?;
             next
@@ -661,9 +656,6 @@ impl OrderStorage {
         Ok(events)
     }
 
-
-
-
     /// Clean up processed command IDs for a given order
     /// (Called after archival - removes command_ids that belong to archived orders)
     pub fn cleanup_command_ids(
@@ -859,7 +851,8 @@ impl OrderStorage {
             let mut dead_letter_table = txn.open_table(DEAD_LETTER_TABLE)?;
 
             // Collect order_ids first (can't iterate and mutate simultaneously)
-            let dead_order_ids: Vec<String> = dead_letter_table.iter()?
+            let dead_order_ids: Vec<String> = dead_letter_table
+                .iter()?
                 .filter_map(|r| r.ok())
                 .map(|(k, _v)| k.value().to_string())
                 .collect();
@@ -1191,7 +1184,9 @@ mod tests {
         // Mark as failed a few times
         storage.mark_archive_failed(order_id, "error 1").unwrap();
         storage.mark_archive_failed(order_id, "error 2").unwrap();
-        storage.mark_archive_failed(order_id, "final error").unwrap();
+        storage
+            .mark_archive_failed(order_id, "final error")
+            .unwrap();
 
         // Move to dead letter queue
         storage
@@ -1342,8 +1337,15 @@ mod tests {
         assert!(all.is_empty());
 
         // 存储多个订单的快照
-        storage.store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")]).unwrap();
-        storage.store_rule_snapshot("order-b", &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")]).unwrap();
+        storage
+            .store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")])
+            .unwrap();
+        storage
+            .store_rule_snapshot(
+                "order-b",
+                &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")],
+            )
+            .unwrap();
 
         let all = storage.get_all_rule_snapshots().unwrap();
         assert_eq!(all.len(), 2);

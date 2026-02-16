@@ -94,9 +94,7 @@ impl CertService {
         crab_cert::verify_chain_against_root(edge_cert_pem, tenant_ca_pem)
             .map_err(|e| AppError::validation(format!("Edge cert validation failed: {}", e)))?;
 
-        tracing::info!(
-            "Certificate chain verification passed: Root CA -> Tenant CA -> Edge Cert"
-        );
+        tracing::info!("Certificate chain verification passed: Root CA -> Tenant CA -> Edge Cert");
         Ok(())
     }
 

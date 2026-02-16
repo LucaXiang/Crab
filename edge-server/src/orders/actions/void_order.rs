@@ -4,9 +4,9 @@
 
 use async_trait::async_trait;
 
-use crate::orders::money::{to_decimal, to_f64};
+use crate::order_money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NOTE_LEN, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_optional_text};
 use rust_decimal::Decimal;
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, LossReason, OrderEvent, OrderEventType, OrderStatus, VoidType};
@@ -49,10 +49,7 @@ impl CommandHandler for VoidOrderAction {
             OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(
                     CommandErrorCode::OrderNotActive,
-                    format!(
-                        "Cannot void order in {:?} status",
-                        snapshot.status
-                    ),
+                    format!("Cannot void order in {:?} status", snapshot.status),
                 ));
             }
         }
@@ -64,9 +61,8 @@ impl CommandHandler for VoidOrderAction {
             VoidType::Cancelled => (None, None),
             VoidType::LossSettled => {
                 let amount = self.loss_amount.unwrap_or_else(|| {
-                    let remaining =
-                        (to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount))
-                            .max(Decimal::ZERO);
+                    let remaining = (to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount))
+                        .max(Decimal::ZERO);
                     to_f64(remaining)
                 });
                 (self.loss_reason.clone(), Some(amount))
@@ -435,11 +431,12 @@ mod tests {
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
-        if let EventPayload::OrderVoided {
-            loss_amount, ..
-        } = &events[0].payload
-        {
-            assert_eq!(*loss_amount, Some(40.0), "Should auto-calculate remaining as loss");
+        if let EventPayload::OrderVoided { loss_amount, .. } = &events[0].payload {
+            assert_eq!(
+                *loss_amount,
+                Some(40.0),
+                "Should auto-calculate remaining as loss"
+            );
         } else {
             panic!("Expected OrderVoided payload");
         }

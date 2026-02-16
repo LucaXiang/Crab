@@ -16,12 +16,11 @@ pub async fn authenticate(
     username: &str,
     password: &str,
 ) -> Result<Option<Tenant>, sqlx::Error> {
-    let tenant: Option<Tenant> = sqlx::query_as(
-        "SELECT id, name, hashed_password, status FROM tenants WHERE id = $1",
-    )
-    .bind(username)
-    .fetch_optional(pool)
-    .await?;
+    let tenant: Option<Tenant> =
+        sqlx::query_as("SELECT id, name, hashed_password, status FROM tenants WHERE id = $1")
+            .bind(username)
+            .fetch_optional(pool)
+            .await?;
 
     let Some(tenant) = tenant else {
         return Ok(None);

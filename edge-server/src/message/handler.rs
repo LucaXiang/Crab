@@ -192,7 +192,10 @@ impl MessageHandler {
     }
 
     /// 处理未注册消息类型
-    async fn handle_unregistered(&self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_unregistered(
+        &self,
+        msg: &BusMessage,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!(
             event_type = ?msg.event_type,
             "No processor registered for event type"

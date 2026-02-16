@@ -24,10 +24,19 @@ pub fn router(state: Arc<AppState>) -> Router {
 
     Router::new()
         .route("/api/server/activate", post(activate::activate))
-        .route("/api/client/activate", post(activate_client::activate_client))
+        .route(
+            "/api/client/activate",
+            post(activate_client::activate_client),
+        )
         .route("/api/tenant/verify", post(verify::verify_tenant))
-        .route("/api/server/deactivate", post(deactivate::deactivate_server))
-        .route("/api/client/deactivate", post(deactivate_client::deactivate_client))
+        .route(
+            "/api/server/deactivate",
+            post(deactivate::deactivate_server),
+        )
+        .route(
+            "/api/client/deactivate",
+            post(deactivate_client::deactivate_client),
+        )
         .route(
             "/api/tenant/subscription",
             post(subscription::get_subscription_status),
@@ -37,7 +46,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .merge(p12_routes)
         .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB default
-        .layer(TimeoutLayer::with_status_code(http::StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30)))
+        .layer(TimeoutLayer::with_status_code(
+            http::StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(30),
+        ))
         .with_state(state)
 }
 

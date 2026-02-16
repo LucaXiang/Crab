@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use super::renderer::KitchenTicketRenderer;
 use super::types::KitchenOrder;
-use shared::models::{Printer, PrintDestination};
+use shared::models::{PrintDestination, Printer};
 use thiserror::Error;
 use tracing::{error, info, instrument, warn};
 
@@ -124,11 +124,7 @@ impl PrintExecutor {
         data: &[u8],
     ) -> PrintExecutorResult<()> {
         // Find active printers, sorted by priority
-        let mut printers: Vec<_> = dest
-            .printers
-            .iter()
-            .filter(|p| p.is_active)
-            .collect();
+        let mut printers: Vec<_> = dest.printers.iter().filter(|p| p.is_active).collect();
 
         printers.sort_by_key(|p| p.priority);
 
@@ -156,11 +152,7 @@ impl PrintExecutor {
     }
 
     /// Send data to a specific printer
-    async fn send_to_printer(
-        &self,
-        printer: &Printer,
-        data: &[u8],
-    ) -> PrintExecutorResult<()> {
+    async fn send_to_printer(&self, printer: &Printer, data: &[u8]) -> PrintExecutorResult<()> {
         match printer.connection.as_str() {
             "driver" => self.send_to_driver_printer(printer, data).await,
             "network" => self.send_to_network_printer(printer, data).await,

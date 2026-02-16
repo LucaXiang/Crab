@@ -87,7 +87,9 @@ impl ClientBridge {
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
-                    let reason = self.detect_activation_reason_from_server(server_state, &tenant_manager).await;
+                    let reason = self
+                        .detect_activation_reason_from_server(server_state, &tenant_manager)
+                        .await;
                     return AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
                         recovery_hint: reason.recovery_hint_code().to_string(),
@@ -152,7 +154,9 @@ impl ClientBridge {
     }
 
     /// 获取当前活动会话 (用于启动时恢复登录状态)
-    pub async fn get_current_session(&self) -> Option<super::super::session_cache::EmployeeSession> {
+    pub async fn get_current_session(
+        &self,
+    ) -> Option<super::super::session_cache::EmployeeSession> {
         let tenant_manager = self.tenant_manager.read().await;
         tenant_manager.current_session().cloned()
     }
@@ -244,14 +248,12 @@ impl ClientBridge {
                         .build();
 
                     let (reachable, last_connected) = match client {
-                        Ok(c) => {
-                            match c.get(format!("{}/health", auth_url)).send().await {
-                                Ok(resp) if resp.status().is_success() => {
-                                    (true, Some(shared::util::now_millis()))
-                                }
-                                _ => (false, None),
+                        Ok(c) => match c.get(format!("{}/health", auth_url)).send().await {
+                            Ok(resp) if resp.status().is_success() => {
+                                (true, Some(shared::util::now_millis()))
                             }
-                        }
+                            _ => (false, None),
+                        },
                         Err(_) => (false, None),
                     };
 
@@ -284,7 +286,9 @@ impl ClientBridge {
                 (subscription, network, database)
             }
 
-            ClientMode::Client { client, edge_url, .. } => {
+            ClientMode::Client {
+                client, edge_url, ..
+            } => {
                 let (network_status, reachable) = if let Some(state) = client {
                     let http = match state {
                         RemoteClientState::Connected(c) => c.edge_http_client().cloned(),

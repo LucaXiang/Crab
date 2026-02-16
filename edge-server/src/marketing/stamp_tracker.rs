@@ -23,10 +23,7 @@ pub struct StampItemInfo<'a> {
 /// For each non-comped item, check if it matches any stamp target.
 /// Sum up quantities of matching items.
 /// Comped items never count — "买二送一带走三个 ≠ 买二带走两个".
-pub fn count_stamps_for_order(
-    items: &[StampItemInfo<'_>],
-    stamp_targets: &[StampTarget],
-) -> i32 {
+pub fn count_stamps_for_order(items: &[StampItemInfo<'_>], stamp_targets: &[StampTarget]) -> i32 {
     items
         .iter()
         .filter(|info| !info.item.is_comped && matches_stamp_target(info, stamp_targets))
@@ -296,7 +293,7 @@ mod tests {
     fn test_count_stamps_multiple_targets_product_and_category() {
         let item1 = make_item(1, "inst-1", 2, 10.0, false); // cat 100
         let item2 = make_item(2, "inst-2", 3, 15.0, false); // cat 200
-        let item3 = make_item(3, "inst-3", 1, 5.0, false);  // cat 300
+        let item3 = make_item(3, "inst-3", 1, 5.0, false); // cat 300
         let items = vec![
             make_stamp_info(&item1, Some(100)),
             make_stamp_info(&item2, Some(200)),
@@ -343,7 +340,10 @@ mod tests {
         item.is_comped = true;
         let items = vec![make_stamp_info(&item, Some(100))];
         let targets = vec![make_reward_target(StampTargetType::Category, 100)];
-        assert_eq!(find_reward_item(&items, &targets, &RewardStrategy::Economizador), None);
+        assert_eq!(
+            find_reward_item(&items, &targets, &RewardStrategy::Economizador),
+            None
+        );
     }
 
     #[test]

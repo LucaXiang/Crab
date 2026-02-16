@@ -141,10 +141,10 @@ impl WindowsPrinter {
 
     /// List available printers (filters out virtual printers)
     pub fn list() -> PrintResult<Vec<String>> {
-        use windows::core::PWSTR;
         use windows::Win32::Graphics::Printing::{
             EnumPrintersW, PRINTER_ENUM_CONNECTIONS, PRINTER_ENUM_LOCAL, PRINTER_INFO_5W,
         };
+        use windows::core::PWSTR;
 
         unsafe {
             let flags = PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS;
@@ -207,8 +207,8 @@ impl WindowsPrinter {
 
     /// Get the default printer name
     pub fn default_printer() -> PrintResult<Option<String>> {
-        use windows::core::PWSTR;
         use windows::Win32::Graphics::Printing::GetDefaultPrinterW;
+        use windows::core::PWSTR;
 
         unsafe {
             let mut needed: u32 = 0;
@@ -264,11 +264,11 @@ impl WindowsPrinter {
     pub fn check_online(name: &str) -> PrintResult<bool> {
         use std::net::{TcpStream, ToSocketAddrs};
         use std::time::Duration;
-        use windows::core::{PCWSTR, PWSTR};
         use windows::Win32::Graphics::Printing::{
             ClosePrinter, GetPrinterW, OpenPrinterW, PRINTER_HANDLE, PRINTER_INFO_5W,
             PRINTER_INFO_6, PRINTER_STATUS_OFFLINE,
         };
+        use windows::core::{PCWSTR, PWSTR};
 
         fn to_wide(s: &str) -> Vec<u16> {
             s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -358,11 +358,11 @@ impl WindowsPrinter {
 
     fn write_raw(&self, data: &[u8]) -> PrintResult<()> {
         use core::ffi::c_void;
-        use windows::core::{PCWSTR, PWSTR};
         use windows::Win32::Graphics::Printing::{
-            ClosePrinter, EndDocPrinter, EndPagePrinter, OpenPrinterW, StartDocPrinterW,
-            StartPagePrinter, WritePrinter, DOC_INFO_1W, PRINTER_HANDLE,
+            ClosePrinter, DOC_INFO_1W, EndDocPrinter, EndPagePrinter, OpenPrinterW, PRINTER_HANDLE,
+            StartDocPrinterW, StartPagePrinter, WritePrinter,
         };
+        use windows::core::{PCWSTR, PWSTR};
 
         fn to_wide(s: &str) -> Vec<u16> {
             s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -390,13 +390,17 @@ impl WindowsPrinter {
 
             if StartDocPrinterW(handle, 1, &doc_info as *const DOC_INFO_1W) == 0 {
                 let _ = ClosePrinter(handle);
-                return Err(PrintError::WindowsPrinter("StartDocPrinter failed".to_string()));
+                return Err(PrintError::WindowsPrinter(
+                    "StartDocPrinter failed".to_string(),
+                ));
             }
 
             if !StartPagePrinter(handle).as_bool() {
                 let _ = EndDocPrinter(handle);
                 let _ = ClosePrinter(handle);
-                return Err(PrintError::WindowsPrinter("StartPagePrinter failed".to_string()));
+                return Err(PrintError::WindowsPrinter(
+                    "StartPagePrinter failed".to_string(),
+                ));
             }
 
             let mut written: u32 = 0;
@@ -412,7 +416,9 @@ impl WindowsPrinter {
             let _ = ClosePrinter(handle);
 
             if !ok.as_bool() {
-                return Err(PrintError::WindowsPrinter("WritePrinter failed".to_string()));
+                return Err(PrintError::WindowsPrinter(
+                    "WritePrinter failed".to_string(),
+                ));
             }
 
             if written != data.len() as u32 {

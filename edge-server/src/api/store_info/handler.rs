@@ -5,13 +5,16 @@ use axum::{
     extract::{Extension, State},
 };
 
-use crate::audit::{create_diff, AuditAction};
+use crate::audit::{AuditAction, create_diff};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::store_info;
 use crate::utils::AppResult;
-use crate::utils::validation::{validate_optional_text, MAX_NAME_LEN, MAX_ADDRESS_LEN, MAX_SHORT_TEXT_LEN, MAX_URL_LEN, MAX_EMAIL_LEN};
+use crate::utils::validation::{
+    MAX_ADDRESS_LEN, MAX_EMAIL_LEN, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_URL_LEN,
+    validate_optional_text,
+};
 use shared::models::{StoreInfo, StoreInfoUpdate};
 
 const RESOURCE: &str = "store_info";
@@ -24,7 +27,11 @@ fn validate_update(payload: &StoreInfoUpdate) -> AppResult<()> {
     validate_optional_text(&payload.phone, "phone", MAX_SHORT_TEXT_LEN)?;
     validate_optional_text(&payload.email, "email", MAX_EMAIL_LEN)?;
     validate_optional_text(&payload.website, "website", MAX_URL_LEN)?;
-    validate_optional_text(&payload.business_day_cutoff, "business_day_cutoff", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(
+        &payload.business_day_cutoff,
+        "business_day_cutoff",
+        MAX_SHORT_TEXT_LEN,
+    )?;
     Ok(())
 }
 
@@ -48,7 +55,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::StoreInfoChanged,
-        "store_info", "main",
+        "store_info",
+        "main",
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_store_info, &store_info, "store_info")

@@ -6,7 +6,7 @@
 //! For split payments with `split_items`, this applier also restores items
 //! using "add items" logic - merging with existing items or creating new ones.
 
-use crate::orders::money::{self, to_decimal, to_f64};
+use crate::order_money::{self, to_decimal, to_f64};
 use crate::orders::traits::EventApplier;
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot};
 
@@ -27,7 +27,11 @@ impl EventApplier for PaymentCancelledApplier {
                     .iter()
                     .find(|p| p.payment_id == *payment_id && !p.cancelled)
                 {
-                    (payment.amount, payment.split_items.clone(), payment.aa_shares)
+                    (
+                        payment.amount,
+                        payment.split_items.clone(),
+                        payment.aa_shares,
+                    )
                 } else {
                     return; // Payment not found or already cancelled
                 }
@@ -55,9 +59,7 @@ impl EventApplier for PaymentCancelledApplier {
             // Check if we need to clear has_amount_split flag
             if snapshot.has_amount_split {
                 let has_remaining_amount_splits = snapshot.payments.iter().any(|p| {
-                    !p.cancelled
-                        && p.split_type
-                            == Some(shared::order::SplitType::AmountSplit)
+                    !p.cancelled && p.split_type == Some(shared::order::SplitType::AmountSplit)
                 });
 
                 if !has_remaining_amount_splits {
@@ -80,7 +82,7 @@ impl EventApplier for PaymentCancelledApplier {
             }
 
             // Recalculate totals to update unpaid_quantity and financial fields
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
@@ -447,7 +449,7 @@ mod tests {
     #[test]
     fn test_payment_cancelled_remaining_amount_calculation() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        
+
         // Add items so recalculate_totals computes correct total
         let item = CartItemSnapshot {
             id: 1,
@@ -474,7 +476,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(item);
         snapshot.total = 100.0;
@@ -544,7 +546,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(item.clone());
 
@@ -584,8 +586,10 @@ mod tests {
         assert_eq!(snapshot.items[0].unpaid_quantity, 3); // recalculated: 3 - 0 = 3
 
         // Check: paid_item_quantities updated
-        assert!(snapshot.paid_item_quantities.get("inst-1").is_none() 
-                || *snapshot.paid_item_quantities.get("inst-1").unwrap() == 0);
+        assert!(
+            snapshot.paid_item_quantities.get("inst-1").is_none()
+                || *snapshot.paid_item_quantities.get("inst-1").unwrap() == 0
+        );
     }
 
     #[test]
@@ -620,7 +624,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(modified_item);
 
@@ -650,7 +654,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -734,7 +738,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(modified_item);
 
@@ -764,7 +768,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -854,7 +858,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(modified_item);
 
@@ -884,7 +888,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(re_added_item);
 
@@ -914,7 +918,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -988,7 +992,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(item);
 
@@ -998,16 +1002,8 @@ mod tests {
             .push(create_payment_record("pay-1", "CASH", 50.0));
 
         // Cancel normal payment
-        let event = create_payment_cancelled_event(
-            "order-1",
-            1,
-            "pay-1",
-            "CASH",
-            50.0,
-            None,
-            None,
-            None,
-        );
+        let event =
+            create_payment_cancelled_event("order-1", 1, "pay-1", "CASH", 50.0, None, None, None);
 
         let applier = PaymentCancelledApplier;
         applier.apply(&mut snapshot, &event);
@@ -1039,15 +1035,17 @@ mod tests {
         snapshot.payments.push(pay2);
 
         // Cancel amt-1
-        let event = create_payment_cancelled_event(
-            "order-1", 1, "amt-1", "CASH", 20.0, None, None, None,
-        );
+        let event =
+            create_payment_cancelled_event("order-1", 1, "amt-1", "CASH", 20.0, None, None, None);
 
         let applier = PaymentCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
         // amt-2 is still active → has_amount_split stays true
-        assert!(snapshot.has_amount_split, "has_amount_split should stay true when other amount splits remain");
+        assert!(
+            snapshot.has_amount_split,
+            "has_amount_split should stay true when other amount splits remain"
+        );
         assert_eq!(snapshot.paid_amount, 20.0);
         assert!(snapshot.payments[0].cancelled);
         assert!(!snapshot.payments[1].cancelled);
@@ -1070,15 +1068,17 @@ mod tests {
         snapshot.payments.push(pay2);
 
         // Cancel the last active one
-        let event = create_payment_cancelled_event(
-            "order-1", 1, "amt-1", "CASH", 20.0, None, None, None,
-        );
+        let event =
+            create_payment_cancelled_event("order-1", 1, "amt-1", "CASH", 20.0, None, None, None);
 
         let applier = PaymentCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
         // No active amount splits remain → flag cleared
-        assert!(!snapshot.has_amount_split, "has_amount_split should be false when no amount splits remain");
+        assert!(
+            !snapshot.has_amount_split,
+            "has_amount_split should be false when no amount splits remain"
+        );
         assert_eq!(snapshot.paid_amount, 0.0);
     }
 
@@ -1103,16 +1103,18 @@ mod tests {
         snapshot.payments.push(pay2);
 
         // Cancel aa-2
-        let event = create_payment_cancelled_event(
-            "order-1", 1, "aa-2", "CARD", 30.0, None, None, None,
-        );
+        let event =
+            create_payment_cancelled_event("order-1", 1, "aa-2", "CARD", 30.0, None, None, None);
 
         let applier = PaymentCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
         // aa-1 still active → AA mode stays locked
         assert_eq!(snapshot.aa_total_shares, Some(3), "AA should remain locked");
-        assert_eq!(snapshot.aa_paid_shares, 1, "Paid shares should be reduced by 1");
+        assert_eq!(
+            snapshot.aa_paid_shares, 1,
+            "Paid shares should be reduced by 1"
+        );
         assert_eq!(snapshot.paid_amount, 30.0);
     }
 
@@ -1136,15 +1138,18 @@ mod tests {
         snapshot.payments.push(pay2);
 
         // Cancel the last active one
-        let event = create_payment_cancelled_event(
-            "order-1", 1, "aa-1", "CASH", 30.0, None, None, None,
-        );
+        let event =
+            create_payment_cancelled_event("order-1", 1, "aa-1", "CASH", 30.0, None, None, None);
 
         let applier = PaymentCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
         // Shares zeroed, but unlock is deferred to AaSplitCancelledApplier
-        assert_eq!(snapshot.aa_total_shares, Some(3), "PaymentCancelledApplier must NOT unlock AA; that is AaSplitCancelledApplier's job");
+        assert_eq!(
+            snapshot.aa_total_shares,
+            Some(3),
+            "PaymentCancelledApplier must NOT unlock AA; that is AaSplitCancelledApplier's job"
+        );
         assert_eq!(snapshot.aa_paid_shares, 0);
         assert_eq!(snapshot.paid_amount, 0.0);
     }

@@ -26,10 +26,10 @@ pub mod order;
 pub mod payment;
 
 // System
-pub mod store_info;
 pub mod label_template;
-pub mod system_state;
+pub mod store_info;
 pub mod system_issue;
+pub mod system_state;
 
 // Image
 pub mod image_ref;
@@ -40,8 +40,8 @@ pub mod member;
 pub mod stamp;
 
 // Operations (班次与日结)
-pub mod shift;
 pub mod daily_report;
+pub mod shift;
 
 use shared::error::{AppError, ErrorCode};
 use thiserror::Error;

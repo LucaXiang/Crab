@@ -59,11 +59,10 @@ pub async fn fetch_order_list(
     bridge: State<'_, Arc<ClientBridge>>,
     params: FetchOrderListParams,
 ) -> Result<ApiResponse<FetchOrderListSummaryResponse>, String> {
-
-
     // Calculate time range in UTC millis (default: last 7 days)
     let now_millis = chrono::Utc::now().timestamp_millis();
-    let start_millis = params.start_time
+    let start_millis = params
+        .start_time
         .map(|t| t as i64)
         .unwrap_or_else(|| now_millis - 7 * 24 * 60 * 60 * 1000);
     let end_millis = now_millis;
@@ -74,10 +73,7 @@ pub async fn fetch_order_list(
     // Build query with optional search parameter
     let mut query = format!(
         "/api/orders/history?start_time={}&end_time={}&limit={}&offset={}",
-        start_millis,
-        end_millis,
-        params.limit,
-        offset
+        start_millis, end_millis, params.limit, offset
     );
     if let Some(search) = &params.search {
         if !search.is_empty() {
@@ -86,13 +82,11 @@ pub async fn fetch_order_list(
     }
 
     match bridge.get::<OrderListApiResponse>(&query).await {
-        Ok(response) => {
-            Ok(ApiResponse::success(FetchOrderListSummaryResponse {
-                orders: response.orders,
-                total: response.total,
-                page: response.page,
-            }))
-        }
+        Ok(response) => Ok(ApiResponse::success(FetchOrderListSummaryResponse {
+            orders: response.orders,
+            total: response.total,
+            page: response.page,
+        })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -115,13 +109,11 @@ pub async fn fetch_member_order_history(
     );
 
     match bridge.get::<OrderListApiResponse>(&query).await {
-        Ok(response) => {
-            Ok(ApiResponse::success(FetchOrderListSummaryResponse {
-                orders: response.orders,
-                total: response.total,
-                page: response.page,
-            }))
-        }
+        Ok(response) => Ok(ApiResponse::success(FetchOrderListSummaryResponse {
+            orders: response.orders,
+            total: response.total,
+            page: response.page,
+        })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
@@ -133,7 +125,6 @@ pub async fn fetch_order_detail(
     bridge: State<'_, Arc<ClientBridge>>,
     order_id: i64,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
-
     match bridge
         .get::<serde_json::Value>(&format!("/api/orders/{}", order_id))
         .await

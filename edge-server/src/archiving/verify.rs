@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tokio_util::sync::CancellationToken;
 
+use crate::archiving::service::OrderArchiveService;
 use crate::db::repository::store_info;
-use crate::orders::archive::OrderArchiveService;
 use crate::utils::time;
 
 // ============================================================================
@@ -146,7 +146,11 @@ impl VerifyScheduler {
             let start = time::date_cutoff_millis(date, cutoff_time, self.tz);
             let end = time::date_cutoff_millis(next, cutoff_time, self.tz);
 
-            match self.archive_service.verify_daily_chain(&date_str, start, end).await {
+            match self
+                .archive_service
+                .verify_daily_chain(&date_str, start, end)
+                .await
+            {
                 Ok(result) => {
                     let intact = result.chain_intact;
                     let total = result.total_orders;
@@ -160,7 +164,11 @@ impl VerifyScheduler {
                             result.invalid_orders.len()
                         );
                     } else {
-                        tracing::info!("Daily chain verification for {}: {} orders OK", date_str, total);
+                        tracing::info!(
+                            "Daily chain verification for {}: {} orders OK",
+                            date_str,
+                            total
+                        );
                     }
                 }
                 Err(e) => {
@@ -209,16 +217,17 @@ impl VerifyScheduler {
             let end = time::date_cutoff_millis(next, cutoff_time, self.tz);
 
             tracing::info!("Running daily verification for {}", date_str);
-            match self.archive_service.verify_daily_chain(&date_str, start, end).await {
+            match self
+                .archive_service
+                .verify_daily_chain(&date_str, start, end)
+                .await
+            {
                 Ok(result) => {
                     let intact = result.chain_intact;
                     let total = result.total_orders;
                     self.save_daily_result(&date_str, &result).await;
                     if !intact {
-                        tracing::warn!(
-                            "Daily verification for {}: issues found",
-                            date_str
-                        );
+                        tracing::warn!("Daily verification for {}: issues found", date_str);
                     } else {
                         tracing::info!("Daily verification for {}: {} orders OK", date_str, total);
                     }
@@ -239,7 +248,7 @@ impl VerifyScheduler {
     async fn save_daily_result(
         &self,
         date: &str,
-        result: &crate::orders::archive::DailyChainVerification,
+        result: &crate::archiving::service::DailyChainVerification,
     ) {
         let details = if !result.chain_intact {
             serde_json::to_string(result).ok()
@@ -325,12 +334,11 @@ impl VerifyScheduler {
 
     /// 查询最早的归档订单日期
     async fn earliest_order_date(&self) -> Result<Option<NaiveDate>, String> {
-        let row: Option<(i64,)> = sqlx::query_as(
-            "SELECT created_at FROM archived_order ORDER BY created_at ASC LIMIT 1",
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| e.to_string())?;
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT created_at FROM archived_order ORDER BY created_at ASC LIMIT 1")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| e.to_string())?;
 
         match row {
             Some((created_at,)) => {
@@ -389,7 +397,9 @@ impl VerifyScheduler {
                     .latest()
                     .unwrap_or_else(|| {
                         // Ultimate fallback: use current time + 1 hour
-                        tracing::error!("Cannot resolve local time for verify scheduler, using fallback");
+                        tracing::error!(
+                            "Cannot resolve local time for verify scheduler, using fallback"
+                        );
                         now + chrono::Duration::hours(1)
                     })
             });
@@ -399,7 +409,9 @@ impl VerifyScheduler {
             // Safety: 不应该发生，但以防万一用 1 分钟兜底
             std::time::Duration::from_secs(60)
         } else {
-            duration.to_std().unwrap_or(std::time::Duration::from_secs(60))
+            duration
+                .to_std()
+                .unwrap_or(std::time::Duration::from_secs(60))
         }
     }
 }
@@ -424,7 +436,8 @@ mod tests {
     fn test_duration_until_next_cutoff_positive() {
         // 使用一个未来的时间点
         let cutoff = NaiveTime::from_hms_opt(23, 59, 0).unwrap();
-        let duration = VerifyScheduler::duration_until_next_cutoff(cutoff, chrono_tz::Europe::Madrid);
+        let duration =
+            VerifyScheduler::duration_until_next_cutoff(cutoff, chrono_tz::Europe::Madrid);
         // 应该是正值（除非恰好在 23:59 运行）
         assert!(duration.as_secs() > 0);
     }

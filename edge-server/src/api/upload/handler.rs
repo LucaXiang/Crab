@@ -114,14 +114,10 @@ pub async fn upload(
     let mut field_data: Option<Vec<u8>> = None;
     let mut original_filename = None;
 
-    while let Some(f) = multipart
-        .next_field()
-        .await
-        .map_err(|e| {
-            AppError::new(ErrorCode::InvalidRequest)
-                .with_detail("reason", format!("Invalid multipart request: {}", e))
-        })?
-    {
+    while let Some(f) = multipart.next_field().await.map_err(|e| {
+        AppError::new(ErrorCode::InvalidRequest)
+            .with_detail("reason", format!("Invalid multipart request: {}", e))
+    })? {
         let name = f.name().map(|s| s.to_string());
         if name.as_deref() == Some("file") || name.as_deref() == Some("") {
             original_filename = f.file_name().map(|s| s.to_string());
@@ -189,18 +185,21 @@ pub async fn upload(
         .map_err(|e| AppError::file_storage_failed(format!("write file: {}", e)))?;
 
     // Log audit event
-    state.audit_service.log(
-        crate::audit::AuditAction::StoreInfoChanged,
-        "upload",
-        hash.clone(),
-        Some(current_user.id),
-        Some(current_user.display_name.clone()),
-        serde_json::json!({
-            "original_name": original_name,
-            "filename": filename,
-            "size": compressed_data.len(),
-        }),
-    ).await;
+    state
+        .audit_service
+        .log(
+            crate::audit::AuditAction::StoreInfoChanged,
+            "upload",
+            hash.clone(),
+            Some(current_user.id),
+            Some(current_user.display_name.clone()),
+            serde_json::json!({
+                "original_name": original_name,
+                "filename": filename,
+                "size": compressed_data.len(),
+            }),
+        )
+        .await;
 
     tracing::info!(
         original_name = %original_name,

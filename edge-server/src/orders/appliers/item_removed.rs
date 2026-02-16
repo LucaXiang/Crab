@@ -7,7 +7,7 @@
 //! snapshot (or their quantity is reduced). For full audit trail support,
 //! a future enhancement could mark items as "voided" instead.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -29,7 +29,7 @@ impl EventApplier for ItemRemovedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals using precise decimal arithmetic
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -74,7 +74,7 @@ fn apply_item_removed(snapshot: &mut OrderSnapshot, instance_id: &str, quantity:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::orders::money::recalculate_totals;
+    use crate::order_money::recalculate_totals;
     use shared::order::{CartItemSnapshot, OrderEventType};
 
     fn create_test_item(
@@ -109,7 +109,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 

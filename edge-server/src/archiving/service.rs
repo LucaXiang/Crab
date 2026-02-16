@@ -5,7 +5,7 @@
 //! All archive operations are atomic - either everything succeeds or nothing is written.
 
 use crate::db::repository::system_state;
-use super::money::{to_decimal, to_f64};
+use crate::order_money::{to_decimal, to_f64};
 use rust_decimal::Decimal;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -437,7 +437,11 @@ impl OrderArchiveService {
         // 5b. INSERT items and their options
         for item in &snapshot.items {
             // Compute item prices using Decimal
-            let base_price = if item.original_price > 0.0 { item.original_price } else { item.price };
+            let base_price = if item.original_price > 0.0 {
+                item.original_price
+            } else {
+                item.price
+            };
             let d_base = to_decimal(base_price);
             let d_qty = Decimal::from(item.quantity);
             let d_manual_discount_per_unit = item
@@ -506,13 +510,11 @@ impl OrderArchiveService {
             .bind(item.tax_rate)
             .bind(item.category_id)
             .bind(&item.category_name)
-            .bind(
-                if item.applied_rules.is_empty() {
-                    None
-                } else {
-                    serde_json::to_string(&item.applied_rules).ok()
-                },
-            )
+            .bind(if item.applied_rules.is_empty() {
+                None
+            } else {
+                serde_json::to_string(&item.applied_rules).ok()
+            })
             .bind(&item.note)
             .bind(item.is_comped)
             .fetch_one(&mut *tx)
@@ -558,13 +560,17 @@ impl OrderArchiveService {
                         instance_id: si.instance_id.clone(),
                         name: si.name.clone(),
                         quantity: si.quantity,
-                        unit_price: if si.unit_price > 0.0 { si.unit_price } else { si.price },
+                        unit_price: if si.unit_price > 0.0 {
+                            si.unit_price
+                        } else {
+                            si.price
+                        },
                     })
                     .collect();
                 serde_json::to_string(&archive_items).unwrap_or_else(|_| "[]".to_string())
             });
 
-            let seq = i as i32;
+            let seq = i32::try_from(i).unwrap_or(i32::MAX);
             let split_type_str = payment.split_type.as_ref().map(|st| {
                 serde_json::to_value(st)
                     .ok()
@@ -618,7 +624,7 @@ impl OrderArchiveService {
             let payload_str =
                 serde_json::to_string(&event.payload).unwrap_or_else(|_| "{}".to_string());
 
-            let seq = i as i32;
+            let seq = i32::try_from(i).unwrap_or(i32::MAX);
 
             sqlx::query!(
                 "INSERT INTO archived_order_event (\
@@ -668,9 +674,9 @@ impl OrderArchiveService {
         hasher.update(b"\x00");
         hasher.update(snapshot.receipt_number.as_bytes());
         hasher.update(b"\x00");
-        // SAFETY: OrderStatus derives Serialize and always succeeds
+        // SAFETY: OrderStatus derives Serialize with no custom impl — serde_json cannot fail
         let status_str = serde_json::to_string(&snapshot.status)
-            .expect("OrderStatus serialization is infallible");
+            .expect("derive(Serialize) enum serialization is infallible");
         hasher.update(status_str.as_bytes());
         hasher.update(b"\x00");
         hasher.update(last_event_hash.as_bytes());
@@ -685,14 +691,14 @@ impl OrderArchiveService {
         hasher.update(event.order_id.as_bytes());
         hasher.update(b"\x00");
         hasher.update(event.sequence.to_le_bytes());
-        // SAFETY: OrderEventType derives Serialize and always succeeds
+        // SAFETY: OrderEventType derives Serialize with no custom impl — infallible
         let event_type_str = serde_json::to_string(&event.event_type)
-            .expect("OrderEventType serialization is infallible");
+            .expect("derive(Serialize) enum serialization is infallible");
         hasher.update(event_type_str.as_bytes());
         hasher.update(b"\x00");
-        // SAFETY: EventPayload derives Serialize and always succeeds
+        // SAFETY: EventPayload derives Serialize with no custom impl — infallible
         let payload_json = serde_json::to_string(&event.payload)
-            .expect("EventPayload serialization is infallible");
+            .expect("derive(Serialize) enum serialization is infallible");
         hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())
     }

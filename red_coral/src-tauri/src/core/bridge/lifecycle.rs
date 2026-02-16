@@ -109,13 +109,10 @@ impl ClientBridge {
 
         let state_arc = Arc::new(server_state);
 
-        let router = state_arc
-            .https_service()
-            .router()
-            .ok_or_else(|| {
-                tracing::error!("Router is None after ServerState initialization");
-                BridgeError::Server("Router not initialized".to_string())
-            })?;
+        let router = state_arc.https_service().router().ok_or_else(|| {
+            tracing::error!("Router is None after ServerState initialization");
+            BridgeError::Server("Router not initialized".to_string())
+        })?;
 
         let message_bus = state_arc.message_bus();
         let client_tx = message_bus.sender_to_server().clone();
@@ -200,12 +197,9 @@ impl ClientBridge {
                     let tenant_manager = self.tenant_manager.read().await;
                     let _ = tenant_manager.clear_current_session();
                     let client = CrabClient::local()
-                        .with_router(
-                            state_arc
-                                .https_service()
-                                .router()
-                                .ok_or_else(|| BridgeError::Server("Router not initialized".to_string()))?,
-                        )
+                        .with_router(state_arc.https_service().router().ok_or_else(|| {
+                            BridgeError::Server("Router not initialized".to_string())
+                        })?)
                         .with_message_channels(
                             state_arc.message_bus().sender_to_server().clone(),
                             state_arc.message_bus().sender().clone(),

@@ -3,15 +3,15 @@
 //! Only provides read-only access to archived orders in SQLite.
 //! All order mutations are handled through OrderManager event sourcing.
 
+use crate::core::ServerState;
+use crate::db::repository::order;
+use crate::utils::AppResult;
+use crate::utils::time;
 use axum::{
     Json,
     extract::{Path, Query, State},
 };
 use serde::{Deserialize, Serialize};
-use crate::core::ServerState;
-use crate::db::repository::order;
-use crate::utils::AppResult;
-use crate::utils::time;
 
 // =========================================================================
 // Order Detail (Archived)
@@ -150,58 +150,75 @@ pub async fn get_by_id(
         loss_reason: detail.loss_reason,
         loss_amount: detail.loss_amount,
         void_note: detail.void_note,
-        items: detail.items.into_iter().map(|i| OrderItemDetail {
-            id: i.id,
-            instance_id: i.instance_id,
-            name: i.name,
-            spec_name: i.spec_name,
-            category_name: i.category_name,
-            price: i.price,
-            quantity: i.quantity,
-            unpaid_quantity: i.unpaid_quantity,
-            unit_price: i.unit_price,
-            line_total: i.line_total,
-            discount_amount: i.discount_amount,
-            surcharge_amount: i.surcharge_amount,
-            rule_discount_amount: i.rule_discount_amount,
-            rule_surcharge_amount: i.rule_surcharge_amount,
-            applied_rules: i.applied_rules.and_then(|s| serde_json::from_str(&s).ok()),
-            note: i.note,
-            is_comped: i.is_comped,
-            tax: i.tax,
-            tax_rate: i.tax_rate,
-            selected_options: i.selected_options.into_iter().map(|o| OrderItemOptionDetail {
-                attribute_name: o.attribute_name,
-                option_name: o.option_name,
-                price_modifier: o.price_modifier,
-                quantity: o.quantity,
-            }).collect(),
-        }).collect(),
-        payments: detail.payments.into_iter().map(|p| {
-            let split_items: Vec<SplitItemDetail> = p.split_items
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default();
-            OrderPaymentDetail {
-                payment_id: p.payment_id,
-                method: p.method,
-                amount: p.amount,
-                timestamp: p.timestamp,
-                cancelled: p.cancelled,
-                cancel_reason: p.cancel_reason,
-                tendered: p.tendered,
-                change_amount: p.change_amount,
-                split_type: p.split_type,
-                split_items,
-                aa_shares: p.aa_shares,
-                aa_total_shares: p.aa_total_shares,
-            }
-        }).collect(),
-        timeline: detail.timeline.into_iter().map(|e| OrderEventDetail {
-            event_id: e.event_id,
-            event_type: e.event_type,
-            timestamp: e.timestamp,
-            payload: e.payload.and_then(|s| serde_json::from_str(&s).ok()),
-        }).collect(),
+        items: detail
+            .items
+            .into_iter()
+            .map(|i| OrderItemDetail {
+                id: i.id,
+                instance_id: i.instance_id,
+                name: i.name,
+                spec_name: i.spec_name,
+                category_name: i.category_name,
+                price: i.price,
+                quantity: i.quantity,
+                unpaid_quantity: i.unpaid_quantity,
+                unit_price: i.unit_price,
+                line_total: i.line_total,
+                discount_amount: i.discount_amount,
+                surcharge_amount: i.surcharge_amount,
+                rule_discount_amount: i.rule_discount_amount,
+                rule_surcharge_amount: i.rule_surcharge_amount,
+                applied_rules: i.applied_rules.and_then(|s| serde_json::from_str(&s).ok()),
+                note: i.note,
+                is_comped: i.is_comped,
+                tax: i.tax,
+                tax_rate: i.tax_rate,
+                selected_options: i
+                    .selected_options
+                    .into_iter()
+                    .map(|o| OrderItemOptionDetail {
+                        attribute_name: o.attribute_name,
+                        option_name: o.option_name,
+                        price_modifier: o.price_modifier,
+                        quantity: o.quantity,
+                    })
+                    .collect(),
+            })
+            .collect(),
+        payments: detail
+            .payments
+            .into_iter()
+            .map(|p| {
+                let split_items: Vec<SplitItemDetail> = p
+                    .split_items
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default();
+                OrderPaymentDetail {
+                    payment_id: p.payment_id,
+                    method: p.method,
+                    amount: p.amount,
+                    timestamp: p.timestamp,
+                    cancelled: p.cancelled,
+                    cancel_reason: p.cancel_reason,
+                    tendered: p.tendered,
+                    change_amount: p.change_amount,
+                    split_type: p.split_type,
+                    split_items,
+                    aa_shares: p.aa_shares,
+                    aa_total_shares: p.aa_total_shares,
+                }
+            })
+            .collect(),
+        timeline: detail
+            .timeline
+            .into_iter()
+            .map(|e| OrderEventDetail {
+                event_id: e.event_id,
+                event_type: e.event_type,
+                timestamp: e.timestamp,
+                payload: e.payload.and_then(|s| serde_json::from_str(&s).ok()),
+            })
+            .collect(),
     };
 
     Ok(Json(response))
@@ -260,13 +277,17 @@ pub async fn fetch_order_list(
     // Resolve start/end millis: prefer direct millis, fallback to date string
     let tz = state.config.timezone;
     let start_millis = params.start_time.unwrap_or_else(|| {
-        params.start_date.as_deref()
+        params
+            .start_date
+            .as_deref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .map(|d| time::day_start_millis(d, tz))
             .unwrap_or(0)
     });
     let end_millis = params.end_time.unwrap_or_else(|| {
-        params.end_date.as_deref()
+        params
+            .end_date
+            .as_deref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .map(|d| time::day_end_millis(d, tz))
             .unwrap_or(0)
@@ -301,7 +322,8 @@ pub async fn fetch_order_list(
     } else {
         let total: i64 = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
-            start_millis, end_millis,
+            start_millis,
+            end_millis,
         )
         .fetch_one(&state.pool)
         .await

@@ -3,7 +3,7 @@
 //! Applies the ItemModified event to update items in the snapshot.
 //! Handles both full modifications and split scenarios.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{
     CartItemSnapshot, EventPayload, ItemChanges, ItemModificationResult, OrderEvent, OrderSnapshot,
@@ -35,7 +35,7 @@ impl EventApplier for ItemModifiedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals using precise decimal arithmetic
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -94,7 +94,11 @@ fn apply_item_modified(
                     new_item.original_price = price;
                 }
                 if let Some(discount) = changes.manual_discount_percent {
-                    new_item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
+                    new_item.manual_discount_percent = if discount.abs() < 0.01 {
+                        None
+                    } else {
+                        Some(discount)
+                    };
                 }
                 if let Some(ref note) = changes.note {
                     new_item.note = Some(note.clone());
@@ -118,9 +122,7 @@ fn apply_item_modified(
                 // Migrate paid_item_quantities key to new instance_id
                 if let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
                     snapshot.items[idx].instance_id = result.instance_id.clone();
-                    snapshot
-                        .paid_item_quantities
-                        .remove(&source.instance_id);
+                    snapshot.paid_item_quantities.remove(&source.instance_id);
                     snapshot
                         .paid_item_quantities
                         .insert(result.instance_id.clone(), paid_qty);
@@ -222,7 +224,11 @@ fn apply_changes_to_item_skip_quantity(item: &mut CartItemSnapshot, changes: &It
     // Skip quantity — already set correctly by the caller
     if let Some(discount) = changes.manual_discount_percent {
         // 0% discount ≡ no discount — normalize to None so instance_id stays consistent
-        item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
+        item.manual_discount_percent = if discount.abs() < 0.01 {
+            None
+        } else {
+            Some(discount)
+        };
     }
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());
@@ -246,7 +252,11 @@ fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
         item.unpaid_quantity = quantity; // Reset unpaid quantity
     }
     if let Some(discount) = changes.manual_discount_percent {
-        item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
+        item.manual_discount_percent = if discount.abs() < 0.01 {
+            None
+        } else {
+            Some(discount)
+        };
     }
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());
@@ -296,7 +306,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -941,7 +951,8 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let modify_event = create_item_modified_event("order-1", 2, initial_item, 1, changes, results);
+        let modify_event =
+            create_item_modified_event("order-1", 2, initial_item, 1, changes, results);
 
         let modify_applier = ItemModifiedApplier;
         modify_applier.apply(&mut snapshot, &modify_event);
@@ -993,7 +1004,9 @@ mod tests {
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 6));
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 1);
 
         let source = create_test_item("item-1", 1, "Product A", 10.0, 6);
         let changes = ItemChanges {
@@ -1016,12 +1029,15 @@ mod tests {
         // Single item, no splitting
         assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].instance_id, "item-1-updated");
-        assert_eq!(snapshot.items[0].quantity, 8);  // paid(1) + unpaid(7)
+        assert_eq!(snapshot.items[0].quantity, 8); // paid(1) + unpaid(7)
         assert_eq!(snapshot.items[0].unpaid_quantity, 7);
 
         // paid_item_quantities key migrated to new instance_id
         assert_eq!(snapshot.paid_item_quantities.get("item-1"), None);
-        assert_eq!(snapshot.paid_item_quantities.get("item-1-updated"), Some(&1));
+        assert_eq!(
+            snapshot.paid_item_quantities.get("item-1-updated"),
+            Some(&1)
+        );
     }
 
     /// Test: after partial payment, modifying note without quantity stays in place.
@@ -1034,7 +1050,9 @@ mod tests {
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 6));
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 1);
 
         let source = create_test_item("item-1", 1, "Product A", 10.0, 6);
         let changes = ItemChanges {
@@ -1057,8 +1075,8 @@ mod tests {
         // Single item, no splitting
         assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].instance_id, "item-1-updated");
-        assert_eq!(snapshot.items[0].quantity, 6);  // unchanged
-        assert_eq!(snapshot.items[0].unpaid_quantity, 5);  // 6 - paid(1) = 5
+        assert_eq!(snapshot.items[0].quantity, 6); // unchanged
+        assert_eq!(snapshot.items[0].unpaid_quantity, 5); // 6 - paid(1) = 5
         assert_eq!(snapshot.items[0].note, Some("Extra spicy".to_string()));
     }
 
@@ -1072,7 +1090,9 @@ mod tests {
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 5.0, 10));
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 9);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 9);
         snapshot.paid_amount = 45.0;
 
         let source = create_test_item("item-1", 1, "Product A", 5.0, 10);
@@ -1133,7 +1153,9 @@ mod tests {
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 5.0, 10));
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 9);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 9);
         snapshot.paid_amount = 45.0;
 
         let source = create_test_item("item-1", 1, "Product A", 5.0, 10);
@@ -1180,7 +1202,9 @@ mod tests {
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 3);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 3);
         snapshot.paid_amount = 30.0;
 
         let source = create_test_item("item-1", 1, "Product A", 10.0, 5);

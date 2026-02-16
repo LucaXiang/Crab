@@ -7,16 +7,16 @@
 //! - PrintConfigCache (product/category parts)
 //! - PriceRuleEngine DB queries
 
-use crate::db::repository::{attribute, image_ref, RepoError, RepoResult};
 use super::ImageCleanupService;
+use crate::db::repository::{RepoError, RepoResult, attribute, image_ref};
+use parking_lot::RwLock;
 use shared::models::{
-    AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
-    ImageRefEntityType, Product, ProductCreate, ProductFull, ProductSpec, ProductUpdate, Tag,
+    AttributeBindingFull, Category, CategoryCreate, CategoryUpdate, ImageRefEntityType, Product,
+    ProductCreate, ProductFull, ProductSpec, ProductUpdate, Tag,
 };
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 // =============================================================================
 // Types
@@ -193,9 +193,15 @@ impl CatalogService {
                     is_inherited: false,
                 };
                 if binding.owner_type == "product" {
-                    product_bindings.entry(binding.owner_id).or_default().push(full);
+                    product_bindings
+                        .entry(binding.owner_id)
+                        .or_default()
+                        .push(full);
                 } else if binding.owner_type == "category" {
-                    category_bindings.entry(binding.owner_id).or_default().push(full);
+                    category_bindings
+                        .entry(binding.owner_id)
+                        .or_default()
+                        .push(full);
                 }
             }
         }
@@ -231,15 +237,11 @@ impl CatalogService {
             .unwrap_or_default();
 
             // Merge: category inherited attributes + product direct attributes
-            let mut attributes = product_bindings
-                .remove(&product_id)
-                .unwrap_or_default();
+            let mut attributes = product_bindings.remove(&product_id).unwrap_or_default();
 
             // Collect product's own attribute IDs for dedup
-            let product_attr_ids: std::collections::HashSet<i64> = attributes
-                .iter()
-                .map(|b| b.attribute.id)
-                .collect();
+            let product_attr_ids: std::collections::HashSet<i64> =
+                attributes.iter().map(|b| b.attribute.id).collect();
 
             // Add inherited category attributes (skip if product already has direct binding)
             if let Some(cat_bindings) = category_bindings.get(&product.category_id) {
@@ -361,9 +363,7 @@ impl CatalogService {
             let cache = self.products.read();
             cache
                 .iter()
-                .filter(|(_, p)| {
-                    p.attributes.iter().any(|b| b.attribute.id == attribute_id)
-                })
+                .filter(|(_, p)| p.attributes.iter().any(|b| b.attribute.id == attribute_id))
                 .map(|(&id, _)| id)
                 .collect()
         };
@@ -389,7 +389,9 @@ impl CatalogService {
         }
         let default_count = data.specs.iter().filter(|s| s.is_default).count();
         if default_count > 1 {
-            return Err(RepoError::Validation("only one default spec allowed".into()));
+            return Err(RepoError::Validation(
+                "only one default spec allowed".into(),
+            ));
         }
 
         // Validate category is not virtual
@@ -445,7 +447,8 @@ impl CatalogService {
         // Insert tags (junction table)
         if let Some(ref tag_ids) = data.tags {
             for tag_id in tag_ids {
-                sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
+                sqlx::query!(
+                    "INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
                     product_id,
                     tag_id,
                 )
@@ -492,7 +495,8 @@ impl CatalogService {
             || data.external_id.is_some();
 
         if !has_scalar_updates && data.tags.is_none() && data.specs.is_none() {
-            return self.get_product(id)
+            return self
+                .get_product(id)
                 .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", id)));
         }
 
@@ -535,7 +539,8 @@ impl CatalogService {
                 .execute(&self.pool)
                 .await?;
             for tag_id in tag_ids {
-                sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
+                sqlx::query!(
+                    "INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
                     id,
                     tag_id,
                 )
@@ -571,14 +576,10 @@ impl CatalogService {
 
         // Sync image references and cleanup orphans
         let image_hashes = Self::extract_product_image_hashes(&full);
-        let removed_hashes = image_ref::sync_refs(
-            &self.pool,
-            ImageRefEntityType::Product,
-            id,
-            image_hashes,
-        )
-        .await
-        .unwrap_or_default();
+        let removed_hashes =
+            image_ref::sync_refs(&self.pool, ImageRefEntityType::Product, id, image_hashes)
+                .await
+                .unwrap_or_default();
 
         // Cleanup orphan images (do this after transaction committed)
         if !removed_hashes.is_empty() {
@@ -604,18 +605,18 @@ impl CatalogService {
     /// Delete a product
     pub async fn delete_product(&self, id: i64) -> RepoResult<()> {
         // Get image references before deleting
-        let image_hashes = image_ref::delete_entity_refs(
-            &self.pool,
-            ImageRefEntityType::Product,
-            id,
-        )
-        .await
-        .unwrap_or_default();
+        let image_hashes =
+            image_ref::delete_entity_refs(&self.pool, ImageRefEntityType::Product, id)
+                .await
+                .unwrap_or_default();
 
         // Clean up attribute bindings
-        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?", id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?",
+            id
+        )
+        .execute(&self.pool)
+        .await?;
 
         // Clean up tag bindings
         sqlx::query!("DELETE FROM product_tag WHERE product_id = ?", id)
@@ -656,9 +657,13 @@ impl CatalogService {
     /// Add tag to product
     pub async fn add_product_tag(&self, product_id: i64, tag_id: i64) -> RepoResult<ProductFull> {
         // Insert into junction table (ignore if already exists)
-        sqlx::query!("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)", product_id, tag_id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)",
+            product_id,
+            tag_id
+        )
+        .execute(&self.pool)
+        .await?;
 
         // Refresh full product and update cache
         let full = self.fetch_product_full(product_id).await?;
@@ -677,9 +682,13 @@ impl CatalogService {
         tag_id: i64,
     ) -> RepoResult<ProductFull> {
         // Delete from junction table
-        sqlx::query!("DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?", product_id, tag_id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?",
+            product_id,
+            tag_id
+        )
+        .execute(&self.pool)
+        .await?;
 
         // Refresh full product and update cache
         let full = self.fetch_product_full(product_id).await?;
@@ -721,7 +730,8 @@ impl CatalogService {
         .unwrap_or_default();
 
         // Fetch product's direct attribute bindings
-        let product_binding_pairs = attribute::find_bindings_for_owner(&self.pool, "product", product_id).await?;
+        let product_binding_pairs =
+            attribute::find_bindings_for_owner(&self.pool, "product", product_id).await?;
         let mut attributes: Vec<AttributeBindingFull> = product_binding_pairs
             .into_iter()
             .map(|(binding, attr)| AttributeBindingFull {
@@ -735,11 +745,10 @@ impl CatalogService {
             .collect();
 
         // Merge inherited category attributes
-        let cat_binding_pairs = attribute::find_bindings_for_owner(&self.pool, "category", product.category_id).await?;
-        let product_attr_ids: std::collections::HashSet<i64> = attributes
-            .iter()
-            .map(|b| b.attribute.id)
-            .collect();
+        let cat_binding_pairs =
+            attribute::find_bindings_for_owner(&self.pool, "category", product.category_id).await?;
+        let product_attr_ids: std::collections::HashSet<i64> =
+            attributes.iter().map(|b| b.attribute.id).collect();
 
         for (binding, attr) in cat_binding_pairs {
             if !product_attr_ids.contains(&attr.id) {
@@ -839,7 +848,11 @@ impl CatalogService {
         .await?;
 
         // Insert print destinations (unified junction table)
-        for dest_id in data.kitchen_print_destinations.iter().chain(data.label_print_destinations.iter()) {
+        for dest_id in data
+            .kitchen_print_destinations
+            .iter()
+            .chain(data.label_print_destinations.iter())
+        {
             sqlx::query!("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)",
                 category_id, dest_id,
             )
@@ -849,8 +862,10 @@ impl CatalogService {
 
         // Insert tag IDs
         for tag_id in &data.tag_ids {
-            sqlx::query!("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
-                category_id, tag_id,
+            sqlx::query!(
+                "INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
+                category_id,
+                tag_id,
             )
             .execute(&self.pool)
             .await?;
@@ -912,8 +927,12 @@ impl CatalogService {
                 .await?;
 
             // Get current values for unchanged side
-            let kitchen_dests = data.kitchen_print_destinations.unwrap_or_else(|| existing.kitchen_print_destinations.clone());
-            let label_dests = data.label_print_destinations.unwrap_or_else(|| existing.label_print_destinations.clone());
+            let kitchen_dests = data
+                .kitchen_print_destinations
+                .unwrap_or_else(|| existing.kitchen_print_destinations.clone());
+            let label_dests = data
+                .label_print_destinations
+                .unwrap_or_else(|| existing.label_print_destinations.clone());
 
             for dest_id in kitchen_dests.iter().chain(label_dests.iter()) {
                 sqlx::query!("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)",
@@ -930,8 +949,10 @@ impl CatalogService {
                 .execute(&self.pool)
                 .await?;
             for tag_id in tag_ids {
-                sqlx::query!("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
-                    id, tag_id,
+                sqlx::query!(
+                    "INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
+                    id,
+                    tag_id,
                 )
                 .execute(&self.pool)
                 .await?;
@@ -967,9 +988,12 @@ impl CatalogService {
         }
 
         // Clean up attribute bindings
-        sqlx::query!("DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?", id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?",
+            id
+        )
+        .execute(&self.pool)
+        .await?;
 
         // Clean up junction table
         sqlx::query!("DELETE FROM category_print_dest WHERE category_id = ?", id)
@@ -1040,7 +1064,10 @@ impl CatalogService {
         cache.get(&product_id).map(|p| {
             let category_name = {
                 let cat_cache = self.categories.read();
-                cat_cache.get(&p.category_id).map(|c| c.name.clone()).unwrap_or_default()
+                cat_cache
+                    .get(&p.category_id)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default()
             };
             ProductMeta {
                 category_id: p.category_id,
@@ -1060,7 +1087,10 @@ impl CatalogService {
             .iter()
             .filter_map(|&id| {
                 cache.get(&id).map(|p| {
-                    let category_name = cat_cache.get(&p.category_id).map(|c| c.name.clone()).unwrap_or_default();
+                    let category_name = cat_cache
+                        .get(&p.category_id)
+                        .map(|c| c.name.clone())
+                        .unwrap_or_default();
                     (
                         id,
                         ProductMeta {
@@ -1155,7 +1185,10 @@ impl CatalogService {
             dests.iter().map(|id| id.to_string()).collect()
         } else {
             let defaults = self.print_defaults.read();
-            get_default(&defaults).into_iter().map(String::from).collect()
+            get_default(&defaults)
+                .into_iter()
+                .map(String::from)
+                .collect()
         }
     }
 

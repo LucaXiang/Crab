@@ -2,11 +2,7 @@
 
 mod handler;
 
-use axum::{
-    Router,
-    middleware,
-    routing::get,
-};
+use axum::{Router, middleware, routing::get};
 
 use crate::auth::require_permission;
 use crate::core::ServerState;
@@ -27,7 +23,10 @@ fn routes() -> Router<ServerState> {
     // 写入路由：需要 settings:manage 权限
     let write_routes = Router::new()
         .route("/", axum::routing::post(handler::create))
-        .route("/{id}", axum::routing::put(handler::update).delete(handler::delete))
+        .route(
+            "/{id}",
+            axum::routing::put(handler::update).delete(handler::delete),
+        )
         .layer(middleware::from_fn(require_permission("settings:manage")));
 
     read_routes.merge(write_routes)

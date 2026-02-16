@@ -301,8 +301,10 @@ impl<'a> ReceiptRenderer<'a> {
         let mut total_tax = 0.0;
 
         for (i, rate_key) in sorted_rates.iter().enumerate() {
-            // SAFETY: rate_key comes from tax_groups.keys() — lookup always succeeds
-            let (base_amount, tax_amount) = tax_groups.get(rate_key).expect("rate_key from keys()");
+            // SAFETY: rate_key comes from tax_groups.keys() — HashMap::get with own key always succeeds
+            let (base_amount, tax_amount) = tax_groups
+                .get(rate_key)
+                .expect("HashMap::get with key from own keys() is infallible");
             total_base += base_amount;
             total_tax += tax_amount;
 

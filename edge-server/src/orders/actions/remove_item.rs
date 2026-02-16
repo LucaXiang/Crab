@@ -9,7 +9,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_optional_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -186,7 +186,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -548,7 +548,10 @@ mod tests {
         let result = action.execute(&mut ctx, &metadata).await;
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
-            assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
+            assert!(
+                msg.contains("comped"),
+                "Error message should mention comped: {msg}"
+            );
         }
     }
 
@@ -562,7 +565,9 @@ mod tests {
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 6);
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 2); // 2 paid, 4 unpaid
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 2); // 2 paid, 4 unpaid
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -596,7 +601,9 @@ mod tests {
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 3); // fully paid
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 3); // fully paid
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -624,7 +631,9 @@ mod tests {
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 6);
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -652,7 +661,9 @@ mod tests {
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 6);
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

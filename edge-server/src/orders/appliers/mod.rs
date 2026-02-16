@@ -8,8 +8,8 @@ use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
 mod item_comped;
 mod item_modified;
-mod item_uncomped;
 mod item_removed;
+mod item_uncomped;
 mod items_added;
 mod member_linked;
 mod member_unlinked;
@@ -30,8 +30,8 @@ mod table_opened;
 
 pub use item_comped::ItemCompedApplier;
 pub use item_modified::ItemModifiedApplier;
-pub use item_uncomped::ItemUncompedApplier;
 pub use item_removed::ItemRemovedApplier;
+pub use item_uncomped::ItemUncompedApplier;
 pub use items_added::ItemsAddedApplier;
 pub use member_linked::MemberLinkedApplier;
 pub use member_unlinked::MemberUnlinkedApplier;
@@ -180,9 +180,7 @@ impl From<&OrderEvent> for EventAction {
             EventPayload::MemberUnlinked { .. } => {
                 EventAction::MemberUnlinked(MemberUnlinkedApplier)
             }
-            EventPayload::StampRedeemed { .. } => {
-                EventAction::StampRedeemed(StampRedeemedApplier)
-            }
+            EventPayload::StampRedeemed { .. } => EventAction::StampRedeemed(StampRedeemedApplier),
             EventPayload::StampRedemptionCancelled { .. } => {
                 EventAction::StampRedemptionCancelled(StampRedemptionCancelledApplier)
             }

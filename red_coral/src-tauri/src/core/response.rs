@@ -105,8 +105,10 @@ fn client_error_to_code(err: &crab_client::ClientError) -> ErrorCode {
         // API error (handled separately before this function is called)
         ClientError::Api { .. } => ErrorCode::InternalError,
         // Protocol / serialization
-        ClientError::Serialization(_) | ClientError::InvalidMessage(_)
-        | ClientError::InvalidResponse(_) | ClientError::Protocol(_) => ErrorCode::InternalError,
+        ClientError::Serialization(_)
+        | ClientError::InvalidMessage(_)
+        | ClientError::InvalidResponse(_)
+        | ClientError::Protocol(_) => ErrorCode::InternalError,
         ClientError::Io(_) | ClientError::Internal(_) => ErrorCode::InternalError,
     }
 }
@@ -137,7 +139,12 @@ impl<T: Serialize> ApiResponse<T> {
         match &err {
             BridgeError::Client(client_err) => {
                 // API 错误：直接保留服务端的 error code + details
-                if let crab_client::ClientError::Api { code, message, details } = client_err {
+                if let crab_client::ClientError::Api {
+                    code,
+                    message,
+                    details,
+                } = client_err
+                {
                     return Self {
                         code: Some(*code as u16),
                         message: message.clone(),

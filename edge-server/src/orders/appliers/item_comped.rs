@@ -4,7 +4,7 @@
 //! Handles both full comp and partial comp (split + mark).
 //! Uses source_instance_id for deterministic replay.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{CompRecord, EventPayload, OrderEvent, OrderSnapshot};
 
@@ -28,7 +28,11 @@ impl EventApplier for ItemCompedApplier {
 
             if is_full_comp {
                 // Full comp: find item by instance_id and mark as comped
-                if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == *instance_id) {
+                if let Some(item) = snapshot
+                    .items
+                    .iter_mut()
+                    .find(|i| i.instance_id == *instance_id)
+                {
                     // Save original_price if not already set
                     if item.original_price == 0.0 {
                         item.original_price = item.price;
@@ -88,7 +92,7 @@ impl EventApplier for ItemCompedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals using precise decimal arithmetic
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -176,7 +180,8 @@ mod tests {
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
-        let event = create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 2, 10.0);
+        let event =
+            create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 2, 10.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -206,7 +211,8 @@ mod tests {
         item.original_price = 12.0; // Already has original_price
         snapshot.items.push(item);
 
-        let event = create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 1, 12.0);
+        let event =
+            create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 1, 12.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -228,7 +234,13 @@ mod tests {
 
         // Partial comp: 2 of 5 items (derived instance_id, source is "item-1")
         let event = create_item_comped_event(
-            "order-1", 2, "item-1::comp::uuid-1", "item-1", "Product A", 2, 10.0,
+            "order-1",
+            2,
+            "item-1::comp::uuid-1",
+            "item-1",
+            "Product A",
+            2,
+            10.0,
         );
 
         let applier = ItemCompedApplier;
@@ -270,7 +282,8 @@ mod tests {
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 10.0);
+        let event =
+            create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 10.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -287,7 +300,8 @@ mod tests {
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
-        let event = create_item_comped_event("order-1", 6, "item-1", "item-1", "Product A", 1, 10.0);
+        let event =
+            create_item_comped_event("order-1", 6, "item-1", "item-1", "Product A", 1, 10.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -304,7 +318,8 @@ mod tests {
         item.rule_surcharge_amount = 2.0;
         snapshot.items.push(item);
 
-        let event = create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 100.0);
+        let event =
+            create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 100.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -325,7 +340,8 @@ mod tests {
             .items
             .push(create_test_item("item-1", 1, "Product A", 15.50, 1));
 
-        let event = create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 15.50);
+        let event =
+            create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 15.50);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);

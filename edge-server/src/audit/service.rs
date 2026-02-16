@@ -7,11 +7,11 @@
 //! - 系统生命周期管理（LOCK 文件 + 24h 间隔检测）
 //! - 启动异常检测 → 写入 system_issue 表（前端通过 system-issues API 渲染对话框）
 
+use chrono_tz::Tz;
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use chrono_tz::Tz;
 use std::sync::Arc;
-use sqlx::SqlitePool;
 use tokio::sync::mpsc;
 
 use super::storage::{AuditStorage, AuditStorageError};
@@ -154,7 +154,11 @@ impl AuditService {
                 Ok(existing) if existing.is_empty() => {
                     let mut params = HashMap::new();
                     let formatted_ts = chrono::DateTime::from_timestamp_millis(last_start_ts)
-                        .map(|dt| dt.with_timezone(&self.tz).format("%Y-%m-%d %H:%M").to_string())
+                        .map(|dt| {
+                            dt.with_timezone(&self.tz)
+                                .format("%Y-%m-%d %H:%M")
+                                .to_string()
+                        })
                         .unwrap_or_else(|| last_start_ts.to_string());
                     params.insert("last_start_timestamp".to_string(), formatted_ts);
                     if let Err(e) = system_issue::create(
@@ -178,7 +182,10 @@ impl AuditService {
                     )
                     .await
                     {
-                        tracing::error!("Failed to create system_issue for abnormal shutdown: {:?}", e);
+                        tracing::error!(
+                            "Failed to create system_issue for abnormal shutdown: {:?}",
+                            e
+                        );
                     }
                 }
                 Ok(_) => {
@@ -248,7 +255,10 @@ impl AuditService {
                         )
                         .await
                         {
-                            tracing::error!("Failed to create system_issue for long downtime: {:?}", e);
+                            tracing::error!(
+                                "Failed to create system_issue for long downtime: {:?}",
+                                e
+                            );
                         }
                     }
                     Ok(_) => {
@@ -284,9 +294,7 @@ impl AuditService {
                         params,
                         title: None,
                         description: None,
-                        options: vec![
-                            "acknowledged".to_string(),
-                        ],
+                        options: vec!["acknowledged".to_string()],
                     },
                 )
                 .await
@@ -333,7 +341,16 @@ impl AuditService {
         operator_name: Option<String>,
         details: serde_json::Value,
     ) {
-        self.log_with_target(action, resource_type, resource_id, operator_id, operator_name, details, None).await;
+        self.log_with_target(
+            action,
+            resource_type,
+            resource_id,
+            operator_id,
+            operator_name,
+            details,
+            None,
+        )
+        .await;
     }
 
     /// 写入审计日志（带关联目标）
@@ -400,10 +417,7 @@ impl AuditService {
     }
 
     /// 查询审计日志
-    pub async fn query(
-        &self,
-        q: &AuditQuery,
-    ) -> Result<(Vec<AuditEntry>, u64), AuditStorageError> {
+    pub async fn query(&self, q: &AuditQuery) -> Result<(Vec<AuditEntry>, u64), AuditStorageError> {
         self.storage.query(q).await
     }
 

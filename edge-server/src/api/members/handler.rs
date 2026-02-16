@@ -5,13 +5,16 @@ use axum::{
     extract::{Extension, Path, Query, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{member, stamp};
 use crate::utils::AppResult;
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_NOTE_LEN};
+use crate::utils::validation::{
+    MAX_EMAIL_LEN, MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text,
+    validate_required_text,
+};
 use shared::models::MemberWithGroup;
 
 const RESOURCE: &str = "member";
@@ -161,7 +164,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::MemberCreated,
-        "member", &id,
+        "member",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&member, "member")
@@ -194,7 +198,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::MemberUpdated,
-        "member", &id_str,
+        "member",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_member, &member, "member")
@@ -228,7 +233,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::MemberDeleted,
-            "member", &id_str,
+            "member",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

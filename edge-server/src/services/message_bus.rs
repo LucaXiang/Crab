@@ -41,10 +41,14 @@ impl MessageBusService {
     pub async fn start_tcp_server(
         &self,
         tls_config: Arc<rustls::ServerConfig>,
-        credential_cache: std::sync::Arc<tokio::sync::RwLock<Option<crate::services::tenant_binding::TenantBinding>>>,
+        credential_cache: std::sync::Arc<
+            tokio::sync::RwLock<Option<crate::services::tenant_binding::TenantBinding>>,
+        >,
     ) -> Result<(), crate::utils::AppError> {
         tracing::debug!(port = self.tcp_port, "Starting Message Bus TCP server");
-        self.bus.start_tcp_server(Some(tls_config), credential_cache).await
+        self.bus
+            .start_tcp_server(Some(tls_config), credential_cache)
+            .await
     }
 
     /// 启动后台消息处理器

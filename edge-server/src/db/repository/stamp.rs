@@ -204,10 +204,16 @@ mod tests {
         .unwrap();
 
         // Seed: marketing_group + member + stamp_activity
-        sqlx::query("INSERT INTO marketing_group (id, name, display_name) VALUES (1, 'VIP', 'VIP')")
-            .execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO marketing_group (id, name, display_name) VALUES (1, 'VIP', 'VIP')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         sqlx::query("INSERT INTO member (id, name, marketing_group_id) VALUES (1, 'Alice', 1)")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO stamp_activity (id, marketing_group_id, name, display_name, stamps_required, is_cyclic) VALUES (1, 1, 'coffee', 'Coffee Card', 10, 1)")
             .execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO stamp_activity (id, marketing_group_id, name, display_name, stamps_required, is_cyclic) VALUES (2, 1, 'tea', 'Tea Card', 5, 0)")

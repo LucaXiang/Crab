@@ -2,8 +2,8 @@ use crate::core::ServerState;
 use crate::db::repository::{employee, role, system_issue};
 use crate::message::{BusMessage, EventType};
 use crate::orders::actions::open_table::load_matching_rules;
-use shared::error::AppError;
 use async_trait::async_trait;
+use shared::error::AppError;
 use shared::order::{OrderCommand, OrderCommandPayload};
 use std::sync::Arc;
 
@@ -73,7 +73,6 @@ impl MessageProcessor for NotificationProcessor {
             .parse_payload()
             .map_err(|e| AppError::invalid(format!("Invalid notification payload: {}", e)))?;
 
-
         Ok(ProcessResult::Success {
             message: format!("Notification '{}' logged", payload.title),
             payload: None,
@@ -111,7 +110,11 @@ impl MessageProcessor for ServerCommandProcessor {
                 delay_seconds,
                 reason,
             } => {
-                tracing::warn!("Server restart requested in {}s. Reason: {:?}", delay_seconds, reason);
+                tracing::warn!(
+                    "Server restart requested in {}s. Reason: {:?}",
+                    delay_seconds,
+                    reason
+                );
             }
             shared::message::ServerCommand::SystemIssue {
                 kind,
@@ -240,9 +243,9 @@ impl RequestCommandProcessor {
 
         // 权限检查：敏感命令需要验证操作者权限
         if let Some(required_permission) = get_required_permission(&command.payload) {
-            let has_permission =
-                self.check_operator_permission(command.operator_id, required_permission)
-                    .await;
+            let has_permission = self
+                .check_operator_permission(command.operator_id, required_permission)
+                .await;
             if !has_permission {
                 tracing::warn!(
                     operator_id = %command.operator_id,
@@ -252,7 +255,10 @@ impl RequestCommandProcessor {
                     "Permission denied: operator lacks required permission"
                 );
                 return Ok(ProcessResult::Failed {
-                    reason: format!("Permission denied: requires {} permission", required_permission),
+                    reason: format!(
+                        "Permission denied: requires {} permission",
+                        required_permission
+                    ),
                 });
             }
         }
@@ -284,8 +290,7 @@ impl RequestCommandProcessor {
             if let Some((zone_id, is_retail)) = rule_load_info
                 && let Some(ref order_id) = response.order_id
             {
-                let rules =
-                    load_matching_rules(&self.state.pool, zone_id, is_retail).await;
+                let rules = load_matching_rules(&self.state.pool, zone_id, is_retail).await;
                 if !rules.is_empty() {
                     tracing::debug!(
                         order_id = %order_id,
@@ -300,12 +305,9 @@ impl RequestCommandProcessor {
             if let Some((ref order_id, ref target_zone_id)) = move_order_info {
                 // 从 snapshot 获取 is_retail（移桌不改变 is_retail）
                 if let Ok(Some(snapshot)) = self.state.orders_manager().get_snapshot(order_id) {
-                    let rules = load_matching_rules(
-                        &self.state.pool,
-                        *target_zone_id,
-                        snapshot.is_retail,
-                    )
-                    .await;
+                    let rules =
+                        load_matching_rules(&self.state.pool, *target_zone_id, snapshot.is_retail)
+                            .await;
                     tracing::debug!(
                         order_id = %order_id,
                         target_zone_id = ?target_zone_id,
@@ -454,7 +456,6 @@ impl MessageProcessor for RequestCommandProcessor {
         let payload: shared::message::RequestCommandPayload = msg
             .parse_payload()
             .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
-
 
         // 处理具体的请求动作
         match payload.action.as_str() {

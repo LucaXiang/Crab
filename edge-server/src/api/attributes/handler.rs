@@ -5,13 +5,15 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN};
 use shared::models::{Attribute, AttributeCreate, AttributeOptionInput, AttributeUpdate};
 
 const RESOURCE: &str = "attribute";
@@ -19,7 +21,11 @@ const RESOURCE: &str = "attribute";
 fn validate_create(payload: &AttributeCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
     validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
-    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(
+        &payload.kitchen_print_name,
+        "kitchen_print_name",
+        MAX_RECEIPT_NAME_LEN,
+    )?;
     Ok(())
 }
 
@@ -28,17 +34,31 @@ fn validate_update(payload: &AttributeUpdate) -> AppResult<()> {
         validate_required_text(name, "name", MAX_NAME_LEN)?;
     }
     validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
-    validate_optional_text(&payload.kitchen_print_name, "kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(
+        &payload.kitchen_print_name,
+        "kitchen_print_name",
+        MAX_RECEIPT_NAME_LEN,
+    )?;
     Ok(())
 }
 
 /// Validate an option input before saving
 fn validate_option(opt: &AttributeOptionInput) -> AppResult<()> {
     validate_required_text(&opt.name, "option name", MAX_NAME_LEN)?;
-    validate_optional_text(&opt.receipt_name, "option receipt_name", MAX_RECEIPT_NAME_LEN)?;
-    validate_optional_text(&opt.kitchen_print_name, "option kitchen_print_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(
+        &opt.receipt_name,
+        "option receipt_name",
+        MAX_RECEIPT_NAME_LEN,
+    )?;
+    validate_optional_text(
+        &opt.kitchen_print_name,
+        "option kitchen_print_name",
+        MAX_RECEIPT_NAME_LEN,
+    )?;
     if !opt.price_modifier.is_finite() {
-        return Err(AppError::validation("price_modifier must be a finite number".to_string()));
+        return Err(AppError::validation(
+            "price_modifier must be a finite number".to_string(),
+        ));
     }
     if let Some(mq) = opt.max_quantity
         && mq < 1
@@ -83,7 +103,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::AttributeCreated,
-        "attribute", &id,
+        "attribute",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&attr, "attribute")
@@ -117,7 +138,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::AttributeUpdated,
-        "attribute", &id_str,
+        "attribute",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_attr, &attr, "attribute")
@@ -128,7 +150,11 @@ pub async fn update(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
+    if let Err(e) = state
+        .catalog_service
+        .refresh_products_with_attribute(id)
+        .await
+    {
         tracing::warn!("Failed to refresh product cache after attribute update: {e}");
     }
 
@@ -171,7 +197,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::AttributeDeleted,
-            "attribute", &id_str,
+            "attribute",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
@@ -182,7 +209,11 @@ pub async fn delete(
             .await;
 
         // 刷新引用此属性的产品缓存
-        if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
+        if let Err(e) = state
+            .catalog_service
+            .refresh_products_with_attribute(id)
+            .await
+        {
             tracing::warn!("Failed to refresh product cache after attribute delete: {e}");
         }
     }
@@ -232,7 +263,8 @@ pub async fn add_option(
     audit_log!(
         state.audit_service,
         AuditAction::AttributeUpdated,
-        "attribute", &id_str,
+        "attribute",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "add_option", "option_name": &option.name})
@@ -244,7 +276,11 @@ pub async fn add_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
+    if let Err(e) = state
+        .catalog_service
+        .refresh_products_with_attribute(id)
+        .await
+    {
         tracing::warn!("Failed to refresh product cache after option add: {e}");
     }
 
@@ -301,10 +337,12 @@ pub async fn update_option(
     audit_log!(
         state.audit_service,
         AuditAction::AttributeUpdated,
-        "attribute", &id_str,
+        "attribute",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"op": "update_option", "index": idx, "option_name": option_name})
+        details =
+            serde_json::json!({"op": "update_option", "index": idx, "option_name": option_name})
     );
 
     // 广播同步通知
@@ -313,7 +351,11 @@ pub async fn update_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
+    if let Err(e) = state
+        .catalog_service
+        .refresh_products_with_attribute(id)
+        .await
+    {
         tracing::warn!("Failed to refresh product cache after option update: {e}");
     }
 
@@ -366,7 +408,8 @@ pub async fn remove_option(
     audit_log!(
         state.audit_service,
         AuditAction::AttributeUpdated,
-        "attribute", &id_str,
+        "attribute",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "remove_option", "index": idx})
@@ -378,7 +421,11 @@ pub async fn remove_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state.catalog_service.refresh_products_with_attribute(id).await {
+    if let Err(e) = state
+        .catalog_service
+        .refresh_products_with_attribute(id)
+        .await
+    {
         tracing::warn!("Failed to refresh product cache after option remove: {e}");
     }
 

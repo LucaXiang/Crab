@@ -102,7 +102,10 @@ impl KitchenPrintWorker {
 
     /// 执行打印
     async fn execute_print(&self, kitchen_order_id: &str, executor: &PrintExecutor) {
-        let order = match self.kitchen_print_service.get_kitchen_order(kitchen_order_id) {
+        let order = match self
+            .kitchen_print_service
+            .get_kitchen_order(kitchen_order_id)
+        {
             Ok(Some(o)) => o,
             Ok(None) => return,
             Err(e) => {

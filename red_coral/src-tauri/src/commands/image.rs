@@ -342,7 +342,10 @@ async fn save_image_client(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_else(|e| format!("<failed to read body: {}>", e));
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|e| format!("<failed to read body: {}>", e));
         return Err(format!("Upload failed ({}): {}", status, text));
     }
 

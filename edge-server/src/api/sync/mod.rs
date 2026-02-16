@@ -12,6 +12,5 @@ pub fn router() -> Router<ServerState> {
 
 fn routes() -> Router<ServerState> {
     // 同步状态：无需权限检查（基础操作）
-    Router::new()
-        .route("/status", get(handler::get_sync_status))
+    Router::new().route("/status", get(handler::get_sync_status))
 }

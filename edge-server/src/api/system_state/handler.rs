@@ -56,8 +56,7 @@ pub async fn update_last_order(
     Json(payload): Json<UpdateLastOrderRequest>,
 ) -> AppResult<Json<SystemState>> {
     let system_state =
-        system_state::update_last_order(&state.pool, &payload.order_id, payload.order_hash)
-            .await?;
+        system_state::update_last_order(&state.pool, &payload.order_id, payload.order_hash).await?;
 
     state
         .broadcast_sync(RESOURCE, "last_order_updated", "main", Some(&system_state))

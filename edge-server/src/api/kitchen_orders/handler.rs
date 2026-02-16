@@ -7,8 +7,8 @@
 //! - Label record management
 
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
 };
 use serde::{Deserialize, Serialize};
 
@@ -54,14 +54,10 @@ pub async fn list(
 
     let items = if let Some(order_id) = query.order_id {
         // Get all kitchen orders for a specific order
-        service
-            .get_kitchen_orders_for_order(&order_id)
-            ?
+        service.get_kitchen_orders_for_order(&order_id)?
     } else {
         // Get paginated list
-        service
-            .get_all_kitchen_orders(query.offset, query.limit)
-            ?
+        service.get_all_kitchen_orders(query.offset, query.limit)?
     };
 
     Ok(Json(KitchenOrderListResponse { items, total: None }))
@@ -75,8 +71,7 @@ pub async fn get_by_id(
     let service = state.kitchen_print_service();
 
     let order = service
-        .get_kitchen_order(&id)
-        ?
+        .get_kitchen_order(&id)?
         .ok_or_else(|| AppError::not_found(format!("Kitchen order {} not found", id)))?;
 
     Ok(Json(order))
@@ -89,9 +84,7 @@ pub async fn reprint(
 ) -> AppResult<Json<bool>> {
     let service = state.kitchen_print_service();
 
-    service
-        .reprint_kitchen_order(&id)
-        ?;
+    service.reprint_kitchen_order(&id)?;
 
     tracing::info!(kitchen_order_id = %id, "Kitchen order reprinted via API");
 
@@ -112,9 +105,7 @@ pub async fn list_labels(
 ) -> AppResult<Json<Vec<LabelPrintRecord>>> {
     let service = state.kitchen_print_service();
 
-    let records = service
-        .get_label_records_for_order(&query.order_id)
-        ?;
+    let records = service.get_label_records_for_order(&query.order_id)?;
 
     Ok(Json(records))
 }
@@ -127,8 +118,7 @@ pub async fn get_label_by_id(
     let service = state.kitchen_print_service();
 
     let record = service
-        .get_label_record(&id)
-        ?
+        .get_label_record(&id)?
         .ok_or_else(|| AppError::not_found(format!("Label record {} not found", id)))?;
 
     Ok(Json(record))
@@ -141,9 +131,7 @@ pub async fn reprint_label(
 ) -> AppResult<Json<bool>> {
     let service = state.kitchen_print_service();
 
-    service
-        .reprint_label_record(&id)
-        ?;
+    service.reprint_label_record(&id)?;
 
     tracing::info!(label_record_id = %id, "Label record reprinted via API");
 

@@ -4,10 +4,7 @@
 
 mod handler;
 
-use axum::{
-    Router,
-    routing::get,
-};
+use axum::{Router, routing::get};
 
 use crate::core::ServerState;
 
@@ -22,7 +19,10 @@ fn routes() -> Router<ServerState> {
         // Order history (archived orders)
         .route("/history", get(handler::fetch_order_list))
         // Member spending history
-        .route("/member/{member_id}/history", get(handler::fetch_member_history))
+        .route(
+            "/member/{member_id}/history",
+            get(handler::fetch_member_history),
+        )
         // Order detail (archived)
         .route("/{id}", get(handler::get_by_id))
 }

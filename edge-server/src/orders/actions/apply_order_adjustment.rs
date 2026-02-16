@@ -4,9 +4,9 @@
 
 use async_trait::async_trait;
 
-use crate::orders::money::{recalculate_totals, to_decimal, to_f64};
+use crate::order_money::{recalculate_totals, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
 use rust_decimal::prelude::*;
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
@@ -59,21 +59,23 @@ impl CommandHandler for ApplyOrderDiscountAction {
 
         // 4. Validate: percent 范围 0-100
         if let Some(pct) = self.discount_percent
-            && (!pct.is_finite() || !(0.0..=100.0).contains(&pct)) {
-                return Err(OrderError::InvalidOperation(
-                    CommandErrorCode::InvalidAdjustmentValue,
-                    format!("discount_percent must be between 0 and 100, got {}", pct),
-                ));
-            }
+            && (!pct.is_finite() || !(0.0..=100.0).contains(&pct))
+        {
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAdjustmentValue,
+                format!("discount_percent must be between 0 and 100, got {}", pct),
+            ));
+        }
 
         // 5. Validate: fixed 必须为正
         if let Some(fixed) = self.discount_fixed
-            && (!fixed.is_finite() || fixed <= 0.0) {
-                return Err(OrderError::InvalidOperation(
-                    CommandErrorCode::InvalidAdjustmentValue,
-                    format!("discount_fixed must be positive, got {}", fixed),
-                ));
-            }
+            && (!fixed.is_finite() || fixed <= 0.0)
+        {
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAdjustmentValue,
+                format!("discount_fixed must be positive, got {}", fixed),
+            ));
+        }
 
         // 6. Record previous values
         let previous_discount_percent = snapshot.order_manual_discount_percent;
@@ -161,21 +163,23 @@ impl CommandHandler for ApplyOrderSurchargeAction {
 
         // 4. Validate: percent 范围 0-100
         if let Some(pct) = self.surcharge_percent
-            && (!pct.is_finite() || pct <= 0.0 || pct > 100.0) {
-                return Err(OrderError::InvalidOperation(
-                    CommandErrorCode::InvalidAdjustmentValue,
-                    format!("surcharge_percent must be between 0 and 100, got {}", pct),
-                ));
-            }
+            && (!pct.is_finite() || pct <= 0.0 || pct > 100.0)
+        {
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAdjustmentValue,
+                format!("surcharge_percent must be between 0 and 100, got {}", pct),
+            ));
+        }
 
         // 5. Validate: surcharge_amount 必须为正（如果有值）
         if let Some(amount) = self.surcharge_amount
-            && (!amount.is_finite() || amount <= 0.0) {
-                return Err(OrderError::InvalidOperation(
-                    CommandErrorCode::InvalidAdjustmentValue,
-                    format!("surcharge_amount must be positive, got {}", amount),
-                ));
-            }
+            && (!amount.is_finite() || amount <= 0.0)
+        {
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAdjustmentValue,
+                format!("surcharge_amount must be positive, got {}", amount),
+            ));
+        }
 
         // 6. Record previous values
         let previous_surcharge_percent = snapshot.order_manual_surcharge_percent;
@@ -208,10 +212,16 @@ impl CommandHandler for ApplyOrderSurchargeAction {
                 subtotal: snapshot.subtotal,
                 surcharge: to_f64(
                     to_decimal(snapshot.order_rule_surcharge_amount)
-                        + snapshot.order_manual_surcharge_percent
-                            .map(|p| to_decimal(snapshot.subtotal) * to_decimal(p) / Decimal::ONE_HUNDRED)
+                        + snapshot
+                            .order_manual_surcharge_percent
+                            .map(|p| {
+                                to_decimal(snapshot.subtotal) * to_decimal(p) / Decimal::ONE_HUNDRED
+                            })
                             .unwrap_or(Decimal::ZERO)
-                        + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO),
+                        + snapshot
+                            .order_manual_surcharge_fixed
+                            .map(to_decimal)
+                            .unwrap_or(Decimal::ZERO),
                 ),
                 total: snapshot.total,
             },
@@ -263,11 +273,15 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
-    fn setup_active_order(storage: &OrderStorage, order_id: &str, items: Vec<CartItemSnapshot>) -> OrderSnapshot {
+    fn setup_active_order(
+        storage: &OrderStorage,
+        order_id: &str,
+        items: Vec<CartItemSnapshot>,
+    ) -> OrderSnapshot {
         let txn = storage.begin_write().unwrap();
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
@@ -299,7 +313,10 @@ mod tests {
             authorizer_name: Some("Manager".to_string()),
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::OrderDiscountApplied);
 
@@ -343,7 +360,10 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
 
         if let EventPayload::OrderDiscountApplied {
             discount_fixed,
@@ -388,7 +408,10 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
 
         if let EventPayload::OrderDiscountApplied {
             discount_percent,
@@ -591,7 +614,10 @@ mod tests {
             authorizer_name: Some("Manager".to_string()),
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::OrderSurchargeApplied);
 
@@ -617,9 +643,13 @@ mod tests {
     #[tokio::test]
     async fn test_apply_percent_surcharge() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![
-            create_test_item(100.0, 4), // subtotal = 400
-        ]);
+        setup_active_order(
+            &storage,
+            "order-1",
+            vec![
+                create_test_item(100.0, 4), // subtotal = 400
+            ],
+        );
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -633,7 +663,10 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
         assert_eq!(events.len(), 1);
 
         if let EventPayload::OrderSurchargeApplied {
@@ -680,7 +713,10 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
 
         if let EventPayload::OrderSurchargeApplied {
             surcharge_amount,
@@ -828,7 +864,10 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
 
         if let EventPayload::OrderDiscountApplied {
             subtotal,

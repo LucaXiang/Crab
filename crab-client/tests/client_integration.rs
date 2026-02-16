@@ -168,7 +168,9 @@ mod local_tests {
         let (sender, _) = broadcast::channel::<BusMessage>(16);
 
         // Missing router
-        let result = CrabClient::local().with_message_channels(sender.clone(), sender).build();
+        let result = CrabClient::local()
+            .with_message_channels(sender.clone(), sender)
+            .build();
         assert!(result.is_err());
     }
 

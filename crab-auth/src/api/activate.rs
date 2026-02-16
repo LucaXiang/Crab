@@ -4,7 +4,7 @@ use axum::Json;
 use axum::extract::State;
 use crab_cert::{CertMetadata, CertProfile};
 use shared::activation::{
-    ActiveDevice, ActivationData, ActivationResponse, EntityType, PlanType, QuotaInfo,
+    ActivationData, ActivationResponse, ActiveDevice, EntityType, PlanType, QuotaInfo,
     SignedBinding, SubscriptionInfo, SubscriptionStatus,
 };
 use std::sync::Arc;
@@ -87,8 +87,7 @@ pub async fn activate(
         if max_edge_servers > 0 && active_count >= max_edge_servers as i64 {
             // Quota full — do we have a replace request?
             if let Some(ref replace_id) = req.replace_entity_id {
-                let replace_target =
-                    activations::find_by_entity(&state.db, replace_id).await;
+                let replace_target = activations::find_by_entity(&state.db, replace_id).await;
                 match replace_target {
                     Ok(Some(target))
                         if target.tenant_id == tenant.id && target.status == "active" =>
@@ -145,7 +144,11 @@ pub async fn activate(
         }
     };
 
-    let tenant_ca = match state.ca_store.get_or_create_tenant_ca(&tenant.id, &root_ca).await {
+    let tenant_ca = match state
+        .ca_store
+        .get_or_create_tenant_ca(&tenant.id, &root_ca)
+        .await
+    {
         Ok(ca) => ca,
         Err(e) => {
             tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
@@ -218,9 +221,14 @@ pub async fn activate(
     };
 
     // 7. Write activation record
-    if let Err(e) =
-        activations::insert(&state.db, &entity_id, &tenant.id, &req.device_id, &fingerprint)
-            .await
+    if let Err(e) = activations::insert(
+        &state.db,
+        &entity_id,
+        &tenant.id,
+        &req.device_id,
+        &fingerprint,
+    )
+    .await
     {
         tracing::error!(error = %e, "Failed to write activation record");
         return Json(fail("Failed to save activation"));

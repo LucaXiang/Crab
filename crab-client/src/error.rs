@@ -115,7 +115,6 @@ pub enum ClientError {
     /// Internal error.
     #[error("Internal error: {0}")]
     Internal(String),
-
 }
 
 // ============================================================================

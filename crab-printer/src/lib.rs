@@ -37,8 +37,8 @@
 //! ```
 
 mod encoding;
-mod escpos;
 mod error;
+mod escpos;
 mod printer;
 
 // Re-exports

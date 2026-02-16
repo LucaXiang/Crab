@@ -277,7 +277,10 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(e.to_string()))?;
 
         if !resp.status().is_success() {
-            let text = resp.text().await.unwrap_or_else(|e| format!("<failed to read body: {}>", e));
+            let text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read body: {}>", e));
             return Err(TenantError::AuthFailed(format!(
                 "Activation failed: {}",
                 text
@@ -329,7 +332,7 @@ impl TenantManager {
         // 8. 保存 Credential (用于 activation check)
         let credential_path = paths.credential_file();
         tracing::info!("Saving credential to: {:?}", credential_path);
-        
+
         // 包装在 TenantBinding 中，subscription 直接使用 shared::activation::SubscriptionInfo
         let mut tenant_binding =
             edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
@@ -342,13 +345,16 @@ impl TenantManager {
             tracing::error!("Failed to serialize credential: {}", e);
             TenantError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         })?;
-        
+
         std::fs::write(&credential_path, &credential_json).map_err(|e| {
             tracing::error!("Failed to write credential to {:?}: {}", credential_path, e);
             TenantError::Io(e)
         })?;
-        
-        tracing::info!("Credential saved successfully ({} bytes)", credential_json.len());
+
+        tracing::info!(
+            "Credential saved successfully ({} bytes)",
+            credential_json.len()
+        );
 
         // 8. 更新内存状态 - 使用 TenantPaths
         self.load_tenant(&tenant_id)?;
@@ -400,7 +406,10 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(e.to_string()))?;
 
         if !resp.status().is_success() {
-            let text = resp.text().await.unwrap_or_else(|e| format!("<failed to read body: {}>", e));
+            let text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read body: {}>", e));
             return Err(TenantError::AuthFailed(format!(
                 "Client activation failed: {}",
                 text
@@ -462,7 +471,10 @@ impl TenantManager {
             TenantError::Io(e)
         })?;
 
-        tracing::info!("Credential saved successfully ({} bytes)", credential_json.len());
+        tracing::info!(
+            "Credential saved successfully ({} bytes)",
+            credential_json.len()
+        );
 
         // 7. 更新内存状态
         self.load_tenant(&tenant_id)?;
@@ -541,7 +553,10 @@ impl TenantManager {
 
         if !resp.status().is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(TenantError::AuthFailed(format!("Deactivate server failed: {}", text)));
+            return Err(TenantError::AuthFailed(format!(
+                "Deactivate server failed: {}",
+                text
+            )));
         }
 
         let resp_data: shared::activation::DeactivateResponse = resp
@@ -582,7 +597,10 @@ impl TenantManager {
 
         if !resp.status().is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(TenantError::AuthFailed(format!("Deactivate client failed: {}", text)));
+            return Err(TenantError::AuthFailed(format!(
+                "Deactivate client failed: {}",
+                text
+            )));
         }
 
         let resp_data: shared::activation::DeactivateResponse = resp

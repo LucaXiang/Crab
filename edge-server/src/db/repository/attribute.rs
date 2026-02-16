@@ -164,7 +164,10 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
 // Attribute Options
 // =========================================================================
 
-async fn find_options_by_attribute(pool: &SqlitePool, attribute_id: i64) -> RepoResult<Vec<AttributeOption>> {
+async fn find_options_by_attribute(
+    pool: &SqlitePool,
+    attribute_id: i64,
+) -> RepoResult<Vec<AttributeOption>> {
     let options = sqlx::query_as::<_, AttributeOption>(
         "SELECT id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity FROM attribute_option WHERE attribute_id = ? ORDER BY display_order",
     )
@@ -190,7 +193,8 @@ async fn batch_load_options(pool: &SqlitePool, attrs: &mut [Attribute]) -> RepoR
     }
     let all_options = query.fetch_all(pool).await?;
 
-    let mut map: std::collections::HashMap<i64, Vec<AttributeOption>> = std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<i64, Vec<AttributeOption>> =
+        std::collections::HashMap::new();
     for opt in all_options {
         map.entry(opt.attribute_id).or_default().push(opt);
     }
@@ -201,7 +205,10 @@ async fn batch_load_options(pool: &SqlitePool, attrs: &mut [Attribute]) -> RepoR
 }
 
 /// Batch load attributes by IDs with their options (eliminates N+1 in binding queries)
-async fn batch_find_attributes(pool: &SqlitePool, ids: &[i64]) -> RepoResult<std::collections::HashMap<i64, Attribute>> {
+async fn batch_find_attributes(
+    pool: &SqlitePool,
+    ids: &[i64],
+) -> RepoResult<std::collections::HashMap<i64, Attribute>> {
     if ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
@@ -271,7 +278,10 @@ pub async fn unlink(
     Ok(true)
 }
 
-pub async fn find_binding_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<AttributeBinding>> {
+pub async fn find_binding_by_id(
+    pool: &SqlitePool,
+    id: i64,
+) -> RepoResult<Option<AttributeBinding>> {
     let binding = sqlx::query_as::<_, AttributeBinding>(
         "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_ids, 'null') as default_option_ids FROM attribute_binding WHERE id = ?",
     )
@@ -384,7 +394,12 @@ pub async fn find_all_bindings_with_attributes(
     }
 
     // Batch load all unique attributes
-    let attr_ids: Vec<i64> = bindings.iter().map(|b| b.attribute_id).collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let attr_ids: Vec<i64> = bindings
+        .iter()
+        .map(|b| b.attribute_id)
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
     let attrs = batch_find_attributes(pool, &attr_ids).await?;
 
     let mut result = Vec::new();

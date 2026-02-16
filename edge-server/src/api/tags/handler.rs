@@ -5,13 +5,15 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::tag;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN};
 use shared::models::{Tag, TagCreate, TagUpdate};
 
 const RESOURCE: &str = "tag";
@@ -62,7 +64,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::TagCreated,
-        "tag", &id,
+        "tag",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&t, "tag")
@@ -95,7 +98,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::TagUpdated,
-        "tag", &id_str,
+        "tag",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_tag, &t, "tag")
@@ -115,13 +119,11 @@ pub async fn delete(
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     // 检查是否有商品正在使用此标签
-    let product_count = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM product_tag WHERE tag_id = ?",
-        id
-    )
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0);
+    let product_count =
+        sqlx::query_scalar!("SELECT COUNT(*) FROM product_tag WHERE tag_id = ?", id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(0);
 
     if product_count > 0 {
         return Err(AppError::validation(format!(
@@ -130,8 +132,12 @@ pub async fn delete(
         )));
     }
 
-    let name_for_audit = tag::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|t| t.name.clone()).unwrap_or_default();
+    let name_for_audit = tag::find_by_id(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|t| t.name.clone())
+        .unwrap_or_default();
     let result = tag::delete(&state.pool, id).await?;
 
     if result {
@@ -139,7 +145,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::TagDeleted,
-            "tag", &id_str,
+            "tag",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

@@ -7,7 +7,7 @@
 //! - `AaSplitPaidApplier` — AA 支付（进度）
 //! - `AaSplitCancelledApplier` — AA 取消（解锁）
 
-use crate::orders::money::{self, to_decimal, to_f64, MONEY_TOLERANCE};
+use crate::order_money::{self, MONEY_TOLERANCE, to_decimal, to_f64};
 use crate::orders::traits::EventApplier;
 use shared::order::{
     CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, PaymentRecord, SplitType,
@@ -99,7 +99,7 @@ impl EventApplier for ItemSplitApplier {
             }
 
             // Recalculate totals
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -147,7 +147,7 @@ impl EventApplier for AmountSplitApplier {
             };
             snapshot.payments.push(payment);
 
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -196,8 +196,7 @@ impl EventApplier for AaSplitPaidApplier {
         } = &event.payload
         {
             // Update paid amount
-            snapshot.paid_amount =
-                to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*amount));
+            snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*amount));
 
             // Update AA paid shares
             snapshot.aa_paid_shares += shares;
@@ -218,7 +217,7 @@ impl EventApplier for AaSplitPaidApplier {
             };
             snapshot.payments.push(payment);
 
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -356,10 +355,7 @@ mod tests {
         assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&2));
         assert_eq!(snapshot.paid_amount, 20.0);
         assert_eq!(snapshot.payments.len(), 1);
-        assert_eq!(
-            snapshot.payments[0].split_type,
-            Some(SplitType::ItemSplit)
-        );
+        assert_eq!(snapshot.payments[0].split_type, Some(SplitType::ItemSplit));
     }
 
     #[test]

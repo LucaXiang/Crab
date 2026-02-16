@@ -5,15 +5,18 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::price_rule;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, MAX_RECEIPT_NAME_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text,
+    validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN};
-use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 use shared::models::price_rule::AdjustmentType;
+use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 
 const RESOURCE: &str = "price_rule";
 
@@ -23,8 +26,16 @@ fn validate_create(payload: &PriceRuleCreate) -> AppResult<()> {
     validate_required_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     validate_optional_text(&payload.zone_scope, "zone_scope", MAX_SHORT_TEXT_LEN)?;
-    validate_optional_text(&payload.active_start_time, "active_start_time", MAX_SHORT_TEXT_LEN)?;
-    validate_optional_text(&payload.active_end_time, "active_end_time", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(
+        &payload.active_start_time,
+        "active_start_time",
+        MAX_SHORT_TEXT_LEN,
+    )?;
+    validate_optional_text(
+        &payload.active_end_time,
+        "active_end_time",
+        MAX_SHORT_TEXT_LEN,
+    )?;
     Ok(())
 }
 
@@ -40,20 +51,29 @@ fn validate_update(payload: &PriceRuleUpdate) -> AppResult<()> {
     }
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     validate_optional_text(&payload.zone_scope, "zone_scope", MAX_SHORT_TEXT_LEN)?;
-    validate_optional_text(&payload.active_start_time, "active_start_time", MAX_SHORT_TEXT_LEN)?;
-    validate_optional_text(&payload.active_end_time, "active_end_time", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(
+        &payload.active_start_time,
+        "active_start_time",
+        MAX_SHORT_TEXT_LEN,
+    )?;
+    validate_optional_text(
+        &payload.active_end_time,
+        "active_end_time",
+        MAX_SHORT_TEXT_LEN,
+    )?;
     Ok(())
 }
 
-fn validate_adjustment_value(
-    adjustment_type: &AdjustmentType,
-    value: f64,
-) -> Result<(), AppError> {
+fn validate_adjustment_value(adjustment_type: &AdjustmentType, value: f64) -> Result<(), AppError> {
     if !value.is_finite() {
-        return Err(AppError::validation("adjustment_value must be a finite number"));
+        return Err(AppError::validation(
+            "adjustment_value must be a finite number",
+        ));
     }
     if value < 0.0 {
-        return Err(AppError::validation("adjustment_value must be non-negative"));
+        return Err(AppError::validation(
+            "adjustment_value must be non-negative",
+        ));
     }
     match adjustment_type {
         AdjustmentType::Percentage => {
@@ -108,8 +128,7 @@ pub async fn list_for_product(
         .into_iter()
         .filter(|r| {
             r.product_scope == ProductScope::Global
-                || (r.product_scope == ProductScope::Product
-                    && r.target_id == Some(product_id))
+                || (r.product_scope == ProductScope::Product && r.target_id == Some(product_id))
         })
         .collect();
     Ok(Json(rules))
@@ -141,7 +160,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::PriceRuleCreated,
-        "price_rule", &id,
+        "price_rule",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&rule, "price_rule")
@@ -169,8 +189,13 @@ pub async fn update(
         .ok_or_else(|| AppError::not_found(format!("Price rule {}", id)))?;
 
     // 验证 adjustment_value（部分更新时用旧值补齐）
-    let adj_type = payload.adjustment_type.as_ref().unwrap_or(&old_rule.adjustment_type);
-    let adj_value = payload.adjustment_value.unwrap_or(old_rule.adjustment_value);
+    let adj_type = payload
+        .adjustment_type
+        .as_ref()
+        .unwrap_or(&old_rule.adjustment_type);
+    let adj_value = payload
+        .adjustment_value
+        .unwrap_or(old_rule.adjustment_value);
     validate_adjustment_value(adj_type, adj_value)?;
 
     let rule = price_rule::update(&state.pool, id, payload).await?;
@@ -180,7 +205,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::PriceRuleUpdated,
-        "price_rule", &id_str,
+        "price_rule",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_rule, &rule, "price_rule")
@@ -199,8 +225,12 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let name_for_audit = price_rule::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|r| r.name.clone()).unwrap_or_default();
+    let name_for_audit = price_rule::find_by_id(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|r| r.name.clone())
+        .unwrap_or_default();
     let result = price_rule::delete(&state.pool, id).await?;
 
     let id_str = id.to_string();
@@ -209,7 +239,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::PriceRuleDeleted,
-            "price_rule", &id_str,
+            "price_rule",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

@@ -35,10 +35,13 @@ impl CommandHandler for CancelStampRedemptionAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
-                    "Cannot cancel stamp redemption on order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot cancel stamp redemption on order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -48,10 +51,13 @@ impl CommandHandler for CancelStampRedemptionAction {
             .iter()
             .find(|r| r.stamp_activity_id == self.stamp_activity_id)
             .ok_or_else(|| {
-                OrderError::InvalidOperation(CommandErrorCode::StampRedemptionNotFound, format!(
-                    "No stamp redemption found for activity {} in this order",
-                    self.stamp_activity_id
-                ))
+                OrderError::InvalidOperation(
+                    CommandErrorCode::StampRedemptionNotFound,
+                    format!(
+                        "No stamp redemption found for activity {} in this order",
+                        self.stamp_activity_id
+                    ),
+                )
             })?;
 
         // Get the stamp activity name from the reward item
@@ -60,9 +66,7 @@ impl CommandHandler for CancelStampRedemptionAction {
             .iter()
             .find(|i| i.instance_id == redemption.reward_instance_id);
 
-        let stamp_activity_name = reward_item
-            .map(|i| i.name.clone())
-            .unwrap_or_default();
+        let stamp_activity_name = reward_item.map(|i| i.name.clone()).unwrap_or_default();
 
         let reward_instance_id = redemption.reward_instance_id.clone();
         let is_comp_existing = redemption.is_comp_existing;
@@ -143,7 +147,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
-        snapshot.items.push(create_reward_item("stamp_reward::prev-cmd"));
+        snapshot
+            .items
+            .push(create_reward_item("stamp_reward::prev-cmd"));
         snapshot.stamp_redemptions.push(StampRedemptionState {
             stamp_activity_id: 1,
             reward_instance_id: "stamp_reward::prev-cmd".to_string(),
@@ -160,10 +166,16 @@ mod tests {
             stamp_activity_id: 1,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
 
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].event_type, OrderEventType::StampRedemptionCancelled);
+        assert_eq!(
+            events[0].event_type,
+            OrderEventType::StampRedemptionCancelled
+        );
 
         if let EventPayload::StampRedemptionCancelled {
             stamp_activity_id,

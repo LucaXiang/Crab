@@ -31,10 +31,7 @@ pub async fn get_zone(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
 ) -> Result<ApiResponse<Zone>, String> {
-    match bridge
-        .get::<Zone>(&format!("/api/zones/{}", id))
-        .await
-    {
+    match bridge.get::<Zone>(&format!("/api/zones/{}", id)).await {
         Ok(zone) => Ok(ApiResponse::success(zone)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::ZoneNotFound,
@@ -80,10 +77,7 @@ pub async fn delete_zone(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
 ) -> Result<ApiResponse<crate::core::DeleteData>, String> {
-    match bridge
-        .delete::<bool>(&format!("/api/zones/{}", id))
-        .await
-    {
+    match bridge.delete::<bool>(&format!("/api/zones/{}", id)).await {
         Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
             deleted: success,
         })),
@@ -180,10 +174,7 @@ pub async fn delete_table(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
 ) -> Result<ApiResponse<crate::core::DeleteData>, String> {
-    match bridge
-        .delete::<bool>(&format!("/api/tables/{}", id))
-        .await
-    {
+    match bridge.delete::<bool>(&format!("/api/tables/{}", id)).await {
         Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
             deleted: success,
         })),

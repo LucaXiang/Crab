@@ -4,7 +4,7 @@
 //! If merged_into is Some, merges the comped item back into the source.
 //! If merged_into is None, restores the item's price in place.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -30,7 +30,11 @@ impl EventApplier for ItemUncompedApplier {
 
                 if let Some((qty, unpaid_qty)) = comped_qty {
                     // Add quantity back to source item
-                    if let Some(source) = snapshot.items.iter_mut().find(|i| i.instance_id == *source_id) {
+                    if let Some(source) = snapshot
+                        .items
+                        .iter_mut()
+                        .find(|i| i.instance_id == *source_id)
+                    {
                         source.quantity += qty;
                         source.unpaid_quantity += unpaid_qty;
                     }
@@ -40,7 +44,11 @@ impl EventApplier for ItemUncompedApplier {
                 }
             } else {
                 // No merge: restore price in place
-                if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == *instance_id) {
+                if let Some(item) = snapshot
+                    .items
+                    .iter_mut()
+                    .find(|i| i.instance_id == *instance_id)
+                {
                     item.is_comped = false;
                     item.price = *restored_price;
                     // original_price stays as-is (it was the pre-comp price)
@@ -55,7 +63,7 @@ impl EventApplier for ItemUncompedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals using precise decimal arithmetic
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -154,13 +162,28 @@ mod tests {
     fn test_uncomp_merge_back() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         // Source item (3 remaining after split)
-        snapshot.items.push(create_test_item("item-1", 1, "Product A", 10.0, 3, false));
+        snapshot
+            .items
+            .push(create_test_item("item-1", 1, "Product A", 10.0, 3, false));
         // Comped item (2 comped)
-        snapshot.items.push(create_test_item("item-1::comp::uuid-1", 1, "Product A", 0.0, 2, true));
-        snapshot.comps.push(create_comp_record("item-1::comp::uuid-1", "item-1", 10.0));
+        snapshot.items.push(create_test_item(
+            "item-1::comp::uuid-1",
+            1,
+            "Product A",
+            0.0,
+            2,
+            true,
+        ));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1::comp::uuid-1", "item-1", 10.0));
 
         let event = create_item_uncomped_event(
-            "order-1", 3, "item-1::comp::uuid-1", 10.0, Some("item-1".to_string()),
+            "order-1",
+            3,
+            "item-1::comp::uuid-1",
+            10.0,
+            Some("item-1".to_string()),
         );
 
         let applier = ItemUncompedApplier;
@@ -185,7 +208,9 @@ mod tests {
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 2, true);
         item.original_price = 10.0;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0));
 
         let event = create_item_uncomped_event("order-1", 3, "item-1", 10.0, None);
 
@@ -210,7 +235,9 @@ mod tests {
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
         item.original_price = 10.0;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0));
         snapshot.update_checksum();
         let initial_checksum = snapshot.state_checksum.clone();
 
@@ -229,7 +256,9 @@ mod tests {
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
         item.original_price = 10.0;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0));
         snapshot.last_sequence = 5;
 
         let event = create_item_uncomped_event("order-1", 6, "item-1", 10.0, None);

@@ -231,9 +231,7 @@ impl TenantPaths {
     ///
     /// 检查 edge_cert.pem, edge_key.pem, tenant_ca.pem 三个文件
     pub fn has_server_certificates(&self) -> bool {
-        self.edge_cert().exists()
-            && self.edge_key().exists()
-            && self.server_tenant_ca().exists()
+        self.edge_cert().exists() && self.edge_key().exists() && self.server_tenant_ca().exists()
     }
 
     /// 检查 Server 模式凭证是否存在
@@ -280,31 +278,85 @@ mod tests {
         let paths = TenantPaths::new("/data/tenants/tenant-123");
 
         // 共用路径
-        assert_eq!(paths.auth_dir(), PathBuf::from("/data/tenants/tenant-123/auth"));
-        assert_eq!(paths.credential_file(), PathBuf::from("/data/tenants/tenant-123/server/credential.json"));
-        assert_eq!(paths.session_file(), PathBuf::from("/data/tenants/tenant-123/auth/session.json"));
-        
+        assert_eq!(
+            paths.auth_dir(),
+            PathBuf::from("/data/tenants/tenant-123/auth")
+        );
+        assert_eq!(
+            paths.credential_file(),
+            PathBuf::from("/data/tenants/tenant-123/server/credential.json")
+        );
+        assert_eq!(
+            paths.session_file(),
+            PathBuf::from("/data/tenants/tenant-123/auth/session.json")
+        );
+
         // Client 证书 (CertManager 兼容文件名)
-        assert_eq!(paths.certs_dir(), PathBuf::from("/data/tenants/tenant-123/certs"));
-        assert_eq!(paths.client_credential(), PathBuf::from("/data/tenants/tenant-123/certs/credential.json"));
-        assert_eq!(paths.client_cert(), PathBuf::from("/data/tenants/tenant-123/certs/entity.crt"));
-        assert_eq!(paths.client_key(), PathBuf::from("/data/tenants/tenant-123/certs/entity.key"));
-        assert_eq!(paths.client_tenant_ca(), PathBuf::from("/data/tenants/tenant-123/certs/tenant_ca.crt"));
-        
+        assert_eq!(
+            paths.certs_dir(),
+            PathBuf::from("/data/tenants/tenant-123/certs")
+        );
+        assert_eq!(
+            paths.client_credential(),
+            PathBuf::from("/data/tenants/tenant-123/certs/credential.json")
+        );
+        assert_eq!(
+            paths.client_cert(),
+            PathBuf::from("/data/tenants/tenant-123/certs/entity.crt")
+        );
+        assert_eq!(
+            paths.client_key(),
+            PathBuf::from("/data/tenants/tenant-123/certs/entity.key")
+        );
+        assert_eq!(
+            paths.client_tenant_ca(),
+            PathBuf::from("/data/tenants/tenant-123/certs/tenant_ca.crt")
+        );
+
         // Cache
-        assert_eq!(paths.cache_images_dir(), PathBuf::from("/data/tenants/tenant-123/cache/images"));
-        
+        assert_eq!(
+            paths.cache_images_dir(),
+            PathBuf::from("/data/tenants/tenant-123/cache/images")
+        );
+
         // Server 路径
-        assert_eq!(paths.server_dir(), PathBuf::from("/data/tenants/tenant-123/server"));
-        assert_eq!(paths.server_images_dir(), PathBuf::from("/data/tenants/tenant-123/server/images"));
-        assert_eq!(paths.server_certs_dir(), PathBuf::from("/data/tenants/tenant-123/server/certs"));
-        assert_eq!(paths.main_db_dir(), PathBuf::from("/data/tenants/tenant-123/server/data/main.db"));
-        assert_eq!(paths.orders_db_file(), PathBuf::from("/data/tenants/tenant-123/server/data/orders.redb"));
-        
+        assert_eq!(
+            paths.server_dir(),
+            PathBuf::from("/data/tenants/tenant-123/server")
+        );
+        assert_eq!(
+            paths.server_images_dir(),
+            PathBuf::from("/data/tenants/tenant-123/server/images")
+        );
+        assert_eq!(
+            paths.server_certs_dir(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs")
+        );
+        assert_eq!(
+            paths.main_db_dir(),
+            PathBuf::from("/data/tenants/tenant-123/server/data/main.db")
+        );
+        assert_eq!(
+            paths.orders_db_file(),
+            PathBuf::from("/data/tenants/tenant-123/server/data/orders.redb")
+        );
+
         // Edge Server 证书 (在 server/certs/ 下)
-        assert_eq!(paths.edge_cert(), PathBuf::from("/data/tenants/tenant-123/server/certs/edge_cert.pem"));
-        assert_eq!(paths.edge_key(), PathBuf::from("/data/tenants/tenant-123/server/certs/edge_key.pem"));
-        assert_eq!(paths.server_root_ca(), PathBuf::from("/data/tenants/tenant-123/server/certs/root_ca.pem"));
-        assert_eq!(paths.server_tenant_ca(), PathBuf::from("/data/tenants/tenant-123/server/certs/tenant_ca.pem"));
+        assert_eq!(
+            paths.edge_cert(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs/edge_cert.pem")
+        );
+        assert_eq!(
+            paths.edge_key(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs/edge_key.pem")
+        );
+        assert_eq!(
+            paths.server_root_ca(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs/root_ca.pem")
+        );
+        assert_eq!(
+            paths.server_tenant_ca(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs/tenant_ca.pem")
+        );
     }
 }

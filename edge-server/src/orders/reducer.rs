@@ -8,8 +8,8 @@
 //! Note: Event application logic has been moved to the appliers module.
 //! Use `EventAction` from `super::appliers` to apply events to snapshots.
 
-use shared::models::PriceRule;
 use crate::pricing::{calculate_item_price, matches_product_scope};
+use shared::models::PriceRule;
 use shared::order::CartItemSnapshot;
 use tracing::debug;
 
@@ -121,9 +121,7 @@ pub fn input_to_snapshot_with_rules(
     // Uses category_id and tag_ids from backend product metadata cache
     let matched_rules: Vec<&PriceRule> = rules
         .iter()
-        .filter(|rule| {
-            matches_product_scope(rule, product_id, category_id, tag_ids)
-        })
+        .filter(|rule| matches_product_scope(rule, product_id, category_id, tag_ids))
         .copied()
         .collect();
 
@@ -157,7 +155,12 @@ pub fn input_to_snapshot_with_rules(
     );
 
     // Calculate item price with matched rules
-    let calc_result = calculate_item_price(base_price, options_modifier, manual_discount, &matched_rules);
+    let calc_result = calculate_item_price(
+        base_price,
+        options_modifier,
+        manual_discount,
+        &matched_rules,
+    );
 
     debug!(
         product_id = %input.product_id,
@@ -200,10 +203,10 @@ pub fn input_to_snapshot_with_rules(
         applied_rules: calc_result.applied_rules,
         applied_mg_rules: vec![],
         mg_discount_amount: 0.0,
-        unit_price: 0.0,   // Computed by recalculate_totals
-        line_total: 0.0,   // Computed by recalculate_totals
-        tax: 0.0,          // Computed by recalculate_totals
-        tax_rate: 0,       // Computed by recalculate_totals
+        unit_price: 0.0, // Computed by recalculate_totals
+        line_total: 0.0, // Computed by recalculate_totals
+        tax: 0.0,        // Computed by recalculate_totals
+        tax_rate: 0,     // Computed by recalculate_totals
         note: input.note.clone(),
         authorizer_id: input.authorizer_id,
         authorizer_name: input.authorizer_name.clone(),

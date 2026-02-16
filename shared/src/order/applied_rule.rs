@@ -37,10 +37,7 @@ pub struct AppliedRule {
 
 impl AppliedRule {
     /// Create from a PriceRule with calculated amount
-    pub fn from_rule(
-        rule: &crate::models::price_rule::PriceRule,
-        calculated_amount: f64,
-    ) -> Self {
+    pub fn from_rule(rule: &crate::models::price_rule::PriceRule, calculated_amount: f64) -> Self {
         Self {
             rule_id: rule.id,
             name: rule.name.clone(),

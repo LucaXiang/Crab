@@ -278,11 +278,13 @@ async fn batch_load_breakdowns(pool: &SqlitePool, reports: &mut [DailyReport]) -
     }
     let all_pay = pay_query.fetch_all(pool).await?;
 
-    let mut tax_map: std::collections::HashMap<i64, Vec<TaxBreakdown>> = std::collections::HashMap::new();
+    let mut tax_map: std::collections::HashMap<i64, Vec<TaxBreakdown>> =
+        std::collections::HashMap::new();
     for t in all_tax {
         tax_map.entry(t.report_id).or_default().push(t);
     }
-    let mut pay_map: std::collections::HashMap<i64, Vec<PaymentMethodBreakdown>> = std::collections::HashMap::new();
+    let mut pay_map: std::collections::HashMap<i64, Vec<PaymentMethodBreakdown>> =
+        std::collections::HashMap::new();
     for p in all_pay {
         pay_map.entry(p.report_id).or_default().push(p);
     }

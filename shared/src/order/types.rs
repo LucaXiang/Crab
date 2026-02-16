@@ -178,7 +178,10 @@ pub struct ItemOption {
     /// Option quantity (default: 1)
     /// - Options without quantity control: implicitly 1 (not serialized)
     /// - Options with quantity control: explicitly stored
-    #[serde(default = "default_option_quantity", skip_serializing_if = "is_default_quantity")]
+    #[serde(
+        default = "default_option_quantity",
+        skip_serializing_if = "is_default_quantity"
+    )]
     pub quantity: i32,
 }
 

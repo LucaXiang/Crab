@@ -140,7 +140,9 @@ impl ShiftAutoCloseScheduler {
                     .latest()
                     .unwrap_or_else(|| {
                         // Ultimate fallback: use current time + 1 hour
-                        tracing::error!("Cannot resolve local time for shift close, using fallback");
+                        tracing::error!(
+                            "Cannot resolve local time for shift close, using fallback"
+                        );
                         now + chrono::Duration::hours(1)
                     })
             });

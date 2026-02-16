@@ -60,21 +60,24 @@ src/
 │   ├── models/         # 数据模型 (与 shared 对齐)
 │   └── repository/     # CRUD 操作
 ├── message/        # 消息总线 (TCP/TLS/Memory)
-├── orders/         # 订单事件溯源 [核心模块]
+├── orders/         # 订单事件溯源 [核心引擎]
 │   ├── traits.rs       # CommandHandler + EventApplier trait
 │   ├── manager/        # OrdersManager (命令执行 + 事件分发)
-│   │   ├── mod.rs      # 核心命令处理逻辑 (563 行)
+│   │   ├── mod.rs      # 核心命令处理逻辑
 │   │   ├── error.rs    # ManagerError + ManagerResult 类型
 │   │   └── tests/      # 188 测试 (按职责分 6 文件: core/boundary/rules/flows/combos/rules_combo)
 │   ├── reducer.rs      # 价格规则集成
-│   ├── money.rs        # 金额计算 (rust_decimal)
 │   ├── actions/        # CommandHandler 实现 (22 命令)
 │   ├── appliers/       # EventApplier 实现 (26 事件)
-│   ├── storage.rs      # redb 持久化 (events, snapshots, queues)
-│   ├── archive.rs      # OrderArchiveService (归档到 SQLite)
-│   ├── archive_worker.rs # ArchiveWorker (队列处理, 并发50, 重试3次)
-│   ├── verify_scheduler.rs # 哈希链验证调度器 (启动补扫 + 每日定时)
-│   └── sync.rs         # 重连同步 API
+│   └── storage.rs      # redb 持久化 (events, snapshots, queues)
+├── archiving/      # 归档系统 (从 orders/ 拆分)
+│   ├── service.rs      # OrderArchiveService (归档到 SQLite, 哈希链)
+│   ├── worker.rs       # ArchiveWorker (队列处理, 并发10, 重试3次)
+│   └── verify.rs       # VerifyScheduler (启动补扫 + 每日定时验证)
+├── order_money/    # 金额计算 (从 orders/ 拆分)
+│   ├── mod.rs          # 精确 Decimal 算术 (rust_decimal)
+│   └── tests.rs        # 金额计算测试
+├── order_sync.rs   # 重连同步协议 (从 orders/ 拆分)
 ├── pricing/        # 价格规则引擎
 │   ├── matcher.rs      # 范围匹配 (Product/Category/Tag/Zone/Time)
 │   ├── calculator.rs   # 通用计算辅助

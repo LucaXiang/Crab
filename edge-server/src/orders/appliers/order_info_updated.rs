@@ -102,13 +102,8 @@ mod tests {
     fn test_order_info_updated_table_name_only() {
         let mut snapshot = create_test_snapshot("order-1");
 
-        let event = create_order_info_updated_event(
-            "order-1",
-            2,
-            None,
-            Some("VIP Room".to_string()),
-            None,
-        );
+        let event =
+            create_order_info_updated_event("order-1", 2, None, Some("VIP Room".to_string()), None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -382,8 +377,7 @@ mod tests {
     fn test_order_info_updated_empty_string_table_name() {
         let mut snapshot = create_test_snapshot("order-1");
 
-        let event =
-            create_order_info_updated_event("order-1", 2, None, Some("".to_string()), None);
+        let event = create_order_info_updated_event("order-1", 2, None, Some("".to_string()), None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);

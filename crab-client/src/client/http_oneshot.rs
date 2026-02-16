@@ -65,7 +65,11 @@ impl OneshotHttpClient {
     }
 
     /// 构建带认证头的请求
-    async fn build_request(&self, method: http::Method, path: &str) -> Request<Body> {
+    async fn build_request(
+        &self,
+        method: http::Method,
+        path: &str,
+    ) -> Result<Request<Body>, ClientError> {
         let mut builder = Request::builder().method(method).uri(path);
 
         if let Some(token) = self.get_token().await {
@@ -75,7 +79,7 @@ impl OneshotHttpClient {
         builder
             .header("Content-Type", "application/json")
             .body(Body::empty())
-            .expect("Failed to build request")
+            .map_err(|e| ClientError::Request(format!("Failed to build request: {}", e)))
     }
 
     /// 构建带 body 的请求
@@ -93,10 +97,10 @@ impl OneshotHttpClient {
             builder = builder.header("Authorization", format!("Bearer {}", token));
         }
 
-        Ok(builder
+        builder
             .header("Content-Type", "application/json")
             .body(Body::from(body_bytes))
-            .expect("Failed to build request"))
+            .map_err(|e| ClientError::Request(format!("Failed to build request: {}", e)))
     }
 
     /// 执行请求并处理响应
@@ -141,7 +145,7 @@ impl OneshotHttpClient {
 #[async_trait]
 impl HttpClient for OneshotHttpClient {
     async fn get<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
-        let request = self.build_request(http::Method::GET, path).await;
+        let request = self.build_request(http::Method::GET, path).await?;
         self.execute(request).await
     }
 
@@ -157,7 +161,7 @@ impl HttpClient for OneshotHttpClient {
     }
 
     async fn post_empty<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
-        let request = self.build_request(http::Method::POST, path).await;
+        let request = self.build_request(http::Method::POST, path).await?;
         self.execute(request).await
     }
 
@@ -173,7 +177,7 @@ impl HttpClient for OneshotHttpClient {
     }
 
     async fn delete<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
-        let request = self.build_request(http::Method::DELETE, path).await;
+        let request = self.build_request(http::Method::DELETE, path).await?;
         self.execute(request).await
     }
 
@@ -208,7 +212,6 @@ impl HttpClient for OneshotHttpClient {
         self.set_token(None).await;
         Ok(())
     }
-
 }
 
 #[cfg(test)]

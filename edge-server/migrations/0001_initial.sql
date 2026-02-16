@@ -70,21 +70,21 @@ CREATE TABLE print_destination (
     id          INTEGER PRIMARY KEY,
     name        TEXT    NOT NULL,
     description TEXT,
+    purpose     TEXT    NOT NULL DEFAULT 'kitchen',  -- 'kitchen' | 'label'
     is_active   INTEGER NOT NULL DEFAULT 1
 );
 CREATE UNIQUE INDEX idx_print_dest_name ON print_destination(name);
 
--- Printers: extracted from embedded array
 CREATE TABLE printer (
-    id                  INTEGER PRIMARY KEY,
+    id                   INTEGER PRIMARY KEY,
     print_destination_id INTEGER NOT NULL REFERENCES print_destination(id) ON DELETE CASCADE,
-    printer_type        TEXT    NOT NULL,     -- 'network' | 'driver'
-    printer_format      TEXT    NOT NULL DEFAULT 'escpos',  -- 'escpos' | 'label'
-    ip                  TEXT,
-    port                INTEGER,
-    driver_name         TEXT,
-    priority            INTEGER NOT NULL DEFAULT 0,
-    is_active           INTEGER NOT NULL DEFAULT 1
+    connection           TEXT    NOT NULL,     -- 'network' | 'driver'
+    protocol             TEXT    NOT NULL DEFAULT 'escpos',  -- 'escpos' | 'label'
+    ip                   TEXT,
+    port                 INTEGER,
+    driver_name          TEXT,
+    priority             INTEGER NOT NULL DEFAULT 0,
+    is_active            INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX idx_printer_dest ON printer(print_destination_id);
 
@@ -104,14 +104,8 @@ CREATE TABLE category (
 CREATE UNIQUE INDEX idx_category_name ON category(name);
 CREATE INDEX idx_category_sort_order ON category(sort_order);
 
--- Category -> print_destination junction tables
-CREATE TABLE category_kitchen_print_dest (
-    category_id          INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE,
-    print_destination_id INTEGER NOT NULL REFERENCES print_destination(id) ON DELETE CASCADE,
-    PRIMARY KEY (category_id, print_destination_id)
-);
-
-CREATE TABLE category_label_print_dest (
+-- Category -> print_destination junction table (unified)
+CREATE TABLE category_print_dest (
     category_id          INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE,
     print_destination_id INTEGER NOT NULL REFERENCES print_destination(id) ON DELETE CASCADE,
     PRIMARY KEY (category_id, print_destination_id)
@@ -237,6 +231,109 @@ CREATE TABLE price_rule (
     created_at        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_price_rule_active ON price_rule(is_active, product_scope);
+
+-- ── Marketing Groups (营销组 = 会员等级) ─────────────────────
+
+CREATE TABLE marketing_group (
+    id               INTEGER PRIMARY KEY,
+    name             TEXT    NOT NULL UNIQUE,
+    display_name     TEXT    NOT NULL,
+    description      TEXT,
+    sort_order       INTEGER NOT NULL DEFAULT 0,
+    points_earn_rate REAL,
+    created_at       INTEGER NOT NULL DEFAULT 0,
+    updated_at       INTEGER NOT NULL DEFAULT 0
+);
+
+-- ── Members (会员) ──────────────────────────────────────────
+
+CREATE TABLE member (
+    id                 INTEGER PRIMARY KEY,
+    name               TEXT    NOT NULL,
+    phone              TEXT,
+    card_number        TEXT,
+    marketing_group_id INTEGER NOT NULL REFERENCES marketing_group(id),
+    birthday           TEXT,
+    email              TEXT,
+    points_balance     INTEGER NOT NULL DEFAULT 0,
+    total_spent        REAL    NOT NULL DEFAULT 0,
+    notes              TEXT,
+    is_active          INTEGER NOT NULL DEFAULT 1,
+    created_at         INTEGER NOT NULL DEFAULT 0,
+    updated_at         INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_member_phone ON member(phone);
+CREATE INDEX idx_member_card_number ON member(card_number);
+CREATE INDEX idx_member_marketing_group ON member(marketing_group_id);
+
+-- ── MG Discount Rules (MG 折扣规则) ────────────────────────
+
+CREATE TABLE mg_discount_rule (
+    id                 INTEGER PRIMARY KEY,
+    marketing_group_id INTEGER NOT NULL REFERENCES marketing_group(id),
+    name               TEXT    NOT NULL,
+    display_name       TEXT    NOT NULL,
+    receipt_name       TEXT    NOT NULL,
+    product_scope      TEXT    NOT NULL,
+    target_id          INTEGER,
+    adjustment_type    TEXT    NOT NULL,
+    adjustment_value   REAL    NOT NULL,
+    is_active          INTEGER NOT NULL DEFAULT 1,
+    created_at         INTEGER NOT NULL DEFAULT 0,
+    updated_at         INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_mg_discount_rule_group ON mg_discount_rule(marketing_group_id);
+
+-- ── Stamp Activities (集章活动) ─────────────────────────────
+
+CREATE TABLE stamp_activity (
+    id                    INTEGER PRIMARY KEY,
+    marketing_group_id    INTEGER NOT NULL REFERENCES marketing_group(id),
+    name                  TEXT    NOT NULL,
+    display_name          TEXT    NOT NULL,
+    stamps_required       INTEGER NOT NULL,
+    reward_quantity       INTEGER NOT NULL DEFAULT 1,
+    reward_strategy       TEXT    NOT NULL DEFAULT 'ECONOMIZADOR',
+    designated_product_id INTEGER,
+    is_cyclic             INTEGER NOT NULL DEFAULT 1,
+    is_active             INTEGER NOT NULL DEFAULT 1,
+    created_at            INTEGER NOT NULL DEFAULT 0,
+    updated_at            INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_stamp_activity_group ON stamp_activity(marketing_group_id);
+
+-- ── Stamp Targets (集章条件目标) ────────────────────────────
+
+CREATE TABLE stamp_target (
+    id                INTEGER PRIMARY KEY,
+    stamp_activity_id INTEGER NOT NULL REFERENCES stamp_activity(id) ON DELETE CASCADE,
+    target_type       TEXT    NOT NULL,
+    target_id         INTEGER NOT NULL
+);
+CREATE INDEX idx_stamp_target_activity ON stamp_target(stamp_activity_id);
+
+-- ── Stamp Reward Targets (集章奖励目标) ─────────────────────
+
+CREATE TABLE stamp_reward_target (
+    id                INTEGER PRIMARY KEY,
+    stamp_activity_id INTEGER NOT NULL REFERENCES stamp_activity(id) ON DELETE CASCADE,
+    target_type       TEXT    NOT NULL,
+    target_id         INTEGER NOT NULL
+);
+CREATE INDEX idx_stamp_reward_target_activity ON stamp_reward_target(stamp_activity_id);
+
+-- ── Member Stamp Progress (会员集章进度) ────────────────────
+
+CREATE TABLE member_stamp_progress (
+    id                INTEGER PRIMARY KEY,
+    member_id         INTEGER NOT NULL REFERENCES member(id),
+    stamp_activity_id INTEGER NOT NULL REFERENCES stamp_activity(id),
+    current_stamps    INTEGER NOT NULL DEFAULT 0,
+    completed_cycles  INTEGER NOT NULL DEFAULT 0,
+    last_stamp_at     INTEGER,
+    updated_at        INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(member_id, stamp_activity_id)
+);
 
 -- ── Singleton Tables ─────────────────────────────────────────
 
@@ -452,6 +549,8 @@ CREATE TABLE archived_order (
     end_time                        INTEGER,
     operator_id                     INTEGER,
     operator_name                   TEXT,
+    member_id                       INTEGER,
+    member_name                     TEXT,
     void_type                       TEXT,
     loss_reason                     TEXT,
     loss_amount                     REAL,
@@ -467,6 +566,7 @@ CREATE INDEX idx_archived_order_end_time ON archived_order(end_time);
 CREATE INDEX idx_archived_order_hash ON archived_order(curr_hash);
 CREATE INDEX idx_archived_order_status_end ON archived_order(status, end_time);
 CREATE INDEX idx_archived_order_created ON archived_order(created_at);
+CREATE INDEX idx_archived_order_member ON archived_order(member_id);
 
 CREATE TABLE archived_order_item (
     id                     INTEGER PRIMARY KEY,
@@ -486,6 +586,7 @@ CREATE TABLE archived_order_item (
     rule_surcharge_amount  REAL    NOT NULL DEFAULT 0.0,
     tax                    REAL    NOT NULL DEFAULT 0.0,
     tax_rate               INTEGER NOT NULL DEFAULT 0,
+    category_id            INTEGER,
     category_name          TEXT,
     applied_rules          TEXT,        -- JSON string (AppliedRule array)
     note                   TEXT,

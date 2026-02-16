@@ -1,15 +1,15 @@
 //! Archive Verify API Handlers
 
 use axum::{
-    extract::{Path, State},
     Json,
+    extract::{Path, State},
 };
 
+use crate::archiving::{DailyChainVerification, OrderVerification};
 use crate::core::ServerState;
 use crate::db::repository::store_info;
-use crate::orders::archive::{DailyChainVerification, OrderVerification};
-use crate::utils::{AppError, AppResult};
 use crate::utils::time;
+use crate::utils::{AppError, AppResult};
 
 /// GET /api/archive/verify/order/:receipt_number
 /// 验证单个订单的事件哈希链完整性
@@ -22,10 +22,7 @@ pub async fn verify_order(
         .archive_service()
         .ok_or_else(|| AppError::internal("Archive service not available"))?;
 
-    let verification = archive_service
-        .verify_order(&receipt_number)
-        .await
-        ?;
+    let verification = archive_service.verify_order(&receipt_number).await?;
 
     Ok(Json(verification))
 }
@@ -61,8 +58,7 @@ pub async fn verify_daily_chain(
 
     let verification = archive_service
         .verify_daily_chain(&date, start, end)
-        .await
-        ?;
+        .await?;
 
     Ok(Json(verification))
 }

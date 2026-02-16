@@ -3,9 +3,9 @@
 //! Append-only 设计，没有任何删除/更新接口。
 //! SHA256 哈希链确保防篡改。
 
-use std::sync::Arc;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
+use std::sync::Arc;
 use thiserror::Error;
 
 use super::types::{AuditAction, AuditEntry, AuditQuery};
@@ -63,8 +63,7 @@ impl AuditRow {
     fn into_entry(self) -> AuditEntry {
         let action: AuditAction = serde_json::from_str(&format!("\"{}\"", self.action))
             .unwrap_or(AuditAction::SystemStartup);
-        let details: serde_json::Value =
-            serde_json::from_str(&self.details).unwrap_or_default();
+        let details: serde_json::Value = serde_json::from_str(&self.details).unwrap_or_default();
         AuditEntry {
             id: self.sequence as u64,
             timestamp: self.timestamp,

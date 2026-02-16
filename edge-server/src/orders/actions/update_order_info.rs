@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -48,9 +48,7 @@ impl CommandHandler for UpdateOrderInfoAction {
         }
 
         // 3. Validate that at least one field is being updated
-        if self.guest_count.is_none()
-            && self.table_name.is_none()
-            && self.is_pre_payment.is_none()
+        if self.guest_count.is_none() && self.table_name.is_none() && self.is_pre_payment.is_none()
         {
             return Err(OrderError::InvalidOperation(
                 CommandErrorCode::NoFieldsToUpdate,
@@ -128,7 +126,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(4),
+            guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -204,7 +202,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: None,
+            guest_count: None,
             table_name: None,
             is_pre_payment: None,
         };
@@ -228,7 +226,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(0),
+            guest_count: Some(0),
             table_name: None,
             is_pre_payment: None,
         };
@@ -252,7 +250,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(-1),
+            guest_count: Some(-1),
             table_name: None,
             is_pre_payment: None,
         };
@@ -277,7 +275,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(4),
+            guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -302,7 +300,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(4),
+            guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -323,7 +321,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "nonexistent".to_string(),
-                        guest_count: Some(4),
+            guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -383,7 +381,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: None,
+            guest_count: None,
             table_name: None,
             is_pre_payment: Some(true),
         };
@@ -412,7 +410,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(3),
+            guest_count: Some(3),
             table_name: None,
             is_pre_payment: None,
         };
@@ -436,7 +434,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-                        guest_count: Some(5),
+            guest_count: Some(5),
             table_name: None,
             is_pre_payment: None,
         };

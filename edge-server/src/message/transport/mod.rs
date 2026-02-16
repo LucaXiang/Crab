@@ -109,6 +109,15 @@ pub(crate) async fn read_from_stream<R: AsyncReadExt + Unpin>(
 
     let len = u32::from_le_bytes(len_buf) as usize;
 
+    // Guard against memory exhaustion from malicious/corrupted payload length
+    const MAX_PAYLOAD_SIZE: usize = 16 * 1024 * 1024; // 16 MB
+    if len > MAX_PAYLOAD_SIZE {
+        return Err(AppError::invalid(format!(
+            "Payload size {} exceeds maximum allowed {} bytes",
+            len, MAX_PAYLOAD_SIZE
+        )));
+    }
+
     // 读取载荷内容
     let mut payload = vec![0u8; len];
     reader
@@ -139,7 +148,9 @@ pub(crate) async fn write_to_stream<W: AsyncWriteExt + Unpin>(
     let correlation_bytes = msg.correlation_id.unwrap_or(Uuid::nil()).into_bytes();
     data.extend_from_slice(&correlation_bytes);
 
-    data.extend_from_slice(&(msg.payload.len() as u32).to_le_bytes());
+    let payload_len = u32::try_from(msg.payload.len())
+        .map_err(|_| AppError::internal("Payload exceeds u32::MAX bytes"))?;
+    data.extend_from_slice(&payload_len.to_le_bytes());
     data.extend_from_slice(&msg.payload);
 
     writer

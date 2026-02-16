@@ -63,4 +63,3 @@ pub fn print_receipt(
         }
     }
 }
-

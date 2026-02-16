@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use shared::order::types::CommandErrorCode;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_optional_text};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, SplitType};
 
 /// CancelPayment action
@@ -44,10 +44,13 @@ impl CommandHandler for CancelPaymentAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
-                    "Cannot cancel payment on order with status {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot cancel payment on order with status {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -59,22 +62,23 @@ impl CommandHandler for CancelPaymentAction {
             .ok_or_else(|| OrderError::PaymentNotFound(self.payment_id.clone()))?;
 
         // 5. Check if this is an AA payment that would zero-out AA shares
-        let is_aa_zero_out =
-            if let (Some(SplitType::AaSplit), Some(shares)) = (&payment.split_type, payment.aa_shares) {
-                let other_active_aa_shares: i32 = snapshot
-                    .payments
-                    .iter()
-                    .filter(|p| {
-                        !p.cancelled
-                            && p.payment_id != self.payment_id
-                            && p.split_type == Some(SplitType::AaSplit)
-                    })
-                    .filter_map(|p| p.aa_shares)
-                    .sum();
-                other_active_aa_shares == 0 && shares > 0
-            } else {
-                false
-            };
+        let is_aa_zero_out = if let (Some(SplitType::AaSplit), Some(shares)) =
+            (&payment.split_type, payment.aa_shares)
+        {
+            let other_active_aa_shares: i32 = snapshot
+                .payments
+                .iter()
+                .filter(|p| {
+                    !p.cancelled
+                        && p.payment_id != self.payment_id
+                        && p.split_type == Some(SplitType::AaSplit)
+                })
+                .filter_map(|p| p.aa_shares)
+                .sum();
+            other_active_aa_shares == 0 && shares > 0
+        } else {
+            false
+        };
 
         let aa_total_for_cancel = snapshot.aa_total_shares;
 
@@ -102,9 +106,7 @@ impl CommandHandler for CancelPaymentAction {
         let mut events = vec![event];
 
         // 7. If AA zero-out, produce extra AaSplitCancelled event
-        if is_aa_zero_out
-            && let Some(total_shares) = aa_total_for_cancel
-        {
+        if is_aa_zero_out && let Some(total_shares) = aa_total_for_cancel {
             let seq2 = ctx.next_sequence();
             let cancel_event = OrderEvent::new(
                 seq2,
@@ -457,7 +459,12 @@ mod tests {
 
     // ========== AA cancel rollback tests ==========
 
-    fn create_aa_payment(payment_id: &str, method: &str, amount: f64, shares: i32) -> PaymentRecord {
+    fn create_aa_payment(
+        payment_id: &str,
+        method: &str,
+        amount: f64,
+        shares: i32,
+    ) -> PaymentRecord {
         PaymentRecord {
             payment_id: payment_id.to_string(),
             method: method.to_string(),
@@ -503,8 +510,12 @@ mod tests {
         snapshot.paid_amount = 60.0;
         snapshot.aa_total_shares = Some(3);
         snapshot.aa_paid_shares = 2;
-        snapshot.payments.push(create_aa_payment("aa-pay-1", "CASH", 30.0, 1));
-        snapshot.payments.push(create_aa_payment("aa-pay-2", "CARD", 30.0, 1));
+        snapshot
+            .payments
+            .push(create_aa_payment("aa-pay-1", "CASH", 30.0, 1));
+        snapshot
+            .payments
+            .push(create_aa_payment("aa-pay-2", "CARD", 30.0, 1));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -539,7 +550,9 @@ mod tests {
         snapshot.aa_total_shares = Some(3);
         snapshot.aa_paid_shares = 1;
         // Only one active AA payment left
-        snapshot.payments.push(create_aa_payment("aa-pay-1", "CASH", 30.0, 1));
+        snapshot
+            .payments
+            .push(create_aa_payment("aa-pay-1", "CASH", 30.0, 1));
         // Second one was already cancelled
         let mut cancelled_pay = create_aa_payment("aa-pay-2", "CARD", 30.0, 1);
         cancelled_pay.cancelled = true;
@@ -584,8 +597,12 @@ mod tests {
         snapshot.total = 100.0;
         snapshot.paid_amount = 40.0;
         snapshot.has_amount_split = true;
-        snapshot.payments.push(create_amount_split_payment("amt-pay-1", "CASH", 20.0));
-        snapshot.payments.push(create_amount_split_payment("amt-pay-2", "CARD", 20.0));
+        snapshot
+            .payments
+            .push(create_amount_split_payment("amt-pay-1", "CASH", 20.0));
+        snapshot
+            .payments
+            .push(create_amount_split_payment("amt-pay-2", "CARD", 20.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

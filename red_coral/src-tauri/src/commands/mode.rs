@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use tauri::{Emitter, State};
 
-use crate::core::response::{ApiResponse, AppConfigResponse, ErrorCode};
 use crate::core::bridge::InitStatus;
+use crate::core::response::{ApiResponse, AppConfigResponse, ErrorCode};
 use crate::core::{AppState, ClientBridge, ModeInfo, ModeType};
 
 /// 查询后端初始化状态 (先于 get_app_state 调用)
@@ -103,9 +103,7 @@ pub async fn start_client_mode(
 
 /// 停止当前模式
 #[tauri::command]
-pub async fn stop_mode(
-    bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<()>, String> {
+pub async fn stop_mode(bridge: State<'_, Arc<ClientBridge>>) -> Result<ApiResponse<()>, String> {
     match bridge.stop().await {
         Ok(_) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -138,9 +136,7 @@ pub async fn check_first_run(
 
 /// 重新连接 (仅 Client 模式)
 #[tauri::command]
-pub async fn reconnect(
-    bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<()>, String> {
+pub async fn reconnect(bridge: State<'_, Arc<ClientBridge>>) -> Result<ApiResponse<()>, String> {
     // Clone the Arc to work with it independently
     let bridge_arc = (*bridge).clone();
 
@@ -209,10 +205,7 @@ pub async fn update_client_config(
     edge_url: String,
     message_addr: String,
 ) -> Result<ApiResponse<()>, String> {
-    match bridge
-        .update_client_config(&edge_url, &message_addr)
-        .await
-    {
+    match bridge.update_client_config(&edge_url, &message_addr).await {
         Ok(_) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::ConfigError,

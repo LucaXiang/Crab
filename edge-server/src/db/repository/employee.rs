@@ -168,9 +168,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
         .ok_or_else(|| RepoError::NotFound(format!("Employee {id} not found")))?;
 
     if existing.is_system {
-        return Err(RepoError::Validation(
-            "Cannot delete system user".into(),
-        ));
+        return Err(RepoError::Validation("Cannot delete system user".into()));
     }
 
     sqlx::query!("DELETE FROM employee WHERE id = ?", id)

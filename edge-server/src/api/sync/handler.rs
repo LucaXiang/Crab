@@ -1,6 +1,6 @@
 //! Sync API Handlers
 
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use shared::models::SyncStatus;
 use std::collections::HashMap;
 

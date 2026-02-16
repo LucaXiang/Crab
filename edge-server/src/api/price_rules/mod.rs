@@ -22,8 +22,13 @@ fn routes() -> Router<ServerState> {
     // 写入路由：需要 price_rules:manage 权限
     let write_routes = Router::new()
         .route("/", axum::routing::post(handler::create))
-        .route("/{id}", axum::routing::put(handler::update).delete(handler::delete))
-        .layer(middleware::from_fn(require_permission("price_rules:manage")));
+        .route(
+            "/{id}",
+            axum::routing::put(handler::update).delete(handler::delete),
+        )
+        .layer(middleware::from_fn(require_permission(
+            "price_rules:manage",
+        )));
 
     read_routes.merge(write_routes)
 }

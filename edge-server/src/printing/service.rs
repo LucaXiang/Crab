@@ -34,9 +34,10 @@ impl From<PrintServiceError> for shared::error::AppError {
             PrintServiceError::LabelRecordNotFound(id) => {
                 AppError::not_found(format!("Label record {}", id))
             }
-            PrintServiceError::PrintingDisabled => {
-                AppError::with_message(ErrorCode::PrinterNotAvailable, "Printing disabled".to_string())
-            }
+            PrintServiceError::PrintingDisabled => AppError::with_message(
+                ErrorCode::PrinterNotAvailable,
+                "Printing disabled".to_string(),
+            ),
         }
     }
 }
@@ -208,10 +209,7 @@ impl KitchenPrintService {
             })
             .unwrap_or_default();
 
-        let spec_name = item
-            .selected_specification
-            .as_ref()
-            .map(|s| s.name.clone());
+        let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
 
         PrintItemContext {
             category_id,
@@ -301,7 +299,6 @@ impl KitchenPrintService {
     pub fn cleanup_old_records(&self, max_age_secs: i64) -> PrintServiceResult<usize> {
         Ok(self.storage.cleanup_old_records(max_age_secs)?)
     }
-
 }
 
 impl std::fmt::Debug for KitchenPrintService {

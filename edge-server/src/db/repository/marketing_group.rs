@@ -12,7 +12,7 @@ use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MarketingGroup>> {
     let rows = sqlx::query_as::<_, MarketingGroup>(
-        "SELECT id, name, display_name, description, sort_order, points_earn_rate, is_active, created_at, updated_at FROM marketing_group WHERE is_active = 1 ORDER BY sort_order",
+        "SELECT id, name, display_name, description, sort_order, points_earn_rate, created_at, updated_at FROM marketing_group ORDER BY sort_order",
     )
     .fetch_all(pool)
     .await?;
@@ -21,7 +21,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MarketingGroup>> {
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<MarketingGroup>> {
     let row = sqlx::query_as::<_, MarketingGroup>(
-        "SELECT id, name, display_name, description, sort_order, points_earn_rate, is_active, created_at, updated_at FROM marketing_group WHERE id = ?",
+        "SELECT id, name, display_name, description, sort_order, points_earn_rate, created_at, updated_at FROM marketing_group WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -33,7 +33,7 @@ pub async fn create(pool: &SqlitePool, data: MarketingGroupCreate) -> RepoResult
     let now = shared::util::now_millis();
     let sort_order = data.sort_order.unwrap_or(0);
     let id = sqlx::query_scalar!(
-        r#"INSERT INTO marketing_group (name, display_name, description, sort_order, points_earn_rate, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?6) RETURNING id as "id!""#,
+        r#"INSERT INTO marketing_group (name, display_name, description, sort_order, points_earn_rate, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6) RETURNING id as "id!""#,
         data.name,
         data.display_name,
         data.description,
@@ -55,13 +55,12 @@ pub async fn update(
 ) -> RepoResult<MarketingGroup> {
     let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE marketing_group SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), sort_order = COALESCE(?4, sort_order), points_earn_rate = COALESCE(?5, points_earn_rate), is_active = COALESCE(?6, is_active), updated_at = ?7 WHERE id = ?8",
+        "UPDATE marketing_group SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), sort_order = COALESCE(?4, sort_order), points_earn_rate = COALESCE(?5, points_earn_rate), updated_at = ?6 WHERE id = ?7",
         data.name,
         data.display_name,
         data.description,
         data.sort_order,
         data.points_earn_rate,
-        data.is_active,
         now,
         id
     )
@@ -78,14 +77,51 @@ pub async fn update(
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    let now = shared::util::now_millis();
-    let rows = sqlx::query!(
-        "UPDATE marketing_group SET is_active = 0, updated_at = ? WHERE id = ? AND is_active = 1",
-        now,
+    let mut tx = pool.begin().await?;
+
+    // 级联删除子记录
+    let activity_ids: Vec<i64> = sqlx::query_scalar!(
+        r#"SELECT id as "id!" FROM stamp_activity WHERE marketing_group_id = ?"#,
         id
     )
-    .execute(pool)
+    .fetch_all(&mut *tx)
     .await?;
+
+    for aid in &activity_ids {
+        sqlx::query!(
+            "DELETE FROM member_stamp_progress WHERE stamp_activity_id = ?",
+            aid
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!("DELETE FROM stamp_target WHERE stamp_activity_id = ?", aid)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!(
+            "DELETE FROM stamp_reward_target WHERE stamp_activity_id = ?",
+            aid
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+    sqlx::query!(
+        "DELETE FROM stamp_activity WHERE marketing_group_id = ?",
+        id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM mg_discount_rule WHERE marketing_group_id = ?",
+        id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    let rows = sqlx::query!("DELETE FROM marketing_group WHERE id = ?", id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
     Ok(rows.rows_affected() > 0)
 }
 
@@ -320,9 +356,12 @@ async fn replace_stamp_targets(
     activity_id: i64,
     targets: &[StampTargetInput],
 ) -> RepoResult<()> {
-    sqlx::query!("DELETE FROM stamp_target WHERE stamp_activity_id = ?", activity_id)
-        .execute(&mut **tx)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM stamp_target WHERE stamp_activity_id = ?",
+        activity_id
+    )
+    .execute(&mut **tx)
+    .await?;
     for t in targets {
         sqlx::query!(
             "INSERT INTO stamp_target (stamp_activity_id, target_type, target_id) VALUES (?1, ?2, ?3)",

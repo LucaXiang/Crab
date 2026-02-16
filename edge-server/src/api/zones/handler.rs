@@ -5,13 +5,15 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{dining_table, zone};
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{DiningTable, Zone, ZoneCreate, ZoneUpdate};
 
 const RESOURCE: &str = "zone";
@@ -62,7 +64,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::ZoneCreated,
-        "zone", &id,
+        "zone",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&z, "zone")
@@ -95,7 +98,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::ZoneUpdated,
-        "zone", &id_str,
+        "zone",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_zone, &z, "zone")
@@ -114,8 +118,12 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let name_for_audit = zone::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|z| z.name.clone()).unwrap_or_default();
+    let name_for_audit = zone::find_by_id(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|z| z.name.clone())
+        .unwrap_or_default();
     let result = zone::delete(&state.pool, id).await?;
 
     if result {
@@ -123,7 +131,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::ZoneDeleted,
-            "zone", &id_str,
+            "zone",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

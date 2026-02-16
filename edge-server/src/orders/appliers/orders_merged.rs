@@ -5,7 +5,7 @@
 //! - OrderMergedOut: Source order is marked as Merged status
 
 use super::items_added::add_or_merge_item;
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, OrderStatus};
 
@@ -39,14 +39,17 @@ impl EventApplier for OrderMergedApplier {
 
             // Merge paid item quantities
             for (key, qty) in paid_item_quantities {
-                *snapshot.paid_item_quantities.entry(key.clone()).or_insert(0) += qty;
+                *snapshot
+                    .paid_item_quantities
+                    .entry(key.clone())
+                    .or_insert(0) += qty;
             }
 
             // Accumulate paid amount
             snapshot.paid_amount += paid_amount;
 
             // Recalculate totals after merging items (updates subtotal, total, remaining, etc.)
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Merge split state
             if *has_amount_split {
@@ -128,7 +131,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -332,8 +335,7 @@ mod tests {
         snapshot.table_id = Some(10);
         snapshot.table_name = Some("Target Table".to_string());
 
-        let event =
-            create_order_merged_event("target-1", 2, 20, "Source Table", vec![]);
+        let event = create_order_merged_event("target-1", 2, 20, "Source Table", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -656,13 +658,7 @@ mod tests {
         // Source has same item but no discount
         let source_item = create_test_item("item-1", "Coffee"); // price=10.0, no discount
 
-        let event = create_order_merged_event(
-            "target-1",
-            2,
-            2,
-            "Table 2",
-            vec![source_item],
-        );
+        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![source_item]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -688,13 +684,7 @@ mod tests {
         // Source has same item with same pricing
         let source_item = create_test_item("item-1", "Coffee"); // price=10, qty=1
 
-        let event = create_order_merged_event(
-            "target-1",
-            2,
-            2,
-            "Table 2",
-            vec![source_item],
-        );
+        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![source_item]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);

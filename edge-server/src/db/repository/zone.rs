@@ -14,12 +14,11 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Zone>> {
 }
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Zone>> {
-    let zone = sqlx::query_as::<_, Zone>(
-        "SELECT id, name, description, is_active FROM zone WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await?;
+    let zone =
+        sqlx::query_as::<_, Zone>("SELECT id, name, description, is_active FROM zone WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
     Ok(zone)
 }
 

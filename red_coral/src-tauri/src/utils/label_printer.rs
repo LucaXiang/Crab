@@ -1130,7 +1130,8 @@ unsafe fn extract_bitmap_data(
     }
 
     // Copy pixel data (ARGB format)
-    let stride = usize::try_from(bmp_data.Stride.unsigned_abs()).expect("stride overflow");
+    let stride = usize::try_from(bmp_data.Stride.unsigned_abs())
+        .map_err(|_| Error::new(E_FAIL, "BMP stride overflow — corrupted image data"))?;
     let data_size = stride * height as usize;
     let mut pixels = vec![0u8; data_size];
 

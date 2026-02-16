@@ -35,28 +35,34 @@ impl CommandHandler for UnlinkMemberAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
-                    "Cannot unlink member on order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot unlink member on order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
         // 3. Must have a member linked
         if snapshot.member_id.is_none() {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::NoMemberLinked,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::NoMemberLinked,
                 "No member linked to this order".to_string(),
             ));
         }
 
         // 4. Block during active split payments
         if snapshot.aa_total_shares.is_some() {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::AaSplitActive,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AaSplitActive,
                 "Cannot unlink member during AA split".to_string(),
             ));
         }
         if snapshot.has_amount_split {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::AmountSplitActive,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::AmountSplitActive,
                 "Cannot unlink member during amount split".to_string(),
             ));
         }

@@ -3,8 +3,7 @@
 mod handler;
 
 use axum::{
-    Router,
-    middleware,
+    Router, middleware,
     routing::{get, post, put},
 };
 
@@ -18,8 +17,7 @@ pub fn router() -> Router<ServerState> {
 
 fn routes() -> Router<ServerState> {
     // 读取路由：无需权限检查（查看系统状态是基础操作）
-    let read_routes = Router::new()
-        .route("/", get(handler::get));
+    let read_routes = Router::new().route("/", get(handler::get));
 
     // 写入路由：需要 settings:manage 权限
     let write_routes = Router::new()

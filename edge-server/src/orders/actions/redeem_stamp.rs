@@ -61,10 +61,13 @@ impl CommandHandler for RedeemStampAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             _ => {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
-                    "Cannot redeem stamp on order with status: {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot redeem stamp on order with status: {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
@@ -82,10 +85,13 @@ impl CommandHandler for RedeemStampAction {
             .iter()
             .any(|r| r.stamp_activity_id == self.stamp_activity_id)
         {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::StampAlreadyRedeemed, format!(
-                "Stamp activity {} already redeemed in this order",
-                self.stamp_activity_id
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::StampAlreadyRedeemed,
+                format!(
+                    "Stamp activity {} already redeemed in this order",
+                    self.stamp_activity_id
+                ),
+            ));
         }
 
         // 5. Resolve reward product info based on mode
@@ -100,24 +106,26 @@ impl CommandHandler for RedeemStampAction {
 
         // Returns (product_info, reward_instance_id, comp_qty_override)
         // comp_qty_override: Some for comp-existing (capped to item qty), None for add-new
-        let (info, reward_instance_id, comp_qty_override) = if let Some(ref existing_id) = comp_existing {
+        let (info, reward_instance_id, comp_qty_override) = if let Some(ref existing_id) =
+            comp_existing
+        {
             // Match mode: comp an existing item
             let item = snapshot
                 .items
                 .iter()
                 .find(|i| i.instance_id == *existing_id)
                 .ok_or_else(|| {
-                    OrderError::InvalidOperation(CommandErrorCode::StampTargetMismatch, format!(
-                        "Item {} not found in order",
-                        existing_id
-                    ))
+                    OrderError::InvalidOperation(
+                        CommandErrorCode::StampTargetMismatch,
+                        format!("Item {} not found in order", existing_id),
+                    )
                 })?;
 
             if item.is_comped {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::ItemAlreadyComped, format!(
-                    "Item {} is already comped",
-                    existing_id
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::ItemAlreadyComped,
+                    format!("Item {} is already comped", existing_id),
+                ));
             }
 
             // Validate the item matches: designated_product_id for Designated, reward_targets otherwise
@@ -160,7 +168,9 @@ impl CommandHandler for RedeemStampAction {
                 existing_id.clone()
             };
             (product_info, rid, Some(capped_qty))
-        } else if self.product_id.is_some() && self.activity.reward_strategy != RewardStrategy::Designated {
+        } else if self.product_id.is_some()
+            && self.activity.reward_strategy != RewardStrategy::Designated
+        {
             // Selection mode (Eco/Gen + explicit product_id): add a new item
             let info = self.reward_product_info.clone().ok_or_else(|| {
                 OrderError::InvalidOperation(
@@ -182,10 +192,13 @@ impl CommandHandler for RedeemStampAction {
                     )
                 })?;
             let info = self.reward_product_info.clone().ok_or_else(|| {
-                OrderError::InvalidOperation(CommandErrorCode::StampProductNotAvailable, format!(
-                    "Product info not available for designated product {}",
-                    product_id
-                ))
+                OrderError::InvalidOperation(
+                    CommandErrorCode::StampProductNotAvailable,
+                    format!(
+                        "Product info not available for designated product {}",
+                        product_id
+                    ),
+                )
             })?;
             let rid = format!("stamp_reward::{}", metadata.command_id);
             (info, rid, None)
@@ -306,7 +319,12 @@ mod tests {
         }
     }
 
-    fn create_test_item(product_id: i64, instance_id: &str, price: f64, category_id: Option<i64>) -> CartItemSnapshot {
+    fn create_test_item(
+        product_id: i64,
+        instance_id: &str,
+        price: f64,
+        category_id: Option<i64>,
+    ) -> CartItemSnapshot {
         CartItemSnapshot {
             id: product_id,
             instance_id: instance_id.to_string(),
@@ -476,9 +494,15 @@ mod tests {
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
         // Category 100: two items at different prices; Category 200: one item
-        snapshot.items.push(create_test_item(1, "inst-1", 20.0, Some(100)));
-        snapshot.items.push(create_test_item(2, "inst-2", 5.0, Some(100)));
-        snapshot.items.push(create_test_item(3, "inst-3", 8.0, Some(200)));
+        snapshot
+            .items
+            .push(create_test_item(1, "inst-1", 20.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(2, "inst-2", 5.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(3, "inst-3", 8.0, Some(200)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -503,7 +527,13 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::StampRedeemed { product_id, original_price, category_id, .. } = &events[0].payload {
+        if let EventPayload::StampRedeemed {
+            product_id,
+            original_price,
+            category_id,
+            ..
+        } = &events[0].payload
+        {
             // Should pick cheapest in category 100 → product 2 at $5.0
             assert_eq!(*product_id, 2);
             assert!((original_price - 5.0).abs() < f64::EPSILON);
@@ -523,9 +553,15 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
-        snapshot.items.push(create_test_item(1, "inst-1", 20.0, Some(100)));
-        snapshot.items.push(create_test_item(2, "inst-2", 5.0, Some(100)));
-        snapshot.items.push(create_test_item(3, "inst-3", 50.0, Some(200)));
+        snapshot
+            .items
+            .push(create_test_item(1, "inst-1", 20.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(2, "inst-2", 5.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(3, "inst-3", 50.0, Some(200)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -550,7 +586,13 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::StampRedeemed { product_id, original_price, category_id, .. } = &events[0].payload {
+        if let EventPayload::StampRedeemed {
+            product_id,
+            original_price,
+            category_id,
+            ..
+        } = &events[0].payload
+        {
             // Should pick most expensive in category 100 → product 1 at $20.0
             assert_eq!(*product_id, 1);
             assert!((original_price - 20.0).abs() < f64::EPSILON);
@@ -570,8 +612,12 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
-        snapshot.items.push(create_test_item(10, "inst-1", 15.0, Some(100)));
-        snapshot.items.push(create_test_item(20, "inst-2", 25.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(10, "inst-1", 15.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(20, "inst-2", 25.0, Some(100)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -596,7 +642,12 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::StampRedeemed { product_id, original_price, .. } = &events[0].payload {
+        if let EventPayload::StampRedeemed {
+            product_id,
+            original_price,
+            ..
+        } = &events[0].payload
+        {
             // Only product 20 matches, regardless of strategy
             assert_eq!(*product_id, 20);
             assert!((original_price - 25.0).abs() < f64::EPSILON);
@@ -615,7 +666,9 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
-        snapshot.items.push(create_test_item(1, "inst-1", 10.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(1, "inst-1", 10.0, Some(100)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -654,7 +707,9 @@ mod tests {
         let mut comped_item = create_test_item(1, "inst-1", 5.0, Some(100));
         comped_item.is_comped = true;
         snapshot.items.push(comped_item);
-        snapshot.items.push(create_test_item(2, "inst-2", 15.0, Some(100)));
+        snapshot
+            .items
+            .push(create_test_item(2, "inst-2", 15.0, Some(100)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -750,7 +805,9 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
-        snapshot.items.push(create_test_item(1, "inst-1", 10.0, Some(777)));
+        snapshot
+            .items
+            .push(create_test_item(1, "inst-1", 10.0, Some(777)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -771,9 +828,17 @@ mod tests {
             reward_product_info: None,
         };
 
-        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        let events = action
+            .execute(&mut ctx, &create_test_metadata())
+            .await
+            .unwrap();
 
-        if let EventPayload::StampRedeemed { category_id, category_name, .. } = &events[0].payload {
+        if let EventPayload::StampRedeemed {
+            category_id,
+            category_name,
+            ..
+        } = &events[0].payload
+        {
             assert_eq!(*category_id, Some(777));
             assert_eq!(category_name.as_deref(), Some("Cat-777"));
         } else {
@@ -792,12 +857,14 @@ mod tests {
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
         // Simulate a previous redemption already recorded
-        snapshot.stamp_redemptions.push(shared::order::StampRedemptionState {
-            stamp_activity_id: 1,
-            reward_instance_id: "stamp_reward::prev-cmd".to_string(),
-            is_comp_existing: false,
-            comp_source_instance_id: None,
-        });
+        snapshot
+            .stamp_redemptions
+            .push(shared::order::StampRedemptionState {
+                stamp_activity_id: 1,
+                reward_instance_id: "stamp_reward::prev-cmd".to_string(),
+                is_comp_existing: false,
+                comp_source_instance_id: None,
+            });
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -828,7 +895,10 @@ mod tests {
 
         // Verify error message mentions "already redeemed"
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
-            assert!(msg.contains("already redeemed"), "Expected 'already redeemed' in: {msg}");
+            assert!(
+                msg.contains("already redeemed"),
+                "Expected 'already redeemed' in: {msg}"
+            );
         }
     }
 
@@ -846,7 +916,9 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
-        snapshot.items.push(create_test_item(50, "potato-1", 4.50, Some(1)));
+        snapshot
+            .items
+            .push(create_test_item(50, "potato-1", 4.50, Some(1)));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -87,7 +87,11 @@ impl CommandHandler for UncompItemAction {
         // 6. Check if source item still exists (for merge-back)
         let merged_into = if source_instance_id != self.instance_id {
             // Partial comp case: check if source item exists
-            if snapshot.items.iter().any(|i| i.instance_id == source_instance_id) {
+            if snapshot
+                .items
+                .iter()
+                .any(|i| i.instance_id == source_instance_id)
+            {
                 Some(source_instance_id)
             } else {
                 None
@@ -204,7 +208,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0, 2));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0, 2));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -244,14 +250,20 @@ mod tests {
         // Source item (3 remaining after split)
         let source_item = create_test_item("item-1", 1, "Test Product", 10.0, 3, false);
         // Comped item (2 comped)
-        let mut comped_item = create_test_item("item-1::comp::uuid-1", 1, "Test Product", 0.0, 2, true);
+        let mut comped_item =
+            create_test_item("item-1::comp::uuid-1", 1, "Test Product", 0.0, 2, true);
         comped_item.original_price = 10.0;
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(source_item);
         snapshot.items.push(comped_item);
-        snapshot.comps.push(create_comp_record("item-1::comp::uuid-1", "item-1", 10.0, 2));
+        snapshot.comps.push(create_comp_record(
+            "item-1::comp::uuid-1",
+            "item-1",
+            10.0,
+            2,
+        ));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -288,13 +300,19 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Only comped item exists, source was removed
-        let mut comped_item = create_test_item("item-1::comp::uuid-1", 1, "Test Product", 0.0, 2, true);
+        let mut comped_item =
+            create_test_item("item-1::comp::uuid-1", 1, "Test Product", 0.0, 2, true);
         comped_item.original_price = 10.0;
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(comped_item);
-        snapshot.comps.push(create_comp_record("item-1::comp::uuid-1", "item-1", 10.0, 2));
+        snapshot.comps.push(create_comp_record(
+            "item-1::comp::uuid-1",
+            "item-1",
+            10.0,
+            2,
+        ));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -310,11 +328,7 @@ mod tests {
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
-        if let EventPayload::ItemUncomped {
-            merged_into,
-            ..
-        } = &events[0].payload
-        {
+        if let EventPayload::ItemUncomped { merged_into, .. } = &events[0].payload {
             assert_eq!(*merged_into, None); // Source gone, no merge
         } else {
             panic!("Expected ItemUncomped payload");
@@ -380,7 +394,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0, 1));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0, 1));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -409,7 +425,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0, 1));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0, 1));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -437,7 +455,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
-        snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0, 1));
+        snapshot
+            .comps
+            .push(create_comp_record("item-1", "item-1", 10.0, 1));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

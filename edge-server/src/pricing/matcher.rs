@@ -2,8 +2,8 @@
 //!
 //! Logic for matching rules to products and checking time validity.
 
-use shared::models::{PriceRule, ProductScope};
 use chrono::Datelike;
+use shared::models::{PriceRule, ProductScope};
 use tracing::trace;
 
 /// Check if a rule matches a product based on scope
@@ -118,7 +118,7 @@ pub use shared::models::ZONE_SCOPE_RETAIL;
 /// zone_scope: "zone:all" = all zones, "zone:retail" = retail only, "zone:xxx" = specific zone
 pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bool) -> bool {
     match rule.zone_scope.as_str() {
-        ZONE_SCOPE_ALL => true,      // All zones
+        ZONE_SCOPE_ALL => true,         // All zones
         ZONE_SCOPE_RETAIL => is_retail, // Retail only
         zone_scope => {
             // Specific zone - direct string comparison
@@ -206,8 +206,6 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64, tz: chrono_tz::Tz) -> 
     true
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,30 +240,15 @@ mod tests {
     #[test]
     fn test_global_scope_matches_all() {
         let rule = make_rule(ProductScope::Global, None);
-        assert!(matches_product_scope(
-            &rule,
-            123,
-            Some(1),
-            &[]
-        ));
+        assert!(matches_product_scope(&rule, 123, Some(1), &[]));
     }
 
     #[test]
     fn test_product_scope_matches_specific() {
         let rule = make_rule(ProductScope::Product, Some(123));
 
-        assert!(matches_product_scope(
-            &rule,
-            123,
-            Some(1),
-            &[]
-        ));
-        assert!(!matches_product_scope(
-            &rule,
-            456,
-            Some(1),
-            &[]
-        ));
+        assert!(matches_product_scope(&rule, 123, Some(1), &[]));
+        assert!(!matches_product_scope(&rule, 456, Some(1), &[]));
     }
 
     #[test]

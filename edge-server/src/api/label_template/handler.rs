@@ -5,13 +5,15 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::label_template;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 
 const RESOURCE: &str = "label_template";
@@ -44,7 +46,9 @@ pub async fn list_all(State(state): State<ServerState>) -> AppResult<Json<Vec<La
 }
 
 /// GET /api/label-templates/default - Get the default label template
-pub async fn get_default(State(state): State<ServerState>) -> AppResult<Json<Option<LabelTemplate>>> {
+pub async fn get_default(
+    State(state): State<ServerState>,
+) -> AppResult<Json<Option<LabelTemplate>>> {
     let template = label_template::get_default(&state.pool).await?;
     Ok(Json(template))
 }
@@ -75,7 +79,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::LabelTemplateCreated,
-        "label_template", &id,
+        "label_template",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&template, "label_template")
@@ -108,7 +113,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::LabelTemplateUpdated,
-        "label_template", &id_str,
+        "label_template",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_template, &template, "label_template")
@@ -127,8 +133,12 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let name_for_audit = label_template::get(&state.pool, id).await.ok().flatten()
-        .map(|t| t.name.clone()).unwrap_or_default();
+    let name_for_audit = label_template::get(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|t| t.name.clone())
+        .unwrap_or_default();
     let result = label_template::delete(&state.pool, id).await?;
 
     let id_str = id.to_string();
@@ -137,7 +147,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::LabelTemplateDeleted,
-            "label_template", &id_str,
+            "label_template",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

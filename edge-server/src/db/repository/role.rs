@@ -69,9 +69,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: RoleUpdate) -> RepoResult<
         .ok_or_else(|| RepoError::NotFound(format!("Role {id} not found")))?;
 
     if existing.is_system {
-        return Err(RepoError::Validation(
-            "Cannot modify system role".into(),
-        ));
+        return Err(RepoError::Validation("Cannot modify system role".into()));
     }
 
     let permissions_json = data
@@ -105,9 +103,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
         .ok_or_else(|| RepoError::NotFound(format!("Role {id} not found")))?;
 
     if existing.is_system {
-        return Err(RepoError::Validation(
-            "Cannot delete system role".into(),
-        ));
+        return Err(RepoError::Validation("Cannot delete system role".into()));
     }
 
     sqlx::query!("DELETE FROM role WHERE id = ?", id)

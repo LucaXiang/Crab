@@ -2,7 +2,7 @@
 //!
 //! Applies the ItemsAdded event to add items to the snapshot.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot};
 
@@ -22,7 +22,7 @@ impl EventApplier for ItemsAddedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals using precise decimal arithmetic
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -93,7 +93,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 

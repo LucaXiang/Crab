@@ -7,18 +7,18 @@ use tokio::sync::mpsc;
 
 use crate::audit::{AuditService, AuditWorker};
 use crate::auth::JwtService;
-use crate::core::tasks::{BackgroundTasks, TaskKind};
 use crate::core::Config;
+use crate::core::tasks::{BackgroundTasks, TaskKind};
 
+use crate::archiving::ArchiveWorker;
 use crate::db::DbService;
-use crate::orders::{ArchiveWorker, OrdersManager};
+use crate::orders::OrdersManager;
 use crate::orders::actions::open_table::load_matching_rules;
 use crate::printing::{KitchenPrintService, PrintStorage};
 use crate::services::{
     ActivationService, CatalogService, CertService, HttpsService, MessageBusService,
     ProvisioningService,
 };
-
 
 /// 资源版本管理器
 ///
@@ -182,18 +182,18 @@ impl ServerState {
     /// 4. HTTPS 服务延迟初始化
     pub async fn initialize(config: &Config) -> Result<Self, crate::utils::AppError> {
         // 0. Ensure work_dir structure exists
-        config
-            .ensure_work_dir_structure()
-            .map_err(|e| crate::utils::AppError::internal(format!("Failed to create work directory: {e}")))?;
+        config.ensure_work_dir_structure().map_err(|e| {
+            crate::utils::AppError::internal(format!("Failed to create work directory: {e}"))
+        })?;
 
         // 1. Initialize DB
         // Database path: {tenant}/server/data/main.db/
         let db_path = config.database_dir();
         let db_path_str = db_path.to_string_lossy();
 
-        let db_service = DbService::new(&db_path_str)
-            .await
-            .map_err(|e| crate::utils::AppError::internal(format!("Failed to initialize database: {e}")))?;
+        let db_service = DbService::new(&db_path_str).await.map_err(|e| {
+            crate::utils::AppError::internal(format!("Failed to initialize database: {e}"))
+        })?;
         let pool = db_service.pool;
 
         // 2. Initialize Services
@@ -216,8 +216,11 @@ impl ServerState {
         // 4. Initialize OrdersManager (event sourcing) with CatalogService
         let orders_db_path = config.orders_db_file();
         let mut orders_manager =
-            OrdersManager::new(&orders_db_path, config.timezone)
-                .map_err(|e| crate::utils::AppError::internal(format!("Failed to initialize orders manager: {e}")))?;
+            OrdersManager::new(&orders_db_path, config.timezone).map_err(|e| {
+                crate::utils::AppError::internal(format!(
+                    "Failed to initialize orders manager: {e}"
+                ))
+            })?;
         orders_manager.set_catalog_service(catalog_service.clone());
         orders_manager.set_archive_service(pool.clone());
 
@@ -227,14 +230,15 @@ impl ServerState {
 
         // 5. Initialize KitchenPrintService
         let print_db_path = config.print_db_file();
-        let print_storage =
-            PrintStorage::open(&print_db_path)
-                .map_err(|e| crate::utils::AppError::internal(format!("Failed to initialize print storage: {e}")))?;
+        let print_storage = PrintStorage::open(&print_db_path).map_err(|e| {
+            crate::utils::AppError::internal(format!("Failed to initialize print storage: {e}"))
+        })?;
         let kitchen_print_service = Arc::new(KitchenPrintService::new(print_storage));
 
         // 7. Initialize AuditService (税务级审计日志 — SQLite)
         let data_dir = config.data_dir();
-        let (audit_service, audit_rx) = AuditService::new(pool.clone(), &data_dir, 1024, config.timezone);
+        let (audit_service, audit_rx) =
+            AuditService::new(pool.clone(), &data_dir, 1024, config.timezone);
 
         // 检测异常关闭和长时间停机（通过 LOCK 文件 + pending-ack.json）
         audit_service.on_startup().await;
@@ -243,9 +247,9 @@ impl ServerState {
         let dead_letter_path = data_dir.join("audit_dead_letter.jsonl");
         let audit_worker = AuditWorker::new(audit_service.storage().clone(), dead_letter_path);
         let audit_worker_handle = tokio::spawn(async move {
-            let result = futures::FutureExt::catch_unwind(
-                std::panic::AssertUnwindSafe(audit_worker.run(audit_rx)),
-            )
+            let result = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(
+                audit_worker.run(audit_rx),
+            ))
             .await;
             if let Err(panic_info) = result {
                 let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
@@ -288,14 +292,17 @@ impl ServerState {
         https.initialize(state.clone());
 
         // 9. 记录系统启动审计日志
-        state.audit_service.log(
-            crate::audit::AuditAction::SystemStartup,
-            "system",
-            "main",
-            None,
-            None,
-            serde_json::json!({"source": "local", "epoch": &state.epoch}),
-        ).await;
+        state
+            .audit_service
+            .log(
+                crate::audit::AuditAction::SystemStartup,
+                "system",
+                "main",
+                None,
+                None,
+                serde_json::json!({"source": "local", "epoch": &state.epoch}),
+            )
+            .await;
 
         Ok(state)
     }
@@ -391,7 +398,10 @@ impl ServerState {
         let message_bus_service = self.message_bus.clone();
         let credential_cache = self.activation.credential_cache.clone();
         tasks.spawn("message_bus_tcp_server", TaskKind::Worker, async move {
-            if let Err(e) = message_bus_service.start_tcp_server(tls_config, credential_cache).await {
+            if let Err(e) = message_bus_service
+                .start_tcp_server(tls_config, credential_cache)
+                .await
+            {
                 tracing::error!("Message Bus TCP server failed: {}", e);
             }
         });
@@ -408,10 +418,7 @@ impl ServerState {
         let restored = self.orders_manager.restore_rule_snapshots_from_redb();
 
         if restored > 0 {
-            tracing::info!(
-                "Restored {} order rule snapshots from redb",
-                restored,
-            );
+            tracing::info!("Restored {} order rule snapshots from redb", restored,);
         }
 
         // 检查是否有活跃订单缺少规则快照（可能是旧数据，redb 中没有）
@@ -425,14 +432,13 @@ impl ServerState {
 
         let mut fallback_count = 0;
         for order in &active_orders {
-            if self.orders_manager.get_cached_rules(&order.order_id).is_none() {
+            if self
+                .orders_manager
+                .get_cached_rules(&order.order_id)
+                .is_none()
+            {
                 // redb 中没有快照，从数据库回退加载
-                let rules = load_matching_rules(
-                    &self.pool,
-                    order.zone_id,
-                    order.is_retail,
-                )
-                .await;
+                let rules = load_matching_rules(&self.pool, order.zone_id, order.is_retail).await;
 
                 if !rules.is_empty() {
                     self.orders_manager.cache_rules(&order.order_id, rules);
@@ -534,7 +540,8 @@ impl ServerState {
                             data: serde_json::json!({
                                 "event": event,
                                 "snapshot": snapshot
-                            }).into(),
+                            })
+                            .into(),
                         };
                         if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
                             tracing::warn!("Failed to forward order sync: {}", e);
@@ -575,7 +582,6 @@ impl ServerState {
         });
     }
 
-
     /// 注册打印记录清理任务
     ///
     /// - 启动时立即执行一次清理
@@ -604,7 +610,8 @@ impl ServerState {
             }
 
             // Then cleanup periodically
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(CLEANUP_INTERVAL_SECS));
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(CLEANUP_INTERVAL_SECS));
             interval.tick().await; // Skip the first immediate tick (already cleaned up above)
 
             loop {
@@ -630,7 +637,7 @@ impl ServerState {
     /// - 启动时检查是否需要全链扫描（>7 天未执行）
     /// - 运行期间按 business_day_cutoff 每日触发
     fn register_verify_scheduler(&self, tasks: &mut BackgroundTasks) {
-        use crate::orders::VerifyScheduler;
+        use crate::archiving::VerifyScheduler;
 
         if let Some(archive_service) = self.orders_manager.archive_service() {
             let scheduler = VerifyScheduler::new(
@@ -653,10 +660,7 @@ impl ServerState {
     fn register_shift_auto_close(&self, tasks: &mut BackgroundTasks) {
         use crate::shifts::ShiftAutoCloseScheduler;
 
-        let scheduler = ShiftAutoCloseScheduler::new(
-            self.clone(),
-            tasks.shutdown_token(),
-        );
+        let scheduler = ShiftAutoCloseScheduler::new(self.clone(), tasks.shutdown_token());
 
         tasks.spawn("shift_auto_close", TaskKind::Periodic, async move {
             scheduler.run().await;
@@ -751,9 +755,7 @@ impl ServerState {
     /// 返回 Ok(()) 如果已激活且自检通过
     /// 返回 Err 如果未激活或自检失败
     pub async fn check_activation(&self) -> Result<(), crate::utils::AppError> {
-        self.activation
-            .check_activation(&self.cert_service)
-            .await
+        self.activation.check_activation(&self.cert_service).await
     }
 
     /// 等待激活（阻塞，可取消）

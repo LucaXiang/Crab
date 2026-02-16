@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::orders::reducer::generate_instance_id_from_parts;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{
     CartItemSnapshot, EventPayload, ItemChanges, ItemModificationResult, OrderEvent,
@@ -37,7 +37,7 @@ impl CommandHandler for ModifyItemAction {
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 1. Validate text lengths + changes
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
-        crate::orders::money::validate_item_changes(&self.changes)?;
+        crate::order_money::validate_item_changes(&self.changes)?;
 
         // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
@@ -189,13 +189,15 @@ impl CommandHandler for ModifyItemAction {
 /// Treats `None` and `Some(0.0)` as equivalent for discount.
 fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
     if let Some(price) = changes.price
-        && (price - item.price).abs() > 0.01 {
-            return true;
-        }
+        && (price - item.price).abs() > 0.01
+    {
+        return true;
+    }
     if let Some(qty) = changes.quantity
-        && qty != item.unpaid_quantity {
-            return true;
-        }
+        && qty != item.unpaid_quantity
+    {
+        return true;
+    }
     if let Some(discount) = changes.manual_discount_percent {
         let current = item.manual_discount_percent.unwrap_or(0.0);
         if (discount - current).abs() > 0.01 {
@@ -203,9 +205,10 @@ fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
         }
     }
     if let Some(ref note) = changes.note
-        && item.note.as_ref() != Some(note) {
-            return true;
-        }
+        && item.note.as_ref() != Some(note)
+    {
+        return true;
+    }
     if let Some(ref new_opts) = changes.selected_options {
         let current = item.selected_options.as_deref().unwrap_or(&[]);
         if new_opts.len() != current.len() {
@@ -302,8 +305,7 @@ fn calculate_modification_results(
     // When item has paid portions AND price/discount is changing, the applier
     // will split: frozen paid portion keeps original instance_id, new unpaid
     // portion needs a unique ID to avoid collision with previously frozen items.
-    let has_price_change =
-        changes.price.is_some() || changes.manual_discount_percent.is_some();
+    let has_price_change = changes.price.is_some() || changes.manual_discount_percent.is_some();
     let new_instance_id = if paid_qty > 0 && has_price_change {
         format!("{}::mod::{}", base_id, uuid::Uuid::new_v4())
     } else {
@@ -390,7 +392,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -1102,19 +1104,28 @@ mod tests {
         // Different price → true
         assert!(has_actual_changes(
             &item,
-            &ItemChanges { price: Some(15.0), ..Default::default() }
+            &ItemChanges {
+                price: Some(15.0),
+                ..Default::default()
+            }
         ));
 
         // Different quantity → true
         assert!(has_actual_changes(
             &item,
-            &ItemChanges { quantity: Some(5), ..Default::default() }
+            &ItemChanges {
+                quantity: Some(5),
+                ..Default::default()
+            }
         ));
 
         // Different discount → true
         assert!(has_actual_changes(
             &item,
-            &ItemChanges { manual_discount_percent: Some(10.0), ..Default::default() }
+            &ItemChanges {
+                manual_discount_percent: Some(10.0),
+                ..Default::default()
+            }
         ));
 
         // Adding options → true
@@ -1160,7 +1171,9 @@ mod tests {
         let mut item = create_test_item("item-1", 1, "Test Product", 5.0, 5);
         item.unpaid_quantity = 3; // 5 total - 2 paid = 3 unpaid
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 2);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 2);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -1209,7 +1222,9 @@ mod tests {
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 10);
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 3);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 3);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -1252,7 +1267,9 @@ mod tests {
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
         let mut snapshot = create_active_order_with_item("order-1", item);
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 2);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 2);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -1358,7 +1375,10 @@ mod tests {
         let result = action.execute(&mut ctx, &metadata).await;
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
-            assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
+            assert!(
+                msg.contains("comped"),
+                "Error message should mention comped: {msg}"
+            );
         }
     }
 }

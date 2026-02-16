@@ -11,9 +11,11 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{shift, store_info};
-use crate::utils::{AppError, AppResult};
 use crate::utils::time;
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
+};
+use crate::utils::{AppError, AppResult};
 use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 
 const RESOURCE: &str = "shift";
@@ -21,10 +23,14 @@ const RESOURCE: &str = "shift";
 /// Validate a cash amount is finite and non-negative
 fn validate_cash(value: f64, field: &str) -> AppResult<()> {
     if !value.is_finite() {
-        return Err(AppError::validation(format!("{field} must be a finite number")));
+        return Err(AppError::validation(format!(
+            "{field} must be a finite number"
+        )));
     }
     if value < 0.0 {
-        return Err(AppError::validation(format!("{field} must be non-negative, got {value}")));
+        return Err(AppError::validation(format!(
+            "{field} must be non-negative, got {value}"
+        )));
     }
     Ok(())
 }
@@ -78,9 +84,7 @@ pub async fn get_by_id(
 }
 
 /// GET /api/shifts/current - 获取当前班次 (全局单班次)
-pub async fn get_current(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Option<Shift>>> {
+pub async fn get_current(State(state): State<ServerState>) -> AppResult<Json<Option<Shift>>> {
     let current = shift::find_any_open(&state.pool).await?;
     Ok(Json(current))
 }
@@ -102,7 +106,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::ShiftOpened,
-        "shift", &id,
+        "shift",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
@@ -141,7 +146,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::ShiftUpdated,
-        "shift", &id_str,
+        "shift",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = crate::audit::create_diff(&old, &s, "shift")
@@ -171,7 +177,8 @@ pub async fn close(
     audit_log!(
         state.audit_service,
         AuditAction::ShiftClosed,
-        "shift", &id_str,
+        "shift",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
@@ -206,7 +213,8 @@ pub async fn force_close(
     audit_log!(
         state.audit_service,
         AuditAction::ShiftClosed,
-        "shift", &id_str,
+        "shift",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
@@ -237,9 +245,7 @@ pub async fn heartbeat(
 ///
 /// 根据 store_info.business_day_cutoff 计算当前营业日起始时间，
 /// 查询过期班次并广播 settlement_required 通知前端处理。
-pub async fn recover_stale(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Shift>>> {
+pub async fn recover_stale(State(state): State<ServerState>) -> AppResult<Json<Vec<Shift>>> {
     let tz = state.config.timezone;
     let cutoff_str = store_info::get(&state.pool)
         .await

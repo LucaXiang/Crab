@@ -5,13 +5,15 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::print_destination;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN};
 use shared::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
 
 const RESOURCE: &str = "print_destination";
@@ -35,9 +37,7 @@ fn validate_update(payload: &PrintDestinationUpdate) -> AppResult<()> {
 }
 
 /// GET /api/print-destinations - 获取所有打印目的地
-pub async fn list(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<PrintDestination>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<PrintDestination>>> {
     let items = print_destination::find_all(&state.pool).await?;
     Ok(Json(items))
 }
@@ -68,7 +68,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::PrintDestinationCreated,
-        "print_destination", &id,
+        "print_destination",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&item, "print_destination")
@@ -101,7 +102,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::PrintDestinationUpdated,
-        "print_destination", &id_str,
+        "print_destination",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_item, &item, "print_destination")
@@ -135,8 +137,12 @@ pub async fn delete(
         )));
     }
 
-    let name_for_audit = print_destination::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|p| p.name.clone()).unwrap_or_default();
+    let name_for_audit = print_destination::find_by_id(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|p| p.name.clone())
+        .unwrap_or_default();
     let result = print_destination::delete(&state.pool, id).await?;
 
     let id_str = id.to_string();
@@ -145,7 +151,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::PrintDestinationDeleted,
-            "print_destination", &id_str,
+            "print_destination",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

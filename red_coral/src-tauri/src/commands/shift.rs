@@ -21,7 +21,6 @@ pub async fn list_shifts(
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
-
     let mut query_params = vec![];
     if let Some(l) = limit {
         query_params.push(format!("limit={}", l));
@@ -53,10 +52,7 @@ pub async fn get_shift(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
 ) -> Result<ApiResponse<Shift>, String> {
-    match bridge
-        .get::<Shift>(&format!("/api/shifts/{}", id))
-        .await
-    {
+    match bridge.get::<Shift>(&format!("/api/shifts/{}", id)).await {
         Ok(shift) => Ok(ApiResponse::success(shift)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
@@ -146,7 +142,10 @@ pub async fn heartbeat_shift(
 pub async fn recover_stale_shifts(
     bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
-    match bridge.post::<Vec<Shift>, _>("/api/shifts/recover", &()).await {
+    match bridge
+        .post::<Vec<Shift>, _>("/api/shifts/recover", &())
+        .await
+    {
         Ok(shifts) => Ok(ApiResponse::success(shifts)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
@@ -162,7 +161,6 @@ pub async fn list_daily_reports(
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<Vec<DailyReport>>, String> {
-
     let mut query_params = vec![];
     if let Some(l) = limit {
         query_params.push(format!("limit={}", l));

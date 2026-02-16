@@ -2,7 +2,7 @@
 //!
 //! Applies the MemberLinked event to set member info and MG discounts on the snapshot.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -40,7 +40,7 @@ impl EventApplier for MemberLinkedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals (now including MG discounts)
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -52,7 +52,9 @@ impl EventApplier for MemberLinkedApplier {
 mod tests {
     use super::*;
     use shared::models::price_rule::{AdjustmentType, ProductScope};
-    use shared::order::{AppliedMgRule, CartItemSnapshot, MgItemDiscount, OrderEventType, OrderSnapshot};
+    use shared::order::{
+        AppliedMgRule, CartItemSnapshot, MgItemDiscount, OrderEventType, OrderSnapshot,
+    };
 
     fn create_member_linked_event(
         order_id: &str,

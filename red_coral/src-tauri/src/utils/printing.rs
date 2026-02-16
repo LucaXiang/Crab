@@ -100,10 +100,7 @@ mod platform {
         }
     }
 
-    pub fn print_raw_bytes(
-        _printer_name: Option<String>,
-        _bytes: Vec<u8>,
-    ) -> Result<(), String> {
+    pub fn print_raw_bytes(_printer_name: Option<String>, _bytes: Vec<u8>) -> Result<(), String> {
         Err("PRINTING_NOT_SUPPORTED".to_string())
     }
 

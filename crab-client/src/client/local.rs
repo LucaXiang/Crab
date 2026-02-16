@@ -135,7 +135,12 @@ impl CrabClient<Local, Connected> {
     ) -> Result<CrabClient<Local, Authenticated>, (ClientError, Self)> {
         let http = match self.oneshot_http.as_ref() {
             Some(h) => h,
-            None => return Err((ClientError::Config("HTTP client not configured".into()), self)),
+            None => {
+                return Err((
+                    ClientError::Config("HTTP client not configured".into()),
+                    self,
+                ));
+            }
         };
 
         tracing::debug!("Employee login (local): {}", username);
@@ -325,9 +330,7 @@ impl CrabClient<Local, Authenticated> {
             .as_ref()
             .ok_or_else(|| ClientError::Config("Message client not configured".into()))?;
 
-        message_client
-            .request_default(msg)
-            .await
+        message_client.request_default(msg).await
     }
 
     /// Sends an RPC request with a custom timeout.
@@ -341,9 +344,7 @@ impl CrabClient<Local, Authenticated> {
             .as_ref()
             .ok_or_else(|| ClientError::Config("Message client not configured".into()))?;
 
-        message_client
-            .request(msg, timeout)
-            .await
+        message_client.request(msg, timeout).await
     }
 
     /// Logs out the employee.

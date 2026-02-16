@@ -67,8 +67,7 @@ impl ErrorCode {
             Self::PaymentInsufficientAmount => StatusCode::PAYMENT_REQUIRED,
 
             // 503 Service Unavailable (transient errors, client can retry)
-            Self::NetworkError
-            | Self::TimeoutError => StatusCode::SERVICE_UNAVAILABLE,
+            Self::NetworkError | Self::TimeoutError => StatusCode::SERVICE_UNAVAILABLE,
 
             // 500 Internal Server Error
             Self::InternalError

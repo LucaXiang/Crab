@@ -6,11 +6,11 @@ use std::time::Duration;
 
 use axum::{Extension, Json, extract::State};
 
+use crate::AppError;
 use crate::audit::AuditAction;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{employee, role};
-use crate::AppError;
 use shared::models::Role;
 
 // Re-use shared DTOs for API consistency
@@ -35,39 +35,48 @@ pub async fn login(
     tokio::time::sleep(Duration::from_millis(AUTH_FIXED_DELAY_MS)).await;
 
     // Check authentication result - unified error message to prevent username enumeration
-    let emp = match emp_with_hash {
-        Some(e) => {
-            // User found - check active status
-            if !e.is_active {
-                return Err(AppError::account_disabled());
-            }
+    let emp =
+        match emp_with_hash {
+            Some(e) => {
+                // User found - check active status
+                if !e.is_active {
+                    return Err(AppError::account_disabled());
+                }
 
-            // Verify password
-            let password_valid = employee::verify_password(&req.password, &e.hash_pass)
-                .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
+                // Verify password
+                let password_valid = employee::verify_password(&req.password, &e.hash_pass)
+                    .map_err(|e| {
+                        AppError::internal(format!("Password verification failed: {}", e))
+                    })?;
 
-            if !password_valid {
-                state.audit_service.log(
+                if !password_valid {
+                    state.audit_service.log(
                     AuditAction::LoginFailed, "auth", &username,
                     None, None,
                     serde_json::json!({"reason": "invalid_credentials", "username": &username}),
                 ).await;
-                tracing::warn!(username = %username, "Login failed - invalid credentials");
+                    tracing::warn!(username = %username, "Login failed - invalid credentials");
+                    return Err(AppError::invalid_credentials());
+                }
+
+                e
+            }
+            None => {
+                state
+                    .audit_service
+                    .log(
+                        AuditAction::LoginFailed,
+                        "auth",
+                        &username,
+                        None,
+                        None,
+                        serde_json::json!({"reason": "user_not_found", "username": &username}),
+                    )
+                    .await;
+                tracing::warn!(username = %username, "Login failed - user not found");
                 return Err(AppError::invalid_credentials());
             }
-
-            e
-        }
-        None => {
-            state.audit_service.log(
-                AuditAction::LoginFailed, "auth", &username,
-                None, None,
-                serde_json::json!({"reason": "user_not_found", "username": &username}),
-            ).await;
-            tracing::warn!(username = %username, "Login failed - user not found");
-            return Err(AppError::invalid_credentials());
-        }
-    };
+        };
 
     // Fetch role information
     let role: Role = role::find_by_id(&state.pool, emp.role_id)
@@ -94,11 +103,17 @@ pub async fn login(
         .map_err(|e| AppError::internal(format!("Failed to generate token: {}", e)))?;
 
     // Log successful login
-    state.audit_service.log(
-        AuditAction::LoginSuccess, "auth", emp.id.to_string(),
-        Some(emp.id), Some(emp.display_name.clone()),
-        serde_json::json!({"username": &emp.username}),
-    ).await;
+    state
+        .audit_service
+        .log(
+            AuditAction::LoginSuccess,
+            "auth",
+            emp.id.to_string(),
+            Some(emp.id),
+            Some(emp.display_name.clone()),
+            serde_json::json!({"username": &emp.username}),
+        )
+        .await;
 
     tracing::info!(
         user_id = %emp.id,
@@ -157,11 +172,17 @@ pub async fn logout(
     State(state): State<ServerState>,
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<()>, AppError> {
-    state.audit_service.log(
-        AuditAction::Logout, "auth", user.id.to_string(),
-        Some(user.id), Some(user.display_name.clone()),
-        serde_json::json!({"username": &user.username}),
-    ).await;
+    state
+        .audit_service
+        .log(
+            AuditAction::Logout,
+            "auth",
+            user.id.to_string(),
+            Some(user.id),
+            Some(user.display_name.clone()),
+            serde_json::json!({"username": &user.username}),
+        )
+        .await;
 
     tracing::info!(
         user_id = %user.id,
@@ -232,7 +253,10 @@ pub async fn escalate(
     // Check permission
     let has_permission = role.name == "admin"
         || role.permissions.iter().any(|p| p == "all")
-        || role.permissions.iter().any(|p| p == &req.required_permission)
+        || role
+            .permissions
+            .iter()
+            .any(|p| p == &req.required_permission)
         || role.permissions.iter().any(|p| {
             // Wildcard match: "orders:*" matches "orders:void"
             if let Some(prefix) = p.strip_suffix(":*") {
@@ -255,19 +279,22 @@ pub async fn escalate(
     let authorizer_id = emp.id;
 
     // Log successful escalation
-    state.audit_service.log(
-        AuditAction::EscalationSuccess,
-        "auth",
-        authorizer_id.to_string(),
-        Some(authorizer_id),
-        Some(emp.display_name.clone()),
-        serde_json::json!({
-            "authorizer_username": &emp.username,
-            "required_permission": &req.required_permission,
-            "requester_id": &current_user.id,
-            "requester_name": &current_user.display_name,
-        }),
-    ).await;
+    state
+        .audit_service
+        .log(
+            AuditAction::EscalationSuccess,
+            "auth",
+            authorizer_id.to_string(),
+            Some(authorizer_id),
+            Some(emp.display_name.clone()),
+            serde_json::json!({
+                "authorizer_username": &emp.username,
+                "required_permission": &req.required_permission,
+                "requester_id": &current_user.id,
+                "requester_name": &current_user.display_name,
+            }),
+        )
+        .await;
 
     tracing::info!(
         authorizer_id = %authorizer_id,

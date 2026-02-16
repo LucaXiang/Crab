@@ -282,15 +282,10 @@ pub enum OrderCommandPayload {
 
     // ========== Member ==========
     /// Link a member to the order
-    LinkMember {
-        order_id: String,
-        member_id: i64,
-    },
+    LinkMember { order_id: String, member_id: i64 },
 
     /// Unlink the member from the order
-    UnlinkMember {
-        order_id: String,
-    },
+    UnlinkMember { order_id: String },
 
     /// Redeem a stamp reward
     RedeemStamp {

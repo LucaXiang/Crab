@@ -6,9 +6,9 @@
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 
-use crate::orders::money::to_decimal;
+use crate::order_money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_optional_text, validate_order_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text, validate_order_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -214,7 +214,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         };
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();

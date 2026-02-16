@@ -12,19 +12,17 @@
 /// 不包含 "all" 和 "users:manage"，这些是系统级权限
 pub const ALL_PERMISSIONS: &[&str] = &[
     // === 模块化权限 (6) ===
-    "menu:manage",         // 菜单管理（商品/分类/属性/标签 增删改查）
-    "tables:manage",       // 桌台管理（区域/餐桌 增删改查）
-    "shifts:manage",       // 班次管理
-    "reports:view",        // 报表查看
-    "price_rules:manage",  // 价格规则管理
-    "settings:manage",     // 系统设置
-
+    "menu:manage",        // 菜单管理（商品/分类/属性/标签 增删改查）
+    "tables:manage",      // 桌台管理（区域/餐桌 增删改查）
+    "shifts:manage",      // 班次管理
+    "reports:view",       // 报表查看
+    "price_rules:manage", // 价格规则管理
+    "settings:manage",    // 系统设置
     // === 营销与会员 (4) ===
-    "members:manage",           // 会员管理
-    "marketing_groups:manage",  // 营销组管理
-    "orders:link_member",       // 订单关联会员
-    "orders:redeem_stamp",      // 订单兑换印花
-
+    "members:manage",          // 会员管理
+    "marketing_groups:manage", // 营销组管理
+    "orders:link_member",      // 订单关联会员
+    "orders:redeem_stamp",     // 订单兑换印花
     // === 敏感操作 (6) ===
     "orders:void",         // 作废订单
     "orders:discount",     // 应用折扣/附加费
@@ -62,9 +60,7 @@ pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
 ];
 
 /// 普通员工默认权限（仅查看报表）
-pub const DEFAULT_USER_PERMISSIONS: &[&str] = &[
-    "reports:view",
-];
+pub const DEFAULT_USER_PERMISSIONS: &[&str] = &["reports:view"];
 
 /// Get permissions for a role name
 pub fn get_default_permissions(role_name: &str) -> Vec<String> {

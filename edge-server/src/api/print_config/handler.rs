@@ -2,8 +2,8 @@
 //!
 //! Manages system default printer configuration for kitchen and label printing.
 
-use axum::extract::{Extension, State};
 use axum::Json;
+use axum::extract::{Extension, State};
 use serde::{Deserialize, Serialize};
 
 use crate::audit::AuditAction;
@@ -49,7 +49,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::PrintConfigChanged,
-        "print_config", "default",
+        "print_config",
+        "default",
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({

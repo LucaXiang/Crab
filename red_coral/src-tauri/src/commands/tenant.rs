@@ -137,9 +137,7 @@ pub async fn deactivate_current_mode(
 
 /// 退出当前租户（停止服务器 + 移除租户数据）
 #[tauri::command]
-pub async fn exit_tenant(
-    bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<()>, String> {
+pub async fn exit_tenant(bridge: State<'_, Arc<ClientBridge>>) -> Result<ApiResponse<()>, String> {
     match bridge.exit_tenant().await {
         Ok(_) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(

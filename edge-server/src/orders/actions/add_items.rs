@@ -6,12 +6,12 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
-use shared::models::{MgDiscountRule, PriceRule};
-use shared::order::types::CommandErrorCode;
 use crate::marketing::mg_calculator;
-use crate::services::catalog_service::ProductMeta;
 use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use crate::services::catalog_service::ProductMeta;
+use shared::models::{MgDiscountRule, PriceRule};
+use shared::order::types::CommandErrorCode;
 use shared::order::{CartItemInput, EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// Maximum items per AddItems command (防止内存爆炸)
@@ -39,21 +39,25 @@ impl CommandHandler for AddItemsAction {
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 0. Validate items count
         if self.items.is_empty() {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::EmptyItems,
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::EmptyItems,
                 "Items cannot be empty".to_string(),
             ));
         }
         if self.items.len() > MAX_ITEMS_PER_COMMAND {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::TooManyItems, format!(
-                "Too many items ({}), maximum is {}",
-                self.items.len(),
-                MAX_ITEMS_PER_COMMAND
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::TooManyItems,
+                format!(
+                    "Too many items ({}), maximum is {}",
+                    self.items.len(),
+                    MAX_ITEMS_PER_COMMAND
+                ),
+            ));
         }
 
         // 1. Validate input items
         for item in &self.items {
-            crate::orders::money::validate_cart_item(item)?;
+            crate::order_money::validate_cart_item(item)?;
         }
 
         // 2. Load existing snapshot
@@ -110,9 +114,7 @@ impl CommandHandler for AddItemsAction {
                 // product_id is already i64
                 let product_id_i64: i64 = item.product_id;
                 let category_id: Option<i64> = meta.map(|m| m.category_id);
-                let tag_ids: Vec<i64> = meta
-                    .map(|m| m.tags.clone())
-                    .unwrap_or_default();
+                let tag_ids: Vec<i64> = meta.map(|m| m.tags.clone()).unwrap_or_default();
 
                 debug!(
                     item_idx = idx,
@@ -127,12 +129,20 @@ impl CommandHandler for AddItemsAction {
                     "[AddItems] Processing item"
                 );
 
-                let mut snapshot = input_to_snapshot_with_rules(item, &rules_refs, product_id_i64, category_id, &tag_ids);
+                let mut snapshot = input_to_snapshot_with_rules(
+                    item,
+                    &rules_refs,
+                    product_id_i64,
+                    category_id,
+                    &tag_ids,
+                );
 
                 // Set tax_rate, category_id, category_name from product metadata
                 snapshot.tax_rate = meta.map(|m| m.tax_rate).unwrap_or(0);
                 snapshot.category_id = meta.map(|m| m.category_id);
-                snapshot.category_name = meta.map(|m| m.category_name.clone()).filter(|s| !s.is_empty());
+                snapshot.category_name = meta
+                    .map(|m| m.category_name.clone())
+                    .filter(|s| !s.is_empty());
 
                 // Set is_multi_spec from product metadata
                 if let Some(ref mut spec) = snapshot.selected_specification {

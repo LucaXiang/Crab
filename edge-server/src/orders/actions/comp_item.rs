@@ -13,7 +13,7 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::utils::validation::{validate_order_text, MAX_NAME_LEN, MAX_NOTE_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_text};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -97,7 +97,11 @@ impl CommandHandler for CompItemAction {
         }
 
         // 8. Capture original price BEFORE zeroing
-        let original_price = if item.original_price > 0.0 { item.original_price } else { item.price };
+        let original_price = if item.original_price > 0.0 {
+            item.original_price
+        } else {
+            item.price
+        };
 
         // 9. Determine full vs partial comp (compare against unpaid, not total)
         let is_full_comp = self.quantity == item.unpaid_quantity;

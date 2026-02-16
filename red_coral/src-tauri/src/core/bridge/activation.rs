@@ -50,7 +50,8 @@ impl ClientBridge {
         username: &str,
         password: &str,
     ) -> Result<(String, Option<String>), BridgeError> {
-        self.handle_activation_with_replace(auth_url, username, password, None).await
+        self.handle_activation_with_replace(auth_url, username, password, None)
+            .await
     }
 
     /// 激活设备（支持替换已有设备）
@@ -64,7 +65,8 @@ impl ClientBridge {
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let (tenant_id, entity_id) = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_device(auth_url, username, password, replace_entity_id).await?
+            tm.activate_device(auth_url, username, password, replace_entity_id)
+                .await?
         };
 
         // 2. 更新已知租户列表、当前租户、entity_id
@@ -98,7 +100,8 @@ impl ClientBridge {
         username: &str,
         password: &str,
     ) -> Result<(String, Option<String>), BridgeError> {
-        self.handle_client_activation_with_replace(auth_url, username, password, None).await
+        self.handle_client_activation_with_replace(auth_url, username, password, None)
+            .await
     }
 
     /// 激活客户端（支持替换已有客户端）
@@ -112,7 +115,8 @@ impl ClientBridge {
         // 1. 调用 TenantManager 客户端激活
         let (tenant_id, entity_id) = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_client(auth_url, username, password, replace_entity_id).await?
+            tm.activate_client(auth_url, username, password, replace_entity_id)
+                .await?
         };
 
         // 2. 更新已知租户列表、当前租户、entity_id
@@ -189,19 +193,20 @@ impl ClientBridge {
             (config.active_entity_id.clone(), config.current_mode)
         };
 
-        let entity_id = entity_id.ok_or_else(|| {
-            BridgeError::Config("No active entity_id to deactivate".to_string())
-        })?;
+        let entity_id = entity_id
+            .ok_or_else(|| BridgeError::Config("No active entity_id to deactivate".to_string()))?;
 
         // 1. 先调用 auth-server 注销 (确保远端成功再清理本地)
         {
             let tm = self.tenant_manager.read().await;
             match current_mode {
                 Some(ModeType::Server) => {
-                    tm.deactivate_server(&auth_url, username, password, &entity_id).await?;
+                    tm.deactivate_server(&auth_url, username, password, &entity_id)
+                        .await?;
                 }
                 Some(ModeType::Client) => {
-                    tm.deactivate_client(&auth_url, username, password, &entity_id).await?;
+                    tm.deactivate_client(&auth_url, username, password, &entity_id)
+                        .await?;
                 }
                 None => {
                     return Err(BridgeError::Config("No mode to deactivate".to_string()));
@@ -242,21 +247,31 @@ impl ClientBridge {
     ) -> ActivationRequiredReason {
         // 尝试调用 edge-server 的自检获取具体错误
         let cert_service = server_state.cert_service();
-        let credential = server_state.activation_service().get_credential().await.ok().flatten();
+        let credential = server_state
+            .activation_service()
+            .get_credential()
+            .await
+            .ok()
+            .flatten();
 
-        match cert_service.self_check_with_binding(credential.as_ref()).await {
+        match cert_service
+            .self_check_with_binding(credential.as_ref())
+            .await
+        {
             Ok(()) => {
                 // 自检通过但未激活，说明 Credential.json 不存在
                 ActivationRequiredReason::FirstTimeSetup
             }
-            Err(e) => {
-                self.parse_activation_error(&e.to_string(), tenant_manager)
-            }
+            Err(e) => self.parse_activation_error(&e.to_string(), tenant_manager),
         }
     }
 
     /// 解析激活错误消息
-    pub(super) fn parse_activation_error(&self, error_str: &str, tenant_manager: &TenantManager) -> ActivationRequiredReason {
+    pub(super) fn parse_activation_error(
+        &self,
+        error_str: &str,
+        tenant_manager: &TenantManager,
+    ) -> ActivationRequiredReason {
         let error_lower = error_str.to_lowercase();
 
         if error_lower.contains("expired") {
@@ -267,9 +282,8 @@ impl ClientBridge {
                         let now = time::OffsetDateTime::now_utc();
                         let duration = metadata.not_after - now;
                         let days_overdue = -duration.whole_days();
-                        let expired_at_millis =
-                            metadata.not_after.unix_timestamp() * 1000
-                                + metadata.not_after.millisecond() as i64;
+                        let expired_at_millis = metadata.not_after.unix_timestamp() * 1000
+                            + metadata.not_after.millisecond() as i64;
                         return ActivationRequiredReason::CertificateExpired {
                             expired_at: expired_at_millis,
                             days_overdue,
@@ -281,11 +295,16 @@ impl ClientBridge {
                 expired_at: 0,
                 days_overdue: 0,
             }
-        } else if error_lower.contains("hardware id mismatch") || error_lower.contains("device id mismatch") || error_lower.contains("device_id") {
+        } else if error_lower.contains("hardware id mismatch")
+            || error_lower.contains("device id mismatch")
+            || error_lower.contains("device_id")
+        {
             // 设备 ID 不匹配
             let (expected, actual) = self.extract_device_ids(error_str);
             ActivationRequiredReason::DeviceMismatch { expected, actual }
-        } else if error_lower.contains("clock") || (error_lower.contains("time") && error_lower.contains("tamper")) {
+        } else if error_lower.contains("clock")
+            || (error_lower.contains("time") && error_lower.contains("tamper"))
+        {
             // 时钟篡改
             let direction = if error_lower.contains("backward") {
                 ClockDirection::Backward
@@ -307,7 +326,9 @@ impl ClientBridge {
                 component: "credential".to_string(),
                 error: error_str.to_string(),
             }
-        } else if error_lower.contains("chain") || (error_lower.contains("certificate") && error_lower.contains("invalid")) {
+        } else if error_lower.contains("chain")
+            || (error_lower.contains("certificate") && error_lower.contains("invalid"))
+        {
             // 证书链无效
             ActivationRequiredReason::CertificateInvalid {
                 error: error_str.to_string(),
@@ -331,20 +352,29 @@ impl ClientBridge {
             if let Some(comma_idx) = rest.find(", ") {
                 let exp = rest[..comma_idx].trim().to_string();
                 let act_start = rest.find("got ").map(|i| i + 4).unwrap_or(comma_idx + 2);
-                let act_end = rest[act_start..].find(|c: char| !c.is_alphanumeric() && c != '-').unwrap_or(rest.len() - act_start);
+                let act_end = rest[act_start..]
+                    .find(|c: char| !c.is_alphanumeric() && c != '-')
+                    .unwrap_or(rest.len() - act_start);
                 let act = rest[act_start..act_start + act_end].trim().to_string();
                 return (exp, act);
             }
         }
         // 无法解析，返回掩码值
-        ("***".to_string(), crab_cert::generate_hardware_id()[..8].to_string())
+        (
+            "***".to_string(),
+            crab_cert::generate_hardware_id()[..8].to_string(),
+        )
     }
 
     /// 检测需要激活的具体原因 (基于 TenantPaths)
     ///
     /// Server 模式: 检查 server/certs/ 下的证书
     /// Client 模式: 检查 certs/ 下的证书
-    pub(super) fn detect_activation_reason(&self, tenant_manager: &TenantManager, for_server: bool) -> ActivationRequiredReason {
+    pub(super) fn detect_activation_reason(
+        &self,
+        tenant_manager: &TenantManager,
+        for_server: bool,
+    ) -> ActivationRequiredReason {
         // 1. 检查是否有路径管理器
         let paths = match tenant_manager.current_paths() {
             Some(p) => p,
@@ -371,16 +401,20 @@ impl ClientBridge {
 
         let cert_pem = match std::fs::read_to_string(&cert_path) {
             Ok(pem) => pem,
-            Err(_) => return ActivationRequiredReason::CertificateInvalid {
-                error: "Cannot read certificate file".to_string(),
-            },
+            Err(_) => {
+                return ActivationRequiredReason::CertificateInvalid {
+                    error: "Cannot read certificate file".to_string(),
+                }
+            }
         };
 
         let metadata = match crab_cert::CertMetadata::from_pem(&cert_pem) {
             Ok(m) => m,
-            Err(e) => return ActivationRequiredReason::CertificateInvalid {
-                error: format!("Invalid certificate: {}", e),
-            },
+            Err(e) => {
+                return ActivationRequiredReason::CertificateInvalid {
+                    error: format!("Invalid certificate: {}", e),
+                }
+            }
         };
 
         // 4. 检查证书过期
@@ -388,8 +422,7 @@ impl ClientBridge {
         let duration = metadata.not_after - now;
         let days_remaining = duration.whole_days();
         let not_after_millis =
-            metadata.not_after.unix_timestamp() * 1000
-                + metadata.not_after.millisecond() as i64;
+            metadata.not_after.unix_timestamp() * 1000 + metadata.not_after.millisecond() as i64;
 
         if days_remaining < 0 {
             return ActivationRequiredReason::CertificateExpired {

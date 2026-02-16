@@ -7,8 +7,8 @@
 //!
 //! Uses rust_decimal for precision calculations.
 
-use shared::models::{AdjustmentType, PriceRule, ProductScope, RuleType};
 use rust_decimal::prelude::*;
+use shared::models::{AdjustmentType, PriceRule, ProductScope, RuleType};
 use shared::order::AppliedRule;
 use tracing::{debug, trace};
 
@@ -142,10 +142,7 @@ pub struct DiscountResult {
 /// 4. Stackable fixed: Simple addition
 ///
 /// All discounts are calculated based on `price_basis`.
-pub fn apply_discount_rules(
-    rules: &[&PriceRule],
-    price_basis: Decimal,
-) -> DiscountResult {
+pub fn apply_discount_rules(rules: &[&PriceRule], price_basis: Decimal) -> DiscountResult {
     let discount_rules: Vec<&PriceRule> = rules
         .iter()
         .filter(|r| matches!(r.rule_type, RuleType::Discount))
@@ -207,10 +204,7 @@ pub fn apply_discount_rules(
             discount_amount = %amount,
             "[DiscountRules] Exclusive winner selected"
         );
-        let applied = AppliedRule::from_rule(
-            winner,
-            to_f64(amount),
-        );
+        let applied = AppliedRule::from_rule(winner, to_f64(amount));
         return DiscountResult {
             amount,
             applied: vec![applied],
@@ -230,10 +224,7 @@ pub fn apply_discount_rules(
             "[DiscountRules] Non-stackable winner selected"
         );
         total_discount += amount;
-        applied_rules.push(AppliedRule::from_rule(
-            winner,
-            to_f64(amount),
-        ));
+        applied_rules.push(AppliedRule::from_rule(winner, to_f64(amount)));
     }
 
     // Step 3: Apply stackable rules
@@ -282,10 +273,7 @@ pub fn apply_discount_rules(
         // Record each rule's individual contribution
         for rule in &stackable_pct {
             let individual_amount = price_basis * to_decimal(rule.adjustment_value) / hundred;
-            applied_rules.push(AppliedRule::from_rule(
-                rule,
-                to_f64(individual_amount),
-            ));
+            applied_rules.push(AppliedRule::from_rule(rule, to_f64(individual_amount)));
         }
     }
 
@@ -298,10 +286,7 @@ pub fn apply_discount_rules(
             "[DiscountRules] Stackable fixed rule applied"
         );
         total_discount += amount;
-        applied_rules.push(AppliedRule::from_rule(
-            rule,
-            to_f64(amount),
-        ));
+        applied_rules.push(AppliedRule::from_rule(rule, to_f64(amount)));
     }
 
     debug!(
@@ -339,10 +324,7 @@ pub struct SurchargeResult {
 
 /// Apply surcharge rules with same stacking logic as discounts.
 /// Surcharges are calculated based on `price_basis` (typically the base price).
-pub fn apply_surcharge_rules(
-    rules: &[&PriceRule],
-    price_basis: Decimal,
-) -> SurchargeResult {
+pub fn apply_surcharge_rules(rules: &[&PriceRule], price_basis: Decimal) -> SurchargeResult {
     let surcharge_rules: Vec<&PriceRule> = rules
         .iter()
         .filter(|r| matches!(r.rule_type, RuleType::Surcharge))
@@ -403,10 +385,7 @@ pub fn apply_surcharge_rules(
             surcharge_amount = %amount,
             "[SurchargeRules] Exclusive winner selected"
         );
-        let applied = AppliedRule::from_rule(
-            winner,
-            to_f64(amount),
-        );
+        let applied = AppliedRule::from_rule(winner, to_f64(amount));
         return SurchargeResult {
             amount,
             applied: vec![applied],
@@ -426,10 +405,7 @@ pub fn apply_surcharge_rules(
             "[SurchargeRules] Non-stackable winner selected"
         );
         total_surcharge += amount;
-        applied_rules.push(AppliedRule::from_rule(
-            winner,
-            to_f64(amount),
-        ));
+        applied_rules.push(AppliedRule::from_rule(winner, to_f64(amount)));
     }
 
     // Step 3: Apply stackable rules
@@ -445,10 +421,7 @@ pub fn apply_surcharge_rules(
             "[SurchargeRules] Stackable rule applied"
         );
         total_surcharge += amount;
-        applied_rules.push(AppliedRule::from_rule(
-            rule,
-            to_f64(amount),
-        ));
+        applied_rules.push(AppliedRule::from_rule(rule, to_f64(amount)));
     }
 
     debug!(
@@ -897,7 +870,11 @@ mod tests {
             (shared::models::ZONE_SCOPE_ALL, ProductScope::Product, 3),
             // zone:retail (weight=1)
             (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Global, 10),
-            (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Category, 11),
+            (
+                shared::models::ZONE_SCOPE_RETAIL,
+                ProductScope::Category,
+                11,
+            ),
             (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Tag, 12),
             (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Product, 13),
             // specific zone (weight=1, same as retail)

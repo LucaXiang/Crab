@@ -2,7 +2,7 @@
 //!
 //! 纯函数：将订单级手动折扣/附加费事件应用到快照。
 
-use crate::orders::money::recalculate_totals;
+use crate::order_money::recalculate_totals;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -93,7 +93,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -128,9 +128,9 @@ mod tests {
                 previous_discount_fixed,
                 authorizer_id: None,
                 authorizer_name: None,
-                subtotal: 0.0,   // applier recalculates
-                discount: 0.0,   // applier recalculates
-                total: 0.0,      // applier recalculates
+                subtotal: 0.0, // applier recalculates
+                discount: 0.0, // applier recalculates
+                total: 0.0,    // applier recalculates
             },
         )
     }

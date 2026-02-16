@@ -134,12 +134,16 @@ impl Server {
         // ═══════════════════════════════════════════════════════════════════
 
         // 记录系统关闭审计日志（同步写入，确保持久化）
-        if let Err(e) = state.audit_service.log_sync(
-            crate::audit::AuditAction::SystemShutdown,
-            "system",
-            "main",
-            serde_json::json!({"epoch": &state.epoch}),
-        ).await {
+        if let Err(e) = state
+            .audit_service
+            .log_sync(
+                crate::audit::AuditAction::SystemShutdown,
+                "system",
+                "main",
+                serde_json::json!({"epoch": &state.epoch}),
+            )
+            .await
+        {
             tracing::error!("Failed to log system shutdown: {:?}", e);
         }
         // 删除 LOCK 文件，标记正常关闭
@@ -167,9 +171,16 @@ impl Server {
     /// Blocks until device is activated and TLS certificates are loaded.
     /// Returns `None` if shutdown was requested during activation wait.
     /// Retries on failure by re-entering unbound state.
-    async fn wait_for_tls(&self, state: &ServerState) -> Option<std::sync::Arc<rustls::ServerConfig>> {
+    async fn wait_for_tls(
+        &self,
+        state: &ServerState,
+    ) -> Option<std::sync::Arc<rustls::ServerConfig>> {
         loop {
-            if state.wait_for_activation(&self.shutdown_token).await.is_err() {
+            if state
+                .wait_for_activation(&self.shutdown_token)
+                .await
+                .is_err()
+            {
                 return None; // shutdown requested
             }
 

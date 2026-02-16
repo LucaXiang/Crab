@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use std::collections::HashMap;
 
-use crate::orders::money::{is_payment_sufficient, to_decimal, to_f64};
+use crate::order_money::{is_payment_sufficient, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::types::{CommandErrorCode, ServiceType};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, PaymentSummaryItem};
@@ -41,10 +41,7 @@ impl CommandHandler for CompleteOrderAction {
             _ => {
                 return Err(OrderError::InvalidOperation(
                     CommandErrorCode::OrderNotActive,
-                    format!(
-                        "Cannot complete order in {:?} status",
-                        snapshot.status
-                    ),
+                    format!("Cannot complete order in {:?} status", snapshot.status),
                 ));
             }
         }
@@ -308,7 +305,9 @@ mod tests {
 
         let mut snapshot = create_active_snapshot("order-1", "RCP-005");
         snapshot.total = 100.0;
-        snapshot.payments.push(create_payment_record("CASH", 99.995));
+        snapshot
+            .payments
+            .push(create_payment_record("CASH", 99.995));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -476,10 +475,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::OrderCompleted {
-            service_type, ..
-        } = &events[0].payload
-        {
+        if let EventPayload::OrderCompleted { service_type, .. } = &events[0].payload {
             assert_eq!(*service_type, Some(ServiceType::DineIn));
         } else {
             panic!("Expected OrderCompleted payload");
@@ -508,10 +504,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::OrderCompleted {
-            service_type, ..
-        } = &events[0].payload
-        {
+        if let EventPayload::OrderCompleted { service_type, .. } = &events[0].payload {
             assert_eq!(*service_type, Some(ServiceType::Takeout));
         } else {
             panic!("Expected OrderCompleted payload");

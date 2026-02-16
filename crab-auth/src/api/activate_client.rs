@@ -4,8 +4,8 @@ use axum::Json;
 use axum::extract::State;
 use crab_cert::{CertMetadata, CertProfile};
 use shared::activation::{
-    ActiveDevice, ActivationData, ActivationResponse, EntityType, QuotaInfo,
-    SignedBinding, SubscriptionInfo, SubscriptionStatus,
+    ActivationData, ActivationResponse, ActiveDevice, EntityType, QuotaInfo, SignedBinding,
+    SubscriptionInfo, SubscriptionStatus,
 };
 use std::sync::Arc;
 
@@ -145,7 +145,11 @@ pub async fn activate_client(
         }
     };
 
-    let tenant_ca = match state.ca_store.get_or_create_tenant_ca(&tenant.id, &root_ca).await {
+    let tenant_ca = match state
+        .ca_store
+        .get_or_create_tenant_ca(&tenant.id, &root_ca)
+        .await
+    {
         Ok(ca) => ca,
         Err(e) => {
             tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");

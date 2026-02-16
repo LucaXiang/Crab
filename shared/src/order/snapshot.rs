@@ -4,8 +4,11 @@
 //! Clients can compare their locally computed checksum with the server's
 //! to detect if the reducer logic has diverged.
 
-use super::types::{CartItemSnapshot, CompRecord, LossReason, PaymentRecord, ServiceType, StampRedemptionState, VoidType};
 use super::AppliedRule;
+use super::types::{
+    CartItemSnapshot, CompRecord, LossReason, PaymentRecord, ServiceType, StampRedemptionState,
+    VoidType,
+};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 

@@ -3,7 +3,7 @@
 //! Clears member info and MG discount data from the snapshot.
 //! Recalculates totals since MG discounts are removed.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -44,7 +44,11 @@ impl EventApplier for MemberUnlinkedApplier {
                             remove_ids.push(r.reward_instance_id.clone());
                         } else {
                             // Full comp: uncomp the existing item
-                            if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == r.reward_instance_id) {
+                            if let Some(item) = snapshot
+                                .items
+                                .iter_mut()
+                                .find(|i| i.instance_id == r.reward_instance_id)
+                            {
                                 item.is_comped = false;
                             }
                         }
@@ -55,13 +59,19 @@ impl EventApplier for MemberUnlinkedApplier {
                 }
                 // Apply merge-backs: restore quantity to source items
                 for (source_id, qty) in &merge_backs {
-                    if let Some(source) = snapshot.items.iter_mut().find(|i| i.instance_id == *source_id) {
+                    if let Some(source) = snapshot
+                        .items
+                        .iter_mut()
+                        .find(|i| i.instance_id == *source_id)
+                    {
                         source.quantity += qty;
                         source.unpaid_quantity += qty;
                     }
                 }
                 if !remove_ids.is_empty() {
-                    snapshot.items.retain(|item| !remove_ids.contains(&item.instance_id));
+                    snapshot
+                        .items
+                        .retain(|item| !remove_ids.contains(&item.instance_id));
                 }
                 snapshot.stamp_redemptions.clear();
             }
@@ -71,7 +81,7 @@ impl EventApplier for MemberUnlinkedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals (MG discounts removed)
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -258,7 +268,9 @@ mod tests {
         snapshot.items.push(create_test_item("item-1", 4.50));
         snapshot.items[0].quantity = 6;
         snapshot.items[0].unpaid_quantity = 6;
-        snapshot.items.push(create_comped_item("stamp_reward::cmd-2", 4.50, 1));
+        snapshot
+            .items
+            .push(create_comped_item("stamp_reward::cmd-2", 4.50, 1));
         snapshot.stamp_redemptions.push(StampRedemptionState {
             stamp_activity_id: 1,
             reward_instance_id: "stamp_reward::cmd-2".to_string(),
@@ -286,7 +298,9 @@ mod tests {
 
         // Add-new mode: separate reward item
         snapshot.items.push(create_test_item("inst-1", 5.00));
-        snapshot.items.push(create_comped_item("stamp_reward::cmd-1", 3.50, 1));
+        snapshot
+            .items
+            .push(create_comped_item("stamp_reward::cmd-1", 3.50, 1));
         snapshot.stamp_redemptions.push(StampRedemptionState {
             stamp_activity_id: 1,
             reward_instance_id: "stamp_reward::cmd-1".to_string(),
@@ -313,8 +327,12 @@ mod tests {
         snapshot.items.push(create_test_item("item-1", 4.50));
         snapshot.items[0].quantity = 6;
         snapshot.items[0].unpaid_quantity = 6;
-        snapshot.items.push(create_comped_item("stamp_reward::partial", 4.50, 1)); // partial comp split
-        snapshot.items.push(create_comped_item("stamp_reward::added", 3.00, 1)); // add-new
+        snapshot
+            .items
+            .push(create_comped_item("stamp_reward::partial", 4.50, 1)); // partial comp split
+        snapshot
+            .items
+            .push(create_comped_item("stamp_reward::added", 3.00, 1)); // add-new
 
         snapshot.stamp_redemptions.push(StampRedemptionState {
             stamp_activity_id: 1,

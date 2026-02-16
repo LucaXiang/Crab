@@ -2,13 +2,10 @@ use super::*;
 use shared::order::types::ServiceType;
 use shared::order::{CartItemInput, OrderCommandPayload, OrderEventType, PaymentInput, VoidType};
 
-
-
 fn create_test_manager() -> OrdersManager {
     let storage = OrderStorage::open_in_memory().unwrap();
     OrdersManager::with_storage(storage)
 }
-
 
 fn create_open_table_cmd(operator_id: i64) -> OrderCommand {
     OrderCommand::new(
@@ -24,7 +21,6 @@ fn create_open_table_cmd(operator_id: i64) -> OrderCommand {
         },
     )
 }
-
 
 // ========================================================================
 // Helper: open a table with items
@@ -67,7 +63,6 @@ fn open_table_with_items(
     order_id
 }
 
-
 fn simple_item(product_id: i64, name: &str, price: f64, quantity: i32) -> CartItemInput {
     CartItemInput {
         product_id,
@@ -83,7 +78,6 @@ fn simple_item(product_id: i64, name: &str, price: f64, quantity: i32) -> CartIt
         authorizer_name: None,
     }
 }
-
 
 // ========================================================================
 // 规则快照持久化测试
@@ -116,7 +110,6 @@ fn create_test_rule(name: &str) -> PriceRule {
     }
 }
 
-
 // ========================================================================
 // ========================================================================
 //  新增测试工具函数
@@ -146,7 +139,6 @@ fn item_with_options(
     }
 }
 
-
 /// 创建带折扣的商品
 fn item_with_discount(
     product_id: i64,
@@ -170,8 +162,6 @@ fn item_with_discount(
     }
 }
 
-
-
 /// 快速完成订单
 fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
     let complete_cmd = OrderCommand::new(
@@ -185,9 +175,12 @@ fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
     manager.execute_command(complete_cmd)
 }
 
-
 /// 快速作废订单
-fn void_order_helper(manager: &OrdersManager, order_id: &str, void_type: VoidType) -> CommandResponse {
+fn void_order_helper(
+    manager: &OrdersManager,
+    order_id: &str,
+    void_type: VoidType,
+) -> CommandResponse {
     let void_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -204,7 +197,6 @@ fn void_order_helper(manager: &OrdersManager, order_id: &str, void_type: VoidTyp
     manager.execute_command(void_cmd)
 }
 
-
 /// 断言订单状态
 fn assert_order_status(manager: &OrdersManager, order_id: &str, expected: OrderStatus) {
     let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
@@ -214,9 +206,6 @@ fn assert_order_status(manager: &OrdersManager, order_id: &str, expected: OrderS
         expected, snapshot.status
     );
 }
-
-
-
 
 /// 打开零售订单
 fn open_retail_order(manager: &OrdersManager) -> String {
@@ -236,7 +225,6 @@ fn open_retail_order(manager: &OrdersManager) -> String {
     assert!(resp.success, "Failed to open retail order");
     resp.order_id.unwrap()
 }
-
 
 // ========================================================================
 // Edge-case combo tests: 奇怪组合场景
@@ -264,7 +252,6 @@ fn modify_item(
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 添加支付
 fn pay(manager: &OrdersManager, order_id: &str, amount: f64, method: &str) -> CommandResponse {
     let cmd = OrderCommand::new(
@@ -283,13 +270,8 @@ fn pay(manager: &OrdersManager, order_id: &str, amount: f64, method: &str) -> Co
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 取消支付
-fn cancel_payment(
-    manager: &OrdersManager,
-    order_id: &str,
-    payment_id: &str,
-) -> CommandResponse {
+fn cancel_payment(manager: &OrdersManager, order_id: &str, payment_id: &str) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -303,7 +285,6 @@ fn cancel_payment(
     );
     manager.execute_command(cmd)
 }
-
 
 /// Helper: 整单折扣
 fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
@@ -321,7 +302,6 @@ fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> Comm
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 清除整单折扣
 fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
     let cmd = OrderCommand::new(
@@ -337,7 +317,6 @@ fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
     );
     manager.execute_command(cmd)
 }
-
 
 /// Helper: 分单支付（按商品）
 fn split_by_items(
@@ -359,11 +338,12 @@ fn split_by_items(
     manager.execute_command(cmd)
 }
 
-
 /// Helper: comp 商品 (comp all unpaid quantity)
 fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
     let s = manager.get_snapshot(order_id).unwrap().unwrap();
-    let qty = s.items.iter()
+    let qty = s
+        .items
+        .iter()
         .find(|i| i.instance_id == instance_id)
         .map(|i| i.unpaid_quantity)
         .unwrap_or(1);
@@ -382,7 +362,6 @@ fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> Comm
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 折扣 changes
 fn discount_changes(percent: f64) -> shared::order::ItemChanges {
     shared::order::ItemChanges {
@@ -394,7 +373,6 @@ fn discount_changes(percent: f64) -> shared::order::ItemChanges {
         selected_specification: None,
     }
 }
-
 
 /// Helper: 价格 changes
 fn price_changes(price: f64) -> shared::order::ItemChanges {
@@ -408,7 +386,6 @@ fn price_changes(price: f64) -> shared::order::ItemChanges {
     }
 }
 
-
 /// Helper: 数量 changes
 fn qty_changes(qty: i32) -> shared::order::ItemChanges {
     shared::order::ItemChanges {
@@ -421,20 +398,28 @@ fn qty_changes(qty: i32) -> shared::order::ItemChanges {
     }
 }
 
-
 /// Helper: 验证快照一致性 (stored vs rebuilt from events)
 fn assert_snapshot_consistent(manager: &OrdersManager, order_id: &str) {
     let stored = manager.get_snapshot(order_id).unwrap().unwrap();
     let rebuilt = manager.rebuild_snapshot(order_id).unwrap();
     assert_eq!(
-        stored.state_checksum, rebuilt.state_checksum,
+        stored.state_checksum,
+        rebuilt.state_checksum,
         "Snapshot diverged from event replay!\n  stored items: {:?}\n  rebuilt items: {:?}\n  stored paid_amount: {}\n  rebuilt paid_amount: {}",
-        stored.items.iter().map(|i| (&i.instance_id, i.quantity, i.unpaid_quantity)).collect::<Vec<_>>(),
-        rebuilt.items.iter().map(|i| (&i.instance_id, i.quantity, i.unpaid_quantity)).collect::<Vec<_>>(),
-        stored.paid_amount, rebuilt.paid_amount,
+        stored
+            .items
+            .iter()
+            .map(|i| (&i.instance_id, i.quantity, i.unpaid_quantity))
+            .collect::<Vec<_>>(),
+        rebuilt
+            .items
+            .iter()
+            .map(|i| (&i.instance_id, i.quantity, i.unpaid_quantity))
+            .collect::<Vec<_>>(),
+        stored.paid_amount,
+        rebuilt.paid_amount,
     );
 }
-
 
 // ========================================================================
 // More complex combo tests: 支付→改动→取消→再操作 链式场景
@@ -456,7 +441,6 @@ fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) -> Com
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 整单固定附加费
 fn apply_surcharge_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -> CommandResponse {
     let cmd = OrderCommand::new(
@@ -472,7 +456,6 @@ fn apply_surcharge_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -
     );
     manager.execute_command(cmd)
 }
-
 
 /// Helper: 整单固定折扣
 fn apply_discount_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -> CommandResponse {
@@ -490,9 +473,13 @@ fn apply_discount_fixed(manager: &OrdersManager, order_id: &str, amount: f64) ->
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 删除商品
-fn remove_item(manager: &OrdersManager, order_id: &str, instance_id: &str, qty: Option<i32>) -> CommandResponse {
+fn remove_item(
+    manager: &OrdersManager,
+    order_id: &str,
+    instance_id: &str,
+    qty: Option<i32>,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -507,7 +494,6 @@ fn remove_item(manager: &OrdersManager, order_id: &str, instance_id: &str, qty: 
     );
     manager.execute_command(cmd)
 }
-
 
 /// Helper: uncomp 商品
 fn uncomp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
@@ -524,9 +510,12 @@ fn uncomp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> Co
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 添加更多商品
-fn add_items(manager: &OrdersManager, order_id: &str, items: Vec<CartItemInput>) -> CommandResponse {
+fn add_items(
+    manager: &OrdersManager,
+    order_id: &str,
+    items: Vec<CartItemInput>,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -538,17 +527,18 @@ fn add_items(manager: &OrdersManager, order_id: &str, items: Vec<CartItemInput>)
     manager.execute_command(cmd)
 }
 
-
 /// Helper: 验证 remaining_amount 字段和方法一致
 fn assert_remaining_consistent(s: &shared::order::OrderSnapshot) {
     let computed = (s.total - s.paid_amount).max(0.0);
     assert!(
         (s.remaining_amount - computed).abs() < 0.02,
         "remaining_amount field({:.2}) diverged from total({:.2}) - paid({:.2}) = {:.2}",
-        s.remaining_amount, s.total, s.paid_amount, computed
+        s.remaining_amount,
+        s.total,
+        s.paid_amount,
+        computed
     );
 }
-
 
 // ========================================================================
 // Price Rule + Options + Spec 复杂组合测试 (Tests 31-40)
@@ -573,7 +563,6 @@ fn open_table(manager: &OrdersManager, table_id: i64) -> String {
     resp.order_id.unwrap()
 }
 
-
 /// Helper: 跳过/恢复规则
 fn toggle_rule_skip(
     manager: &OrdersManager,
@@ -592,7 +581,6 @@ fn toggle_rule_skip(
     );
     manager.execute_command(cmd)
 }
-
 
 /// Helper: 创建百分比折扣规则
 fn make_discount_rule(id: i64, percent: f64) -> PriceRule {
@@ -622,7 +610,6 @@ fn make_discount_rule(id: i64, percent: f64) -> PriceRule {
     }
 }
 
-
 /// Helper: 创建百分比附加费规则
 fn make_surcharge_rule(id: i64, percent: f64) -> PriceRule {
     use shared::models::price_rule::*;
@@ -650,7 +637,6 @@ fn make_surcharge_rule(id: i64, percent: f64) -> PriceRule {
         created_at: 0,
     }
 }
-
 
 /// Helper: 创建固定金额折扣规则
 fn make_fixed_discount_rule(id: i64, amount: f64) -> PriceRule {
@@ -680,7 +666,6 @@ fn make_fixed_discount_rule(id: i64, amount: f64) -> PriceRule {
     }
 }
 
-
 /// Helper: 带规格的商品
 fn item_with_spec(
     product_id: i64,
@@ -704,9 +689,14 @@ fn item_with_spec(
     }
 }
 
-
 /// Helper: 创建选项
-fn make_option(attr_id: i64, attr_name: &str, id: i64, opt_name: &str, modifier: f64) -> shared::order::ItemOption {
+fn make_option(
+    attr_id: i64,
+    attr_name: &str,
+    id: i64,
+    opt_name: &str,
+    modifier: f64,
+) -> shared::order::ItemOption {
     shared::order::ItemOption {
         attribute_id: attr_id,
         attribute_name: attr_name.to_string(),
@@ -716,7 +706,6 @@ fn make_option(attr_id: i64, attr_name: &str, id: i64, opt_name: &str, modifier:
         quantity: 1,
     }
 }
-
 
 /// Helper: 创建规格
 fn make_spec(id: i64, name: &str, price: Option<f64>) -> shared::order::SpecificationInfo {
@@ -728,7 +717,6 @@ fn make_spec(id: i64, name: &str, price: Option<f64>) -> shared::order::Specific
         is_multi_spec: false,
     }
 }
-
 
 /// Helper: 组合 changes
 fn combo_changes(
@@ -748,16 +736,16 @@ fn combo_changes(
     }
 }
 
-
 /// 浮点断言 helper
 fn assert_close(actual: f64, expected: f64, msg: &str) {
     assert!(
         (actual - expected).abs() < 0.02,
         "{}: expected {:.2}, got {:.2}",
-        msg, expected, actual
+        msg,
+        expected,
+        actual
     );
 }
-
 
 // ========================================================================
 // 联动测试 (Tests 46-60): 暴露 comp/uncomp + rules + payment 交互 bug
@@ -784,7 +772,6 @@ fn comp_item_qty(
     );
     manager.execute_command(cmd)
 }
-
 
 // ========================================================================
 // AddItems 时间动态过滤测试 (Tests: time-filter)
@@ -826,9 +813,9 @@ fn make_timed_discount_rule(
     }
 }
 
-mod test_core;
 mod test_boundary;
-mod test_rules;
-mod test_flows;
 mod test_combos;
+mod test_core;
+mod test_flows;
+mod test_rules;
 mod test_rules_combo;

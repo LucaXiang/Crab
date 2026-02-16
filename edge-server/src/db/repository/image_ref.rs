@@ -21,7 +21,10 @@ pub async fn sync_refs(
 
     // 2. Diff
     let to_add: Vec<&String> = current_hashes.difference(&existing_hashes).collect();
-    let to_remove: Vec<String> = existing_hashes.difference(&current_hashes).cloned().collect();
+    let to_remove: Vec<String> = existing_hashes
+        .difference(&current_hashes)
+        .cloned()
+        .collect();
 
     // 3. Create new refs
     let now = shared::util::now_millis();
@@ -67,7 +70,8 @@ pub async fn delete_entity_refs(
     let refs = get_entity_refs(pool, entity_type, entity_id).await?;
     let hashes: Vec<String> = refs.into_iter().map(|r| r.hash).collect();
 
-    sqlx::query!("DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ?",
+    sqlx::query!(
+        "DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ?",
         entity_type_str,
         entity_id
     )
@@ -79,10 +83,9 @@ pub async fn delete_entity_refs(
 
 /// Count references for a hash
 pub async fn count_refs(pool: &SqlitePool, hash: &str) -> RepoResult<i64> {
-    let count =
-        sqlx::query_scalar!("SELECT COUNT(*) FROM image_ref WHERE hash = ?", hash)
-            .fetch_one(pool)
-            .await?;
+    let count = sqlx::query_scalar!("SELECT COUNT(*) FROM image_ref WHERE hash = ?", hash)
+        .fetch_one(pool)
+        .await?;
     Ok(count)
 }
 
@@ -94,9 +97,7 @@ pub async fn find_orphan_hashes(pool: &SqlitePool, hashes: &[String]) -> RepoRes
 
     // Dynamic query: variable number of IN placeholders — keep as runtime query
     let placeholders = hashes.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!(
-        "SELECT DISTINCT hash FROM image_ref WHERE hash IN ({placeholders})"
-    );
+    let sql = format!("SELECT DISTINCT hash FROM image_ref WHERE hash IN ({placeholders})");
     let mut query = sqlx::query_scalar::<_, String>(&sql);
     for hash in hashes {
         query = query.bind(hash);

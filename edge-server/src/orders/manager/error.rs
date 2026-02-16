@@ -57,8 +57,7 @@ fn classify_storage_error(e: &StorageError) -> CommandErrorCode {
     let err_str = e.to_string().to_lowercase();
 
     // 磁盘空间不足
-    if err_str.contains("no space") || err_str.contains("disk full") || err_str.contains("enospc")
-    {
+    if err_str.contains("no space") || err_str.contains("disk full") || err_str.contains("enospc") {
         return CommandErrorCode::StorageFull;
     }
 
@@ -137,7 +136,9 @@ impl From<OrderError> for ManagerError {
             OrderError::InvalidAmount => ManagerError::InvalidAmount,
             OrderError::InvalidOperation(code, msg) => ManagerError::InvalidOperation(code, msg),
             OrderError::TableOccupied(msg) => ManagerError::TableOccupied(msg),
-            OrderError::InsufficientStamps { current, required } => ManagerError::InsufficientStamps { current, required },
+            OrderError::InsufficientStamps { current, required } => {
+                ManagerError::InsufficientStamps { current, required }
+            }
             OrderError::Storage(msg) => ManagerError::Internal(msg),
         }
     }

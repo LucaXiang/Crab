@@ -1,7 +1,7 @@
 //! 员工认证命令
 
-use std::sync::Arc;
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::State;
 
 use crate::core::response::ErrorCode;
@@ -79,15 +79,24 @@ pub async fn escalate_permission(
         required_permission,
     };
 
-    match bridge.post::<EscalateResponse, _>("/api/auth/escalate", &request).await {
+    match bridge
+        .post::<EscalateResponse, _>("/api/auth/escalate", &request)
+        .await
+    {
         Ok(response) => Ok(ApiResponse::success(response.authorizer)),
         Err(e) => {
             let error_msg = e.to_string();
             // 区分权限不足和凭据错误
             if error_msg.contains("permission") {
-                Ok(ApiResponse::error_with_code(ErrorCode::PermissionDenied, error_msg))
+                Ok(ApiResponse::error_with_code(
+                    ErrorCode::PermissionDenied,
+                    error_msg,
+                ))
             } else {
-                Ok(ApiResponse::error_with_code(ErrorCode::InvalidCredentials, error_msg))
+                Ok(ApiResponse::error_with_code(
+                    ErrorCode::InvalidCredentials,
+                    error_msg,
+                ))
             }
         }
     }

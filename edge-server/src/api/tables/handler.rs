@@ -5,13 +5,13 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::dining_table;
+use crate::utils::validation::{MAX_NAME_LEN, validate_required_text};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, MAX_NAME_LEN};
 use shared::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 
 const RESOURCE: &str = "dining_table";
@@ -60,7 +60,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::TableCreated,
-        "dining_table", &id,
+        "dining_table",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&table, "dining_table")
@@ -94,7 +95,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::TableUpdated,
-        "dining_table", &id_str,
+        "dining_table",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_table, &table, "dining_table")
@@ -114,15 +116,23 @@ pub async fn delete(
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     // Reject if table has active orders (stored in redb, not SQLite)
-    if let Ok(Some(order_id)) = state.orders_manager.storage().find_active_order_for_table(id) {
+    if let Ok(Some(order_id)) = state
+        .orders_manager
+        .storage()
+        .find_active_order_for_table(id)
+    {
         return Err(AppError::validation(format!(
             "Cannot delete table: active order {} exists",
             order_id
         )));
     }
 
-    let name_for_audit = dining_table::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|t| t.name.clone()).unwrap_or_default();
+    let name_for_audit = dining_table::find_by_id(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|t| t.name.clone())
+        .unwrap_or_default();
     let result = dining_table::delete(&state.pool, id).await?;
 
     let id_str = id.to_string();
@@ -131,7 +141,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::TableDeleted,
-            "dining_table", &id_str,
+            "dining_table",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})

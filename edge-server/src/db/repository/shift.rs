@@ -28,9 +28,7 @@ pub async fn create(pool: &SqlitePool, data: ShiftCreate) -> RepoResult<Shift> {
 
     // Global single shift: only one OPEN shift allowed at a time
     if find_any_open(pool).await?.is_some() {
-        return Err(RepoError::Duplicate(
-            "A shift is already open".into(),
-        ));
+        return Err(RepoError::Duplicate("A shift is already open".into()));
     }
 
     let now = shared::util::now_millis();
@@ -136,7 +134,10 @@ pub async fn close(pool: &SqlitePool, id: i64, data: ShiftClose) -> RepoResult<S
 
 pub async fn force_close(pool: &SqlitePool, id: i64, data: ShiftForceClose) -> RepoResult<Shift> {
     let now = shared::util::now_millis();
-    let note = data.note.as_deref().unwrap_or("Force closed without cash counting");
+    let note = data
+        .note
+        .as_deref()
+        .unwrap_or("Force closed without cash counting");
 
     let rows = sqlx::query!(
         "UPDATE shift SET status = 'CLOSED', end_time = ?1, abnormal_close = 1, note = ?2, last_active_at = ?1, updated_at = ?1 WHERE id = ?3 AND status = 'OPEN'",
@@ -157,7 +158,10 @@ pub async fn force_close(pool: &SqlitePool, id: i64, data: ShiftForceClose) -> R
         .ok_or_else(|| RepoError::NotFound(format!("Shift {id} not found")))
 }
 
-pub async fn find_stale_shifts(pool: &SqlitePool, business_day_start: i64) -> RepoResult<Vec<Shift>> {
+pub async fn find_stale_shifts(
+    pool: &SqlitePool,
+    business_day_start: i64,
+) -> RepoResult<Vec<Shift>> {
     let shifts = sqlx::query_as::<_, Shift>(
         "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE status = 'OPEN' AND start_time < ?",
     )
@@ -181,8 +185,12 @@ pub async fn add_cash_payment(pool: &SqlitePool, amount: f64) -> RepoResult<()> 
 
 pub async fn heartbeat(pool: &SqlitePool, id: i64) -> RepoResult<()> {
     let now = shared::util::now_millis();
-    sqlx::query!("UPDATE shift SET last_active_at = ? WHERE id = ? AND status = 'OPEN'", now, id)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        "UPDATE shift SET last_active_at = ? WHERE id = ? AND status = 'OPEN'",
+        now,
+        id
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }

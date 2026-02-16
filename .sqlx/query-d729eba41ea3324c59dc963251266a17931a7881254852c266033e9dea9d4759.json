@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM mg_discount_rule WHERE marketing_group_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "d729eba41ea3324c59dc963251266a17931a7881254852c266033e9dea9d4759"
+}

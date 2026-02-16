@@ -6,7 +6,7 @@ use async_trait::async_trait;
 
 use shared::order::types::CommandErrorCode;
 
-use crate::orders::money::{to_decimal, to_f64, MONEY_TOLERANCE};
+use crate::order_money::{MONEY_TOLERANCE, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, PaymentInput};
@@ -26,7 +26,7 @@ impl CommandHandler for AddPaymentAction {
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 1. Validate payment input (finite, positive, within bounds)
-        crate::orders::money::validate_payment(&self.payment)?;
+        crate::order_money::validate_payment(&self.payment)?;
 
         // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
@@ -41,21 +41,27 @@ impl CommandHandler for AddPaymentAction {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
             OrderStatus::Merged => {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::OrderNotActive, format!(
-                    "Cannot add payment to order with status {:?}",
-                    snapshot.status
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::OrderNotActive,
+                    format!(
+                        "Cannot add payment to order with status {:?}",
+                        snapshot.status
+                    ),
+                ));
             }
         }
 
         // 4. Overpayment guard: reject if amount exceeds remaining
         let remaining = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
         if to_decimal(self.payment.amount) > remaining + MONEY_TOLERANCE {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::PaymentExceedsRemaining, format!(
-                "Payment amount ({:.2}) exceeds remaining unpaid ({:.2})",
-                self.payment.amount,
-                to_f64(remaining)
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::PaymentExceedsRemaining,
+                format!(
+                    "Payment amount ({:.2}) exceeds remaining unpaid ({:.2})",
+                    self.payment.amount,
+                    to_f64(remaining)
+                ),
+            ));
         }
 
         // 5. Allocate sequence number
@@ -66,12 +72,16 @@ impl CommandHandler for AddPaymentAction {
 
         // 7. Validate tendered amount
         if let Some(t) = self.payment.tendered
-            && to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::InsufficientTender, format!(
+            && to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE
+        {
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InsufficientTender,
+                format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, self.payment.amount
-                )));
-            }
+                ),
+            ));
+        }
 
         // 8. Calculate change for cash payments (using rust_decimal)
         let change = self.payment.tendered.map(|t| {

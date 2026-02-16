@@ -15,8 +15,7 @@ pub fn router() -> Router<ServerState> {
 
 fn routes() -> Router<ServerState> {
     // 读取路由：无需权限检查
-    let read_routes = Router::new()
-        .route("/", get(handler::get));
+    let read_routes = Router::new().route("/", get(handler::get));
 
     // 管理路由：需要 settings:manage 权限
     let manage_routes = Router::new()

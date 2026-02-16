@@ -80,7 +80,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // === 4. 员工登录 (用于 HTTP API) ===
     println!("\n=== HTTP API (需要登录) ===");
     println!("Employee login...");
-    let client = client.login("employee", "emp_password").await.map_err(|(e, _)| e)?;
+    let client = client
+        .login("employee", "emp_password")
+        .await
+        .map_err(|(e, _)| e)?;
     println!(
         "Token: {}...",
         client

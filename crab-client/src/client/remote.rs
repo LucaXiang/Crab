@@ -3,7 +3,7 @@
 //! This module implements the Remote mode functionality, which uses
 //! mTLS certificates to connect to Edge Servers.
 
-use crate::error::{handle_reqwest_response, ClientError, ClientResult};
+use crate::error::{ClientError, ClientResult, handle_reqwest_response};
 use crate::types::{Authenticated, Connected, Disconnected, Remote};
 use serde::de::DeserializeOwned;
 use shared::message::BusMessage;
@@ -12,7 +12,6 @@ use super::http::HttpClient;
 use std::time::Duration;
 
 use super::common::CrabClient;
-
 
 // ============================================================================
 // Disconnected State
@@ -194,7 +193,10 @@ impl CrabClient<Remote, Disconnected> {
             .unwrap_or_default();
 
         // 3. Connect to message server
-        tracing::info!("Connecting to message server with cached credentials: {}", message_addr);
+        tracing::info!(
+            "Connecting to message server with cached credentials: {}",
+            message_addr
+        );
         let message_client = crate::client::message::NetworkMessageClient::connect_mtls(
             message_addr,
             ca_cert_pem.as_bytes(),
@@ -320,9 +322,11 @@ impl CrabClient<Remote, Connected> {
             Some(h) => h,
             None => {
                 return Err((
-                    ClientError::Connection("mTLS HTTP client not available. Are you connected?".into()),
+                    ClientError::Connection(
+                        "mTLS HTTP client not available. Are you connected?".into(),
+                    ),
                     self,
-                ))
+                ));
             }
         };
 
@@ -339,7 +343,10 @@ impl CrabClient<Remote, Connected> {
             Some(url) => url,
             None => {
                 self.edge_http = Some(edge_http);
-                return Err((ClientError::Config("Edge Server URL not configured".into()), self));
+                return Err((
+                    ClientError::Config("Edge Server URL not configured".into()),
+                    self,
+                ));
             }
         };
 
@@ -353,7 +360,10 @@ impl CrabClient<Remote, Connected> {
             Ok(r) => r,
             Err(e) => {
                 self.edge_http = Some(edge_http);
-                return Err((ClientError::Connection(format!("Login request failed: {}", e)), self));
+                return Err((
+                    ClientError::Connection(format!("Login request failed: {}", e)),
+                    self,
+                ));
             }
         };
 

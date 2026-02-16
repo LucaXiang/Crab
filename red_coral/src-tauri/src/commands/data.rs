@@ -6,9 +6,7 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::core::{
-    ApiResponse, ClientBridge, DeleteData,
-};
+use crate::core::{ApiResponse, ClientBridge, DeleteData};
 use shared::models::{
     // Attributes
     Attribute,
@@ -52,10 +50,7 @@ pub async fn get_tag(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
 ) -> Result<ApiResponse<Tag>, String> {
-    match bridge
-        .get::<Tag>(&format!("/api/tags/{}", id))
-        .await
-    {
+    match bridge.get::<Tag>(&format!("/api/tags/{}", id)).await {
         Ok(tag) => Ok(ApiResponse::success(tag)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
@@ -92,10 +87,7 @@ pub async fn delete_tag(
     bridge: State<'_, Arc<ClientBridge>>,
     id: i64,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    match bridge
-        .delete::<bool>(&format!("/api/tags/{}", id))
-        .await
-    {
+    match bridge.delete::<bool>(&format!("/api/tags/{}", id)).await {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
@@ -323,10 +315,7 @@ pub async fn add_attribute_option(
     data: AttributeOptionInput,
 ) -> Result<ApiResponse<Attribute>, String> {
     match bridge
-        .post::<Attribute, _>(
-            &format!("/api/attributes/{}/options", attribute_id),
-            &data,
-        )
+        .post::<Attribute, _>(&format!("/api/attributes/{}/options", attribute_id), &data)
         .await
     {
         Ok(template) => Ok(ApiResponse::success(template)),
@@ -343,11 +332,7 @@ pub async fn update_attribute_option(
 ) -> Result<ApiResponse<Attribute>, String> {
     match bridge
         .put::<Attribute, _>(
-            &format!(
-                "/api/attributes/{}/options/{}",
-                attribute_id,
-                index
-            ),
+            &format!("/api/attributes/{}/options/{}", attribute_id, index),
             &data,
         )
         .await
@@ -366,8 +351,7 @@ pub async fn delete_attribute_option(
     match bridge
         .delete::<Attribute>(&format!(
             "/api/attributes/{}/options/{}",
-            attribute_id,
-            index
+            attribute_id, index
         ))
         .await
     {

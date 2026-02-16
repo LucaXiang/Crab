@@ -5,18 +5,20 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::marketing_group;
-use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN, MAX_RECEIPT_NAME_LEN};
-use shared::models::{
-    MarketingGroup, MgDiscountRule, MgDiscountRuleCreate, MgDiscountRuleUpdate,
-    StampActivityDetail,
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, MAX_RECEIPT_NAME_LEN, validate_optional_text,
+    validate_required_text,
 };
+use crate::utils::{AppError, AppResult};
 use shared::models::price_rule::AdjustmentType;
+use shared::models::{
+    MarketingGroup, MgDiscountRule, MgDiscountRuleCreate, MgDiscountRuleUpdate, StampActivityDetail,
+};
 
 const RESOURCE: &str = "marketing_group";
 
@@ -78,7 +80,9 @@ fn validate_activity_update(payload: &shared::models::StampActivityUpdate) -> Ap
 fn validate_points_earn_rate(rate: Option<f64>) -> AppResult<()> {
     if let Some(r) = rate {
         if !r.is_finite() {
-            return Err(AppError::validation("points_earn_rate must be a finite number"));
+            return Err(AppError::validation(
+                "points_earn_rate must be a finite number",
+            ));
         }
         if r < 0.0 {
             return Err(AppError::validation(format!(
@@ -92,10 +96,14 @@ fn validate_points_earn_rate(rate: Option<f64>) -> AppResult<()> {
 /// Validate MG discount rule adjustment_value
 fn validate_mg_adjustment(adjustment_type: &AdjustmentType, value: f64) -> AppResult<()> {
     if !value.is_finite() {
-        return Err(AppError::validation("adjustment_value must be a finite number"));
+        return Err(AppError::validation(
+            "adjustment_value must be a finite number",
+        ));
     }
     if value < 0.0 {
-        return Err(AppError::validation("adjustment_value must be non-negative"));
+        return Err(AppError::validation(
+            "adjustment_value must be non-negative",
+        ));
     }
     match adjustment_type {
         AdjustmentType::Percentage => {
@@ -146,10 +154,8 @@ pub async fn get_by_id(
     // 为每个 activity 加载 targets
     let mut stamp_activities = Vec::with_capacity(activities.len());
     for activity in activities {
-        let stamp_targets =
-            marketing_group::find_stamp_targets(&state.pool, activity.id).await?;
-        let reward_targets =
-            marketing_group::find_reward_targets(&state.pool, activity.id).await?;
+        let stamp_targets = marketing_group::find_stamp_targets(&state.pool, activity.id).await?;
+        let reward_targets = marketing_group::find_reward_targets(&state.pool, activity.id).await?;
         stamp_activities.push(StampActivityDetail {
             activity,
             stamp_targets,
@@ -180,7 +186,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupCreated,
-        "marketing_group", &id,
+        "marketing_group",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&group, "marketing_group")
@@ -214,7 +221,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupUpdated,
-        "marketing_group", &id_str,
+        "marketing_group",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_group, &group, "marketing_group")
@@ -227,7 +235,7 @@ pub async fn update(
     Ok(Json(group))
 }
 
-/// DELETE /api/marketing-groups/:id - 删除营销组（软删除）
+/// DELETE /api/marketing-groups/:id - 删除营销组（级联删除子记录）
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
@@ -248,7 +256,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::MarketingGroupDeleted,
-            "marketing_group", &id_str,
+            "marketing_group",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
@@ -276,7 +285,9 @@ pub async fn create_rule(
 
     let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
-        .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", group_id)))?;
+        .ok_or_else(|| {
+            crate::utils::AppError::not_found(format!("Marketing group {}", group_id))
+        })?;
 
     let rule = marketing_group::create_rule(&state.pool, group_id, payload).await?;
 
@@ -285,7 +296,8 @@ pub async fn create_rule(
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupUpdated,
-        "mg_discount_rule", &id_str,
+        "mg_discount_rule",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&rule, "mg_discount_rule")
@@ -312,10 +324,14 @@ pub async fn update_rule(
     } else if let Some(av) = payload.adjustment_value {
         // Basic validation when type is not changing
         if !av.is_finite() {
-            return Err(AppError::validation("adjustment_value must be a finite number"));
+            return Err(AppError::validation(
+                "adjustment_value must be a finite number",
+            ));
         }
         if av < 0.0 {
-            return Err(AppError::validation("adjustment_value must be non-negative"));
+            return Err(AppError::validation(
+                "adjustment_value must be non-negative",
+            ));
         }
     }
 
@@ -326,7 +342,8 @@ pub async fn update_rule(
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupUpdated,
-        "mg_discount_rule", &id_str,
+        "mg_discount_rule",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&rule, "mg_discount_rule")
@@ -356,7 +373,8 @@ pub async fn delete_rule(
         audit_log!(
             state.audit_service,
             AuditAction::MarketingGroupUpdated,
-            "mg_discount_rule", &id_str,
+            "mg_discount_rule",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"action": "rule_deleted", "rule_id": rule_id})
@@ -385,7 +403,9 @@ pub async fn create_activity(
 
     let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
-        .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", group_id)))?;
+        .ok_or_else(|| {
+            crate::utils::AppError::not_found(format!("Marketing group {}", group_id))
+        })?;
 
     let detail = marketing_group::create_activity(&state.pool, group_id, payload).await?;
 
@@ -394,7 +414,8 @@ pub async fn create_activity(
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupUpdated,
-        "stamp_activity", &id_str,
+        "stamp_activity",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&detail, "stamp_activity")
@@ -423,7 +444,8 @@ pub async fn update_activity(
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupUpdated,
-        "stamp_activity", &id_str,
+        "stamp_activity",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&detail, "stamp_activity")
@@ -453,7 +475,8 @@ pub async fn delete_activity(
         audit_log!(
             state.audit_service,
             AuditAction::MarketingGroupUpdated,
-            "stamp_activity", &id_str,
+            "stamp_activity",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"action": "activity_deleted", "activity_id": activity_id})

@@ -11,8 +11,9 @@ env:
   SQLX_OFFLINE: true
 
 jobs:
-  ci:
-    name: ${{ matrix.os }}
+  # ============ Rust Quality Gates ============
+  rust:
+    name: Rust (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -25,7 +26,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -48,8 +49,67 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
+      - name: Format check
+        run: cargo fmt --all -- --check
+
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
 
       - name: Test
         run: cargo nextest run --workspace --lib
+
+  # ============ Frontend Quality Gates ============
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: red_coral/package-lock.json
+
+      - name: Install dependencies
+        working-directory: red_coral
+        run: npm ci
+
+      - name: TypeScript type check
+        working-directory: red_coral
+        run: npx tsc --noEmit
+
+  # ============ Production Code Hygiene ============
+  hygiene:
+    name: Code Hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for unwrap in production code
+        run: |
+          # Find .unwrap() in non-test Rust files (excluding target/, tests.rs, #[cfg(test)] blocks)
+          # This is advisory — tracked as metric, not blocking
+          echo "=== Production unwrap() usage ==="
+          count=$(grep -rn '\.unwrap()' --include='*.rs' \
+            --exclude-dir=target \
+            --exclude='*tests.rs' \
+            --exclude='*test*.rs' \
+            edge-server/src/ shared/src/ crab-client/src/ red_coral/src-tauri/src/ \
+            | grep -v '#\[cfg(test)\]' \
+            | grep -v '#\[test\]' \
+            | grep -v '// SAFETY:' \
+            | wc -l || true)
+          echo "Found $count unwrap() calls in production code (excluding SAFETY-annotated)"
+          echo "unwrap_count=$count" >> $GITHUB_OUTPUT
+
+      - name: Check for TODO/FIXME/HACK
+        run: |
+          echo "=== Technical debt markers ==="
+          grep -rn 'TODO\|FIXME\|HACK\|XXX' --include='*.rs' --include='*.ts' --include='*.tsx' \
+            --exclude-dir=target --exclude-dir=node_modules \
+            edge-server/src/ shared/src/ crab-client/src/ red_coral/src/ \
+            || echo "No technical debt markers found"

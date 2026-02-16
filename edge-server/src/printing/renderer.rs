@@ -76,7 +76,10 @@ impl KitchenTicketRenderer {
         let mut groups: BTreeMap<i64, Vec<&PrintItemContext>> = BTreeMap::new();
 
         for item in items {
-            groups.entry(item.context.category_id).or_default().push(&item.context);
+            groups
+                .entry(item.context.category_id)
+                .or_default()
+                .push(&item.context);
         }
 
         // Convert to vec with category names, sort items by external_id
@@ -84,13 +87,11 @@ impl KitchenTicketRenderer {
             .into_values()
             .map(|mut items| {
                 // Sort by external_id (nulls last)
-                items.sort_by(|a, b| {
-                    match (a.external_id, b.external_id) {
-                        (Some(a_id), Some(b_id)) => a_id.cmp(&b_id),
-                        (Some(_), None) => std::cmp::Ordering::Less,
-                        (None, Some(_)) => std::cmp::Ordering::Greater,
-                        (None, None) => std::cmp::Ordering::Equal,
-                    }
+                items.sort_by(|a, b| match (a.external_id, b.external_id) {
+                    (Some(a_id), Some(b_id)) => a_id.cmp(&b_id),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => std::cmp::Ordering::Equal,
                 });
 
                 // Get category name from first item
@@ -105,7 +106,12 @@ impl KitchenTicketRenderer {
     }
 
     /// Render a category section
-    fn render_category(&self, b: &mut EscPosBuilder, category_name: &str, items: &[&PrintItemContext]) {
+    fn render_category(
+        &self,
+        b: &mut EscPosBuilder,
+        category_name: &str,
+        items: &[&PrintItemContext],
+    ) {
         // Category header
         b.bold();
         b.line(&format!("【{}】", category_name));

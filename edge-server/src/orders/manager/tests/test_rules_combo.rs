@@ -1,6 +1,5 @@
 use super::*;
 
-
 // --- Test 31: 价格规则 + skip/unskip 循环 ---
 
 #[test]
@@ -50,7 +49,6 @@ fn test_combo_rule_skip_unskip_cycle() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 32: 价格规则 + 手动改价 ---
 
 #[test]
@@ -74,7 +72,10 @@ fn test_combo_rule_then_manual_reprice() {
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     // 改价后 instance_id 可能变化，找到改价后的商品
     let item = &s.items[0];
-    assert_eq!(item.original_price, 80.0, "original_price updated to manual price");
+    assert_eq!(
+        item.original_price, 80.0,
+        "original_price updated to manual price"
+    );
     assert_close(item.unit_price, 72.0, "unit_price = 80 - 10% = 72");
     assert_close(item.price, 72.0, "item.price synced");
     assert_close(s.total, 72.0, "total");
@@ -97,7 +98,6 @@ fn test_combo_rule_then_manual_reprice() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 33: 选项 + 手动折扣 + 价格规则 ---
 
 #[test]
@@ -108,12 +108,17 @@ fn test_combo_options_manual_discount_rule() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // 商品 50€, 选项 +5€ (加大), 数量 2
-    let r = add_items(&manager, &order_id, vec![
-        item_with_options(
-            1, "Coffee", 50.0, 2,
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![item_with_options(
+            1,
+            "Coffee",
+            50.0,
+            2,
             vec![make_option(1, "Size", 1, "Large", 5.0)],
-        ),
-    ]);
+        )],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -133,7 +138,11 @@ fn test_combo_options_manual_discount_rule() {
     // base_with_options=55, manual 20% = 11 → after_manual=44
     // rule discount = 10% of after_manual=44 → 4.4
     // unit_price = 55 - 11 - 4.4 = 39.6
-    assert_close(item.unit_price, 39.6, "unit_price with option + manual + rule");
+    assert_close(
+        item.unit_price,
+        39.6,
+        "unit_price with option + manual + rule",
+    );
     assert_close(s.subtotal, 79.2, "subtotal = 39.6 × 2");
 
     // 支付完成
@@ -145,7 +154,6 @@ fn test_combo_options_manual_discount_rule() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 34: 规格变更 + 规则重算 ---
 
 #[test]
@@ -156,9 +164,17 @@ fn test_combo_spec_change_with_rule() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // 商品: spec A 价格 100€
-    let r = add_items(&manager, &order_id, vec![
-        item_with_spec(1, "Pasta", 100.0, 1, make_spec(1, "Regular", Some(100.0))),
-    ]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![item_with_spec(
+            1,
+            "Pasta",
+            100.0,
+            1,
+            make_spec(1, "Regular", Some(100.0)),
+        )],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -167,9 +183,14 @@ fn test_combo_spec_change_with_rule() {
 
     // 改规格到 spec B (价格 150€) — 通过 ModifyItem 改价格和规格
     let r = modify_item(
-        &manager, &order_id, &iid,
+        &manager,
+        &order_id,
+        &iid,
         combo_changes(
-            Some(150.0), None, None, None,
+            Some(150.0),
+            None,
+            None,
+            None,
             Some(make_spec(2, "Premium", Some(150.0))),
         ),
     );
@@ -178,13 +199,15 @@ fn test_combo_spec_change_with_rule() {
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let item = &s.items[0];
     // original_price=150, rule 10% → unit_price=135
-    assert_eq!(item.original_price, 150.0, "original_price updated to new spec price");
+    assert_eq!(
+        item.original_price, 150.0,
+        "original_price updated to new spec price"
+    );
     assert_close(item.unit_price, 135.0, "unit_price after spec change");
     assert_close(s.total, 135.0, "total after spec change");
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 35: 多规则 skip 其中一个 ---
 
@@ -194,10 +217,10 @@ fn test_combo_multiple_rules_selective_skip() {
     let order_id = open_table(&manager, 35);
 
     // 两个规则: 10% 折扣 + 5% 附加费
-    manager.cache_rules(&order_id, vec![
-        make_discount_rule(10, 10.0),
-        make_surcharge_rule(5, 5.0),
-    ]);
+    manager.cache_rules(
+        &order_id,
+        vec![make_discount_rule(10, 10.0), make_surcharge_rule(5, 5.0)],
+    );
 
     let r = add_items(&manager, &order_id, vec![simple_item(1, "Steak", 100.0, 1)]);
     assert!(r.success);
@@ -243,7 +266,6 @@ fn test_combo_multiple_rules_selective_skip() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 36: 价格规则 + 整单折扣 + 整单附加费 ---
 
 #[test]
@@ -254,10 +276,14 @@ fn test_combo_item_rule_plus_order_discount_surcharge() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // 两个商品
-    let r = add_items(&manager, &order_id, vec![
-        simple_item(1, "A", 100.0, 1), // rule: 90
-        simple_item(2, "B", 50.0, 2),  // rule: 45 × 2 = 90
-    ]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![
+            simple_item(1, "A", 100.0, 1), // rule: 90
+            simple_item(2, "B", 50.0, 2),  // rule: 45 × 2 = 90
+        ],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -300,7 +326,6 @@ fn test_combo_item_rule_plus_order_discount_surcharge() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 37: 价格规则 + 选项 ± 金额 + 修改选项 ---
 
 #[test]
@@ -311,15 +336,20 @@ fn test_combo_options_modifier_change() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // 商品 80€, 选项 +10€ (Extra Cheese) + -3€ (No Sauce)
-    let r = add_items(&manager, &order_id, vec![
-        item_with_options(
-            1, "Burger", 80.0, 1,
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![item_with_options(
+            1,
+            "Burger",
+            80.0,
+            1,
             vec![
                 make_option(2, "Topping", 0, "Extra Cheese", 10.0),
                 make_option(3, "Sauce", 1, "No Sauce", -3.0),
             ],
-        ),
-    ]);
+        )],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -331,9 +361,13 @@ fn test_combo_options_modifier_change() {
 
     // 修改选项: 换成 Extra Meat +15€
     let r = modify_item(
-        &manager, &order_id, &iid,
+        &manager,
+        &order_id,
+        &iid,
         combo_changes(
-            None, None, None,
+            None,
+            None,
+            None,
             Some(vec![make_option(2, "Topping", 2, "Extra Meat", 15.0)]),
             None,
         ),
@@ -356,7 +390,6 @@ fn test_combo_options_modifier_change() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 38: 固定金额规则 + 百分比规则叠加 ---
 
 #[test]
@@ -365,10 +398,13 @@ fn test_combo_fixed_and_percent_rules_stacking() {
     let order_id = open_table(&manager, 38);
 
     // 固定 5€ 折扣 + 15% 附加费
-    manager.cache_rules(&order_id, vec![
-        make_fixed_discount_rule(50, 5.0),
-        make_surcharge_rule(15, 15.0),
-    ]);
+    manager.cache_rules(
+        &order_id,
+        vec![
+            make_fixed_discount_rule(50, 5.0),
+            make_surcharge_rule(15, 15.0),
+        ],
+    );
 
     let r = add_items(&manager, &order_id, vec![simple_item(1, "Salmon", 60.0, 2)]);
     assert!(r.success);
@@ -404,7 +440,6 @@ fn test_combo_fixed_and_percent_rules_stacking() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 39: 全组合: 规则+手动折扣+选项+规格+整单折扣+整单附加费 ---
 
 #[test]
@@ -416,19 +451,23 @@ fn test_combo_kitchen_sink() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // 商品1: 100€, spec A (100€), option +5€, 手动折扣 20%, qty 2
-    let r = add_items(&manager, &order_id, vec![CartItemInput {
-        product_id: 1,
-        name: "Deluxe Plate".to_string(),
-        price: 100.0,
-        original_price: None,
-        quantity: 2,
-        selected_options: Some(vec![make_option(4, "Side", 0, "Truffle Fries", 5.0)]),
-        selected_specification: Some(make_spec(1, "Regular", Some(100.0))),
-        manual_discount_percent: Some(20.0),
-        note: None,
-        authorizer_id: None,
-        authorizer_name: None,
-    }]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![CartItemInput {
+            product_id: 1,
+            name: "Deluxe Plate".to_string(),
+            price: 100.0,
+            original_price: None,
+            quantity: 2,
+            selected_options: Some(vec![make_option(4, "Side", 0, "Truffle Fries", 5.0)]),
+            selected_specification: Some(make_spec(1, "Regular", Some(100.0))),
+            manual_discount_percent: Some(20.0),
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        }],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -462,7 +501,12 @@ fn test_combo_kitchen_sink() {
     // surcharge = 232.2 * 8% = 18.576 → 18.58
     // total = 232.2 - 11.61 + 18.58 = 239.17
     let expected_total = 232.2 - (232.2 * 0.05) + (232.2 * 0.08);
-    assert!((s.total - expected_total).abs() < 0.1, "total = {:.2}, expected {:.2}", s.total, expected_total);
+    assert!(
+        (s.total - expected_total).abs() < 0.1,
+        "total = {:.2}, expected {:.2}",
+        s.total,
+        expected_total
+    );
     assert_remaining_consistent(&s);
 
     // 支付完成
@@ -473,7 +517,6 @@ fn test_combo_kitchen_sink() {
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 40: 规则 + 部分支付 + skip 规则 + 支付剩余 ---
 
@@ -519,7 +562,6 @@ fn test_combo_rule_partial_pay_skip_pay_remaining() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 41: 选项 quantity > 1 + 规则 ---
 
 #[test]
@@ -530,9 +572,14 @@ fn test_combo_option_quantity_with_rule() {
     manager.cache_rules(&order_id, vec![make_surcharge_rule(10, 10.0)]);
 
     // 商品 20€, 选项 +2€ × qty 3 (e.g., 3 eggs)
-    let r = add_items(&manager, &order_id, vec![
-        item_with_options(
-            1, "Ramen", 20.0, 1,
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![item_with_options(
+            1,
+            "Ramen",
+            20.0,
+            1,
             vec![shared::order::ItemOption {
                 attribute_id: 7,
                 attribute_name: "Eggs".to_string(),
@@ -541,8 +588,8 @@ fn test_combo_option_quantity_with_rule() {
                 price_modifier: Some(2.0),
                 quantity: 3,
             }],
-        ),
-    ]);
+        )],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -560,7 +607,6 @@ fn test_combo_option_quantity_with_rule() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 42: 改价 + 改选项 + 改规格 + 改折扣 一次性修改 ---
 
 #[test]
@@ -571,19 +617,23 @@ fn test_combo_modify_everything_at_once() {
     manager.cache_rules(&order_id, vec![make_discount_rule(5, 5.0)]);
 
     // 初始: 50€, spec A, option +3€
-    let r = add_items(&manager, &order_id, vec![CartItemInput {
-        product_id: 1,
-        name: "Salad".to_string(),
-        price: 50.0,
-        original_price: None,
-        quantity: 1,
-        selected_options: Some(vec![make_option(5, "Dressing", 0, "Vinaigrette", 3.0)]),
-        selected_specification: Some(make_spec(1, "Small", Some(50.0))),
-        manual_discount_percent: None,
-        note: None,
-        authorizer_id: None,
-        authorizer_name: None,
-    }]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![CartItemInput {
+            product_id: 1,
+            name: "Salad".to_string(),
+            price: 50.0,
+            original_price: None,
+            quantity: 1,
+            selected_options: Some(vec![make_option(5, "Dressing", 0, "Vinaigrette", 3.0)]),
+            selected_specification: Some(make_spec(1, "Small", Some(50.0))),
+            manual_discount_percent: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        }],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -594,7 +644,9 @@ fn test_combo_modify_everything_at_once() {
 
     // 一次性: 改价 60, 改规格 spec B, 改选项 +8€, 加 10% 手动折扣
     let r = modify_item(
-        &manager, &order_id, &iid,
+        &manager,
+        &order_id,
+        &iid,
         combo_changes(
             Some(60.0),
             None,
@@ -623,7 +675,6 @@ fn test_combo_modify_everything_at_once() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 43: 分单支付(按商品) + 价格规则 ---
 
 #[test]
@@ -634,21 +685,29 @@ fn test_combo_split_by_items_with_rule() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // A: 100€ × 2 → 90×2=180, B: 50€ × 3 → 45×3=135
-    let r = add_items(&manager, &order_id, vec![
-        simple_item(1, "A", 100.0, 2),
-        simple_item(2, "B", 50.0, 3),
-    ]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![simple_item(1, "A", 100.0, 2), simple_item(2, "B", 50.0, 3)],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_close(s.subtotal, 315.0, "subtotal = 180 + 135");
 
-    let a_iid = s.items.iter().find(|i| i.name == "A").unwrap().instance_id.clone();
+    let a_iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "A")
+        .unwrap()
+        .instance_id
+        .clone();
     let a_unit_price = s.items.iter().find(|i| i.name == "A").unwrap().unit_price;
 
     // 分单支付: 1 个 A
     let r = split_by_items(
-        &manager, &order_id,
+        &manager,
+        &order_id,
         vec![shared::order::SplitItem {
             instance_id: a_iid.clone(),
             name: "A".to_string(),
@@ -671,7 +730,6 @@ fn test_combo_split_by_items_with_rule() {
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 44: 规则 + comp + uncomp ---
 
@@ -714,7 +772,13 @@ fn test_combo_rule_comp_uncomp() {
     assert_close(s.comp_total_amount, 100.0, "comp_total = original value");
 
     // Uncomp
-    let comped_iid = s.items.iter().find(|i| i.is_comped).unwrap().instance_id.clone();
+    let comped_iid = s
+        .items
+        .iter()
+        .find(|i| i.is_comped)
+        .unwrap()
+        .instance_id
+        .clone();
     let r = uncomp_item(&manager, &order_id, &comped_iid);
     assert!(r.success);
 
@@ -731,7 +795,6 @@ fn test_combo_rule_comp_uncomp() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 45: 负选项金额 + 固定折扣规则 ---
 
 #[test]
@@ -743,19 +806,28 @@ fn test_combo_negative_option_with_fixed_discount() {
     manager.cache_rules(&order_id, vec![make_fixed_discount_rule(30, 3.0)]);
 
     // 30€, 选项 -5€ (No Premium Ingredient), qty 2
-    let r = add_items(&manager, &order_id, vec![
-        item_with_options(
-            1, "Soup", 30.0, 2,
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![item_with_options(
+            1,
+            "Soup",
+            30.0,
+            2,
             vec![make_option(6, "Ingredient", 0, "No Truffle", -5.0)],
-        ),
-    ]);
+        )],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     // base=30, option=-5 → base_with_options=25
     // after_manual=25, fixed discount=3
     // unit_price = 25 - 3 = 22
-    assert_close(s.items[0].unit_price, 22.0, "negative option + fixed discount");
+    assert_close(
+        s.items[0].unit_price,
+        22.0,
+        "negative option + fixed discount",
+    );
     assert_close(s.subtotal, 44.0, "subtotal = 22 × 2");
 
     // 支付完成
@@ -766,7 +838,6 @@ fn test_combo_negative_option_with_fixed_discount() {
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 46: [FIXED] Full comp + uncomp 保留 applied_rules ---
 // Comp 保留 applied_rules, uncomp 后规则正确恢复
@@ -794,7 +865,10 @@ fn test_full_comp_uncomp_preserves_applied_rules() {
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(s.items[0].is_comped);
     assert_close(s.total, 0.0, "comped = free");
-    assert!(!s.items[0].applied_rules.is_empty(), "rules preserved on comped item");
+    assert!(
+        !s.items[0].applied_rules.is_empty(),
+        "rules preserved on comped item"
+    );
 
     // Uncomp → rules correctly restored
     let r = uncomp_item(&manager, &order_id, &iid);
@@ -802,13 +876,15 @@ fn test_full_comp_uncomp_preserves_applied_rules() {
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(!s.items[0].is_comped);
-    assert!(!s.items[0].applied_rules.is_empty(), "rules restored after uncomp");
+    assert!(
+        !s.items[0].applied_rules.is_empty(),
+        "rules restored after uncomp"
+    );
     assert_close(s.items[0].unit_price, 90.0, "100*0.9=90 correctly restored");
     assert_close(s.total, 90.0, "total correct after uncomp");
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 47: Partial comp + uncomp (merge back) 保留源商品规则 ---
 #[test]
@@ -850,12 +926,14 @@ fn test_partial_comp_uncomp_merge_preserves_rules() {
     assert_eq!(s.items.len(), 1, "merged back");
     assert_eq!(s.items[0].quantity, 3);
     // 源商品规则保留 → 价格正确
-    assert!(!s.items[0].applied_rules.is_empty(), "rules preserved after merge");
+    assert!(
+        !s.items[0].applied_rules.is_empty(),
+        "rules preserved after merge"
+    );
     assert_close(s.total, 120.0, "restored: 40*3=120");
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 48: 规则 + skip + comp + toggle(comped时仍可操作) + uncomp → 验证规则状态 ---
 #[test]
@@ -885,7 +963,10 @@ fn test_rule_skip_comp_toggle_uncomp_rules_preserved() {
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_close(s.total, 0.0, "comped");
-    assert!(!s.items[0].applied_rules.is_empty(), "rules preserved on comp");
+    assert!(
+        !s.items[0].applied_rules.is_empty(),
+        "rules preserved on comp"
+    );
 
     // Toggle 规则应该成功 — rules 保留在 comped item 上
     let r = toggle_rule_skip(&manager, &order_id, rule_id, false);
@@ -899,23 +980,21 @@ fn test_rule_skip_comp_toggle_uncomp_rules_preserved() {
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(!s.items[0].is_comped);
-    assert!(!s.items[0].applied_rules.is_empty(), "rules restored after uncomp");
+    assert!(
+        !s.items[0].applied_rules.is_empty(),
+        "rules restored after uncomp"
+    );
     assert_close(s.items[0].unit_price, 170.0, "200*0.85=170 restored");
     assert_close(s.total, 170.0, "total restored with rules");
     assert_remaining_consistent(&s);
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 49: 手动折扣 + comp + uncomp → 验证手动折扣恢复 ---
 #[test]
 fn test_manual_discount_comp_uncomp_restores_discount() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        49,
-        vec![simple_item(1, "A", 100.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 49, vec![simple_item(1, "A", 100.0, 1)]);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let iid = s.items[0].instance_id.clone();
@@ -951,7 +1030,6 @@ fn test_manual_discount_comp_uncomp_restores_discount() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 50: 部分支付 + comp + uncomp + 支付完成 ---
 #[test]
 fn test_partial_pay_comp_uncomp_complete() {
@@ -971,7 +1049,13 @@ fn test_partial_pay_comp_uncomp_complete() {
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_close(s.paid_amount, 60.0, "paid 60");
-    let b_iid = s.items.iter().find(|i| i.name == "B").unwrap().instance_id.clone();
+    let b_iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "B")
+        .unwrap()
+        .instance_id
+        .clone();
 
     // Comp B (30€)
     let r = comp_item(&manager, &order_id, &b_iid);
@@ -997,7 +1081,6 @@ fn test_partial_pay_comp_uncomp_complete() {
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 51: 规则 + 部分支付 + comp 部分 + toggle rule ---
 #[test]
@@ -1052,7 +1135,6 @@ fn test_rule_partial_pay_partial_comp_toggle() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 52: 两种商品 + 规则 + comp 其中一种 + 整单折扣 ---
 #[test]
 fn test_two_items_rule_comp_order_discount() {
@@ -1062,15 +1144,22 @@ fn test_two_items_rule_comp_order_discount() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // A: 100€×2=200→180, B: 50€×1=50→45 → total=225
-    let r = add_items(&manager, &order_id, vec![
-        simple_item(1, "A", 100.0, 2),
-        simple_item(2, "B", 50.0, 1),
-    ]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![simple_item(1, "A", 100.0, 2), simple_item(2, "B", 50.0, 1)],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_close(s.subtotal, 225.0, "initial subtotal");
-    let b_iid = s.items.iter().find(|i| i.name == "B").unwrap().instance_id.clone();
+    let b_iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "B")
+        .unwrap()
+        .instance_id
+        .clone();
 
     // Comp B
     let r = comp_item(&manager, &order_id, &b_iid);
@@ -1095,7 +1184,6 @@ fn test_two_items_rule_comp_order_discount() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 53: 选项 + 规则 + comp + uncomp + 修改选项 ---
 #[test]
 fn test_options_rule_comp_uncomp_modify_options() {
@@ -1105,12 +1193,17 @@ fn test_options_rule_comp_uncomp_modify_options() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // 80€ + 选项(+10€) = 90 → 规则后 81
-    let r = add_items(&manager, &order_id, vec![
-        item_with_options(
-            1, "Steak", 80.0, 1,
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![item_with_options(
+            1,
+            "Steak",
+            80.0,
+            1,
             vec![make_option(4, "Side", 0, "Premium Fries", 10.0)],
-        ),
-    ]);
+        )],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1133,7 +1226,6 @@ fn test_options_rule_comp_uncomp_modify_options() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 54: 规则 + 分单支付 + 取消支付 + toggle rule ---
 #[test]
 fn test_rule_split_pay_cancel_toggle() {
@@ -1153,7 +1245,8 @@ fn test_rule_split_pay_cancel_toggle() {
 
     // 分单支付 1 个 A
     let r = split_by_items(
-        &manager, &order_id,
+        &manager,
+        &order_id,
         vec![shared::order::SplitItem {
             instance_id: iid.clone(),
             name: "A".to_string(),
@@ -1169,10 +1262,13 @@ fn test_rule_split_pay_cancel_toggle() {
     assert_remaining_consistent(&s);
 
     // 取消这笔支付
-    let payment_id = s.payments.iter()
+    let payment_id = s
+        .payments
+        .iter()
         .find(|p| !p.cancelled)
         .unwrap()
-        .payment_id.clone();
+        .payment_id
+        .clone();
     let r = cancel_payment(&manager, &order_id, &payment_id);
     assert!(r.success);
 
@@ -1200,7 +1296,6 @@ fn test_rule_split_pay_cancel_toggle() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 55: 多商品 + 规则 + 选择性 comp + 分单支付 ---
 #[test]
 fn test_multi_items_rule_selective_comp_split_pay() {
@@ -1210,15 +1305,28 @@ fn test_multi_items_rule_selective_comp_split_pay() {
     manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
     // A: 80€×2 → 72×2=144, B: 40€×1 → 36
-    let r = add_items(&manager, &order_id, vec![
-        simple_item(1, "A", 80.0, 2),
-        simple_item(2, "B", 40.0, 1),
-    ]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![simple_item(1, "A", 80.0, 2), simple_item(2, "B", 40.0, 1)],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let a_iid = s.items.iter().find(|i| i.name == "A").unwrap().instance_id.clone();
-    let b_iid = s.items.iter().find(|i| i.name == "B").unwrap().instance_id.clone();
+    let a_iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "A")
+        .unwrap()
+        .instance_id
+        .clone();
+    let b_iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "B")
+        .unwrap()
+        .instance_id
+        .clone();
     assert_close(s.subtotal, 180.0, "144+36=180");
 
     // Comp B
@@ -1231,7 +1339,8 @@ fn test_multi_items_rule_selective_comp_split_pay() {
     // 分单支付 1 个 A
     let a_unit = s.items.iter().find(|i| i.name == "A").unwrap().unit_price;
     let r = split_by_items(
-        &manager, &order_id,
+        &manager,
+        &order_id,
         vec![shared::order::SplitItem {
             instance_id: a_iid.clone(),
             name: "A".to_string(),
@@ -1254,7 +1363,6 @@ fn test_multi_items_rule_selective_comp_split_pay() {
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 56: 修改数量 + 规则 + comp 部分 + 修改价格 ---
 #[test]
@@ -1303,7 +1411,6 @@ fn test_modify_qty_rule_partial_comp_modify_price() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 57: 规则 + 整单附加费 + comp + 取消附加费 ---
 #[test]
 fn test_rule_surcharge_comp_cancel_surcharge() {
@@ -1321,7 +1428,13 @@ fn test_rule_surcharge_comp_cancel_surcharge() {
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let iid = s.items.iter().find(|i| i.name == "A").unwrap().instance_id.clone();
+    let iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "A")
+        .unwrap()
+        .instance_id
+        .clone();
     assert_close(s.total, 198.0, "180+18=198");
 
     // Comp 全部 A
@@ -1351,7 +1464,13 @@ fn test_rule_surcharge_comp_cancel_surcharge() {
     assert_close(s.total, 0.0, "still 0 (all comped, no surcharge)");
 
     // Uncomp
-    let comped_iid = s.items.iter().find(|i| i.is_comped).unwrap().instance_id.clone();
+    let comped_iid = s
+        .items
+        .iter()
+        .find(|i| i.is_comped)
+        .unwrap()
+        .instance_id
+        .clone();
     let r = uncomp_item(&manager, &order_id, &comped_iid);
     assert!(r.success);
 
@@ -1362,7 +1481,6 @@ fn test_rule_surcharge_comp_cancel_surcharge() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 58: 固定+百分比规则 + comp + uncomp + skip 交叉 ---
 #[test]
 fn test_fixed_percent_rules_comp_uncomp_skip_cross() {
@@ -1370,10 +1488,13 @@ fn test_fixed_percent_rules_comp_uncomp_skip_cross() {
     let order_id = open_table(&manager, 58);
 
     // 百分比折扣 10% + 固定折扣 5€
-    manager.cache_rules(&order_id, vec![
-        make_discount_rule(100, 10.0),
-        make_fixed_discount_rule(200, 5.0),
-    ]);
+    manager.cache_rules(
+        &order_id,
+        vec![
+            make_discount_rule(100, 10.0),
+            make_fixed_discount_rule(200, 5.0),
+        ],
+    );
 
     // 100€ × 2
     // base=100, percent disc=10 → 90, fixed disc=5 → 85 per unit
@@ -1405,7 +1526,6 @@ fn test_fixed_percent_rules_comp_uncomp_skip_cross() {
     assert_remaining_consistent(&s);
     assert_snapshot_consistent(&manager, &order_id);
 }
-
 
 // --- Test 59: 加菜 → 规则 → 再加菜 → comp 第一批 → 验证第二批不受影响 ---
 #[test]
@@ -1452,7 +1572,6 @@ fn test_add_items_twice_rule_comp_first_batch() {
     assert_snapshot_consistent(&manager, &order_id);
 }
 
-
 // --- Test 60: Kitchen sink — 规则+选项+折扣+comp+uncomp+支付+取消+toggle+完成 ---
 #[test]
 fn test_kitchen_sink_all_interactions() {
@@ -1465,17 +1584,30 @@ fn test_kitchen_sink_all_interactions() {
     // A: 200€, 选项+20€, qty=2 → base=220, *0.85=187 → 374
     // B: 80€, qty=1 → 80*0.85=68
     // total = 374+68 = 442
-    let r = add_items(&manager, &order_id, vec![
-        item_with_options(
-            1, "A", 200.0, 2,
-            vec![make_option(7, "Add-on", 0, "Truffle", 20.0)],
-        ),
-        simple_item(2, "B", 80.0, 1),
-    ]);
+    let r = add_items(
+        &manager,
+        &order_id,
+        vec![
+            item_with_options(
+                1,
+                "A",
+                200.0,
+                2,
+                vec![make_option(7, "Add-on", 0, "Truffle", 20.0)],
+            ),
+            simple_item(2, "B", 80.0, 1),
+        ],
+    );
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let b_iid = s.items.iter().find(|i| i.name == "B").unwrap().instance_id.clone();
+    let b_iid = s
+        .items
+        .iter()
+        .find(|i| i.name == "B")
+        .unwrap()
+        .instance_id
+        .clone();
     assert_close(s.subtotal, 442.0, "initial subtotal");
 
     // 1. 整单折扣 10% → discount=44.2, total=397.8
@@ -1506,10 +1638,13 @@ fn test_kitchen_sink_all_interactions() {
     assert_close(s.subtotal, 440.0, "A=220*2=440 (rule skipped)");
 
     // 5. 取消第一笔支付
-    let payment_id = s.payments.iter()
+    let payment_id = s
+        .payments
+        .iter()
         .find(|p| !p.cancelled)
         .unwrap()
-        .payment_id.clone();
+        .payment_id
+        .clone();
     let r = cancel_payment(&manager, &order_id, &payment_id);
     assert!(r.success);
 
@@ -1524,7 +1659,13 @@ fn test_kitchen_sink_all_interactions() {
     assert_close(s.subtotal, 374.0, "rules restored");
 
     // 7. Uncomp B
-    let b_comped_iid = s.items.iter().find(|i| i.is_comped).unwrap().instance_id.clone();
+    let b_comped_iid = s
+        .items
+        .iter()
+        .find(|i| i.is_comped)
+        .unwrap()
+        .instance_id
+        .clone();
     let r = uncomp_item(&manager, &order_id, &b_comped_iid);
     assert!(r.success);
 
@@ -1545,4 +1686,3 @@ fn test_kitchen_sink_all_interactions() {
 
     assert_snapshot_consistent(&manager, &order_id);
 }
-

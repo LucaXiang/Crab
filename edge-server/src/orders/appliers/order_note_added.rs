@@ -80,12 +80,8 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.note = Some("Existing note".to_string());
 
-        let event = create_order_note_added_event(
-            "order-1",
-            2,
-            "",
-            Some("Existing note".to_string()),
-        );
+        let event =
+            create_order_note_added_event("order-1", 2, "", Some("Existing note".to_string()));
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -98,12 +94,8 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.note = Some("Old note".to_string());
 
-        let event = create_order_note_added_event(
-            "order-1",
-            2,
-            "New note",
-            Some("Old note".to_string()),
-        );
+        let event =
+            create_order_note_added_event("order-1", 2, "New note", Some("Old note".to_string()));
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);

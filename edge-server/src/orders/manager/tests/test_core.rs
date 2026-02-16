@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn test_open_table() {
     let manager = create_test_manager();
@@ -20,7 +19,6 @@ fn test_open_table() {
     assert_eq!(snapshot.table_id, Some(1));
 }
 
-
 #[test]
 fn test_idempotency() {
     let manager = create_test_manager();
@@ -39,7 +37,6 @@ fn test_idempotency() {
     let orders = manager.get_active_orders().unwrap();
     assert_eq!(orders.len(), 1);
 }
-
 
 #[test]
 fn test_add_items() {
@@ -80,7 +77,6 @@ fn test_add_items() {
     assert_eq!(snapshot.items[0].quantity, 2);
     assert_eq!(snapshot.subtotal, 20.0);
 }
-
 
 #[test]
 fn test_add_payment_and_complete() {
@@ -153,7 +149,6 @@ fn test_add_payment_and_complete() {
     assert!(!snapshot.receipt_number.is_empty()); // Server-generated at OpenTable
 }
 
-
 #[test]
 fn test_void_order() {
     let manager = create_test_manager();
@@ -188,7 +183,6 @@ fn test_void_order() {
     assert!(active_orders.is_empty());
 }
 
-
 #[test]
 fn test_event_broadcast() {
     let manager = create_test_manager();
@@ -202,7 +196,6 @@ fn test_event_broadcast() {
     let event = rx.try_recv().unwrap();
     assert_eq!(event.event_type, OrderEventType::TableOpened);
 }
-
 
 // ========================================================================
 // 1. rebuild_snapshot 一致性验证
@@ -253,7 +246,6 @@ fn test_rebuild_snapshot_matches_stored() {
     assert_eq!(stored.state_checksum, rebuilt.state_checksum);
 }
 
-
 // ========================================================================
 // 2. MoveOrder — zone 信息正确更新
 // ========================================================================
@@ -261,11 +253,7 @@ fn test_rebuild_snapshot_matches_stored() {
 #[test]
 fn test_move_order_zone_updates_correctly() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        201,
-        vec![simple_item(1, "Coffee", 5.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 201, vec![simple_item(1, "Coffee", 5.0, 1)]);
 
     // Verify initial zone
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -303,7 +291,6 @@ fn test_move_order_zone_updates_correctly() {
     );
 }
 
-
 // ========================================================================
 // 3. Merge 带支付的订单 — 存在支付记录时拒绝合并
 // ========================================================================
@@ -313,11 +300,7 @@ fn test_merge_orders_source_with_payment_rejected() {
     let manager = create_test_manager();
 
     // Source order with items and partial payment
-    let source_id = open_table_with_items(
-        &manager,
-        202,
-        vec![simple_item(1, "Coffee", 10.0, 2)],
-    );
+    let source_id = open_table_with_items(&manager, 202, vec![simple_item(1, "Coffee", 10.0, 2)]);
 
     // Pay partially on source
     let pay_cmd = OrderCommand::new(
@@ -339,11 +322,7 @@ fn test_merge_orders_source_with_payment_rejected() {
     assert_eq!(source_before.paid_amount, 5.0);
 
     // Target order
-    let target_id = open_table_with_items(
-        &manager,
-        203,
-        vec![simple_item(2, "Tea", 8.0, 1)],
-    );
+    let target_id = open_table_with_items(&manager, 203, vec![simple_item(2, "Tea", 8.0, 1)]);
 
     // Merge source → target should be rejected
     let merge_cmd = OrderCommand::new(
@@ -369,7 +348,6 @@ fn test_merge_orders_source_with_payment_rejected() {
     assert_eq!(target_after.paid_amount, 0.0);
 }
 
-
 // ========================================================================
 // 4. AddPayment 超额支付
 // ========================================================================
@@ -377,11 +355,7 @@ fn test_merge_orders_source_with_payment_rejected() {
 #[test]
 fn test_add_payment_overpay_is_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        204,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 204, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // Pay way more than the total — should be rejected
     let pay_cmd = OrderCommand::new(
@@ -398,15 +372,11 @@ fn test_add_payment_overpay_is_rejected() {
         },
     );
     let resp = manager.execute_command(pay_cmd);
-    assert!(
-        !resp.success,
-        "AddPayment should reject overpayment"
-    );
+    assert!(!resp.success, "AddPayment should reject overpayment");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 0.0);
 }
-
 
 // ========================================================================
 // 5. cancel_payment → re-pay → complete 完整流程
@@ -415,11 +385,7 @@ fn test_add_payment_overpay_is_rejected() {
 #[test]
 fn test_cancel_payment_then_repay_then_complete() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        205,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 205, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // Pay with CARD
     let pay_cmd = OrderCommand::new(
@@ -497,7 +463,6 @@ fn test_cancel_payment_then_repay_then_complete() {
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
-
 // ========================================================================
 // 6. 空订单 complete
 // ========================================================================
@@ -517,12 +482,14 @@ fn test_complete_empty_order() {
     );
     let resp = manager.execute_command(complete_cmd);
     // Zero-total orders should complete (e.g., complimentary)
-    assert!(resp.success, "Zero-total order should complete successfully");
+    assert!(
+        resp.success,
+        "Zero-total order should complete successfully"
+    );
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
-
 
 // ========================================================================
 // 7. Sequence 单调递增
@@ -533,11 +500,7 @@ fn test_sequence_monotonically_increasing() {
     let manager = create_test_manager();
     let mut rx = manager.subscribe();
 
-    let order_id = open_table_with_items(
-        &manager,
-        206,
-        vec![simple_item(1, "Coffee", 5.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 206, vec![simple_item(1, "Coffee", 5.0, 1)]);
 
     let add_cmd = OrderCommand::new(
         1,
@@ -564,7 +527,6 @@ fn test_sequence_monotonically_increasing() {
         );
     }
 }
-
 
 // ========================================================================
 // 8. 重复打开相同桌台应失败
@@ -605,7 +567,6 @@ fn test_open_same_table_twice_fails() {
     assert!(!resp2.success, "Opening the same table twice should fail");
 }
 
-
 // ========================================================================
 // 9. void 已 void 的订单应失败
 // ========================================================================
@@ -645,9 +606,11 @@ fn test_void_already_voided_order_fails() {
         },
     );
     let resp2 = manager.execute_command(void_cmd2);
-    assert!(!resp2.success, "Voiding an already voided order should fail");
+    assert!(
+        !resp2.success,
+        "Voiding an already voided order should fail"
+    );
 }
-
 
 // ========================================================================
 // 10. 移桌后结账完整流程
@@ -656,11 +619,7 @@ fn test_void_already_voided_order_fails() {
 #[test]
 fn test_move_order_then_complete() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        207,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 207, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let move_cmd = OrderCommand::new(
         1,
@@ -708,7 +667,6 @@ fn test_move_order_then_complete() {
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert_eq!(snapshot.table_id, Some(329));
 }
-
 
 // ========================================================================
 // 11. split by items → complete 流程
@@ -783,7 +741,6 @@ fn test_split_by_items_then_complete() {
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
-
 // ========================================================================
 // 12. AA split 完整流程 → complete
 // ========================================================================
@@ -791,11 +748,7 @@ fn test_split_by_items_then_complete() {
 #[test]
 fn test_aa_split_full_flow_then_complete() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        209,
-        vec![simple_item(1, "Coffee", 30.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 209, vec![simple_item(1, "Coffee", 30.0, 1)]);
 
     // Start AA: 3 shares, pay 1
     let start_aa_cmd = OrderCommand::new(
@@ -865,7 +818,6 @@ fn test_aa_split_full_flow_then_complete() {
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
-
 // ========================================================================
 // 13. 零售订单应生成 queue_number
 // ========================================================================
@@ -891,10 +843,12 @@ fn test_retail_order_gets_queue_number() {
 
     let order_id = resp.order_id.unwrap();
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    assert!(snapshot.queue_number.is_some(), "Retail order should have queue number");
+    assert!(
+        snapshot.queue_number.is_some(),
+        "Retail order should have queue number"
+    );
     assert!(snapshot.is_retail);
 }
-
 
 // ========================================================================
 // 14. execute_command_with_events 返回 events
@@ -912,7 +866,6 @@ fn test_execute_command_with_events_returns_events() {
     assert_eq!(events[0].event_type, OrderEventType::TableOpened);
 }
 
-
 // ========================================================================
 // 15. get_events_since 完整性
 // ========================================================================
@@ -921,11 +874,7 @@ fn test_execute_command_with_events_returns_events() {
 fn test_get_events_since_completeness() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(
-        &manager,
-        210,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 210, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let seq_before = manager.get_current_sequence().unwrap();
 
@@ -946,9 +895,12 @@ fn test_get_events_since_completeness() {
 
     let events = manager.get_events_since(seq_before).unwrap();
     assert!(!events.is_empty());
-    assert!(events.iter().any(|e| e.event_type == OrderEventType::PaymentAdded));
+    assert!(
+        events
+            .iter()
+            .any(|e| e.event_type == OrderEventType::PaymentAdded)
+    );
 }
-
 
 // ========================================================================
 // 16. 合并后源订单变为 Merged 状态
@@ -958,16 +910,8 @@ fn test_get_events_since_completeness() {
 fn test_merge_source_becomes_merged_status() {
     let manager = create_test_manager();
 
-    let source_id = open_table_with_items(
-        &manager,
-        211,
-        vec![simple_item(1, "Coffee", 5.0, 1)],
-    );
-    let target_id = open_table_with_items(
-        &manager,
-        212,
-        vec![simple_item(2, "Tea", 3.0, 1)],
-    );
+    let source_id = open_table_with_items(&manager, 211, vec![simple_item(1, "Coffee", 5.0, 1)]);
+    let target_id = open_table_with_items(&manager, 212, vec![simple_item(2, "Tea", 3.0, 1)]);
 
     let merge_cmd = OrderCommand::new(
         1,
@@ -992,7 +936,6 @@ fn test_merge_source_becomes_merged_status() {
     assert_eq!(target.status, OrderStatus::Active);
     assert_eq!(target.items.len(), 2);
 }
-
 
 // ========================================================================
 // 17. 操作不存在的订单应返回错误
@@ -1045,4 +988,3 @@ fn test_operations_on_nonexistent_order_fail() {
     let resp = manager.execute_command(void_cmd);
     assert!(!resp.success);
 }
-

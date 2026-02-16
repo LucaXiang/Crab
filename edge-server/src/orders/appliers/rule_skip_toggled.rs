@@ -3,7 +3,7 @@
 //! Applies the RuleSkipToggled event to toggle a rule's skipped status
 //! and recalculate order totals using precise decimal arithmetic.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -13,9 +13,7 @@ pub struct RuleSkipToggledApplier;
 impl EventApplier for RuleSkipToggledApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::RuleSkipToggled {
-            rule_id,
-            skipped,
-            ..
+            rule_id, skipped, ..
         } = &event.payload
         {
             // 1. Update the skipped status on all items' applied_rules with matching rule_id
@@ -39,7 +37,7 @@ impl EventApplier for RuleSkipToggledApplier {
             snapshot.updated_at = event.timestamp;
 
             // 4. Recalculate totals using precise decimal arithmetic
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // 5. Update checksum
             snapshot.update_checksum();
@@ -142,8 +140,14 @@ mod tests {
 
         // Item: original_price 100, rule_discount 10 → price 90, subtotal 90
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
         snapshot.subtotal = 90.0;
         snapshot.discount = 10.0;
@@ -171,8 +175,14 @@ mod tests {
 
         // Item starts with skipped rule
         let mut item = create_test_item_with_rule(
-            "inst-1", 100.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            100.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         );
         item.applied_rules[0].skipped = true;
         snapshot.items.push(item);
@@ -261,8 +271,14 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
         let original_skipped = snapshot.items[0].applied_rules[0].skipped;
 
@@ -272,10 +288,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Existing rule unchanged
-        assert_eq!(
-            snapshot.items[0].applied_rules[0].skipped,
-            original_skipped
-        );
+        assert_eq!(snapshot.items[0].applied_rules[0].skipped, original_skipped);
     }
 
     #[test]
@@ -283,8 +296,14 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
         snapshot.last_sequence = 5;
 
@@ -300,8 +319,14 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
         let initial_checksum = snapshot.state_checksum.clone();
 
@@ -320,12 +345,24 @@ mod tests {
 
         // Two items with the same rule
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
         snapshot.items.push(create_test_item_with_rule(
-            "inst-2", 45.0, 50.0, 2,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 5.0,
+            "inst-2",
+            45.0,
+            50.0,
+            2,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            5.0,
         ));
 
         // Skip the rule
@@ -349,8 +386,14 @@ mod tests {
 
         // Item: base 100, surcharge +15 → price 115
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 115.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Surcharge, 15.0, 15.0,
+            "inst-1",
+            115.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Surcharge,
+            15.0,
+            15.0,
         ));
         snapshot.subtotal = 115.0;
         snapshot.total = 115.0;
@@ -372,8 +415,14 @@ mod tests {
         snapshot.status = OrderStatus::Active;
 
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
         snapshot.subtotal = 90.0;
         snapshot.total = 90.0;
@@ -401,7 +450,10 @@ mod tests {
         // Note: checksum won't match exactly due to different sequence/timestamp,
         // but verify_checksum should still pass
         assert!(snapshot.verify_checksum());
-        assert_ne!(snapshot.state_checksum, checksum_after_skip, "Different sequence → different checksum");
+        assert_ne!(
+            snapshot.state_checksum, checksum_after_skip,
+            "Different sequence → different checksum"
+        );
     }
 
     #[test]
@@ -411,8 +463,14 @@ mod tests {
 
         // Comped item with a rule
         let mut item = create_test_item_with_rule(
-            "inst-1", 0.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            0.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         );
         item.is_comped = true;
         item.price = 0.0;
@@ -439,8 +497,14 @@ mod tests {
 
         // Item: base 100, manual 20% off, rule discount 10 → unit_price = 100-20-10 = 70
         let mut item = create_test_item_with_rule(
-            "inst-1", 70.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            70.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         );
         item.manual_discount_percent = Some(20.0);
         snapshot.items.push(item);
@@ -464,8 +528,14 @@ mod tests {
 
         // Item: base 50, option +5, rule discount 6 → unit_price = 55-6 = 49
         let mut item = create_test_item_with_rule(
-            "inst-1", 49.0, 50.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 6.0,
+            "inst-1",
+            49.0,
+            50.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            6.0,
         );
         item.selected_options = Some(vec![shared::order::ItemOption {
             attribute_id: 1,
@@ -495,8 +565,14 @@ mod tests {
         snapshot.status = OrderStatus::Active;
 
         let mut item = create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         );
         item.tax_rate = 21; // 21% IVA
         snapshot.items.push(item);
@@ -504,7 +580,7 @@ mod tests {
         // Apply with discount active
         let applier = RuleSkipToggledApplier;
         // First recalculate to set baseline
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
         let tax_with_discount = snapshot.items[0].tax;
         // Tax on 90: 90 * 21/121 ≈ 15.62
         assert_eq!(tax_with_discount, 15.62);
@@ -515,8 +591,10 @@ mod tests {
 
         // Tax on 100: 100 * 21/121 ≈ 17.36
         assert_eq!(snapshot.items[0].tax, 17.36);
-        assert!(snapshot.items[0].tax > tax_with_discount,
-            "Tax increases when discount is removed");
+        assert!(
+            snapshot.items[0].tax > tax_with_discount,
+            "Tax increases when discount is removed"
+        );
     }
 
     #[test]
@@ -526,8 +604,14 @@ mod tests {
 
         // Item with item-level discount
         snapshot.items.push(create_test_item_with_rule(
-            "inst-1", 90.0, 100.0, 1,
-            5, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            90.0,
+            100.0,
+            1,
+            5,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         ));
 
         // Order-level discount (separate rule)
@@ -548,7 +632,7 @@ mod tests {
         }];
         snapshot.order_rule_discount_amount = 9.0;
 
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
         // subtotal = 90, order_discount = 9, total = 81
         assert_eq!(snapshot.subtotal, 90.0);
         assert_eq!(snapshot.total, 81.0);
@@ -573,8 +657,14 @@ mod tests {
 
         // Item with already-skipped rule
         let mut item = create_test_item_with_rule(
-            "inst-1", 100.0, 100.0, 1,
-            1, shared::models::price_rule::RuleType::Discount, 10.0, 10.0,
+            "inst-1",
+            100.0,
+            100.0,
+            1,
+            1,
+            shared::models::price_rule::RuleType::Discount,
+            10.0,
+            10.0,
         );
         item.applied_rules[0].skipped = true;
         snapshot.items.push(item);
@@ -659,7 +749,7 @@ mod tests {
             is_comped: false,
         });
 
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
         // Both active: 100 - 10 - 8 = 82
         assert_eq!(snapshot.subtotal, 82.0);
 

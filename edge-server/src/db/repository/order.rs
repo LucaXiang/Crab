@@ -209,12 +209,15 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         }
         let all_options = query.fetch_all(pool).await?;
         for (item_pk, attr, opt, price, qty) in all_options {
-            options_map.entry(item_pk).or_default().push(OrderDetailOption {
-                attribute_name: attr,
-                option_name: opt,
-                price_modifier: price,
-                quantity: qty,
-            });
+            options_map
+                .entry(item_pk)
+                .or_default()
+                .push(OrderDetailOption {
+                    attribute_name: attr,
+                    option_name: opt,
+                    price_modifier: price,
+                    quantity: qty,
+                });
         }
     }
 

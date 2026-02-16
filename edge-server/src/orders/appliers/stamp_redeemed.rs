@@ -3,9 +3,11 @@
 //! Adds the reward item as a new comped line in the order and records
 //! the redemption in snapshot.stamp_redemptions for reversal on member unlink.
 
-use crate::orders::money;
+use crate::order_money;
 use crate::orders::traits::EventApplier;
-use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, StampRedemptionState};
+use shared::order::{
+    CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, StampRedemptionState,
+};
 
 /// StampRedeemed applier
 pub struct StampRedeemedApplier;
@@ -36,12 +38,20 @@ impl EventApplier for StampRedeemedApplier {
 
                 if is_full_comp {
                     // Full comp: item.quantity <= reward_quantity, comp the whole item
-                    if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == *existing_id) {
+                    if let Some(item) = snapshot
+                        .items
+                        .iter_mut()
+                        .find(|i| i.instance_id == *existing_id)
+                    {
                         item.is_comped = true;
                     }
                 } else {
                     // Partial comp: item.quantity > reward_quantity, split the item
-                    if let Some(source_idx) = snapshot.items.iter().position(|i| i.instance_id == *existing_id) {
+                    if let Some(source_idx) = snapshot
+                        .items
+                        .iter()
+                        .position(|i| i.instance_id == *existing_id)
+                    {
                         let source = snapshot.items[source_idx].clone();
 
                         // Reduce source quantity
@@ -106,7 +116,7 @@ impl EventApplier for StampRedeemedApplier {
             snapshot.updated_at = event.timestamp;
 
             // Recalculate totals
-            money::recalculate_totals(snapshot);
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -214,7 +224,7 @@ mod tests {
             category_name: None,
             is_comped: false,
         });
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
         assert!((snapshot.total - 5.00).abs() < f64::EPSILON);
 
         // Redeem stamp — adds free Coffee
@@ -228,7 +238,12 @@ mod tests {
         assert!(snapshot.verify_checksum());
     }
 
-    fn create_test_item(instance_id: &str, product_id: i64, price: f64, quantity: i32) -> CartItemSnapshot {
+    fn create_test_item(
+        instance_id: &str,
+        product_id: i64,
+        price: f64,
+        quantity: i32,
+    ) -> CartItemSnapshot {
         CartItemSnapshot {
             id: product_id,
             instance_id: instance_id.to_string(),
@@ -299,7 +314,7 @@ mod tests {
         // Item qty=1, reward_qty=1 → full comp (no split)
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 1));
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
 
         // Full comp: reward_instance_id == comp_existing_instance_id
         let event = create_comp_existing_event("order-1", 1, "item-1", "item-1", 1);
@@ -318,7 +333,11 @@ mod tests {
         // Redemption state: no source (full comp)
         assert_eq!(snapshot.stamp_redemptions.len(), 1);
         assert!(snapshot.stamp_redemptions[0].is_comp_existing);
-        assert!(snapshot.stamp_redemptions[0].comp_source_instance_id.is_none());
+        assert!(
+            snapshot.stamp_redemptions[0]
+                .comp_source_instance_id
+                .is_none()
+        );
     }
 
     #[test]
@@ -327,7 +346,7 @@ mod tests {
         // Event quantity is already capped by action to min(3, 2) = 2
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 2));
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
 
         // Full comp: reward_instance_id == comp_existing_instance_id
         let event = create_comp_existing_event("order-1", 1, "item-1", "item-1", 2);
@@ -349,7 +368,7 @@ mod tests {
         // Item qty=7, reward_qty=1 → partial comp (split 1 off)
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 7));
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
         let initial_total = snapshot.total;
 
         // Partial comp: reward_instance_id != comp_existing_instance_id
@@ -361,12 +380,20 @@ mod tests {
         assert_eq!(snapshot.items.len(), 2);
 
         // Original item: qty reduced from 7 to 6
-        let source = snapshot.items.iter().find(|i| i.instance_id == "item-1").unwrap();
+        let source = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "item-1")
+            .unwrap();
         assert_eq!(source.quantity, 6);
         assert!(!source.is_comped);
 
         // New comped item: qty = 1
-        let comped = snapshot.items.iter().find(|i| i.instance_id == "stamp_reward::cmd-2").unwrap();
+        let comped = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "stamp_reward::cmd-2")
+            .unwrap();
         assert_eq!(comped.quantity, 1);
         assert!(comped.is_comped);
         assert_eq!(comped.id, 50);
@@ -380,18 +407,25 @@ mod tests {
         assert_eq!(snapshot.stamp_redemptions.len(), 1);
         assert!(snapshot.stamp_redemptions[0].is_comp_existing);
         assert_eq!(
-            snapshot.stamp_redemptions[0].comp_source_instance_id.as_deref(),
+            snapshot.stamp_redemptions[0]
+                .comp_source_instance_id
+                .as_deref(),
             Some("item-1")
         );
-        assert_eq!(snapshot.stamp_redemptions[0].reward_instance_id, "stamp_reward::cmd-2");
+        assert_eq!(
+            snapshot.stamp_redemptions[0].reward_instance_id,
+            "stamp_reward::cmd-2"
+        );
     }
 
     #[test]
     fn test_comp_existing_partial_comp_large_split() {
         // Item qty=10, reward_qty=3 → split 3 off, leave 7
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item("item-1", 50, 2.00, 10));
-        money::recalculate_totals(&mut snapshot);
+        snapshot
+            .items
+            .push(create_test_item("item-1", 50, 2.00, 10));
+        order_money::recalculate_totals(&mut snapshot);
 
         let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "item-1", 3);
         let applier = StampRedeemedApplier;
@@ -399,11 +433,19 @@ mod tests {
 
         assert_eq!(snapshot.items.len(), 2);
 
-        let source = snapshot.items.iter().find(|i| i.instance_id == "item-1").unwrap();
+        let source = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "item-1")
+            .unwrap();
         assert_eq!(source.quantity, 7);
         assert!(!source.is_comped);
 
-        let comped = snapshot.items.iter().find(|i| i.instance_id == "stamp_reward::cmd-2").unwrap();
+        let comped = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "stamp_reward::cmd-2")
+            .unwrap();
         assert_eq!(comped.quantity, 3);
         assert!(comped.is_comped);
 
@@ -416,17 +458,25 @@ mod tests {
         // Item qty=5, unpaid_qty=5, reward_qty=2
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(create_test_item("item-1", 50, 3.00, 5));
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
 
         let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "item-1", 2);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
-        let source = snapshot.items.iter().find(|i| i.instance_id == "item-1").unwrap();
+        let source = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "item-1")
+            .unwrap();
         assert_eq!(source.quantity, 3);
         assert_eq!(source.unpaid_quantity, 3);
 
-        let comped = snapshot.items.iter().find(|i| i.instance_id == "stamp_reward::cmd-2").unwrap();
+        let comped = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "stamp_reward::cmd-2")
+            .unwrap();
         assert_eq!(comped.quantity, 2);
         assert_eq!(comped.unpaid_quantity, 2);
     }
@@ -435,10 +485,14 @@ mod tests {
     fn test_comp_existing_with_other_items_in_order() {
         // Order has multiple items, only one gets partially comped
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item("coffee-1", 10, 3.50, 5)); // 5 coffees
-        snapshot.items.push(create_test_item("potato-1", 50, 4.50, 7)); // 7 potatoes (target)
-        snapshot.items.push(create_test_item("cake-1", 20, 5.00, 1));   // 1 cake
-        money::recalculate_totals(&mut snapshot);
+        snapshot
+            .items
+            .push(create_test_item("coffee-1", 10, 3.50, 5)); // 5 coffees
+        snapshot
+            .items
+            .push(create_test_item("potato-1", 50, 4.50, 7)); // 7 potatoes (target)
+        snapshot.items.push(create_test_item("cake-1", 20, 5.00, 1)); // 1 cake
+        order_money::recalculate_totals(&mut snapshot);
 
         let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "potato-1", 1);
         let applier = StampRedeemedApplier;
@@ -448,22 +502,38 @@ mod tests {
         assert_eq!(snapshot.items.len(), 4);
 
         // Coffee untouched
-        let coffee = snapshot.items.iter().find(|i| i.instance_id == "coffee-1").unwrap();
+        let coffee = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "coffee-1")
+            .unwrap();
         assert_eq!(coffee.quantity, 5);
         assert!(!coffee.is_comped);
 
         // Potato reduced to 6
-        let potato = snapshot.items.iter().find(|i| i.instance_id == "potato-1").unwrap();
+        let potato = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "potato-1")
+            .unwrap();
         assert_eq!(potato.quantity, 6);
         assert!(!potato.is_comped);
 
         // Cake untouched
-        let cake = snapshot.items.iter().find(|i| i.instance_id == "cake-1").unwrap();
+        let cake = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "cake-1")
+            .unwrap();
         assert_eq!(cake.quantity, 1);
         assert!(!cake.is_comped);
 
         // New comped potato
-        let comped = snapshot.items.iter().find(|i| i.instance_id == "stamp_reward::cmd-2").unwrap();
+        let comped = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "stamp_reward::cmd-2")
+            .unwrap();
         assert_eq!(comped.quantity, 1);
         assert!(comped.is_comped);
     }
@@ -472,7 +542,7 @@ mod tests {
     fn test_comp_existing_checksum_updates() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 3));
-        money::recalculate_totals(&mut snapshot);
+        order_money::recalculate_totals(&mut snapshot);
         snapshot.update_checksum();
         let initial_checksum = snapshot.state_checksum.clone();
 

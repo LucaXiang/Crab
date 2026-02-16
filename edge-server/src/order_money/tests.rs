@@ -235,7 +235,10 @@ fn test_is_pre_payment_reset_when_total_changes() {
 
     // Recalculate without changing items - total unchanged, is_pre_payment stays true
     recalculate_totals(&mut snapshot);
-    assert!(snapshot.is_pre_payment, "is_pre_payment should stay true when total unchanged");
+    assert!(
+        snapshot.is_pre_payment,
+        "is_pre_payment should stay true when total unchanged"
+    );
 
     // Add another item - total changes, is_pre_payment should reset
     snapshot.items.push(CartItemSnapshot {
@@ -268,7 +271,10 @@ fn test_is_pre_payment_reset_when_total_changes() {
 
     recalculate_totals(&mut snapshot);
     assert_eq!(snapshot.total, 150.0);
-    assert!(!snapshot.is_pre_payment, "is_pre_payment should reset when total changes");
+    assert!(
+        !snapshot.is_pre_payment,
+        "is_pre_payment should reset when total changes"
+    );
 }
 
 #[test]
@@ -330,23 +336,39 @@ fn test_to_decimal_nan_becomes_zero() {
 #[test]
 fn test_to_decimal_infinity_becomes_zero() {
     let result = to_decimal(f64::INFINITY);
-    assert_eq!(result, Decimal::ZERO, "INFINITY should silently convert to 0");
+    assert_eq!(
+        result,
+        Decimal::ZERO,
+        "INFINITY should silently convert to 0"
+    );
 
     let result_neg = to_decimal(f64::NEG_INFINITY);
-    assert_eq!(result_neg, Decimal::ZERO, "NEG_INFINITY should silently convert to 0");
+    assert_eq!(
+        result_neg,
+        Decimal::ZERO,
+        "NEG_INFINITY should silently convert to 0"
+    );
 }
 
 #[test]
 fn test_to_decimal_f64_max_becomes_zero() {
     // f64::MAX 超出 Decimal 范围
     let result = to_decimal(f64::MAX);
-    assert_eq!(result, Decimal::ZERO, "f64::MAX should silently convert to 0");
+    assert_eq!(
+        result,
+        Decimal::ZERO,
+        "f64::MAX should silently convert to 0"
+    );
 }
 
 #[test]
 fn test_to_decimal_f64_min_becomes_zero() {
     let result = to_decimal(f64::MIN);
-    assert_eq!(result, Decimal::ZERO, "f64::MIN should silently convert to 0");
+    assert_eq!(
+        result,
+        Decimal::ZERO,
+        "f64::MIN should silently convert to 0"
+    );
 }
 
 #[test]
@@ -360,7 +382,10 @@ fn test_to_decimal_negative_price() {
 fn test_to_decimal_very_large_but_valid() {
     // 1_000_000_000.99 在 Decimal 范围内
     let result = to_decimal(1_000_000_000.99);
-    assert!(result > Decimal::ZERO, "Large but valid f64 should convert normally");
+    assert!(
+        result > Decimal::ZERO,
+        "Large but valid f64 should convert normally"
+    );
 }
 
 // ========================================================================
@@ -399,7 +424,11 @@ fn test_unit_price_negative_base_clamped_to_zero() {
 
     let result = calculate_unit_price(&item);
     // 负价格 clamp 到 0
-    assert_eq!(result, Decimal::ZERO, "Negative price should be clamped to 0");
+    assert_eq!(
+        result,
+        Decimal::ZERO,
+        "Negative price should be clamped to 0"
+    );
 }
 
 #[test]
@@ -468,7 +497,11 @@ fn test_unit_price_nan_price_becomes_zero() {
     };
 
     let result = calculate_unit_price(&item);
-    assert_eq!(result, Decimal::ZERO, "NaN price should result in 0 unit price");
+    assert_eq!(
+        result,
+        Decimal::ZERO,
+        "NaN price should result in 0 unit price"
+    );
 }
 
 #[test]
@@ -502,7 +535,11 @@ fn test_unit_price_infinity_price_becomes_zero() {
     };
 
     let result = calculate_unit_price(&item);
-    assert_eq!(result, Decimal::ZERO, "Infinity price should result in 0 unit price");
+    assert_eq!(
+        result,
+        Decimal::ZERO,
+        "Infinity price should result in 0 unit price"
+    );
 }
 
 #[test]
@@ -537,7 +574,11 @@ fn test_unit_price_negative_discount_increases_price() {
 
     let result = calculate_unit_price(&item);
     // -20% discount = +20% => 100 + 20 = 120
-    assert_eq!(to_f64(result), 120.0, "Negative discount should increase price");
+    assert_eq!(
+        to_f64(result),
+        120.0,
+        "Negative discount should increase price"
+    );
 }
 
 // ========================================================================
@@ -576,7 +617,11 @@ fn test_calculate_item_total_negative_quantity() {
 
     let result = calculate_item_total(&item);
     // 10.0 * -5 = -50.0 — 负数行总计
-    assert_eq!(to_f64(result), -50.0, "Negative quantity produces negative line total");
+    assert_eq!(
+        to_f64(result),
+        -50.0,
+        "Negative quantity produces negative line total"
+    );
 }
 
 #[test]
@@ -610,7 +655,11 @@ fn test_calculate_item_total_zero_quantity() {
     };
 
     let result = calculate_item_total(&item);
-    assert_eq!(to_f64(result), 0.0, "Zero quantity produces zero line total");
+    assert_eq!(
+        to_f64(result),
+        0.0,
+        "Zero quantity produces zero line total"
+    );
 }
 
 #[test]
@@ -763,7 +812,10 @@ fn test_recalculate_totals_order_discount_exceeds_subtotal() {
 
     // total = max(subtotal(50) - order_discount(100), 0) = 0
     assert_eq!(snapshot.subtotal, 50.0);
-    assert_eq!(snapshot.total, 0.0, "total 被 clamp 到 0 (折扣不产生负总额)");
+    assert_eq!(
+        snapshot.total, 0.0,
+        "total 被 clamp 到 0 (折扣不产生负总额)"
+    );
     assert_eq!(snapshot.remaining_amount, 0.0, "remaining_amount 也为 0");
 }
 
@@ -800,8 +852,8 @@ fn test_unit_price_with_original_price_and_options_no_double_counting() {
         id: 1,
         instance_id: "i1".to_string(),
         name: "Pizza".to_string(),
-        price: 16.50,                     // item_final from reducer (already includes options)
-        original_price: 12.0,       // spec price set by reducer
+        price: 16.50,         // item_final from reducer (already includes options)
+        original_price: 12.0, // spec price set by reducer
         quantity: 1,
         unpaid_quantity: 1,
         selected_options: Some(vec![
@@ -857,8 +909,8 @@ fn test_rule_discount_plus_options_plus_manual_discount() {
         id: 1,
         instance_id: "i1".to_string(),
         name: "Item".to_string(),
-        price: 85.0,                      // item_final from reducer
-        original_price: 100.0,      // spec price
+        price: 85.0,           // item_final from reducer
+        original_price: 100.0, // spec price
         quantity: 2,
         unpaid_quantity: 2,
         selected_options: Some(vec![shared::order::ItemOption {
@@ -870,8 +922,8 @@ fn test_rule_discount_plus_options_plus_manual_discount() {
             quantity: 1,
         }]),
         selected_specification: None,
-        manual_discount_percent: Some(10.0),   // 10% off
-        rule_discount_amount: 3.0,       // -3 per unit
+        manual_discount_percent: Some(10.0), // 10% off
+        rule_discount_amount: 3.0,           // -3 per unit
         rule_surcharge_amount: 0.0,
         applied_rules: vec![],
         applied_mg_rules: vec![],
@@ -910,20 +962,18 @@ fn test_option_quantity_multiplies_price_modifier() {
         id: 1,
         instance_id: "i1".to_string(),
         name: "Noodles".to_string(),
-        price: 16.0,                      // item_final from reducer
-        original_price: 10.0,       // base price
+        price: 16.0,          // item_final from reducer
+        original_price: 10.0, // base price
         quantity: 1,
         unpaid_quantity: 1,
-        selected_options: Some(vec![
-            shared::order::ItemOption {
-                attribute_id: 1,
-                attribute_name: "加蛋".to_string(),
-                option_id: 0,
-                option_name: "鸡蛋".to_string(),
-                price_modifier: Some(2.0),  // +2 per egg
-                quantity: 3,                // 3 eggs!
-            },
-        ]),
+        selected_options: Some(vec![shared::order::ItemOption {
+            attribute_id: 1,
+            attribute_name: "加蛋".to_string(),
+            option_id: 0,
+            option_name: "鸡蛋".to_string(),
+            price_modifier: Some(2.0), // +2 per egg
+            quantity: 3,               // 3 eggs!
+        }]),
         selected_specification: None,
         manual_discount_percent: None,
         rule_discount_amount: 0.0,
@@ -963,8 +1013,8 @@ fn test_multiple_options_with_different_quantities() {
         instance_id: "i1".to_string(),
         name: "Burger".to_string(),
         price: 17.0,
-        original_price: 10.0,       // base price
-        quantity: 2,                      // 2 burgers
+        original_price: 10.0, // base price
+        quantity: 2,          // 2 burgers
         unpaid_quantity: 2,
         selected_options: Some(vec![
             shared::order::ItemOption {
@@ -972,16 +1022,16 @@ fn test_multiple_options_with_different_quantities() {
                 attribute_name: "Cheese".to_string(),
                 option_id: 0,
                 option_name: "Cheddar".to_string(),
-                price_modifier: Some(1.5),  // +1.5 per slice
-                quantity: 2,                // 2 slices
+                price_modifier: Some(1.5), // +1.5 per slice
+                quantity: 2,               // 2 slices
             },
             shared::order::ItemOption {
                 attribute_id: 2,
                 attribute_name: "Bacon".to_string(),
                 option_id: 0,
                 option_name: "Crispy".to_string(),
-                price_modifier: Some(2.0),  // +2 per strip
-                quantity: 2,                // 2 strips
+                price_modifier: Some(2.0), // +2 per strip
+                quantity: 2,               // 2 strips
             },
         ]),
         selected_specification: None,
@@ -1030,7 +1080,7 @@ fn test_rule_discount_exceeding_price_clamps_to_zero() {
         selected_options: None,
         selected_specification: None,
         manual_discount_percent: None,
-        rule_discount_amount: 15.0,  // Discount exceeds base price
+        rule_discount_amount: 15.0, // Discount exceeds base price
         rule_surcharge_amount: 0.0,
         applied_rules: vec![],
         applied_mg_rules: vec![],
@@ -1095,7 +1145,10 @@ fn test_validate_item_changes_nan_price() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "NaN price should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "NaN price should be rejected"
+    );
 }
 
 #[test]
@@ -1108,7 +1161,10 @@ fn test_validate_item_changes_infinity_price() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Infinity price should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Infinity price should be rejected"
+    );
 }
 
 #[test]
@@ -1121,7 +1177,10 @@ fn test_validate_item_changes_negative_price() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Negative price should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Negative price should be rejected"
+    );
 }
 
 #[test]
@@ -1134,7 +1193,10 @@ fn test_validate_item_changes_exceeds_max_price() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Price > MAX_PRICE should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Price > MAX_PRICE should be rejected"
+    );
 }
 
 #[test]
@@ -1147,7 +1209,10 @@ fn test_validate_item_changes_zero_quantity() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Zero quantity should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Zero quantity should be rejected"
+    );
 }
 
 #[test]
@@ -1160,7 +1225,10 @@ fn test_validate_item_changes_negative_quantity() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Negative quantity should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Negative quantity should be rejected"
+    );
 }
 
 #[test]
@@ -1173,7 +1241,10 @@ fn test_validate_item_changes_exceeds_max_quantity() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Quantity > MAX should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Quantity > MAX should be rejected"
+    );
 }
 
 #[test]
@@ -1186,7 +1257,10 @@ fn test_validate_item_changes_discount_nan() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "NaN discount should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "NaN discount should be rejected"
+    );
 }
 
 #[test]
@@ -1199,7 +1273,10 @@ fn test_validate_item_changes_discount_negative() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Negative discount should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Negative discount should be rejected"
+    );
 }
 
 #[test]
@@ -1212,7 +1289,10 @@ fn test_validate_item_changes_discount_over_100() {
         selected_options: None,
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Discount > 100% should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Discount > 100% should be rejected"
+    );
 }
 
 #[test]
@@ -1232,7 +1312,10 @@ fn test_validate_item_changes_option_nan_modifier() {
         }]),
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "NaN option modifier should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "NaN option modifier should be rejected"
+    );
 }
 
 #[test]
@@ -1252,7 +1335,10 @@ fn test_validate_item_changes_option_exceeds_max_modifier() {
         }]),
         selected_specification: None,
     };
-    assert!(validate_item_changes(&changes).is_err(), "Option modifier > MAX_PRICE should be rejected");
+    assert!(
+        validate_item_changes(&changes).is_err(),
+        "Option modifier > MAX_PRICE should be rejected"
+    );
 }
 
 // ========================================================================
@@ -1315,27 +1401,29 @@ fn test_sum_payments_with_cancelled() {
             timestamp: 2000,
         },
     ];
-    assert_eq!(sum_payments(&payments), 15.0, "Cancelled payment should be excluded");
+    assert_eq!(
+        sum_payments(&payments),
+        15.0,
+        "Cancelled payment should be excluded"
+    );
 }
 
 #[test]
 fn test_sum_payments_all_cancelled() {
-    let payments = vec![
-        shared::order::PaymentRecord {
-            payment_id: "p1".to_string(),
-            method: "CASH".to_string(),
-            amount: 50.0,
-            tendered: None,
-            change: None,
-            note: None,
-            cancelled: true,
-            cancel_reason: None,
-            split_items: None,
-            aa_shares: None,
-            split_type: None,
-            timestamp: 1000,
-        },
-    ];
+    let payments = vec![shared::order::PaymentRecord {
+        payment_id: "p1".to_string(),
+        method: "CASH".to_string(),
+        amount: 50.0,
+        tendered: None,
+        change: None,
+        note: None,
+        cancelled: true,
+        cancel_reason: None,
+        split_items: None,
+        aa_shares: None,
+        split_type: None,
+        timestamp: 1000,
+    }];
     assert_eq!(sum_payments(&payments), 0.0, "All cancelled = 0");
 }
 
@@ -1358,7 +1446,11 @@ fn test_sum_payments_precision() {
             timestamp: 1000 + i,
         })
         .collect();
-    assert_eq!(sum_payments(&payments), 1.0, "0.1 * 10 = 1.0 with Decimal precision");
+    assert_eq!(
+        sum_payments(&payments),
+        1.0,
+        "0.1 * 10 = 1.0 with Decimal precision"
+    );
 }
 
 // ========================================================================
@@ -1368,7 +1460,12 @@ fn test_sum_payments_precision() {
 use shared::models::price_rule::{AdjustmentType, ProductScope};
 use shared::order::AppliedRule;
 
-fn make_applied_rule(rule_id: i64, rule_type: RuleType, adjustment_value: f64, skipped: bool) -> AppliedRule {
+fn make_applied_rule(
+    rule_id: i64,
+    rule_type: RuleType,
+    adjustment_value: f64,
+    skipped: bool,
+) -> AppliedRule {
     AppliedRule {
         rule_id,
         name: format!("rule-{rule_id}"),
@@ -1473,9 +1570,7 @@ fn test_effective_rule_discount_all_skipped() {
 fn test_effective_rule_surcharge_all_skipped() {
     let item = make_item_with_rules(
         100.0,
-        vec![
-            make_applied_rule(11, RuleType::Surcharge, 5.0, true),
-        ],
+        vec![make_applied_rule(11, RuleType::Surcharge, 5.0, true)],
         None,
         Some(5.0),
     );
@@ -1563,14 +1658,16 @@ fn test_unit_price_with_skipped_surcharge_rule() {
     // Item: base 100, skipped surcharge 10 → unit_price = 100 (not 110)
     let item = make_item_with_rules(
         100.0,
-        vec![
-            make_applied_rule(11, RuleType::Surcharge, 10.0, true),
-        ],
+        vec![make_applied_rule(11, RuleType::Surcharge, 10.0, true)],
         None,
         Some(10.0),
     );
     let up = calculate_unit_price(&item);
-    assert_eq!(to_f64(up), 100.0, "Skipped surcharge should not increase price");
+    assert_eq!(
+        to_f64(up),
+        100.0,
+        "Skipped surcharge should not increase price"
+    );
 }
 
 #[test]
@@ -1601,7 +1698,11 @@ fn test_unit_price_manual_plus_rule_discount_combined() {
     // base = 100, manual = 60, after_manual = 40
     // rule_discount = 40 * 50% = 20
     // unit_price = 100 - 60 - 20 = 20
-    assert_eq!(up, Decimal::from(20), "Rule discount based on after_manual price");
+    assert_eq!(
+        up,
+        Decimal::from(20),
+        "Rule discount based on after_manual price"
+    );
 }
 
 #[test]
@@ -1672,7 +1773,10 @@ fn test_recalculate_totals_skipped_order_level_surcharge() {
     recalculate_totals(&mut snapshot);
 
     assert_eq!(snapshot.subtotal, 100.0);
-    assert_eq!(snapshot.total, 100.0, "Skipped order surcharge → no increase");
+    assert_eq!(
+        snapshot.total, 100.0,
+        "Skipped order surcharge → no increase"
+    );
 }
 
 #[test]
@@ -1683,10 +1787,10 @@ fn test_recalculate_totals_mixed_active_and_skipped_order_rules() {
     snapshot.items.push(item);
 
     snapshot.order_applied_rules = vec![
-        make_applied_rule(101, RuleType::Discount, 10.0, false),  // active
-        make_applied_rule(102, RuleType::Discount, 20.0, true),   // skipped
-        make_applied_rule(111, RuleType::Surcharge, 5.0, false),  // active
-        make_applied_rule(112, RuleType::Surcharge, 8.0, true),   // skipped
+        make_applied_rule(101, RuleType::Discount, 10.0, false), // active
+        make_applied_rule(102, RuleType::Discount, 20.0, true),  // skipped
+        make_applied_rule(111, RuleType::Surcharge, 5.0, false), // active
+        make_applied_rule(112, RuleType::Surcharge, 8.0, true),  // skipped
     ];
 
     recalculate_totals(&mut snapshot);
@@ -1722,7 +1826,10 @@ fn test_recalculate_totals_pre_payment_reset_on_rule_skip() {
 
     // Total changed from 90 to 100 → pre_payment should reset
     assert_eq!(snapshot.total, 100.0);
-    assert!(!snapshot.is_pre_payment, "Pre-payment must reset when total changes from rule skip");
+    assert!(
+        !snapshot.is_pre_payment,
+        "Pre-payment must reset when total changes from rule skip"
+    );
 }
 
 #[test]
@@ -1865,8 +1972,14 @@ fn test_skip_unskip_cycle_preserves_amounts() {
     snapshot.items[0].applied_rules[0].skipped = false;
     recalculate_totals(&mut snapshot);
 
-    assert_eq!(snapshot.total, original_total, "Total restored after unskip");
-    assert_eq!(snapshot.subtotal, original_subtotal, "Subtotal restored after unskip");
+    assert_eq!(
+        snapshot.total, original_total,
+        "Total restored after unskip"
+    );
+    assert_eq!(
+        snapshot.subtotal, original_subtotal,
+        "Subtotal restored after unskip"
+    );
 }
 
 #[test]
@@ -1902,7 +2015,11 @@ fn test_effective_order_rule_discount_legacy_fallback() {
     snapshot.order_rule_discount_amount = 12.0;
 
     let eff = effective_order_rule_discount(&snapshot, to_decimal(100.0));
-    assert_eq!(to_f64(eff), 12.0, "None order_applied_rules → legacy fallback");
+    assert_eq!(
+        to_f64(eff),
+        12.0,
+        "None order_applied_rules → legacy fallback"
+    );
 }
 
 #[test]
@@ -1912,7 +2029,11 @@ fn test_effective_order_rule_surcharge_legacy_fallback() {
     snapshot.order_rule_surcharge_amount = 6.0;
 
     let eff = effective_order_rule_surcharge(&snapshot, to_decimal(100.0));
-    assert_eq!(to_f64(eff), 6.0, "None order_applied_rules → legacy fallback");
+    assert_eq!(
+        to_f64(eff),
+        6.0,
+        "None order_applied_rules → legacy fallback"
+    );
 }
 
 #[test]
@@ -1963,7 +2084,11 @@ fn test_rule_discount_recalculates_after_manual_discount_change() {
     // unit_price = 100 - 50 - 5 = 45
     item.manual_discount_percent = Some(50.0);
     let up2 = calculate_unit_price(&item);
-    assert_eq!(to_f64(up2), 45.0, "Rule discount should recalculate based on after_manual");
+    assert_eq!(
+        to_f64(up2),
+        45.0,
+        "Rule discount should recalculate based on after_manual"
+    );
 }
 
 #[test]
@@ -1980,7 +2105,11 @@ fn test_rule_surcharge_uses_base_not_after_manual() {
     let up = calculate_unit_price(&item);
     // base = 100, manual = 50, surcharge = 100 * 10% = 10 (based on base, not after_manual)
     // unit_price = 100 - 50 + 10 = 60
-    assert_eq!(to_f64(up), 60.0, "Surcharge should use base_with_options, not after_manual");
+    assert_eq!(
+        to_f64(up),
+        60.0,
+        "Surcharge should use base_with_options, not after_manual"
+    );
 }
 
 #[test]
@@ -2021,9 +2150,7 @@ fn test_order_rule_recalculates_on_subtotal_change() {
     item.applied_rules = vec![];
     snapshot.items.push(item);
 
-    snapshot.order_applied_rules = vec![
-        make_applied_rule(101, RuleType::Discount, 10.0, false),
-    ];
+    snapshot.order_applied_rules = vec![make_applied_rule(101, RuleType::Discount, 10.0, false)];
 
     recalculate_totals(&mut snapshot);
     // subtotal = 100, order_discount = 100 * 10% = 10, total = 90
@@ -2034,7 +2161,10 @@ fn test_order_rule_recalculates_on_subtotal_change() {
     snapshot.items[0].original_price = 200.0;
     recalculate_totals(&mut snapshot);
     // subtotal = 200, order_discount = 200 * 10% = 20, total = 180
-    assert_eq!(snapshot.total, 180.0, "Order rule discount should recalculate on subtotal change");
+    assert_eq!(
+        snapshot.total, 180.0,
+        "Order rule discount should recalculate on subtotal change"
+    );
 }
 
 #[test]
@@ -2052,7 +2182,10 @@ fn test_recalculate_updates_calculated_amount_in_snapshot() {
 
     // calculated_amount should be synced: 100 * 10% = 10.0
     let ca = snapshot.items[0].applied_rules[0].calculated_amount;
-    assert_eq!(ca, 10.0, "calculated_amount should be synced by recalculate_totals");
+    assert_eq!(
+        ca, 10.0,
+        "calculated_amount should be synced by recalculate_totals"
+    );
 
     // Change manual discount → after_manual changes → calculated_amount should update
     snapshot.items[0].manual_discount_percent = Some(50.0);
@@ -2060,7 +2193,10 @@ fn test_recalculate_updates_calculated_amount_in_snapshot() {
 
     // after_manual = 50, rule discount = 50 * 10% = 5.0
     let ca2 = snapshot.items[0].applied_rules[0].calculated_amount;
-    assert_eq!(ca2, 5.0, "calculated_amount should update after manual discount change");
+    assert_eq!(
+        ca2, 5.0,
+        "calculated_amount should update after manual discount change"
+    );
 }
 
 #[test]
@@ -2071,9 +2207,7 @@ fn test_recalculate_updates_order_calculated_amount_in_snapshot() {
     item.applied_rules = vec![];
     snapshot.items.push(item);
 
-    snapshot.order_applied_rules = vec![
-        make_applied_rule(101, RuleType::Discount, 10.0, false),
-    ];
+    snapshot.order_applied_rules = vec![make_applied_rule(101, RuleType::Discount, 10.0, false)];
 
     recalculate_totals(&mut snapshot);
     let ca = snapshot.order_applied_rules[0].calculated_amount;
@@ -2084,7 +2218,10 @@ fn test_recalculate_updates_order_calculated_amount_in_snapshot() {
     snapshot.items[0].original_price = 200.0;
     recalculate_totals(&mut snapshot);
     let ca2 = snapshot.order_applied_rules[0].calculated_amount;
-    assert_eq!(ca2, 20.0, "order calculated_amount should update to 200*10%=20");
+    assert_eq!(
+        ca2, 20.0,
+        "order calculated_amount should update to 200*10%=20"
+    );
 }
 
 #[test]
@@ -2097,20 +2234,18 @@ fn test_recalculate_totals_with_option_quantity() {
         id: 1,
         instance_id: "i1".to_string(),
         name: "Noodles".to_string(),
-        price: 16.0,                      // base 10 + options 6
+        price: 16.0, // base 10 + options 6
         original_price: 10.0,
-        quantity: 2,                      // 2 bowls
+        quantity: 2, // 2 bowls
         unpaid_quantity: 2,
-        selected_options: Some(vec![
-            shared::order::ItemOption {
-                attribute_id: 1,
-                attribute_name: "加蛋".to_string(),
-                option_id: 0,
-                option_name: "鸡蛋".to_string(),
-                price_modifier: Some(2.0),  // +2 per egg
-                quantity: 3,                // 3 eggs per bowl
-            },
-        ]),
+        selected_options: Some(vec![shared::order::ItemOption {
+            attribute_id: 1,
+            attribute_name: "加蛋".to_string(),
+            option_id: 0,
+            option_name: "鸡蛋".to_string(),
+            price_modifier: Some(2.0), // +2 per egg
+            quantity: 3,               // 3 eggs per bowl
+        }]),
         selected_specification: None,
         manual_discount_percent: None,
         rule_discount_amount: 0.0,
@@ -2194,55 +2329,70 @@ fn make_option(name: &str, price_modifier: f64, quantity: i32) -> shared::order:
 #[test]
 fn test_negative_option_modifier_exceeding_base_price_clamps_unit_price() {
     // Bug scenario: Cortado 3.50€ with option -100€ → unit_price must be 0, not -96.50
-    let item = make_item_with_options(3.50, vec![
-        make_option("Avena", -100.0, 1),
-    ]);
+    let item = make_item_with_options(3.50, vec![make_option("Avena", -100.0, 1)]);
     let up = calculate_unit_price(&item);
-    assert_eq!(up, Decimal::ZERO, "Negative option exceeding base must clamp unit_price to 0");
+    assert_eq!(
+        up,
+        Decimal::ZERO,
+        "Negative option exceeding base must clamp unit_price to 0"
+    );
 }
 
 #[test]
 fn test_negative_option_modifier_within_base_price() {
     // Valid scenario: -0.50€ discount option on 3.50€ item → 3.00€
-    let item = make_item_with_options(3.50, vec![
-        make_option("No cream", -0.50, 1),
-    ]);
+    let item = make_item_with_options(3.50, vec![make_option("No cream", -0.50, 1)]);
     let up = calculate_unit_price(&item);
-    assert_eq!(to_f64(up), 3.0, "Small negative option within base price should work");
+    assert_eq!(
+        to_f64(up),
+        3.0,
+        "Small negative option within base price should work"
+    );
 }
 
 #[test]
 fn test_negative_option_modifier_exactly_equals_base_price() {
     // Edge case: option modifier exactly negates base price → 0
-    let item = make_item_with_options(5.0, vec![
-        make_option("Free modifier", -5.0, 1),
-    ]);
+    let item = make_item_with_options(5.0, vec![make_option("Free modifier", -5.0, 1)]);
     let up = calculate_unit_price(&item);
-    assert_eq!(up, Decimal::ZERO, "Option modifier equal to base price should yield 0");
+    assert_eq!(
+        up,
+        Decimal::ZERO,
+        "Option modifier equal to base price should yield 0"
+    );
 }
 
 #[test]
 fn test_multiple_negative_options_exceed_base() {
     // Multiple negative options that together exceed base price
-    let item = make_item_with_options(10.0, vec![
-        make_option("Discount A", -4.0, 1),
-        make_option("Discount B", -4.0, 1),
-        make_option("Discount C", -4.0, 1),
-    ]);
+    let item = make_item_with_options(
+        10.0,
+        vec![
+            make_option("Discount A", -4.0, 1),
+            make_option("Discount B", -4.0, 1),
+            make_option("Discount C", -4.0, 1),
+        ],
+    );
     let up = calculate_unit_price(&item);
     // base=10, options=-12, base_with_options=max(-2, 0)=0
-    assert_eq!(up, Decimal::ZERO, "Combined negative options exceeding base must clamp to 0");
+    assert_eq!(
+        up,
+        Decimal::ZERO,
+        "Combined negative options exceeding base must clamp to 0"
+    );
 }
 
 #[test]
 fn test_negative_option_with_quantity_exceeds_base() {
     // -2€ × quantity 10 = -20€ on 5€ item
-    let item = make_item_with_options(5.0, vec![
-        make_option("Discount", -2.0, 10),
-    ]);
+    let item = make_item_with_options(5.0, vec![make_option("Discount", -2.0, 10)]);
     let up = calculate_unit_price(&item);
     // base=5, options=-2*10=-20, base_with_options=max(-15,0)=0
-    assert_eq!(up, Decimal::ZERO, "Negative option * quantity exceeding base must clamp to 0");
+    assert_eq!(
+        up,
+        Decimal::ZERO,
+        "Negative option * quantity exceeding base must clamp to 0"
+    );
 }
 
 #[test]
@@ -2255,18 +2405,28 @@ fn test_recalculate_totals_negative_option_original_total_never_negative() {
     snapshot.items[0].selected_options = None;
 
     // Item with absurd negative modifier
-    let mut bad_item = make_item_with_options(3.50, vec![
-        make_option("Avena", -100.0, 1),
-    ]);
+    let mut bad_item = make_item_with_options(3.50, vec![make_option("Avena", -100.0, 1)]);
     bad_item.id = 2;
     bad_item.instance_id = "i2".to_string();
     snapshot.items.push(bad_item);
 
     recalculate_totals(&mut snapshot);
 
-    assert!(snapshot.original_total >= 0.0, "original_total must never be negative, got {}", snapshot.original_total);
-    assert!(snapshot.subtotal >= 0.0, "subtotal must never be negative, got {}", snapshot.subtotal);
-    assert!(snapshot.total >= 0.0, "total must never be negative, got {}", snapshot.total);
+    assert!(
+        snapshot.original_total >= 0.0,
+        "original_total must never be negative, got {}",
+        snapshot.original_total
+    );
+    assert!(
+        snapshot.subtotal >= 0.0,
+        "subtotal must never be negative, got {}",
+        snapshot.subtotal
+    );
+    assert!(
+        snapshot.total >= 0.0,
+        "total must never be negative, got {}",
+        snapshot.total
+    );
     // original_total = 5.50 + max(3.50-100, 0) = 5.50 + 0 = 5.50
     assert_eq!(snapshot.original_total, 5.5);
 }
@@ -2287,7 +2447,10 @@ fn test_recalculate_totals_all_items_negative_options() {
 
     recalculate_totals(&mut snapshot);
 
-    assert_eq!(snapshot.original_total, 0.0, "All-negative items should yield 0 original_total");
+    assert_eq!(
+        snapshot.original_total, 0.0,
+        "All-negative items should yield 0 original_total"
+    );
     assert_eq!(snapshot.subtotal, 0.0);
     assert_eq!(snapshot.total, 0.0);
     assert_eq!(snapshot.remaining_amount, 0.0);
@@ -2304,8 +2467,11 @@ fn test_recalculate_totals_comped_item_with_negative_option() {
 
     recalculate_totals(&mut snapshot);
 
-    assert!(snapshot.comp_total_amount >= 0.0,
-        "comp_total_amount must never be negative, got {}", snapshot.comp_total_amount);
+    assert!(
+        snapshot.comp_total_amount >= 0.0,
+        "comp_total_amount must never be negative, got {}",
+        snapshot.comp_total_amount
+    );
     assert_eq!(snapshot.comp_total_amount, 0.0);
 }
 
@@ -2412,5 +2578,8 @@ fn test_validate_cart_item_option_exceeds_max_quantity() {
     };
 
     let result = validate_cart_item(&input);
-    assert!(result.is_err(), "Option quantity exceeding MAX must be rejected");
+    assert!(
+        result.is_err(),
+        "Option quantity exceeding MAX must be rejected"
+    );
 }

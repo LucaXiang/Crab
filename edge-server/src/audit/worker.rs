@@ -123,18 +123,12 @@ impl AuditWorker {
                         );
                     }
                     Err(e) => {
-                        tracing::error!(
-                            "AUDIT ENTRY LOST — dead letter write failed: {:?}",
-                            e
-                        );
+                        tracing::error!("AUDIT ENTRY LOST — dead letter write failed: {:?}", e);
                     }
                 }
             }
             Err(e) => {
-                tracing::error!(
-                    "AUDIT ENTRY LOST — serialization failed: {:?}",
-                    e
-                );
+                tracing::error!("AUDIT ENTRY LOST — serialization failed: {:?}", e);
             }
         }
     }

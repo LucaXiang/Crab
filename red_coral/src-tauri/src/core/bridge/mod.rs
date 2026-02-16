@@ -27,11 +27,13 @@ use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::sync::RwLock;
 
+use super::tenant_manager::{TenantError, TenantManager};
 use crab_client::CrabClient;
 use shared::activation::SubscriptionStatus;
 use shared::app_state::{ActivationRequiredReason, ClockDirection};
-use shared::order::{CommandResponse, OrderCommand, OrderCommandPayload, OrderEvent, OrderSnapshot, SyncResponse};
-use super::tenant_manager::{TenantError, TenantManager};
+use shared::order::{
+    CommandResponse, OrderCommand, OrderCommandPayload, OrderEvent, OrderSnapshot, SyncResponse,
+};
 
 /// 后端初始化内部状态
 enum InitState {
@@ -116,9 +118,18 @@ impl ClientBridge {
     pub fn get_init_status(&self) -> InitStatus {
         let state = self.init_state.lock().unwrap_or_else(|e| e.into_inner());
         match &*state {
-            InitState::Pending => InitStatus { ready: false, error: None },
-            InitState::Ok => InitStatus { ready: true, error: None },
-            InitState::Failed(e) => InitStatus { ready: true, error: Some(e.clone()) },
+            InitState::Pending => InitStatus {
+                ready: false,
+                error: None,
+            },
+            InitState::Ok => InitStatus {
+                ready: true,
+                error: None,
+            },
+            InitState::Failed(e) => InitStatus {
+                ready: true,
+                error: Some(e.clone()),
+            },
         }
     }
 

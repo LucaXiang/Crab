@@ -55,4 +55,3 @@ pub struct SortOrderUpdate {
 pub struct BatchUpdateResponse {
     pub updated: usize,
 }
-

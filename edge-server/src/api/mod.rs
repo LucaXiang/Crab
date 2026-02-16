@@ -28,13 +28,13 @@ pub mod categories;
 pub mod employees;
 pub mod has_attribute;
 pub mod kitchen_orders;
+pub mod label_template;
 pub mod orders;
 pub mod price_rules;
 pub mod print_config;
 pub mod print_destinations;
 pub mod products;
 pub mod store_info;
-pub mod label_template;
 pub mod sync;
 pub mod system_state;
 pub mod tables;
@@ -46,8 +46,8 @@ pub mod marketing_groups;
 pub mod members;
 
 // Operations (班次与日结)
-pub mod shifts;
 pub mod daily_reports;
+pub mod shifts;
 
 // Analytics (数据统计)
 pub mod statistics;

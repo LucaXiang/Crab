@@ -1,20 +1,18 @@
 //! System Issues API Handlers
 
 use axum::{
-    extract::{Extension, State},
     Json,
+    extract::{Extension, State},
 };
 
+use crate::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::system_issue;
 use crate::utils::AppResult;
-use crate::CurrentUser;
 use shared::models::{SystemIssue, SystemIssueResolve};
 
 /// GET /api/system-issues/pending
-pub async fn pending(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<SystemIssue>>> {
+pub async fn pending(State(state): State<ServerState>) -> AppResult<Json<Vec<SystemIssue>>> {
     let issues = system_issue::find_pending(&state.pool).await?;
     Ok(Json(issues))
 }

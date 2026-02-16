@@ -58,7 +58,8 @@ impl MessageBus {
             ));
         };
 
-        self.accept_loop(listener, tls_acceptor, credential_cache).await
+        self.accept_loop(listener, tls_acceptor, credential_cache)
+            .await
     }
 
     /// Main accept loop

@@ -1,0 +1,35 @@
+#!/bin/sh
+# Pre-commit hook for Crab project
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "🦀 Pre-commit checks..."
+
+# Only check staged Rust files
+RUST_STAGED=$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' | head -1)
+TS_STAGED=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' | head -1)
+
+if [ -n "$RUST_STAGED" ]; then
+    echo "  → cargo fmt --check"
+    cargo fmt --all -- --check 2>/dev/null || {
+        echo "❌ Format check failed. Run: cargo fmt --all"
+        exit 1
+    }
+
+    echo "  → cargo clippy"
+    SQLX_OFFLINE=true cargo clippy --workspace -- -D warnings 2>/dev/null || {
+        echo "❌ Clippy failed. Fix warnings before committing."
+        exit 1
+    }
+fi
+
+if [ -n "$TS_STAGED" ]; then
+    echo "  → tsc --noEmit"
+    (cd red_coral && npx tsc --noEmit 2>/dev/null) || {
+        echo "❌ TypeScript type check failed."
+        exit 1
+    }
+fi
+
+echo "✅ All checks passed."

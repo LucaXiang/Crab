@@ -242,8 +242,7 @@ impl LocalClientBuilder {
         let oneshot_http = super::http_oneshot::OneshotHttpClient::new(router);
 
         // Create in-memory message client with bidirectional channels
-        let memory_message =
-            super::message::InMemoryMessageClient::new(client_tx, server_tx);
+        let memory_message = super::message::InMemoryMessageClient::new(client_tx, server_tx);
 
         Ok(CrabClient {
             marker: StateMarker::new(),

@@ -35,9 +35,8 @@ pub async fn get_health_status(
                         } else {
                             HealthLevel::Healthy
                         };
-                        let expires_at_millis =
-                            metadata.not_after.unix_timestamp() * 1000
-                                + metadata.not_after.millisecond() as i64;
+                        let expires_at_millis = metadata.not_after.unix_timestamp() * 1000
+                            + metadata.not_after.millisecond() as i64;
                         CertificateHealth {
                             status,
                             expires_at: Some(expires_at_millis),
@@ -119,7 +118,12 @@ pub async fn get_health_status(
         device_info: DeviceInfo {
             device_id: format!("{}...", &device_id[..8]),
             entity_id: None,
-            tenant_id: bridge.tenant_manager().read().await.current_tenant_id().map(|s| s.to_string()),
+            tenant_id: bridge
+                .tenant_manager()
+                .read()
+                .await
+                .current_tenant_id()
+                .map(|s| s.to_string()),
         },
     };
 

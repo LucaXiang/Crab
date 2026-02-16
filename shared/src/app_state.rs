@@ -28,10 +28,7 @@ pub enum ActivationRequiredReason {
     FirstTimeSetup,
 
     /// 证书过期
-    CertificateExpired {
-        expired_at: i64,
-        days_overdue: i64,
-    },
+    CertificateExpired { expired_at: i64, days_overdue: i64 },
 
     /// 证书即将过期 (警告)
     CertificateExpiringSoon {

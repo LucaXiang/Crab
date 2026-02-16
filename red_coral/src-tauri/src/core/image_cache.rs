@@ -101,16 +101,10 @@ impl ImageCacheService {
     /// 获取图片本地路径 - Server 模式
     ///
     /// 从 `{tenant}/server/images/{hash}.jpg` 读取
-    pub fn get_server_image_path(
-        &self,
-        hash: &str,
-    ) -> Result<std::path::PathBuf, ImageCacheError> {
+    pub fn get_server_image_path(&self, hash: &str) -> Result<std::path::PathBuf, ImageCacheError> {
         Self::validate_hash(hash)?;
 
-        let path = self
-            .paths
-            .server_images_dir()
-            .join(format!("{}.jpg", hash));
+        let path = self.paths.server_images_dir().join(format!("{}.jpg", hash));
 
         if !path.exists() {
             tracing::warn!(hash = %hash, "Image not found in server images");
@@ -130,10 +124,7 @@ impl ImageCacheService {
     ) -> Result<std::path::PathBuf, ImageCacheError> {
         Self::validate_hash(hash)?;
 
-        let local_path = self
-            .paths
-            .cache_images_dir()
-            .join(format!("{}.jpg", hash));
+        let local_path = self.paths.cache_images_dir().join(format!("{}.jpg", hash));
 
         if local_path.exists() {
             return Ok(local_path);

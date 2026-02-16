@@ -5,13 +5,15 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::employee;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_PASSWORD_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_PASSWORD_LEN};
 use shared::models::{Employee, EmployeeCreate, EmployeeUpdate};
 
 const RESOURCE: &str = "employee";
@@ -74,7 +76,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::EmployeeCreated,
-        "employee", &id,
+        "employee",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&emp, "employee")
@@ -107,7 +110,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::EmployeeUpdated,
-        "employee", &id_str,
+        "employee",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_employee, &emp, "employee")
@@ -138,7 +142,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::EmployeeDeleted,
-            "employee", &id_str,
+            "employee",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name, "username": username})

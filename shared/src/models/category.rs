@@ -22,7 +22,6 @@ pub struct Category {
     pub is_display: bool,
 
     // -- Relations (populated by application code, skipped by FromRow) --
-
     /// Kitchen print destination IDs (junction table)
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]

@@ -63,7 +63,11 @@ pub async fn create(pool: &SqlitePool, data: DiningTableCreate) -> RepoResult<Di
         .ok_or_else(|| RepoError::Database("Failed to create dining table".into()))
 }
 
-pub async fn update(pool: &SqlitePool, id: i64, data: DiningTableUpdate) -> RepoResult<DiningTable> {
+pub async fn update(
+    pool: &SqlitePool,
+    id: i64,
+    data: DiningTableUpdate,
+) -> RepoResult<DiningTable> {
     let rows = sqlx::query!(
         "UPDATE dining_table SET name = COALESCE(?1, name), zone_id = COALESCE(?2, zone_id), capacity = COALESCE(?3, capacity), is_active = COALESCE(?4, is_active) WHERE id = ?5",
         data.name,

@@ -5,7 +5,7 @@
 //! 浮点数使用容差比较避免精度问题。
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 
 /// 浮点数比较容差 (用于处理序列化/反序列化精度损失)
@@ -34,9 +34,8 @@ fn values_equal(a: &Value, b: &Value) -> bool {
             if a.len() != b.len() {
                 return false;
             }
-            a.iter().all(|(key, va)| {
-                b.get(key).is_some_and(|vb| values_equal(va, vb))
-            })
+            a.iter()
+                .all(|(key, va)| b.get(key).is_some_and(|vb| values_equal(va, vb)))
         }
         _ => false,
     }

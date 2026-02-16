@@ -3,8 +3,7 @@
 mod handler;
 
 use axum::{
-    Router,
-    middleware,
+    Router, middleware,
     routing::{get, post},
 };
 

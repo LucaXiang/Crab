@@ -384,10 +384,16 @@ async fn activate(
     ];
     let (sub_status, sub_plan, sub_features) = match tenant_id.as_str() {
         "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Basic, vec![]),
-        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Basic, vec![]),
+        "tenant-expired" | "expired_tenant" => {
+            (SubscriptionStatus::Expired, PlanType::Basic, vec![])
+        }
         "tenant-canceled" => (SubscriptionStatus::Canceled, PlanType::Pro, vec![]),
         "tenant-unpaid" => (SubscriptionStatus::Unpaid, PlanType::Pro, vec![]),
-        "tenant-pastdue" => (SubscriptionStatus::PastDue, PlanType::Pro, pro_features.clone()),
+        "tenant-pastdue" => (
+            SubscriptionStatus::PastDue,
+            PlanType::Pro,
+            pro_features.clone(),
+        ),
         _ => (SubscriptionStatus::Active, PlanType::Pro, pro_features),
     };
 
@@ -498,10 +504,16 @@ async fn get_subscription_status(
     ];
     let (status, plan, features) = match tenant_id.as_str() {
         "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Basic, vec![]),
-        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Basic, vec![]),
+        "tenant-expired" | "expired_tenant" => {
+            (SubscriptionStatus::Expired, PlanType::Basic, vec![])
+        }
         "tenant-canceled" => (SubscriptionStatus::Canceled, PlanType::Pro, vec![]),
         "tenant-unpaid" => (SubscriptionStatus::Unpaid, PlanType::Pro, vec![]),
-        "tenant-pastdue" => (SubscriptionStatus::PastDue, PlanType::Pro, pro_features.clone()),
+        "tenant-pastdue" => (
+            SubscriptionStatus::PastDue,
+            PlanType::Pro,
+            pro_features.clone(),
+        ),
         _ => (SubscriptionStatus::Active, PlanType::Pro, pro_features),
     };
 
@@ -968,7 +980,11 @@ async fn client_activate(
         plan: PlanType::Pro,
         starts_at: shared::util::now_millis(),
         expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
-        features: vec!["audit_log".to_string(), "advanced_reporting".to_string(), "api_access".to_string()],
+        features: vec![
+            "audit_log".to_string(),
+            "advanced_reporting".to_string(),
+            "api_access".to_string(),
+        ],
         max_stores: PlanType::Pro.max_stores() as u32,
         max_clients: 0,
         signature_valid_until,
@@ -1060,7 +1076,12 @@ async fn deactivate_server(
     let username = req.get("username").and_then(|v| v.as_str()).unwrap_or("");
     let password = req.get("password").and_then(|v| v.as_str()).unwrap_or("");
 
-    if state.user_store.authenticate(username, password).await.is_none() {
+    if state
+        .user_store
+        .authenticate(username, password)
+        .await
+        .is_none()
+    {
         return Json(shared::activation::DeactivateResponse {
             success: false,
             error: Some("Invalid credentials".to_string()),
@@ -1087,7 +1108,12 @@ async fn deactivate_client(
     let username = req.get("username").and_then(|v| v.as_str()).unwrap_or("");
     let password = req.get("password").and_then(|v| v.as_str()).unwrap_or("");
 
-    if state.user_store.authenticate(username, password).await.is_none() {
+    if state
+        .user_store
+        .authenticate(username, password)
+        .await
+        .is_none()
+    {
         return Json(shared::activation::DeactivateResponse {
             success: false,
             error: Some("Invalid credentials".to_string()),

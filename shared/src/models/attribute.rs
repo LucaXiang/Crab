@@ -40,7 +40,6 @@ pub struct Attribute {
     pub kitchen_print_name: Option<String>,
 
     // -- Relations (populated by application code, skipped by FromRow) --
-
     /// Embedded options
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]

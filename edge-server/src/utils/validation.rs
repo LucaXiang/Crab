@@ -74,11 +74,7 @@ use shared::order::types::CommandErrorCode;
 use crate::orders::traits::OrderError;
 
 /// Validate a required string for order actions (non-empty + max length).
-pub fn validate_order_text(
-    value: &str,
-    field: &str,
-    max_len: usize,
-) -> Result<(), OrderError> {
+pub fn validate_order_text(value: &str, field: &str, max_len: usize) -> Result<(), OrderError> {
     if value.len() > max_len {
         return Err(OrderError::InvalidOperation(
             CommandErrorCode::InvalidOperation,

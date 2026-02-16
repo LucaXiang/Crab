@@ -1,10 +1,7 @@
 //! redb-based storage for kitchen orders and label records
 
 use super::types::{KitchenOrder, LabelPrintRecord};
-use redb::{
-    Database, ReadableDatabase, ReadableTable, TableDefinition,
-    WriteTransaction,
-};
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition, WriteTransaction};
 use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
@@ -79,8 +76,7 @@ impl PrintStorage {
     /// Open in-memory database (for testing)
     #[cfg(test)]
     pub fn open_in_memory() -> PrintStorageResult<Self> {
-        let db =
-            Database::builder().create_with_backend(redb::backends::InMemoryBackend::new())?;
+        let db = Database::builder().create_with_backend(redb::backends::InMemoryBackend::new())?;
 
         let write_txn = db.begin_write()?;
         {
@@ -398,7 +394,6 @@ impl PrintStorage {
         txn.commit()?;
         Ok(deleted)
     }
-
 }
 
 #[cfg(test)]

@@ -3,8 +3,7 @@
 mod handler;
 
 use axum::{
-    Router,
-    middleware,
+    Router, middleware,
     routing::{get, post, put},
 };
 
@@ -30,7 +29,10 @@ fn product_routes() -> Router<ServerState> {
         .route("/{id}", put(handler::update))
         .route("/{id}/tags/{tag_id}", post(handler::add_product_tag))
         .route("/{id}", axum::routing::delete(handler::delete))
-        .route("/{id}/tags/{tag_id}", axum::routing::delete(handler::remove_product_tag))
+        .route(
+            "/{id}/tags/{tag_id}",
+            axum::routing::delete(handler::remove_product_tag),
+        )
         .layer(middleware::from_fn(require_permission("menu:manage")));
 
     read_routes.merge(manage_routes)

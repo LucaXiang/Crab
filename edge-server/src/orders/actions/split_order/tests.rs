@@ -1,7 +1,9 @@
 use super::*;
 use crate::orders::storage::OrderStorage;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata};
-use shared::order::{CartItemSnapshot, EventPayload, OrderEventType, OrderSnapshot, OrderStatus, SplitItem};
+use shared::order::{
+    CartItemSnapshot, EventPayload, OrderEventType, OrderSnapshot, OrderStatus, SplitItem,
+};
 
 fn create_test_metadata() -> CommandMetadata {
     CommandMetadata {
@@ -387,7 +389,10 @@ async fn test_item_split_then_amount_split_allowed() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(result.is_ok(), "Amount split should be allowed after item split");
+    assert!(
+        result.is_ok(),
+        "Amount split should be allowed after item split"
+    );
 }
 
 #[tokio::test]
@@ -417,7 +422,10 @@ async fn test_item_split_then_aa_split_allowed() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(result.is_ok(), "AA split should be allowed after item split");
+    assert!(
+        result.is_ok(),
+        "AA split should be allowed after item split"
+    );
 }
 
 #[tokio::test]
@@ -478,7 +486,10 @@ async fn test_amount_split_then_aa_split_allowed() {
 
     let metadata = create_test_metadata();
     let result = action.execute(&mut ctx, &metadata).await;
-    assert!(result.is_ok(), "AA split should be allowed after amount split");
+    assert!(
+        result.is_ok(),
+        "AA split should be allowed after amount split"
+    );
 }
 
 #[tokio::test]

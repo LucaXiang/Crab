@@ -6,10 +6,8 @@ use sqlx::SqlitePool;
 
 pub async fn create(pool: &SqlitePool, data: SystemIssueCreate) -> RepoResult<SystemIssue> {
     let now = shared::util::now_millis();
-    let params_json =
-        serde_json::to_string(&data.params).unwrap_or_else(|_| "{}".to_string());
-    let options_json =
-        serde_json::to_string(&data.options).unwrap_or_else(|_| "[]".to_string());
+    let params_json = serde_json::to_string(&data.params).unwrap_or_else(|_| "{}".to_string());
+    let options_json = serde_json::to_string(&data.options).unwrap_or_else(|_| "[]".to_string());
 
     let id = sqlx::query_scalar!(
         r#"INSERT INTO system_issue (source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9) RETURNING id as "id!""#,
@@ -78,9 +76,7 @@ pub async fn resolve(
     .await?;
 
     if rows.rows_affected() == 0 {
-        return Err(RepoError::NotFound(format!(
-            "system_issue {id} not found"
-        )));
+        return Err(RepoError::NotFound(format!("system_issue {id} not found")));
     }
     find_by_id(pool, id)
         .await?

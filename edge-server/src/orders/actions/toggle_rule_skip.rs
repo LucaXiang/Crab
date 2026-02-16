@@ -151,7 +151,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -186,9 +186,7 @@ mod tests {
         assert_eq!(event.event_type, OrderEventType::RuleSkipToggled);
 
         if let EventPayload::RuleSkipToggled {
-            rule_id,
-            skipped,
-            ..
+            rule_id, skipped, ..
         } = &event.payload
         {
             assert_eq!(*rule_id, 1);
@@ -229,9 +227,7 @@ mod tests {
         assert_eq!(event.event_type, OrderEventType::RuleSkipToggled);
 
         if let EventPayload::RuleSkipToggled {
-            rule_id,
-            skipped,
-            ..
+            rule_id, skipped, ..
         } = &event.payload
         {
             assert_eq!(*rule_id, 100);
@@ -353,7 +349,7 @@ mod tests {
             authorizer_name: None,
             category_id: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }];
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -494,10 +490,7 @@ mod tests {
             manual_discount_percent: None,
             rule_discount_amount: 0.0,
             rule_surcharge_amount: 0.0,
-            applied_rules: vec![
-                create_test_applied_rule(1),
-                create_test_applied_rule(2),
-            ],
+            applied_rules: vec![create_test_applied_rule(1), create_test_applied_rule(2)],
             applied_mg_rules: vec![],
             mg_discount_amount: 0.0,
             unit_price: 0.0,
@@ -527,7 +520,10 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
         assert_eq!(events.len(), 1);
 
-        if let EventPayload::RuleSkipToggled { rule_id, skipped, .. } = &events[0].payload {
+        if let EventPayload::RuleSkipToggled {
+            rule_id, skipped, ..
+        } = &events[0].payload
+        {
             assert_eq!(*rule_id, 2);
             assert!(*skipped);
         } else {

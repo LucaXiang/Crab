@@ -24,7 +24,6 @@ pub async fn order_execute_command(
     bridge: State<'_, Arc<ClientBridge>>,
     command: OrderCommand,
 ) -> Result<ApiResponse<CommandResponse>, String> {
-
     match bridge.execute_order_command(command).await {
         Ok(response) => Ok(ApiResponse::success(response)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -44,7 +43,6 @@ pub async fn order_execute(
     operator_name: String,
     payload: OrderCommandPayload,
 ) -> Result<ApiResponse<CommandResponse>, String> {
-
     let command = OrderCommand::new(operator_id, operator_name, payload);
     match bridge.execute_order_command(command).await {
         Ok(response) => Ok(ApiResponse::success(response)),
@@ -64,7 +62,6 @@ pub async fn order_execute(
 pub async fn order_get_active_orders(
     bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<Vec<OrderSnapshot>>, String> {
-
     match bridge.get_active_orders().await {
         Ok(snapshots) => Ok(ApiResponse::success(snapshots)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -80,7 +77,6 @@ pub async fn order_get_snapshot(
     bridge: State<'_, Arc<ClientBridge>>,
     order_id: String,
 ) -> Result<ApiResponse<Option<OrderSnapshot>>, String> {
-
     match bridge.get_order_snapshot(&order_id).await {
         Ok(snapshot) => Ok(ApiResponse::success(snapshot)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -100,7 +96,6 @@ pub async fn order_sync_since(
     bridge: State<'_, Arc<ClientBridge>>,
     since_sequence: u64,
 ) -> Result<ApiResponse<SyncResponse>, String> {
-
     match bridge.sync_orders_since(since_sequence).await {
         Ok(response) => Ok(ApiResponse::success(response)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -118,7 +113,6 @@ pub async fn order_get_events_since(
     bridge: State<'_, Arc<ClientBridge>>,
     since_sequence: u64,
 ) -> Result<ApiResponse<Vec<shared::order::OrderEvent>>, String> {
-
     match bridge.get_active_events_since(since_sequence).await {
         Ok(events) => Ok(ApiResponse::success(events)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -136,7 +130,6 @@ pub async fn order_get_events_for_order(
     bridge: State<'_, Arc<ClientBridge>>,
     order_id: String,
 ) -> Result<ApiResponse<Vec<shared::order::OrderEvent>>, String> {
-
     match bridge.get_events_for_order(&order_id).await {
         Ok(events) => Ok(ApiResponse::success(events)),
         Err(e) => Ok(ApiResponse::error_with_code(

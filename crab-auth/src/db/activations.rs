@@ -25,10 +25,7 @@ pub async fn count_active(pool: &PgPool, tenant_id: &str) -> Result<i64, sqlx::E
 }
 
 /// 获取租户所有活跃设备
-pub async fn list_active(
-    pool: &PgPool,
-    tenant_id: &str,
-) -> Result<Vec<Activation>, sqlx::Error> {
+pub async fn list_active(pool: &PgPool, tenant_id: &str) -> Result<Vec<Activation>, sqlx::Error> {
     sqlx::query_as::<_, Activation>(
         "SELECT entity_id, tenant_id, device_id, fingerprint, status,
             activated_at, last_refreshed_at
@@ -135,10 +132,7 @@ pub async fn deactivate(pool: &PgPool, entity_id: &str) -> Result<bool, sqlx::Er
 }
 
 /// 更新 last_refreshed_at
-pub async fn update_last_refreshed(
-    pool: &PgPool,
-    entity_id: &str,
-) -> Result<(), sqlx::Error> {
+pub async fn update_last_refreshed(pool: &PgPool, entity_id: &str) -> Result<(), sqlx::Error> {
     let now = shared::util::now_millis();
     sqlx::query("UPDATE activations SET last_refreshed_at = $1 WHERE entity_id = $2")
         .bind(now)

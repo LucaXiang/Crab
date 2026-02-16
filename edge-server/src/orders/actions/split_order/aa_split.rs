@@ -5,13 +5,15 @@
 
 use async_trait::async_trait;
 
-use crate::orders::money::{to_decimal, to_f64};
+use crate::order_money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType};
 
-use super::{validate_active_order, validate_split_mode_allowed, validate_tendered_and_change, SplitMode};
+use super::{
+    SplitMode, validate_active_order, validate_split_mode_allowed, validate_tendered_and_change,
+};
 
 // ============================================================================
 // StartAASplit (AA 开始 + 第一份支付)
@@ -55,10 +57,13 @@ impl CommandHandler for StartAaSplitAction {
             return Err(OrderError::InvalidAmount);
         }
         if self.shares > self.total_shares {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidShares, format!(
-                "Shares ({}) exceeds total shares ({})",
-                self.shares, self.total_shares
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidShares,
+                format!(
+                    "Shares ({}) exceeds total shares ({})",
+                    self.shares, self.total_shares
+                ),
+            ));
         }
 
         let remaining_unpaid = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
@@ -159,10 +164,13 @@ impl CommandHandler for PayAaSplitAction {
 
         let remaining_shares = total_shares - snapshot.aa_paid_shares;
         if self.shares > remaining_shares {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidShares, format!(
-                "AA shares ({}) exceeds remaining shares ({})",
-                self.shares, remaining_shares
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidShares,
+                format!(
+                    "AA shares ({}) exceeds remaining shares ({})",
+                    self.shares, remaining_shares
+                ),
+            ));
         }
 
         let remaining_unpaid = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);

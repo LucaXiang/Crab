@@ -2,11 +2,7 @@
 
 mod handler;
 
-use axum::{
-    Router,
-    middleware,
-    routing::get,
-};
+use axum::{Router, middleware, routing::get};
 
 use crate::auth::require_permission;
 use crate::core::ServerState;

@@ -32,6 +32,12 @@ fn roles_read_routes() -> Router<ServerState> {
 fn roles_write_routes() -> Router<ServerState> {
     Router::new()
         .route("/", axum::routing::post(handler::create))
-        .route("/{id}", axum::routing::put(handler::update).delete(handler::delete))
-        .route("/{id}/permissions", axum::routing::put(handler::update_role_permissions))
+        .route(
+            "/{id}",
+            axum::routing::put(handler::update).delete(handler::delete),
+        )
+        .route(
+            "/{id}/permissions",
+            axum::routing::put(handler::update_role_permissions),
+        )
 }

@@ -237,9 +237,7 @@ impl NetworkMessageClient {
         let mut ca_reader = std::io::Cursor::new(&params.ca_cert_pem);
         let ca_certs: Vec<CertificateDer> = rustls_pemfile::certs(&mut ca_reader)
             .collect::<Result<_, _>>()
-            .map_err(|e| {
-                ClientError::Connection(format!("Failed to parse CA certs: {}", e))
-            })?;
+            .map_err(|e| ClientError::Connection(format!("Failed to parse CA certs: {}", e)))?;
         if ca_certs.is_empty() {
             return Err(ClientError::Connection(
                 "No CA certificates found".to_string(),
@@ -250,27 +248,24 @@ impl NetworkMessageClient {
         let mut cert_reader = std::io::Cursor::new(&params.client_cert_pem);
         let client_certs: Vec<CertificateDer> = rustls_pemfile::certs(&mut cert_reader)
             .collect::<Result<_, _>>()
-            .map_err(|e| {
-                ClientError::Connection(format!("Failed to parse client cert: {}", e))
-            })?;
-        let client_cert = client_certs.into_iter().next().ok_or_else(|| {
-            ClientError::Connection("No client certificate found".to_string())
-        })?;
+            .map_err(|e| ClientError::Connection(format!("Failed to parse client cert: {}", e)))?;
+        let client_cert = client_certs
+            .into_iter()
+            .next()
+            .ok_or_else(|| ClientError::Connection("No client certificate found".to_string()))?;
 
         // 解析私钥
         let mut key_reader = std::io::Cursor::new(&params.client_key_pem);
         let private_key = rustls_pemfile::private_key(&mut key_reader)
-            .map_err(|e| {
-                ClientError::Connection(format!("Failed to parse private key: {}", e))
-            })?
+            .map_err(|e| ClientError::Connection(format!("Failed to parse private key: {}", e)))?
             .ok_or_else(|| ClientError::Connection("No private key found".to_string()))?;
 
         // 构建 TLS 配置
         let mut root_store = rustls::RootCertStore::empty();
         for ca_cert in ca_certs {
-            root_store.add(ca_cert).map_err(|e| {
-                ClientError::Connection(format!("Failed to add CA cert: {}", e))
-            })?;
+            root_store
+                .add(ca_cert)
+                .map_err(|e| ClientError::Connection(format!("Failed to add CA cert: {}", e)))?;
         }
 
         let verifier = crab_cert::SkipHostnameVerifier::new(root_store);
@@ -279,18 +274,19 @@ impl NetworkMessageClient {
             .dangerous()
             .with_custom_certificate_verifier(Arc::new(verifier))
             .with_client_auth_cert(client_cert_chain, private_key)
-            .map_err(|e| {
-                ClientError::Connection(format!("Failed to configure TLS: {}", e))
-            })?;
+            .map_err(|e| ClientError::Connection(format!("Failed to configure TLS: {}", e)))?;
 
         // TCP 连接 (带超时)
-        let tcp_stream = tokio::time::timeout(
-            TCP_CONNECT_TIMEOUT,
-            TcpStream::connect(&params.addr),
-        )
-        .await
-        .map_err(|_| ClientError::Connection(format!("TCP connect timed out after {:?}", TCP_CONNECT_TIMEOUT)))?
-        .map_err(|e| ClientError::Connection(format!("TCP connect failed: {}", e)))?;
+        let tcp_stream =
+            tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(&params.addr))
+                .await
+                .map_err(|_| {
+                    ClientError::Connection(format!(
+                        "TCP connect timed out after {:?}",
+                        TCP_CONNECT_TIMEOUT
+                    ))
+                })?
+                .map_err(|e| ClientError::Connection(format!("TCP connect failed: {}", e)))?;
 
         // TLS 握手 (带超时)
         let connector = TlsConnector::from(Arc::new(tls_config));
@@ -299,7 +295,12 @@ impl NetworkMessageClient {
 
         tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, connector.connect(domain, tcp_stream))
             .await
-            .map_err(|_| ClientError::Connection(format!("TLS handshake timed out after {:?}", TLS_HANDSHAKE_TIMEOUT)))?
+            .map_err(|_| {
+                ClientError::Connection(format!(
+                    "TLS handshake timed out after {:?}",
+                    TLS_HANDSHAKE_TIMEOUT
+                ))
+            })?
             .map_err(|e| ClientError::Connection(format!("TLS handshake failed: {}", e)))
     }
 
@@ -571,7 +572,10 @@ impl NetworkMessageClient {
 
     /// 快速 TCP 探测 - 检测网络是否可达
     async fn quick_tcp_probe(addr: &str) -> bool {
-        matches!(tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(addr)).await, Ok(Ok(_)))
+        matches!(
+            tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(addr)).await,
+            Ok(Ok(_))
+        )
     }
 
     /// 后台读取任务循环
@@ -661,9 +665,10 @@ impl NetworkMessageClient {
 
         // 读取 Correlation ID (16 字节)
         let correlation_buf = &mut [0u8; 16];
-        stream.read_exact(correlation_buf).await.map_err(|e| {
-            ClientError::Connection(format!("Read Correlation UUID failed: {}", e))
-        })?;
+        stream
+            .read_exact(correlation_buf)
+            .await
+            .map_err(|e| ClientError::Connection(format!("Read Correlation UUID failed: {}", e)))?;
         let correlation_id_raw = Uuid::from_bytes(*correlation_buf);
         let correlation_id = if correlation_id_raw.is_nil() {
             None
@@ -738,9 +743,7 @@ impl NetworkMessageClient {
         {
             let guard = self.write_stream.read().await;
             if guard.is_none() {
-                return Err(ClientError::Connection(
-                    "No active connection".to_string(),
-                ));
+                return Err(ClientError::Connection("No active connection".to_string()));
             }
         }
 
@@ -933,10 +936,7 @@ impl NetworkMessageClient {
     }
 
     /// 发送请求并等待响应（使用默认超时）
-    pub async fn request_default(
-        &self,
-        msg: &BusMessage,
-    ) -> Result<BusMessage, ClientError> {
+    pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, ClientError> {
         self.request(msg, self.config.request_timeout).await
     }
 
@@ -1063,9 +1063,7 @@ impl InMemoryMessageClient {
             }
         })
         .await
-        .map_err(|_| {
-            ClientError::Timeout(format!("Request timed out after {:?}", timeout))
-        })??;
+        .map_err(|_| ClientError::Timeout(format!("Request timed out after {:?}", timeout)))??;
 
         Ok(response)
     }
@@ -1081,16 +1079,13 @@ impl InMemoryMessageClient {
     /// 接收一条服务器消息
     pub async fn recv(&self) -> Result<BusMessage, ClientError> {
         let mut rx = self.server_tx.subscribe();
-        rx.recv().await.map_err(|e: broadcast::error::RecvError| {
-            ClientError::Connection(e.to_string())
-        })
+        rx.recv()
+            .await
+            .map_err(|e: broadcast::error::RecvError| ClientError::Connection(e.to_string()))
     }
 
     /// 发送请求并等待响应（使用默认超时）
-    pub async fn request_default(
-        &self,
-        msg: &BusMessage,
-    ) -> Result<BusMessage, ClientError> {
+    pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, ClientError> {
         let timeout = crate::MessageClientConfig::default().request_timeout;
         self.request(msg, timeout).await
     }
@@ -1101,7 +1096,6 @@ impl InMemoryMessageClient {
     pub fn subscribe(&self) -> broadcast::Receiver<BusMessage> {
         self.server_tx.subscribe()
     }
-
 }
 
 #[cfg(test)]

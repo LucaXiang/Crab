@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM stamp_activity WHERE marketing_group_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7f1a034e487d1905bb34dd3351846f5cf26e98d568efcf8b6b31bc8c93a55645"
+}

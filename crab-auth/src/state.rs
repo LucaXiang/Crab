@@ -55,8 +55,7 @@ impl CaStore {
         let secret = match self.read_secret(&secret_name).await? {
             Some(s) => s,
             None => {
-                let profile =
-                    CaProfile::intermediate(tenant_id, &format!("Tenant {tenant_id}"));
+                let profile = CaProfile::intermediate(tenant_id, &format!("Tenant {tenant_id}"));
                 let ca = CertificateAuthority::new_intermediate(profile, root_ca)?;
                 let s = CaSecret {
                     cert_pem: ca.cert_pem().to_string(),
@@ -73,10 +72,7 @@ impl CaStore {
     }
 
     /// Load existing Tenant CA (errors if not found)
-    pub async fn load_tenant_ca(
-        &self,
-        tenant_id: &str,
-    ) -> Result<CertificateAuthority, BoxError> {
+    pub async fn load_tenant_ca(&self, tenant_id: &str) -> Result<CertificateAuthority, BoxError> {
         let secret_name = format!("crab-auth/tenant/{tenant_id}");
         let secret = self
             .read_secret(&secret_name)
@@ -92,8 +88,7 @@ impl CaStore {
         match self.read_secret("crab-auth/root-ca").await? {
             Some(s) => Ok(s),
             None => {
-                let ca =
-                    CertificateAuthority::new_root(CaProfile::root("Crab Root CA"))?;
+                let ca = CertificateAuthority::new_root(CaProfile::root("Crab Root CA"))?;
                 let s = CaSecret {
                     cert_pem: ca.cert_pem().to_string(),
                     key_pem: ca.key_pem(),
@@ -107,9 +102,7 @@ impl CaStore {
     async fn read_secret(&self, name: &str) -> Result<Option<CaSecret>, BoxError> {
         match self.sm.get_secret_value().secret_id(name).send().await {
             Ok(output) => {
-                let json = output
-                    .secret_string()
-                    .ok_or("Secret has no string value")?;
+                let json = output.secret_string().ok_or("Secret has no string value")?;
                 Ok(Some(serde_json::from_str(json)?))
             }
             Err(err) => {

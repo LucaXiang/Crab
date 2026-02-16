@@ -1,6 +1,5 @@
 use super::*;
 
-
 // ========================================================================
 // 18. 完成订单后不能添加商品
 // ========================================================================
@@ -8,11 +7,7 @@ use super::*;
 #[test]
 fn test_cannot_add_items_to_completed_order() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        213,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 213, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -48,9 +43,11 @@ fn test_cannot_add_items_to_completed_order() {
         },
     );
     let resp = manager.execute_command(add_cmd);
-    assert!(!resp.success, "Should not allow adding items to completed order");
+    assert!(
+        !resp.success,
+        "Should not allow adding items to completed order"
+    );
 }
-
 
 // ========================================================================
 // ========================================================================
@@ -65,11 +62,8 @@ fn test_cannot_add_items_to_completed_order() {
 #[test]
 fn test_add_items_with_zero_price() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        214,
-        vec![simple_item(1, "Free Sample", 0.0, 1)],
-    );
+    let order_id =
+        open_table_with_items(&manager, 214, vec![simple_item(1, "Free Sample", 0.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.items.len(), 1);
@@ -89,7 +83,6 @@ fn test_add_items_with_zero_price() {
     let resp = manager.execute_command(complete_cmd);
     assert!(resp.success, "Zero-price order should complete");
 }
-
 
 // ========================================================================
 // 20. NaN 价格 — 静默变成 0 (当前行为记录)
@@ -126,7 +119,6 @@ fn test_add_items_with_nan_price_rejected() {
     assert!(!resp.success, "NaN price should be rejected by validation");
 }
 
-
 // ========================================================================
 // 21. Infinity 价格 — 静默变成 0
 // ========================================================================
@@ -159,9 +151,11 @@ fn test_add_items_with_infinity_price_rejected() {
         },
     );
     let resp = manager.execute_command(add_cmd);
-    assert!(!resp.success, "Infinity price should be rejected by validation");
+    assert!(
+        !resp.success,
+        "Infinity price should be rejected by validation"
+    );
 }
-
 
 // ========================================================================
 // 22. 负价格 — 当前被 clamp 到 0
@@ -195,9 +189,11 @@ fn test_add_items_with_negative_price_rejected() {
         },
     );
     let resp = manager.execute_command(add_cmd);
-    assert!(!resp.success, "Negative price should be rejected by validation");
+    assert!(
+        !resp.success,
+        "Negative price should be rejected by validation"
+    );
 }
-
 
 // ========================================================================
 // 23. 极大价格 × 数量仍正确计算
@@ -217,7 +213,6 @@ fn test_add_items_large_price_and_quantity() {
     assert_eq!(snapshot.subtotal, 9_999_999.0);
     assert_eq!(snapshot.total, 9_999_999.0);
 }
-
 
 // ========================================================================
 // 24. f64::MAX 价格 — 转为 0 (Decimal 转换失败)
@@ -251,9 +246,11 @@ fn test_add_items_with_f64_max_price_rejected() {
         },
     );
     let resp = manager.execute_command(add_cmd);
-    assert!(!resp.success, "f64::MAX price should be rejected (exceeds max)");
+    assert!(
+        !resp.success,
+        "f64::MAX price should be rejected (exceeds max)"
+    );
 }
-
 
 // ========================================================================
 // 25. 数量为 0 — 当前被接受（应添加商品但金额为 0）
@@ -290,7 +287,6 @@ fn test_add_items_with_zero_quantity_rejected() {
     assert!(!resp.success, "Zero quantity should be rejected");
 }
 
-
 // ========================================================================
 // 26. 负数量 — 当前被接受 (导致负总额)
 // ========================================================================
@@ -326,7 +322,6 @@ fn test_add_items_with_negative_quantity_rejected() {
     assert!(!resp.success, "Negative quantity should be rejected");
 }
 
-
 // ========================================================================
 // 27. i32::MAX 数量 — Decimal 可以处理
 // ========================================================================
@@ -359,9 +354,11 @@ fn test_add_items_with_i32_max_quantity_rejected() {
         },
     );
     let resp = manager.execute_command(add_cmd);
-    assert!(!resp.success, "i32::MAX quantity exceeds max (9999), should be rejected");
+    assert!(
+        !resp.success,
+        "i32::MAX quantity exceeds max (9999), should be rejected"
+    );
 }
-
 
 #[test]
 fn test_add_items_with_max_allowed_quantity() {
@@ -377,7 +374,6 @@ fn test_add_items_with_max_allowed_quantity() {
     // 0.01 * 9999 = 99.99
     assert_eq!(snapshot.subtotal, 99.99);
 }
-
 
 // ========================================================================
 // 28. 折扣超过 100% — unit_price clamp 到 0
@@ -428,7 +424,6 @@ fn test_add_items_with_discount_over_100_percent() {
     assert!(!resp.success, "200% discount should be rejected (max 100%)");
 }
 
-
 // ========================================================================
 // 29. 负折扣 — 当前被接受 (相当于加价)
 // ========================================================================
@@ -473,9 +468,11 @@ fn test_add_items_with_negative_discount_acts_as_markup() {
         },
     );
     let resp = manager.execute_command(add_cmd);
-    assert!(!resp.success, "Negative discount should be rejected (min 0%)");
+    assert!(
+        !resp.success,
+        "Negative discount should be rejected (min 0%)"
+    );
 }
-
 
 // ========================================================================
 // 30. 支付 NaN 金额 — 当前被 <= 0.0 检查通过 (NaN 比较特殊)
@@ -484,11 +481,7 @@ fn test_add_items_with_negative_discount_acts_as_markup() {
 #[test]
 fn test_add_payment_with_nan_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        217,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 217, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -507,7 +500,6 @@ fn test_add_payment_with_nan_amount_rejected() {
     assert!(!resp.success, "NaN payment amount should be rejected");
 }
 
-
 // ========================================================================
 // 31. 支付 Infinity 金额 — 同样绕过 <= 0.0 检查
 // ========================================================================
@@ -515,11 +507,7 @@ fn test_add_payment_with_nan_amount_rejected() {
 #[test]
 fn test_add_payment_with_infinity_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        218,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 218, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -538,7 +526,6 @@ fn test_add_payment_with_infinity_amount_rejected() {
     assert!(!resp.success, "Infinity payment amount should be rejected");
 }
 
-
 // ========================================================================
 // 32. 支付 f64::MAX — 绕过检查，但 Decimal 转换为 0
 // ========================================================================
@@ -546,11 +533,7 @@ fn test_add_payment_with_infinity_amount_rejected() {
 #[test]
 fn test_add_payment_with_f64_max_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        219,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 219, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -566,9 +549,11 @@ fn test_add_payment_with_f64_max_amount_rejected() {
         },
     );
     let resp = manager.execute_command(pay_cmd);
-    assert!(!resp.success, "f64::MAX payment should be rejected (exceeds max)");
+    assert!(
+        !resp.success,
+        "f64::MAX payment should be rejected (exceeds max)"
+    );
 }
-
 
 // ========================================================================
 // 33. 多个极端商品叠加后完成订单
@@ -645,7 +630,6 @@ fn test_multiple_edge_items_then_complete() {
     assert_eq!(snapshot.payments[0].change, Some(8.0)); // 60 - 52 = 8
 }
 
-
 // ========================================================================
 // 34. 带选项价格修改器的边界测试
 // ========================================================================
@@ -716,7 +700,6 @@ fn test_add_items_with_option_price_modifiers() {
     assert_eq!(snapshot.subtotal, 16.5);
 }
 
-
 // ========================================================================
 // 35. 选项修改器为负值 — 当前被接受
 // ========================================================================
@@ -770,14 +753,19 @@ fn test_add_items_with_negative_option_modifier() {
     let resp = manager.execute_command(add_cmd);
     // 负的 price_modifier 是被允许的 (比如更小的规格减价)
     // 但不能超过 MAX_PRICE 的绝对值
-    assert!(resp.success, "Negative option modifier within bounds is allowed");
+    assert!(
+        resp.success,
+        "Negative option modifier within bounds is allowed"
+    );
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     // reducer: base=10+(-15)=-5, item_final=max(0,-5)=0
     // money: base_price=0, options=-15, base_with_options=-15 → clamped to 0
-    assert_eq!(snapshot.subtotal, 0.0, "Negative modifier can reduce price to 0");
+    assert_eq!(
+        snapshot.subtotal, 0.0,
+        "Negative modifier can reduce price to 0"
+    );
 }
-
 
 // ========================================================================
 // 37. 现金支付 tendered < amount 应被拒绝
@@ -786,11 +774,7 @@ fn test_add_items_with_negative_option_modifier() {
 #[test]
 fn test_add_cash_payment_tendered_less_than_amount_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        220,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 220, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -806,9 +790,11 @@ fn test_add_cash_payment_tendered_less_than_amount_fails() {
         },
     );
     let resp = manager.execute_command(pay_cmd);
-    assert!(!resp.success, "Tendered less than amount should be rejected");
+    assert!(
+        !resp.success,
+        "Tendered less than amount should be rejected"
+    );
 }
-
 
 // ========================================================================
 // 38. 折扣 + 附加费 + 选项叠加后精度测试
@@ -872,7 +858,6 @@ fn test_discount_surcharge_options_combined_precision() {
     assert_eq!(snapshot.subtotal, 94.5);
 }
 
-
 // ========================================================================
 // 39. 支付 NaN 后尝试完成订单 — 应该失败
 // ========================================================================
@@ -880,11 +865,7 @@ fn test_discount_surcharge_options_combined_precision() {
 #[test]
 fn test_nan_payment_then_complete_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        221,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 221, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // NaN payment — 被输入验证拒绝
     let pay_cmd = OrderCommand::new(
@@ -901,7 +882,10 @@ fn test_nan_payment_then_complete_fails() {
         },
     );
     let pay_resp = manager.execute_command(pay_cmd);
-    assert!(!pay_resp.success, "NaN payment should be rejected by validation");
+    assert!(
+        !pay_resp.success,
+        "NaN payment should be rejected by validation"
+    );
 
     // 尝试完成 — 应该失败因为没有成功的支付
     let complete_cmd = OrderCommand::new(
@@ -915,7 +899,6 @@ fn test_nan_payment_then_complete_fails() {
     let resp = manager.execute_command(complete_cmd);
     assert!(!resp.success, "Should fail: no payment was recorded");
 }
-
 
 // ========================================================================
 // 40. 快照重建一致性 — 带边界值
@@ -963,7 +946,6 @@ fn test_rebuild_snapshot_with_edge_values() {
     // 0*5 + 0.01*99 = 0.99
     assert_eq!(stored.subtotal, 0.99);
 }
-
 
 // ========================================================================
 // 41. 批量小金额累加精度
@@ -1019,7 +1001,6 @@ fn test_many_small_amounts_precision() {
     assert_eq!(snapshot.total, 1.0);
 }
 
-
 // ========================================================================
 // 42. NaN tendered — 对应 amount 为正值
 // ========================================================================
@@ -1027,11 +1008,7 @@ fn test_many_small_amounts_precision() {
 #[test]
 fn test_add_cash_payment_nan_tendered() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        222,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 222, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -1052,7 +1029,6 @@ fn test_add_cash_payment_nan_tendered() {
     assert!(!resp.success, "NaN tendered should fail: Decimal(0) < 9.99");
 }
 
-
 // ========================================================================
 // 43. 移桌后仍可正常支付
 // ========================================================================
@@ -1060,11 +1036,7 @@ fn test_add_cash_payment_nan_tendered() {
 #[test]
 fn test_add_payment_after_move_order() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        223,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 223, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // Move order
     let move_cmd = OrderCommand::new(
@@ -1097,9 +1069,11 @@ fn test_add_payment_after_move_order() {
         },
     );
     let resp = manager.execute_command(pay_cmd);
-    assert!(resp.success, "Order should accept payments after MoveOrder (status stays Active)");
+    assert!(
+        resp.success,
+        "Order should accept payments after MoveOrder (status stays Active)"
+    );
 }
-
 
 // ========================================================================
 // 44. 极小金额差异 — 支付容差边界
@@ -1108,11 +1082,7 @@ fn test_add_payment_after_move_order() {
 #[test]
 fn test_payment_tolerance_boundary() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        224,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 224, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // 支付 9.99 — 差 0.01，在容差内
     let pay_cmd = OrderCommand::new(
@@ -1139,18 +1109,16 @@ fn test_payment_tolerance_boundary() {
         },
     );
     let resp = manager.execute_command(complete_cmd);
-    assert!(resp.success, "9.99 should be sufficient for 10.0 (within 0.01 tolerance)");
+    assert!(
+        resp.success,
+        "9.99 should be sufficient for 10.0 (within 0.01 tolerance)"
+    );
 }
-
 
 #[test]
 fn test_payment_below_tolerance_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        225,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 225, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // 支付 9.98 — 差 0.02，超出容差
     let pay_cmd = OrderCommand::new(
@@ -1177,9 +1145,11 @@ fn test_payment_below_tolerance_rejected() {
         },
     );
     let resp = manager.execute_command(complete_cmd);
-    assert!(!resp.success, "9.98 should be insufficient for 10.0 (outside 0.01 tolerance)");
+    assert!(
+        !resp.success,
+        "9.98 should be insufficient for 10.0 (outside 0.01 tolerance)"
+    );
 }
-
 
 // ========================================================================
 // 41. 多选项 + 手动折扣 + 规则字段: 端到端精度验证 (无双重计算)
@@ -1254,13 +1224,15 @@ fn test_options_discount_rule_fields_no_double_counting() {
     assert_eq!(item.original_price, 20.0, "original_price = input price");
 
     // unit_price: base(20)+options(5)=25, discount=25*10%=2.5, unit=22.5
-    assert_eq!(item.unit_price, 22.5, "unit_price = 22.5 (no double counting)");
+    assert_eq!(
+        item.unit_price, 22.5,
+        "unit_price = 22.5 (no double counting)"
+    );
 
     // subtotal = 22.5 * 2 = 45.0
     assert_eq!(snapshot.subtotal, 45.0, "subtotal = 45.0");
     assert_eq!(snapshot.total, 45.0, "total = 45.0 (no tax)");
 }
-
 
 // ========================================================================
 // 42. ModifyItem 后 unit_price 一致性
@@ -1349,7 +1321,10 @@ fn test_modify_item_unit_price_consistency() {
     let item = &snapshot_after.items[0];
 
     // original_price should still be 15.0
-    assert_eq!(item.original_price, 15.0, "original_price unchanged after modify");
+    assert_eq!(
+        item.original_price, 15.0,
+        "original_price unchanged after modify"
+    );
 
     // unit_price: base(15)+options(2.5)=17.5, discount=17.5*20%=3.5, unit=14.0
     assert_eq!(item.unit_price, 14.0, "unit_price after 20% discount");
@@ -1358,7 +1333,6 @@ fn test_modify_item_unit_price_consistency() {
     assert_eq!(snapshot_after.subtotal, 42.0, "subtotal after modify");
     assert_eq!(snapshot_after.total, 42.0, "total after modify");
 }
-
 
 // ========================================================================
 // ========================================================================
@@ -1373,11 +1347,7 @@ fn test_modify_item_unit_price_consistency() {
 #[test]
 fn test_add_items_to_voided_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        226,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 226, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // Void
     let void_cmd = OrderCommand::new(
@@ -1408,15 +1378,10 @@ fn test_add_items_to_voided_order_fails() {
     assert!(!resp.success, "Should not add items to voided order");
 }
 
-
 #[test]
 fn test_add_payment_to_voided_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        227,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 227, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let void_cmd = OrderCommand::new(
         1,
@@ -1450,7 +1415,6 @@ fn test_add_payment_to_voided_order_fails() {
     assert!(!resp.success, "Should not add payment to voided order");
 }
 
-
 #[test]
 fn test_complete_voided_order_fails() {
     let manager = create_test_manager();
@@ -1483,7 +1447,6 @@ fn test_complete_voided_order_fails() {
     assert!(!resp.success, "Should not complete a voided order");
 }
 
-
 // ========================================================================
 // 状态守卫: Completed 订单不可 void
 // ========================================================================
@@ -1491,11 +1454,7 @@ fn test_complete_voided_order_fails() {
 #[test]
 fn test_void_completed_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        228,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 228, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // Pay + complete
     let pay_cmd = OrderCommand::new(
@@ -1541,15 +1500,10 @@ fn test_void_completed_order_fails() {
     assert!(!resp.success, "Should not void a completed order");
 }
 
-
 #[test]
 fn test_double_complete_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        229,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 229, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -1589,7 +1543,6 @@ fn test_double_complete_fails() {
     assert!(!resp2.success, "Double complete should fail");
 }
 
-
 // ========================================================================
 // 恶意 ModifyItem 数据
 // ========================================================================
@@ -1597,11 +1550,7 @@ fn test_double_complete_fails() {
 #[test]
 fn test_modify_item_nan_price_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        230,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 230, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1626,18 +1575,16 @@ fn test_modify_item_nan_price_rejected() {
         },
     );
     let resp = manager.execute_command(modify_cmd);
-    assert!(!resp.success, "ModifyItem with NaN price should be rejected");
+    assert!(
+        !resp.success,
+        "ModifyItem with NaN price should be rejected"
+    );
 }
-
 
 #[test]
 fn test_modify_item_negative_price_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        231,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 231, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1662,18 +1609,16 @@ fn test_modify_item_negative_price_rejected() {
         },
     );
     let resp = manager.execute_command(modify_cmd);
-    assert!(!resp.success, "ModifyItem with negative price should be rejected");
+    assert!(
+        !resp.success,
+        "ModifyItem with negative price should be rejected"
+    );
 }
-
 
 #[test]
 fn test_modify_item_nan_discount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        232,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 232, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1698,18 +1643,16 @@ fn test_modify_item_nan_discount_rejected() {
         },
     );
     let resp = manager.execute_command(modify_cmd);
-    assert!(!resp.success, "ModifyItem with NaN discount should be rejected");
+    assert!(
+        !resp.success,
+        "ModifyItem with NaN discount should be rejected"
+    );
 }
-
 
 #[test]
 fn test_modify_item_discount_over_100_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        233,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 233, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1734,18 +1677,16 @@ fn test_modify_item_discount_over_100_rejected() {
         },
     );
     let resp = manager.execute_command(modify_cmd);
-    assert!(!resp.success, "ModifyItem with 150% discount should be rejected");
+    assert!(
+        !resp.success,
+        "ModifyItem with 150% discount should be rejected"
+    );
 }
-
 
 #[test]
 fn test_modify_item_zero_quantity_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        234,
-        vec![simple_item(1, "Coffee", 10.0, 2)],
-    );
+    let order_id = open_table_with_items(&manager, 234, vec![simple_item(1, "Coffee", 10.0, 2)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1770,9 +1711,11 @@ fn test_modify_item_zero_quantity_rejected() {
         },
     );
     let resp = manager.execute_command(modify_cmd);
-    assert!(!resp.success, "ModifyItem with quantity=0 should be rejected");
+    assert!(
+        !resp.success,
+        "ModifyItem with quantity=0 should be rejected"
+    );
 }
-
 
 // ========================================================================
 // 空 items 数组攻击
@@ -1795,7 +1738,11 @@ fn test_add_empty_items_array() {
     // 即使 AddItems 允许空数组（当前行为），订单不应进入不一致状态
     // 记录当前行为，不管成功与否，订单仍可继续操作
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    assert_eq!(snapshot.status, OrderStatus::Active, "Order should remain Active");
+    assert_eq!(
+        snapshot.status,
+        OrderStatus::Active,
+        "Order should remain Active"
+    );
     assert_eq!(snapshot.items.len(), 0, "No items should be added");
 
     // 验证可以继续添加正常商品 (不进入死胡同)
@@ -1808,9 +1755,11 @@ fn test_add_empty_items_array() {
         },
     );
     let resp2 = manager.execute_command(add_cmd2);
-    assert!(resp2.success, "Should be able to add items after empty array");
+    assert!(
+        resp2.success,
+        "Should be able to add items after empty array"
+    );
 }
-
 
 // ========================================================================
 // 合并操作: 无效目标
@@ -1852,7 +1801,6 @@ fn test_merge_voided_source_fails() {
     assert!(!resp.success, "Should not merge a voided source order");
 }
 
-
 #[test]
 fn test_merge_into_voided_target_fails() {
     let manager = create_test_manager();
@@ -1889,7 +1837,6 @@ fn test_merge_into_voided_target_fails() {
     assert!(!resp.success, "Should not merge into a voided target order");
 }
 
-
 #[test]
 fn test_merge_self_fails() {
     let manager = create_test_manager();
@@ -1909,7 +1856,6 @@ fn test_merge_self_fails() {
     assert!(!resp.success, "Should not merge order with itself");
 }
 
-
 // ========================================================================
 // AA Split 恶意数据
 // ========================================================================
@@ -1917,11 +1863,7 @@ fn test_merge_self_fails() {
 #[test]
 fn test_aa_split_zero_total_shares_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        235,
-        vec![simple_item(1, "Coffee", 30.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 235, vec![simple_item(1, "Coffee", 30.0, 1)]);
 
     let cmd = OrderCommand::new(
         1,
@@ -1938,15 +1880,10 @@ fn test_aa_split_zero_total_shares_fails() {
     assert!(!resp.success, "AA split with 0 total shares should fail");
 }
 
-
 #[test]
 fn test_aa_split_one_share_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        236,
-        vec![simple_item(1, "Coffee", 30.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 236, vec![simple_item(1, "Coffee", 30.0, 1)]);
 
     let cmd = OrderCommand::new(
         1,
@@ -1960,18 +1897,16 @@ fn test_aa_split_one_share_fails() {
         },
     );
     let resp = manager.execute_command(cmd);
-    assert!(!resp.success, "AA split with 1 total share should fail (need >= 2)");
+    assert!(
+        !resp.success,
+        "AA split with 1 total share should fail (need >= 2)"
+    );
 }
-
 
 #[test]
 fn test_aa_split_shares_exceed_total_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        237,
-        vec![simple_item(1, "Coffee", 30.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 237, vec![simple_item(1, "Coffee", 30.0, 1)]);
 
     let cmd = OrderCommand::new(
         1,
@@ -1988,15 +1923,10 @@ fn test_aa_split_shares_exceed_total_fails() {
     assert!(!resp.success, "AA split shares > total_shares should fail");
 }
 
-
 #[test]
 fn test_pay_aa_split_exceed_remaining_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        238,
-        vec![simple_item(1, "Coffee", 30.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 238, vec![simple_item(1, "Coffee", 30.0, 1)]);
 
     // Start AA: 3 shares, pay 2
     let start_cmd = OrderCommand::new(
@@ -2025,9 +1955,11 @@ fn test_pay_aa_split_exceed_remaining_fails() {
         },
     );
     let resp = manager.execute_command(pay_cmd);
-    assert!(!resp.success, "Pay AA split with shares > remaining should fail");
+    assert!(
+        !resp.success,
+        "Pay AA split with shares > remaining should fail"
+    );
 }
-
 
 // ========================================================================
 // 取消已取消的支付
@@ -2036,11 +1968,7 @@ fn test_pay_aa_split_exceed_remaining_fails() {
 #[test]
 fn test_cancel_already_cancelled_payment_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        239,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 239, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     // Pay
     let pay_cmd = OrderCommand::new(
@@ -2089,9 +2017,11 @@ fn test_cancel_already_cancelled_payment_fails() {
         },
     );
     let resp2 = manager.execute_command(cancel2);
-    assert!(!resp2.success, "Should not cancel an already-cancelled payment");
+    assert!(
+        !resp2.success,
+        "Should not cancel an already-cancelled payment"
+    );
 }
-
 
 // ========================================================================
 // 移桌到已占用桌台
@@ -2100,16 +2030,8 @@ fn test_cancel_already_cancelled_payment_fails() {
 #[test]
 fn test_move_to_occupied_table_fails() {
     let manager = create_test_manager();
-    let _order1 = open_table_with_items(
-        &manager,
-        240,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
-    let order2 = open_table_with_items(
-        &manager,
-        241,
-        vec![simple_item(2, "Tea", 5.0, 1)],
-    );
+    let _order1 = open_table_with_items(&manager, 240, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order2 = open_table_with_items(&manager, 241, vec![simple_item(2, "Tea", 5.0, 1)]);
 
     // Move order2 to T-occ-1 (occupied)
     let move_cmd = OrderCommand::new(
@@ -2129,7 +2051,6 @@ fn test_move_to_occupied_table_fails() {
     assert!(!resp.success, "Should not move to an occupied table");
 }
 
-
 // ========================================================================
 // ModifyItem 对已完成/已取消订单
 // ========================================================================
@@ -2137,11 +2058,7 @@ fn test_move_to_occupied_table_fails() {
 #[test]
 fn test_modify_item_on_completed_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        242,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 242, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -2195,7 +2112,6 @@ fn test_modify_item_on_completed_order_fails() {
     assert!(!resp.success, "Should not modify items on completed order");
 }
 
-
 // ========================================================================
 // 支付负金额
 // ========================================================================
@@ -2203,11 +2119,7 @@ fn test_modify_item_on_completed_order_fails() {
 #[test]
 fn test_add_payment_negative_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        243,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 243, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -2226,15 +2138,10 @@ fn test_add_payment_negative_amount_rejected() {
     assert!(!resp.success, "Negative payment amount should be rejected");
 }
 
-
 #[test]
 fn test_add_payment_zero_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(
-        &manager,
-        244,
-        vec![simple_item(1, "Coffee", 10.0, 1)],
-    );
+    let order_id = open_table_with_items(&manager, 244, vec![simple_item(1, "Coffee", 10.0, 1)]);
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -2252,4 +2159,3 @@ fn test_add_payment_zero_amount_rejected() {
     let resp = manager.execute_command(pay_cmd);
     assert!(!resp.success, "Zero payment amount should be rejected");
 }
-

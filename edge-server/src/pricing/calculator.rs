@@ -3,8 +3,8 @@
 //! Logic for calculating price adjustments from matched rules.
 //! Uses rust_decimal for precise calculations, stores as f64.
 
-use shared::models::{AdjustmentType, PriceRule, RuleType};
 use rust_decimal::prelude::*;
+use shared::models::{AdjustmentType, PriceRule, RuleType};
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
 const DECIMAL_PLACES: u32 = 2;
@@ -27,8 +27,9 @@ fn to_f64(value: Decimal) -> f64 {
     value
         .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
         .to_f64()
-        // SAFETY: Decimal rounded to 2dp is always representable as f64
-        .expect("rounded Decimal always converts to f64")
+        // SAFETY: Decimal rounded to 2dp from DB-stored PriceRules (bounded values)
+        // is always within f64 representable range
+        .expect("Decimal rounded to 2dp is always representable as f64")
 }
 
 /// Calculated adjustment result
@@ -75,7 +76,10 @@ pub fn sort_rules_by_priority(rules: &mut [&PriceRule]) {
 }
 
 /// Calculate adjustment from a single rule using Decimal precision
-fn calculate_single_adjustment(rule: &PriceRule, base_price: Decimal) -> (Decimal, Decimal, Decimal) {
+fn calculate_single_adjustment(
+    rule: &PriceRule,
+    base_price: Decimal,
+) -> (Decimal, Decimal, Decimal) {
     let value = to_decimal(rule.adjustment_value);
     let hundred = Decimal::ONE_HUNDRED;
 
@@ -221,12 +225,7 @@ mod tests {
     #[test]
     fn test_fixed_discount() {
         // ¥5.00 fixed discount
-        let rule = make_rule(
-            RuleType::Discount,
-            AdjustmentType::FixedAmount,
-            5.0,
-            true,
-        );
+        let rule = make_rule(RuleType::Discount, AdjustmentType::FixedAmount, 5.0, true);
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 

@@ -1,10 +1,10 @@
 //! Order events - immutable facts recorded after command processing
 
+use super::AppliedMgRule;
 use super::types::{
     CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentRecord,
     PaymentSummaryItem, ServiceType, SplitItem, VoidType,
 };
-use super::AppliedMgRule;
 use serde::{Deserialize, Serialize};
 
 /// Order event - immutable audit record
@@ -316,9 +316,7 @@ pub enum EventPayload {
     },
 
     /// AA 取消（所有 AA 支付被取消，解锁 AA 模式）
-    AaSplitCancelled {
-        total_shares: i32,
-    },
+    AaSplitCancelled { total_shares: i32 },
 
     // ========== Table Operations ==========
     OrderMoved {

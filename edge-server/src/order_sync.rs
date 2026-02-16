@@ -16,8 +16,8 @@
 //! - No gaps in sequence (can be validated)
 //! - Full sync is always available as fallback
 
-use super::manager::{ManagerError, OrdersManager};
-use super::money::to_decimal;
+use crate::order_money::to_decimal;
+use crate::orders::manager::{ManagerError, OrdersManager};
 use serde::{Deserialize, Serialize};
 use shared::order::{OrderEvent, OrderSnapshot};
 
@@ -155,9 +155,11 @@ impl SyncService {
                             && s.items.iter().zip(rebuilt.items.iter()).all(|(a, b)| {
                                 a.id == b.id
                                     && a.quantity == b.quantity
-                                    && (to_decimal(a.price) - to_decimal(b.price)).abs() < to_decimal(0.01)
+                                    && (to_decimal(a.price) - to_decimal(b.price)).abs()
+                                        < to_decimal(0.01)
                             });
-                        let match_total = (to_decimal(s.total) - to_decimal(rebuilt.total)).abs() < to_decimal(0.01);
+                        let match_total = (to_decimal(s.total) - to_decimal(rebuilt.total)).abs()
+                            < to_decimal(0.01);
                         let match_sequence = s.last_sequence == rebuilt.last_sequence;
 
                         Ok(match_status && match_items && match_total && match_sequence)

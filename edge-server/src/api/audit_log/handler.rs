@@ -1,8 +1,8 @@
 //! Audit Log API Handlers
 
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 
 use crate::audit::{AuditListResponse, AuditQuery};

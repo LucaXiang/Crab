@@ -132,13 +132,9 @@ pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<
 
     let image_hashes = extract_image_hashes(&template.fields);
     if !image_hashes.is_empty() {
-        let _ = super::image_ref::sync_refs(
-            pool,
-            ImageRefEntityType::LabelTemplate,
-            id,
-            image_hashes,
-        )
-        .await;
+        let _ =
+            super::image_ref::sync_refs(pool, ImageRefEntityType::LabelTemplate, id, image_hashes)
+                .await;
     }
 
     Ok(template)
@@ -151,9 +147,12 @@ pub async fn update(
 ) -> RepoResult<LabelTemplate> {
     // If setting as default, unset other defaults first
     if data.is_default == Some(true) {
-        sqlx::query!("UPDATE label_template SET is_default = 0 WHERE is_default = 1 AND id != ?", id)
-            .execute(pool)
-            .await?;
+        sqlx::query!(
+            "UPDATE label_template SET is_default = 0 WHERE is_default = 1 AND id != ?",
+            id
+        )
+        .execute(pool)
+        .await?;
     }
 
     let now = shared::util::now_millis();
@@ -232,25 +231,15 @@ pub async fn update(
 
     // Sync image refs
     let image_hashes = extract_image_hashes(&updated.fields);
-    let _ = super::image_ref::sync_refs(
-        pool,
-        ImageRefEntityType::LabelTemplate,
-        id,
-        image_hashes,
-    )
-    .await;
+    let _ = super::image_ref::sync_refs(pool, ImageRefEntityType::LabelTemplate, id, image_hashes)
+        .await;
 
     Ok(updated)
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     // Clean up image refs
-    let _ = super::image_ref::delete_entity_refs(
-        pool,
-        ImageRefEntityType::LabelTemplate,
-        id,
-    )
-    .await;
+    let _ = super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await;
 
     // Soft delete
     sqlx::query!("UPDATE label_template SET is_active = 0 WHERE id = ?", id)
@@ -260,12 +249,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
 }
 
 pub async fn hard_delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    let _ = super::image_ref::delete_entity_refs(
-        pool,
-        ImageRefEntityType::LabelTemplate,
-        id,
-    )
-    .await;
+    let _ = super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await;
 
     // Fields cascade via FK
     let result = sqlx::query!("DELETE FROM label_template WHERE id = ?", id)

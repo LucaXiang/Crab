@@ -6,12 +6,12 @@
 //!
 //! Note: redb operations are synchronous for stability.
 
-use super::archive::OrderArchiveService;
-use super::money::{to_decimal, to_f64};
-use super::storage::{OrderStorage, PendingArchive};
+use crate::archiving::service::OrderArchiveService;
 use crate::audit::{AuditAction, AuditService};
 use crate::core::state::ServerState;
 use crate::db::repository::{marketing_group, member, payment, shift};
+use crate::order_money::{to_decimal, to_f64};
+use crate::orders::storage::{OrderStorage, PendingArchive};
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
 use sqlx::SqlitePool;
@@ -71,7 +71,10 @@ impl ArchiveWorker {
     ///
     /// 接收来自 EventRouter 的 mpsc 通道（已过滤为终端事件）
     pub async fn run(self, mut event_rx: mpsc::Receiver<ArcOrderEvent>) {
-        tracing::info!("ArchiveWorker started with concurrency={}", ARCHIVE_CONCURRENCY);
+        tracing::info!(
+            "ArchiveWorker started with concurrency={}",
+            ARCHIVE_CONCURRENCY
+        );
 
         let worker = Arc::new(self);
 
@@ -193,7 +196,11 @@ impl ArchiveWorker {
         };
 
         // 2. Archive to SQLite (async)
-        match self.archive_service.archive_order(&snapshot, events.clone()).await {
+        match self
+            .archive_service
+            .archive_order(&snapshot, events.clone())
+            .await
+        {
             Ok(newly_archived) => {
                 // Only run post-processing for newly archived orders (skip on idempotency hit)
                 if newly_archived {
@@ -321,7 +328,9 @@ impl ArchiveWorker {
         let mut target: Option<String> = None;
 
         match &event.payload {
-            EventPayload::OrderCompleted { payment_summary, .. } => {
+            EventPayload::OrderCompleted {
+                payment_summary, ..
+            } => {
                 let summary: Vec<serde_json::Value> = payment_summary
                     .iter()
                     .map(|p| serde_json::json!({ "method": p.method, "amount": p.amount }))

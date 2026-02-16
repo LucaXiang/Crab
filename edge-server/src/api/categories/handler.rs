@@ -1,19 +1,19 @@
 //! Category API Handlers
 
 use axum::{
-    extract::{Extension, Path, State},
     Json,
+    extract::{Extension, Path, State},
 };
 use serde::Deserialize;
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
-use crate::utils::{AppError, AppResult};
 use crate::utils::types::{BatchUpdateResponse, SortOrderUpdate};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN};
+use crate::utils::validation::{MAX_NAME_LEN, validate_optional_text, validate_required_text};
+use crate::utils::{AppError, AppResult};
 use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
 const RESOURCE: &str = "category";
@@ -58,18 +58,15 @@ pub async fn create(
 ) -> AppResult<Json<Category>> {
     validate_create(&payload)?;
 
-    let category = state
-        .catalog_service
-        .create_category(payload)
-        .await
-        ?;
+    let category = state.catalog_service.create_category(payload).await?;
 
     let id = category.id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryCreated,
-        "category", &id,
+        "category",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&category, "category")
@@ -99,15 +96,13 @@ pub async fn update(
         .get_category(id)
         .ok_or_else(|| AppError::not_found(format!("Category {}", id)))?;
 
-    let category = state
-        .catalog_service
-        .update_category(id, payload)
-        .await?;
+    let category = state.catalog_service.update_category(id, payload).await?;
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryUpdated,
-        "category", &id_str,
+        "category",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_category, &category, "category")
@@ -129,18 +124,18 @@ pub async fn delete(
     let id_str = id.to_string();
     tracing::info!(id = %id, "Deleting category");
 
-    let name_for_audit = state.catalog_service.get_category(id)
-        .map(|c| c.name.clone()).unwrap_or_default();
-    state
+    let name_for_audit = state
         .catalog_service
-        .delete_category(id)
-        .await
-        ?;
+        .get_category(id)
+        .map(|c| c.name.clone())
+        .unwrap_or_default();
+    state.catalog_service.delete_category(id).await?;
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryDeleted,
-        "category", &id_str,
+        "category",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": name_for_audit})
@@ -268,15 +263,24 @@ pub async fn bind_category_attribute(
     audit_log!(
         state.audit_service,
         AuditAction::CategoryUpdated,
-        "category", &category_id_str,
+        "category",
+        &category_id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "bind_attribute", "attribute_id": attr_id})
     );
 
     // Refresh product cache for this category (inherited attributes changed)
-    if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
-        tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
+    if let Err(e) = state
+        .catalog_service
+        .refresh_products_in_category(category_id)
+        .await
+    {
+        tracing::warn!(
+            "Failed to refresh products in category {}: {}",
+            category_id,
+            e
+        );
     }
 
     // 广播同步通知
@@ -306,15 +310,24 @@ pub async fn unbind_category_attribute(
         audit_log!(
             state.audit_service,
             AuditAction::CategoryUpdated,
-            "category", &category_id_str,
+            "category",
+            &category_id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"op": "unbind_attribute", "attribute_id": attr_id})
         );
 
         // Refresh product cache for this category (inherited attributes changed)
-        if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
-            tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
+        if let Err(e) = state
+            .catalog_service
+            .refresh_products_in_category(category_id)
+            .await
+        {
+            tracing::warn!(
+                "Failed to refresh products in category {}: {}",
+                category_id,
+                e
+            );
         }
 
         // 广播同步通知

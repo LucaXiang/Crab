@@ -5,14 +5,16 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
 use serde::Deserialize;
 
-use crate::audit::{create_diff, create_snapshot, AuditAction};
+use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
-use crate::auth::permissions::{is_valid_permission, ALL_PERMISSIONS};
 use crate::auth::CurrentUser;
+use crate::auth::permissions::{ALL_PERMISSIONS, is_valid_permission};
 use crate::core::ServerState;
 use crate::db::repository::role;
+use crate::utils::validation::{
+    MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
+};
 use crate::utils::{AppError, AppResult};
-use crate::utils::validation::{validate_required_text, validate_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN};
 use shared::models::{Role, RoleCreate, RoleUpdate};
 
 fn validate_create(payload: &RoleCreate) -> AppResult<()> {
@@ -118,7 +120,8 @@ pub async fn create(
     audit_log!(
         state.audit_service,
         AuditAction::RoleCreated,
-        "role", &id,
+        "role",
+        &id,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_snapshot(&r, "role")
@@ -159,7 +162,8 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::RoleUpdated,
-        "role", &id_str,
+        "role",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_role, &r, "role")
@@ -181,8 +185,12 @@ pub async fn delete(
         "Deleting role"
     );
 
-    let name_for_audit = role::find_by_id(&state.pool, id).await.ok().flatten()
-        .map(|r| r.name.clone()).unwrap_or_default();
+    let name_for_audit = role::find_by_id(&state.pool, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|r| r.name.clone())
+        .unwrap_or_default();
     let result = role::delete(&state.pool, id).await?;
 
     if result {
@@ -190,7 +198,8 @@ pub async fn delete(
         audit_log!(
             state.audit_service,
             AuditAction::RoleDeleted,
-            "role", &id_str,
+            "role",
+            &id_str,
             operator_id = Some(current_user.id),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"role_name": name_for_audit})
@@ -202,10 +211,7 @@ pub async fn delete(
 
 /// GET /api/permissions - Get all available permissions
 pub async fn get_all_permissions() -> AppResult<impl IntoResponse> {
-    let permissions: Vec<String> = ALL_PERMISSIONS
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let permissions: Vec<String> = ALL_PERMISSIONS.iter().map(|s| s.to_string()).collect();
     Ok(Json(permissions))
 }
 
@@ -258,7 +264,8 @@ pub async fn update_role_permissions(
     audit_log!(
         state.audit_service,
         AuditAction::RoleUpdated,
-        "role", &id_str,
+        "role",
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_role, &r, "role")

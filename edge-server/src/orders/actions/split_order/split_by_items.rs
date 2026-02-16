@@ -2,12 +2,15 @@
 
 use async_trait::async_trait;
 
-use crate::orders::money::{to_decimal, to_f64, MONEY_TOLERANCE};
+use crate::order_money::{MONEY_TOLERANCE, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, SplitItem};
 
-use super::{validate_active_order, validate_items_and_calculate, validate_split_mode_allowed, validate_tendered_and_change, SplitMode};
+use super::{
+    SplitMode, validate_active_order, validate_items_and_calculate, validate_split_mode_allowed,
+    validate_tendered_and_change,
+};
 
 #[derive(Debug, Clone)]
 pub struct SplitByItemsAction {
@@ -44,11 +47,14 @@ impl CommandHandler for SplitByItemsAction {
         // Cannot overpay
         let remaining = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
         if calculated_amount > remaining + MONEY_TOLERANCE {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::SplitExceedsRemaining, format!(
-                "Split amount ({:.2}) exceeds remaining unpaid ({:.2})",
-                amount_f64,
-                to_f64(remaining)
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::SplitExceedsRemaining,
+                format!(
+                    "Split amount ({:.2}) exceeds remaining unpaid ({:.2})",
+                    amount_f64,
+                    to_f64(remaining)
+                ),
+            ));
         }
 
         let change = validate_tendered_and_change(self.tendered, amount_f64)?;

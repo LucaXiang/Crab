@@ -59,7 +59,6 @@ pub struct DailyReport {
     pub note: Option<String>,
 
     // -- Relations (populated by application code, skipped by FromRow) --
-
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]
     pub tax_breakdowns: Vec<TaxBreakdown>,

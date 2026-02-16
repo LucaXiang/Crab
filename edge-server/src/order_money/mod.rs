@@ -5,13 +5,13 @@
 //! for storage/serialization.
 
 use crate::orders::traits::OrderError;
-use crate::utils::validation::{
-    validate_order_optional_text, MAX_NAME_LEN, MAX_NOTE_LEN,
-};
+use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_optional_text};
 use rust_decimal::prelude::*;
 use shared::models::price_rule::{AdjustmentType, RuleType};
-use shared::order::{CartItemInput, CartItemSnapshot, ItemChanges, OrderSnapshot, PaymentInput, MAX_OPTION_QUANTITY};
 use shared::order::types::CommandErrorCode;
+use shared::order::{
+    CartItemInput, CartItemSnapshot, ItemChanges, MAX_OPTION_QUANTITY, OrderSnapshot, PaymentInput,
+};
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
 const DECIMAL_PLACES: u32 = 2;
@@ -30,10 +30,10 @@ const MAX_PAYMENT_AMOUNT: f64 = 1_000_000.0;
 #[inline]
 fn require_finite(value: f64, field_name: &str) -> Result<(), OrderError> {
     if !value.is_finite() {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-            "{} must be a finite number, got {}",
-            field_name, value
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InvalidAmount,
+            format!("{} must be a finite number, got {}", field_name, value),
+        ));
     }
     Ok(())
 }
@@ -43,57 +43,69 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
     // Price must be finite and non-negative
     require_finite(item.price, "price")?;
     if item.price < 0.0 {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-            "price must be non-negative, got {}",
-            item.price
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InvalidAmount,
+            format!("price must be non-negative, got {}", item.price),
+        ));
     }
     if item.price > MAX_PRICE {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-            "price exceeds maximum allowed ({}), got {}",
-            MAX_PRICE, item.price
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InvalidAmount,
+            format!(
+                "price exceeds maximum allowed ({}), got {}",
+                MAX_PRICE, item.price
+            ),
+        ));
     }
 
     // original_price must be finite and non-negative if present
     if let Some(op) = item.original_price {
         require_finite(op, "original_price")?;
         if op < 0.0 {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-                "original_price must be non-negative, got {}",
-                op
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAmount,
+                format!("original_price must be non-negative, got {}", op),
+            ));
         }
         if op > MAX_PRICE {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-                "original_price exceeds maximum allowed ({}), got {}",
-                MAX_PRICE, op
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAmount,
+                format!(
+                    "original_price exceeds maximum allowed ({}), got {}",
+                    MAX_PRICE, op
+                ),
+            ));
         }
     }
 
     // Quantity must be positive and within bounds
     if item.quantity <= 0 {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
-            "quantity must be positive, got {}",
-            item.quantity
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InvalidQuantity,
+            format!("quantity must be positive, got {}", item.quantity),
+        ));
     }
     if item.quantity > MAX_QUANTITY {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
-            "quantity exceeds maximum allowed ({}), got {}",
-            MAX_QUANTITY, item.quantity
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InvalidQuantity,
+            format!(
+                "quantity exceeds maximum allowed ({}), got {}",
+                MAX_QUANTITY, item.quantity
+            ),
+        ));
     }
 
     // manual_discount_percent must be in [0, 100]
     if let Some(d) = item.manual_discount_percent {
         require_finite(d, "manual_discount_percent")?;
         if !(0.0..=100.0).contains(&d) {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAdjustmentValue, format!(
-                "manual_discount_percent must be between 0 and 100, got {}",
-                d
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAdjustmentValue,
+                format!(
+                    "manual_discount_percent must be between 0 and 100, got {}",
+                    d
+                ),
+            ));
         }
     }
 
@@ -103,25 +115,31 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
             if let Some(pm) = opt.price_modifier {
                 require_finite(pm, "option price_modifier")?;
                 if pm.abs() > MAX_PRICE {
-                    return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-                        "option price_modifier exceeds maximum allowed, got {}",
-                        pm
-                    )));
+                    return Err(OrderError::InvalidOperation(
+                        CommandErrorCode::InvalidAmount,
+                        format!("option price_modifier exceeds maximum allowed, got {}", pm),
+                    ));
                 }
             }
             // Validate option quantity
             if opt.quantity <= 0 {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
-                    "option quantity must be positive, got {} for option '{}'",
-                    opt.quantity, opt.option_name
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::InvalidQuantity,
+                    format!(
+                        "option quantity must be positive, got {} for option '{}'",
+                        opt.quantity, opt.option_name
+                    ),
+                ));
             }
             // Use shared constant for max option quantity
             if opt.quantity > MAX_OPTION_QUANTITY {
-                return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
-                    "option quantity exceeds maximum allowed ({}), got {} for option '{}'",
-                    MAX_OPTION_QUANTITY, opt.quantity, opt.option_name
-                )));
+                return Err(OrderError::InvalidOperation(
+                    CommandErrorCode::InvalidQuantity,
+                    format!(
+                        "option quantity exceeds maximum allowed ({}), got {} for option '{}'",
+                        MAX_OPTION_QUANTITY, opt.quantity, opt.option_name
+                    ),
+                ));
             }
         }
     }
@@ -141,10 +159,13 @@ pub fn validate_payment(payment: &PaymentInput) -> Result<(), OrderError> {
         return Err(OrderError::InvalidAmount);
     }
     if payment.amount > MAX_PAYMENT_AMOUNT {
-        return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-            "payment amount exceeds maximum allowed ({}), got {}",
-            MAX_PAYMENT_AMOUNT, payment.amount
-        )));
+        return Err(OrderError::InvalidOperation(
+            CommandErrorCode::InvalidAmount,
+            format!(
+                "payment amount exceeds maximum allowed ({}), got {}",
+                MAX_PAYMENT_AMOUNT, payment.amount
+            ),
+        ));
     }
 
     // Tendered must be finite if present
@@ -166,36 +187,47 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
     if let Some(p) = changes.price {
         require_finite(p, "price")?;
         if p < 0.0 {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-                "price must be non-negative, got {}", p
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAmount,
+                format!("price must be non-negative, got {}", p),
+            ));
         }
         if p > MAX_PRICE {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-                "price exceeds maximum allowed ({}), got {}", MAX_PRICE, p
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAmount,
+                format!("price exceeds maximum allowed ({}), got {}", MAX_PRICE, p),
+            ));
         }
     }
 
     if let Some(q) = changes.quantity {
         if q <= 0 {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
-                "quantity must be positive, got {}", q
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidQuantity,
+                format!("quantity must be positive, got {}", q),
+            ));
         }
         if q > MAX_QUANTITY {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidQuantity, format!(
-                "quantity exceeds maximum allowed ({}), got {}", MAX_QUANTITY, q
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidQuantity,
+                format!(
+                    "quantity exceeds maximum allowed ({}), got {}",
+                    MAX_QUANTITY, q
+                ),
+            ));
         }
     }
 
     if let Some(d) = changes.manual_discount_percent {
         require_finite(d, "manual_discount_percent")?;
         if !(0.0..=100.0).contains(&d) {
-            return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAdjustmentValue, format!(
-                "manual_discount_percent must be between 0 and 100, got {}", d
-            )));
+            return Err(OrderError::InvalidOperation(
+                CommandErrorCode::InvalidAdjustmentValue,
+                format!(
+                    "manual_discount_percent must be between 0 and 100, got {}",
+                    d
+                ),
+            ));
         }
     }
 
@@ -205,9 +237,10 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
             if let Some(pm) = opt.price_modifier {
                 require_finite(pm, "option price_modifier")?;
                 if pm.abs() > MAX_PRICE {
-                    return Err(OrderError::InvalidOperation(CommandErrorCode::InvalidAmount, format!(
-                        "option price_modifier exceeds maximum allowed, got {}", pm
-                    )));
+                    return Err(OrderError::InvalidOperation(
+                        CommandErrorCode::InvalidAmount,
+                        format!("option price_modifier exceeds maximum allowed, got {}", pm),
+                    ));
                 }
             }
         }
@@ -235,8 +268,9 @@ pub fn to_f64(value: Decimal) -> f64 {
     value
         .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
         .to_f64()
-        // SAFETY: Decimal rounded to 2dp is always representable as f64
-        .expect("rounded Decimal always converts to f64")
+        // SAFETY: Decimal rounded to 2dp with max input ≤ 1_000_000 (validated at boundary)
+        // is always within f64 representable range (~1.8e308)
+        .expect("Decimal rounded to 2dp is always representable as f64")
 }
 
 /// Compute effective per-unit rule discount, dynamically recalculating from `adjustment_value`.
@@ -251,10 +285,9 @@ fn effective_rule_discount(item: &CartItemSnapshot, after_manual: Decimal) -> De
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Discount)
             .map(|r| match r.adjustment_type {
-                AdjustmentType::Percentage => {
-                    (after_manual * to_decimal(r.adjustment_value) / Decimal::ONE_HUNDRED)
-                        .round_dp(DECIMAL_PLACES)
-                }
+                AdjustmentType::Percentage => (after_manual * to_decimal(r.adjustment_value)
+                    / Decimal::ONE_HUNDRED)
+                    .round_dp(DECIMAL_PLACES),
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
             .sum()
@@ -273,10 +306,9 @@ fn effective_rule_surcharge(item: &CartItemSnapshot, base_with_options: Decimal)
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Surcharge)
             .map(|r| match r.adjustment_type {
-                AdjustmentType::Percentage => {
-                    (base_with_options * to_decimal(r.adjustment_value) / Decimal::ONE_HUNDRED)
-                        .round_dp(DECIMAL_PLACES)
-                }
+                AdjustmentType::Percentage => (base_with_options * to_decimal(r.adjustment_value)
+                    / Decimal::ONE_HUNDRED)
+                    .round_dp(DECIMAL_PLACES),
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
             .sum()
@@ -291,14 +323,14 @@ fn effective_order_rule_discount(snapshot: &OrderSnapshot, subtotal: Decimal) ->
         // Legacy fallback: use pre-computed amount
         to_decimal(snapshot.order_rule_discount_amount)
     } else {
-        snapshot.order_applied_rules
+        snapshot
+            .order_applied_rules
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Discount)
             .map(|r| match r.adjustment_type {
-                AdjustmentType::Percentage => {
-                    (subtotal * to_decimal(r.adjustment_value) / Decimal::ONE_HUNDRED)
-                        .round_dp(DECIMAL_PLACES)
-                }
+                AdjustmentType::Percentage => (subtotal * to_decimal(r.adjustment_value)
+                    / Decimal::ONE_HUNDRED)
+                    .round_dp(DECIMAL_PLACES),
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
             .sum()
@@ -313,14 +345,14 @@ fn effective_order_rule_surcharge(snapshot: &OrderSnapshot, subtotal: Decimal) -
         // Legacy fallback: use pre-computed amount
         to_decimal(snapshot.order_rule_surcharge_amount)
     } else {
-        snapshot.order_applied_rules
+        snapshot
+            .order_applied_rules
             .iter()
             .filter(|r| !r.skipped && r.rule_type == RuleType::Surcharge)
             .map(|r| match r.adjustment_type {
-                AdjustmentType::Percentage => {
-                    (subtotal * to_decimal(r.adjustment_value) / Decimal::ONE_HUNDRED)
-                        .round_dp(DECIMAL_PLACES)
-                }
+                AdjustmentType::Percentage => (subtotal * to_decimal(r.adjustment_value)
+                    / Decimal::ONE_HUNDRED)
+                    .round_dp(DECIMAL_PLACES),
                 AdjustmentType::FixedAmount => to_decimal(r.adjustment_value),
             })
             .sum()
@@ -365,7 +397,11 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     }
 
     // Use original_price as the base for calculations (updated on manual repricing/spec change)
-    let base_price = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
+    let base_price = to_decimal(if item.original_price > 0.0 {
+        item.original_price
+    } else {
+        item.price
+    });
 
     // Options modifier: sum of (price_modifier × quantity) for each selected option
     let options_modifier: Decimal = item
@@ -373,7 +409,10 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
         .as_ref()
         .map(|opts| {
             opts.iter()
-                .filter_map(|o| o.price_modifier.map(|p| to_decimal(p) * Decimal::from(o.quantity)))
+                .filter_map(|o| {
+                    o.price_modifier
+                        .map(|p| to_decimal(p) * Decimal::from(o.quantity))
+                })
                 .sum()
         })
         .unwrap_or(Decimal::ZERO);
@@ -413,7 +452,8 @@ pub fn calculate_item_total(item: &CartItemSnapshot) -> Decimal {
     let unit_price = calculate_unit_price(item);
     let quantity = Decimal::from(item.quantity);
 
-    (unit_price * quantity).round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
+    (unit_price * quantity)
+        .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
 }
 
 /// Recalculate order totals from items using precise decimal arithmetic
@@ -451,14 +491,21 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         item.unpaid_quantity = (item.quantity - paid_qty).max(0);
 
         // Calculate base price + options modifier
-        let base_price = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
+        let base_price = to_decimal(if item.original_price > 0.0 {
+            item.original_price
+        } else {
+            item.price
+        });
         // Options modifier: sum of (price_modifier × quantity) for each selected option
         let options_modifier: Decimal = item
             .selected_options
             .as_ref()
             .map(|opts| {
                 opts.iter()
-                    .filter_map(|o| o.price_modifier.map(|p| to_decimal(p) * Decimal::from(o.quantity)))
+                    .filter_map(|o| {
+                        o.price_modifier
+                            .map(|p| to_decimal(p) * Decimal::from(o.quantity))
+                    })
                     .sum()
             })
             .unwrap_or(Decimal::ZERO);
@@ -523,10 +570,9 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
                 RuleType::Surcharge => base_with_options,
             };
             rule.calculated_amount = to_f64(match rule.adjustment_type {
-                AdjustmentType::Percentage => {
-                    (basis * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
-                        .round_dp(DECIMAL_PLACES)
-                }
+                AdjustmentType::Percentage => (basis * to_decimal(rule.adjustment_value)
+                    / Decimal::ONE_HUNDRED)
+                    .round_dp(DECIMAL_PLACES),
                 AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
             });
         }
@@ -555,7 +601,11 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         // Accumulate comp total (original value of comped items)
         // Use original_price for comp value since item.price is zeroed on comp
         if item.is_comped {
-            let comp_base = to_decimal(if item.original_price > 0.0 { item.original_price } else { item.price });
+            let comp_base = to_decimal(if item.original_price > 0.0 {
+                item.original_price
+            } else {
+                item.price
+            });
             let comp_with_options = (comp_base + options_modifier).max(Decimal::ZERO);
             comp_total += comp_with_options * quantity;
         }
@@ -565,16 +615,22 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     }
 
     // Order-level manual discount (computed amount)
-    let order_manual_discount =
-        snapshot.order_manual_discount_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
-        + snapshot.order_manual_discount_percent
+    let order_manual_discount = snapshot
+        .order_manual_discount_fixed
+        .map(to_decimal)
+        .unwrap_or(Decimal::ZERO)
+        + snapshot
+            .order_manual_discount_percent
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
 
     // Order-level manual surcharge (computed amount)
-    let order_manual_surcharge =
-        snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
-        + snapshot.order_manual_surcharge_percent
+    let order_manual_surcharge = snapshot
+        .order_manual_surcharge_fixed
+        .map(to_decimal)
+        .unwrap_or(Decimal::ZERO)
+        + snapshot
+            .order_manual_surcharge_percent
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
 
@@ -590,10 +646,9 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             continue;
         }
         rule.calculated_amount = to_f64(match rule.adjustment_type {
-            AdjustmentType::Percentage => {
-                (subtotal * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
-                    .round_dp(DECIMAL_PLACES)
-            }
+            AdjustmentType::Percentage => (subtotal * to_decimal(rule.adjustment_value)
+                / Decimal::ONE_HUNDRED)
+                .round_dp(DECIMAL_PLACES),
             AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
         });
     }

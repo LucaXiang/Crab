@@ -59,11 +59,7 @@ pub async fn create(pool: &SqlitePool, data: MemberCreate) -> RepoResult<MemberW
         .ok_or_else(|| RepoError::Database("Failed to create member".into()))
 }
 
-pub async fn update(
-    pool: &SqlitePool,
-    id: i64,
-    data: MemberUpdate,
-) -> RepoResult<MemberWithGroup> {
+pub async fn update(pool: &SqlitePool, id: i64, data: MemberUpdate) -> RepoResult<MemberWithGroup> {
     let now = shared::util::now_millis();
     let rows = sqlx::query!(
         "UPDATE member SET name = COALESCE(?1, name), phone = COALESCE(?2, phone), card_number = COALESCE(?3, card_number), marketing_group_id = COALESCE(?4, marketing_group_id), birthday = COALESCE(?5, birthday), email = COALESCE(?6, email), notes = COALESCE(?7, notes), is_active = COALESCE(?8, is_active), updated_at = ?9 WHERE id = ?10",

@@ -62,7 +62,9 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Pr
 
 pub async fn create(pool: &SqlitePool, data: PriceRuleCreate) -> RepoResult<PriceRule> {
     let now = shared::util::now_millis();
-    let zone_scope = data.zone_scope.unwrap_or_else(|| ZONE_SCOPE_ALL.to_string());
+    let zone_scope = data
+        .zone_scope
+        .unwrap_or_else(|| ZONE_SCOPE_ALL.to_string());
     let active_days_json = data
         .active_days
         .as_ref()
