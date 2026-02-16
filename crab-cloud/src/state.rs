@@ -1,0 +1,122 @@
+//! Application state for crab-cloud
+
+use aws_sdk_secretsmanager::Client as SmClient;
+use sqlx::PgPool;
+use tokio::sync::OnceCell;
+
+use crate::config::Config;
+
+/// Shared application state
+#[derive(Clone)]
+#[allow(dead_code)]
+pub struct AppState {
+    /// PostgreSQL connection pool (shared with crab-auth)
+    pub pool: PgPool,
+    /// CA store for loading Tenant CA certs from Secrets Manager
+    pub ca_store: CaStore,
+    /// Root CA PEM for mTLS verification
+    pub root_ca_pem: String,
+}
+
+/// Certificate Authority store (reads from AWS Secrets Manager)
+///
+/// Used to load Tenant CA certificates for SignedBinding verification.
+#[derive(Clone)]
+#[allow(dead_code)]
+pub struct CaStore {
+    sm: SmClient,
+    /// Root CA cert cache
+    root_ca_cache: std::sync::Arc<OnceCell<String>>,
+}
+
+impl CaStore {
+    pub fn new(sm: SmClient) -> Self {
+        Self {
+            sm,
+            root_ca_cache: std::sync::Arc::new(OnceCell::new()),
+        }
+    }
+
+    /// Load Tenant CA cert PEM from Secrets Manager
+    pub async fn load_tenant_ca_cert(
+        &self,
+        tenant_id: &str,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        let secret_name = format!("crab-auth/tenant/{tenant_id}");
+        let output = self
+            .sm
+            .get_secret_value()
+            .secret_id(&secret_name)
+            .send()
+            .await?;
+
+        let json = output.secret_string().ok_or("Secret has no string value")?;
+
+        #[derive(serde::Deserialize)]
+        struct CaSecret {
+            cert_pem: String,
+        }
+
+        let secret: CaSecret = serde_json::from_str(json)?;
+        Ok(secret.cert_pem)
+    }
+
+    /// Get Root CA cert PEM (cached)
+    #[allow(dead_code)]
+    pub async fn get_root_ca_cert(
+        &self,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        self.root_ca_cache
+            .get_or_try_init(|| async {
+                let output = self
+                    .sm
+                    .get_secret_value()
+                    .secret_id("crab-auth/root-ca")
+                    .send()
+                    .await?;
+
+                let json = output.secret_string().ok_or("Secret has no string value")?;
+
+                #[derive(serde::Deserialize)]
+                struct CaSecret {
+                    cert_pem: String,
+                }
+
+                let secret: CaSecret = serde_json::from_str(json)?;
+                Ok(secret.cert_pem)
+            })
+            .await
+            .cloned()
+    }
+}
+
+impl AppState {
+    /// Create a new AppState
+    pub async fn new(config: &Config) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        // Connect to PostgreSQL
+        let pool = PgPool::connect(&config.database_url).await?;
+
+        // Run migrations
+        sqlx::migrate!("./migrations").run(&pool).await?;
+
+        // Initialize AWS SDK
+        let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+        let sm_client = SmClient::new(&aws_config);
+        let ca_store = CaStore::new(sm_client);
+
+        // Load Root CA PEM
+        let root_ca_pem = std::fs::read_to_string(&config.root_ca_path).unwrap_or_else(|_| {
+            tracing::warn!(
+                "Root CA file not found at {}, will use Secrets Manager",
+                config.root_ca_path
+            );
+            String::new()
+        });
+
+        Ok(Self {
+            pool,
+            ca_store,
+            root_ca_pem,
+        })
+    }
+}

@@ -1,0 +1,56 @@
+[package]
+name = "crab-cloud"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+# Workspace crates
+shared.workspace = true
+crab-cert.workspace = true
+
+# Web framework
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+
+# Database (PostgreSQL)
+sqlx = { workspace = true, features = ["postgres"] }
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# HTTP types
+http.workspace = true
+
+# Time and UUID
+chrono.workspace = true
+uuid.workspace = true
+
+# TLS
+rustls.workspace = true
+rustls-pemfile.workspace = true
+rustls-pki-types.workspace = true
+axum-server.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# AWS
+aws-config.workspace = true
+aws-sdk-secretsmanager.workspace = true
+
+# Utilities
+dotenvy.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

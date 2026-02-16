@@ -44,6 +44,8 @@ pub struct Config {
     pub shutdown_timeout_ms: u64,
     /// 业务时区 (IANA 格式，如 "Europe/Madrid")
     pub timezone: Tz,
+    /// Cloud sync URL (None = disabled)
+    pub cloud_url: Option<String>,
 }
 
 /// Config Builder
@@ -59,6 +61,7 @@ pub struct ConfigBuilder {
     request_timeout_ms: Option<u64>,
     shutdown_timeout_ms: Option<u64>,
     timezone: Option<Tz>,
+    cloud_url: Option<String>,
 }
 
 impl ConfigBuilder {
@@ -118,6 +121,12 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn cloud_url(mut self, value: impl Into<String>) -> Self {
+        let v = value.into();
+        self.cloud_url = if v.is_empty() { None } else { Some(v) };
+        self
+    }
+
     /// 构建配置，使用默认值填充未设置的字段
     pub fn build(self) -> Config {
         Config {
@@ -133,6 +142,7 @@ impl ConfigBuilder {
             request_timeout_ms: self.request_timeout_ms.unwrap_or(30000),
             shutdown_timeout_ms: self.shutdown_timeout_ms.unwrap_or(10000),
             timezone: self.timezone.unwrap_or(chrono_tz::Europe::Madrid),
+            cloud_url: self.cloud_url,
         }
     }
 }
@@ -195,6 +205,7 @@ impl Config {
                     .unwrap_or(10000),
             )
             .timezone(std::env::var("TIMEZONE").unwrap_or_else(|_| "Europe/Madrid".into()))
+            .cloud_url(std::env::var("CRAB_CLOUD_URL").unwrap_or_default())
             .build()
     }
 
