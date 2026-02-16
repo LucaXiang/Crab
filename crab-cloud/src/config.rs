@@ -18,6 +18,16 @@ pub struct Config {
     pub server_key_path: String,
     /// Environment: development | staging | production
     pub environment: String,
+    /// SES sender email address
+    pub ses_from_email: String,
+    /// Stripe secret key
+    pub stripe_secret_key: String,
+    /// Stripe webhook signing secret
+    pub stripe_webhook_secret: String,
+    /// URL to redirect after successful registration checkout
+    pub registration_success_url: String,
+    /// URL to redirect after cancelled registration checkout
+    pub registration_cancel_url: String,
 }
 
 impl Config {
@@ -40,6 +50,14 @@ impl Config {
             server_key_path: std::env::var("SERVER_KEY_PATH")
                 .unwrap_or_else(|_| "certs/server.key".into()),
             environment: std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into()),
+            ses_from_email: std::env::var("SES_FROM_EMAIL")
+                .unwrap_or_else(|_| "noreply@crab.es".into()),
+            stripe_secret_key: std::env::var("STRIPE_SECRET_KEY").unwrap_or_default(),
+            stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET").unwrap_or_default(),
+            registration_success_url: std::env::var("REGISTRATION_SUCCESS_URL")
+                .unwrap_or_else(|_| "https://crab.es/registration/success".into()),
+            registration_cancel_url: std::env::var("REGISTRATION_CANCEL_URL")
+                .unwrap_or_else(|_| "https://crab.es/registration/cancel".into()),
         }
     }
 

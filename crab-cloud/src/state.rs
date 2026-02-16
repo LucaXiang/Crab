@@ -1,6 +1,7 @@
 //! Application state for crab-cloud
 
 use aws_sdk_secretsmanager::Client as SmClient;
+use aws_sdk_sesv2::Client as SesClient;
 use sqlx::PgPool;
 use tokio::sync::OnceCell;
 
@@ -16,6 +17,18 @@ pub struct AppState {
     pub ca_store: CaStore,
     /// Root CA PEM for mTLS verification
     pub root_ca_pem: String,
+    /// AWS SES client for sending emails
+    pub ses: SesClient,
+    /// Stripe secret key
+    pub stripe_secret_key: String,
+    /// Stripe webhook signing secret
+    pub stripe_webhook_secret: String,
+    /// SES sender email address
+    pub ses_from_email: String,
+    /// URL to redirect after successful registration checkout
+    pub registration_success_url: String,
+    /// URL to redirect after cancelled registration checkout
+    pub registration_cancel_url: String,
 }
 
 /// Certificate Authority store (reads from AWS Secrets Manager)
@@ -102,6 +115,7 @@ impl AppState {
         // Initialize AWS SDK
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let sm_client = SmClient::new(&aws_config);
+        let ses = SesClient::new(&aws_config);
         let ca_store = CaStore::new(sm_client);
 
         // Load Root CA PEM
@@ -117,6 +131,12 @@ impl AppState {
             pool,
             ca_store,
             root_ca_pem,
+            ses,
+            stripe_secret_key: config.stripe_secret_key.clone(),
+            stripe_webhook_secret: config.stripe_webhook_secret.clone(),
+            ses_from_email: config.ses_from_email.clone(),
+            registration_success_url: config.registration_success_url.clone(),
+            registration_cancel_url: config.registration_cancel_url.clone(),
         })
     }
 }

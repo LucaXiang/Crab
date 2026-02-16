@@ -9,7 +9,9 @@ mod api;
 mod auth;
 mod config;
 mod db;
+mod email;
 mod state;
+mod stripe;
 
 use config::Config;
 use state::AppState;

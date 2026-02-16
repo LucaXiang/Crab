@@ -45,9 +45,22 @@ axum-server.workspace = true
 # Async runtime
 tokio.workspace = true
 
+# Auth
+argon2.workspace = true
+rand.workspace = true
+
+# HTTP client (Stripe API)
+reqwest.workspace = true
+
+# Crypto (webhook signature)
+hmac.workspace = true
+sha2.workspace = true
+hex.workspace = true
+
 # AWS
 aws-config.workspace = true
 aws-sdk-secretsmanager.workspace = true
+aws-sdk-sesv2.workspace = true
 
 # Utilities
 dotenvy.workspace = true

@@ -79,6 +79,7 @@ time = { version = "0.3", features = ["macros"] }
 # ========== Cryptography ==========
 sha2 = "0.10"
 hex = "0.4"
+hmac = "0.12"
 argon2 = { version = "0.5", features = ["std"] }
 jsonwebtoken = { version = "10.2", default-features = false, features = ["rust_crypto"] }
 ring = "0.17"
@@ -118,6 +119,7 @@ aws-config = "1"
 aws-sdk-s3 = "1"
 aws-sdk-kms = "1"
 aws-sdk-secretsmanager = "1"
+aws-sdk-sesv2 = "1"
 lambda_http = "1"
 
 # ========== HTTPS Server ==========
