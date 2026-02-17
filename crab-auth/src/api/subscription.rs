@@ -1,4 +1,4 @@
-use crate::db::{p12, subscriptions};
+use crate::db::{p12, subscriptions, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -7,15 +7,37 @@ use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
 pub struct SubscriptionRequest {
-    pub tenant_id: String,
+    pub username: String,
+    pub password: String,
 }
 
 pub async fn get_subscription_status(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<SubscriptionRequest>,
 ) -> Json<serde_json::Value> {
+    // 0. Authenticate tenant
+    let tenant = match tenants::authenticate(&state.db, &payload.username, &payload.password).await
+    {
+        Ok(Some(t)) => t,
+        Ok(None) => {
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Invalid credentials"
+            }));
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Database error during authentication");
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Internal error"
+            }));
+        }
+    };
+
+    let tenant_id = &tenant.id;
+
     // 1. Load Tenant CA
-    let tenant_ca = match state.ca_store.load_tenant_ca(&payload.tenant_id).await {
+    let tenant_ca = match state.ca_store.load_tenant_ca(tenant_id).await {
         Ok(ca) => ca,
         Err(e) => {
             return Json(serde_json::json!({
@@ -26,7 +48,7 @@ pub async fn get_subscription_status(
     };
 
     // 2. Query subscription from PG
-    let sub = match subscriptions::get_active_subscription(&state.db, &payload.tenant_id).await {
+    let sub = match subscriptions::get_active_subscription(&state.db, tenant_id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             return Json(serde_json::json!({
@@ -48,7 +70,7 @@ pub async fn get_subscription_status(
     let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
 
     let subscription = SubscriptionInfo {
-        tenant_id: payload.tenant_id.clone(),
+        tenant_id: tenant_id.clone(),
         id: Some(sub.id),
         status,
         plan,
@@ -60,7 +82,7 @@ pub async fn get_subscription_status(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
-        p12: match p12::get_p12_info(&state.db, &payload.tenant_id).await {
+        p12: match p12::get_p12_info(&state.db, tenant_id).await {
             Ok(info) => Some(info),
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");

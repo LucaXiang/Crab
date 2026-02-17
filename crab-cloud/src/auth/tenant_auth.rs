@@ -70,7 +70,8 @@ pub async fn tenant_auth_middleware(
         .strip_prefix("Bearer ")
         .ok_or_else(|| error_response(401, "Invalid Authorization format"))?;
 
-    let validation = Validation::default();
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.set_required_spec_claims(&["exp", "sub"]);
     let token_data = jsonwebtoken::decode::<TenantClaims>(
         token,
         &DecodingKey::from_secret(state.jwt_secret.as_bytes()),

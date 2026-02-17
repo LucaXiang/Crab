@@ -130,11 +130,11 @@ pub fn verify_webhook_signature(
     let mut mac =
         Hmac::<Sha256>::new_from_slice(secret.as_bytes()).map_err(|_| "HMAC key error")?;
     mac.update(signed_payload.as_bytes());
-    let expected = hex::encode(mac.finalize().into_bytes());
 
-    if expected != signature {
-        return Err("Webhook signature mismatch");
-    }
+    // Decode hex signature and use constant-time comparison via hmac::verify_slice
+    let sig_bytes = hex::decode(signature).map_err(|_| "Invalid signature hex")?;
+    mac.verify_slice(&sig_bytes)
+        .map_err(|_| "Webhook signature mismatch")?;
 
     // Reject events older than 5 minutes to prevent replay attacks
     let ts: i64 = timestamp.parse().map_err(|_| "Invalid timestamp")?;

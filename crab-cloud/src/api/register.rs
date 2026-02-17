@@ -287,14 +287,16 @@ pub async fn resend_code(
     let email = req.email.trim().to_lowercase();
     let now = now_millis();
 
-    // Find tenant
+    // Find tenant — return identical response for all non-pending states to prevent email enumeration
     match db::tenants::find_by_email(&state.pool, &email).await {
         Ok(Some(t)) if t.status == "pending" => {}
-        Ok(Some(_)) => {
-            return error_response(StatusCode::CONFLICT, "Email already verified");
-        }
-        Ok(None) => {
-            return error_response(StatusCode::NOT_FOUND, "Email not registered");
+        Ok(Some(_)) | Ok(None) => {
+            return (
+                StatusCode::OK,
+                Json(
+                    json!({ "message": "If this email is registered and pending verification, a new code has been sent" }),
+                ),
+            );
         }
         Err(e) => {
             tracing::error!(%e, "DB error finding tenant");

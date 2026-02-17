@@ -16,6 +16,7 @@ use crate::auth::quota::quota_middleware;
 use crate::auth::rate_limit::{login_rate_limit, register_rate_limit};
 use crate::auth::tenant_auth::tenant_auth_middleware;
 use crate::state::AppState;
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
 
@@ -93,6 +94,7 @@ pub fn public_router(state: AppState) -> Router {
         .merge(tenant_api)
         .merge(tenant_login)
         .merge(password_reset)
+        .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB
         .with_state(state)
 }
 
@@ -108,5 +110,6 @@ pub fn edge_router(state: AppState) -> Router {
             state.clone(),
             edge_auth_middleware,
         ))
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024)) // 10MB for sync batches
         .with_state(state)
 }
