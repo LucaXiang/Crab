@@ -1,5 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Crab SaaS Infrastructure — crab-auth (Lambda) + crab-cloud (ECS Fargate)
+Description: >
+  Crab SaaS Infrastructure (Production Grade)
+  crab-auth (Lambda) + crab-cloud (ECS Fargate)
+  Secrets Manager, WAF, CloudWatch Alarms, Cost Tags
 
 Parameters:
   Environment:
@@ -10,19 +13,6 @@ Parameters:
   DomainName:
     Type: String
     Default: crab.es
-
-  DatabaseUrl:
-    Type: String
-    NoEcho: true
-    Description: PostgreSQL connection string
-
-  StripeSecretKey:
-    Type: String
-    NoEcho: true
-
-  StripeWebhookSecret:
-    Type: String
-    NoEcho: true
 
   CrabCloudImageUri:
     Type: String
@@ -40,7 +30,53 @@ Parameters:
     Type: String
     Description: ACM certificate ARN for *.crab.es
 
+  AlertEmail:
+    Type: String
+    Description: Email for CloudWatch alarm notifications
+    Default: ops@crab.es
+
+# ══════════════════════════════════════════════
+# NO sensitive parameters — all secrets in Secrets Manager
+# ══════════════════════════════════════════════
+
 Resources:
+
+  # ════════════════════════════════════════════
+  # Secrets Manager — all sensitive config
+  # ════════════════════════════════════════════
+
+  DatabaseUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub crab/${Environment}/database-url
+      Description: PostgreSQL connection string
+      Tags:
+        - Key: Project
+          Value: crab
+        - Key: Environment
+          Value: !Ref Environment
+
+  StripeSecretKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub crab/${Environment}/stripe-secret-key
+      Description: Stripe API secret key
+      Tags:
+        - Key: Project
+          Value: crab
+        - Key: Environment
+          Value: !Ref Environment
+
+  StripeWebhookSecretSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub crab/${Environment}/stripe-webhook-secret
+      Description: Stripe webhook signing secret
+      Tags:
+        - Key: Project
+          Value: crab
+        - Key: Environment
+          Value: !Ref Environment
 
   # ════════════════════════════════════════════
   # VPC & Networking
@@ -55,6 +91,51 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub crab-${Environment}
+        - Key: Project
+          Value: crab
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Flow Logs for VPC traffic auditing
+  VPCFlowLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /vpc/crab-${Environment}
+      RetentionInDays: 90
+      Tags:
+        - Key: Project
+          Value: crab
+
+  VPCFlowLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: vpc-flow-logs.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FlowLogWrite
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !GetAtt VPCFlowLogGroup.Arn
+
+  VPCFlowLog:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      ResourceId: !Ref VPC
+      ResourceType: VPC
+      TrafficType: REJECT
+      LogGroupName: !Ref VPCFlowLogGroup
+      DeliverLogsPermissionArn: !GetAtt VPCFlowLogRole.Arn
 
   PublicSubnet1:
     Type: AWS::EC2::Subnet
@@ -63,6 +144,11 @@ Resources:
       CidrBlock: 10.0.1.0/24
       AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub crab-${Environment}-public-1
+        - Key: Project
+          Value: crab
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -71,6 +157,11 @@ Resources:
       CidrBlock: 10.0.2.0/24
       AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub crab-${Environment}-public-2
+        - Key: Project
+          Value: crab
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -78,6 +169,11 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.10.0/24
       AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub crab-${Environment}-private-1
+        - Key: Project
+          Value: crab
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
@@ -85,9 +181,18 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.11.0/24
       AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub crab-${Environment}-private-2
+        - Key: Project
+          Value: crab
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Project
+          Value: crab
 
   GatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -120,7 +225,6 @@ Resources:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
 
-  # NAT Gateway for private subnets (ECS tasks need outbound internet)
   NatEIP:
     Type: AWS::EC2::EIP
     Properties:
@@ -170,6 +274,9 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Project
+          Value: crab
 
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -181,11 +288,14 @@ Resources:
           FromPort: 8080
           ToPort: 8080
           SourceSecurityGroupId: !Ref ALBSecurityGroup
+      Tags:
+        - Key: Project
+          Value: crab
 
   RDSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: RDS - allow from ECS and Lambda
+      GroupDescription: RDS - allow from ECS and Lambda only
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -196,15 +306,21 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Tags:
+        - Key: Project
+          Value: crab
 
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Lambda - outbound to RDS and internet
       VpcId: !Ref VPC
+      Tags:
+        - Key: Project
+          Value: crab
 
   # ════════════════════════════════════════════
-  # RDS PostgreSQL
+  # RDS PostgreSQL (hardened)
   # ════════════════════════════════════════════
 
   RDSSubnetGroup:
@@ -218,25 +334,54 @@ Resources:
   RDSInstance:
     Type: AWS::RDS::DBInstance
     DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
     Properties:
       DBInstanceIdentifier: !Sub crab-${Environment}
       Engine: postgres
       EngineVersion: '16'
       DBInstanceClass: db.t4g.micro
       AllocatedStorage: 20
+      MaxAllocatedStorage: 100
       StorageType: gp3
+      StorageEncrypted: true
       MasterUsername: crab
-      ManageMasterUserPassword: true  # Auto-managed by RDS
+      ManageMasterUserPassword: true
       DBName: crab
       VPCSecurityGroups:
         - !Ref RDSSecurityGroup
       DBSubnetGroupName: !Ref RDSSubnetGroup
       PubliclyAccessible: false
-      BackupRetentionPeriod: 7
-      MultiAZ: false
+      BackupRetentionPeriod: 14
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      EnablePerformanceInsights: true
+      PerformanceInsightsRetentionPeriod: 7
+      MonitoringInterval: 60
+      MonitoringRoleArn: !GetAtt RDSMonitoringRole.Arn
+      Tags:
+        - Key: Project
+          Value: crab
+        - Key: Environment
+          Value: !Ref Environment
+
+  RDSMonitoringRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
 
   # ════════════════════════════════════════════
-  # S3 (P12 certificates)
+  # S3 (P12 certificates) — hardened
   # ════════════════════════════════════════════
 
   P12Bucket:
@@ -252,10 +397,314 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      Tags:
+        - Key: Project
+          Value: crab
+
+  # ════════════════════════════════════════════
+  # WAF v2 — protect ALB
+  # ════════════════════════════════════════════
+
+  WAFWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub crab-${Environment}-waf
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub crab-${Environment}-waf
+      Rules:
+        # Rate limiting: 1000 requests per 5 min per IP
+        - Name: RateLimit
+          Priority: 1
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: 1000
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimit
+
+        # AWS Managed Rules: Common Rule Set (SQLi, XSS, etc.)
+        - Name: AWSManagedCommonRuleSet
+          Priority: 2
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: CommonRuleSet
+
+        # AWS Managed Rules: Known Bad Inputs
+        - Name: AWSManagedKnownBadInputs
+          Priority: 3
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: KnownBadInputs
+
+        # AWS Managed Rules: SQL injection
+        - Name: AWSManagedSQLi
+          Priority: 4
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: SQLiRuleSet
+      Tags:
+        - Key: Project
+          Value: crab
+
+  WAFAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Ref ALB
+      WebACLArn: !GetAtt WAFWebACL.Arn
+
+  # ════════════════════════════════════════════
+  # SNS Topic — alarm notifications
+  # ════════════════════════════════════════════
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub crab-${Environment}-alarms
+      Tags:
+        - Key: Project
+          Value: crab
+
+  AlarmSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  # ════════════════════════════════════════════
+  # CloudWatch Alarms
+  # ════════════════════════════════════════════
+
+  # RDS: CPU > 80% for 5 min
+  RDSCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-rds-cpu-high
+      AlarmDescription: RDS CPU utilization > 80%
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref RDSInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # RDS: Free storage < 2 GB
+  RDSStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-rds-storage-low
+      AlarmDescription: RDS free storage < 2 GB
+      Namespace: AWS/RDS
+      MetricName: FreeStorageSpace
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref RDSInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2147483648  # 2 GB in bytes
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # RDS: Database connections > 80% of max (t4g.micro max ~85)
+  RDSConnectionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-rds-connections-high
+      AlarmDescription: RDS connections > 68 (80% of max)
+      Namespace: AWS/RDS
+      MetricName: DatabaseConnections
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref RDSInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 68
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # ECS: crab-cloud running task count = 0
+  ECSRunningTaskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-ecs-no-tasks
+      AlarmDescription: crab-cloud has 0 running tasks
+      Namespace: AWS/ECS
+      MetricName: RunningTaskCount
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !GetAtt CrabCloudService.Name
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # Lambda: crab-auth errors > 5 in 5 min
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-lambda-errors
+      AlarmDescription: crab-auth Lambda errors > 5
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref CrabAuthFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # Lambda: duration > 10s (cold start concern)
+  LambdaDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-lambda-slow
+      AlarmDescription: crab-auth Lambda p99 duration > 10s
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref CrabAuthFunction
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10000
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # ALB: 5xx errors > 10 in 5 min
+  ALB5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-alb-5xx
+      AlarmDescription: ALB 5xx errors > 10
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_5XX_Count
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !GetAtt ALB.LoadBalancerFullName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # ALB: Target response time > 5s
+  ALBLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-alb-latency
+      AlarmDescription: ALB target response time > 5s
+      Namespace: AWS/ApplicationELB
+      MetricName: TargetResponseTime
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !GetAtt ALB.LoadBalancerFullName
+      ExtendedStatistic: p95
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # WAF: blocked requests > 100 in 5 min (possible attack)
+  WAFBlockedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub crab-${Environment}-waf-blocked
+      AlarmDescription: WAF blocked > 100 requests (potential attack)
+      Namespace: AWS/WAFV2
+      MetricName: BlockedRequests
+      Dimensions:
+        - Name: WebACL
+          Value: !Sub crab-${Environment}-waf
+        - Name: Region
+          Value: !Ref AWS::Region
+        - Name: Rule
+          Value: ALL
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 100
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
 
   # ════════════════════════════════════════════
   # crab-auth (Lambda)
   # ════════════════════════════════════════════
+
+  CrabAuthLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/crab-auth
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: crab
 
   CrabAuthRole:
     Type: AWS::IAM::Role
@@ -274,17 +723,22 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Secrets Manager: CA certs + database URL
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
                   - secretsmanager:CreateSecret
                   - secretsmanager:PutSecretValue
-                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crab-auth/*
+                Resource:
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crab-auth/*
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crab/${Environment}/*
+              # S3: P12 certificate storage
               - Effect: Allow
                 Action:
                   - s3:PutObject
                   - s3:GetObject
                 Resource: !Sub ${P12Bucket.Arn}/*
+              # KMS: decrypt P12 from S3
               - Effect: Allow
                 Action:
                   - kms:Decrypt
@@ -304,6 +758,7 @@ Resources:
       Role: !GetAtt CrabAuthRole.Arn
       MemorySize: 256
       Timeout: 30
+      ReservedConcurrentExecutions: 10
       VpcConfig:
         SecurityGroupIds:
           - !Ref LambdaSecurityGroup
@@ -312,9 +767,14 @@ Resources:
           - !Ref PrivateSubnet2
       Environment:
         Variables:
-          DATABASE_URL: !Ref DatabaseUrl
+          # Non-sensitive config only
           P12_S3_BUCKET: !Ref P12Bucket
           RUST_LOG: crab_auth=info
+          # Secret ARN — app reads at startup
+          DATABASE_URL_SECRET_ARN: !Ref DatabaseUrlSecret
+      Tags:
+        Project: crab
+        Environment: !Ref Environment
 
   CrabAuthFunctionUrl:
     Type: AWS::Lambda::Url
@@ -338,12 +798,21 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub crab-${Environment}
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Project
+          Value: crab
 
   CloudLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /ecs/crab-cloud-${Environment}
       RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: crab
 
   CrabCloudTaskRole:
     Type: AWS::IAM::Role
@@ -360,10 +829,14 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Secrets Manager: read secrets at runtime
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crab-auth/*
+                Resource:
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crab-auth/*
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crab/${Environment}/*
+              # SES: send verification emails
               - Effect: Allow
                 Action:
                   - ses:SendEmail
@@ -381,6 +854,19 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadSecrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # ECS needs this to inject secrets into container env
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseUrlSecret
+                  - !Ref StripeSecretKeySecret
+                  - !Ref StripeWebhookSecretSecret
 
   CrabCloudTaskDef:
     Type: AWS::ECS::TaskDefinition
@@ -399,17 +885,12 @@ Resources:
           PortMappings:
             - ContainerPort: 8080
               Protocol: tcp
+          # Non-sensitive env vars
           Environment:
             - Name: HTTP_PORT
               Value: '8080'
             - Name: ENVIRONMENT
               Value: !Ref Environment
-            - Name: DATABASE_URL
-              Value: !Ref DatabaseUrl
-            - Name: STRIPE_SECRET_KEY
-              Value: !Ref StripeSecretKey
-            - Name: STRIPE_WEBHOOK_SECRET
-              Value: !Ref StripeWebhookSecret
             - Name: SES_FROM_EMAIL
               Value: !Sub noreply@${DomainName}
             - Name: REGISTRATION_SUCCESS_URL
@@ -418,12 +899,29 @@ Resources:
               Value: !Sub https://${DomainName}/registration/cancel
             - Name: RUST_LOG
               Value: crab_cloud=info,tower_http=info
+          # Sensitive env vars from Secrets Manager
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecret
+            - Name: STRIPE_SECRET_KEY
+              ValueFrom: !Ref StripeSecretKeySecret
+            - Name: STRIPE_WEBHOOK_SECRET
+              ValueFrom: !Ref StripeWebhookSecretSecret
           LogConfiguration:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref CloudLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: crab-cloud
+          HealthCheck:
+            Command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 10
+      Tags:
+        - Key: Project
+          Value: crab
 
   # ── ALB ──
 
@@ -438,6 +936,16 @@ Resources:
         - !Ref PublicSubnet2
       SecurityGroups:
         - !Ref ALBSecurityGroup
+      LoadBalancerAttributes:
+        - Key: access_logs.s3.enabled
+          Value: 'false'
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: 'true'
+      Tags:
+        - Key: Project
+          Value: crab
 
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -448,6 +956,12 @@ Resources:
       TargetType: ip
       HealthCheckPath: /health
       HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      HealthCheckTimeoutSeconds: 5
+      Tags:
+        - Key: Project
+          Value: crab
 
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -455,20 +969,42 @@ Resources:
       LoadBalancerArn: !Ref ALB
       Port: 443
       Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
       Certificates:
         - CertificateArn: !Ref CertificateArn
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref ALBTargetGroup
 
+  # HTTP → HTTPS redirect
+  ALBHttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: '443'
+            StatusCode: HTTP_301
+
   CrabCloudService:
     Type: AWS::ECS::Service
     DependsOn: ALBListener
     Properties:
       Cluster: !Ref ECSCluster
+      ServiceName: crab-cloud
       TaskDefinition: !Ref CrabCloudTaskDef
       DesiredCount: 1
       LaunchType: FARGATE
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           Subnets:
@@ -480,6 +1016,9 @@ Resources:
         - ContainerName: crab-cloud
           ContainerPort: 8080
           TargetGroupArn: !Ref ALBTargetGroup
+      Tags:
+        - Key: Project
+          Value: crab
 
   # ════════════════════════════════════════════
   # ECR Repository
@@ -491,20 +1030,26 @@ Resources:
       RepositoryName: crab-cloud
       ImageScanningConfiguration:
         ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      ImageTagMutability: IMMUTABLE
       LifecyclePolicy:
         LifecyclePolicyText: |
           {
             "rules": [{
               "rulePriority": 1,
-              "description": "Keep last 5 images",
+              "description": "Keep last 10 images",
               "selection": {
                 "tagStatus": "any",
                 "countType": "imageCountMoreThan",
-                "countNumber": 5
+                "countNumber": 10
               },
               "action": { "type": "expire" }
             }]
           }
+      Tags:
+        - Key: Project
+          Value: crab
 
 Outputs:
   CrabAuthFunctionUrl:
@@ -512,7 +1057,7 @@ Outputs:
     Value: !GetAtt CrabAuthFunctionUrl.FunctionUrl
 
   ALBDnsName:
-    Description: crab-cloud ALB DNS name (point cloud.crab.es here)
+    Description: crab-cloud ALB DNS (CNAME cloud.crab.es here)
     Value: !GetAtt ALB.DNSName
 
   RDSEndpoint:
@@ -520,5 +1065,21 @@ Outputs:
     Value: !GetAtt RDSInstance.Endpoint.Address
 
   ECRRepositoryUri:
-    Description: ECR repository URI for crab-cloud
+    Description: ECR repository URI
     Value: !GetAtt ECRRepository.RepositoryUri
+
+  DatabaseUrlSecretArn:
+    Description: Secrets Manager ARN for DATABASE_URL
+    Value: !Ref DatabaseUrlSecret
+
+  StripeSecretKeyArn:
+    Description: Secrets Manager ARN for STRIPE_SECRET_KEY
+    Value: !Ref StripeSecretKeySecret
+
+  StripeWebhookSecretArn:
+    Description: Secrets Manager ARN for STRIPE_WEBHOOK_SECRET
+    Value: !Ref StripeWebhookSecretSecret
+
+  AlarmTopicArn:
+    Description: SNS topic for alarm notifications
+    Value: !Ref AlarmTopic
