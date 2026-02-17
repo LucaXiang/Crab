@@ -37,15 +37,23 @@ pub struct Config {
 }
 
 impl Config {
+    /// Require a secret env var: must be set and non-empty in non-development environments.
+    fn require_secret(name: &str, environment: &str) -> String {
+        let val = std::env::var(name).unwrap_or_else(|_| {
+            if environment != "development" {
+                panic!("{name} must be set in {environment} environment");
+            }
+            format!("dev-{name}-not-for-production")
+        });
+        if val.is_empty() && environment != "development" {
+            panic!("{name} must not be empty in {environment} environment");
+        }
+        val
+    }
+
     /// Load configuration from environment variables
     pub fn from_env() -> Self {
         let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into());
-        let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| {
-            if environment != "development" {
-                panic!("JWT_SECRET must be set in {environment} environment");
-            }
-            "dev-jwt-secret-change-in-production".into()
-        });
 
         Self {
             database_url: std::env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
@@ -63,11 +71,11 @@ impl Config {
                 .unwrap_or_else(|_| "certs/server.pem".into()),
             server_key_path: std::env::var("SERVER_KEY_PATH")
                 .unwrap_or_else(|_| "certs/server.key".into()),
-            environment,
+            environment: environment.clone(),
             ses_from_email: std::env::var("SES_FROM_EMAIL")
                 .unwrap_or_else(|_| "noreply@redcoral.app".into()),
-            stripe_secret_key: std::env::var("STRIPE_SECRET_KEY").unwrap_or_default(),
-            stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET").unwrap_or_default(),
+            stripe_secret_key: Self::require_secret("STRIPE_SECRET_KEY", &environment),
+            stripe_webhook_secret: Self::require_secret("STRIPE_WEBHOOK_SECRET", &environment),
             registration_success_url: std::env::var("REGISTRATION_SUCCESS_URL")
                 .unwrap_or_else(|_| "https://redcoral.app/registration/success".into()),
             registration_cancel_url: std::env::var("REGISTRATION_CANCEL_URL")
@@ -76,7 +84,7 @@ impl Config {
                 .unwrap_or_else(|_| "crab-app-updates".into()),
             update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")
                 .unwrap_or_else(|_| "https://updates.redcoral.app".into()),
-            jwt_secret,
+            jwt_secret: Self::require_secret("JWT_SECRET", &environment),
         }
     }
 
