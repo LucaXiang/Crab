@@ -52,7 +52,7 @@ pub async fn handle_webhook(
     let event_type = event["type"].as_str().unwrap_or("");
     tracing::info!(event_type = event_type, "Received Stripe webhook");
 
-    // 4. Idempotency check
+    // 4. Idempotency: INSERT first, check rows_affected (eliminates TOCTOU race)
     let event_id = match event["id"].as_str() {
         Some(id) => id,
         None => {
@@ -61,27 +61,31 @@ pub async fn handle_webhook(
         }
     };
 
-    let already_processed = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM processed_webhook_events WHERE event_id = $1)",
+    let now = chrono::Utc::now().timestamp_millis();
+    let insert_result = sqlx::query(
+        "INSERT INTO processed_webhook_events (event_id, event_type, processed_at)
+         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
     )
     .bind(event_id)
-    .fetch_one(&state.pool)
+    .bind(event_type)
+    .bind(now)
+    .execute(&state.pool)
     .await;
 
-    match already_processed {
-        Ok(true) => {
+    match insert_result {
+        Ok(r) if r.rows_affected() == 0 => {
             tracing::info!(event_id = event_id, "Duplicate webhook event, skipping");
             return StatusCode::OK;
         }
         Err(e) => {
-            tracing::error!(%e, "DB error checking webhook idempotency");
+            tracing::error!(%e, "DB error recording webhook event");
             return StatusCode::INTERNAL_SERVER_ERROR;
         }
-        Ok(false) => {}
+        Ok(_) => {} // New event, proceed
     }
 
     // 5. Handle event types
-    let status = match event_type {
+    match event_type {
         "checkout.session.completed" => handle_checkout_completed(&state, &event).await,
         "customer.subscription.updated" => handle_subscription_updated(&state, &event).await,
         "customer.subscription.deleted" => handle_subscription_deleted(&state, &event).await,
@@ -93,27 +97,7 @@ pub async fn handle_webhook(
             tracing::debug!(event_type = event_type, "Unhandled webhook event type");
             StatusCode::OK
         }
-    };
-
-    // 6. Record processed event (only on success)
-    if status == StatusCode::OK {
-        let now = chrono::Utc::now().timestamp_millis();
-        if let Err(e) = sqlx::query(
-            "INSERT INTO processed_webhook_events (event_id, event_type, processed_at)
-             VALUES ($1, $2, $3)
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(event_id)
-        .bind(event_type)
-        .bind(now)
-        .execute(&state.pool)
-        .await
-        {
-            tracing::error!(%e, "Failed to record processed webhook event");
-        }
     }
-
-    status
 }
 
 /// checkout.session.completed → create subscription + activate tenant
