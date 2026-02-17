@@ -123,16 +123,17 @@ pub async fn register(
     }
 
     if let Err(e) = sqlx::query(
-        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at, purpose)
-         VALUES ($1, $2, 0, $3, $4, $5)
+        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at, purpose, metadata)
+         VALUES ($1, $2, 0, $3, $4, $5, $6)
          ON CONFLICT (email, purpose) DO UPDATE SET
-            code = $2, attempts = 0, expires_at = $3, created_at = $4",
+            code = $2, attempts = 0, expires_at = $3, created_at = $4, metadata = $6",
     )
     .bind(&email)
     .bind(&code_hash)
     .bind(expires_at)
     .bind(now)
     .bind("registration")
+    .bind(None::<&str>)
     .execute(&mut *tx)
     .await
     {
@@ -319,6 +320,7 @@ pub async fn resend_code(
         expires_at,
         now,
         "registration",
+        None,
     )
     .await
     {

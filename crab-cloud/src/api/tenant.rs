@@ -344,7 +344,7 @@ pub async fn billing_portal(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
 ) -> ApiResult<serde_json::Value> {
-    let tenant = db::tenants::find_by_email(&state.pool, &identity.email)
+    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
         .await
         .map_err(|_| internal_error("Internal error"))?
         .ok_or_else(|| error(404, "Tenant not found"))?;
@@ -394,7 +394,7 @@ pub async fn change_email(
         return Err(error(400, "Invalid email"));
     }
 
-    let tenant = db::tenants::find_by_email(&state.pool, &identity.email)
+    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
         .await
         .map_err(|_| internal_error("Internal error"))?
         .ok_or_else(|| error(404, "Tenant not found"))?;
@@ -412,6 +412,13 @@ pub async fn change_email(
     let now = shared::util::now_millis();
     let expires_at = now + 5 * 60 * 1000;
 
+    // Store tenant_id in metadata so confirm_email_change can verify ownership
+    let metadata = serde_json::json!({
+        "tenant_id": identity.tenant_id,
+        "old_email": tenant.email,
+    })
+    .to_string();
+
     db::email_verifications::upsert(
         &state.pool,
         &new_email,
@@ -419,6 +426,7 @@ pub async fn change_email(
         expires_at,
         now,
         "email_change",
+        Some(&metadata),
     )
     .await
     .map_err(|_| internal_error("Internal error"))?;
@@ -450,6 +458,17 @@ pub async fn confirm_email_change(
         .map_err(|_| internal_error("Internal error"))?
         .ok_or_else(|| error(404, "No email change pending"))?;
 
+    // Verify tenant_id from metadata to prevent cross-tenant attacks
+    if let Some(ref meta) = record.metadata {
+        let meta: serde_json::Value =
+            serde_json::from_str(meta).map_err(|_| internal_error("Internal error"))?;
+        if meta.get("tenant_id").and_then(|v| v.as_str()) != Some(&identity.tenant_id) {
+            return Err(error(403, "Not authorized"));
+        }
+    } else {
+        return Err(error(403, "Not authorized"));
+    }
+
     let now = shared::util::now_millis();
     if now > record.expires_at {
         return Err(error(410, "Code expired"));
@@ -475,7 +494,17 @@ pub async fn confirm_email_change(
 
     let _ = db::email_verifications::delete(&state.pool, &new_email, "email_change").await;
 
-    let detail = serde_json::json!({ "old_email": identity.email, "new_email": new_email });
+    let old_email = record
+        .metadata
+        .as_deref()
+        .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
+        .and_then(|v| {
+            v.get("old_email")
+                .and_then(|e| e.as_str())
+                .map(String::from)
+        })
+        .unwrap_or_else(|| identity.email.clone());
+    let detail = serde_json::json!({ "old_email": old_email, "new_email": new_email });
     let _ = crate::db::audit::log(
         &state.pool,
         &identity.tenant_id,
@@ -505,7 +534,7 @@ pub async fn change_password(
         return Err(error(400, "Password must be at least 8 characters"));
     }
 
-    let tenant = db::tenants::find_by_email(&state.pool, &identity.email)
+    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
         .await
         .map_err(|_| internal_error("Internal error"))?
         .ok_or_else(|| error(404, "Tenant not found"))?;
@@ -593,6 +622,7 @@ pub async fn forgot_password(
         expires_at,
         now,
         "password_reset",
+        None,
     )
     .await;
 

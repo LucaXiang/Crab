@@ -9,6 +9,7 @@ pub struct EmailVerification {
     pub expires_at: i64,
     pub created_at: i64,
     pub purpose: String,
+    pub metadata: Option<String>,
 }
 
 pub async fn upsert(
@@ -18,18 +19,20 @@ pub async fn upsert(
     expires_at: i64,
     now: i64,
     purpose: &str,
+    metadata: Option<&str>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at, purpose)
-         VALUES ($1, $2, 0, $3, $4, $5)
+        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at, purpose, metadata)
+         VALUES ($1, $2, 0, $3, $4, $5, $6)
          ON CONFLICT (email, purpose) DO UPDATE SET
-            code = $2, attempts = 0, expires_at = $3, created_at = $4",
+            code = $2, attempts = 0, expires_at = $3, created_at = $4, metadata = $6",
     )
     .bind(email)
     .bind(code_hash)
     .bind(expires_at)
     .bind(now)
     .bind(purpose)
+    .bind(metadata)
     .execute(pool)
     .await?;
     Ok(())
