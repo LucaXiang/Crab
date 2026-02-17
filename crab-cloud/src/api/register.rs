@@ -200,8 +200,13 @@ pub async fn verify_email(
         );
     }
 
-    // Increment attempts
-    let _ = db::email_verifications::increment_attempts(&state.pool, &email, "registration").await;
+    // Increment attempts (must not be silently ignored — enables brute force bypass)
+    if let Err(e) =
+        db::email_verifications::increment_attempts(&state.pool, &email, "registration").await
+    {
+        tracing::error!(%e, "Failed to increment verification attempts");
+        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+    }
 
     // Verify code
     if !verify_password(&req.code, &record.code) {

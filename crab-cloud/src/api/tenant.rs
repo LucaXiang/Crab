@@ -458,8 +458,12 @@ pub async fn confirm_email_change(
         return Err(error(429, "Too many attempts"));
     }
 
-    let _ =
-        db::email_verifications::increment_attempts(&state.pool, &new_email, "email_change").await;
+    db::email_verifications::increment_attempts(&state.pool, &new_email, "email_change")
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to increment attempts: {e}");
+            internal_error("Internal error")
+        })?;
 
     if !verify_password(&req.code, &record.code) {
         return Err(error(401, "Invalid code"));
@@ -636,8 +640,12 @@ pub async fn reset_password(
         return Err(error(429, "Too many attempts, request a new code"));
     }
 
-    let _ = db::email_verifications::increment_attempts(&state.pool, &email_addr, "password_reset")
-        .await;
+    db::email_verifications::increment_attempts(&state.pool, &email_addr, "password_reset")
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to increment attempts: {e}");
+            internal_error("Internal error")
+        })?;
 
     if !verify_password(&req.code, &record.code) {
         return Err(error(401, "Invalid reset code"));
