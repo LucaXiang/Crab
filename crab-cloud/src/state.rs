@@ -6,6 +6,7 @@ use aws_sdk_sesv2::Client as SesClient;
 use sqlx::PgPool;
 use tokio::sync::OnceCell;
 
+use crate::auth::QuotaCache;
 use crate::config::Config;
 
 /// Shared application state
@@ -36,6 +37,12 @@ pub struct AppState {
     pub update_s3_bucket: String,
     /// Base URL for update downloads
     pub update_download_base_url: String,
+    /// JWT secret for tenant authentication
+    pub jwt_secret: String,
+    /// Quota validation cache
+    pub quota_cache: QuotaCache,
+    /// Rate limiter for login/registration routes
+    pub rate_limiter: crate::auth::rate_limit::RateLimiter,
 }
 
 /// Certificate Authority store (reads from AWS Secrets Manager)
@@ -148,6 +155,9 @@ impl AppState {
             s3,
             update_s3_bucket: config.update_s3_bucket.clone(),
             update_download_base_url: config.update_download_base_url.clone(),
+            jwt_secret: config.jwt_secret.clone(),
+            quota_cache: QuotaCache::new(),
+            rate_limiter: crate::auth::rate_limit::RateLimiter::new(),
         })
     }
 }

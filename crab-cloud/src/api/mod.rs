@@ -1,31 +1,37 @@
 //! API routes for crab-cloud
+//!
+//! Split into two routers:
+//! - `public_router`: HTTP port (health, register, webhook, update, tenant API)
+//! - `edge_router`: mTLS port (edge sync with SignedBinding + quota validation)
 
 pub mod health;
 pub mod register;
 pub mod stripe_webhook;
 pub mod sync;
+pub mod tenant;
 pub mod update;
 
 use crate::auth::edge_auth::edge_auth_middleware;
+use crate::auth::quota::quota_middleware;
+use crate::auth::rate_limit::{login_rate_limit, register_rate_limit};
+use crate::auth::tenant_auth::tenant_auth_middleware;
 use crate::state::AppState;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
 
-/// Create the combined router
-pub fn create_router(state: AppState) -> Router {
-    // Edge-server sync (mTLS authenticated)
-    let edge = Router::new()
-        .route("/api/edge/sync", post(sync::handle_sync))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            edge_auth_middleware,
-        ));
-
-    // Public registration (no auth)
+/// Public router — served on HTTP port (no mTLS)
+///
+/// Includes: health, registration, Stripe webhook, app update, tenant management API
+pub fn public_router(state: AppState) -> Router {
+    // Public registration (rate-limited)
     let registration = Router::new()
         .route("/api/register", post(register::register))
         .route("/api/verify-email", post(register::verify_email))
-        .route("/api/resend-code", post(register::resend_code));
+        .route("/api/resend-code", post(register::resend_code))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            register_rate_limit,
+        ));
 
     // Stripe webhook (signature-verified, raw body)
     let webhook = Router::new().route("/stripe/webhook", post(stripe_webhook::handle_webhook));
@@ -36,11 +42,54 @@ pub fn create_router(state: AppState) -> Router {
         get(update::check_update),
     );
 
+    // Tenant management API (JWT authenticated)
+    let tenant_api = Router::new()
+        .route("/api/tenant/profile", get(tenant::get_profile))
+        .route("/api/tenant/stores", get(tenant::list_stores))
+        .route("/api/tenant/stores/{id}/orders", get(tenant::list_orders))
+        .route("/api/tenant/stores/{id}/stats", get(tenant::get_stats))
+        .route(
+            "/api/tenant/stores/{id}/products",
+            get(tenant::list_products),
+        )
+        .route(
+            "/api/tenant/stores/{id}/commands",
+            post(tenant::create_command).get(tenant::list_commands),
+        )
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            tenant_auth_middleware,
+        ));
+
+    // Tenant login (rate-limited)
+    let tenant_login = Router::new()
+        .route("/api/tenant/login", post(tenant::login))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            login_rate_limit,
+        ));
+
     Router::new()
         .route("/health", get(health::health_check))
         .merge(registration)
         .merge(webhook)
         .merge(app_update)
-        .merge(edge)
+        .merge(tenant_api)
+        .merge(tenant_login)
+        .with_state(state)
+}
+
+/// Edge router — served on mTLS port (requires client certificate + SignedBinding + quota)
+pub fn edge_router(state: AppState) -> Router {
+    Router::new()
+        .route("/api/edge/sync", post(sync::handle_sync))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            quota_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            edge_auth_middleware,
+        ))
         .with_state(state)
 }
