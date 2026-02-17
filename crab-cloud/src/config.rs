@@ -10,11 +10,14 @@ pub struct Config {
     pub http_port: u16,
     /// mTLS port (edge-server sync API)
     pub mtls_port: u16,
-    /// Path to Root CA PEM (for mTLS client verification)
+    /// Root CA PEM content (env: ROOT_CA_PEM) or file path (env: ROOT_CA_PATH)
+    pub root_ca_pem: Option<String>,
     pub root_ca_path: String,
-    /// Path to server TLS cert PEM
+    /// Server cert PEM content (env: SERVER_CERT_PEM) or file path (env: SERVER_CERT_PATH)
+    pub server_cert_pem: Option<String>,
     pub server_cert_path: String,
-    /// Path to server TLS key PEM
+    /// Server key PEM content (env: SERVER_KEY_PEM) or file path (env: SERVER_KEY_PATH)
+    pub server_key_pem: Option<String>,
     pub server_key_path: String,
     /// Environment: development | staging | production
     pub environment: String,
@@ -65,10 +68,17 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8443),
+            root_ca_pem: std::env::var("ROOT_CA_PEM").ok().filter(|s| !s.is_empty()),
             root_ca_path: std::env::var("ROOT_CA_PATH")
                 .unwrap_or_else(|_| "certs/root_ca.pem".into()),
+            server_cert_pem: std::env::var("SERVER_CERT_PEM")
+                .ok()
+                .filter(|s| !s.is_empty()),
             server_cert_path: std::env::var("SERVER_CERT_PATH")
                 .unwrap_or_else(|_| "certs/server.pem".into()),
+            server_key_pem: std::env::var("SERVER_KEY_PEM")
+                .ok()
+                .filter(|s| !s.is_empty()),
             server_key_path: std::env::var("SERVER_KEY_PATH")
                 .unwrap_or_else(|_| "certs/server.key".into()),
             environment: environment.clone(),

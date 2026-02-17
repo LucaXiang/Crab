@@ -97,29 +97,44 @@ async fn main() -> Result<(), BoxError> {
     Ok(())
 }
 
-/// Build rustls ServerConfig with mandatory client certificate verification
+/// Load PEM bytes from env var content (preferred) or file path (fallback).
+fn load_pem(
+    pem_content: &Option<String>,
+    file_path: &str,
+    label: &str,
+) -> Result<Vec<u8>, BoxError> {
+    if let Some(content) = pem_content {
+        tracing::info!("Loading {label} from environment variable");
+        Ok(content.as_bytes().to_vec())
+    } else {
+        let path = std::path::PathBuf::from(file_path);
+        if !path.exists() {
+            return Err(format!("{label} not found: {file_path}").into());
+        }
+        tracing::info!("Loading {label} from file: {file_path}");
+        Ok(std::fs::read(&path)?)
+    }
+}
+
+/// Build rustls ServerConfig with mandatory client certificate verification.
+///
+/// Supports two modes:
+/// - **PEM env vars** (containerized): SERVER_CERT_PEM, SERVER_KEY_PEM, ROOT_CA_PEM
+/// - **File paths** (local dev): SERVER_CERT_PATH, SERVER_KEY_PATH, ROOT_CA_PATH
+///
+/// PEM env vars take priority when set.
 fn build_mtls_config(config: &Config) -> Result<axum_server::tls_rustls::RustlsConfig, BoxError> {
-    use std::path::PathBuf;
-
-    let cert_path = PathBuf::from(&config.server_cert_path);
-    let key_path = PathBuf::from(&config.server_key_path);
-    let ca_path = PathBuf::from(&config.root_ca_path);
-
-    // Verify files exist
-    if !cert_path.exists() {
-        return Err(format!("Server cert not found: {}", config.server_cert_path).into());
-    }
-    if !key_path.exists() {
-        return Err(format!("Server key not found: {}", config.server_key_path).into());
-    }
-    if !ca_path.exists() {
-        return Err(format!("Root CA not found: {}", config.root_ca_path).into());
-    }
-
-    // Build rustls config with client auth
-    let cert_pem = std::fs::read(&cert_path)?;
-    let key_pem = std::fs::read(&key_path)?;
-    let ca_pem = std::fs::read(&ca_path)?;
+    let cert_pem = load_pem(
+        &config.server_cert_pem,
+        &config.server_cert_path,
+        "server cert",
+    )?;
+    let key_pem = load_pem(
+        &config.server_key_pem,
+        &config.server_key_path,
+        "server key",
+    )?;
+    let ca_pem = load_pem(&config.root_ca_pem, &config.root_ca_path, "root CA")?;
 
     // Parse server certs
     let certs: Vec<rustls_pki_types::CertificateDer<'static>> =
