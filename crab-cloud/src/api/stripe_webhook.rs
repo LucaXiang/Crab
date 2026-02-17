@@ -7,7 +7,7 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 
 use crate::state::AppState;
-use crate::{db, stripe};
+use crate::{db, email, stripe};
 
 use chrono;
 use sqlx;
@@ -186,6 +186,10 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
         "Tenant activated via Stripe checkout"
     );
 
+    let _ =
+        email::send_subscription_activated(&state.ses, &state.ses_from_email, &tenant.email, plan)
+            .await;
+
     let detail = serde_json::json!({ "subscription_id": subscription_id, "plan": plan });
     let _ = crate::db::audit::log(
         &state.pool,
@@ -251,6 +255,12 @@ async fn handle_subscription_deleted(state: &AppState, event: &serde_json::Value
         let _ = db::tenants::update_status(&state.pool, &tenant_id, "canceled").await;
         tracing::info!(tenant_id = %tenant_id, "Tenant canceled (subscription deleted)");
 
+        if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
+            let _ =
+                email::send_subscription_canceled(&state.ses, &state.ses_from_email, &tenant.email)
+                    .await;
+        }
+
         let detail = serde_json::json!({ "subscription_id": sub_id });
         let _ = crate::db::audit::log(
             &state.pool,
@@ -289,6 +299,11 @@ async fn handle_payment_failed(state: &AppState, event: &serde_json::Value) -> S
     {
         let _ = db::tenants::update_status(&state.pool, &tenant_id, "suspended").await;
         tracing::info!(tenant_id = %tenant_id, "Tenant suspended (payment failed)");
+
+        if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
+            let _ =
+                email::send_payment_failed(&state.ses, &state.ses_from_email, &tenant.email).await;
+        }
     }
 
     StatusCode::OK
