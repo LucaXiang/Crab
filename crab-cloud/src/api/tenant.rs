@@ -39,16 +39,9 @@ pub async fn login(
         })?
         .ok_or_else(|| error(401, "Invalid credentials"))?;
 
-    // Verify password with Argon2
-    let parsed_hash = argon2::PasswordHash::new(&tenant.hashed_password)
-        .map_err(|_| error(500, "Internal error"))?;
-
-    argon2::PasswordVerifier::verify_password(
-        &argon2::Argon2::default(),
-        req.password.as_bytes(),
-        &parsed_hash,
-    )
-    .map_err(|_| error(401, "Invalid credentials"))?;
+    if !verify_password(&req.password, &tenant.hashed_password) {
+        return Err(error(401, "Invalid credentials"));
+    }
 
     if tenant.status != "active" {
         return Err(error(
@@ -406,7 +399,7 @@ pub async fn change_email(
         .map_err(|_| internal_error("Internal error"))?
         .ok_or_else(|| error(404, "Tenant not found"))?;
 
-    if !verify_password_hash(&req.current_password, &tenant.hashed_password) {
+    if !verify_password(&req.current_password, &tenant.hashed_password) {
         return Err(error(401, "Invalid password"));
     }
 
@@ -468,7 +461,7 @@ pub async fn confirm_email_change(
     let _ =
         db::email_verifications::increment_attempts(&state.pool, &new_email, "email_change").await;
 
-    if !verify_password_hash(&req.code, &record.code) {
+    if !verify_password(&req.code, &record.code) {
         return Err(error(401, "Invalid code"));
     }
 
@@ -513,7 +506,7 @@ pub async fn change_password(
         .map_err(|_| internal_error("Internal error"))?
         .ok_or_else(|| error(404, "Tenant not found"))?;
 
-    if !verify_password_hash(&req.current_password, &tenant.hashed_password) {
+    if !verify_password(&req.current_password, &tenant.hashed_password) {
         return Err(error(401, "Invalid current password"));
     }
 
@@ -558,32 +551,7 @@ pub async fn update_profile(
     Ok(Json(serde_json::json!({ "message": "Profile updated" })))
 }
 
-// ── Password reset helpers ──
-
-fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
-    use argon2::password_hash::SaltString;
-    use argon2::password_hash::rand_core::OsRng;
-    use argon2::{Argon2, PasswordHasher};
-    let salt = SaltString::generate(&mut OsRng);
-    let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
-    Ok(hash.to_string())
-}
-
-fn generate_code() -> String {
-    use rand::Rng;
-    let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
-    code.to_string()
-}
-
-fn verify_password_hash(password: &str, hash: &str) -> bool {
-    use argon2::{Argon2, PasswordHash, PasswordVerifier};
-    let Ok(parsed) = PasswordHash::new(hash) else {
-        return false;
-    };
-    Argon2::default()
-        .verify_password(password.as_bytes(), &parsed)
-        .is_ok()
-}
+use crate::util::{generate_code, hash_password, verify_password};
 
 // ── Password reset endpoints ──
 
@@ -671,7 +639,7 @@ pub async fn reset_password(
     let _ = db::email_verifications::increment_attempts(&state.pool, &email_addr, "password_reset")
         .await;
 
-    if !verify_password_hash(&req.code, &record.code) {
+    if !verify_password(&req.code, &record.code) {
         return Err(error(401, "Invalid reset code"));
     }
 

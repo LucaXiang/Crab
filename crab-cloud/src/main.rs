@@ -13,6 +13,7 @@ mod db;
 mod email;
 mod state;
 mod stripe;
+pub mod util;
 
 use config::Config;
 use state::AppState;
