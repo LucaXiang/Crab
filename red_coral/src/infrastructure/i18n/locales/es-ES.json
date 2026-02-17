@@ -2555,5 +2555,12 @@
     "NO_FIELDS_TO_UPDATE": "No hay campos que actualizar",
     "INVALID_GUEST_COUNT": "Número de comensales no válido",
     "_fallback": "Operación fallida"
+  },
+  "update": {
+    "available": "Nueva versión v{version} disponible",
+    "install": "Actualizar",
+    "downloading": "Descargando actualización... {progress}%",
+    "ready": "Actualización lista, reinicie para completar",
+    "restart": "Reiniciar"
   }
 }

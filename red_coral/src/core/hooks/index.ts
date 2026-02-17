@@ -11,3 +11,4 @@ export * from './useImageUrl';
 export * from './useShiftCloseGuard';
 export * from './useSystemIssueGuard';
 export * from './useHealthCheck';
+export * from './useUpdateChecker';

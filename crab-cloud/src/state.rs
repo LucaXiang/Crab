@@ -1,5 +1,6 @@
 //! Application state for crab-cloud
 
+use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
 use aws_sdk_sesv2::Client as SesClient;
 use sqlx::PgPool;
@@ -29,6 +30,12 @@ pub struct AppState {
     pub registration_success_url: String,
     /// URL to redirect after cancelled registration checkout
     pub registration_cancel_url: String,
+    /// AWS S3 client for update artifacts
+    pub s3: S3Client,
+    /// S3 bucket for update artifacts
+    pub update_s3_bucket: String,
+    /// Base URL for update downloads
+    pub update_download_base_url: String,
 }
 
 /// Certificate Authority store (reads from AWS Secrets Manager)
@@ -116,6 +123,7 @@ impl AppState {
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let sm_client = SmClient::new(&aws_config);
         let ses = SesClient::new(&aws_config);
+        let s3 = S3Client::new(&aws_config);
         let ca_store = CaStore::new(sm_client);
 
         // Load Root CA PEM
@@ -137,6 +145,9 @@ impl AppState {
             ses_from_email: config.ses_from_email.clone(),
             registration_success_url: config.registration_success_url.clone(),
             registration_cancel_url: config.registration_cancel_url.clone(),
+            s3,
+            update_s3_bucket: config.update_s3_bucket.clone(),
+            update_download_base_url: config.update_download_base_url.clone(),
         })
     }
 }

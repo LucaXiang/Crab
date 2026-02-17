@@ -2555,5 +2555,12 @@
     "NO_FIELDS_TO_UPDATE": "无字段需要更新",
     "INVALID_GUEST_COUNT": "客数无效",
     "_fallback": "操作失败"
+  },
+  "update": {
+    "available": "新版本 v{version} 可用",
+    "install": "立即更新",
+    "downloading": "正在下载更新... {progress}%",
+    "ready": "更新已就绪，重启以完成安装",
+    "restart": "重启"
   }
 }

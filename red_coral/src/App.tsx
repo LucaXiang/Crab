@@ -19,6 +19,7 @@ import { NotificationProvider } from '@/presentation/components/notifications';
 import { ShiftGuard } from '@/presentation/components/shift';
 import { SystemIssueDialog } from '@/presentation/components/modals/SystemIssueDialog';
 import { VirtualKeyboard } from '@/presentation/components/ui/VirtualKeyboard';
+import { UpdateNotification } from '@/presentation/components/UpdateNotification';
 import { useVirtualKeyboardStore } from '@/core/stores/ui';
 
 // Screens
@@ -382,6 +383,7 @@ const App: React.FC = () => {
     <BrowserRouter>
       <NotificationProvider>
         {/* Global Toast Containers */}
+        <UpdateNotification />
         <ToastContainer />
         <ServerMessageToastContainer />
         <PermissionEscalationProvider />

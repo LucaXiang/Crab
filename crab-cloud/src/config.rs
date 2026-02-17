@@ -28,6 +28,10 @@ pub struct Config {
     pub registration_success_url: String,
     /// URL to redirect after cancelled registration checkout
     pub registration_cancel_url: String,
+    /// S3 bucket for update artifacts
+    pub update_s3_bucket: String,
+    /// CloudFront or S3 base URL for download
+    pub update_download_base_url: String,
 }
 
 impl Config {
@@ -58,6 +62,10 @@ impl Config {
                 .unwrap_or_else(|_| "https://crab.es/registration/success".into()),
             registration_cancel_url: std::env::var("REGISTRATION_CANCEL_URL")
                 .unwrap_or_else(|_| "https://crab.es/registration/cancel".into()),
+            update_s3_bucket: std::env::var("UPDATE_S3_BUCKET")
+                .unwrap_or_else(|_| "crab-app-updates".into()),
+            update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")
+                .unwrap_or_else(|_| "https://updates.crab.es".into()),
         }
     }
 

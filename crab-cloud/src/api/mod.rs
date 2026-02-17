@@ -4,6 +4,7 @@ pub mod health;
 pub mod register;
 pub mod stripe_webhook;
 pub mod sync;
+pub mod update;
 
 use crate::auth::edge_auth::edge_auth_middleware;
 use crate::state::AppState;
@@ -29,10 +30,17 @@ pub fn create_router(state: AppState) -> Router {
     // Stripe webhook (signature-verified, raw body)
     let webhook = Router::new().route("/stripe/webhook", post(stripe_webhook::handle_webhook));
 
+    // App update check (public, no auth)
+    let app_update = Router::new().route(
+        "/api/update/{target}/{arch}/{current_version}",
+        get(update::check_update),
+    );
+
     Router::new()
         .route("/health", get(health::health_check))
         .merge(registration)
         .merge(webhook)
+        .merge(app_update)
         .merge(edge)
         .with_state(state)
 }
