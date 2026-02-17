@@ -55,17 +55,17 @@ impl Config {
                 .unwrap_or_else(|_| "certs/server.key".into()),
             environment: std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into()),
             ses_from_email: std::env::var("SES_FROM_EMAIL")
-                .unwrap_or_else(|_| "noreply@crab.es".into()),
+                .unwrap_or_else(|_| "noreply@redcoral.app".into()),
             stripe_secret_key: std::env::var("STRIPE_SECRET_KEY").unwrap_or_default(),
             stripe_webhook_secret: std::env::var("STRIPE_WEBHOOK_SECRET").unwrap_or_default(),
             registration_success_url: std::env::var("REGISTRATION_SUCCESS_URL")
-                .unwrap_or_else(|_| "https://crab.es/registration/success".into()),
+                .unwrap_or_else(|_| "https://redcoral.app/registration/success".into()),
             registration_cancel_url: std::env::var("REGISTRATION_CANCEL_URL")
-                .unwrap_or_else(|_| "https://crab.es/registration/cancel".into()),
+                .unwrap_or_else(|_| "https://redcoral.app/registration/cancel".into()),
             update_s3_bucket: std::env::var("UPDATE_S3_BUCKET")
                 .unwrap_or_else(|_| "crab-app-updates".into()),
             update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")
-                .unwrap_or_else(|_| "https://updates.crab.es".into()),
+                .unwrap_or_else(|_| "https://updates.redcoral.app".into()),
         }
     }
 

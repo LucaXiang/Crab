@@ -106,7 +106,7 @@ setup_stack() {
             "CrabCloudImageUri=$ECR_URI" \
             "CrabAuthCodeS3Bucket=$LAMBDA_S3_BUCKET" \
             "CertificateArn=$ACM_CERTIFICATE_ARN" \
-            "AlertEmail=${ALERT_EMAIL:-ops@crab.es}"
+            "AlertEmail=${ALERT_EMAIL:-ops@redcoral.app}"
 
     echo ""
     echo "==> Stack outputs:"

@@ -4,12 +4,12 @@
 
 ### 1. 域名 + DNS
 
-- [ ] 购买域名（如 `crab.es`）
+- [ ] 购买域名（如 `redcoral.app`）
 - [ ] 在 AWS Route 53 创建 Hosted Zone
 - [ ] 将域名 NS 记录指向 Route 53
 - [ ] 规划子域名：
-  - `cloud.crab.es` → crab-cloud (ECS/ALB)
-  - `auth.crab.es` → crab-auth (Lambda Function URL)
+  - `cloud.redcoral.app` → crab-cloud (ECS/ALB)
+  - `auth.redcoral.app` → crab-auth (Lambda Function URL)
 
 ### 2. AWS 账户
 
@@ -20,14 +20,14 @@
 
 ### 3. ACM 证书（HTTPS）
 
-- [ ] 在 ACM 申请证书：`*.crab.es` + `crab.es`
+- [ ] 在 ACM 申请证书：`*.redcoral.app` + `redcoral.app`
   - 验证方式：DNS（Route 53 可一键添加 CNAME）
   - 等待 Issued 状态
 - [ ] 记录 `ACM_CERTIFICATE_ARN`
 
 ### 4. SES 邮件服务
 
-- [ ] 在 SES 中验证域名 `crab.es`
+- [ ] 在 SES 中验证域名 `redcoral.app`
   - 添加 DKIM (3 条 CNAME) + SPF (TXT) + DMARC (TXT) DNS 记录
 - [ ] **申请脱离 SES 沙箱**（Production Access）
   - AWS Console → SES → Account Dashboard → Request Production Access
@@ -39,7 +39,7 @@
 - [ ] 创建 Products + Prices（basic €29/月, pro €79/月, enterprise €199/月）
 - [ ] 记录 `STRIPE_SECRET_KEY` (sk_live_...)
 - [ ] 配置 Webhook:
-  - URL: `https://cloud.crab.es/stripe/webhook`
+  - URL: `https://cloud.redcoral.app/stripe/webhook`
   - 事件: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
   - 记录 `STRIPE_WEBHOOK_SECRET` (whsec_...)
 
@@ -67,11 +67,11 @@ export ALERT_EMAIL="your@email.com"
 
 # 3. DNS 配置
 # 在 Route 53 添加:
-#   cloud.crab.es → CNAME → ALB DNS name (从 stack outputs 获取)
-#   auth.crab.es  → CNAME → Lambda Function URL (从 stack outputs 获取)
+#   cloud.redcoral.app → CNAME → ALB DNS name (从 stack outputs 获取)
+#   auth.redcoral.app  → CNAME → Lambda Function URL (从 stack outputs 获取)
 
 # 4. 验证
-curl https://cloud.crab.es/health
+curl https://cloud.redcoral.app/health
 ./deploy/deploy.sh status
 ```
 

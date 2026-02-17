@@ -48,7 +48,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://cloud.crab.es/api/update/{{target}}/{{arch}}/{{current_version}}"
+        "https://cloud.redcoral.app/api/update/{{target}}/{{arch}}/{{current_version}}"
       ],
       "pubkey": ""
     }

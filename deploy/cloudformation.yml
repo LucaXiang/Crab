@@ -12,7 +12,7 @@ Parameters:
 
   DomainName:
     Type: String
-    Default: crab.es
+    Default: redcoral.app
 
   CrabCloudImageUri:
     Type: String
@@ -28,12 +28,12 @@ Parameters:
 
   CertificateArn:
     Type: String
-    Description: ACM certificate ARN for *.crab.es
+    Description: ACM certificate ARN for *.redcoral.app
 
   AlertEmail:
     Type: String
     Description: Email for CloudWatch alarm notifications
-    Default: ops@crab.es
+    Default: ops@redcoral.app
 
 # ══════════════════════════════════════════════
 # NO sensitive parameters — all secrets in Secrets Manager
@@ -1057,7 +1057,7 @@ Outputs:
     Value: !GetAtt CrabAuthFunctionUrl.FunctionUrl
 
   ALBDnsName:
-    Description: crab-cloud ALB DNS (CNAME cloud.crab.es here)
+    Description: crab-cloud ALB DNS (CNAME cloud.redcoral.app here)
     Value: !GetAtt ALB.DNSName
 
   RDSEndpoint:
