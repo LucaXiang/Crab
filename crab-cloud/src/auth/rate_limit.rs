@@ -71,14 +71,15 @@ impl RateLimiter {
     }
 }
 
-/// Extract client IP: X-Forwarded-For header first (ALB/CloudFront), then peer address.
+/// Extract client IP: last entry in X-Forwarded-For (ALB appends real client IP), then peer address.
 fn extract_ip(request: &Request) -> String {
     if let Some(forwarded) = request.headers().get("x-forwarded-for")
         && let Ok(val) = forwarded.to_str()
     {
-        // X-Forwarded-For can be comma-separated; first entry is the original client
-        if let Some(first) = val.split(',').next() {
-            let ip = first.trim();
+        // ALB appends the real client IP as the last entry in X-Forwarded-For.
+        // Taking the first would allow attackers to spoof via: X-Forwarded-For: fake_ip
+        if let Some(last) = val.rsplit(',').next() {
+            let ip = last.trim();
             if !ip.is_empty() {
                 return ip.to_owned();
             }
