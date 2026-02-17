@@ -14,6 +14,8 @@ use serde_json::{Value, json};
 use crate::state::AppState;
 use crate::{db, email, stripe};
 
+use sqlx;
+
 // ── Request / Response types ──
 
 #[derive(Deserialize)]
@@ -112,15 +114,7 @@ pub async fn register(
     let tenant_id = uuid::Uuid::new_v4().to_string();
     let now = now_millis();
 
-    // Insert tenant
-    if let Err(e) =
-        db::tenants::create(&state.pool, &tenant_id, &email, &hashed_password, now).await
-    {
-        tracing::error!(%e, "Failed to create tenant");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
-    }
-
-    // Generate + send verification code
+    // Generate + hash verification code before transaction
     let code = generate_code();
     let code_hash = match hash_password(&code) {
         Ok(h) => h,
@@ -129,20 +123,59 @@ pub async fn register(
             return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
         }
     };
-
     let expires_at = now + 5 * 60 * 1000; // 5 minutes
-    if let Err(e) =
-        db::email_verifications::upsert(&state.pool, &email, &code_hash, expires_at, now).await
+
+    // Insert tenant + verification code in a single transaction
+    let mut tx = match state.pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!(%e, "Failed to begin transaction");
+            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        }
+    };
+
+    if let Err(e) = sqlx::query(
+        "INSERT INTO tenants (id, email, hashed_password, status, created_at)
+         VALUES ($1, $2, $3, 'pending', $4)",
+    )
+    .bind(&tenant_id)
+    .bind(&email)
+    .bind(&hashed_password)
+    .bind(now)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!(%e, "Failed to create tenant");
+        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+    }
+
+    if let Err(e) = sqlx::query(
+        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at)
+         VALUES ($1, $2, 0, $3, $4)
+         ON CONFLICT (email) DO UPDATE SET
+            code = $2, attempts = 0, expires_at = $3, created_at = $4",
+    )
+    .bind(&email)
+    .bind(&code_hash)
+    .bind(expires_at)
+    .bind(now)
+    .execute(&mut *tx)
+    .await
     {
         tracing::error!(%e, "Failed to save verification code");
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
     }
 
+    if let Err(e) = tx.commit().await {
+        tracing::error!(%e, "Failed to commit registration transaction");
+        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+    }
+
+    // Send email after commit — if this fails, user can resend
     if let Err(e) =
         email::send_verification_code(&state.ses, &state.ses_from_email, &email, &code).await
     {
-        tracing::error!(%e, "Failed to send verification email");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email");
+        tracing::warn!(%e, "Failed to send verification email (user can resend)");
     }
 
     tracing::info!(tenant_id = %tenant_id, email = %email, "Tenant registered, verification code sent");

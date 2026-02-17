@@ -13,6 +13,7 @@ pub struct Tenant {
     pub verified_at: Option<i64>,
 }
 
+#[allow(dead_code)]
 pub async fn create(
     pool: &PgPool,
     id: &str,
