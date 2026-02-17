@@ -50,6 +50,7 @@ set_secret() {
 set_secret "database-url" "PostgreSQL connection string (postgres://user:pass@host:5432/crab)"
 set_secret "stripe-secret-key" "Stripe API secret key (sk_live_... or sk_test_...)"
 set_secret "stripe-webhook-secret" "Stripe webhook signing secret (whsec_...)"
+set_secret "jwt-secret" "JWT signing secret for tenant auth (min 32 chars, e.g. openssl rand -hex 32)"
 
 echo ""
 echo "═══════════════════════════════════════════"

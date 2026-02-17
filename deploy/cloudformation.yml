@@ -78,6 +78,17 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub crab/${Environment}/jwt-secret
+      Description: JWT signing secret for tenant authentication
+      Tags:
+        - Key: Project
+          Value: crab
+        - Key: Environment
+          Value: !Ref Environment
+
   # ════════════════════════════════════════════
   # VPC & Networking
   # ════════════════════════════════════════════
@@ -278,16 +289,34 @@ Resources:
         - Key: Project
           Value: crab
 
+  NLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: NLB - allow mTLS from edge servers
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Project
+          Value: crab
+
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: ECS tasks - allow from ALB only
+      GroupDescription: ECS tasks - allow from ALB and NLB
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
           SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          SourceSecurityGroupId: !Ref NLBSecurityGroup
       Tags:
         - Key: Project
           Value: crab
@@ -867,6 +896,7 @@ Resources:
                   - !Ref DatabaseUrlSecret
                   - !Ref StripeSecretKeySecret
                   - !Ref StripeWebhookSecretSecret
+                  - !Ref JwtSecret
 
   CrabCloudTaskDef:
     Type: AWS::ECS::TaskDefinition
@@ -884,6 +914,8 @@ Resources:
           Essential: true
           PortMappings:
             - ContainerPort: 8080
+              Protocol: tcp
+            - ContainerPort: 8443
               Protocol: tcp
           # Non-sensitive env vars
           Environment:
@@ -907,6 +939,8 @@ Resources:
               ValueFrom: !Ref StripeSecretKeySecret
             - Name: STRIPE_WEBHOOK_SECRET
               ValueFrom: !Ref StripeWebhookSecretSecret
+            - Name: JWT_SECRET
+              ValueFrom: !Ref JwtSecret
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -990,9 +1024,52 @@ Resources:
             Port: '443'
             StatusCode: HTTP_301
 
+  # ── NLB (mTLS TCP pass-through for edge-server sync) ──
+
+  NLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub crab-mtls-${Environment}
+      Scheme: internet-facing
+      Type: network
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Project
+          Value: crab
+
+  NLBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VPC
+      Port: 8443
+      Protocol: TCP
+      TargetType: ip
+      HealthCheckProtocol: TCP
+      HealthCheckPort: '8443'
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckIntervalSeconds: 30
+      Tags:
+        - Key: Project
+          Value: crab
+
+  NLBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NLB
+      Port: 8443
+      Protocol: TCP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref NLBTargetGroup
+
   CrabCloudService:
     Type: AWS::ECS::Service
-    DependsOn: ALBListener
+    DependsOn:
+      - ALBListener
+      - NLBListener
     Properties:
       Cluster: !Ref ECSCluster
       ServiceName: crab-cloud
@@ -1016,6 +1093,9 @@ Resources:
         - ContainerName: crab-cloud
           ContainerPort: 8080
           TargetGroupArn: !Ref ALBTargetGroup
+        - ContainerName: crab-cloud
+          ContainerPort: 8443
+          TargetGroupArn: !Ref NLBTargetGroup
       Tags:
         - Key: Project
           Value: crab
@@ -1060,6 +1140,10 @@ Outputs:
     Description: crab-cloud ALB DNS (CNAME cloud.redcoral.app here)
     Value: !GetAtt ALB.DNSName
 
+  NLBDnsName:
+    Description: crab-cloud NLB DNS for mTLS (CNAME sync.redcoral.app here)
+    Value: !GetAtt NLB.DNSName
+
   RDSEndpoint:
     Description: RDS PostgreSQL endpoint
     Value: !GetAtt RDSInstance.Endpoint.Address
@@ -1079,6 +1163,10 @@ Outputs:
   StripeWebhookSecretArn:
     Description: Secrets Manager ARN for STRIPE_WEBHOOK_SECRET
     Value: !Ref StripeWebhookSecretSecret
+
+  JwtSecretArn:
+    Description: Secrets Manager ARN for JWT_SECRET
+    Value: !Ref JwtSecret
 
   AlarmTopicArn:
     Description: SNS topic for alarm notifications
