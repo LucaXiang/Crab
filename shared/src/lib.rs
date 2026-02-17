@@ -15,6 +15,9 @@ pub mod request;
 pub mod types;
 pub mod util;
 
+/// Default auth server URL (production)
+pub const DEFAULT_AUTH_SERVER_URL: &str = "https://auth.redcoral.app";
+
 // Re-exports
 pub use axum::{Json, body};
 pub use http;

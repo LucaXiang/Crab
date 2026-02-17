@@ -137,7 +137,7 @@ impl ConfigBuilder {
             environment: self.environment.unwrap_or_else(|| "development".into()),
             auth_server_url: self
                 .auth_server_url
-                .unwrap_or_else(|| "http://localhost:3001".into()),
+                .unwrap_or_else(|| shared::DEFAULT_AUTH_SERVER_URL.into()),
             max_connections: self.max_connections.unwrap_or(1000),
             request_timeout_ms: self.request_timeout_ms.unwrap_or(30000),
             shutdown_timeout_ms: self.shutdown_timeout_ms.unwrap_or(10000),
@@ -166,7 +166,7 @@ impl Config {
     /// | HTTP_PORT | 3000 | HTTP 端口 |
     /// | MESSAGE_TCP_PORT | 8081 | TCP 消息端口 |
     /// | ENVIRONMENT | development | 运行环境 |
-    /// | AUTH_SERVER_URL | http://localhost:3001 | 认证服务器 |
+    /// | AUTH_SERVER_URL | https://auth.redcoral.app | 认证服务器 |
     pub fn from_env() -> Self {
         Self::builder()
             .work_dir(std::env::var("WORK_DIR").unwrap_or_else(|_| "/var/lib/crab/edge".into()))
@@ -184,7 +184,8 @@ impl Config {
             )
             .environment(std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into()))
             .auth_server_url(
-                std::env::var("AUTH_SERVER_URL").unwrap_or_else(|_| "http://localhost:3001".into()),
+                std::env::var("AUTH_SERVER_URL")
+                    .unwrap_or_else(|_| shared::DEFAULT_AUTH_SERVER_URL.into()),
             )
             .max_connections(
                 std::env::var("MAX_CONNECTIONS")
