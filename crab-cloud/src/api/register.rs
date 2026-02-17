@@ -150,15 +150,16 @@ pub async fn register(
     }
 
     if let Err(e) = sqlx::query(
-        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at)
-         VALUES ($1, $2, 0, $3, $4)
-         ON CONFLICT (email) DO UPDATE SET
+        "INSERT INTO email_verifications (email, code, attempts, expires_at, created_at, purpose)
+         VALUES ($1, $2, 0, $3, $4, $5)
+         ON CONFLICT (email, purpose) DO UPDATE SET
             code = $2, attempts = 0, expires_at = $3, created_at = $4",
     )
     .bind(&email)
     .bind(&code_hash)
     .bind(expires_at)
     .bind(now)
+    .bind("registration")
     .execute(&mut *tx)
     .await
     {
@@ -199,7 +200,7 @@ pub async fn verify_email(
     let now = now_millis();
 
     // Find verification record
-    let record = match db::email_verifications::find(&state.pool, &email).await {
+    let record = match db::email_verifications::find(&state.pool, &email, "registration").await {
         Ok(Some(r)) => r,
         Ok(None) => {
             return error_response(
@@ -227,7 +228,7 @@ pub async fn verify_email(
     }
 
     // Increment attempts
-    let _ = db::email_verifications::increment_attempts(&state.pool, &email).await;
+    let _ = db::email_verifications::increment_attempts(&state.pool, &email, "registration").await;
 
     // Verify code
     if !verify_password(&req.code, &record.code) {
@@ -253,7 +254,7 @@ pub async fn verify_email(
     }
 
     // Delete verification record
-    let _ = db::email_verifications::delete(&state.pool, &email).await;
+    let _ = db::email_verifications::delete(&state.pool, &email, "registration").await;
 
     // Create Stripe Customer
     let customer_id =
@@ -333,8 +334,15 @@ pub async fn resend_code(
     };
 
     let expires_at = now + 5 * 60 * 1000;
-    if let Err(e) =
-        db::email_verifications::upsert(&state.pool, &email, &code_hash, expires_at, now).await
+    if let Err(e) = db::email_verifications::upsert(
+        &state.pool,
+        &email,
+        &code_hash,
+        expires_at,
+        now,
+        "registration",
+    )
+    .await
     {
         tracing::error!(%e, "Failed to save verification code");
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
