@@ -32,11 +32,21 @@ pub struct Config {
     pub update_s3_bucket: String,
     /// CloudFront or S3 base URL for download
     pub update_download_base_url: String,
+    /// JWT secret for tenant authentication
+    pub jwt_secret: String,
 }
 
 impl Config {
     /// Load configuration from environment variables
     pub fn from_env() -> Self {
+        let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into());
+        let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+            if environment != "development" {
+                panic!("JWT_SECRET must be set in {environment} environment");
+            }
+            "dev-jwt-secret-change-in-production".into()
+        });
+
         Self {
             database_url: std::env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
             http_port: std::env::var("HTTP_PORT")
@@ -53,7 +63,7 @@ impl Config {
                 .unwrap_or_else(|_| "certs/server.pem".into()),
             server_key_path: std::env::var("SERVER_KEY_PATH")
                 .unwrap_or_else(|_| "certs/server.key".into()),
-            environment: std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into()),
+            environment,
             ses_from_email: std::env::var("SES_FROM_EMAIL")
                 .unwrap_or_else(|_| "noreply@redcoral.app".into()),
             stripe_secret_key: std::env::var("STRIPE_SECRET_KEY").unwrap_or_default(),
@@ -66,6 +76,7 @@ impl Config {
                 .unwrap_or_else(|_| "crab-app-updates".into()),
             update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")
                 .unwrap_or_else(|_| "https://updates.redcoral.app".into()),
+            jwt_secret,
         }
     }
 
