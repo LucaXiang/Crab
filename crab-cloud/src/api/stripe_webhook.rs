@@ -86,6 +86,9 @@ pub async fn handle_webhook(
         "customer.subscription.updated" => handle_subscription_updated(&state, &event).await,
         "customer.subscription.deleted" => handle_subscription_deleted(&state, &event).await,
         "invoice.payment_failed" => handle_payment_failed(&state, &event).await,
+        "charge.refunded" => handle_charge_refunded(&state, &event).await,
+        "invoice.paid" => handle_invoice_paid(&state, &event).await,
+        "invoice.payment_action_required" => handle_payment_action_required(&state, &event).await,
         _ => {
             tracing::debug!(event_type = event_type, "Unhandled webhook event type");
             StatusCode::OK
@@ -304,6 +307,80 @@ async fn handle_payment_failed(state: &AppState, event: &serde_json::Value) -> S
             let _ =
                 email::send_payment_failed(&state.ses, &state.ses_from_email, &tenant.email).await;
         }
+    }
+
+    StatusCode::OK
+}
+
+/// charge.refunded → notify tenant
+async fn handle_charge_refunded(state: &AppState, event: &serde_json::Value) -> StatusCode {
+    let obj = match event.get("data").and_then(|d| d.get("object")) {
+        Some(o) => o,
+        None => return StatusCode::OK,
+    };
+
+    let customer_id = match obj["customer"].as_str() {
+        Some(s) => s,
+        None => return StatusCode::OK,
+    };
+
+    if let Ok(Some(tenant)) = db::tenants::find_by_stripe_customer(&state.pool, customer_id).await {
+        let _ =
+            email::send_refund_processed(&state.ses, &state.ses_from_email, &tenant.email).await;
+        tracing::info!(tenant_id = %tenant.id, "Refund notification sent");
+    }
+
+    StatusCode::OK
+}
+
+/// invoice.paid → update current_period_end
+async fn handle_invoice_paid(state: &AppState, event: &serde_json::Value) -> StatusCode {
+    let obj = match event.get("data").and_then(|d| d.get("object")) {
+        Some(o) => o,
+        None => return StatusCode::OK,
+    };
+
+    let sub_id = match obj["subscription"].as_str() {
+        Some(s) => s,
+        None => return StatusCode::OK,
+    };
+
+    // Update current_period_end from invoice lines
+    if let Some(period_end) = obj
+        .get("lines")
+        .and_then(|l| l.get("data"))
+        .and_then(|d| d.as_array())
+        .and_then(|a| a.first())
+        .and_then(|line| line.get("period"))
+        .and_then(|p| p["end"].as_i64())
+    {
+        let period_end_ms = period_end * 1000; // Stripe uses seconds
+        let _ = sqlx::query("UPDATE subscriptions SET current_period_end = $1 WHERE id = $2")
+            .bind(period_end_ms)
+            .bind(sub_id)
+            .execute(&state.pool)
+            .await;
+    }
+
+    tracing::info!(subscription_id = sub_id, "Invoice paid, period updated");
+    StatusCode::OK
+}
+
+/// invoice.payment_action_required → notify tenant about SCA/3DS
+async fn handle_payment_action_required(state: &AppState, event: &serde_json::Value) -> StatusCode {
+    let obj = match event.get("data").and_then(|d| d.get("object")) {
+        Some(o) => o,
+        None => return StatusCode::OK,
+    };
+
+    let customer_id = match obj["customer"].as_str() {
+        Some(s) => s,
+        None => return StatusCode::OK,
+    };
+
+    if let Ok(Some(tenant)) = db::tenants::find_by_stripe_customer(&state.pool, customer_id).await {
+        let _ = email::send_payment_failed(&state.ses, &state.ses_from_email, &tenant.email).await;
+        tracing::info!(tenant_id = %tenant.id, "Payment action required notification sent");
     }
 
     StatusCode::OK

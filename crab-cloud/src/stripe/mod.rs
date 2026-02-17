@@ -84,6 +84,28 @@ pub async fn create_checkout_session(
         .ok_or_else(|| format!("Stripe create_checkout failed: {resp}").into())
 }
 
+/// Create a Stripe Billing Portal session
+pub async fn create_billing_portal_session(
+    secret_key: &str,
+    customer_id: &str,
+    return_url: &str,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post("https://api.stripe.com/v1/billing_portal/sessions")
+        .basic_auth(secret_key, None::<&str>)
+        .form(&[("customer", customer_id), ("return_url", return_url)])
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    resp["url"]
+        .as_str()
+        .map(String::from)
+        .ok_or_else(|| format!("Stripe billing portal failed: {resp}").into())
+}
+
 /// Verify Stripe webhook signature (HMAC-SHA256)
 pub fn verify_webhook_signature(
     payload: &[u8],

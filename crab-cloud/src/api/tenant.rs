@@ -346,6 +346,42 @@ fn internal_error(msg: &str) -> (http::StatusCode, Json<serde_json::Value>) {
     error(500, msg)
 }
 
+/// POST /api/tenant/billing-portal — get Stripe Customer Portal URL
+pub async fn billing_portal(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+) -> ApiResult<serde_json::Value> {
+    let tenant = db::tenants::find_by_email(&state.pool, &identity.email)
+        .await
+        .map_err(|_| internal_error("Internal error"))?
+        .ok_or_else(|| error(404, "Tenant not found"))?;
+
+    let customer_id = tenant
+        .stripe_customer_id
+        .as_deref()
+        .ok_or_else(|| error(400, "No Stripe customer linked"))?;
+
+    let return_url = format!(
+        "{}/dashboard",
+        state
+            .registration_success_url
+            .trim_end_matches("/registration/success")
+    );
+
+    let url = crate::stripe::create_billing_portal_session(
+        &state.stripe_secret_key,
+        customer_id,
+        &return_url,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Billing portal error: {e}");
+        internal_error("Failed to create billing portal session")
+    })?;
+
+    Ok(Json(serde_json::json!({ "url": url })))
+}
+
 // ── Account management endpoints ──
 
 /// POST /api/tenant/change-email
