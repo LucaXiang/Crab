@@ -99,7 +99,6 @@ pub async fn update_password(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub async fn update_email(
     pool: &PgPool,
     tenant_id: &str,
@@ -113,7 +112,6 @@ pub async fn update_email(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub async fn find_by_id(pool: &PgPool, id: &str) -> Result<Option<Tenant>, sqlx::Error> {
     sqlx::query_as("SELECT * FROM tenants WHERE id = $1")
         .bind(id)

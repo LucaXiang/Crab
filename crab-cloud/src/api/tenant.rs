@@ -5,9 +5,11 @@ use axum::{
     extract::{Path, Query, State},
 };
 use serde::Deserialize;
+use sqlx;
 
 use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::{self, commands, tenant_queries};
+use crate::email;
 use crate::state::AppState;
 
 type ApiResult<T> = Result<Json<T>, (http::StatusCode, Json<serde_json::Value>)>;
@@ -342,6 +344,182 @@ fn error(status: u16, msg: &str) -> (http::StatusCode, Json<serde_json::Value>) 
 
 fn internal_error(msg: &str) -> (http::StatusCode, Json<serde_json::Value>) {
     error(500, msg)
+}
+
+// ── Account management endpoints ──
+
+/// POST /api/tenant/change-email
+#[derive(Deserialize)]
+pub struct ChangeEmailRequest {
+    pub current_password: String,
+    pub new_email: String,
+}
+
+pub async fn change_email(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Json(req): Json<ChangeEmailRequest>,
+) -> ApiResult<serde_json::Value> {
+    let new_email = req.new_email.trim().to_lowercase();
+    if new_email.is_empty() || !new_email.contains('@') {
+        return Err(error(400, "Invalid email"));
+    }
+
+    let tenant = db::tenants::find_by_email(&state.pool, &identity.email)
+        .await
+        .map_err(|_| internal_error("Internal error"))?
+        .ok_or_else(|| error(404, "Tenant not found"))?;
+
+    if !verify_password_hash(&req.current_password, &tenant.hashed_password) {
+        return Err(error(401, "Invalid password"));
+    }
+
+    if let Ok(Some(_)) = db::tenants::find_by_email(&state.pool, &new_email).await {
+        return Err(error(409, "Email already in use"));
+    }
+
+    let code = generate_code();
+    let code_hash = hash_password(&code).map_err(|_| internal_error("Internal error"))?;
+    let now = shared::util::now_millis();
+    let expires_at = now + 5 * 60 * 1000;
+
+    db::email_verifications::upsert(
+        &state.pool,
+        &new_email,
+        &code_hash,
+        expires_at,
+        now,
+        "email_change",
+    )
+    .await
+    .map_err(|_| internal_error("Internal error"))?;
+
+    let _ =
+        email::send_email_change_code(&state.ses, &state.ses_from_email, &new_email, &code).await;
+
+    Ok(Json(
+        serde_json::json!({ "message": "Verification code sent to new email" }),
+    ))
+}
+
+/// POST /api/tenant/confirm-email-change
+#[derive(Deserialize)]
+pub struct ConfirmEmailChangeRequest {
+    pub new_email: String,
+    pub code: String,
+}
+
+pub async fn confirm_email_change(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Json(req): Json<ConfirmEmailChangeRequest>,
+) -> ApiResult<serde_json::Value> {
+    let new_email = req.new_email.trim().to_lowercase();
+
+    let record = db::email_verifications::find(&state.pool, &new_email, "email_change")
+        .await
+        .map_err(|_| internal_error("Internal error"))?
+        .ok_or_else(|| error(404, "No email change pending"))?;
+
+    let now = shared::util::now_millis();
+    if now > record.expires_at {
+        return Err(error(410, "Code expired"));
+    }
+    if record.attempts >= 3 {
+        return Err(error(429, "Too many attempts"));
+    }
+
+    let _ =
+        db::email_verifications::increment_attempts(&state.pool, &new_email, "email_change").await;
+
+    if !verify_password_hash(&req.code, &record.code) {
+        return Err(error(401, "Invalid code"));
+    }
+
+    db::tenants::update_email(&state.pool, &identity.tenant_id, &new_email)
+        .await
+        .map_err(|_| internal_error("Internal error"))?;
+
+    let _ = db::email_verifications::delete(&state.pool, &new_email, "email_change").await;
+
+    let detail = serde_json::json!({ "old_email": identity.email, "new_email": new_email });
+    let _ = crate::db::audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "email_changed",
+        Some(&detail),
+        None,
+        now,
+    )
+    .await;
+
+    Ok(Json(serde_json::json!({ "message": "Email updated" })))
+}
+
+/// POST /api/tenant/change-password
+#[derive(Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+pub async fn change_password(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Json(req): Json<ChangePasswordRequest>,
+) -> ApiResult<serde_json::Value> {
+    if req.new_password.len() < 8 {
+        return Err(error(400, "Password must be at least 8 characters"));
+    }
+
+    let tenant = db::tenants::find_by_email(&state.pool, &identity.email)
+        .await
+        .map_err(|_| internal_error("Internal error"))?
+        .ok_or_else(|| error(404, "Tenant not found"))?;
+
+    if !verify_password_hash(&req.current_password, &tenant.hashed_password) {
+        return Err(error(401, "Invalid current password"));
+    }
+
+    let hashed = hash_password(&req.new_password).map_err(|_| internal_error("Internal error"))?;
+    db::tenants::update_password(&state.pool, &identity.tenant_id, &hashed)
+        .await
+        .map_err(|_| internal_error("Internal error"))?;
+
+    let now = shared::util::now_millis();
+    let _ = crate::db::audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "password_changed",
+        None,
+        None,
+        now,
+    )
+    .await;
+
+    Ok(Json(serde_json::json!({ "message": "Password changed" })))
+}
+
+/// PUT /api/tenant/profile
+#[derive(Deserialize)]
+pub struct UpdateProfileRequest {
+    pub name: Option<String>,
+}
+
+pub async fn update_profile(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Json(req): Json<UpdateProfileRequest>,
+) -> ApiResult<serde_json::Value> {
+    if let Some(ref name) = req.name {
+        sqlx::query("UPDATE tenants SET name = $1 WHERE id = $2")
+            .bind(name)
+            .bind(&identity.tenant_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|_| internal_error("Internal error"))?;
+    }
+    Ok(Json(serde_json::json!({ "message": "Profile updated" })))
 }
 
 // ── Password reset helpers ──

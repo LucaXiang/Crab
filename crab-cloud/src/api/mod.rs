@@ -44,7 +44,16 @@ pub fn public_router(state: AppState) -> Router {
 
     // Tenant management API (JWT authenticated)
     let tenant_api = Router::new()
-        .route("/api/tenant/profile", get(tenant::get_profile))
+        .route(
+            "/api/tenant/profile",
+            get(tenant::get_profile).put(tenant::update_profile),
+        )
+        .route("/api/tenant/change-email", post(tenant::change_email))
+        .route(
+            "/api/tenant/confirm-email-change",
+            post(tenant::confirm_email_change),
+        )
+        .route("/api/tenant/change-password", post(tenant::change_password))
         .route("/api/tenant/stores", get(tenant::list_stores))
         .route("/api/tenant/stores/{id}/orders", get(tenant::list_orders))
         .route("/api/tenant/stores/{id}/stats", get(tenant::get_stats))
