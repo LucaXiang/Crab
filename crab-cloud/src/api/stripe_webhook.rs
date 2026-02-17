@@ -186,6 +186,17 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
         "Tenant activated via Stripe checkout"
     );
 
+    let detail = serde_json::json!({ "subscription_id": subscription_id, "plan": plan });
+    let _ = crate::db::audit::log(
+        &state.pool,
+        &tenant.id,
+        "subscription_activated",
+        Some(&detail),
+        None,
+        now,
+    )
+    .await;
+
     StatusCode::OK
 }
 
@@ -239,6 +250,17 @@ async fn handle_subscription_deleted(state: &AppState, event: &serde_json::Value
     {
         let _ = db::tenants::update_status(&state.pool, &tenant_id, "canceled").await;
         tracing::info!(tenant_id = %tenant_id, "Tenant canceled (subscription deleted)");
+
+        let detail = serde_json::json!({ "subscription_id": sub_id });
+        let _ = crate::db::audit::log(
+            &state.pool,
+            &tenant_id,
+            "subscription_canceled",
+            Some(&detail),
+            None,
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .await;
     }
 
     StatusCode::OK

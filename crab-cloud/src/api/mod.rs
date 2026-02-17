@@ -52,6 +52,7 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/products",
             get(tenant::list_products),
         )
+        .route("/api/tenant/audit-log", get(tenant::audit_log))
         .route(
             "/api/tenant/stores/{id}/commands",
             post(tenant::create_command).get(tenant::list_commands),
