@@ -14,6 +14,9 @@ pub struct CloudSyncBatch {
     pub items: Vec<CloudSyncItem>,
     /// Timestamp when the batch was sent (Unix millis)
     pub sent_at: i64,
+    /// Results from previously executed commands
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub command_results: Vec<CloudCommandResult>,
 }
 
 /// A single resource change to sync to the cloud
@@ -71,13 +74,16 @@ pub struct CloudCommand {
     pub created_at: i64,
 }
 
-/// Result of executing a cloud command on edge-server (future use)
+/// Result of executing a cloud command on edge-server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudCommandResult {
     /// Command ID
     pub command_id: String,
     /// Whether the command succeeded
     pub success: bool,
+    /// Result data if succeeded
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
     /// Error message if failed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -101,6 +107,7 @@ mod tests {
                 data: serde_json::json!({"name": "Test Product", "price": 9.99}),
             }],
             sent_at: 1700000000000,
+            command_results: vec![],
         };
 
         let json = serde_json::to_string(&batch).unwrap();

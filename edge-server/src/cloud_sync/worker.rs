@@ -2,8 +2,9 @@
 //!
 //! Subscribes to MessageBus server broadcast channel to detect resource changes,
 //! debounces events, and pushes batches to crab-cloud.
+//! Also executes cloud commands and reports results on the next sync.
 
-use shared::cloud::{CloudSyncBatch, CloudSyncItem};
+use shared::cloud::{CloudCommandResult, CloudSyncBatch, CloudSyncItem};
 use shared::message::{BusMessage, EventType, SyncPayload};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,6 +13,7 @@ use tokio::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
 use crate::cloud_sync::CloudSyncService;
+use crate::cloud_sync::command_executor;
 use crate::core::state::ServerState;
 
 /// Debounce window for batching changes
@@ -27,6 +29,8 @@ pub struct CloudSyncWorker {
     state: ServerState,
     sync_service: Arc<CloudSyncService>,
     shutdown: CancellationToken,
+    /// Results from previously executed commands, to be sent on next sync
+    pending_results: Vec<CloudCommandResult>,
 }
 
 impl CloudSyncWorker {
@@ -39,6 +43,7 @@ impl CloudSyncWorker {
             state,
             sync_service,
             shutdown,
+            pending_results: Vec::new(),
         }
     }
 
@@ -47,7 +52,7 @@ impl CloudSyncWorker {
     /// 1. Full sync on startup
     /// 2. Listen for broadcast events, debounce and push
     /// 3. Periodic full sync every hour
-    pub async fn run(self) {
+    pub async fn run(mut self) {
         tracing::info!("CloudSyncWorker started");
 
         // Full sync on startup
@@ -147,21 +152,26 @@ impl CloudSyncWorker {
     }
 
     /// Flush all pending items as a batch
-    async fn flush_pending(&self, pending: &mut HashMap<String, HashMap<String, CloudSyncItem>>) {
+    async fn flush_pending(
+        &mut self,
+        pending: &mut HashMap<String, HashMap<String, CloudSyncItem>>,
+    ) {
         let items: Vec<CloudSyncItem> = pending
             .drain()
             .flat_map(|(_, items)| items.into_values())
             .collect();
 
-        if items.is_empty() {
+        if items.is_empty() && self.pending_results.is_empty() {
             return;
         }
 
         let count = items.len();
+        let results_count = self.pending_results.len();
         let batch = CloudSyncBatch {
             edge_id: self.sync_service.edge_id().to_string(),
             items,
             sent_at: shared::util::now_millis(),
+            command_results: std::mem::take(&mut self.pending_results),
         };
 
         match self.push_with_retry(batch).await {
@@ -169,8 +179,12 @@ impl CloudSyncWorker {
                 tracing::debug!(
                     accepted = resp.accepted,
                     rejected = resp.rejected,
+                    results_sent = results_count,
                     "Flushed {count} sync items"
                 );
+
+                // Execute any pending commands from cloud
+                self.handle_commands(resp.pending_commands).await;
             }
             Err(e) => {
                 tracing::error!("Failed to push sync batch after retries: {e}");
@@ -179,7 +193,7 @@ impl CloudSyncWorker {
     }
 
     /// Full sync — query all local data and push to cloud
-    async fn full_sync(&self) -> Result<(), crate::utils::AppError> {
+    async fn full_sync(&mut self) -> Result<(), crate::utils::AppError> {
         tracing::info!("Starting full cloud sync");
 
         let mut items = Vec::new();
@@ -224,7 +238,7 @@ impl CloudSyncWorker {
             }
         }
 
-        if items.is_empty() {
+        if items.is_empty() && self.pending_results.is_empty() {
             tracing::info!("Full sync: nothing to sync");
             return Ok(());
         }
@@ -234,6 +248,7 @@ impl CloudSyncWorker {
             edge_id: self.sync_service.edge_id().to_string(),
             items,
             sent_at: shared::util::now_millis(),
+            command_results: std::mem::take(&mut self.pending_results),
         };
 
         let response = self.push_with_retry(batch).await?;
@@ -243,7 +258,30 @@ impl CloudSyncWorker {
             response.rejected,
         );
 
+        // Execute any pending commands from cloud
+        self.handle_commands(response.pending_commands).await;
+
         Ok(())
+    }
+
+    /// Execute cloud commands and cache results for next sync
+    async fn handle_commands(&mut self, commands: Vec<shared::cloud::CloudCommand>) {
+        if commands.is_empty() {
+            return;
+        }
+
+        tracing::info!(count = commands.len(), "Executing cloud commands");
+
+        for cmd in &commands {
+            let result = command_executor::execute(&self.state, cmd).await;
+            tracing::info!(
+                command_id = %cmd.id,
+                command_type = %cmd.command_type,
+                success = result.success,
+                "Cloud command executed"
+            );
+            self.pending_results.push(result);
+        }
     }
 
     /// Push batch with exponential backoff retry
