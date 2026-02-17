@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::auth::tenant_auth::TenantIdentity;
-use crate::db::{commands, tenant_queries};
+use crate::db::{self, commands, tenant_queries};
 use crate::state::AppState;
 
 type ApiResult<T> = Result<Json<T>, (http::StatusCode, Json<serde_json::Value>)>;
@@ -342,4 +342,141 @@ fn error(status: u16, msg: &str) -> (http::StatusCode, Json<serde_json::Value>) 
 
 fn internal_error(msg: &str) -> (http::StatusCode, Json<serde_json::Value>) {
     error(500, msg)
+}
+
+// ── Password reset helpers ──
+
+fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
+    use argon2::password_hash::SaltString;
+    use argon2::password_hash::rand_core::OsRng;
+    use argon2::{Argon2, PasswordHasher};
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
+    Ok(hash.to_string())
+}
+
+fn generate_code() -> String {
+    use rand::Rng;
+    let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
+    code.to_string()
+}
+
+fn verify_password_hash(password: &str, hash: &str) -> bool {
+    use argon2::{Argon2, PasswordHash, PasswordVerifier};
+    let Ok(parsed) = PasswordHash::new(hash) else {
+        return false;
+    };
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed)
+        .is_ok()
+}
+
+// ── Password reset endpoints ──
+
+#[derive(Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+/// POST /api/tenant/forgot-password
+pub async fn forgot_password(
+    State(state): State<AppState>,
+    Json(req): Json<ForgotPasswordRequest>,
+) -> ApiResult<serde_json::Value> {
+    let email_addr = req.email.trim().to_lowercase();
+
+    // Always return OK to prevent email enumeration
+    let _tenant = match db::tenants::find_by_email(&state.pool, &email_addr).await {
+        Ok(Some(t)) => t,
+        _ => {
+            return Ok(Json(serde_json::json!({
+                "message": "If the email exists, a reset code has been sent"
+            })));
+        }
+    };
+
+    let code = generate_code();
+    let code_hash = hash_password(&code).map_err(|_| internal_error("Internal error"))?;
+    let now = shared::util::now_millis();
+    let expires_at = now + 5 * 60 * 1000;
+
+    let _ = db::email_verifications::upsert(
+        &state.pool,
+        &email_addr,
+        &code_hash,
+        expires_at,
+        now,
+        "password_reset",
+    )
+    .await;
+
+    let _ = crate::email::send_password_reset_code(
+        &state.ses,
+        &state.ses_from_email,
+        &email_addr,
+        &code,
+    )
+    .await;
+
+    Ok(Json(serde_json::json!({
+        "message": "If the email exists, a reset code has been sent"
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct ResetPasswordRequest {
+    pub email: String,
+    pub code: String,
+    pub new_password: String,
+}
+
+/// POST /api/tenant/reset-password
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(req): Json<ResetPasswordRequest>,
+) -> ApiResult<serde_json::Value> {
+    let email_addr = req.email.trim().to_lowercase();
+
+    if req.new_password.len() < 8 {
+        return Err(error(400, "Password must be at least 8 characters"));
+    }
+
+    let record = db::email_verifications::find(&state.pool, &email_addr, "password_reset")
+        .await
+        .map_err(|_| internal_error("Internal error"))?
+        .ok_or_else(|| error(404, "No password reset pending"))?;
+
+    let now = shared::util::now_millis();
+    if now > record.expires_at {
+        return Err(error(410, "Reset code expired"));
+    }
+    if record.attempts >= 3 {
+        return Err(error(429, "Too many attempts, request a new code"));
+    }
+
+    let _ = db::email_verifications::increment_attempts(&state.pool, &email_addr, "password_reset")
+        .await;
+
+    if !verify_password_hash(&req.code, &record.code) {
+        return Err(error(401, "Invalid reset code"));
+    }
+
+    let tenant = db::tenants::find_by_email(&state.pool, &email_addr)
+        .await
+        .map_err(|_| internal_error("Internal error"))?
+        .ok_or_else(|| error(404, "Tenant not found"))?;
+
+    let hashed = hash_password(&req.new_password).map_err(|_| internal_error("Internal error"))?;
+    db::tenants::update_password(&state.pool, &tenant.id, &hashed)
+        .await
+        .map_err(|_| internal_error("Internal error"))?;
+
+    let _ = db::email_verifications::delete(&state.pool, &email_addr, "password_reset").await;
+
+    // Audit
+    let _ = crate::db::audit::log(&state.pool, &tenant.id, "password_reset", None, None, now).await;
+
+    Ok(Json(
+        serde_json::json!({ "message": "Password has been reset" }),
+    ))
 }

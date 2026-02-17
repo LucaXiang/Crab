@@ -70,6 +70,11 @@ pub fn public_router(state: AppState) -> Router {
             login_rate_limit,
         ));
 
+    // Password reset (public, no auth)
+    let password_reset = Router::new()
+        .route("/api/tenant/forgot-password", post(tenant::forgot_password))
+        .route("/api/tenant/reset-password", post(tenant::reset_password));
+
     Router::new()
         .route("/health", get(health::health_check))
         .merge(registration)
@@ -77,6 +82,7 @@ pub fn public_router(state: AppState) -> Router {
         .merge(app_update)
         .merge(tenant_api)
         .merge(tenant_login)
+        .merge(password_reset)
         .with_state(state)
 }
 

@@ -85,3 +85,38 @@ pub async fn set_stripe_customer(
         .await?;
     Ok(())
 }
+
+pub async fn update_password(
+    pool: &PgPool,
+    tenant_id: &str,
+    hashed_password: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE tenants SET hashed_password = $1 WHERE id = $2")
+        .bind(hashed_password)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub async fn update_email(
+    pool: &PgPool,
+    tenant_id: &str,
+    new_email: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE tenants SET email = $1 WHERE id = $2")
+        .bind(new_email)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub async fn find_by_id(pool: &PgPool, id: &str) -> Result<Option<Tenant>, sqlx::Error> {
+    sqlx::query_as("SELECT * FROM tenants WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+}
