@@ -255,6 +255,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some("Invalid credentials".to_string()),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -268,6 +269,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(e.to_string()),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -287,6 +289,7 @@ async fn activate(
                 return Json(ActivationResponse {
                     success: false,
                     error: Some(format!("Failed to load Tenant CA: {}", e)),
+                    error_code: None,
                     data: None,
                     quota_info: None,
                 });
@@ -300,6 +303,7 @@ async fn activate(
                 return Json(ActivationResponse {
                     success: false,
                     error: Some(format!("Failed to create Tenant CA: {}", e)),
+                    error_code: None,
                     data: None,
                     quota_info: None,
                 });
@@ -309,6 +313,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to save Tenant CA: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -334,6 +339,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to issue certificate: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -347,6 +353,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to parse certificate metadata: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -368,6 +375,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to sign binding: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -420,6 +428,7 @@ async fn activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to sign subscription: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -448,6 +457,7 @@ async fn activate(
     Json(ActivationResponse {
         success: true,
         error: None,
+        error_code: None,
         data: Some(data),
         quota_info: None,
     })
@@ -855,6 +865,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some("Invalid credentials".to_string()),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -868,6 +879,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(e.to_string()),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -887,6 +899,7 @@ async fn client_activate(
                 return Json(ActivationResponse {
                     success: false,
                     error: Some(format!("Failed to load Tenant CA: {}", e)),
+                    error_code: None,
                     data: None,
                     quota_info: None,
                 });
@@ -900,6 +913,7 @@ async fn client_activate(
                 return Json(ActivationResponse {
                     success: false,
                     error: Some(format!("Failed to create Tenant CA: {}", e)),
+                    error_code: None,
                     data: None,
                     quota_info: None,
                 });
@@ -909,6 +923,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to save Tenant CA: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -933,6 +948,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to issue certificate: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -946,6 +962,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to parse certificate metadata: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -967,6 +984,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to sign binding: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -1001,6 +1019,7 @@ async fn client_activate(
             return Json(ActivationResponse {
                 success: false,
                 error: Some(format!("Failed to sign subscription: {}", e)),
+                error_code: None,
                 data: None,
                 quota_info: None,
             });
@@ -1029,6 +1048,7 @@ async fn client_activate(
     Json(ActivationResponse {
         success: true,
         error: None,
+        error_code: None,
         data: Some(data),
         quota_info: None,
     })
@@ -1048,6 +1068,7 @@ async fn verify_tenant(
             return Json(shared::activation::TenantVerifyResponse {
                 success: false,
                 error: Some("Invalid credentials".to_string()),
+                error_code: None,
                 data: None,
             });
         }
@@ -1067,6 +1088,7 @@ async fn verify_tenant(
     Json(shared::activation::TenantVerifyResponse {
         success: true,
         error: None,
+        error_code: None,
         data: Some(data),
     })
 }
@@ -1088,6 +1110,7 @@ async fn deactivate_server(
         return Json(shared::activation::DeactivateResponse {
             success: false,
             error: Some("Invalid credentials".to_string()),
+            error_code: None,
         });
     }
 
@@ -1100,6 +1123,7 @@ async fn deactivate_server(
     Json(shared::activation::DeactivateResponse {
         success: true,
         error: None,
+        error_code: None,
     })
 }
 
@@ -1120,6 +1144,7 @@ async fn deactivate_client(
         return Json(shared::activation::DeactivateResponse {
             success: false,
             error: Some("Invalid credentials".to_string()),
+            error_code: None,
         });
     }
 
@@ -1132,6 +1157,7 @@ async fn deactivate_client(
     Json(shared::activation::DeactivateResponse {
         success: true,
         error: None,
+        error_code: None,
     })
 }
 

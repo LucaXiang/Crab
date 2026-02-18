@@ -64,8 +64,10 @@ impl ProvisioningService {
             .map_err(|e| AppError::internal(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
-            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(AppError::validation(format!("Activation failed: {}", msg)));
+            let code = resp_data
+                .error_code
+                .unwrap_or(shared::error::ErrorCode::InternalError);
+            return Err(AppError::with_message(code, code.message()));
         }
 
         let data = resp_data

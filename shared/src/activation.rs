@@ -10,6 +10,7 @@
 //! - edge-server: 验证并保存服务器绑定
 //! - crab-client: 验证并保存客户端凭证
 
+use crate::error::ErrorCode;
 use serde::{Deserialize, Serialize};
 
 /// 统一的激活响应
@@ -20,9 +21,12 @@ use serde::{Deserialize, Serialize};
 pub struct ActivationResponse {
     /// 是否成功
     pub success: bool,
-    /// 错误信息 (失败时)
+    /// 错误信息 (失败时，开发调试用)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// 结构化错误码 (失败时，客户端用于 i18n 查表)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub error_code: Option<ErrorCode>,
     /// 激活数据 (成功时)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<ActivationData>,
@@ -472,6 +476,8 @@ pub struct TenantVerifyResponse {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub error_code: Option<ErrorCode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<TenantVerifyData>,
 }
@@ -500,6 +506,8 @@ pub struct DeactivateResponse {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub error_code: Option<ErrorCode>,
 }
 
 #[cfg(test)]

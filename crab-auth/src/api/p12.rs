@@ -3,6 +3,7 @@ use crate::state::AppState;
 use aws_sdk_s3::primitives::ByteStream;
 use axum::Json;
 use axum::extract::{Multipart, State};
+use shared::error::ErrorCode;
 use std::sync::Arc;
 
 /// 上传 P12 证书 (multipart/form-data)
@@ -53,7 +54,8 @@ pub async fn upload_p12(
     else {
         return Json(serde_json::json!({
             "success": false,
-            "error": "Missing required fields: username, password, p12_password, p12_file"
+            "error": "Missing required fields: username, password, p12_password, p12_file",
+            "error_code": ErrorCode::RequiredField
         }));
     };
 
@@ -63,14 +65,16 @@ pub async fn upload_p12(
         Ok(None) => {
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Invalid credentials"
+                "error": "Invalid credentials",
+                "error_code": ErrorCode::TenantCredentialsInvalid
             }));
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error during authentication");
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Internal error"
+                "error": "Internal error",
+                "error_code": ErrorCode::InternalError
             }));
         }
     };
@@ -86,7 +90,8 @@ pub async fn upload_p12(
             );
             return Json(serde_json::json!({
                 "success": false,
-                "error": format!("Invalid P12 file: {e}")
+                "error": format!("Invalid P12 file: {e}"),
+                "error_code": ErrorCode::ValidationFailed
             }));
         }
     };
@@ -106,7 +111,8 @@ pub async fn upload_p12(
         tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to store P12 password in Secrets Manager");
         return Json(serde_json::json!({
             "success": false,
-            "error": "Failed to secure certificate password"
+            "error": "Failed to secure certificate password",
+            "error_code": ErrorCode::InternalError
         }));
     }
 
@@ -129,7 +135,8 @@ pub async fn upload_p12(
         tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to upload .p12 to S3");
         return Json(serde_json::json!({
             "success": false,
-            "error": "Failed to store certificate"
+            "error": "Failed to store certificate",
+            "error_code": ErrorCode::InternalError
         }));
     }
 
@@ -138,7 +145,8 @@ pub async fn upload_p12(
         tracing::error!(error = %e, "Failed to save P12 metadata");
         return Json(serde_json::json!({
             "success": false,
-            "error": "Failed to save certificate metadata"
+            "error": "Failed to save certificate metadata",
+            "error_code": ErrorCode::InternalError
         }));
     }
 

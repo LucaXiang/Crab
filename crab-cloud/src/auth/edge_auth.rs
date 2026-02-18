@@ -7,9 +7,10 @@
 use axum::{
     extract::{Request, State},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use shared::activation::SignedBinding;
+use shared::error::{AppError, ErrorCode};
 
 use crate::state::AppState;
 
@@ -36,11 +37,11 @@ pub async fn edge_auth_middleware(
         .headers()
         .get("X-Signed-Binding")
         .and_then(|v| v.to_str().ok())
-        .ok_or_else(|| error_response(401, "Missing X-Signed-Binding header"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::NotAuthenticated).into_response())?;
 
     // Parse SignedBinding JSON
     let binding: SignedBinding = serde_json::from_str(binding_header)
-        .map_err(|e| error_response(401, &format!("Invalid SignedBinding: {e}")))?;
+        .map_err(|_| AppError::new(ErrorCode::NotAuthenticated).into_response())?;
 
     // Load Tenant CA cert for signature verification
     let tenant_ca_cert = state
@@ -52,7 +53,7 @@ pub async fn edge_auth_middleware(
                 tenant_id = %binding.tenant_id,
                 "Failed to load Tenant CA cert: {e}"
             );
-            error_response(500, "Failed to verify credentials")
+            AppError::new(ErrorCode::InternalError).into_response()
         })?;
 
     // Verify signature
@@ -62,7 +63,7 @@ pub async fn edge_auth_middleware(
             tenant_id = %binding.tenant_id,
             "SignedBinding verification failed: {e}"
         );
-        error_response(401, "Invalid binding signature")
+        AppError::new(ErrorCode::NotAuthenticated).into_response()
     })?;
 
     // Inject EdgeIdentity into request extensions
@@ -76,17 +77,6 @@ pub async fn edge_auth_middleware(
 
     Ok(next.run(request).await)
 }
-
-fn error_response(status: u16, message: &str) -> Response {
-    let body = serde_json::json!({
-        "error": message,
-    });
-    let status =
-        http::StatusCode::from_u16(status).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR);
-    (status, axum::Json(body)).into_response()
-}
-
-use axum::response::IntoResponse;
 
 #[cfg(test)]
 mod tests {

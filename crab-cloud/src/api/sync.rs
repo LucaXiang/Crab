@@ -2,6 +2,7 @@
 
 use axum::{Extension, Json, extract::State};
 use shared::cloud::{CloudCommand, CloudSyncBatch, CloudSyncError, CloudSyncResponse};
+use shared::error::{AppError, ErrorCode};
 
 use crate::auth::EdgeIdentity;
 use crate::db::{commands, sync_store};
@@ -19,7 +20,7 @@ pub async fn handle_sync(
     State(state): State<AppState>,
     Extension(identity): Extension<EdgeIdentity>,
     Json(batch): Json<CloudSyncBatch>,
-) -> Result<Json<CloudSyncResponse>, (http::StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<CloudSyncResponse>, AppError> {
     let now = shared::util::now_millis();
 
     // Auto-register edge-server
@@ -33,7 +34,7 @@ pub async fn handle_sync(
     .await
     .map_err(|e| {
         tracing::error!("Failed to register edge-server: {e}");
-        internal_error("Failed to register edge-server")
+        AppError::new(ErrorCode::InternalError)
     })?;
 
     // Update last_sync_at
@@ -41,7 +42,7 @@ pub async fn handle_sync(
         .await
         .map_err(|e| {
             tracing::error!("Failed to update last_sync: {e}");
-            internal_error("Database error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     // Process command results from edge-server
@@ -144,11 +145,4 @@ pub async fn handle_sync(
         errors,
         pending_commands,
     }))
-}
-
-fn internal_error(msg: &str) -> (http::StatusCode, Json<serde_json::Value>) {
-    (
-        http::StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({ "error": msg })),
-    )
 }

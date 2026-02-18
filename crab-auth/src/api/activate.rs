@@ -7,6 +7,7 @@ use shared::activation::{
     ActivationData, ActivationResponse, ActiveDevice, EntityType, PlanType, QuotaInfo,
     SignedBinding, SubscriptionInfo, SubscriptionStatus,
 };
+use shared::error::ErrorCode;
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -25,11 +26,14 @@ pub async fn activate(
     let tenant = match tenants::authenticate(&state.db, &req.username, &req.password).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return Json(fail("Invalid credentials"));
+            return Json(fail(
+                ErrorCode::TenantCredentialsInvalid,
+                "Invalid credentials",
+            ));
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error during authentication");
-            return Json(fail("Internal error"));
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
         }
     };
 
@@ -37,18 +41,24 @@ pub async fn activate(
     let sub = match subscriptions::get_active_subscription(&state.db, &tenant.id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
-            return Json(fail("No active subscription"));
+            return Json(fail(
+                ErrorCode::TenantNoSubscription,
+                "No active subscription",
+            ));
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching subscription");
-            return Json(fail("Internal error"));
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
         }
     };
 
     // Check subscription status
     let sub_status = parse_subscription_status(&sub.status);
     if sub_status.is_blocked() {
-        return Json(fail(&format!("Subscription {}", sub.status)));
+        return Json(fail(
+            ErrorCode::SubscriptionBlocked,
+            &format!("Subscription {}", sub.status),
+        ));
     }
 
     let plan = parse_plan_type(&sub.plan);
@@ -59,7 +69,7 @@ pub async fn activate(
         Ok(v) => v,
         Err(e) => {
             tracing::error!(error = %e, "Database error checking existing device");
-            return Json(fail("Internal error"));
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
         }
     };
 
@@ -79,7 +89,7 @@ pub async fn activate(
             Ok(n) => n,
             Err(e) => {
                 tracing::error!(error = %e, "Database error counting active devices");
-                return Json(fail("Internal error"));
+                return Json(fail(ErrorCode::InternalError, "Internal error"));
             }
         };
 
@@ -96,11 +106,14 @@ pub async fn activate(
                             activations::mark_replaced(&state.db, replace_id, &entity_id).await
                         {
                             tracing::error!(error = %e, "Failed to mark device as replaced");
-                            return Json(fail("Failed to replace device"));
+                            return Json(fail(
+                                ErrorCode::InternalError,
+                                "Failed to replace device",
+                            ));
                         }
                     }
                     _ => {
-                        return Json(fail("Invalid replace target"));
+                        return Json(fail(ErrorCode::ValidationFailed, "Invalid replace target"));
                     }
                 }
             } else {
@@ -117,13 +130,14 @@ pub async fn activate(
                         .collect(),
                     Err(e) => {
                         tracing::error!(error = %e, "Database error listing active devices");
-                        return Json(fail("Internal error"));
+                        return Json(fail(ErrorCode::InternalError, "Internal error"));
                     }
                 };
 
                 return Json(ActivationResponse {
                     success: false,
                     error: Some("device_limit_reached".to_string()),
+                    error_code: Some(ErrorCode::DeviceLimitReached),
                     data: None,
                     quota_info: Some(QuotaInfo {
                         max_edge_servers: max_edge_servers as u32,
@@ -140,7 +154,7 @@ pub async fn activate(
         Ok(ca) => ca,
         Err(e) => {
             tracing::error!(error = %e, "Root CA error");
-            return Json(fail("Root CA error"));
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
 
@@ -152,7 +166,7 @@ pub async fn activate(
         Ok(ca) => ca,
         Err(e) => {
             tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
-            return Json(fail("Tenant CA error"));
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
 
@@ -168,7 +182,8 @@ pub async fn activate(
     let (entity_cert, entity_key) = match tenant_ca.issue_cert(&profile) {
         Ok(pair) => pair,
         Err(e) => {
-            return Json(fail(&format!("Failed to issue certificate: {e}")));
+            tracing::error!(error = %e, "Failed to issue certificate");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
 
@@ -176,7 +191,8 @@ pub async fn activate(
     let fingerprint = match CertMetadata::from_pem(&entity_cert) {
         Ok(meta) => meta.fingerprint_sha256,
         Err(e) => {
-            return Json(fail(&format!("Certificate metadata error: {e}")));
+            tracing::error!(error = %e, "Certificate metadata error");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
 
@@ -192,7 +208,8 @@ pub async fn activate(
     let signed_binding = match binding.sign(&tenant_ca.key_pem()) {
         Ok(b) => b,
         Err(e) => {
-            return Json(fail(&format!("Failed to sign binding: {e}")));
+            tracing::error!(error = %e, "Failed to sign binding");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
 
@@ -223,7 +240,8 @@ pub async fn activate(
     let signed_subscription = match subscription_info.sign(&tenant_ca.key_pem()) {
         Ok(s) => s,
         Err(e) => {
-            return Json(fail(&format!("Failed to sign subscription: {e}")));
+            tracing::error!(error = %e, "Failed to sign subscription");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
 
@@ -238,7 +256,7 @@ pub async fn activate(
     .await
     {
         tracing::error!(error = %e, "Failed to write activation record");
-        return Json(fail("Failed to save activation"));
+        return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 
     tracing::info!(
@@ -251,6 +269,7 @@ pub async fn activate(
     Json(ActivationResponse {
         success: true,
         error: None,
+        error_code: None,
         data: Some(ActivationData {
             entity_id,
             tenant_id: tenant.id,
@@ -266,10 +285,11 @@ pub async fn activate(
     })
 }
 
-fn fail(error: &str) -> ActivationResponse {
+fn fail(code: ErrorCode, error: &str) -> ActivationResponse {
     ActivationResponse {
         success: false,
         error: Some(error.to_string()),
+        error_code: Some(code),
         data: None,
         quota_info: None,
     }

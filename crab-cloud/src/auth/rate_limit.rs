@@ -2,10 +2,10 @@
 
 use axum::{
     extract::{Request, State},
-    http::StatusCode,
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use shared::error::{AppError, ErrorCode};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -95,11 +95,7 @@ fn extract_ip(request: &Request) -> String {
 }
 
 fn too_many_requests() -> Response {
-    (
-        StatusCode::TOO_MANY_REQUESTS,
-        axum::Json(serde_json::json!({"error": "Too many requests, try again later"})),
-    )
-        .into_response()
+    AppError::new(ErrorCode::TooManyAttempts).into_response()
 }
 
 /// Rate limit middleware for login: 5 requests/minute per IP

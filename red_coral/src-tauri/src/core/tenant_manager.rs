@@ -62,14 +62,20 @@ pub enum TenantError {
     OfflineNotAvailable(String),
 }
 
-/// Classify auth server error response into specific TenantError variant
-fn classify_auth_error(error_msg: &str) -> TenantError {
-    match error_msg {
-        "Invalid credentials" => TenantError::CredentialsInvalid(error_msg.to_string()),
-        "No active subscription" => TenantError::NoSubscription(error_msg.to_string()),
-        "Internal error" => TenantError::AuthServerError(error_msg.to_string()),
-        s if s.starts_with("Subscription ") => TenantError::NoSubscription(s.to_string()),
-        _ => TenantError::AuthFailed(error_msg.to_string()),
+/// Classify auth server error by ErrorCode
+fn classify_auth_error_code(code: shared::error::ErrorCode) -> TenantError {
+    use shared::error::ErrorCode;
+    match code {
+        ErrorCode::TenantCredentialsInvalid | ErrorCode::InvalidCredentials => {
+            TenantError::CredentialsInvalid(code.message().to_string())
+        }
+        ErrorCode::TenantNoSubscription | ErrorCode::SubscriptionBlocked => {
+            TenantError::NoSubscription(code.message().to_string())
+        }
+        ErrorCode::InternalError | ErrorCode::AuthServerError => {
+            TenantError::AuthServerError(code.message().to_string())
+        }
+        _ => TenantError::AuthFailed(code.message().to_string()),
     }
 }
 
@@ -294,14 +300,15 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
-            // Check for device_limit_reached with quota_info
-            if resp_data.error.as_deref() == Some("device_limit_reached") {
+            let code = resp_data
+                .error_code
+                .unwrap_or(shared::error::ErrorCode::InternalError);
+            if code == shared::error::ErrorCode::DeviceLimitReached {
                 if let Some(quota_info) = resp_data.quota_info {
                     return Err(TenantError::DeviceLimitReached(quota_info));
                 }
             }
-            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(classify_auth_error(msg));
+            return Err(classify_auth_error_code(code));
         }
 
         let data = resp_data
@@ -423,14 +430,15 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
-            // Check for client_limit_reached with quota_info
-            if resp_data.error.as_deref() == Some("client_limit_reached") {
+            let code = resp_data
+                .error_code
+                .unwrap_or(shared::error::ErrorCode::InternalError);
+            if code == shared::error::ErrorCode::ClientLimitReached {
                 if let Some(quota_info) = resp_data.quota_info {
                     return Err(TenantError::ClientLimitReached(quota_info));
                 }
             }
-            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(classify_auth_error(msg));
+            return Err(classify_auth_error_code(code));
         }
 
         let data = resp_data
@@ -519,8 +527,10 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
-            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(classify_auth_error(msg));
+            let code = resp_data
+                .error_code
+                .unwrap_or(shared::error::ErrorCode::InternalError);
+            return Err(classify_auth_error_code(code));
         }
 
         resp_data
@@ -565,8 +575,10 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
-            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(classify_auth_error(msg));
+            let code = resp_data
+                .error_code
+                .unwrap_or(shared::error::ErrorCode::InternalError);
+            return Err(classify_auth_error_code(code));
         }
 
         Ok(())
@@ -609,8 +621,10 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
         if !resp_data.success {
-            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
-            return Err(classify_auth_error(msg));
+            let code = resp_data
+                .error_code
+                .unwrap_or(shared::error::ErrorCode::InternalError);
+            return Err(classify_auth_error_code(code));
         }
 
         Ok(())

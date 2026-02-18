@@ -3,6 +3,7 @@ use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
 use shared::activation::{PlanType, SubscriptionStatus, TenantVerifyData, TenantVerifyResponse};
+use shared::error::ErrorCode;
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -24,6 +25,7 @@ pub async fn verify_tenant(
             return Json(TenantVerifyResponse {
                 success: false,
                 error: Some("Invalid credentials".to_string()),
+                error_code: Some(ErrorCode::TenantCredentialsInvalid),
                 data: None,
             });
         }
@@ -32,6 +34,7 @@ pub async fn verify_tenant(
             return Json(TenantVerifyResponse {
                 success: false,
                 error: Some("Internal error".to_string()),
+                error_code: Some(ErrorCode::InternalError),
                 data: None,
             });
         }
@@ -44,6 +47,7 @@ pub async fn verify_tenant(
             return Json(TenantVerifyResponse {
                 success: false,
                 error: Some("No active subscription".to_string()),
+                error_code: Some(ErrorCode::TenantNoSubscription),
                 data: None,
             });
         }
@@ -52,6 +56,7 @@ pub async fn verify_tenant(
             return Json(TenantVerifyResponse {
                 success: false,
                 error: Some("Internal error".to_string()),
+                error_code: Some(ErrorCode::InternalError),
                 data: None,
             });
         }
@@ -115,6 +120,7 @@ pub async fn verify_tenant(
     Json(TenantVerifyResponse {
         success: true,
         error: None,
+        error_code: None,
         data: Some(TenantVerifyData {
             tenant_id: tenant.id,
             subscription_status,

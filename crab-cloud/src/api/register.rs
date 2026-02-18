@@ -7,9 +7,9 @@
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use shared::error::{AppError, ErrorCode};
 
 use crate::state::AppState;
 use crate::{db, email, stripe};
@@ -39,38 +39,31 @@ pub struct ResendRequest {
 
 use crate::util::{generate_code, hash_password, now_millis, verify_password};
 
-fn error_response(status: StatusCode, msg: &str) -> (StatusCode, Json<Value>) {
-    (status, Json(json!({ "error": msg })))
-}
-
 // ── POST /api/register ──
 
 pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
-) -> impl IntoResponse {
+) -> Result<(StatusCode, Json<Value>), AppError> {
     let email = req.email.trim().to_lowercase();
 
     // Validate
     if email.is_empty() || !email.contains('@') {
-        return error_response(StatusCode::BAD_REQUEST, "Invalid email");
+        return Err(AppError::new(ErrorCode::ValidationFailed));
     }
     if req.password.len() < 8 {
-        return error_response(
-            StatusCode::BAD_REQUEST,
-            "Password must be at least 8 characters",
-        );
+        return Err(AppError::new(ErrorCode::PasswordTooShort));
     }
 
     // Check email not taken
     match db::tenants::find_by_email(&state.pool, &email).await {
         Ok(Some(_)) => {
-            return error_response(StatusCode::CONFLICT, "Email already registered");
+            return Err(AppError::new(ErrorCode::AlreadyExists));
         }
         Ok(None) => {}
         Err(e) => {
             tracing::error!(%e, "DB error checking email");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     }
 
@@ -79,7 +72,7 @@ pub async fn register(
         Ok(h) => h,
         Err(e) => {
             tracing::error!(%e, "Password hash error");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     };
 
@@ -93,7 +86,7 @@ pub async fn register(
         Ok(h) => h,
         Err(e) => {
             tracing::error!(%e, "Code hash error");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     };
     let expires_at = now + 5 * 60 * 1000; // 5 minutes
@@ -103,7 +96,7 @@ pub async fn register(
         Ok(tx) => tx,
         Err(e) => {
             tracing::error!(%e, "Failed to begin transaction");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     };
 
@@ -119,7 +112,7 @@ pub async fn register(
     .await
     {
         tracing::error!(%e, "Failed to create tenant");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     if let Err(e) = sqlx::query(
@@ -138,12 +131,12 @@ pub async fn register(
     .await
     {
         tracing::error!(%e, "Failed to save verification code");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     if let Err(e) = tx.commit().await {
         tracing::error!(%e, "Failed to commit registration transaction");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     // Send email after commit — if this fails, user can resend
@@ -155,13 +148,13 @@ pub async fn register(
 
     tracing::info!(tenant_id = %tenant_id, email = %email, "Tenant registered, verification code sent");
 
-    (
+    Ok((
         StatusCode::OK,
         Json(json!({
             "tenant_id": tenant_id,
             "message": "Verification code sent to your email"
         })),
-    )
+    ))
 }
 
 // ── POST /api/verify-email ──
@@ -169,7 +162,7 @@ pub async fn register(
 pub async fn verify_email(
     State(state): State<AppState>,
     Json(req): Json<VerifyRequest>,
-) -> impl IntoResponse {
+) -> Result<(StatusCode, Json<Value>), AppError> {
     let email = req.email.trim().to_lowercase();
     let now = now_millis();
 
@@ -177,28 +170,22 @@ pub async fn verify_email(
     let record = match db::email_verifications::find(&state.pool, &email, "registration").await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return error_response(
-                StatusCode::NOT_FOUND,
-                "No verification pending for this email",
-            );
+            return Err(AppError::new(ErrorCode::ValidationFailed));
         }
         Err(e) => {
             tracing::error!(%e, "DB error finding verification");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     };
 
     // Check expiry
     if now > record.expires_at {
-        return error_response(StatusCode::GONE, "Verification code expired");
+        return Err(AppError::new(ErrorCode::VerificationCodeExpired));
     }
 
     // Check attempts
     if record.attempts >= 3 {
-        return error_response(
-            StatusCode::TOO_MANY_REQUESTS,
-            "Too many attempts, request a new code",
-        );
+        return Err(AppError::new(ErrorCode::TooManyAttempts));
     }
 
     // Increment attempts (must not be silently ignored — enables brute force bypass)
@@ -206,30 +193,30 @@ pub async fn verify_email(
         db::email_verifications::increment_attempts(&state.pool, &email, "registration").await
     {
         tracing::error!(%e, "Failed to increment verification attempts");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     // Verify code
     if !verify_password(&req.code, &record.code) {
-        return error_response(StatusCode::UNAUTHORIZED, "Invalid verification code");
+        return Err(AppError::new(ErrorCode::VerificationCodeInvalid));
     }
 
     // Find tenant
     let tenant = match db::tenants::find_by_email(&state.pool, &email).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return error_response(StatusCode::NOT_FOUND, "Tenant not found");
+            return Err(AppError::new(ErrorCode::TenantNotFound));
         }
         Err(e) => {
             tracing::error!(%e, "DB error finding tenant");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     };
 
     // Mark tenant as verified
     if let Err(e) = db::tenants::set_verified(&state.pool, &tenant.id, now).await {
         tracing::error!(%e, "Failed to verify tenant");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     // Delete verification record
@@ -241,14 +228,14 @@ pub async fn verify_email(
             Ok(id) => id,
             Err(e) => {
                 tracing::error!(%e, "Failed to create Stripe customer");
-                return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Payment setup failed");
+                return Err(AppError::new(ErrorCode::PaymentSetupFailed));
             }
         };
 
     // Save stripe_customer_id
     if let Err(e) = db::tenants::set_stripe_customer(&state.pool, &tenant.id, &customer_id).await {
         tracing::error!(%e, "Failed to save Stripe customer ID");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     // Create Stripe Checkout Session
@@ -263,19 +250,19 @@ pub async fn verify_email(
         Ok(url) => url,
         Err(e) => {
             tracing::error!(%e, "Failed to create Stripe checkout session");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Payment setup failed");
+            return Err(AppError::new(ErrorCode::PaymentSetupFailed));
         }
     };
 
     tracing::info!(tenant_id = %tenant.id, "Email verified, Stripe checkout created");
 
-    (
+    Ok((
         StatusCode::OK,
         Json(json!({
             "checkout_url": checkout_url,
             "message": "Email verified successfully"
         })),
-    )
+    ))
 }
 
 // ── POST /api/resend-code ──
@@ -283,7 +270,7 @@ pub async fn verify_email(
 pub async fn resend_code(
     State(state): State<AppState>,
     Json(req): Json<ResendRequest>,
-) -> impl IntoResponse {
+) -> Result<(StatusCode, Json<Value>), AppError> {
     let email = req.email.trim().to_lowercase();
     let now = now_millis();
 
@@ -291,16 +278,16 @@ pub async fn resend_code(
     match db::tenants::find_by_email(&state.pool, &email).await {
         Ok(Some(t)) if t.status == "pending" => {}
         Ok(Some(_)) | Ok(None) => {
-            return (
+            return Ok((
                 StatusCode::OK,
                 Json(
                     json!({ "message": "If this email is registered and pending verification, a new code has been sent" }),
                 ),
-            );
+            ));
         }
         Err(e) => {
             tracing::error!(%e, "DB error finding tenant");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     }
 
@@ -310,7 +297,7 @@ pub async fn resend_code(
         Ok(h) => h,
         Err(e) => {
             tracing::error!(%e, "Code hash error");
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+            return Err(AppError::new(ErrorCode::InternalError));
         }
     };
 
@@ -327,20 +314,20 @@ pub async fn resend_code(
     .await
     {
         tracing::error!(%e, "Failed to save verification code");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     if let Err(e) =
         email::send_verification_code(&state.ses, &state.ses_from_email, &email, &code).await
     {
         tracing::error!(%e, "Failed to send verification email");
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email");
+        return Err(AppError::new(ErrorCode::InternalError));
     }
 
     tracing::info!(email = %email, "Verification code resent");
 
-    (
+    Ok((
         StatusCode::OK,
         Json(json!({ "message": "Verification code resent" })),
-    )
+    ))
 }

@@ -95,6 +95,18 @@ pub enum ErrorCode {
     TenantNoSubscription = 3011,
     /// Auth server internal error
     AuthServerError = 3012,
+    /// Verification code expired
+    VerificationCodeExpired = 3013,
+    /// Verification code invalid
+    VerificationCodeInvalid = 3014,
+    /// Too many verification attempts
+    TooManyAttempts = 3015,
+    /// Email not verified
+    EmailNotVerified = 3016,
+    /// Payment setup failed (Stripe)
+    PaymentSetupFailed = 3017,
+    /// Password too short
+    PasswordTooShort = 3018,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -288,6 +300,12 @@ impl ErrorCode {
             ErrorCode::FeatureNotAvailable => "Feature not available in current subscription plan",
             ErrorCode::TenantNoSubscription => "No active subscription",
             ErrorCode::AuthServerError => "Auth server internal error",
+            ErrorCode::VerificationCodeExpired => "Verification code has expired",
+            ErrorCode::VerificationCodeInvalid => "Invalid verification code",
+            ErrorCode::TooManyAttempts => "Too many attempts",
+            ErrorCode::EmailNotVerified => "Email not verified",
+            ErrorCode::PaymentSetupFailed => "Payment setup failed",
+            ErrorCode::PasswordTooShort => "Password must be at least 8 characters",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -431,6 +449,12 @@ impl TryFrom<u16> for ErrorCode {
             3010 => Ok(ErrorCode::FeatureNotAvailable),
             3011 => Ok(ErrorCode::TenantNoSubscription),
             3012 => Ok(ErrorCode::AuthServerError),
+            3013 => Ok(ErrorCode::VerificationCodeExpired),
+            3014 => Ok(ErrorCode::VerificationCodeInvalid),
+            3015 => Ok(ErrorCode::TooManyAttempts),
+            3016 => Ok(ErrorCode::EmailNotVerified),
+            3017 => Ok(ErrorCode::PaymentSetupFailed),
+            3018 => Ok(ErrorCode::PasswordTooShort),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),

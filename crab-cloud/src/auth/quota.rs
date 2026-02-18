@@ -8,6 +8,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use shared::error::{AppError, ErrorCode};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,8 +20,7 @@ use crate::state::AppState;
 
 /// Cache entry for quota validation
 struct QuotaCacheEntry {
-    allowed: bool,
-    reason: Option<String>,
+    error: Option<ErrorCode>,
     expires_at: Instant,
 }
 
@@ -52,7 +52,7 @@ pub async fn quota_middleware(
         .extensions()
         .get::<EdgeIdentity>()
         .cloned()
-        .ok_or_else(|| error_response(500, "Missing EdgeIdentity"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::InternalError).into_response())?;
 
     let cache_key = identity.tenant_id.clone();
 
@@ -62,16 +62,15 @@ pub async fn quota_middleware(
         if let Some(entry) = entries.get(&cache_key)
             && entry.expires_at > Instant::now()
         {
-            if !entry.allowed {
-                let reason = entry.reason.as_deref().unwrap_or("Quota exceeded");
-                return Err(error_response(403, reason));
+            if let Some(code) = entry.error {
+                return Err(AppError::new(code).into_response());
             }
             return Ok(next.run(request).await);
         }
     }
 
     // Query DB
-    let (allowed, reason) = check_quota(&state.pool, &identity).await;
+    let error = check_quota(&state.pool, &identity).await;
 
     // Update cache
     {
@@ -79,22 +78,21 @@ pub async fn quota_middleware(
         entries.insert(
             cache_key,
             QuotaCacheEntry {
-                allowed,
-                reason: reason.clone(),
+                error,
                 expires_at: Instant::now() + std::time::Duration::from_secs(CACHE_TTL_SECS),
             },
         );
     }
 
-    if !allowed {
-        let reason = reason.as_deref().unwrap_or("Quota exceeded");
-        return Err(error_response(403, reason));
+    if let Some(code) = error {
+        return Err(AppError::new(code).into_response());
     }
 
     Ok(next.run(request).await)
 }
 
-async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> (bool, Option<String>) {
+/// Returns `None` if quota check passes, or `Some(ErrorCode)` on failure.
+async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode> {
     // Check tenant status
     let tenant_status: Option<(String,)> =
         match sqlx::query_as("SELECT status FROM tenants WHERE id = $1")
@@ -105,19 +103,17 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> (bool, Option<St
             Ok(row) => row,
             Err(e) => {
                 tracing::error!("Quota check DB error: {e}");
-                return (false, Some("Internal error".to_string()));
+                return Some(ErrorCode::InternalError);
             }
         };
 
     let Some((status,)) = tenant_status else {
-        return (false, Some("Tenant not found".to_string()));
+        return Some(ErrorCode::TenantNotFound);
     };
 
     if status != "active" {
-        return (
-            false,
-            Some(format!("Tenant status is '{status}', must be 'active'")),
-        );
+        tracing::warn!(tenant_id = %identity.tenant_id, status = %status, "Tenant not active");
+        return Some(ErrorCode::SubscriptionBlocked);
     }
 
     // Check subscription quota
@@ -131,12 +127,12 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> (bool, Option<St
         Ok(row) => row,
         Err(e) => {
             tracing::error!("Subscription query error: {e}");
-            return (false, Some("Internal error".to_string()));
+            return Some(ErrorCode::InternalError);
         }
     };
 
     let Some((max_edge_servers,)) = sub else {
-        return (false, Some("No active subscription".to_string()));
+        return Some(ErrorCode::TenantNoSubscription);
     };
 
     // Count current edge servers
@@ -149,7 +145,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> (bool, Option<St
             Ok(row) => row,
             Err(e) => {
                 tracing::error!("Edge server count error: {e}");
-                return (false, Some("Internal error".to_string()));
+                return Some(ErrorCode::InternalError);
             }
         };
 
@@ -167,20 +163,14 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> (bool, Option<St
     };
 
     if !already_registered && current_count >= max_edge_servers as i64 {
-        return (
-            false,
-            Some(format!(
-                "Edge server quota exceeded: {current_count}/{max_edge_servers}"
-            )),
+        tracing::warn!(
+            tenant_id = %identity.tenant_id,
+            current = current_count,
+            max = max_edge_servers,
+            "Edge server quota exceeded"
         );
+        return Some(ErrorCode::DeviceLimitReached);
     }
 
-    (true, None)
-}
-
-fn error_response(status: u16, message: &str) -> Response {
-    let body = serde_json::json!({ "error": message });
-    let status =
-        http::StatusCode::from_u16(status).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR);
-    (status, axum::Json(body)).into_response()
+    None
 }

@@ -3,6 +3,7 @@ use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
 use shared::activation::SignedBinding;
+use shared::error::ErrorCode;
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -61,7 +62,8 @@ pub async fn refresh_binding(
         );
         return Json(serde_json::json!({
             "success": false,
-            "error": format!("device_{}", activation.status)
+            "error": format!("device_{}", activation.status),
+            "error_code": ErrorCode::ActivationFailed
         }));
     }
 
@@ -90,6 +92,7 @@ pub async fn refresh_binding(
 fn auth_failed() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "success": false,
-        "error": "Authentication failed"
+        "error": "Authentication failed",
+        "error_code": ErrorCode::TenantCredentialsInvalid
     }))
 }

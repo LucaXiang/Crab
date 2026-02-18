@@ -7,6 +7,7 @@ use axum::{
 };
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use shared::error::{AppError, ErrorCode};
 
 use crate::state::AppState;
 
@@ -64,11 +65,11 @@ pub async fn tenant_auth_middleware(
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
-        .ok_or_else(|| error_response(401, "Missing Authorization header"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::NotAuthenticated).into_response())?;
 
     let token = auth_header
         .strip_prefix("Bearer ")
-        .ok_or_else(|| error_response(401, "Invalid Authorization format"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::NotAuthenticated).into_response())?;
 
     let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
     validation.set_required_spec_claims(&["exp", "sub"]);
@@ -79,7 +80,7 @@ pub async fn tenant_auth_middleware(
     )
     .map_err(|e| {
         tracing::debug!("JWT validation failed: {e}");
-        error_response(401, "Invalid or expired token")
+        AppError::new(ErrorCode::TokenExpired).into_response()
     })?;
 
     let identity = TenantIdentity {
@@ -90,11 +91,4 @@ pub async fn tenant_auth_middleware(
     request.extensions_mut().insert(identity);
 
     Ok(next.run(request).await)
-}
-
-fn error_response(status: u16, message: &str) -> Response {
-    let body = serde_json::json!({ "error": message });
-    let status =
-        http::StatusCode::from_u16(status).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR);
-    (status, axum::Json(body)).into_response()
 }

@@ -5,6 +5,7 @@ use axum::{
     extract::{Path, Query, State},
 };
 use serde::Deserialize;
+use shared::error::{AppError, ErrorCode};
 use sqlx;
 
 use crate::auth::tenant_auth::TenantIdentity;
@@ -12,7 +13,7 @@ use crate::db::{self, commands, tenant_queries};
 use crate::email;
 use crate::state::AppState;
 
-type ApiResult<T> = Result<Json<T>, (http::StatusCode, Json<serde_json::Value>)>;
+type ApiResult<T> = Result<Json<T>, AppError>;
 
 /// POST /api/tenant/login
 #[derive(Deserialize)]
@@ -35,26 +36,23 @@ pub async fn login(
         .await
         .map_err(|e| {
             tracing::error!("DB error during login: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?
-        .ok_or_else(|| error(401, "Invalid credentials"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::InvalidCredentials))?;
 
     if !verify_password(&req.password, &tenant.hashed_password) {
-        return Err(error(401, "Invalid credentials"));
+        return Err(AppError::new(ErrorCode::InvalidCredentials));
     }
 
     if tenant.status != "active" {
-        return Err(error(
-            403,
-            &format!("Account is not active (status: {})", tenant.status),
-        ));
+        return Err(AppError::new(ErrorCode::AccountDisabled));
     }
 
     let token =
         crate::auth::tenant_auth::create_token(&tenant.id, &tenant.email, &state.jwt_secret)
             .map_err(|e| {
                 tracing::error!("JWT creation failed: {e}");
-                internal_error("Internal error")
+                AppError::new(ErrorCode::InternalError)
             })?;
 
     let now = shared::util::now_millis();
@@ -75,15 +73,15 @@ pub async fn get_profile(
         .await
         .map_err(|e| {
             tracing::error!("Profile query error: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?
-        .ok_or_else(|| error(404, "Tenant not found"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
     let subscription = tenant_queries::get_subscription(&state.pool, &identity.tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Subscription query error: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     Ok(Json(serde_json::json!({
@@ -101,7 +99,7 @@ pub async fn list_stores(
         .await
         .map_err(|e| {
             tracing::error!("Stores query error: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     let mut result = Vec::new();
@@ -154,7 +152,7 @@ pub async fn list_orders(
     .await
     .map_err(|e| {
         tracing::error!("Orders query error: {e}");
-        internal_error("Internal error")
+        AppError::new(ErrorCode::InternalError)
     })?;
 
     Ok(Json(orders))
@@ -185,7 +183,7 @@ pub async fn get_stats(
     .await
     .map_err(|e| {
         tracing::error!("Stats query error: {e}");
-        internal_error("Internal error")
+        AppError::new(ErrorCode::InternalError)
     })?;
 
     Ok(Json(reports))
@@ -203,7 +201,7 @@ pub async fn list_products(
         .await
         .map_err(|e| {
             tracing::error!("Products query error: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     Ok(Json(products))
@@ -237,7 +235,7 @@ pub async fn create_command(
     .await
     .map_err(|e| {
         tracing::error!("Create command error: {e}");
-        internal_error("Internal error")
+        AppError::new(ErrorCode::InternalError)
     })?;
 
     let detail = serde_json::json!({ "command_type": req.command_type, "command_id": command_id });
@@ -281,7 +279,7 @@ pub async fn list_commands(
             .await
             .map_err(|e| {
                 tracing::error!("Commands query error: {e}");
-                internal_error("Internal error")
+                AppError::new(ErrorCode::InternalError)
             })?;
 
     Ok(Json(commands))
@@ -307,36 +305,21 @@ pub async fn audit_log(
         .await
         .map_err(|e| {
             tracing::error!("Audit log query error: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     Ok(Json(entries))
 }
 
-async fn verify_store(
-    state: &AppState,
-    store_id: i64,
-    tenant_id: &str,
-) -> Result<(), (http::StatusCode, Json<serde_json::Value>)> {
+async fn verify_store(state: &AppState, store_id: i64, tenant_id: &str) -> Result<(), AppError> {
     tenant_queries::verify_store_ownership(&state.pool, store_id, tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Store verification error: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?
-        .ok_or_else(|| error(404, "Store not found"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::NotFound))?;
     Ok(())
-}
-
-fn error(status: u16, msg: &str) -> (http::StatusCode, Json<serde_json::Value>) {
-    (
-        http::StatusCode::from_u16(status).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR),
-        Json(serde_json::json!({ "error": msg })),
-    )
-}
-
-fn internal_error(msg: &str) -> (http::StatusCode, Json<serde_json::Value>) {
-    error(500, msg)
 }
 
 /// POST /api/tenant/billing-portal — get Stripe Customer Portal URL
@@ -346,13 +329,13 @@ pub async fn billing_portal(
 ) -> ApiResult<serde_json::Value> {
     let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
         .await
-        .map_err(|_| internal_error("Internal error"))?
-        .ok_or_else(|| error(404, "Tenant not found"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
     let customer_id = tenant
         .stripe_customer_id
         .as_deref()
-        .ok_or_else(|| error(400, "No Stripe customer linked"))?;
+        .ok_or_else(|| AppError::new(ErrorCode::ValidationFailed))?;
 
     let return_url = format!(
         "{}/dashboard",
@@ -369,7 +352,7 @@ pub async fn billing_portal(
     .await
     .map_err(|e| {
         tracing::error!("Billing portal error: {e}");
-        internal_error("Failed to create billing portal session")
+        AppError::new(ErrorCode::InternalError)
     })?;
 
     Ok(Json(serde_json::json!({ "url": url })))
@@ -391,24 +374,24 @@ pub async fn change_email(
 ) -> ApiResult<serde_json::Value> {
     let new_email = req.new_email.trim().to_lowercase();
     if new_email.is_empty() || !new_email.contains('@') {
-        return Err(error(400, "Invalid email"));
+        return Err(AppError::new(ErrorCode::ValidationFailed));
     }
 
     let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
         .await
-        .map_err(|_| internal_error("Internal error"))?
-        .ok_or_else(|| error(404, "Tenant not found"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
     if !verify_password(&req.current_password, &tenant.hashed_password) {
-        return Err(error(401, "Invalid password"));
+        return Err(AppError::new(ErrorCode::InvalidCredentials));
     }
 
     if let Ok(Some(_)) = db::tenants::find_by_email(&state.pool, &new_email).await {
-        return Err(error(409, "Email already in use"));
+        return Err(AppError::new(ErrorCode::AlreadyExists));
     }
 
     let code = generate_code();
-    let code_hash = hash_password(&code).map_err(|_| internal_error("Internal error"))?;
+    let code_hash = hash_password(&code).map_err(|_| AppError::new(ErrorCode::InternalError))?;
     let now = shared::util::now_millis();
     let expires_at = now + 5 * 60 * 1000;
 
@@ -429,7 +412,7 @@ pub async fn change_email(
         Some(&metadata),
     )
     .await
-    .map_err(|_| internal_error("Internal error"))?;
+    .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
     let _ =
         email::send_email_change_code(&state.ses, &state.ses_from_email, &new_email, &code).await;
@@ -455,42 +438,42 @@ pub async fn confirm_email_change(
 
     let record = db::email_verifications::find(&state.pool, &new_email, "email_change")
         .await
-        .map_err(|_| internal_error("Internal error"))?
-        .ok_or_else(|| error(404, "No email change pending"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::NotFound))?;
 
     // Verify tenant_id from metadata to prevent cross-tenant attacks
     if let Some(ref meta) = record.metadata {
         let meta: serde_json::Value =
-            serde_json::from_str(meta).map_err(|_| internal_error("Internal error"))?;
+            serde_json::from_str(meta).map_err(|_| AppError::new(ErrorCode::InternalError))?;
         if meta.get("tenant_id").and_then(|v| v.as_str()) != Some(&identity.tenant_id) {
-            return Err(error(403, "Not authorized"));
+            return Err(AppError::new(ErrorCode::PermissionDenied));
         }
     } else {
-        return Err(error(403, "Not authorized"));
+        return Err(AppError::new(ErrorCode::PermissionDenied));
     }
 
     let now = shared::util::now_millis();
     if now > record.expires_at {
-        return Err(error(410, "Code expired"));
+        return Err(AppError::new(ErrorCode::VerificationCodeExpired));
     }
     if record.attempts >= 3 {
-        return Err(error(429, "Too many attempts"));
+        return Err(AppError::new(ErrorCode::TooManyAttempts));
     }
 
     db::email_verifications::increment_attempts(&state.pool, &new_email, "email_change")
         .await
         .map_err(|e| {
             tracing::error!("Failed to increment attempts: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     if !verify_password(&req.code, &record.code) {
-        return Err(error(401, "Invalid code"));
+        return Err(AppError::new(ErrorCode::VerificationCodeInvalid));
     }
 
     db::tenants::update_email(&state.pool, &identity.tenant_id, &new_email)
         .await
-        .map_err(|_| internal_error("Internal error"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
     let _ = db::email_verifications::delete(&state.pool, &new_email, "email_change").await;
 
@@ -531,22 +514,23 @@ pub async fn change_password(
     Json(req): Json<ChangePasswordRequest>,
 ) -> ApiResult<serde_json::Value> {
     if req.new_password.len() < 8 {
-        return Err(error(400, "Password must be at least 8 characters"));
+        return Err(AppError::new(ErrorCode::PasswordTooShort));
     }
 
     let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
         .await
-        .map_err(|_| internal_error("Internal error"))?
-        .ok_or_else(|| error(404, "Tenant not found"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
     if !verify_password(&req.current_password, &tenant.hashed_password) {
-        return Err(error(401, "Invalid current password"));
+        return Err(AppError::new(ErrorCode::InvalidCredentials));
     }
 
-    let hashed = hash_password(&req.new_password).map_err(|_| internal_error("Internal error"))?;
+    let hashed =
+        hash_password(&req.new_password).map_err(|_| AppError::new(ErrorCode::InternalError))?;
     db::tenants::update_password(&state.pool, &identity.tenant_id, &hashed)
         .await
-        .map_err(|_| internal_error("Internal error"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
     let now = shared::util::now_millis();
     let _ = crate::db::audit::log(
@@ -579,7 +563,7 @@ pub async fn update_profile(
             .bind(&identity.tenant_id)
             .execute(&state.pool)
             .await
-            .map_err(|_| internal_error("Internal error"))?;
+            .map_err(|_| AppError::new(ErrorCode::InternalError))?;
     }
     Ok(Json(serde_json::json!({ "message": "Profile updated" })))
 }
@@ -611,7 +595,7 @@ pub async fn forgot_password(
     };
 
     let code = generate_code();
-    let code_hash = hash_password(&code).map_err(|_| internal_error("Internal error"))?;
+    let code_hash = hash_password(&code).map_err(|_| AppError::new(ErrorCode::InternalError))?;
     let now = shared::util::now_millis();
     let expires_at = now + 5 * 60 * 1000;
 
@@ -654,42 +638,43 @@ pub async fn reset_password(
     let email_addr = req.email.trim().to_lowercase();
 
     if req.new_password.len() < 8 {
-        return Err(error(400, "Password must be at least 8 characters"));
+        return Err(AppError::new(ErrorCode::PasswordTooShort));
     }
 
     let record = db::email_verifications::find(&state.pool, &email_addr, "password_reset")
         .await
-        .map_err(|_| internal_error("Internal error"))?
-        .ok_or_else(|| error(404, "No password reset pending"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::NotFound))?;
 
     let now = shared::util::now_millis();
     if now > record.expires_at {
-        return Err(error(410, "Reset code expired"));
+        return Err(AppError::new(ErrorCode::VerificationCodeExpired));
     }
     if record.attempts >= 3 {
-        return Err(error(429, "Too many attempts, request a new code"));
+        return Err(AppError::new(ErrorCode::TooManyAttempts));
     }
 
     db::email_verifications::increment_attempts(&state.pool, &email_addr, "password_reset")
         .await
         .map_err(|e| {
             tracing::error!("Failed to increment attempts: {e}");
-            internal_error("Internal error")
+            AppError::new(ErrorCode::InternalError)
         })?;
 
     if !verify_password(&req.code, &record.code) {
-        return Err(error(401, "Invalid reset code"));
+        return Err(AppError::new(ErrorCode::VerificationCodeInvalid));
     }
 
     let tenant = db::tenants::find_by_email(&state.pool, &email_addr)
         .await
-        .map_err(|_| internal_error("Internal error"))?
-        .ok_or_else(|| error(404, "Tenant not found"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
-    let hashed = hash_password(&req.new_password).map_err(|_| internal_error("Internal error"))?;
+    let hashed =
+        hash_password(&req.new_password).map_err(|_| AppError::new(ErrorCode::InternalError))?;
     db::tenants::update_password(&state.pool, &tenant.id, &hashed)
         .await
-        .map_err(|_| internal_error("Internal error"))?;
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
     let _ = db::email_verifications::delete(&state.pool, &email_addr, "password_reset").await;
 

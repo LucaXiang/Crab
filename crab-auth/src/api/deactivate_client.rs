@@ -3,6 +3,7 @@ use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
 use shared::activation::DeactivateResponse;
+use shared::error::ErrorCode;
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -25,6 +26,7 @@ pub async fn deactivate_client(
             return Json(DeactivateResponse {
                 success: false,
                 error: Some("Invalid credentials".to_string()),
+                error_code: Some(ErrorCode::TenantCredentialsInvalid),
             });
         }
         Err(e) => {
@@ -32,6 +34,7 @@ pub async fn deactivate_client(
             return Json(DeactivateResponse {
                 success: false,
                 error: Some("Internal error".to_string()),
+                error_code: Some(ErrorCode::InternalError),
             });
         }
     };
@@ -43,12 +46,14 @@ pub async fn deactivate_client(
             return Json(DeactivateResponse {
                 success: false,
                 error: Some("Entity does not belong to this tenant/device".to_string()),
+                error_code: Some(ErrorCode::PermissionDenied),
             });
         }
         Ok(None) => {
             return Json(DeactivateResponse {
                 success: false,
                 error: Some("Client connection not found".to_string()),
+                error_code: Some(ErrorCode::NotFound),
             });
         }
         Err(e) => {
@@ -56,6 +61,7 @@ pub async fn deactivate_client(
             return Json(DeactivateResponse {
                 success: false,
                 error: Some("Internal error".to_string()),
+                error_code: Some(ErrorCode::InternalError),
             });
         }
     };
@@ -64,6 +70,7 @@ pub async fn deactivate_client(
         return Json(DeactivateResponse {
             success: false,
             error: Some(format!("Client is already {}", connection.status)),
+            error_code: Some(ErrorCode::ValidationFailed),
         });
     }
 
@@ -73,6 +80,7 @@ pub async fn deactivate_client(
         return Json(DeactivateResponse {
             success: false,
             error: Some("Failed to deactivate".to_string()),
+            error_code: Some(ErrorCode::InternalError),
         });
     }
 
@@ -85,5 +93,6 @@ pub async fn deactivate_client(
     Json(DeactivateResponse {
         success: true,
         error: None,
+        error_code: None,
     })
 }

@@ -3,6 +3,7 @@ use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
 use shared::activation::{PlanType, SubscriptionInfo, SubscriptionStatus};
+use shared::error::ErrorCode;
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -22,14 +23,16 @@ pub async fn get_subscription_status(
         Ok(None) => {
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Invalid credentials"
+                "error": "Invalid credentials",
+                "error_code": ErrorCode::TenantCredentialsInvalid
             }));
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error during authentication");
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Internal error"
+                "error": "Internal error",
+                "error_code": ErrorCode::InternalError
             }));
         }
     };
@@ -40,9 +43,11 @@ pub async fn get_subscription_status(
     let tenant_ca = match state.ca_store.load_tenant_ca(tenant_id).await {
         Ok(ca) => ca,
         Err(e) => {
+            tracing::error!(error = %e, tenant_id = %tenant_id, "Tenant CA error");
             return Json(serde_json::json!({
                 "success": false,
-                "error": format!("Tenant not found or CA error: {}", e)
+                "error": "Internal error",
+                "error_code": ErrorCode::AuthServerError
             }));
         }
     };
@@ -53,14 +58,16 @@ pub async fn get_subscription_status(
         Ok(None) => {
             return Json(serde_json::json!({
                 "success": false,
-                "error": "No subscription found"
+                "error": "No subscription found",
+                "error_code": ErrorCode::TenantNoSubscription
             }));
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching subscription");
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Internal error"
+                "error": "Internal error",
+                "error_code": ErrorCode::InternalError
             }));
         }
     };
@@ -94,9 +101,11 @@ pub async fn get_subscription_status(
     let signed = match subscription.sign(&tenant_ca.key_pem()) {
         Ok(s) => s,
         Err(e) => {
+            tracing::error!(error = %e, "Failed to sign subscription");
             return Json(serde_json::json!({
                 "success": false,
-                "error": format!("Failed to sign subscription: {}", e)
+                "error": "Internal error",
+                "error_code": ErrorCode::AuthServerError
             }));
         }
     };

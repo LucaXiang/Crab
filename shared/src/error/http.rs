@@ -45,7 +45,8 @@ impl ErrorCode {
             | Self::TokenInvalid
             | Self::SessionExpired
             | Self::AccountLocked
-            | Self::AccountDisabled => StatusCode::UNAUTHORIZED,
+            | Self::AccountDisabled
+            | Self::VerificationCodeInvalid => StatusCode::UNAUTHORIZED,
 
             // 403 Forbidden
             Self::PermissionDenied
@@ -61,7 +62,17 @@ impl ErrorCode {
             | Self::DeviceLimitReached
             | Self::ClientLimitReached
             | Self::TenantNoSubscription
-            | Self::FeatureNotAvailable => StatusCode::FORBIDDEN,
+            | Self::FeatureNotAvailable
+            | Self::EmailNotVerified => StatusCode::FORBIDDEN,
+
+            // 410 Gone
+            Self::VerificationCodeExpired => StatusCode::GONE,
+
+            // 429 Too Many Requests
+            Self::TooManyAttempts => StatusCode::TOO_MANY_REQUESTS,
+
+            // 502 Bad Gateway
+            Self::PaymentSetupFailed => StatusCode::BAD_GATEWAY,
 
             // 402 Payment Required
             Self::PaymentInsufficientAmount => StatusCode::PAYMENT_REQUIRED,
