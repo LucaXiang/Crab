@@ -870,6 +870,14 @@ Resources:
                 Action:
                   - ses:SendEmail
                 Resource: '*'
+              # ECS Exec (SSM) for debugging
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: '*'
 
   CrabCloudExecutionRole:
     Type: AWS::IAM::Role
@@ -1075,6 +1083,7 @@ Resources:
       ServiceName: crab-cloud
       TaskDefinition: !Ref CrabCloudTaskDef
       DesiredCount: 1
+      EnableExecuteCommand: true
       LaunchType: FARGATE
       DeploymentConfiguration:
         MinimumHealthyPercent: 100
@@ -1112,7 +1121,7 @@ Resources:
         ScanOnPush: true
       EncryptionConfiguration:
         EncryptionType: AES256
-      ImageTagMutability: IMMUTABLE
+      ImageTagMutability: MUTABLE
       LifecyclePolicy:
         LifecyclePolicyText: |
           {

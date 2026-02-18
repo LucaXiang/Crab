@@ -138,9 +138,6 @@ jobs:
         run: |
           docker build -f crab-cloud/Dockerfile -t $ECR_REGISTRY/crab-cloud:$IMAGE_TAG .
           docker push $ECR_REGISTRY/crab-cloud:$IMAGE_TAG
-          # Also tag as latest
-          docker tag $ECR_REGISTRY/crab-cloud:$IMAGE_TAG $ECR_REGISTRY/crab-cloud:latest
-          docker push $ECR_REGISTRY/crab-cloud:latest
 
       - name: Deploy to ECS
         env:
