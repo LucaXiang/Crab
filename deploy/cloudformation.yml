@@ -933,6 +933,8 @@ Resources:
               Value: !Ref Environment
             - Name: SES_FROM_EMAIL
               Value: !Sub noreply@${DomainName}
+            - Name: SES_REGION
+              Value: eu-west-1
             - Name: REGISTRATION_SUCCESS_URL
               Value: !Sub https://${DomainName}/registration/success
             - Name: REGISTRATION_CANCEL_URL

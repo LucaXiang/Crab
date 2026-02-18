@@ -129,8 +129,18 @@ impl AppState {
         // Initialize AWS SDK
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let sm_client = SmClient::new(&aws_config);
-        let ses = SesClient::new(&aws_config);
         let s3 = S3Client::new(&aws_config);
+
+        // SES may run in a different region (eu-south-2 doesn't support SES)
+        let ses = if let Ok(ses_region) = std::env::var("SES_REGION") {
+            let ses_config = aws_config
+                .to_builder()
+                .region(aws_config::Region::new(ses_region))
+                .build();
+            SesClient::new(&ses_config)
+        } else {
+            SesClient::new(&aws_config)
+        };
         let ca_store = CaStore::new(sm_client);
 
         // Load Root CA PEM
