@@ -78,7 +78,7 @@ pub async fn get_active_subscription(
         "SELECT id, tenant_id, status, plan, max_edge_servers, max_clients,
             features, current_period_end
             FROM subscriptions
-            WHERE tenant_id = $1
+            WHERE tenant_id = $1 AND status = 'active'
             ORDER BY created_at DESC
             LIMIT 1",
     )

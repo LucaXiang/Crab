@@ -96,6 +96,16 @@ pub fn public_router(state: AppState) -> Router {
     // PKI routes (merged from crab-auth)
     let pki_routes = pki::pki_router();
 
+    // PKI auth routes (accept password → login rate limit: 5 req/min per IP)
+    let pki_auth_routes = pki::pki_auth_router();
+    let pki_auth_limited =
+        Router::new()
+            .merge(pki_auth_routes)
+            .layer(middleware::from_fn_with_state(
+                state.clone(),
+                login_rate_limit,
+            ));
+
     Router::new()
         .route("/health", get(health::health_check))
         .merge(registration)
@@ -105,6 +115,7 @@ pub fn public_router(state: AppState) -> Router {
         .merge(tenant_login)
         .merge(password_reset)
         .merge(pki_routes)
+        .merge(pki_auth_limited)
         .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB
         .layer(middleware::from_fn_with_state(
             state.clone(),

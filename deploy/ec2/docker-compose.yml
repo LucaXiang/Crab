@@ -49,6 +49,7 @@ services:
       SES_REGION: eu-west-1
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_BASIC_PRICE_ID: ${STRIPE_BASIC_PRICE_ID}
       JWT_SECRET: ${JWT_SECRET}
       REGISTRATION_SUCCESS_URL: https://redcoral.app/registration/success
       REGISTRATION_CANCEL_URL: https://redcoral.app/registration/cancel
@@ -57,9 +58,7 @@ services:
       ROOT_CA_PATH: /certs/root_ca.pem
       SERVER_CERT_PATH: /certs/server.pem
       SERVER_KEY_PATH: /certs/server.key
-      # PKI (merged from crab-auth)
-      P12_S3_BUCKET: ${P12_S3_BUCKET:-}
-      P12_KMS_KEY_ID: ${P12_KMS_KEY_ID:-}
+      # PKI (merged from crab-auth) — P12 stored in Secrets Manager
     volumes:
       - ./certs:/certs:ro
 

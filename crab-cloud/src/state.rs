@@ -36,7 +36,7 @@ pub struct AppState {
     pub registration_success_url: String,
     /// URL to redirect after cancelled registration checkout
     pub registration_cancel_url: String,
-    /// AWS S3 client (update artifacts + P12 certificates)
+    /// AWS S3 client (update artifacts)
     pub s3: S3Client,
     /// S3 bucket for update artifacts
     pub update_s3_bucket: String,
@@ -48,31 +48,36 @@ pub struct AppState {
     pub quota_cache: QuotaCache,
     /// Rate limiter for login/registration routes
     pub rate_limiter: crate::auth::rate_limit::RateLimiter,
-    /// S3 bucket for P12 certificates (Verifactu)
-    pub p12_s3_bucket: String,
-    /// KMS Key ID for P12 SSE-KMS encryption
-    pub kms_key_id: Option<String>,
     /// Stripe Price ID for Basic plan (checkout session)
     pub stripe_basic_price_id: String,
 }
 
 impl AppState {
-    /// Store P12 password in Secrets Manager (create or update)
-    pub async fn store_p12_password(
+    /// Store P12 binary (base64) + password in Secrets Manager (create or update)
+    pub async fn store_p12_secret(
         &self,
         tenant_id: &str,
+        p12_data: &[u8],
         password: &str,
-    ) -> Result<(), BoxError> {
-        let secret_name = format!("crab-auth/p12/{tenant_id}");
+    ) -> Result<String, BoxError> {
+        use base64::Engine;
+        let p12_base64 = base64::engine::general_purpose::STANDARD.encode(p12_data);
+        let secret_value = serde_json::json!({
+            "p12_base64": p12_base64,
+            "password": password,
+        })
+        .to_string();
+
+        let secret_name = format!("crab/p12/{tenant_id}");
         match self
             .sm
             .put_secret_value()
             .secret_id(&secret_name)
-            .secret_string(password)
+            .secret_string(&secret_value)
             .send()
             .await
         {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(secret_name),
             Err(err)
                 if err
                     .as_service_error()
@@ -81,10 +86,10 @@ impl AppState {
                 self.sm
                     .create_secret()
                     .name(&secret_name)
-                    .secret_string(password)
+                    .secret_string(&secret_value)
                     .send()
                     .await?;
-                Ok(())
+                Ok(secret_name)
             }
             Err(err) => Err(err.into()),
         }
@@ -153,8 +158,6 @@ impl AppState {
             jwt_secret: config.jwt_secret.clone(),
             quota_cache: QuotaCache::new(),
             rate_limiter: crate::auth::rate_limit::RateLimiter::new(),
-            p12_s3_bucket: config.p12_s3_bucket.clone(),
-            kms_key_id: config.kms_key_id.clone(),
             stripe_basic_price_id: config.stripe_basic_price_id.clone(),
         })
     }
@@ -203,7 +206,7 @@ impl CaStore {
         tenant_id: &str,
         root_ca: &CertificateAuthority,
     ) -> Result<CertificateAuthority, BoxError> {
-        let secret_name = format!("crab-auth/tenant/{tenant_id}");
+        let secret_name = format!("crab/tenant/{tenant_id}");
         let secret = match self.read_secret(&secret_name).await? {
             Some(s) => s,
             None => {
@@ -225,7 +228,7 @@ impl CaStore {
 
     /// Load existing Tenant CA (errors if not found)
     pub async fn load_tenant_ca(&self, tenant_id: &str) -> Result<CertificateAuthority, BoxError> {
-        let secret_name = format!("crab-auth/tenant/{tenant_id}");
+        let secret_name = format!("crab/tenant/{tenant_id}");
         let secret = self
             .read_secret(&secret_name)
             .await?
@@ -238,7 +241,7 @@ impl CaStore {
 
     /// Load Tenant CA cert PEM only (for mTLS verification in edge_auth)
     pub async fn load_tenant_ca_cert(&self, tenant_id: &str) -> Result<String, BoxError> {
-        let secret_name = format!("crab-auth/tenant/{tenant_id}");
+        let secret_name = format!("crab/tenant/{tenant_id}");
         let output = self
             .sm
             .get_secret_value()
@@ -252,7 +255,7 @@ impl CaStore {
     }
 
     async fn init_root_ca(&self) -> Result<CaSecret, BoxError> {
-        match self.read_secret("crab-auth/root-ca").await? {
+        match self.read_secret("crab/root-ca").await? {
             Some(s) => Ok(s),
             None => {
                 let ca = CertificateAuthority::new_root(CaProfile::root("Crab Root CA"))?;
@@ -260,7 +263,7 @@ impl CaStore {
                     cert_pem: ca.cert_pem().to_string(),
                     key_pem: ca.key_pem(),
                 };
-                self.create_secret("crab-auth/root-ca", &s).await?;
+                self.create_secret("crab/root-ca", &s).await?;
                 Ok(s)
             }
         }

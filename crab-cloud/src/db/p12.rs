@@ -5,7 +5,7 @@ use sqlx::PgPool;
 #[allow(dead_code)]
 pub struct P12Certificate {
     pub tenant_id: String,
-    pub s3_key: String,
+    pub secret_name: String,
     pub fingerprint: Option<String>,
     pub common_name: Option<String>,
     pub serial_number: Option<String>,
@@ -26,7 +26,7 @@ pub async fn find_by_tenant(
     tenant_id: &str,
 ) -> Result<Option<P12Certificate>, sqlx::Error> {
     sqlx::query_as::<_, P12Certificate>(
-        "SELECT tenant_id, s3_key, fingerprint, common_name, serial_number,
+        "SELECT tenant_id, secret_name, fingerprint, common_name, serial_number,
             organization_id, organization, issuer, country,
             expires_at, not_before, uploaded_at, updated_at
             FROM p12_certificates
@@ -62,24 +62,24 @@ pub async fn get_p12_info(
 pub async fn upsert(
     pool: &PgPool,
     tenant_id: &str,
-    s3_key: &str,
+    secret_name: &str,
     info: &crab_cert::P12CertInfo,
 ) -> Result<(), sqlx::Error> {
     let now = shared::util::now_millis();
     sqlx::query(
         "INSERT INTO p12_certificates
-            (tenant_id, s3_key, fingerprint, common_name, serial_number,
+            (tenant_id, secret_name, fingerprint, common_name, serial_number,
              organization_id, organization, issuer, country,
              expires_at, not_before, uploaded_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
             ON CONFLICT (tenant_id)
-            DO UPDATE SET s3_key = $2, fingerprint = $3, common_name = $4,
+            DO UPDATE SET secret_name = $2, fingerprint = $3, common_name = $4,
                           serial_number = $5, organization_id = $6, organization = $7,
                           issuer = $8, country = $9, expires_at = $10, not_before = $11,
                           updated_at = $12",
     )
     .bind(tenant_id)
-    .bind(s3_key)
+    .bind(secret_name)
     .bind(&info.fingerprint)
     .bind(&info.common_name)
     .bind(&info.serial_number)

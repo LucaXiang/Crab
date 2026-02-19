@@ -204,7 +204,27 @@
         "empty_fields": "请输入用户名和密码"
       },
       "no_account": "还没有账户？",
-      "register": "立即注册"
+      "register": "立即注册",
+      "device_limit": {
+        "title": "服务器配额已满",
+        "description": "您的计划最多允许 {max} 台服务器，当前已激活 {count} 台",
+        "device_id": "设备 ID",
+        "activated_at": "激活时间",
+        "last_refreshed": "最后刷新",
+        "replacing": "替换中...",
+        "button_replace": "替换此设备",
+        "button_cancel": "取消"
+      },
+      "client_limit": {
+        "title": "客户端配额已满",
+        "description": "您的计划最多允许 {max} 个客户端，当前已连接 {count} 个",
+        "device_id": "设备 ID",
+        "activated_at": "激活时间",
+        "last_refreshed": "最后刷新",
+        "replacing": "替换中...",
+        "button_replace": "替换此客户端",
+        "button_cancel": "取消"
+      }
     },
     "login": {
       "title": "登录",
@@ -2140,6 +2160,8 @@
     "button_exit_tenant": "退出当前租户",
     "confirm_exit_tenant": "确定退出当前租户？退出后需要重新激活设备。",
     "message": {
+      "Active": "订阅正常",
+      "PastDue": "订阅逾期，请尽快付款",
       "Inactive": "订阅未激活，请先完成付费",
       "Expired": "合同已到期，请续约",
       "Canceled": "订阅已取消",
@@ -2168,6 +2190,19 @@
     "message": {
       "missing": "需要上传 P12 电子签名证书才能使用系统",
       "expired": "P12 电子签名证书已过期，请上传新证书"
+    },
+    "upload": {
+      "section_title": "上传电子签名证书",
+      "p12_password_label": "证书密码",
+      "p12_password_placeholder": "P12 证书的保护密码",
+      "file_label": "选择证书文件",
+      "file_placeholder": "点击选择 .p12 文件",
+      "file_selected": "已选择",
+      "button_submit": "上传证书",
+      "uploading": "正在上传...",
+      "success": "证书上传成功！",
+      "success_detail": "签发者: {{issuer}}, 主体: {{common_name}}",
+      "security_notice": "证书文件仅用于上传验证，不会在本地保留"
     }
   },
   "fonts": {

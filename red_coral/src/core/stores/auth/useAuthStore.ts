@@ -20,7 +20,6 @@ interface AuthStore {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   setUser: (user: User | null) => void;
-  refreshToken: () => Promise<void>;
 
   // Permission Checks
   hasPermission: (permission: string) => boolean;
@@ -104,17 +103,6 @@ export const useAuthStore = create<AuthStore>()(
           set({ user, permissions: [], isAuthenticated: false });
         } else {
           set({ user, permissions: user.permissions ?? [], isAuthenticated: true });
-        }
-      },
-
-      /**
-       * Refresh token (handled by Rust ClientBridge)
-       */
-      refreshToken: async () => {
-        try {
-          await getApi().refreshToken();
-        } catch {
-          get().logout();
         }
       },
 

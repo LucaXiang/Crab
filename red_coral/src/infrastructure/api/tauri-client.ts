@@ -443,13 +443,6 @@ export class TauriApiClient {
     return invokeApi<RolePermission[]>('get_role_permissions', { roleId });
   }
 
-  // ============ Token Management ============
-  // In Tauri mode, authentication is handled by ClientBridge on Rust side
-
-  async refreshToken(): Promise<void> {
-    await invokeApi<void>('refresh_token');
-  }
-
   // ============ Shifts (班次管理) ============
 
   async listShifts(params?: { limit?: number; offset?: number; startDate?: string; endDate?: string }): Promise<Shift[]> {

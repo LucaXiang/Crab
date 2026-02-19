@@ -13,6 +13,56 @@ impl ClientBridge {
         self.config.read().await.auth_url.clone()
     }
 
+    /// 使用 refresh_token 换取新的 access token
+    ///
+    /// 自动更新 config 中的 refresh_token（轮转机制）
+    pub async fn get_fresh_token(&self) -> Result<String, BridgeError> {
+        let (auth_url, refresh_token) = {
+            let config = self.config.read().await;
+            let rt = config.refresh_token.clone().ok_or_else(|| {
+                BridgeError::Config("No refresh token stored — re-login required".to_string())
+            })?;
+            (config.auth_url.clone(), rt)
+        };
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| BridgeError::Config(e.to_string()))?;
+
+        let resp = client
+            .post(format!("{auth_url}/api/tenant/refresh"))
+            .json(&shared::activation::TokenRefreshRequest { refresh_token })
+            .send()
+            .await
+            .map_err(|e| BridgeError::Config(format!("Token refresh network error: {e}")))?;
+
+        let data: shared::activation::TokenRefreshResponse = resp
+            .json()
+            .await
+            .map_err(|e| BridgeError::Config(format!("Token refresh parse error: {e}")))?;
+
+        if !data.success {
+            return Err(BridgeError::Config(
+                data.error
+                    .unwrap_or_else(|| "Token refresh failed".to_string()),
+            ));
+        }
+
+        let token = data
+            .token
+            .ok_or_else(|| BridgeError::Config("No token in refresh response".to_string()))?;
+
+        // 保存新的 refresh_token（轮转后旧的失效）
+        if let Some(new_rt) = data.refresh_token {
+            let mut config = self.config.write().await;
+            config.refresh_token = Some(new_rt);
+            config.save(&self.config_path)?;
+        }
+
+        Ok(token)
+    }
+
     /// 获取服务器模式配置
     pub async fn get_server_config(&self) -> ServerModeConfig {
         self.config.read().await.server_config.clone()

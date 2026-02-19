@@ -13,6 +13,20 @@ pub struct ClientConnection {
     pub last_refreshed_at: Option<i64>,
 }
 
+/// 获取租户 client 激活 advisory lock (防止并发激活超配额)
+pub async fn acquire_activation_lock(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: &str,
+) -> Result<(), sqlx::Error> {
+    // 使用 'client:' 前缀避免与 server activation lock 冲突
+    let lock_key = format!("client:{tenant_id}");
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+        .bind(&lock_key)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
 /// 统计租户活跃 Client 数
 pub async fn count_active(pool: &PgPool, tenant_id: &str) -> Result<i64, sqlx::Error> {
     let row: (i64,) = sqlx::query_as(
@@ -75,9 +89,23 @@ pub async fn find_by_entity(
     .await
 }
 
-/// 插入新的 Client 连接记录
-pub async fn insert(
-    pool: &PgPool,
+/// 在事务内统计活跃 Client 数 (配合 advisory lock 使用)
+pub async fn count_active_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: &str,
+) -> Result<i64, sqlx::Error> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM client_connections WHERE tenant_id = $1 AND status = 'active'",
+    )
+    .bind(tenant_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(row.0)
+}
+
+/// 在事务内插入 Client 连接记录 (配合 advisory lock 使用)
+pub async fn insert_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     entity_id: &str,
     tenant_id: &str,
     device_id: &str,
@@ -96,14 +124,14 @@ pub async fn insert(
     .bind(device_id)
     .bind(fingerprint)
     .bind(now)
-    .execute(pool)
+    .execute(&mut **tx)
     .await?;
     Ok(())
 }
 
-/// 标记 Client 为 replaced
-pub async fn mark_replaced(
-    pool: &PgPool,
+/// 在事务内标记 Client 为 replaced
+pub async fn mark_replaced_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     old_entity_id: &str,
     new_entity_id: &str,
 ) -> Result<bool, sqlx::Error> {
@@ -116,7 +144,7 @@ pub async fn mark_replaced(
     .bind(now)
     .bind(new_entity_id)
     .bind(old_entity_id)
-    .execute(pool)
+    .execute(&mut **tx)
     .await?;
     Ok(result.rows_affected() > 0)
 }

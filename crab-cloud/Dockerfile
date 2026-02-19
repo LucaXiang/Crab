@@ -36,7 +36,9 @@ COPY crab-cloud/ crab-cloud/
 # Touch source files to invalidate the dummy build
 RUN touch shared/src/lib.rs crab-cert/src/lib.rs crab-cloud/src/main.rs
 
-# Build the real binary
+# Build the real binary (inject git hash for /health endpoint)
+ARG GIT_HASH=dev
+ENV GIT_HASH=${GIT_HASH}
 RUN cargo build --release -p crab-cloud
 
 # ── Stage 2: Runtime ──

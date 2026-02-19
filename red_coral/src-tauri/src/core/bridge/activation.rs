@@ -162,13 +162,14 @@ impl ClientBridge {
             }
         }
 
-        // 更新配置
+        // 更新配置（包括保存 refresh_token 以便后续无密码操作）
         {
             let mut config = self.config.write().await;
             if !config.known_tenants.contains(&tenant_id) {
                 config.known_tenants.push(tenant_id.clone());
             }
             config.current_tenant = Some(tenant_id);
+            config.refresh_token = Some(data.refresh_token.clone());
             config.save(&self.config_path)?;
         }
 

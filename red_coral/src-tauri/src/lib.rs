@@ -178,6 +178,7 @@ pub async fn run() {
             commands::activate_client_tenant,
             commands::deactivate_current_mode,
             commands::exit_tenant,
+            commands::upload_p12,
             commands::get_current_tenant,
             commands::check_subscription,
             // Auth commands (ClientBridge-based - unified)

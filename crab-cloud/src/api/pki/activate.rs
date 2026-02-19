@@ -87,67 +87,7 @@ pub async fn activate(
         (format!("edge-server-{}", uuid::Uuid::new_v4()), false)
     };
 
-    if !is_reactivation {
-        let active_count = match activations::count_active(&state.pool, &tenant.id).await {
-            Ok(n) => n,
-            Err(e) => {
-                tracing::error!(error = %e, "Database error counting active devices");
-                return Json(fail(ErrorCode::InternalError, "Internal error"));
-            }
-        };
-
-        if max_edge_servers > 0 && active_count >= max_edge_servers as i64 {
-            if let Some(ref replace_id) = req.replace_entity_id {
-                let replace_target = activations::find_by_entity(&state.pool, replace_id).await;
-                match replace_target {
-                    Ok(Some(target))
-                        if target.tenant_id == tenant.id && target.status == "active" =>
-                    {
-                        if let Err(e) =
-                            activations::mark_replaced(&state.pool, replace_id, &entity_id).await
-                        {
-                            tracing::error!(error = %e, "Failed to mark device as replaced");
-                            return Json(fail(
-                                ErrorCode::InternalError,
-                                "Failed to replace device",
-                            ));
-                        }
-                    }
-                    _ => {
-                        return Json(fail(ErrorCode::ValidationFailed, "Invalid replace target"));
-                    }
-                }
-            } else {
-                let active_devices = match activations::list_active(&state.pool, &tenant.id).await {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|a| ActiveDevice {
-                            entity_id: a.entity_id,
-                            device_id: a.device_id,
-                            activated_at: a.activated_at,
-                            last_refreshed_at: a.last_refreshed_at,
-                        })
-                        .collect(),
-                    Err(e) => {
-                        tracing::error!(error = %e, "Database error listing active devices");
-                        return Json(fail(ErrorCode::InternalError, "Internal error"));
-                    }
-                };
-
-                return Json(ActivationResponse {
-                    success: false,
-                    error: Some("device_limit_reached".to_string()),
-                    error_code: Some(ErrorCode::DeviceLimitReached),
-                    data: None,
-                    quota_info: Some(QuotaInfo {
-                        max_slots: max_edge_servers as u32,
-                        active_count: active_count as u32,
-                        active_devices,
-                    }),
-                });
-            }
-        }
-    }
+    // === CA 操作（幂等，可在事务外执行）===
 
     let root_ca = match state.ca_store.get_or_create_root_ca().await {
         Ok(ca) => ca,
@@ -169,6 +109,9 @@ pub async fn activate(
         }
     };
 
+    // Edge-server 证书需要同时具备 Server + Client EKU:
+    // - Server: 作为 MessageBus TLS 服务端（POS 客户端连接）
+    // - Client: 作为 mTLS 客户端（向 cloud 同步数据）
     let mut profile = CertProfile::new_server(
         &entity_id,
         vec![entity_id.clone(), "localhost".to_string()],
@@ -218,7 +161,7 @@ pub async fn activate(
         starts_at: shared::util::now_millis(),
         expires_at: sub.current_period_end,
         features: sub.features.clone(),
-        max_stores: max_edge_servers as u32,
+        max_stores: plan.max_stores() as u32,
         max_clients: sub.max_clients as u32,
         signature_valid_until,
         signature: String::new(),
@@ -240,8 +183,85 @@ pub async fn activate(
         }
     };
 
-    if let Err(e) = activations::insert(
-        &state.pool,
+    // === 配额检查 + 写入在事务内完成（advisory lock 防止并发超配额）===
+
+    let mut tx = match state.pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to begin transaction");
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
+        }
+    };
+
+    if let Err(e) = activations::acquire_activation_lock(&mut tx, &tenant.id).await {
+        tracing::error!(error = %e, "Failed to acquire activation lock");
+        return Json(fail(ErrorCode::InternalError, "Internal error"));
+    }
+
+    if !is_reactivation && max_edge_servers > 0 {
+        let active_count = match activations::count_active_in_tx(&mut tx, &tenant.id).await {
+            Ok(n) => n,
+            Err(e) => {
+                tracing::error!(error = %e, "Database error counting active devices");
+                return Json(fail(ErrorCode::InternalError, "Internal error"));
+            }
+        };
+
+        if active_count >= max_edge_servers as i64 {
+            if let Some(ref replace_id) = req.replace_entity_id {
+                let replace_target = activations::find_by_entity(&state.pool, replace_id).await;
+                match replace_target {
+                    Ok(Some(target))
+                        if target.tenant_id == tenant.id && target.status == "active" =>
+                    {
+                        if let Err(e) =
+                            activations::mark_replaced_in_tx(&mut tx, replace_id, &entity_id).await
+                        {
+                            tracing::error!(error = %e, "Failed to mark device as replaced");
+                            return Json(fail(
+                                ErrorCode::InternalError,
+                                "Failed to replace device",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Json(fail(ErrorCode::ValidationFailed, "Invalid replace target"));
+                    }
+                }
+            } else {
+                let active_devices = match activations::list_active(&state.pool, &tenant.id).await {
+                    Ok(list) => list
+                        .into_iter()
+                        .map(|a| ActiveDevice {
+                            entity_id: a.entity_id,
+                            device_id: a.device_id,
+                            activated_at: a.activated_at,
+                            last_refreshed_at: a.last_refreshed_at,
+                        })
+                        .collect(),
+                    Err(e) => {
+                        tracing::error!(error = %e, "Database error listing active devices");
+                        return Json(fail(ErrorCode::InternalError, "Internal error"));
+                    }
+                };
+
+                return Json(ActivationResponse {
+                    success: false,
+                    error: Some("device_limit_reached".to_string()),
+                    error_code: Some(ErrorCode::DeviceLimitReached),
+                    data: None,
+                    quota_info: Some(QuotaInfo {
+                        max_slots: max_edge_servers as u32,
+                        active_count: active_count as u32,
+                        active_devices,
+                    }),
+                });
+            }
+        }
+    }
+
+    if let Err(e) = activations::insert_in_tx(
+        &mut tx,
         &entity_id,
         &tenant.id,
         &req.device_id,
@@ -250,6 +270,11 @@ pub async fn activate(
     .await
     {
         tracing::error!(error = %e, "Failed to write activation record");
+        return Json(fail(ErrorCode::InternalError, "Internal error"));
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!(error = %e, "Failed to commit activation transaction");
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 

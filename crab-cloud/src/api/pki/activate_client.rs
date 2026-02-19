@@ -18,6 +18,8 @@ pub struct ActivateClientRequest {
     pub token: String,
     pub device_id: String,
     pub replace_entity_id: Option<String>,
+    /// 客户端名称 (POS, KDS, etc.)
+    pub client_name: Option<String>,
 }
 
 pub async fn activate_client(
@@ -89,8 +91,116 @@ pub async fn activate_client(
         (format!("client-{}", uuid::Uuid::new_v4()), false)
     };
 
-    if !is_reactivation {
-        let active_count = match client_connections::count_active(&state.pool, &tenant.id).await {
+    // === CA 操作（幂等，可在事务外执行）===
+
+    let root_ca = match state.ca_store.get_or_create_root_ca().await {
+        Ok(ca) => ca,
+        Err(e) => {
+            tracing::error!(error = %e, "Root CA error");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
+        }
+    };
+
+    let tenant_ca = match state
+        .ca_store
+        .get_or_create_tenant_ca(&tenant.id, &root_ca)
+        .await
+    {
+        Ok(ca) => ca,
+        Err(e) => {
+            tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
+        }
+    };
+
+    // Client 证书只需要 ClientAuth EKU（POS 终端作为 mTLS 客户端连接 edge-server）
+    let profile = CertProfile::new_client(
+        &entity_id,
+        Some(tenant.id.clone()),
+        Some(req.device_id.clone()),
+        req.client_name.clone(),
+    );
+
+    let (entity_cert, entity_key) = match tenant_ca.issue_cert(&profile) {
+        Ok(pair) => pair,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to issue certificate");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
+        }
+    };
+
+    let fingerprint = match CertMetadata::from_pem(&entity_cert) {
+        Ok(meta) => meta.fingerprint_sha256,
+        Err(e) => {
+            tracing::error!(error = %e, "Certificate metadata error");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
+        }
+    };
+
+    let binding = SignedBinding::new(
+        &entity_id,
+        &tenant.id,
+        &req.device_id,
+        &fingerprint,
+        EntityType::Client,
+    );
+
+    let signed_binding = match binding.sign(&tenant_ca.key_pem()) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to sign binding");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
+        }
+    };
+
+    let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
+    let subscription_info = SubscriptionInfo {
+        tenant_id: tenant.id.clone(),
+        id: Some(sub.id.clone()),
+        status: sub_status,
+        plan,
+        starts_at: shared::util::now_millis(),
+        expires_at: sub.current_period_end,
+        features: sub.features.clone(),
+        max_stores: plan.max_stores() as u32,
+        max_clients: max_clients as u32,
+        signature_valid_until,
+        signature: String::new(),
+        last_checked_at: 0,
+        p12: match p12::get_p12_info(&state.pool, &tenant.id).await {
+            Ok(info) => Some(info),
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");
+                None
+            }
+        },
+    };
+
+    let signed_subscription = match subscription_info.sign(&tenant_ca.key_pem()) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to sign subscription");
+            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
+        }
+    };
+
+    // === 配额检查 + 写入在事务内完成（advisory lock 防止并发超配额）===
+
+    let mut tx = match state.pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to begin transaction");
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
+        }
+    };
+
+    if let Err(e) = client_connections::acquire_activation_lock(&mut tx, &tenant.id).await {
+        tracing::error!(error = %e, "Failed to acquire client activation lock");
+        return Json(fail(ErrorCode::InternalError, "Internal error"));
+    }
+
+    if !is_reactivation && max_clients > 0 {
+        let active_count = match client_connections::count_active_in_tx(&mut tx, &tenant.id).await {
             Ok(n) => n,
             Err(e) => {
                 tracing::error!(error = %e, "Database error counting active clients");
@@ -98,7 +208,7 @@ pub async fn activate_client(
             }
         };
 
-        if max_clients > 0 && active_count >= max_clients as i64 {
+        if active_count >= max_clients as i64 {
             if let Some(ref replace_id) = req.replace_entity_id {
                 let replace_target =
                     client_connections::find_by_entity(&state.pool, replace_id).await;
@@ -107,7 +217,7 @@ pub async fn activate_client(
                         if target.tenant_id == tenant.id && target.status == "active" =>
                     {
                         if let Err(e) =
-                            client_connections::mark_replaced(&state.pool, replace_id, &entity_id)
+                            client_connections::mark_replaced_in_tx(&mut tx, replace_id, &entity_id)
                                 .await
                         {
                             tracing::error!(error = %e, "Failed to mark client as replaced");
@@ -154,99 +264,8 @@ pub async fn activate_client(
         }
     }
 
-    let root_ca = match state.ca_store.get_or_create_root_ca().await {
-        Ok(ca) => ca,
-        Err(e) => {
-            tracing::error!(error = %e, "Root CA error");
-            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
-        }
-    };
-
-    let tenant_ca = match state
-        .ca_store
-        .get_or_create_tenant_ca(&tenant.id, &root_ca)
-        .await
-    {
-        Ok(ca) => ca,
-        Err(e) => {
-            tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
-            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
-        }
-    };
-
-    let mut profile = CertProfile::new_server(
-        &entity_id,
-        vec![entity_id.clone()],
-        Some(tenant.id.clone()),
-        req.device_id.clone(),
-    );
-    profile.is_client = true;
-
-    let (entity_cert, entity_key) = match tenant_ca.issue_cert(&profile) {
-        Ok(pair) => pair,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to issue certificate");
-            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
-        }
-    };
-
-    let fingerprint = match CertMetadata::from_pem(&entity_cert) {
-        Ok(meta) => meta.fingerprint_sha256,
-        Err(e) => {
-            tracing::error!(error = %e, "Certificate metadata error");
-            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
-        }
-    };
-
-    let binding = SignedBinding::new(
-        &entity_id,
-        &tenant.id,
-        &req.device_id,
-        &fingerprint,
-        EntityType::Client,
-    );
-
-    let signed_binding = match binding.sign(&tenant_ca.key_pem()) {
-        Ok(b) => b,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to sign binding");
-            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
-        }
-    };
-
-    let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
-    let subscription_info = SubscriptionInfo {
-        tenant_id: tenant.id.clone(),
-        id: Some(sub.id.clone()),
-        status: sub_status,
-        plan,
-        starts_at: shared::util::now_millis(),
-        expires_at: sub.current_period_end,
-        features: sub.features.clone(),
-        max_stores: sub.max_edge_servers as u32,
-        max_clients: max_clients as u32,
-        signature_valid_until,
-        signature: String::new(),
-        last_checked_at: 0,
-        p12: match p12::get_p12_info(&state.pool, &tenant.id).await {
-            Ok(info) => Some(info),
-            Err(e) => {
-                tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");
-                None
-            }
-        },
-    };
-
-    let signed_subscription = match subscription_info.sign(&tenant_ca.key_pem()) {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to sign subscription");
-            return Json(fail(ErrorCode::AuthServerError, "Internal error"));
-        }
-    };
-
-    if let Err(e) = client_connections::insert(
-        &state.pool,
+    if let Err(e) = client_connections::insert_in_tx(
+        &mut tx,
         &entity_id,
         &tenant.id,
         &req.device_id,
@@ -255,6 +274,11 @@ pub async fn activate_client(
     .await
     {
         tracing::error!(error = %e, "Failed to write client connection record");
+        return Json(fail(ErrorCode::InternalError, "Internal error"));
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!(error = %e, "Failed to commit client activation transaction");
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 

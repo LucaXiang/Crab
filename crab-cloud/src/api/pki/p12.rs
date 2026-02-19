@@ -1,6 +1,6 @@
+use crate::auth::tenant_auth;
 use crate::db::{p12, tenants};
 use crate::state::AppState;
-use aws_sdk_s3::primitives::ByteStream;
 use axum::Json;
 use axum::extract::{Multipart, State};
 use shared::error::ErrorCode;
@@ -9,19 +9,15 @@ pub async fn upload_p12(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Json<serde_json::Value> {
-    let mut username = None;
-    let mut password = None;
+    let mut token = None;
     let mut p12_password = None;
     let mut p12_data = None;
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = field.name().unwrap_or_default().to_string();
         match name.as_str() {
-            "username" => {
-                username = field.text().await.ok();
-            }
-            "password" => {
-                password = field.text().await.ok();
+            "token" => {
+                token = field.text().await.ok();
             }
             "p12_password" => {
                 p12_password = field.text().await.ok();
@@ -33,27 +29,37 @@ pub async fn upload_p12(
         }
     }
 
-    let (Some(username), Some(password), Some(p12_password), Some(p12_data)) =
-        (username, password, p12_password, p12_data)
-    else {
+    let (Some(token), Some(p12_password), Some(p12_data)) = (token, p12_password, p12_data) else {
         return Json(serde_json::json!({
             "success": false,
-            "error": "Missing required fields: username, password, p12_password, p12_file",
+            "error": "Missing required fields: token, p12_password, p12_file",
             "error_code": ErrorCode::RequiredField
         }));
     };
 
-    let tenant = match tenants::authenticate(&state.pool, &username, &password).await {
+    // JWT 认证（与其他 PKI 端点统一）
+    let tenant_id = match tenant_auth::verify_token(&token, &state.jwt_secret) {
+        Ok(claims) => claims.sub,
+        Err(_) => {
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Invalid or expired token",
+                "error_code": ErrorCode::TokenExpired
+            }));
+        }
+    };
+
+    let tenant = match tenants::find_by_id(&state.pool, &tenant_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Invalid credentials",
+                "error": "Tenant not found",
                 "error_code": ErrorCode::TenantCredentialsInvalid
             }));
         }
         Err(e) => {
-            tracing::error!(error = %e, "Database error during authentication");
+            tracing::error!(error = %e, "Database error finding tenant");
             return Json(serde_json::json!({
                 "success": false,
                 "error": "Internal error",
@@ -62,6 +68,7 @@ pub async fn upload_p12(
         }
     };
 
+    // 验证 P12 文件有效性（密码正确、证书链可解析、FNMT 签发）
     let cert_info = match crab_cert::parse_p12(&p12_data, &p12_password) {
         Ok(info) => info,
         Err(e) => {
@@ -88,39 +95,24 @@ pub async fn upload_p12(
         "P12 validated: issued by trusted Spanish CA"
     );
 
-    if let Err(e) = state.store_p12_password(&tenant.id, &p12_password).await {
-        tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to store P12 password in Secrets Manager");
-        return Json(serde_json::json!({
-            "success": false,
-            "error": "Failed to secure certificate password",
-            "error_code": ErrorCode::InternalError
-        }));
-    }
+    // Store P12 binary (base64) + password in Secrets Manager
+    let secret_name = match state
+        .store_p12_secret(&tenant.id, &p12_data, &p12_password)
+        .await
+    {
+        Ok(name) => name,
+        Err(e) => {
+            tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to store P12 in Secrets Manager");
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Failed to secure certificate",
+                "error_code": ErrorCode::InternalError
+            }));
+        }
+    };
 
-    let s3_key = format!("{}/verifactu.p12", tenant.id);
-
-    let mut put_builder = state
-        .s3
-        .put_object()
-        .bucket(&state.p12_s3_bucket)
-        .key(&s3_key)
-        .body(ByteStream::from(p12_data.to_vec()))
-        .server_side_encryption(aws_sdk_s3::types::ServerSideEncryption::AwsKms);
-
-    if let Some(ref kms_key) = state.kms_key_id {
-        put_builder = put_builder.ssekms_key_id(kms_key);
-    }
-
-    if let Err(e) = put_builder.send().await {
-        tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to upload .p12 to S3");
-        return Json(serde_json::json!({
-            "success": false,
-            "error": "Failed to store certificate",
-            "error_code": ErrorCode::InternalError
-        }));
-    }
-
-    if let Err(e) = p12::upsert(&state.pool, &tenant.id, &s3_key, &cert_info).await {
+    // Save metadata to PostgreSQL (upsert — 重复上传覆盖)
+    if let Err(e) = p12::upsert(&state.pool, &tenant.id, &secret_name, &cert_info).await {
         tracing::error!(error = %e, "Failed to save P12 metadata");
         return Json(serde_json::json!({
             "success": false,
@@ -132,12 +124,11 @@ pub async fn upload_p12(
     tracing::info!(
         tenant_id = %tenant.id,
         fingerprint = %cert_info.fingerprint,
-        "P12 certificate uploaded and secured"
+        "P12 certificate uploaded and secured in Secrets Manager"
     );
 
     Json(serde_json::json!({
         "success": true,
-        "s3_key": s3_key,
         "fingerprint": cert_info.fingerprint,
         "common_name": cert_info.common_name,
         "organization": cert_info.organization,

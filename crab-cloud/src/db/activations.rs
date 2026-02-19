@@ -24,6 +24,81 @@ pub async fn count_active(pool: &PgPool, tenant_id: &str) -> Result<i64, sqlx::E
     Ok(row.0)
 }
 
+/// 获取租户激活 advisory lock (防止并发激活超配额)
+///
+/// 使用 hashtext(tenant_id) 作为 lock key，保证同一租户串行激活。
+/// 锁在事务结束时自动释放。
+pub async fn acquire_activation_lock(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+        .bind(tenant_id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// 在事务内统计活跃设备数 (配合 advisory lock 使用)
+pub async fn count_active_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: &str,
+) -> Result<i64, sqlx::Error> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM activations WHERE tenant_id = $1 AND status = 'active'",
+    )
+    .bind(tenant_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(row.0)
+}
+
+/// 在事务内插入激活记录 (配合 advisory lock 使用)
+pub async fn insert_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    entity_id: &str,
+    tenant_id: &str,
+    device_id: &str,
+    fingerprint: &str,
+) -> Result<(), sqlx::Error> {
+    let now = shared::util::now_millis();
+    sqlx::query(
+        "INSERT INTO activations (entity_id, tenant_id, device_id, fingerprint, status, activated_at)
+            VALUES ($1, $2, $3, $4, 'active', $5)
+            ON CONFLICT (tenant_id, device_id)
+            DO UPDATE SET entity_id = $1, fingerprint = $4, status = 'active',
+                          activated_at = $5, deactivated_at = NULL, replaced_by = NULL",
+    )
+    .bind(entity_id)
+    .bind(tenant_id)
+    .bind(device_id)
+    .bind(fingerprint)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// 在事务内标记设备为 replaced
+pub async fn mark_replaced_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    old_entity_id: &str,
+    new_entity_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let now = shared::util::now_millis();
+    let result = sqlx::query(
+        "UPDATE activations
+            SET status = 'replaced', deactivated_at = $1, replaced_by = $2
+            WHERE entity_id = $3 AND status = 'active'",
+    )
+    .bind(now)
+    .bind(new_entity_id)
+    .bind(old_entity_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
 /// 获取租户所有活跃设备
 pub async fn list_active(pool: &PgPool, tenant_id: &str) -> Result<Vec<Activation>, sqlx::Error> {
     sqlx::query_as::<_, Activation>(
@@ -70,52 +145,6 @@ pub async fn find_by_entity(
     .bind(entity_id)
     .fetch_optional(pool)
     .await
-}
-
-/// 插入新的激活记录
-pub async fn insert(
-    pool: &PgPool,
-    entity_id: &str,
-    tenant_id: &str,
-    device_id: &str,
-    fingerprint: &str,
-) -> Result<(), sqlx::Error> {
-    let now = shared::util::now_millis();
-    sqlx::query(
-        "INSERT INTO activations (entity_id, tenant_id, device_id, fingerprint, status, activated_at)
-            VALUES ($1, $2, $3, $4, 'active', $5)
-            ON CONFLICT (tenant_id, device_id)
-            DO UPDATE SET entity_id = $1, fingerprint = $4, status = 'active',
-                          activated_at = $5, deactivated_at = NULL, replaced_by = NULL",
-    )
-    .bind(entity_id)
-    .bind(tenant_id)
-    .bind(device_id)
-    .bind(fingerprint)
-    .bind(now)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
-/// 将旧设备标记为 replaced
-pub async fn mark_replaced(
-    pool: &PgPool,
-    old_entity_id: &str,
-    new_entity_id: &str,
-) -> Result<bool, sqlx::Error> {
-    let now = shared::util::now_millis();
-    let result = sqlx::query(
-        "UPDATE activations
-            SET status = 'replaced', deactivated_at = $1, replaced_by = $2
-            WHERE entity_id = $3 AND status = 'active'",
-    )
-    .bind(now)
-    .bind(new_entity_id)
-    .bind(old_entity_id)
-    .execute(pool)
-    .await?;
-    Ok(result.rows_affected() > 0)
 }
 
 /// 注销激活记录 (释放配额)

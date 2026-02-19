@@ -37,10 +37,6 @@ pub struct Config {
     pub update_download_base_url: String,
     /// JWT secret for tenant authentication
     pub jwt_secret: String,
-    /// S3 bucket for P12 certificates (Verifactu)
-    pub p12_s3_bucket: String,
-    /// KMS Key ID for P12 SSE-KMS encryption
-    pub kms_key_id: Option<String>,
     /// Stripe Price ID for Basic plan (used in checkout session)
     pub stripe_basic_price_id: String,
 }
@@ -101,9 +97,6 @@ impl Config {
             update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")
                 .unwrap_or_else(|_| "https://updates.redcoral.app".into()),
             jwt_secret: Self::require_secret("JWT_SECRET", &environment),
-            p12_s3_bucket: std::env::var("P12_S3_BUCKET")
-                .unwrap_or_else(|_| "crab-tenant-certificates".into()),
-            kms_key_id: std::env::var("P12_KMS_KEY_ID").ok(),
             stripe_basic_price_id: std::env::var("STRIPE_BASIC_PRICE_ID")
                 .unwrap_or_else(|_| "price_1Sj9YE3Ednyw0kfvhWD4TKci".into()),
         }

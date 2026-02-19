@@ -204,7 +204,27 @@
         "empty_fields": "Introduzca usuario y contraseña"
       },
       "no_account": "¿No tiene cuenta?",
-      "register": "Regístrese"
+      "register": "Regístrese",
+      "device_limit": {
+        "title": "Límite de servidores alcanzado",
+        "description": "Su plan permite un máximo de {max} servidores, actualmente hay {count} activos",
+        "device_id": "ID del dispositivo",
+        "activated_at": "Activado el",
+        "last_refreshed": "Última actualización",
+        "replacing": "Reemplazando...",
+        "button_replace": "Reemplazar este servidor",
+        "button_cancel": "Cancelar"
+      },
+      "client_limit": {
+        "title": "Límite de clientes alcanzado",
+        "description": "Su plan permite un máximo de {max} clientes, actualmente hay {count} conectados",
+        "device_id": "ID del dispositivo",
+        "activated_at": "Activado el",
+        "last_refreshed": "Última actualización",
+        "replacing": "Reemplazando...",
+        "button_replace": "Reemplazar este cliente",
+        "button_cancel": "Cancelar"
+      }
     },
     "login": {
       "title": "Iniciar sesión",
@@ -2140,6 +2160,8 @@
     "button_exit_tenant": "Salir establecimiento",
     "confirm_exit_tenant": "¿Salir? Deberá reactivar.",
     "message": {
+      "Active": "Suscripción activa",
+      "PastDue": "Suscripción vencida, pague pronto",
       "Inactive": "Suscripción inactiva",
       "Expired": "Contrato expirado",
       "Canceled": "Suscripción cancelada",
@@ -2168,6 +2190,19 @@
     "message": {
       "missing": "Se requiere subir un certificado P12 de firma electrónica para usar el sistema",
       "expired": "El certificado P12 de firma electrónica ha expirado. Por favor, suba uno nuevo"
+    },
+    "upload": {
+      "section_title": "Subir certificado de firma electrónica",
+      "p12_password_label": "Contraseña del certificado",
+      "p12_password_placeholder": "Contraseña de protección del P12",
+      "file_label": "Seleccionar archivo de certificado",
+      "file_placeholder": "Haga clic para seleccionar archivo .p12",
+      "file_selected": "Seleccionado",
+      "button_submit": "Subir certificado",
+      "uploading": "Subiendo...",
+      "success": "¡Certificado subido correctamente!",
+      "success_detail": "Emisor: {{issuer}}, Titular: {{common_name}}",
+      "security_notice": "El archivo del certificado solo se usa para la verificación de carga, no se almacena localmente"
     }
   },
   "fonts": {

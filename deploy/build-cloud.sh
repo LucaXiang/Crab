@@ -21,8 +21,10 @@ REPO_NAME="crab-cloud"
 
 cd "$PROJECT_ROOT"
 
-echo "==> Building crab-cloud Docker image"
-docker build -f crab-cloud/Dockerfile -t "$REPO_NAME:$IMAGE_TAG" .
+GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+echo "==> Building crab-cloud Docker image (git: $GIT_HASH)"
+docker build -f crab-cloud/Dockerfile --build-arg GIT_HASH="$GIT_HASH" -t "$REPO_NAME:$IMAGE_TAG" .
 
 if [ "${1:-}" = "push" ]; then
     if [ -z "${AWS_ACCOUNT_ID:-}" ]; then

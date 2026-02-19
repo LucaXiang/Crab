@@ -129,15 +129,22 @@ impl ConfigBuilder {
 
     /// 构建配置，使用默认值填充未设置的字段
     pub fn build(self) -> Config {
+        let auth_url = self
+            .auth_server_url
+            .unwrap_or_else(|| shared::DEFAULT_AUTH_SERVER_URL.into());
+        // 强制 HTTPS — P12 等敏感数据绝不能走明文
+        let auth_server_url = if let Some(rest) = auth_url.strip_prefix("http://") {
+            format!("https://{rest}")
+        } else {
+            auth_url
+        };
         Config {
             work_dir: self.work_dir.unwrap_or_else(|| "/var/lib/crab/edge".into()),
             http_port: self.http_port.unwrap_or(3000),
             message_tcp_port: self.message_tcp_port.unwrap_or(8081),
             jwt: self.jwt.unwrap_or_default(),
             environment: self.environment.unwrap_or_else(|| "development".into()),
-            auth_server_url: self
-                .auth_server_url
-                .unwrap_or_else(|| shared::DEFAULT_AUTH_SERVER_URL.into()),
+            auth_server_url,
             max_connections: self.max_connections.unwrap_or(1000),
             request_timeout_ms: self.request_timeout_ms.unwrap_or(30000),
             shutdown_timeout_ms: self.shutdown_timeout_ms.unwrap_or(10000),

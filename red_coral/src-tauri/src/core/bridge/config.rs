@@ -46,7 +46,19 @@ pub struct ClientModeConfig {
 }
 
 fn default_auth_url() -> String {
-    std::env::var("AUTH_SERVER_URL").unwrap_or_else(|_| shared::DEFAULT_AUTH_SERVER_URL.to_string())
+    enforce_https(
+        &std::env::var("AUTH_SERVER_URL")
+            .unwrap_or_else(|_| shared::DEFAULT_AUTH_SERVER_URL.to_string()),
+    )
+}
+
+/// http:// → https:// 强制升级（敏感数据绝不走明文）
+fn enforce_https(url: &str) -> String {
+    if let Some(rest) = url.strip_prefix("http://") {
+        format!("https://{rest}")
+    } else {
+        url.to_string()
+    }
 }
 
 /// 应用配置
@@ -68,6 +80,9 @@ pub struct AppConfig {
     /// Auth Server URL (全局，激活和 edge-server 都用)
     #[serde(default = "default_auth_url")]
     pub auth_url: String,
+    /// Refresh token (用于无需重新输入密码即可获取 JWT)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -80,6 +95,7 @@ impl Default for AppConfig {
             client_config: None,
             known_tenants: Vec::new(),
             auth_url: default_auth_url(),
+            refresh_token: None,
         }
     }
 }
@@ -87,12 +103,15 @@ impl Default for AppConfig {
 impl AppConfig {
     /// 从文件加载配置
     pub fn load(path: &std::path::Path) -> Result<Self, BridgeError> {
-        if path.exists() {
+        let mut config = if path.exists() {
             let content = std::fs::read_to_string(path)?;
-            serde_json::from_str(&content).map_err(|e| BridgeError::Config(e.to_string()))
+            serde_json::from_str(&content).map_err(|e| BridgeError::Config(e.to_string()))?
         } else {
-            Ok(Self::default())
-        }
+            Self::default()
+        };
+        // 强制 HTTPS — P12 等敏感数据绝不能走明文
+        config.auth_url = enforce_https(&config.auth_url);
+        Ok(config)
     }
 
     /// 保存配置到文件

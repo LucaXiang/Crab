@@ -72,7 +72,7 @@ pub async fn get_subscription_status(
         starts_at: shared::util::now_millis(),
         expires_at: sub.current_period_end,
         features: sub.features,
-        max_stores: sub.max_edge_servers as u32,
+        max_stores: plan.max_stores() as u32,
         max_clients: sub.max_clients as u32,
         signature_valid_until,
         signature: String::new(),

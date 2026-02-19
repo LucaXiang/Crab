@@ -181,13 +181,18 @@ impl ActivationService {
     /// 2. P12 过期 (`expires_at < now`)
     pub async fn is_p12_blocked(&self) -> bool {
         let cache = self.credential_cache.read().await;
-        let p12 = match cache
-            .as_ref()
-            .and_then(|c| c.subscription.as_ref())
-            .and_then(|s| s.p12.as_ref())
-        {
+        let subscription = match cache.as_ref().and_then(|c| c.subscription.as_ref()) {
+            Some(s) => s,
+            None => return false, // 无订阅数据 = 未激活 → 不阻止 (激活流程负责)
+        };
+
+        let p12 = match subscription.p12.as_ref() {
             Some(p) => p,
-            None => return false, // 无 P12 数据 = auth-server 未返回 → 不阻止 (向后兼容)
+            None => {
+                // P12 字段缺失 = cloud 查询失败或数据异常 → 视为阻止
+                tracing::warn!("P12 info missing from subscription data, blocking");
+                return true;
+            }
         };
 
         if !p12.has_p12 {
@@ -209,7 +214,20 @@ impl ActivationService {
     pub async fn get_p12_blocked_info(&self) -> Option<P12BlockedInfo> {
         let cache = self.credential_cache.read().await;
         let cred = cache.as_ref()?;
-        let p12 = cred.subscription.as_ref()?.p12.as_ref()?;
+        let subscription = cred.subscription.as_ref()?;
+
+        let p12 = match subscription.p12.as_ref() {
+            Some(p) => p,
+            None => {
+                // P12 字段缺失 → 视为 Missing
+                return Some(P12BlockedInfo {
+                    reason: P12BlockedReason::Missing,
+                    tenant_id: cred.binding.tenant_id.clone(),
+                    upload_url: Some(format!("{}/api/p12/upload", self.auth_server_url)),
+                    user_message: "p12_missing".to_string(),
+                });
+            }
+        };
 
         let now = shared::util::now_millis();
 

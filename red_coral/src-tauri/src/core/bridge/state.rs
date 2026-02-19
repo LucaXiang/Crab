@@ -249,7 +249,6 @@ impl ClientBridge {
                     let auth_url = std::env::var("AUTH_SERVER_URL")
                         .unwrap_or_else(|_| shared::DEFAULT_AUTH_SERVER_URL.to_string());
                     let client = reqwest::Client::builder()
-                        .danger_accept_invalid_certs(true)
                         .timeout(std::time::Duration::from_secs(3))
                         .build();
 

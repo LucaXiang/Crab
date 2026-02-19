@@ -10,6 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invokeApi } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
 import { storeRegistry, getLoadedStores, refreshAllLoadedStores } from '@/core/stores/resources';
+import { useBridgeStore } from '@/core/stores/bridge';
 
 interface SyncStatus {
   epoch: string;
@@ -85,12 +86,19 @@ export function useSyncConnection() {
     };
 
     // 监听 Tauri 连接状态事件
-    const unlisten = listen<boolean>('connection-state-changed', (event) => {
+    const unlistenConnection = listen<boolean>('connection-state-changed', (event) => {
       handleConnectionChange(event.payload);
     });
 
+    // 监听连接永久丢失事件（重连耗尽后触发，需要重新获取 AppState 走激活/重连流程）
+    const unlistenPermanentlyLost = listen<boolean>('connection-permanently-lost', () => {
+      logger.warn('Connection permanently lost, refreshing app state', { component: 'SyncConnection' });
+      useBridgeStore.getState().fetchAppState();
+    });
+
     return () => {
-      unlisten.then(fn => fn());
+      unlistenConnection.then(fn => fn());
+      unlistenPermanentlyLost.then(fn => fn());
     };
   }, []);
 }
