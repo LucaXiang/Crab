@@ -3,6 +3,7 @@
 use reqwest::Client;
 use shared::activation::SignedBinding;
 use shared::cloud::{CloudSyncBatch, CloudSyncResponse};
+use std::error::Error as StdError;
 use std::path::Path;
 
 use crate::utils::AppError;
@@ -29,6 +30,15 @@ impl CloudSyncService {
             .map_err(|e| AppError::internal(format!("Failed to read tenant CA: {e}")))?;
         let root_ca_pem = std::fs::read(certs_dir.join("root_ca.pem"))
             .map_err(|e| AppError::internal(format!("Failed to read root CA: {e}")))?;
+
+        tracing::info!(
+            cloud_url = %cloud_url,
+            edge_cert_len = edge_cert_pem.len(),
+            edge_key_len = edge_key_pem.len(),
+            tenant_ca_len = tenant_ca_pem.len(),
+            root_ca_len = root_ca_pem.len(),
+            "CloudSyncService: loading mTLS certificates"
+        );
 
         // Build identity: edge_cert + tenant_ca (full chain) + key
         let identity_pem = [
@@ -78,7 +88,16 @@ impl CloudSyncService {
             .json(&batch)
             .send()
             .await
-            .map_err(|e| AppError::internal(format!("Cloud sync request failed: {e}")))?;
+            .map_err(|e| {
+                // Log full error chain for TLS debugging
+                let mut msg = format!("Cloud sync request failed: {e}");
+                let mut source: Option<&dyn StdError> = StdError::source(&e);
+                while let Some(s) = source {
+                    msg.push_str(&format!(" → {s}"));
+                    source = s.source();
+                }
+                AppError::internal(msg)
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
