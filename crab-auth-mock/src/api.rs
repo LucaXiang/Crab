@@ -1077,6 +1077,8 @@ async fn verify_tenant(
     // Mock: return tenant info with quota slots
     let data = shared::activation::TenantVerifyData {
         tenant_id,
+        token: "mock-jwt-token".to_string(),
+        refresh_token: "mock-refresh-token".to_string(),
         subscription_status: SubscriptionStatus::Active,
         plan: PlanType::Pro,
         server_slots_remaining: 2,

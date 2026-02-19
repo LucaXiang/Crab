@@ -118,3 +118,40 @@ pub async fn find_by_id(pool: &PgPool, id: &str) -> Result<Option<Tenant>, sqlx:
         .fetch_optional(pool)
         .await
 }
+
+/// 通过用户名(id)查找租户并验证密码 (从 crab-auth 合并)
+pub async fn authenticate(
+    pool: &PgPool,
+    username: &str,
+    password: &str,
+) -> Result<Option<Tenant>, sqlx::Error> {
+    // Support login by tenant_id (UUID) or email
+    let tenant: Option<Tenant> =
+        sqlx::query_as("SELECT * FROM tenants WHERE id = $1 OR email = $1")
+            .bind(username)
+            .fetch_optional(pool)
+            .await?;
+
+    let Some(tenant) = tenant else {
+        return Ok(None);
+    };
+
+    if tenant.status != "active" {
+        return Ok(None);
+    }
+
+    use argon2::{Argon2, PasswordHash, PasswordVerifier};
+    let hash = match PasswordHash::new(&tenant.hashed_password) {
+        Ok(h) => h,
+        Err(_) => return Ok(None),
+    };
+
+    if Argon2::default()
+        .verify_password(password.as_bytes(), &hash)
+        .is_ok()
+    {
+        Ok(Some(tenant))
+    } else {
+        Ok(None)
+    }
+}

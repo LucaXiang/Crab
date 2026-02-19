@@ -1,5 +1,5 @@
 # ── Stage 1: Build ──
-FROM rust:1.83-bookworm AS builder
+FROM rust:1.91-bookworm AS builder
 
 # Install build dependencies (OpenSSL, aws-lc-rs needs cmake + clang)
 RUN apt-get update && apt-get install -y \
@@ -8,11 +8,16 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy workspace manifests first for dependency caching
+# Copy workspace manifests — only crab-cloud and its dependencies
 COPY Cargo.toml Cargo.lock ./
 COPY shared/Cargo.toml shared/Cargo.toml
 COPY crab-cert/Cargo.toml crab-cert/Cargo.toml
 COPY crab-cloud/Cargo.toml crab-cloud/Cargo.toml
+
+# Trim workspace to only needed members
+RUN printf '[workspace]\nresolver = "2"\nmembers = ["shared", "crab-cert", "crab-cloud"]\n' > /tmp/ws.toml && \
+    sed -n '/^\[workspace\.package\]/,$ p' Cargo.toml >> /tmp/ws.toml && \
+    mv /tmp/ws.toml Cargo.toml
 
 # Create dummy source files to build dependencies
 RUN mkdir -p shared/src crab-cert/src crab-cloud/src && \
@@ -49,6 +54,9 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/target/release/crab-cloud .
+
+# Copy migrations
+COPY --from=builder /app/crab-cloud/migrations ./migrations
 
 # Switch to non-root user
 USER crab

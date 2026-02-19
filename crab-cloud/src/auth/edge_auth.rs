@@ -20,6 +20,7 @@ pub struct EdgeIdentity {
     pub entity_id: String,
     pub tenant_id: String,
     pub device_id: String,
+    pub entity_type: shared::activation::EntityType,
 }
 
 /// Middleware that extracts and verifies SignedBinding from request headers
@@ -71,6 +72,7 @@ pub async fn edge_auth_middleware(
         entity_id: binding.entity_id.clone(),
         tenant_id: binding.tenant_id.clone(),
         device_id: binding.device_id.clone(),
+        entity_type: binding.entity_type,
     };
 
     request.extensions_mut().insert(identity);
@@ -88,6 +90,7 @@ mod tests {
             entity_id: "edge-001".to_string(),
             tenant_id: "tenant-123".to_string(),
             device_id: "hw-abc".to_string(),
+            entity_type: shared::activation::EntityType::Server,
         };
         let cloned = identity.clone();
         assert_eq!(cloned.entity_id, "edge-001");

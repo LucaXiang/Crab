@@ -5,6 +5,7 @@
 //! - `edge_router`: mTLS port (edge sync with SignedBinding + quota validation)
 
 pub mod health;
+pub mod pki;
 pub mod register;
 pub mod stripe_webhook;
 pub mod sync;
@@ -13,7 +14,9 @@ pub mod update;
 
 use crate::auth::edge_auth::edge_auth_middleware;
 use crate::auth::quota::quota_middleware;
-use crate::auth::rate_limit::{login_rate_limit, register_rate_limit};
+use crate::auth::rate_limit::{
+    global_rate_limit, login_rate_limit, password_reset_rate_limit, register_rate_limit,
+};
 use crate::auth::tenant_auth::tenant_auth_middleware;
 use crate::state::AppState;
 use axum::extract::DefaultBodyLimit;
@@ -81,10 +84,17 @@ pub fn public_router(state: AppState) -> Router {
             login_rate_limit,
         ));
 
-    // Password reset (public, no auth)
+    // Password reset (rate-limited)
     let password_reset = Router::new()
         .route("/api/tenant/forgot-password", post(tenant::forgot_password))
-        .route("/api/tenant/reset-password", post(tenant::reset_password));
+        .route("/api/tenant/reset-password", post(tenant::reset_password))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            password_reset_rate_limit,
+        ));
+
+    // PKI routes (merged from crab-auth)
+    let pki_routes = pki::pki_router();
 
     Router::new()
         .route("/health", get(health::health_check))
@@ -94,7 +104,12 @@ pub fn public_router(state: AppState) -> Router {
         .merge(tenant_api)
         .merge(tenant_login)
         .merge(password_reset)
+        .merge(pki_routes)
         .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            global_rate_limit,
+        ))
         .with_state(state)
 }
 

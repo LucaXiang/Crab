@@ -168,8 +168,8 @@ impl ActivationService {
             grace_period_days: None,
             grace_period_ends_at: None,
             in_grace_period: false,
-            support_url: Some("https://support.example.com".to_string()),
-            renewal_url: Some("https://billing.example.com/renew".to_string()),
+            support_url: Some("https://redcoral.app/support".to_string()),
+            renewal_url: Some("https://redcoral.app/renew".to_string()),
             user_message,
         })
     }
@@ -232,7 +232,7 @@ impl ActivationService {
         Some(P12BlockedInfo {
             reason,
             tenant_id: cred.binding.tenant_id.clone(),
-            upload_url: Some(format!("{}/p12/upload", self.auth_server_url)),
+            upload_url: Some(format!("{}/api/p12/upload", self.auth_server_url)),
             user_message: match &p12.has_p12 {
                 false => "p12_missing".to_string(),
                 true => "p12_expired".to_string(),
@@ -605,12 +605,25 @@ impl ActivationService {
 
     pub async fn fetch_subscription_from_auth_server(
         &self,
-        tenant_id: &str,
+        _tenant_id: &str,
     ) -> Option<SubscriptionInfo> {
+        // Use SignedBinding for authentication (no password stored on device)
+        let binding = {
+            let cache = self.credential_cache.read().await;
+            cache.as_ref().map(|c| c.binding.clone())
+        };
+        let binding = match binding {
+            Some(b) => b,
+            None => {
+                tracing::warn!("No credential available for subscription sync");
+                return None;
+            }
+        };
+
         let client = reqwest::Client::new();
         let resp = match client
             .post(format!("{}/api/tenant/subscription", self.auth_server_url))
-            .json(&serde_json::json!({ "tenant_id": tenant_id }))
+            .json(&serde_json::json!({ "binding": binding }))
             .timeout(std::time::Duration::from_secs(10))
             .send()
             .await

@@ -85,12 +85,14 @@ impl ClientBridge {
         drop(tenant_manager);
 
         let auth_url = config.auth_url.clone();
+        let cloud_url = server_config.cloud_url.clone();
 
         let edge_config = edge_server::Config::builder()
             .work_dir(work_dir)
             .http_port(server_config.http_port)
             .message_tcp_port(server_config.message_port)
             .auth_server_url(auth_url)
+            .cloud_url(cloud_url)
             .build();
 
         let server_state = edge_server::ServerState::initialize(&edge_config)

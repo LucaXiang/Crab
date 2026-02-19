@@ -256,8 +256,7 @@ impl TenantManager {
     pub async fn activate_device(
         &mut self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
         replace_entity_id: Option<&str>,
     ) -> Result<(String, String), TenantError> {
         // 1. 生成 Hardware ID
@@ -266,8 +265,7 @@ impl TenantManager {
 
         // 2. 调用 Auth Server 激活接口
         let mut body = serde_json::json!({
-            "username": username,
-            "password": password,
+            "token": token,
             "device_id": device_id,
         });
         if let Some(replace_id) = replace_entity_id {
@@ -386,8 +384,7 @@ impl TenantManager {
     pub async fn activate_client(
         &mut self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
         replace_entity_id: Option<&str>,
     ) -> Result<(String, String), TenantError> {
         // 1. 生成 Hardware ID
@@ -396,8 +393,7 @@ impl TenantManager {
 
         // 2. 调用 Auth Server 客户端激活接口
         let mut body = serde_json::json!({
-            "username": username,
-            "password": password,
+            "token": token,
             "device_id": device_id,
         });
         if let Some(replace_id) = replace_entity_id {
@@ -542,8 +538,7 @@ impl TenantManager {
     pub async fn deactivate_server(
         &self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
         entity_id: &str,
     ) -> Result<(), TenantError> {
         let device_id = crab_cert::generate_hardware_id();
@@ -552,8 +547,7 @@ impl TenantManager {
         let resp = client
             .post(format!("{}/api/server/deactivate", auth_url))
             .json(&serde_json::json!({
-                "username": username,
-                "password": password,
+                "token": token,
                 "device_id": device_id,
                 "entity_id": entity_id,
             }))
@@ -588,8 +582,7 @@ impl TenantManager {
     pub async fn deactivate_client(
         &self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
         entity_id: &str,
     ) -> Result<(), TenantError> {
         let device_id = crab_cert::generate_hardware_id();
@@ -598,8 +591,7 @@ impl TenantManager {
         let resp = client
             .post(format!("{}/api/client/deactivate", auth_url))
             .json(&serde_json::json!({
-                "username": username,
-                "password": password,
+                "token": token,
                 "device_id": device_id,
                 "entity_id": entity_id,
             }))

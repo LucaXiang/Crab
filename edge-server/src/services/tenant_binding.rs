@@ -61,11 +61,19 @@ pub struct TenantBinding {
 }
 
 impl TenantBinding {
-    /// 从 SignedBinding 创建 (推荐)
+    /// 从 SignedBinding 创建（无订阅数据）
     pub fn from_signed(binding: SignedBinding) -> Self {
         Self {
             binding,
             subscription: None,
+        }
+    }
+
+    /// 从激活响应创建（包含订阅数据）
+    pub fn from_activation(binding: SignedBinding, subscription: Option<SubscriptionInfo>) -> Self {
+        Self {
+            binding,
+            subscription,
         }
     }
 

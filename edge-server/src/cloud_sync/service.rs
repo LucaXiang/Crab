@@ -25,16 +25,24 @@ impl CloudSyncService {
             .map_err(|e| AppError::internal(format!("Failed to read edge cert: {e}")))?;
         let edge_key_pem = std::fs::read(certs_dir.join("edge_key.pem"))
             .map_err(|e| AppError::internal(format!("Failed to read edge key: {e}")))?;
+        let tenant_ca_pem = std::fs::read(certs_dir.join("tenant_ca.pem"))
+            .map_err(|e| AppError::internal(format!("Failed to read tenant CA: {e}")))?;
         let root_ca_pem = std::fs::read(certs_dir.join("root_ca.pem"))
             .map_err(|e| AppError::internal(format!("Failed to read root CA: {e}")))?;
 
-        // Build identity from PEM cert+key
-        let identity = reqwest::Identity::from_pem(
-            &[edge_cert_pem.clone(), b"\n".to_vec(), edge_key_pem].concat(),
-        )
-        .map_err(|e| AppError::internal(format!("Failed to create identity: {e}")))?;
+        // Build identity: edge_cert + tenant_ca (full chain) + key
+        let identity_pem = [
+            edge_cert_pem,
+            b"\n".to_vec(),
+            tenant_ca_pem,
+            b"\n".to_vec(),
+            edge_key_pem,
+        ]
+        .concat();
+        let identity = reqwest::Identity::from_pem(&identity_pem)
+            .map_err(|e| AppError::internal(format!("Failed to create identity: {e}")))?;
 
-        // Build root CA certificate for server verification
+        // Root CA for verifying crab-cloud's server certificate
         let root_cert = reqwest::Certificate::from_pem(&root_ca_pem)
             .map_err(|e| AppError::internal(format!("Failed to parse root CA: {e}")))?;
 

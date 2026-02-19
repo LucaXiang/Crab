@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Server, Wifi, AlertCircle, ChevronRight, Settings, Power, Shield,
@@ -14,7 +14,7 @@ import { logger } from '@/utils/logger';
 import { useI18n } from '@/hooks/useI18n';
 import { MAX_NAME_LEN, MAX_PASSWORD_LEN, MAX_URL_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
 
-const REGISTER_URL = 'https://auth.redcoral.cloud/register';
+const REGISTER_URL = 'https://auth.redcoral.app/register';
 
 type SetupStep = 'credentials' | 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
@@ -47,18 +47,16 @@ export const SetupScreen: React.FC = () => {
     updateServerConfig,
     updateClientConfig,
     fetchAppState,
+    exitTenant,
     isLoading,
     error,
   } = useBridgeStore();
 
-  // Determine initial step from appState
+  // If tenant is already verified (TenantReady), skip to mode selection.
+  // Credentials are only needed at activation time (configure step).
   const appState = useBridgeStore((s) => s.appState);
-  const getInitialStep = (): SetupStep => {
-    if (appState?.type === 'TenantReady') return 'mode';
-    return 'credentials';
-  };
-
-  const [step, setStep] = useState<SetupStep>(getInitialStep);
+  const isTenantReady = appState?.type === 'TenantReady';
+  const [step, setStep] = useState<SetupStep>(isTenantReady ? 'mode' : 'credentials');
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
 
   // Credentials state (暂存在前端，不缓存到后端)
@@ -79,12 +77,7 @@ export const SetupScreen: React.FC = () => {
   const [edgeUrl, setEdgeUrl] = useState('https://edge.example.com');
   const [messageAddr, setMessageAddr] = useState('edge.example.com:9626');
 
-  // Update step when appState changes externally
-  useEffect(() => {
-    if (appState?.type === 'TenantReady' && step === 'credentials') {
-      setStep('mode');
-    }
-  }, [appState?.type, step]);
+  const hasCredentials = username.trim() !== '' && password.trim() !== '';
 
   // Step 1: Verify credentials
   const handleVerify = async (e: React.FormEvent) => {
@@ -112,15 +105,8 @@ export const SetupScreen: React.FC = () => {
     }
   };
 
-  // Guard: if credentials are lost (page refresh), fall back to credentials step
-  const hasCredentials = username.trim() !== '' && password.trim() !== '';
-
   // Step 2: Mode selection
   const handleModeSelect = (mode: ModeChoice) => {
-    if (!hasCredentials) {
-      setStep('credentials');
-      return;
-    }
     setModeChoice(mode);
     setStep('configure');
   };
@@ -132,10 +118,28 @@ export const SetupScreen: React.FC = () => {
     setActivationError('');
     setQuotaInfo(null);
 
+    // Ensure we have a token (verify if needed, e.g. TenantReady without credentials)
+    let token = tenantInfo?.token;
+    if (!token) {
+      if (!username.trim() || !password.trim()) {
+        setConfigError(t('auth.activate.error.empty_fields'));
+        return;
+      }
+      try {
+        const data = await verifyTenant(username, password);
+        setTenantInfo(data);
+        token = data.token;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setConfigError(msg);
+        return;
+      }
+    }
+
     try {
       // Activate (download cert)
       const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
-      const result = await activateFn(username, password);
+      const result = await activateFn(token);
 
       if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
         navigate('/status/subscription-blocked', { replace: true });
@@ -175,8 +179,13 @@ export const SetupScreen: React.FC = () => {
     setConfigError('');
 
     try {
+      const token = tenantInfo?.token;
+      if (!token) {
+        setConfigError('Session expired, please re-enter credentials');
+        return;
+      }
       const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
-      const result = await activateFn(username, password, device.entity_id);
+      const result = await activateFn(token, device.entity_id);
       setQuotaInfo(null);
 
       if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
@@ -470,7 +479,13 @@ export const SetupScreen: React.FC = () => {
       <div className="text-center">
         <button
           type="button"
-          onClick={() => { setStep('credentials'); setTenantInfo(null); }}
+          onClick={async () => {
+            setTenantInfo(null);
+            setUsername('');
+            setPassword('');
+            await exitTenant();
+            setStep('credentials');
+          }}
           className="text-sm text-gray-500 hover:text-gray-700"
         >
           {t('setup.button_back')}
@@ -495,6 +510,36 @@ export const SetupScreen: React.FC = () => {
       </div>
 
       <form onSubmit={handleConfigure} className="space-y-6">
+        {/* Credentials for activation (needed if no token yet, e.g. TenantReady skip) */}
+        {!tenantInfo?.token && (
+          <>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">{t('auth.activate.username_label')}</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t('auth.activate.username_placeholder')}
+                maxLength={MAX_NAME_LEN}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">{t('auth.activate.password_label')}</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('auth.activate.password_placeholder')}
+                maxLength={MAX_PASSWORD_LEN}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                disabled={isLoading}
+              />
+            </div>
+          </>
+        )}
+
         {isServer ? (
           <>
             <div className="space-y-1">
@@ -671,10 +716,10 @@ export const SetupScreen: React.FC = () => {
           ))}
         </div>
 
-        {/* Step content — guard mode/configure against lost credentials (page refresh) */}
+        {/* Step content */}
         {step === 'credentials' && renderCredentialsStep()}
-        {step === 'mode' && (hasCredentials ? renderModeStep() : renderCredentialsStep())}
-        {step === 'configure' && (hasCredentials ? renderConfigureStep() : renderCredentialsStep())}
+        {step === 'mode' && renderModeStep()}
+        {step === 'configure' && renderConfigureStep()}
         {step === 'complete' && renderCompleteStep()}
       </div>
     </div>

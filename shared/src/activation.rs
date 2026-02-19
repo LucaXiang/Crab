@@ -486,6 +486,10 @@ pub struct TenantVerifyResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantVerifyData {
     pub tenant_id: String,
+    /// JWT access token (短期，1 小时)
+    pub token: String,
+    /// Refresh token (长期，30 天，活跃时自动续期)
+    pub refresh_token: String,
     pub subscription_status: SubscriptionStatus,
     pub plan: PlanType,
     /// 剩余可用 Server 配额
@@ -496,6 +500,28 @@ pub struct TenantVerifyData {
     pub has_active_server: bool,
     /// 当前设备是否已有 Client 激活
     pub has_active_client: bool,
+}
+
+/// Token 刷新请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenRefreshRequest {
+    pub refresh_token: String,
+}
+
+/// Token 刷新响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenRefreshResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub error_code: Option<ErrorCode>,
+    /// 新的 access token
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    /// 新的 refresh token (轮转)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
 }
 
 // === Deactivate Types (注销证书，释放配额) ===

@@ -32,7 +32,7 @@ pub struct TenantIdentity {
     pub email: String,
 }
 
-const JWT_EXPIRY_HOURS: i64 = 24;
+const JWT_EXPIRY_HOURS: i64 = 1;
 
 /// Create a JWT token for a tenant
 pub fn create_token(
@@ -53,6 +53,21 @@ pub fn create_token(
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
     )
+}
+
+/// Verify a JWT token and return the claims
+pub fn verify_token(
+    token: &str,
+    secret: &str,
+) -> Result<TenantClaims, jsonwebtoken::errors::Error> {
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.set_required_spec_claims(&["exp", "sub"]);
+    let token_data = jsonwebtoken::decode::<TenantClaims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )?;
+    Ok(token_data.claims)
 }
 
 /// Middleware that extracts and verifies tenant JWT from Authorization header

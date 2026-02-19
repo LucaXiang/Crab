@@ -13,19 +13,13 @@ use crate::core::{AppState, ClientBridge};
 #[tauri::command]
 pub async fn activate_server_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    username: String,
-    password: String,
+    token: String,
     replace_entity_id: Option<String>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
     let auth_url = bridge.get_auth_url().await;
 
     match bridge
-        .handle_activation_with_replace(
-            &auth_url,
-            &username,
-            &password,
-            replace_entity_id.as_deref(),
-        )
+        .handle_activation_with_replace(&auth_url, &token, replace_entity_id.as_deref())
         .await
     {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
@@ -61,19 +55,13 @@ pub async fn activate_server_tenant(
 #[tauri::command]
 pub async fn activate_client_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    username: String,
-    password: String,
+    token: String,
     replace_entity_id: Option<String>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
     let auth_url = bridge.get_auth_url().await;
 
     match bridge
-        .handle_client_activation_with_replace(
-            &auth_url,
-            &username,
-            &password,
-            replace_entity_id.as_deref(),
-        )
+        .handle_client_activation_with_replace(&auth_url, &token, replace_entity_id.as_deref())
         .await
     {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
@@ -123,10 +111,9 @@ pub async fn verify_tenant(
 #[tauri::command]
 pub async fn deactivate_current_mode(
     bridge: State<'_, Arc<ClientBridge>>,
-    username: String,
-    password: String,
+    token: String,
 ) -> Result<ApiResponse<()>, String> {
-    match bridge.deactivate_current_mode(&username, &password).await {
+    match bridge.deactivate_current_mode(&token).await {
         Ok(()) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::InternalError,

@@ -13,8 +13,8 @@ Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信的
 | `shared` | 共享类型、协议、错误系统、事件溯源定义 | [`shared/CLAUDE.md`](shared/CLAUDE.md) |
 | `edge-server` | 边缘服务器 (SQLite + Axum + MessageBus + 事件溯源) | [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
 | `crab-client` | 统一客户端库 (Local/Remote + Typestate + 心跳重连) | [`crab-client/CLAUDE.md`](crab-client/CLAUDE.md) |
+| `crab-cloud` | 云端统一服务 (租户 + PKI + 订阅 + Stripe + 同步) | [`crab-cloud/CLAUDE.md`](crab-cloud/CLAUDE.md) |
 | `crab-cert` | PKI/证书管理 (Root CA → Tenant CA → Entity) | [`crab-cert/CLAUDE.md`](crab-cert/CLAUDE.md) |
-| `crab-auth` | 认证服务器 (激活 + 订阅校验) | [`crab-auth/CLAUDE.md`](crab-auth/CLAUDE.md) |
 | `crab-printer` | ESC/POS 热敏打印底层库 (GBK 编码) | [`crab-printer/CLAUDE.md`](crab-printer/CLAUDE.md) |
 | `red_coral` | **Tauri POS 前端** (React 19 + Zustand + Tailwind) | [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md) |
 
@@ -43,8 +43,15 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 
 - **edge-server**: 餐厅本地运行，内含 Axum API + MessageBus (TCP/TLS) + SQLite + redb 事件存储
 - **red_coral**: Tauri POS 前端，双模式运行 — Server 模式内嵌 edge-server (LocalClient)，Client 模式 mTLS 远程连接 (RemoteClient)
-- **crab-auth**: 云端认证服务，负责设备激活、证书签发、订阅校验
+- **crab-cloud**: 云端统一服务 (租户管理 + PKI/认证 + 订阅校验 + Stripe + 数据同步)，EC2 + Docker Compose + Caddy 部署
 - **订单系统**: Event Sourcing + CQRS，redb 存储事件，SQLite 归档查询
+
+## 部署
+
+EC2 + Docker Compose + Caddy (自动 HTTPS)，配置在 `deploy/ec2/`。
+- 构建: `./deploy/build-cloud.sh push`
+- EC2 路径: `/opt/crab/`
+- CI: GitHub Actions → ECR push → SSH 部署到 EC2
 
 ## 禁止事项
 

@@ -22,6 +22,11 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
+    // Install rustls crypto provider (required before any TLS operations)
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install rustls CryptoProvider");
+
     // Load .env file
     let _ = dotenvy::dotenv();
 

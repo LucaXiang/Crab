@@ -242,6 +242,7 @@ pub async fn verify_email(
     let checkout_url = match stripe::create_checkout_session(
         &state.stripe_secret_key,
         &customer_id,
+        &state.stripe_basic_price_id,
         &state.registration_success_url,
         &state.registration_cancel_url,
     )

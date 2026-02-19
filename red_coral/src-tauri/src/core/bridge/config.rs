@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 use super::error::BridgeError;
 use super::types::ModeType;
 
+fn default_cloud_url() -> String {
+    std::env::var("CRAB_CLOUD_URL").unwrap_or_else(|_| shared::DEFAULT_CLOUD_SYNC_URL.to_string())
+}
+
 /// Server 模式配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerModeConfig {
@@ -16,6 +20,9 @@ pub struct ServerModeConfig {
     pub data_dir: PathBuf,
     /// 消息总线端口
     pub message_port: u16,
+    /// Cloud sync URL (mTLS, port 8443)
+    #[serde(default = "default_cloud_url")]
+    pub cloud_url: String,
 }
 
 impl Default for ServerModeConfig {
@@ -24,6 +31,7 @@ impl Default for ServerModeConfig {
             http_port: 9625,
             data_dir: PathBuf::from("./data"),
             message_port: 9626,
+            cloud_url: default_cloud_url(),
         }
     }
 }
@@ -38,10 +46,7 @@ pub struct ClientModeConfig {
 }
 
 fn default_auth_url() -> String {
-    std::env::var("AUTH_SERVER_URL").unwrap_or_else(|_| {
-        tracing::debug!("AUTH_SERVER_URL not set, using development default");
-        "http://127.0.0.1:3001".to_string()
-    })
+    std::env::var("AUTH_SERVER_URL").unwrap_or_else(|_| shared::DEFAULT_AUTH_SERVER_URL.to_string())
 }
 
 /// 应用配置

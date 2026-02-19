@@ -1,0 +1,7 @@
+cloud.redcoral.app {
+	reverse_proxy crab-cloud:8080
+}
+
+auth.redcoral.app {
+	reverse_proxy crab-cloud:8080
+}

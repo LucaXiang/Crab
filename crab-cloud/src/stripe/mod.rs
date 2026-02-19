@@ -53,12 +53,10 @@ pub async fn create_customer(
 }
 
 /// Create a Stripe Checkout Session (subscription mode)
-///
-/// `price_ids` should be configured in Stripe Dashboard and passed via env.
-/// For now, we create a session that lets the customer pick from the price table.
 pub async fn create_checkout_session(
     secret_key: &str,
     customer_id: &str,
+    price_id: &str,
     success_url: &str,
     cancel_url: &str,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -69,9 +67,12 @@ pub async fn create_checkout_session(
         .form(&[
             ("customer", customer_id),
             ("mode", "subscription"),
+            ("line_items[0][price]", price_id),
+            ("line_items[0][quantity]", "1"),
             ("success_url", success_url),
             ("cancel_url", cancel_url),
             ("allow_promotion_codes", "true"),
+            ("metadata[plan]", "basic"),
         ])
         .send()
         .await?

@@ -110,8 +110,8 @@ impl ProvisioningService {
             .await
             .map_err(|e| AppError::internal(format!("Failed to save certificates: {}", e)))?;
 
-        // 8. 构造 TenantBinding 并激活
-        let credential = TenantBinding::from_signed(data.binding);
+        // 8. 构造 TenantBinding 并激活（包含 subscription）
+        let credential = TenantBinding::from_activation(data.binding, data.subscription);
 
         // 通过 ActivationService 激活（保存 Credential.json 并通知）
         self.state.activation_service().activate(credential).await?;

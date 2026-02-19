@@ -47,10 +47,9 @@ impl ClientBridge {
     pub async fn handle_activation(
         &self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
     ) -> Result<(String, Option<String>), BridgeError> {
-        self.handle_activation_with_replace(auth_url, username, password, None)
+        self.handle_activation_with_replace(auth_url, token, None)
             .await
     }
 
@@ -58,14 +57,13 @@ impl ClientBridge {
     pub async fn handle_activation_with_replace(
         &self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
         replace_entity_id: Option<&str>,
     ) -> Result<(String, Option<String>), BridgeError> {
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let (tenant_id, entity_id) = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_device(auth_url, username, password, replace_entity_id)
+            tm.activate_device(auth_url, token, replace_entity_id)
                 .await?
         };
 
@@ -97,10 +95,9 @@ impl ClientBridge {
     pub async fn handle_client_activation(
         &self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
     ) -> Result<(String, Option<String>), BridgeError> {
-        self.handle_client_activation_with_replace(auth_url, username, password, None)
+        self.handle_client_activation_with_replace(auth_url, token, None)
             .await
     }
 
@@ -108,14 +105,13 @@ impl ClientBridge {
     pub async fn handle_client_activation_with_replace(
         &self,
         auth_url: &str,
-        username: &str,
-        password: &str,
+        token: &str,
         replace_entity_id: Option<&str>,
     ) -> Result<(String, Option<String>), BridgeError> {
         // 1. 调用 TenantManager 客户端激活
         let (tenant_id, entity_id) = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_client(auth_url, username, password, replace_entity_id)
+            tm.activate_client(auth_url, token, replace_entity_id)
                 .await?
         };
 
@@ -180,11 +176,7 @@ impl ClientBridge {
     }
 
     /// 注销当前模式 (释放配额 + 删除本地证书)
-    pub async fn deactivate_current_mode(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<(), BridgeError> {
+    pub async fn deactivate_current_mode(&self, token: &str) -> Result<(), BridgeError> {
         let auth_url = self.get_auth_url().await;
 
         // 读取当前 entity_id 和模式
@@ -201,12 +193,10 @@ impl ClientBridge {
             let tm = self.tenant_manager.read().await;
             match current_mode {
                 Some(ModeType::Server) => {
-                    tm.deactivate_server(&auth_url, username, password, &entity_id)
-                        .await?;
+                    tm.deactivate_server(&auth_url, token, &entity_id).await?;
                 }
                 Some(ModeType::Client) => {
-                    tm.deactivate_client(&auth_url, username, password, &entity_id)
-                        .await?;
+                    tm.deactivate_client(&auth_url, token, &entity_id).await?;
                 }
                 None => {
                     return Err(BridgeError::Config("No mode to deactivate".to_string()));

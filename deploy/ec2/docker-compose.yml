@@ -1,0 +1,69 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      crab-cloud:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crab
+      POSTGRES_USER: crab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  crab-cloud:
+    image: ${CRAB_CLOUD_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+    ports:
+      - "8443:8443"
+    environment:
+      DATABASE_URL: postgres://crab:${POSTGRES_PASSWORD}@postgres:5432/crab
+      ENVIRONMENT: production
+      HTTP_PORT: "8080"
+      MTLS_PORT: "8443"
+      SES_FROM_EMAIL: noreply@redcoral.app
+      SES_REGION: eu-west-1
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      REGISTRATION_SUCCESS_URL: https://redcoral.app/registration/success
+      REGISTRATION_CANCEL_URL: https://redcoral.app/registration/cancel
+      RUST_LOG: crab_cloud=info,tower_http=info
+      # mTLS certs — mounted from host
+      ROOT_CA_PATH: /certs/root_ca.pem
+      SERVER_CERT_PATH: /certs/server.pem
+      SERVER_KEY_PATH: /certs/server.key
+      # PKI (merged from crab-auth)
+      P12_S3_BUCKET: ${P12_S3_BUCKET:-}
+      P12_KMS_KEY_ID: ${P12_KMS_KEY_ID:-}
+    volumes:
+      - ./certs:/certs:ro
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

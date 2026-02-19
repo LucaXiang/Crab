@@ -21,6 +21,19 @@ pub async fn handle_sync(
     Extension(identity): Extension<EdgeIdentity>,
     Json(batch): Json<CloudSyncBatch>,
 ) -> Result<Json<CloudSyncResponse>, AppError> {
+    // Only Server entities can sync — Client devices must not use this endpoint
+    if identity.entity_type != shared::activation::EntityType::Server {
+        tracing::warn!(
+            entity_id = %identity.entity_id,
+            entity_type = ?identity.entity_type,
+            "Non-server entity attempted cloud sync"
+        );
+        return Err(AppError::with_message(
+            ErrorCode::PermissionDenied,
+            "Only server entities can sync to cloud",
+        ));
+    }
+
     let now = shared::util::now_millis();
 
     // Auto-register edge-server
