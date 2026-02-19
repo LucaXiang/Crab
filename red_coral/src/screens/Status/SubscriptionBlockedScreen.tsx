@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, RefreshCw, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useAppState, useBridgeStore } from '@/core/stores/bridge';
+import { useAppState, useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { logger } from '@/utils/logger';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { t } from '@/infrastructure/i18n';
@@ -48,8 +49,9 @@ function getTheme(status: SubscriptionStatus) {
 }
 
 export const SubscriptionBlockedScreen: React.FC = () => {
+  const navigate = useNavigate();
   const appState = useAppState();
-  const fetchAppState = useBridgeStore((s) => s.fetchAppState);
+  const exitTenant = useBridgeStore((s) => s.exitTenant);
   const [isChecking, setIsChecking] = useState(false);
   const [checkMessage, setCheckMessage] = useState<string | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -69,8 +71,10 @@ export const SubscriptionBlockedScreen: React.FC = () => {
 
   const handleExitTenant = async () => {
     try {
-      await invokeApi('exit_tenant');
-      await fetchAppState();
+      await exitTenant();
+      const newState = useBridgeStore.getState().appState;
+      const route = AppStateHelpers.getRouteForState(newState);
+      navigate(route, { replace: true });
     } catch (error) {
       logger.error('Exit tenant failed', error);
     }
