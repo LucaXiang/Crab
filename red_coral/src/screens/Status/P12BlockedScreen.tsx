@@ -36,6 +36,8 @@ export const P12BlockedScreen: React.FC = () => {
   const [showP12Password, setShowP12Password] = useState(false);
 
   if (appState?.type !== 'ServerP12Blocked') {
+    const target = AppStateHelpers.getRouteForState(appState);
+    navigate(target, { replace: true });
     return null;
   }
 

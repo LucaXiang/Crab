@@ -57,6 +57,8 @@ export const SubscriptionBlockedScreen: React.FC = () => {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   if (appState?.type !== 'ServerSubscriptionBlocked') {
+    const target = AppStateHelpers.getRouteForState(appState);
+    navigate(target, { replace: true });
     return null;
   }
 

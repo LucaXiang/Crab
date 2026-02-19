@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Clock, Shield, Wifi } from 'lucide-react';
-import { useBridgeStore, useAppState } from '@/core/stores/bridge';
+import { useBridgeStore, useAppState, AppStateHelpers } from '@/core/stores/bridge';
 import { t } from '@/infrastructure/i18n';
 import type { ActivationRequiredReason } from '@/core/domain/types/appState';
 
@@ -33,6 +33,8 @@ export const ActivationRequiredScreen: React.FC = () => {
   const isLoading = useBridgeStore((state) => state.isLoading);
 
   if (appState?.type !== 'ServerNeedActivation' && appState?.type !== 'ClientNeedActivation') {
+    const target = AppStateHelpers.getRouteForState(appState);
+    navigate(target, { replace: true });
     return null;
   }
 
