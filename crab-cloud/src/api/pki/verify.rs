@@ -3,7 +3,7 @@ use crate::db::{activations, client_connections, refresh_tokens, subscriptions, 
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
-use shared::activation::{TenantVerifyData, TenantVerifyResponse};
+use shared::activation::{PlanType, SubscriptionStatus, TenantVerifyData, TenantVerifyResponse};
 use shared::error::ErrorCode;
 
 use super::activate::{parse_plan_type, parse_subscription_status};
@@ -40,16 +40,9 @@ pub async fn verify_tenant(
         }
     };
 
+    // 无订阅时仍允许登录，前端根据 subscription_status 决定后续流程
     let sub = match subscriptions::get_active_subscription(&state.pool, &tenant.id).await {
-        Ok(Some(s)) => s,
-        Ok(None) => {
-            return Json(TenantVerifyResponse {
-                success: false,
-                error: Some("No active subscription".to_string()),
-                error_code: Some(ErrorCode::TenantNoSubscription),
-                data: None,
-            });
-        }
+        Ok(s) => s, // Some or None
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching subscription");
             return Json(TenantVerifyResponse {
@@ -68,16 +61,21 @@ pub async fn verify_tenant(
         .await
         .unwrap_or(0);
 
-    let server_slots_remaining = if sub.max_edge_servers > 0 {
-        (sub.max_edge_servers as i64 - active_servers).max(0) as i32
-    } else {
-        -1
-    };
-
-    let client_slots_remaining = if sub.max_clients > 0 {
-        (sub.max_clients as i64 - active_clients).max(0) as i32
-    } else {
-        -1
+    let (server_slots_remaining, client_slots_remaining) = match &sub {
+        Some(s) => {
+            let sr = if s.max_edge_servers > 0 {
+                (s.max_edge_servers as i64 - active_servers).max(0) as i32
+            } else {
+                -1
+            };
+            let cr = if s.max_clients > 0 {
+                (s.max_clients as i64 - active_clients).max(0) as i32
+            } else {
+                -1
+            };
+            (sr, cr)
+        }
+        None => (0, 0),
     };
 
     let has_active_server = activations::find_by_device(&state.pool, &tenant.id, &req.device_id)
@@ -97,11 +95,17 @@ pub async fn verify_tenant(
 
     tracing::info!(
         tenant_id = %tenant.id,
+        has_subscription = sub.is_some(),
         "Tenant verified"
     );
 
-    let subscription_status = parse_subscription_status(&sub.status);
-    let plan = parse_plan_type(&sub.plan);
+    let (subscription_status, plan) = match &sub {
+        Some(s) => (
+            parse_subscription_status(&s.status),
+            parse_plan_type(&s.plan),
+        ),
+        None => (SubscriptionStatus::Inactive, PlanType::Basic),
+    };
 
     // Generate JWT session token for subsequent operations (activate, deactivate)
     let token = match tenant_auth::create_token(&tenant.id, &tenant.email, &state.jwt_secret) {

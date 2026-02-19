@@ -118,22 +118,11 @@ export const SetupScreen: React.FC = () => {
     setActivationError('');
     setQuotaInfo(null);
 
-    // Ensure we have a token (verify if needed, e.g. TenantReady without credentials)
-    let token = tenantInfo?.token;
+    // 无 token 说明 verify 步骤未完成，回退到登录
+    const token = tenantInfo?.token;
     if (!token) {
-      if (!username.trim() || !password.trim()) {
-        setConfigError(t('auth.activate.error.empty_fields'));
-        return;
-      }
-      try {
-        const data = await verifyTenant(username, password);
-        setTenantInfo(data);
-        token = data.token;
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setConfigError(msg);
-        return;
-      }
+      setStep('credentials');
+      return;
     }
 
     try {
@@ -510,35 +499,7 @@ export const SetupScreen: React.FC = () => {
       </div>
 
       <form onSubmit={handleConfigure} className="space-y-6">
-        {/* Credentials for activation (needed if no token yet, e.g. TenantReady skip) */}
-        {!tenantInfo?.token && (
-          <>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">{t('auth.activate.username_label')}</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={t('auth.activate.username_placeholder')}
-                maxLength={MAX_NAME_LEN}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">{t('auth.activate.password_label')}</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('auth.activate.password_placeholder')}
-                maxLength={MAX_PASSWORD_LEN}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                disabled={isLoading}
-              />
-            </div>
-          </>
-        )}
+        {/* 无 token 时回退到登录步骤，不在配置页重复要求输入凭据 */}
 
         {isServer ? (
           <>

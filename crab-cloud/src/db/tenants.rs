@@ -136,7 +136,9 @@ pub async fn authenticate(
         return Ok(None);
     };
 
-    if tenant.status != "active" {
+    // pending = 邮箱未验证，不能登录；verified/active 都可以登录
+    // 订阅检查在 verify_tenant 端点中单独处理
+    if tenant.status == "pending" {
         return Ok(None);
     }
 
