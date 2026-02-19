@@ -33,7 +33,13 @@ impl DbService {
             .await
             .map_err(|e| AppError::database(format!("Failed to open database: {e}")))?;
 
-        tracing::info!("Database connection established (SQLite WAL)");
+        // busy_timeout: 写冲突时等待 5s 而非立即失败
+        sqlx::query("PRAGMA busy_timeout = 5000;")
+            .execute(&pool)
+            .await
+            .map_err(|e| AppError::database(format!("Failed to set busy_timeout: {e}")))?;
+
+        tracing::info!("Database connection established (SQLite WAL, busy_timeout=5000ms)");
 
         // Run migrations
         sqlx::migrate!("./migrations")
