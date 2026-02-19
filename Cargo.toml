@@ -5,7 +5,6 @@ members = [
     "shared",
     "crab-client",
     "crab-cert",
-    "crab-auth-mock",
     "crab-cloud",
     "crab-printer",
     "red_coral/src-tauri",
@@ -119,7 +118,6 @@ aws-sdk-s3 = "1"
 aws-sdk-kms = "1"
 aws-sdk-secretsmanager = "1"
 aws-sdk-sesv2 = "1"
-lambda_http = "1"
 
 # ========== HTTPS Server ==========
 axum-server = { version = "0.8", features = ["tls-rustls"] }

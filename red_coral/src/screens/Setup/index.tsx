@@ -264,7 +264,7 @@ export const SetupScreen: React.FC = () => {
             </h1>
             <p className="text-gray-500">
               {t(`${limitKey}.description`, {
-                max: String(quotaInfo.max_edge_servers),
+                max: String(quotaInfo.max_slots),
                 count: String(quotaInfo.active_count),
               })}
             </p>

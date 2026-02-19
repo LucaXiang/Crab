@@ -41,8 +41,8 @@ pub struct ActivationResponse {
 /// 包含当前已激活设备列表，供前端展示替换选项。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuotaInfo {
-    /// 计划允许的最大 edge-server 数量
-    pub max_edge_servers: u32,
+    /// 计划允许的最大设备数量 (server 或 client 取决于上下文)
+    pub max_slots: u32,
     /// 当前活跃设备数
     pub active_count: u32,
     /// 当前已激活设备列表

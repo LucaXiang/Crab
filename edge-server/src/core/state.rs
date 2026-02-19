@@ -17,7 +17,6 @@ use crate::orders::actions::open_table::load_matching_rules;
 use crate::printing::{KitchenPrintService, PrintStorage};
 use crate::services::{
     ActivationService, CatalogService, CertService, HttpsService, MessageBusService,
-    ProvisioningService,
 };
 
 /// 资源版本管理器
@@ -850,11 +849,6 @@ impl ServerState {
         self.activation.get_p12_blocked_info().await
     }
 
-    /// 创建预配服务 (用于边缘激活)
-    pub fn provisioning_service(&self, auth_url: String) -> ProvisioningService {
-        ProvisioningService::new(self.clone(), auth_url)
-    }
-
     /// 加载 TLS 配置 (mTLS)
     ///
     /// 用于启动 TCP 消息总线和 HTTPS 服务器
@@ -864,7 +858,7 @@ impl ServerState {
         self.cert_service.load_tls_config()
     }
 
-    /// 保存证书 (边缘激活时由 ProvisioningService 调用)
+    /// 保存证书 (边缘激活时调用)
     ///
     /// 保存到 work_dir/certs/ 目录
     pub async fn save_certificates(

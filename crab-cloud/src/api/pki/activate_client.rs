@@ -145,7 +145,7 @@ pub async fn activate_client(
                     error_code: Some(ErrorCode::ClientLimitReached),
                     data: None,
                     quota_info: Some(QuotaInfo {
-                        max_edge_servers: max_clients as u32,
+                        max_slots: max_clients as u32,
                         active_count: active_count as u32,
                         active_devices: active_clients,
                     }),

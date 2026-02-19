@@ -136,7 +136,7 @@ interface AuthData {
 }
 
 export interface QuotaInfo {
-  max_edge_servers: number;
+  max_slots: number;
   active_count: number;
   active_devices: ActiveDevice[];
 }

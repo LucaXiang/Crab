@@ -140,7 +140,7 @@ pub async fn activate(
                     error_code: Some(ErrorCode::DeviceLimitReached),
                     data: None,
                     quota_info: Some(QuotaInfo {
-                        max_edge_servers: max_edge_servers as u32,
+                        max_slots: max_edge_servers as u32,
                         active_count: active_count as u32,
                         active_devices,
                     }),

@@ -1683,27 +1683,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crab-auth-mock"
-version = "0.1.0"
-dependencies = [
- "axum",
- "base64 0.22.1",
- "chrono",
- "crab-cert",
- "jsonwebtoken",
- "serde",
- "serde_json",
- "shared",
- "thiserror 2.0.18",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "crab-cert"
 version = "0.1.0"
 dependencies = [
@@ -8169,7 +8148,6 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
