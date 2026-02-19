@@ -177,7 +177,10 @@ impl ClientBridge {
     }
 
     /// 注销当前模式 (释放配额 + 删除本地证书)
-    pub async fn deactivate_current_mode(&self, token: &str) -> Result<(), BridgeError> {
+    ///
+    /// 内部自动通过 refresh_token 获取 JWT，无需前端传入 token。
+    pub async fn deactivate_current_mode(&self) -> Result<(), BridgeError> {
+        let token = self.get_fresh_token().await?;
         let auth_url = self.get_auth_url().await;
 
         // 读取当前 entity_id 和模式
@@ -194,10 +197,10 @@ impl ClientBridge {
             let tm = self.tenant_manager.read().await;
             match current_mode {
                 Some(ModeType::Server) => {
-                    tm.deactivate_server(&auth_url, token, &entity_id).await?;
+                    tm.deactivate_server(&auth_url, &token, &entity_id).await?;
                 }
                 Some(ModeType::Client) => {
-                    tm.deactivate_client(&auth_url, token, &entity_id).await?;
+                    tm.deactivate_client(&auth_url, &token, &entity_id).await?;
                 }
                 None => {
                     return Err(BridgeError::Config("No mode to deactivate".to_string()));

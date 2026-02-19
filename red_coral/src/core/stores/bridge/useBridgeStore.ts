@@ -199,7 +199,7 @@ interface BridgeStore {
   verifyTenant: (username: string, password: string) => Promise<TenantVerifyData>;
   activateServerTenant: (token: string, replaceEntityId?: string) => Promise<ActivationResult>;
   activateClientTenant: (token: string, replaceEntityId?: string) => Promise<ActivationResult>;
-  deactivateCurrentMode: (token: string) => Promise<void>;
+  deactivateCurrentMode: () => Promise<void>;
   exitTenant: () => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
 
@@ -374,10 +374,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      deactivateCurrentMode: async (token) => {
+      deactivateCurrentMode: async () => {
         try {
           set({ isLoading: true, error: null });
-          await invokeApi('deactivate_current_mode', { token });
+          await invokeApi('deactivate_current_mode');
           set({
             appState: { type: 'TenantReady' },
             modeInfo: null,

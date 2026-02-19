@@ -119,12 +119,13 @@ pub async fn verify_tenant(
 }
 
 /// 注销当前模式 (释放配额 + 删除本地证书)
+///
+/// 后端自动通过 refresh_token 获取 JWT，无需前端传 token。
 #[tauri::command]
 pub async fn deactivate_current_mode(
     bridge: State<'_, Arc<ClientBridge>>,
-    token: String,
 ) -> Result<ApiResponse<()>, String> {
-    match bridge.deactivate_current_mode(&token).await {
+    match bridge.deactivate_current_mode().await {
         Ok(()) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::InternalError,
