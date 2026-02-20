@@ -238,7 +238,26 @@ pub async fn create_command(
         AppError::new(ErrorCode::InternalError)
     })?;
 
-    let detail = serde_json::json!({ "command_type": req.command_type, "command_id": command_id });
+    // Try real-time push via WebSocket if edge is connected
+    // Note: try_send only enqueues to the mpsc channel — actual WS delivery
+    // is confirmed when the edge responds with CommandResult. We don't mark
+    // as delivered here; the WS handler will do that on actual send.
+    let mut ws_pushed = false;
+    if let Some(sender) = state.connected_edges.get(&store_id) {
+        let cloud_cmd = shared::cloud::CloudCommand {
+            id: command_id.to_string(),
+            command_type: req.command_type.clone(),
+            payload: req.payload.clone(),
+            created_at: now,
+        };
+        ws_pushed = sender.try_send(cloud_cmd).is_ok();
+    }
+
+    let detail = serde_json::json!({
+        "command_type": req.command_type,
+        "command_id": command_id,
+        "ws_pushed": ws_pushed,
+    });
     let _ = crate::db::audit::log(
         &state.pool,
         &identity.tenant_id,
@@ -252,6 +271,7 @@ pub async fn create_command(
     Ok(Json(serde_json::json!({
         "command_id": command_id,
         "status": "pending",
+        "ws_queued": ws_pushed,
     })))
 }
 

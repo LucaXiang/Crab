@@ -67,6 +67,8 @@ aws-sdk-kms.workspace = true
 
 # Utilities
 dotenvy.workspace = true
+dashmap.workspace = true
+futures.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -322,3 +322,34 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         timeline,
     })
 }
+
+/// Archived order row for cloud sync (lightweight, no items/payments/events)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+pub struct ArchivedOrderSyncRow {
+    pub id: i64,
+    pub receipt_number: String,
+    pub status: String,
+    pub total_amount: f64,
+    pub end_time: Option<i64>,
+    pub prev_hash: String,
+    pub curr_hash: String,
+    pub created_at: i64,
+}
+
+/// List archived orders after a given ID for cursor-based sync
+pub async fn list_archived_after(
+    pool: &SqlitePool,
+    after_id: i64,
+    limit: i64,
+) -> RepoResult<Vec<ArchivedOrderSyncRow>> {
+    let rows = sqlx::query_as::<_, ArchivedOrderSyncRow>(
+        "SELECT id, receipt_number, status, total_amount, end_time, prev_hash, curr_hash, created_at \
+         FROM archived_order WHERE id > ? ORDER BY id LIMIT ?",
+    )
+    .bind(after_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows)
+}

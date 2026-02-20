@@ -23,7 +23,7 @@ pub struct CloudSyncBatch {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudSyncItem {
     /// Resource type: "product", "category", "archived_order",
-    /// "active_order", "daily_report", "store_info"
+    /// "daily_report", "store_info"
     pub resource: String,
     /// Monotonically increasing version for this resource on this edge
     pub version: u64,

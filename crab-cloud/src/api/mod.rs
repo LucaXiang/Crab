@@ -11,6 +11,7 @@ pub mod stripe_webhook;
 pub mod sync;
 pub mod tenant;
 pub mod update;
+pub mod ws;
 
 use crate::auth::edge_auth::edge_auth_middleware;
 use crate::auth::quota::quota_middleware;
@@ -128,6 +129,7 @@ pub fn public_router(state: AppState) -> Router {
 pub fn edge_router(state: AppState) -> Router {
     Router::new()
         .route("/api/edge/sync", post(sync::handle_sync))
+        .route("/api/edge/ws", get(ws::handle_edge_ws))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             quota_middleware,

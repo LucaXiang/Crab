@@ -4,8 +4,11 @@ use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
 use aws_sdk_sesv2::Client as SesClient;
 use crab_cert::{CaProfile, CertificateAuthority};
+use dashmap::DashMap;
+use shared::cloud::CloudCommand;
 use sqlx::PgPool;
-use tokio::sync::OnceCell;
+use std::sync::Arc;
+use tokio::sync::{OnceCell, mpsc};
 
 use crate::auth::QuotaCache;
 use crate::config::Config;
@@ -48,8 +51,12 @@ pub struct AppState {
     pub quota_cache: QuotaCache,
     /// Rate limiter for login/registration routes
     pub rate_limiter: crate::auth::rate_limit::RateLimiter,
-    /// Stripe Price ID for Basic plan (checkout session)
+    /// Stripe Price ID for Basic plan
     pub stripe_basic_price_id: String,
+    /// Stripe Price ID for Pro plan
+    pub stripe_pro_price_id: String,
+    /// Connected edge-servers (edge_server_id → command sender)
+    pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudCommand>>>,
 }
 
 impl AppState {
@@ -159,6 +166,8 @@ impl AppState {
             quota_cache: QuotaCache::new(),
             rate_limiter: crate::auth::rate_limit::RateLimiter::new(),
             stripe_basic_price_id: config.stripe_basic_price_id.clone(),
+            stripe_pro_price_id: config.stripe_pro_price_id.clone(),
+            connected_edges: Arc::new(DashMap::new()),
         })
     }
 }

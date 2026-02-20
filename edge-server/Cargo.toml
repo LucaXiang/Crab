@@ -63,9 +63,11 @@ futures.workspace = true
 # HTTP Client
 reqwest.workspace = true
 
-# TLS
+# TLS / WebSocket
 rustls.workspace = true
 tokio-rustls.workspace = true
+tokio-tungstenite.workspace = true
+rustls-pemfile.workspace = true
 
 # Image processing
 image.workspace = true

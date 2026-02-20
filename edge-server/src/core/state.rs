@@ -405,15 +405,15 @@ impl ServerState {
             }
         });
 
-        // CloudSyncWorker (if cloud_url is configured)
-        self.register_cloud_sync_worker(tasks);
+        // CloudWorker (if cloud_url is configured)
+        self.register_cloud_worker(tasks);
 
         tracing::info!("TLS tasks started (MessageBus TCP Server)");
     }
 
-    /// Register CloudSyncWorker if CRAB_CLOUD_URL is configured
-    fn register_cloud_sync_worker(&self, tasks: &mut BackgroundTasks) {
-        use crate::cloud_sync::{CloudSyncService, CloudSyncWorker};
+    /// Register CloudWorker if CRAB_CLOUD_URL is configured
+    fn register_cloud_worker(&self, tasks: &mut BackgroundTasks) {
+        use crate::cloud::{CloudService, CloudWorker};
 
         let cloud_url = match &self.config.cloud_url {
             Some(url) => url.clone(),
@@ -429,28 +429,28 @@ impl ServerState {
         let state = self.clone();
         let shutdown = tasks.shutdown_token();
 
-        tasks.spawn("cloud_sync_worker", TaskKind::Worker, async move {
+        tasks.spawn("cloud_worker", TaskKind::Worker, async move {
             // Wait for credential to be available
             let edge_id = {
                 let cred = credential_cache.read().await;
                 match cred.as_ref() {
                     Some(c) => c.binding.entity_id.clone(),
                     None => {
-                        tracing::error!("CloudSyncWorker: no credential available, cannot start");
+                        tracing::error!("CloudWorker: no credential available, cannot start");
                         return;
                     }
                 }
             };
 
-            let sync_service = match CloudSyncService::new(cloud_url, edge_id, &certs_dir) {
+            let cloud_service = match CloudService::new(cloud_url, edge_id, &certs_dir) {
                 Ok(s) => std::sync::Arc::new(s),
                 Err(e) => {
-                    tracing::error!("Failed to create CloudSyncService: {e}");
+                    tracing::error!("Failed to create CloudService: {e}");
                     return;
                 }
             };
 
-            let worker = CloudSyncWorker::new(state, sync_service, shutdown);
+            let worker = CloudWorker::new(state, cloud_service, shutdown);
             worker.run().await;
         });
     }

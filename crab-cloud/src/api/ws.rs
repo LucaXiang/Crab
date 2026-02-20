@@ -1,0 +1,271 @@
+//! WebSocket handler for edge-server duplex communication
+//!
+//! Replaces the HTTP POST sync with a persistent WebSocket connection.
+//! Commands are pushed to edge in real-time, sync batches processed as they arrive.
+
+use axum::Extension;
+use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::IntoResponse;
+use futures::{SinkExt, StreamExt};
+use shared::cloud::{CloudCommand, CloudMessage};
+use shared::error::{AppError, ErrorCode};
+use tokio::sync::mpsc;
+
+use crate::auth::EdgeIdentity;
+use crate::db::{commands, sync_store};
+use crate::state::AppState;
+
+/// GET /api/edge/ws — upgrade to WebSocket
+pub async fn handle_edge_ws(
+    State(state): State<AppState>,
+    Extension(identity): Extension<EdgeIdentity>,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, AppError> {
+    // Only Server entities can use WebSocket
+    if identity.entity_type != shared::activation::EntityType::Server {
+        return Err(AppError::with_message(
+            ErrorCode::PermissionDenied,
+            "Only server entities can use WebSocket sync",
+        ));
+    }
+
+    Ok(ws.on_upgrade(move |socket| handle_ws_connection(socket, state, identity)))
+}
+
+async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: EdgeIdentity) {
+    let now = shared::util::now_millis();
+
+    // Auto-register edge-server
+    let edge_server_id = match sync_store::ensure_edge_server(
+        &state.pool,
+        &identity.entity_id,
+        &identity.tenant_id,
+        &identity.device_id,
+        now,
+    )
+    .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Failed to register edge-server for WS: {e}");
+            return;
+        }
+    };
+
+    tracing::info!(
+        edge_id = %identity.entity_id,
+        tenant_id = %identity.tenant_id,
+        edge_server_id,
+        "WebSocket connected"
+    );
+
+    let (mut ws_sink, mut ws_stream) = socket.split();
+
+    // Create command channel for real-time push
+    let (cmd_tx, mut cmd_rx) = mpsc::channel::<CloudCommand>(32);
+
+    // Register in connected_edges
+    state.connected_edges.insert(edge_server_id, cmd_tx.clone());
+
+    // Send any pending commands immediately on connect
+    if let Ok(pending) = commands::get_pending(&state.pool, edge_server_id, 10).await
+        && !pending.is_empty()
+    {
+        let mut sent_ids: Vec<i64> = Vec::new();
+        for cmd in pending {
+            let cmd_id = cmd.id;
+            let cloud_cmd = CloudCommand {
+                id: cmd.id.to_string(),
+                command_type: cmd.command_type,
+                payload: cmd.payload,
+                created_at: cmd.created_at,
+            };
+            let msg = CloudMessage::Command(cloud_cmd);
+            if let Ok(json) = serde_json::to_string(&msg)
+                && ws_sink.send(Message::Text(json.into())).await.is_ok()
+            {
+                sent_ids.push(cmd_id);
+            } else {
+                break;
+            }
+        }
+        if !sent_ids.is_empty() {
+            let _ = commands::mark_delivered(&state.pool, &sent_ids).await;
+        }
+    }
+
+    // Main select loop
+    loop {
+        tokio::select! {
+            // Incoming message from edge
+            msg = ws_stream.next() => {
+                match msg {
+                    Some(Ok(Message::Text(text))) => {
+                        handle_edge_message(
+                            &text,
+                            &state,
+                            &identity,
+                            edge_server_id,
+                            &mut ws_sink,
+                        )
+                        .await;
+                    }
+                    Some(Ok(Message::Ping(data))) => {
+                        let _ = ws_sink.send(Message::Pong(data)).await;
+                    }
+                    Some(Ok(Message::Close(_))) | None => {
+                        tracing::info!(
+                            edge_id = %identity.entity_id,
+                            "WebSocket disconnected"
+                        );
+                        break;
+                    }
+                    Some(Err(e)) => {
+                        tracing::warn!(
+                            edge_id = %identity.entity_id,
+                            "WebSocket error: {e}"
+                        );
+                        break;
+                    }
+                    _ => {} // Binary, Pong — ignore
+                }
+            }
+
+            // Command to push to edge
+            cmd = cmd_rx.recv() => {
+                match cmd {
+                    Some(cloud_cmd) => {
+                        let msg = CloudMessage::Command(cloud_cmd);
+                        if let Ok(json) = serde_json::to_string(&msg)
+                            && ws_sink.send(Message::Text(json.into())).await.is_err() {
+                                tracing::warn!("Failed to push command via WS");
+                                break;
+                            }
+                    }
+                    None => break, // channel closed
+                }
+            }
+        }
+    }
+
+    // Cleanup
+    state.connected_edges.remove(&edge_server_id);
+    tracing::info!(
+        edge_id = %identity.entity_id,
+        "WebSocket session cleaned up"
+    );
+}
+
+async fn handle_edge_message<S>(
+    text: &str,
+    state: &AppState,
+    identity: &EdgeIdentity,
+    edge_server_id: i64,
+    ws_sink: &mut S,
+) where
+    S: futures::Sink<Message, Error = axum::Error> + Unpin,
+{
+    let cloud_msg: CloudMessage = match serde_json::from_str(text) {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!(
+                edge_id = %identity.entity_id,
+                "Invalid CloudMessage: {e}"
+            );
+            return;
+        }
+    };
+
+    let now = shared::util::now_millis();
+
+    match cloud_msg {
+        CloudMessage::SyncBatch {
+            items,
+            command_results,
+            ..
+        } => {
+            // Update last_sync_at
+            let _ = sync_store::update_last_sync(&state.pool, edge_server_id, now).await;
+
+            // Process command results
+            if !command_results.is_empty()
+                && let Err(e) =
+                    commands::complete_commands(&state.pool, &command_results, now).await
+            {
+                tracing::warn!("Failed to process command results: {e}");
+            }
+
+            let mut accepted = 0u32;
+            let mut rejected = 0u32;
+            let mut errors = Vec::new();
+
+            for (idx, item) in items.iter().enumerate() {
+                match sync_store::upsert_resource(
+                    &state.pool,
+                    edge_server_id,
+                    &identity.tenant_id,
+                    item,
+                    now,
+                )
+                .await
+                {
+                    Ok(()) => {
+                        accepted += 1;
+                        if let Err(e) = sync_store::update_cursor(
+                            &state.pool,
+                            edge_server_id,
+                            &item.resource,
+                            item.version as i64,
+                            now,
+                        )
+                        .await
+                        {
+                            tracing::warn!(
+                                resource = %item.resource,
+                                "Failed to update sync cursor: {e}"
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        rejected += 1;
+                        errors.push(shared::cloud::CloudSyncError {
+                            index: idx as u32,
+                            resource_id: item.resource_id.clone(),
+                            message: e.to_string(),
+                        });
+                    }
+                }
+            }
+
+            // Send SyncAck
+            let ack = CloudMessage::SyncAck {
+                accepted,
+                rejected,
+                errors,
+            };
+            if let Ok(json) = serde_json::to_string(&ack) {
+                let _ = ws_sink.send(Message::Text(json.into())).await;
+            }
+
+            tracing::info!(
+                edge_id = %identity.entity_id,
+                accepted,
+                rejected,
+                "WS sync batch processed"
+            );
+        }
+
+        CloudMessage::CommandResult { results } => {
+            if let Err(e) = commands::complete_commands(&state.pool, &results, now).await {
+                tracing::warn!("Failed to process WS command results: {e}");
+            } else {
+                tracing::info!(count = results.len(), "Processed command results from WS");
+            }
+        }
+
+        _ => {
+            tracing::debug!("Ignoring unexpected CloudMessage from edge");
+        }
+    }
+}

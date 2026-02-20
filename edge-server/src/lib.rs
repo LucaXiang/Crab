@@ -31,7 +31,7 @@ pub mod api;
 pub mod archiving;
 pub mod audit;
 pub mod auth;
-pub mod cloud_sync;
+pub mod cloud;
 pub mod core;
 pub mod db;
 pub mod marketing;
