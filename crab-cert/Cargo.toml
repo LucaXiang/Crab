@@ -4,12 +4,16 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
+[features]
+default = []
+p12-openssl = ["openssl"]
+
 [dependencies]
 # Certificate generation
 rcgen.workspace = true
 x509-parser.workspace = true
 pem.workspace = true
-openssl.workspace = true
+openssl = { workspace = true, optional = true }
 
 # TLS
 rustls.workspace = true

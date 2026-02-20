@@ -145,5 +145,17 @@ export const es: Record<string, string> = {
 	'settings.email_changed': 'Email actualizado.',
 	'settings.billing': 'Facturación',
 	'settings.manage_billing': 'Gestionar facturación en Stripe',
-	'settings.language': 'Idioma'
+	'settings.language': 'Idioma',
+
+	'onboard.title': 'Elige tu plan',
+	'onboard.subtitle': 'Empieza a gestionar tu restaurante con RedCoral. Cambia de plan en cualquier momento.',
+	'onboard.basic_desc': 'Para restaurantes pequeños con un solo local.',
+	'onboard.pro_desc': 'Para cadenas multilocal o necesidades de soporte prioritario.',
+	'onboard.month': 'mes',
+	'onboard.edge_server': 'servidor edge',
+	'onboard.terminals': 'terminales',
+	'onboard.cloud_sync': 'Sincronización cloud',
+	'onboard.priority_support': 'Soporte prioritario',
+	'onboard.choose': 'Elegir plan',
+	'onboard.popular': 'Popular'
 };

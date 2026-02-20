@@ -19,7 +19,11 @@
 		try {
 			const res = await login({ email, password });
 			setAuth(res.token, res.tenant_id);
-			goto('/dashboard');
+			// Redirect to console with auth credentials
+			const consoleUrl = import.meta.env.DEV
+				? `http://localhost:5174/auth?token=${encodeURIComponent(res.token)}&tenant_id=${encodeURIComponent(res.tenant_id)}`
+				: `https://console.redcoral.app/auth?token=${encodeURIComponent(res.token)}&tenant_id=${encodeURIComponent(res.tenant_id)}`;
+			window.location.href = consoleUrl;
 		} catch (err) {
 			if (err instanceof ApiError) {
 				if (err.status === 401) {

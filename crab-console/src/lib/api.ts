@@ -340,3 +340,7 @@ export function confirmEmailChange(
 export function createBillingPortal(token: string): Promise<{ url: string }> {
 	return request('POST', '/api/tenant/billing-portal', undefined, token);
 }
+
+export function createCheckout(token: string, plan: string): Promise<{ checkout_url: string }> {
+	return request('POST', '/api/tenant/create-checkout', { plan }, token);
+}

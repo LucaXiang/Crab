@@ -135,5 +135,17 @@ export const zh: Record<string, string> = {
 	'settings.email_changed': '邮箱已更新。',
 	'settings.billing': '账单',
 	'settings.manage_billing': '在 Stripe 管理账单',
-	'settings.language': '语言'
+	'settings.language': '语言',
+
+	'onboard.title': '选择你的方案',
+	'onboard.subtitle': '开始使用 RedCoral 管理你的餐厅。随时可以升级或降级。',
+	'onboard.basic_desc': '适合单店运营的小型餐厅。',
+	'onboard.pro_desc': '适合多店连锁或需要优先支持的餐厅。',
+	'onboard.month': '月',
+	'onboard.edge_server': '边缘服务器',
+	'onboard.terminals': '终端设备',
+	'onboard.cloud_sync': '云端数据同步',
+	'onboard.priority_support': '优先技术支持',
+	'onboard.choose': '选择方案',
+	'onboard.popular': '推荐'
 };

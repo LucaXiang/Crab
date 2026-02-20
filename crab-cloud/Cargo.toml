@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 # Workspace crates
 shared.workspace = true
-crab-cert.workspace = true
+crab-cert = { workspace = true, features = ["p12-openssl"] }
 
 # Web framework
 axum.workspace = true

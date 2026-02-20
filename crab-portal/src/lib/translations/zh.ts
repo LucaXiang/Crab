@@ -196,23 +196,5 @@ export const zh: Record<string, string> = {
 	'reg_cancel.message': '支付流程已取消。你的账户已创建，但尚未激活订阅。',
 	'reg_cancel.hint': '你可以随时登录并完成支付。',
 	'reg_cancel.back_home': '返回首页',
-	'reg_cancel.try_login': '登录',
-
-	// === Dashboard ===
-	'dashboard.page_title': '控制面板',
-	'dashboard.logout': '退出登录',
-	'dashboard.subscription': '订阅',
-	'dashboard.plan': '方案',
-	'dashboard.next_billing': '下次扣费',
-	'dashboard.stores_count': '已连接门店',
-	'dashboard.manage_billing': '管理账单',
-	'dashboard.change_password': '修改密码',
-	'dashboard.current_password': '当前密码',
-	'dashboard.new_password': '新密码',
-	'dashboard.save_password': '保存密码',
-	'dashboard.password_changed': '密码修改成功。',
-	'dashboard.stores_title': '门店',
-	'dashboard.no_stores': '暂无已连接门店。',
-	'dashboard.no_stores_hint': '下载 RedCoral 应用并激活你的第一个门店。',
-	'dashboard.last_sync': '最后同步'
+	'reg_cancel.try_login': '登录'
 };

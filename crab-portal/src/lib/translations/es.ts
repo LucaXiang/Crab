@@ -199,23 +199,5 @@ export const es: Record<string, string> = {
 	'reg_cancel.message': 'El proceso de pago ha sido cancelado. Tu cuenta ha sido creada pero no tiene una suscripción activa.',
 	'reg_cancel.hint': 'Puedes iniciar sesión y completar el pago en cualquier momento.',
 	'reg_cancel.back_home': 'Volver al inicio',
-	'reg_cancel.try_login': 'Iniciar sesión',
-
-	// === Dashboard ===
-	'dashboard.page_title': 'Panel de control',
-	'dashboard.logout': 'Cerrar sesión',
-	'dashboard.subscription': 'Suscripción',
-	'dashboard.plan': 'Plan',
-	'dashboard.next_billing': 'Próxima facturación',
-	'dashboard.stores_count': 'Locales conectados',
-	'dashboard.manage_billing': 'Gestionar facturación',
-	'dashboard.change_password': 'Cambiar contraseña',
-	'dashboard.current_password': 'Contraseña actual',
-	'dashboard.new_password': 'Nueva contraseña',
-	'dashboard.save_password': 'Guardar contraseña',
-	'dashboard.password_changed': 'Contraseña actualizada con éxito.',
-	'dashboard.stores_title': 'Locales',
-	'dashboard.no_stores': 'No hay locales conectados aún.',
-	'dashboard.no_stores_hint': 'Descarga la app RedCoral y activa tu primer local.',
-	'dashboard.last_sync': 'Última sincronización'
+	'reg_cancel.try_login': 'Iniciar sesión'
 };
