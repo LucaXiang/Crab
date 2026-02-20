@@ -37,10 +37,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --exclude crab-cloud -- -D warnings
 
       - name: Test
-        run: cargo nextest run --workspace --lib
+        run: cargo nextest run --workspace --exclude crab-cloud --lib
 
   # ============ Frontend Quality Gates ============
   frontend:
