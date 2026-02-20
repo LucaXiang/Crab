@@ -5,7 +5,7 @@
  * Matches backend Rust types exactly.
  */
 
-import type { AppliedRule } from './orderEvent';
+import type { AppliedRule, EventPayload } from './orderEvent';
 
 // ============================================================================
 // List View Types
@@ -103,7 +103,7 @@ export interface ArchivedEvent {
   event_id: number;
   event_type: string;
   timestamp: number; // milliseconds
-  payload: unknown | null;
+  payload: EventPayload | null;
 }
 
 /** Void type for archived orders */

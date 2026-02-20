@@ -3,7 +3,7 @@ import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedE
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { useCategoryStore } from '@/core/stores/resources';
-import { formatCurrency, Currency } from '@/utils/currency';
+import { formatCurrency, Currency, computePriceBreakdown } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
@@ -29,10 +29,9 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
 
   // Backend payload already has `type` field from serde serialization
   // If payload is null/empty, create minimal payload with type
-  const rawPayload = event.payload as Record<string, unknown> | null;
-  const payload: EventPayload = (rawPayload && Object.keys(rawPayload).length > 0)
-    ? rawPayload as unknown as EventPayload
-    : { type: eventType } as unknown as EventPayload;
+  const payload: EventPayload = (event.payload && Object.keys(event.payload).length > 0)
+    ? event.payload
+    : { type: eventType } as EventPayload;
 
   return {
     event_id: String(event.event_id),
@@ -57,6 +56,10 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     if (!order?.timeline) return [];
     return order.timeline.map((event, index) => convertArchivedEventToOrderEvent(event, index));
   }, [order?.timeline]);
+
+  const breakdown = useMemo(
+    () => order ? computePriceBreakdown(order.items, order) : null, [order],
+  );
 
   // Sort items: category sort_order → paid/comped sink → name
   const sortedItems = useMemo(() => {
@@ -257,36 +260,24 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                   <span className="text-emerald-600">-{formatCurrency(order.comp_total_amount)}</span>
                 </div>
               )}
-              {(() => {
-                const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
-                const itemRuleDiscount = order.items.reduce((sum, item) => Currency.add(sum, item.rule_discount_amount).toNumber(), 0);
-                const itemRuleSurcharge = order.items.reduce((sum, item) => Currency.add(sum, item.rule_surcharge_amount).toNumber(), 0);
-                const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
-                const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
-                const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
-                return (
-                  <>
-                    {manualItemDiscount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-orange-500">{t('checkout.breakdown.manual_discount')}</span>
-                        <span className="text-orange-500">-{formatCurrency(manualItemDiscount)}</span>
-                      </div>
-                    )}
-                    {totalRuleDiscount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-amber-600">{t('checkout.breakdown.rule_discount')}</span>
-                        <span className="text-amber-600">-{formatCurrency(totalRuleDiscount)}</span>
-                      </div>
-                    )}
-                    {totalRuleSurcharge > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-purple-500">{t('checkout.breakdown.rule_surcharge')}</span>
-                        <span className="text-purple-500">+{formatCurrency(totalRuleSurcharge)}</span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              {breakdown && breakdown.manualItemDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-500">{t('checkout.breakdown.manual_discount')}</span>
+                  <span className="text-orange-500">-{formatCurrency(breakdown.manualItemDiscount)}</span>
+                </div>
+              )}
+              {breakdown && breakdown.totalRuleDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-600">{t('checkout.breakdown.rule_discount')}</span>
+                  <span className="text-amber-600">-{formatCurrency(breakdown.totalRuleDiscount)}</span>
+                </div>
+              )}
+              {breakdown && breakdown.totalRuleSurcharge > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-purple-500">{t('checkout.breakdown.rule_surcharge')}</span>
+                  <span className="text-purple-500">+{formatCurrency(breakdown.totalRuleSurcharge)}</span>
+                </div>
+              )}
               {order.order_manual_discount_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-orange-500">{t('checkout.breakdown.order_discount')}</span>

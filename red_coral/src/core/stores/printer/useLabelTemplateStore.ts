@@ -7,26 +7,25 @@
 import { create } from 'zustand';
 import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
-import type { LabelTemplate, LabelField } from '@/core/domain/types/print';
+import type { LabelTemplate } from '@/core/domain/types/print';
 import type { LabelTemplateCreate, LabelTemplateUpdate } from '@/core/domain/types/api';
 import { DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 
 // Lazy-load API client to avoid initialization issues
 const getApi = () => createTauriClient();
 
-function mapApiToFrontend(apiTemplate: Record<string, unknown>): LabelTemplate {
+function mapApiToFrontend(apiTemplate: LabelTemplate): LabelTemplate {
   return {
     ...apiTemplate,
-    id: apiTemplate.id as number,
-    padding: apiTemplate.padding as number || 2,
-    fields: (apiTemplate.fields as LabelField[]) || [],
-    is_default: apiTemplate.is_default as boolean || false,
-    is_active: apiTemplate.is_active as boolean ?? true,
-    created_at: apiTemplate.created_at as number || Date.now(),
-    updated_at: apiTemplate.updated_at as number || Date.now(),
-    width_mm: apiTemplate.width_mm as number ?? apiTemplate.width as number,
-    height_mm: apiTemplate.height_mm as number ?? apiTemplate.height as number,
-  } as LabelTemplate;
+    padding: apiTemplate.padding || 2,
+    fields: apiTemplate.fields || [],
+    is_default: apiTemplate.is_default || false,
+    is_active: apiTemplate.is_active ?? true,
+    created_at: apiTemplate.created_at || Date.now(),
+    updated_at: apiTemplate.updated_at || Date.now(),
+    width_mm: apiTemplate.width_mm ?? apiTemplate.width,
+    height_mm: apiTemplate.height_mm ?? apiTemplate.height,
+  };
 }
 
 // 构造 Create payload
@@ -111,7 +110,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const rawTemplates = await getApi().listLabelTemplates();
-      const templates = rawTemplates.map((t) => mapApiToFrontend(t as unknown as Record<string, unknown>));
+      const templates = rawTemplates.map((t) => mapApiToFrontend(t));
       set({ templates, isLoading: false, isLoaded: true });
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch label templates';
@@ -125,7 +124,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     try {
       const createData = toCreatePayload(templateData);
       const rawCreated = await getApi().createLabelTemplate(createData);
-      const created = mapApiToFrontend(rawCreated as unknown as Record<string, unknown>);
+      const created = mapApiToFrontend(rawCreated);
       // 去重：sync 事件可能先于 API 响应到达，已经添加过
       set((state) => {
         const exists = state.templates.some((t) => t.id === created.id);
@@ -150,7 +149,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     try {
       const updateData = toUpdatePayload(templateData);
       const rawUpdated = await getApi().updateLabelTemplate(id, updateData);
-      const updated = mapApiToFrontend(rawUpdated as unknown as Record<string, unknown>);
+      const updated = mapApiToFrontend(rawUpdated);
       set((state) => ({
         templates: state.templates.map((t) => (t.id === id || t.id === updated.id ? updated : t)),
         isLoading: false,
@@ -211,7 +210,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     switch (action) {
       case 'created':
         if (data) {
-          const template = mapApiToFrontend(data as Record<string, unknown>);
+          const template = mapApiToFrontend(data as LabelTemplate);
           const exists = state.templates.some((t) => t.id === actualId || t.id === template.id);
           if (exists) {
             set((s) => ({
@@ -228,7 +227,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
         break;
       case 'updated':
         if (data) {
-          const template = mapApiToFrontend(data as Record<string, unknown>);
+          const template = mapApiToFrontend(data as LabelTemplate);
           set((s) => ({
             templates: s.templates.map((t) => (t.id === actualId || t.id === template.id ? template : t)),
             lastVersion: version,

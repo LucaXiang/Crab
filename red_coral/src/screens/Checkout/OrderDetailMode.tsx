@@ -10,7 +10,7 @@ import { HeldOrder, CartItemSnapshot, PaymentRecord } from '@/core/domain/types'
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore, useCategoryStore } from '@/core/stores/resources';
-import { formatCurrency, Currency } from '@/utils/currency';
+import { formatCurrency, Currency, computePriceBreakdown } from '@/utils/currency';
 import { CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 import {
   ArrowLeft, Receipt, CreditCard, Coins,
@@ -100,19 +100,10 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
     }
   };
 
-  // Price breakdown (same logic as OrderSidebar)
-  const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
-
-  // Split: rule vs manual
-  const itemRuleDiscount = order.items
-    .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0);
-  const itemRuleSurcharge = order.items
-    .filter(i => !i._removed)
-    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0);
-  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
-  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
-  const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
+  // Price breakdown
+  const { displayItemDiscount, totalRuleDiscount, totalRuleSurcharge, manualItemDiscount } = useMemo(
+    () => computePriceBreakdown(order.items, order), [order],
+  );
 
   return (
     <div className="h-full flex bg-gray-50/50 backdrop-blur-xl">

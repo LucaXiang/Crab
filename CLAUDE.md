@@ -103,6 +103,7 @@ docker-compose up -d            # 重启，自动 migrate
 - **全栈 HTTPS**: 所有 auth_url 强制 `https://`，无 `danger_accept_invalid_certs`
 - **P12 安全**: 客户电子签名存 AWS Secrets Manager，PG 只存元数据，密码不入日志
 - **mTLS**: edge-server ↔ crab-cloud 通过 8443 端口双向 TLS
+- **私钥文件**: 写入私钥/凭据文件必须使用 `crab_cert::write_secret_file()` (Unix 下 0o600 权限)
 
 ## 禁止事项
 

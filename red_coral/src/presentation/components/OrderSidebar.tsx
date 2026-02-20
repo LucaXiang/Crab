@@ -9,7 +9,7 @@ import { DeleteReasonModal } from '@/screens/Checkout/DeleteReasonModal';
 import * as orderOps from '@/core/stores/order/commands';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
-import { formatCurrency, Currency } from '@/utils/currency';
+import { formatCurrency, computePriceBreakdown } from '@/utils/currency';
 
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
@@ -90,25 +90,10 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     displayFinalTotal,
     displayRemainingAmount,
   } = useMemo(() => {
-    const origPrice = order.original_total;
-    const itemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
-
-    const itemRuleDiscount = order.items
-      .filter(i => !i._removed)
-      .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0);
-    const itemRuleSurcharge = order.items
-      .filter(i => !i._removed)
-      .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0);
-    const ruleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
-    const ruleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
-    const manualDiscount = Currency.sub(itemDiscount, ruleDiscount).toNumber();
-
+    const breakdown = computePriceBreakdown(order.items, order);
     return {
-      displayOriginalPrice: origPrice,
-      displayItemDiscount: itemDiscount,
-      totalRuleDiscount: ruleDiscount,
-      totalRuleSurcharge: ruleSurcharge,
-      manualItemDiscount: manualDiscount,
+      displayOriginalPrice: order.original_total,
+      ...breakdown,
       displayFinalTotal: order.total,
       displayRemainingAmount: order.remaining_amount,
     };

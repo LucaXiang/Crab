@@ -18,6 +18,7 @@ cargo run -p crab-cert --example mtls_demo
 
 ```
 src/
+├── lib.rs        # 公开 API + write_secret_file (私钥文件 0o600 权限写入)
 ├── ca.rs         # CertificateAuthority - CA 证书生成
 ├── credential.rs # Credential - 实体证书 + 私钥
 ├── server.rs     # CertService - 证书服务
