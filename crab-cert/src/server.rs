@@ -36,7 +36,8 @@ impl CertService {
 
         fs::write(certs_dir.join("tenant_ca.pem"), storage.ca_pem).map_err(CertError::Io)?;
         fs::write(certs_dir.join("client_cert.pem"), storage.cert_pem).map_err(CertError::Io)?;
-        fs::write(certs_dir.join("client_key.pem"), storage.key_pem).map_err(CertError::Io)?;
+        crate::write_secret_file(certs_dir.join("client_key.pem"), storage.key_pem)
+            .map_err(CertError::Io)?;
 
         Ok(())
     }

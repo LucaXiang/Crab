@@ -110,9 +110,4 @@ impl Config {
                 .unwrap_or_else(|_| "price_pro_placeholder".into()),
         })
     }
-
-    #[allow(dead_code)]
-    pub fn is_development(&self) -> bool {
-        self.environment == "development"
-    }
 }

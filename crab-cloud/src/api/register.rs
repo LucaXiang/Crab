@@ -39,7 +39,8 @@ pub struct ResendRequest {
 
 // ── Helpers ──
 
-use crate::util::{generate_code, hash_password, now_millis, verify_password};
+use crate::util::{generate_code, hash_password, verify_password};
+use shared::util::now_millis;
 
 // ── POST /api/register ──
 

@@ -22,3 +22,33 @@ pub use p12::{P12CertInfo, parse_p12};
 pub use profile::{CaProfile, CertProfile, KeyType};
 pub use server::{CertService, CertStorage};
 pub use trust::{get_or_create_root_ca, verify_ca_signature, verify_chain_against_root};
+
+/// Write a file with restrictive permissions (0o600 on Unix) suitable for secrets.
+///
+/// On Unix, the file is created with mode 0o600 (owner read/write only).
+/// On non-Unix platforms, falls back to `std::fs::write`.
+pub fn write_secret_file(
+    path: impl AsRef<std::path::Path>,
+    contents: impl AsRef<[u8]>,
+) -> std::io::Result<()> {
+    _write_secret_file(path.as_ref(), contents.as_ref())
+}
+
+#[cfg(unix)]
+fn _write_secret_file(path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(contents)
+}
+
+#[cfg(not(unix))]
+fn _write_secret_file(path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
+    std::fs::write(path, contents)
+}

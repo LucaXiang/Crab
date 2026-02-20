@@ -175,7 +175,8 @@ impl CertManager {
 
         // 保存客户端私钥
         let key_path = cert_dir.join("entity.key");
-        std::fs::write(&key_path, key_pem).map_err(|e| CertError::Storage(e.to_string()))?;
+        crab_cert::write_secret_file(&key_path, key_pem)
+            .map_err(|e| CertError::Storage(e.to_string()))?;
 
         // 保存 CA 证书
         let ca_path = cert_dir.join("tenant_ca.crt");

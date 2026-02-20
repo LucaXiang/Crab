@@ -101,7 +101,7 @@ impl CertificateAuthority {
             CertError::VerificationFailed(format!("Failed to write cert file: {}", e))
         })?;
 
-        fs::write(&key_path, self.key_pem()).map_err(|e| {
+        crate::write_secret_file(&key_path, self.key_pem()).map_err(|e| {
             CertError::VerificationFailed(format!("Failed to write key file: {}", e))
         })?;
 

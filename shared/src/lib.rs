@@ -22,8 +22,6 @@ pub const DEFAULT_AUTH_SERVER_URL: &str = "https://auth.redcoral.app";
 pub const DEFAULT_CLOUD_SYNC_URL: &str = "https://sync.redcoral.app:8443";
 
 // Re-exports
-pub use axum::{Json, body};
-pub use http;
 pub use serde::{Deserialize, Serialize};
 
 // Message bus re-exports (for convenient access)

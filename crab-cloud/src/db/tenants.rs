@@ -13,27 +13,6 @@ pub struct Tenant {
     pub verified_at: Option<i64>,
 }
 
-#[allow(dead_code)]
-pub async fn create(
-    pool: &PgPool,
-    id: &str,
-    email: &str,
-    hashed_password: &str,
-    now: i64,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO tenants (id, email, hashed_password, status, created_at)
-         VALUES ($1, $2, $3, 'pending', $4)",
-    )
-    .bind(id)
-    .bind(email)
-    .bind(hashed_password)
-    .bind(now)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
 pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<Tenant>, sqlx::Error> {
     sqlx::query_as("SELECT * FROM tenants WHERE email = $1")
         .bind(email)

@@ -320,7 +320,7 @@ impl CredentialStorage {
         self.ensure_dir()?;
         let json = serde_json::to_string_pretty(credential)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        fs::write(&self.path, json)
+        crate::write_secret_file(&self.path, json)
     }
 
     /// Loads a credential from storage.

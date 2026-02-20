@@ -1,9 +1,5 @@
 //! Shared utility functions for crab-cloud
 
-pub fn now_millis() -> i64 {
-    chrono::Utc::now().timestamp_millis()
-}
-
 pub fn generate_code() -> String {
     use rand::Rng;
     let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);

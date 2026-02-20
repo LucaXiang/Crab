@@ -10,6 +10,7 @@ use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, Notify, RwLock, broadcast, oneshot};
+use tokio::task::JoinHandle;
 use tokio_rustls::TlsConnector;
 use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
@@ -103,6 +104,8 @@ pub struct NetworkMessageClient {
     stop_notify: Arc<Notify>,
     /// 是否已停止
     stopped: Arc<AtomicBool>,
+    /// 后台读取任务句柄 (用于重连时 abort 旧任务)
+    reader_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl std::fmt::Debug for NetworkMessageClient {
@@ -208,10 +211,11 @@ impl NetworkMessageClient {
             config: Arc::new(config),
             stop_notify,
             stopped: Arc::new(AtomicBool::new(false)),
+            reader_handle: Arc::new(Mutex::new(None)),
         };
 
         // 启动后台读取任务
-        client.spawn_reader_task(read_half);
+        client.spawn_reader_task(read_half).await;
 
         // 协议握手
         tracing::info!("Starting protocol handshake...");
@@ -304,8 +308,16 @@ impl NetworkMessageClient {
             .map_err(|e| ClientError::Connection(format!("TLS handshake failed: {}", e)))
     }
 
-    /// 启动后台读取任务
-    fn spawn_reader_task(&self, read_half: ReadHalf<TlsStream<TcpStream>>) {
+    /// 启动后台读取任务 (abort 旧任务，避免并发读取)
+    async fn spawn_reader_task(&self, read_half: ReadHalf<TlsStream<TcpStream>>) {
+        // Abort 旧的 reader task
+        {
+            let mut guard = self.reader_handle.lock().await;
+            if let Some(old_handle) = guard.take() {
+                old_handle.abort();
+            }
+        }
+
         let pending = self.pending_requests.clone();
         let notify_tx = self.notification_tx.clone();
         let state = self.state.clone();
@@ -313,7 +325,7 @@ impl NetworkMessageClient {
         let stop_notify = self.stop_notify.clone();
         let stopped = self.stopped.clone();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             Self::reader_task_loop(
                 read_half,
                 pending,
@@ -325,6 +337,12 @@ impl NetworkMessageClient {
             )
             .await;
         });
+
+        // 存储新的 handle
+        {
+            let mut guard = self.reader_handle.lock().await;
+            *guard = Some(handle);
+        }
     }
 
     /// 启动心跳任务
@@ -423,13 +441,17 @@ impl NetworkMessageClient {
 
     /// 处理断连
     async fn handle_disconnection(&self) {
-        // 避免重复处理
-        if self.get_state() != ConnectionState::Connected {
+        // CAS: 仅当状态为 Connected(0) 时原子地切换到 Disconnected(1)
+        // 只有赢得 CAS 的任务才执行后续逻辑，避免重复触发重连
+        if self
+            .state
+            .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
             return;
         }
 
         tracing::info!("Connection lost, starting reconnection...");
-        self.set_state(ConnectionState::Disconnected);
 
         // 通知订阅者
         let _ = self.reconnect_tx.send(ReconnectEvent::Disconnected);
@@ -527,8 +549,8 @@ impl NetworkMessageClient {
                         tracing::info!("Reconnected successfully after {} attempts", attempts);
                         self.set_state(ConnectionState::Connected);
 
-                        // 启动新的读取任务
-                        self.spawn_reader_task(read_half);
+                        // 启动新的读取任务 (abort 旧任务)
+                        self.spawn_reader_task(read_half).await;
 
                         // 通知订阅者
                         let _ = self.reconnect_tx.send(ReconnectEvent::Reconnected);
@@ -625,9 +647,14 @@ impl NetworkMessageClient {
                         }
                         Err(e) => {
                             tracing::debug!("Reader task error: {}", e);
-                            // 标记断连
-                            state.store(1, Ordering::SeqCst); // Disconnected
-                            let _ = reconnect_tx.send(ReconnectEvent::Disconnected);
+                            // CAS: 仅当仍为 Connected(0) 时切换到 Disconnected(1)
+                            // 避免与 handle_disconnection 重复发送事件
+                            if state
+                                .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
+                                .is_ok()
+                            {
+                                let _ = reconnect_tx.send(ReconnectEvent::Disconnected);
+                            }
                             break;
                         }
                     }
@@ -788,6 +815,14 @@ impl NetworkMessageClient {
         self.stopped.store(true, Ordering::SeqCst);
         self.set_state(ConnectionState::Disconnected);
         self.stop_notify.notify_waiters();
+
+        // Abort reader task
+        {
+            let mut guard = self.reader_handle.lock().await;
+            if let Some(handle) = guard.take() {
+                handle.abort();
+            }
+        }
 
         // 清理写入流
         let mut guard = self.write_stream.write().await;
@@ -974,8 +1009,8 @@ impl NetworkMessageClient {
 
         self.set_state(ConnectionState::Connected);
 
-        // 启动新的读取任务
-        self.spawn_reader_task(read_half);
+        // 启动新的读取任务 (abort 旧任务)
+        self.spawn_reader_task(read_half).await;
 
         // 通知订阅者
         let _ = self.reconnect_tx.send(ReconnectEvent::Reconnected);
