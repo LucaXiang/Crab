@@ -1,6 +1,12 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v0.3.0)'
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
@@ -59,7 +65,7 @@ jobs:
         env:
           S3_BUCKET: ${{ secrets.UPDATE_S3_BUCKET }}
           DOWNLOAD_BASE: ${{ secrets.UPDATE_DOWNLOAD_BASE_URL }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           NSIS_DIR="target/release/bundle/nsis"
 
