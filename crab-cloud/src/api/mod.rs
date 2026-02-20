@@ -23,6 +23,8 @@ use crate::state::AppState;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
+use http::HeaderName;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 /// Public router — served on HTTP port (no mTLS)
 ///
@@ -111,6 +113,27 @@ pub fn public_router(state: AppState) -> Router {
                 login_rate_limit,
             ));
 
+    // CORS — allow portal frontend to call API
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::list([
+            "https://redcoral.app".parse().unwrap(),
+            "https://www.redcoral.app".parse().unwrap(),
+            "http://localhost:5173".parse().unwrap(), // dev
+        ]))
+        .allow_methods([
+            http::Method::GET,
+            http::Method::POST,
+            http::Method::PUT,
+            http::Method::DELETE,
+            http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            http::header::CONTENT_TYPE,
+            http::header::AUTHORIZATION,
+            HeaderName::from_static("x-signed-binding"),
+        ])
+        .max_age(std::time::Duration::from_secs(3600));
+
     Router::new()
         .route("/health", get(health::health_check))
         .merge(registration)
@@ -121,6 +144,7 @@ pub fn public_router(state: AppState) -> Router {
         .merge(password_reset)
         .merge(pki_routes)
         .merge(pki_auth_limited)
+        .layer(cors)
         .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB
         .layer(middleware::from_fn_with_state(
             state.clone(),

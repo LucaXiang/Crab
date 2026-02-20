@@ -1,0 +1,132 @@
+@import 'tailwindcss';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/poppins/600.css';
+@import '@fontsource/poppins/700.css';
+@import '@fontsource/poppins/800.css';
+@import '@fontsource/poppins/900.css';
+
+@theme {
+	--color-coral-50: #fff5f5;
+	--color-coral-100: #ffe0e0;
+	--color-coral-200: #ffcccc;
+	--color-coral-300: #ffa8a8;
+	--color-coral-400: #ff7a7a;
+	--color-coral-500: #ff5e5e;
+	--color-coral-600: #e63946;
+	--color-coral-700: #c92a36;
+	--color-coral-800: #a82530;
+	--color-coral-900: #8c222b;
+
+	--font-heading: 'Poppins', system-ui, sans-serif;
+	--font-body: 'Inter', system-ui, sans-serif;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+/* Focus states */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+details summary:focus-visible {
+	outline: 2px solid #ff5e5e;
+	outline-offset: 2px;
+	border-radius: 8px;
+}
+
+input[type='checkbox']:focus-visible {
+	outline: 2px solid #ff5e5e;
+	outline-offset: 2px;
+}
+
+/* Glass navbar */
+.glass-nav {
+	background: rgba(255, 255, 255, 0.85);
+	backdrop-filter: blur(24px) saturate(180%);
+	-webkit-backdrop-filter: blur(24px) saturate(180%);
+	border: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+/* Hero gradient */
+.hero-bg {
+	background: linear-gradient(168deg, #0c0f1a 0%, #111827 50%, #0c0f1a 100%);
+	position: relative;
+}
+.hero-bg::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(ellipse 50% 60% at 30% 30%, rgba(255, 94, 94, 0.12) 0%, transparent 70%),
+		radial-gradient(ellipse 40% 50% at 70% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 70%);
+}
+
+/* Subtle grain texture */
+.grain::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	opacity: 0.3;
+	pointer-events: none;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* Dot grid pattern for hero */
+.dot-grid::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.04) 1px, transparent 0);
+	background-size: 32px 32px;
+	pointer-events: none;
+}
+
+/* Feature card hover */
+.feature-card {
+	transition:
+		transform 0.2s ease,
+		box-shadow 0.2s ease,
+		border-color 0.2s ease;
+}
+.feature-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.1);
+}
+
+/* Pricing popular ring */
+.pricing-popular {
+	box-shadow:
+		0 0 0 2px #ff5e5e,
+		0 20px 40px -12px rgba(255, 94, 94, 0.12);
+}
+
+/* Glow dot animation */
+@keyframes glow {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.4;
+	}
+}
+.glow-dot {
+	animation: glow 2s ease-in-out infinite;
+}
+
+/* Smooth section transitions */
+section {
+	position: relative;
+}
