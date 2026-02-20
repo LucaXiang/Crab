@@ -22,6 +22,8 @@ use sqlx;
 pub struct RegisterRequest {
     pub email: String,
     pub password: String,
+    /// Selected plan: "basic" or "pro" (default: "basic")
+    pub plan: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +55,11 @@ pub async fn register(
     }
     if req.password.len() < 8 {
         return Err(AppError::new(ErrorCode::PasswordTooShort));
+    }
+
+    let plan = req.plan.as_deref().unwrap_or("basic");
+    if !matches!(plan, "basic" | "pro") {
+        return Err(AppError::new(ErrorCode::ValidationFailed));
     }
 
     // Check email not taken
@@ -126,7 +133,7 @@ pub async fn register(
     .bind(expires_at)
     .bind(now)
     .bind("registration")
-    .bind(None::<&str>)
+    .bind(Some(plan))
     .execute(&mut *tx)
     .await
     {
@@ -238,11 +245,19 @@ pub async fn verify_email(
         return Err(AppError::new(ErrorCode::InternalError));
     }
 
+    // Determine plan from verification metadata
+    let plan = record.metadata.as_deref().unwrap_or("basic");
+    let price_id = match plan {
+        "pro" => &state.stripe_pro_price_id,
+        _ => &state.stripe_basic_price_id,
+    };
+
     // Create Stripe Checkout Session
     let checkout_url = match stripe::create_checkout_session(
         &state.stripe_secret_key,
         &customer_id,
-        &state.stripe_basic_price_id,
+        price_id,
+        plan,
         &state.registration_success_url,
         &state.registration_cancel_url,
     )

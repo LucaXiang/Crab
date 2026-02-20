@@ -57,6 +57,7 @@ pub async fn create_checkout_session(
     secret_key: &str,
     customer_id: &str,
     price_id: &str,
+    plan: &str,
     success_url: &str,
     cancel_url: &str,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -72,7 +73,7 @@ pub async fn create_checkout_session(
             ("success_url", success_url),
             ("cancel_url", cancel_url),
             ("allow_promotion_codes", "true"),
-            ("metadata[plan]", "basic"),
+            ("metadata[plan]", plan),
         ])
         .send()
         .await?

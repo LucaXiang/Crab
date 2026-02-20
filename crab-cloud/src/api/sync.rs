@@ -5,7 +5,7 @@ use shared::cloud::{CloudCommand, CloudSyncBatch, CloudSyncError, CloudSyncRespo
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::EdgeIdentity;
-use crate::db::{commands, sync_store};
+use crate::db::{audit, commands, sync_store};
 use crate::state::AppState;
 
 /// Handle sync batch from edge-server
@@ -64,6 +64,29 @@ pub async fn handle_sync(
         {
             tracing::warn!("Failed to process command results: {e}");
         } else {
+            for r in &batch.command_results {
+                let cmd_detail = serde_json::json!({
+                    "command_id": r.command_id,
+                    "success": r.success,
+                    "error": r.error,
+                    "edge_server_id": edge_server_id,
+                    "via": "http",
+                });
+                let action = if r.success {
+                    "command_completed"
+                } else {
+                    "command_failed"
+                };
+                let _ = audit::log(
+                    &state.pool,
+                    &identity.tenant_id,
+                    action,
+                    Some(&cmd_detail),
+                    None,
+                    now,
+                )
+                .await;
+            }
             tracing::info!(
                 count = batch.command_results.len(),
                 "Processed command results from edge"
@@ -94,7 +117,7 @@ pub async fn handle_sync(
                     &state.pool,
                     edge_server_id,
                     &item.resource,
-                    item.version as i64,
+                    i64::try_from(item.version).unwrap_or(i64::MAX),
                     now,
                 )
                 .await
@@ -109,7 +132,7 @@ pub async fn handle_sync(
             Err(e) => {
                 rejected += 1;
                 errors.push(CloudSyncError {
-                    index: idx as u32,
+                    index: u32::try_from(idx).unwrap_or(u32::MAX),
                     resource_id: item.resource_id.clone(),
                     message: e.to_string(),
                 });

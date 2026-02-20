@@ -127,6 +127,21 @@ pub async fn complete_commands(
     Ok(())
 }
 
+/// Rollback delivered commands back to pending when edge disconnects.
+///
+/// Prevents permanent orphaning: if edge crashes after receiving commands
+/// but before sending results, these commands would be stuck in 'delivered' forever.
+pub async fn rollback_delivered(pool: &PgPool, edge_server_id: i64) -> Result<u64, BoxError> {
+    let result = sqlx::query(
+        "UPDATE cloud_commands SET status = 'pending' WHERE edge_server_id = $1 AND status = 'delivered'",
+    )
+    .bind(edge_server_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 /// Get command history for an edge-server (for tenant management API)
 #[derive(sqlx::FromRow, serde::Serialize)]
 pub struct CommandRecord {

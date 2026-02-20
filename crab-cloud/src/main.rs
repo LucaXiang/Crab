@@ -23,9 +23,8 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
     // Install rustls crypto provider (required before any TLS operations)
-    rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .expect("Failed to install rustls CryptoProvider");
+    // SAFETY: Called once at process start; `install_default` is idempotent (returns Err if already installed)
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     // Load .env file
     let _ = dotenvy::dotenv();
@@ -38,7 +37,7 @@ async fn main() -> Result<(), BoxError> {
         )
         .init();
 
-    let config = Config::from_env();
+    let config = Config::from_env()?;
 
     tracing::info!("Starting crab-cloud (env: {})", config.environment);
 
@@ -116,6 +115,30 @@ async fn main() -> Result<(), BoxError> {
                 Err(e) => {
                     tracing::warn!("Order detail cleanup failed: {e}");
                 }
+            }
+        }
+    });
+
+    // Periodic pending_requests cleanup (every 30s, remove entries older than 60s)
+    let pending_requests = state.pending_requests.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            let cutoff = shared::util::now_millis() - 60_000; // 60s TTL
+            let stale_keys: Vec<String> = pending_requests
+                .iter()
+                .filter(|entry| entry.value().0 < cutoff)
+                .map(|entry| entry.key().clone())
+                .collect();
+            for key in &stale_keys {
+                pending_requests.remove(key);
+            }
+            if !stale_keys.is_empty() {
+                tracing::debug!(
+                    cleaned = stale_keys.len(),
+                    "Cleaned up stale pending_requests entries"
+                );
             }
         }
     });

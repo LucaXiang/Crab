@@ -9,6 +9,12 @@ use sqlx::PgPool;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
+/// Safely convert u64 version to i64 for PostgreSQL storage.
+/// Clamps to i64::MAX on overflow (practically unreachable).
+fn version_to_i64(version: u64) -> i64 {
+    i64::try_from(version).unwrap_or(i64::MAX)
+}
+
 /// Ensure edge-server is registered, returning its database ID
 pub async fn ensure_edge_server(
     pool: &PgPool,
@@ -120,9 +126,11 @@ pub async fn upsert_resource(
 }
 
 /// Generic upsert for simple mirror tables (product, category, daily_report)
+///
+/// `table` must be a `&'static str` from the match in `upsert_resource` — never user input.
 async fn upsert_generic(
     pool: &PgPool,
-    table: &str,
+    table: &'static str,
     edge_server_id: i64,
     tenant_id: &str,
     item: &CloudSyncItem,
@@ -143,7 +151,7 @@ async fn upsert_generic(
         .bind(tenant_id)
         .bind(&item.resource_id)
         .bind(&item.data)
-        .bind(item.version as i64)
+        .bind(version_to_i64(item.version))
         .bind(now)
         .execute(pool)
         .await?;
@@ -168,15 +176,15 @@ async fn upsert_archived_order(
     // 事务包裹三层写入：任何一步失败全部回滚
     let mut tx = pool.begin().await?;
 
-    // 1. UPSERT cloud_archived_orders (永久摘要)
+    // 1. UPSERT cloud_archived_orders (永久摘要，不含 detail)
     let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO cloud_archived_orders (
             edge_server_id, tenant_id, source_id, order_key,
             receipt_number, status, end_time, total, tax,
-            prev_hash, curr_hash, data, version, synced_at
+            prev_hash, curr_hash, version, synced_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (tenant_id, edge_server_id, order_key)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -185,10 +193,9 @@ async fn upsert_archived_order(
                       tax = EXCLUDED.tax,
                       prev_hash = EXCLUDED.prev_hash,
                       curr_hash = EXCLUDED.curr_hash,
-                      data = EXCLUDED.data,
                       version = EXCLUDED.version,
                       synced_at = EXCLUDED.synced_at
-        WHERE cloud_archived_orders.version < EXCLUDED.version
+        WHERE cloud_archived_orders.version <= EXCLUDED.version
         RETURNING id
         "#,
     )
@@ -203,8 +210,7 @@ async fn upsert_archived_order(
     .bind(detail_sync.tax)
     .bind(&detail_sync.prev_hash)
     .bind(&detail_sync.curr_hash)
-    .bind(&item.data)
-    .bind(item.version as i64)
+    .bind(version_to_i64(item.version))
     .bind(now)
     .fetch_optional(&mut *tx)
     .await?;
@@ -274,7 +280,7 @@ async fn upsert_store_info(
     .bind(edge_server_id)
     .bind(tenant_id)
     .bind(&item.data)
-    .bind(item.version as i64)
+    .bind(version_to_i64(item.version))
     .bind(now)
     .execute(pool)
     .await?;

@@ -13,7 +13,7 @@ use shared::error::{AppError, ErrorCode};
 use tokio::sync::mpsc;
 
 use crate::auth::EdgeIdentity;
-use crate::db::{commands, sync_store};
+use crate::db::{audit, commands, sync_store};
 use crate::state::AppState;
 
 /// GET /api/edge/ws — upgrade to WebSocket
@@ -59,6 +59,22 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         edge_server_id,
         "WebSocket connected"
     );
+
+    // Audit: edge connected
+    let connect_detail = serde_json::json!({
+        "edge_id": identity.entity_id,
+        "edge_server_id": edge_server_id,
+        "device_id": identity.device_id,
+    });
+    let _ = audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "edge_connected",
+        Some(&connect_detail),
+        None,
+        now,
+    )
+    .await;
 
     let (mut ws_sink, mut ws_stream) = socket.split();
 
@@ -149,8 +165,46 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         }
     }
 
-    // Cleanup
+    // Send Close frame (best-effort)
+    let _ = ws_sink.close().await;
+
+    // Cleanup: remove from connected edges
     state.connected_edges.remove(&edge_server_id);
+
+    // Rollback delivered→pending so commands can be re-sent on reconnect
+    match commands::rollback_delivered(&state.pool, edge_server_id).await {
+        Ok(n) if n > 0 => {
+            tracing::info!(
+                edge_id = %identity.entity_id,
+                rolled_back = n,
+                "Rolled back delivered commands to pending on disconnect"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                edge_id = %identity.entity_id,
+                "Failed to rollback delivered commands: {e}"
+            );
+        }
+        _ => {}
+    }
+
+    // Audit: edge disconnected
+    let disconnect_now = shared::util::now_millis();
+    let disconnect_detail = serde_json::json!({
+        "edge_id": identity.entity_id,
+        "edge_server_id": edge_server_id,
+    });
+    let _ = audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "edge_disconnected",
+        Some(&disconnect_detail),
+        None,
+        disconnect_now,
+    )
+    .await;
+
     tracing::info!(
         edge_id = %identity.entity_id,
         "WebSocket session cleaned up"
@@ -186,7 +240,9 @@ async fn handle_edge_message<S>(
             ..
         } => {
             // Update last_sync_at
-            let _ = sync_store::update_last_sync(&state.pool, edge_server_id, now).await;
+            if let Err(e) = sync_store::update_last_sync(&state.pool, edge_server_id, now).await {
+                tracing::warn!(edge_server_id, "Failed to update last_sync_at: {e}");
+            }
 
             // Process command results
             if !command_results.is_empty()
@@ -216,7 +272,7 @@ async fn handle_edge_message<S>(
                             &state.pool,
                             edge_server_id,
                             &item.resource,
-                            item.version as i64,
+                            i64::try_from(item.version).unwrap_or(i64::MAX),
                             now,
                         )
                         .await
@@ -230,7 +286,7 @@ async fn handle_edge_message<S>(
                     Err(e) => {
                         rejected += 1;
                         errors.push(shared::cloud::CloudSyncError {
-                            index: idx as u32,
+                            index: u32::try_from(idx).unwrap_or(u32::MAX),
                             resource_id: item.resource_id.clone(),
                             message: e.to_string(),
                         });
@@ -257,17 +313,50 @@ async fn handle_edge_message<S>(
         }
 
         CloudMessage::CommandResult { results } => {
-            // Check for pending on-demand requests and notify waiters
-            for result in &results {
-                if let Some((_, sender)) = state.pending_requests.remove(&result.command_id) {
-                    let _ = sender.send(result.clone());
+            // Separate ephemeral on-demand results from persistent command results
+            let mut persistent_results = Vec::new();
+            for result in results {
+                if let Some((_, (_, sender))) = state.pending_requests.remove(&result.command_id) {
+                    let _ = sender.send(result);
+                } else {
+                    persistent_results.push(result);
                 }
             }
 
-            if let Err(e) = commands::complete_commands(&state.pool, &results, now).await {
-                tracing::warn!("Failed to process WS command results: {e}");
-            } else {
-                tracing::info!(count = results.len(), "Processed command results from WS");
+            if !persistent_results.is_empty() {
+                if let Err(e) =
+                    commands::complete_commands(&state.pool, &persistent_results, now).await
+                {
+                    tracing::warn!("Failed to process WS command results: {e}");
+                } else {
+                    // Audit each command result
+                    for r in &persistent_results {
+                        let cmd_detail = serde_json::json!({
+                            "command_id": r.command_id,
+                            "success": r.success,
+                            "error": r.error,
+                            "edge_server_id": edge_server_id,
+                        });
+                        let action = if r.success {
+                            "command_completed"
+                        } else {
+                            "command_failed"
+                        };
+                        let _ = audit::log(
+                            &state.pool,
+                            &identity.tenant_id,
+                            action,
+                            Some(&cmd_detail),
+                            None,
+                            now,
+                        )
+                        .await;
+                    }
+                    tracing::info!(
+                        count = persistent_results.len(),
+                        "Processed command results from WS"
+                    );
+                }
             }
         }
 

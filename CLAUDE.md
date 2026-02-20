@@ -46,12 +46,63 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 - **crab-cloud**: 云端统一服务 (租户管理 + PKI/认证 + 订阅校验 + Stripe + 数据同步)，EC2 + Docker Compose + Caddy 部署
 - **订单系统**: Event Sourcing + CQRS，redb 存储事件，SQLite 归档查询
 
-## 部署
+## 部署 (crab-cloud → EC2)
 
-EC2 + Docker Compose + Caddy (自动 HTTPS)，配置在 `deploy/ec2/`。
-- 构建: `./deploy/build-cloud.sh push`
-- EC2 路径: `/opt/crab/`
-- CI: GitHub Actions → ECR push → SSH 部署到 EC2
+**架构**: EC2 (Amazon Linux 2023) + Docker Compose + Caddy (自动 HTTPS) + PostgreSQL 16
+
+**域名**: `auth.redcoral.app` / `cloud.redcoral.app` → Caddy → crab-cloud:8080
+**mTLS**: 端口 8443 直接暴露 (edge-server 双向 TLS 连接用)
+
+### 完整部署流程
+
+```bash
+# 1. 本地构建 + 推送到 ECR
+./deploy/build-cloud.sh push
+
+# 2. SSH 到 EC2
+ssh -i deploy/ec2/crab-ec2.pem ec2-user@<EC2_IP>
+
+# 3. ECR 登录 + 拉取新镜像
+aws ecr get-login-password --region eu-south-2 | \
+  docker login --username AWS --password-stdin 364453382269.dkr.ecr.eu-south-2.amazonaws.com
+docker pull 364453382269.dkr.ecr.eu-south-2.amazonaws.com/crab-cloud:latest
+
+# 4. 重启服务
+cd /opt/crab
+docker-compose down
+docker-compose up -d
+
+# 5. 验证
+curl https://auth.redcoral.app/health
+# 期望: {"git_hash":"...","service":"crab-cloud","status":"ok","version":"..."}
+```
+
+### 清理数据库 (仅内测阶段)
+
+```bash
+# 在 EC2 上
+cd /opt/crab
+docker-compose down
+docker volume rm crab_pgdata    # 删除 PostgreSQL 数据卷
+docker-compose up -d            # 重启，自动 migrate
+```
+
+### 关键文件
+
+| 文件 | 用途 |
+|------|------|
+| `deploy/build-cloud.sh` | 构建 Docker 镜像 + 推送 ECR |
+| `deploy/ec2/docker-compose.yml` | 生产编排 (Caddy + PG + crab-cloud) |
+| `deploy/ec2/Caddyfile` | 反向代理 + 自动 HTTPS |
+| `deploy/ec2/.env` | 生产密钥 (不入 git) |
+| `deploy/ec2/certs/` | mTLS 证书 (root_ca, server.pem/key) |
+| `deploy/ec2/crab-ec2.pem` | SSH 密钥 (不入 git) |
+
+### 安全要求
+
+- **全栈 HTTPS**: 所有 auth_url 强制 `https://`，无 `danger_accept_invalid_certs`
+- **P12 安全**: 客户电子签名存 AWS Secrets Manager，PG 只存元数据，密码不入日志
+- **mTLS**: edge-server ↔ crab-cloud 通过 8443 端口双向 TLS
 
 ## 禁止事项
 

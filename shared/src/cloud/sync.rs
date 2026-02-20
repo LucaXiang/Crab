@@ -188,6 +188,38 @@ pub struct OrderPaymentSync {
     pub cancelled: bool,
 }
 
+// ── Tenant API response types ──
+
+/// GET /api/tenant/stores/:id/orders/:order_key/detail response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderDetailResponse {
+    /// "cache" or "edge"
+    pub source: String,
+    pub detail: OrderDetailPayload,
+    pub desglose: Vec<TaxDesglose>,
+}
+
+/// Edge status returned by `get_status` command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EdgeStatusResult {
+    pub active_orders: usize,
+    pub products: usize,
+    pub categories: usize,
+    pub epoch: String,
+}
+
+/// GET /api/tenant/stores response item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoreDetailResponse {
+    pub id: i64,
+    pub entity_id: String,
+    pub device_id: String,
+    pub last_sync_at: Option<i64>,
+    pub registered_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub store_info: Option<serde_json::Value>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

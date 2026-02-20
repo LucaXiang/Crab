@@ -94,7 +94,7 @@ pub async fn get_profile(
 pub async fn list_stores(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
-) -> ApiResult<Vec<serde_json::Value>> {
+) -> ApiResult<Vec<shared::cloud::StoreDetailResponse>> {
     let stores = tenant_queries::list_stores(&state.pool, &identity.tenant_id)
         .await
         .map_err(|e| {
@@ -106,16 +106,19 @@ pub async fn list_stores(
     for store in stores {
         let store_info = tenant_queries::get_store_info(&state.pool, store.id, &identity.tenant_id)
             .await
-            .unwrap_or(None);
+            .map_err(|e| {
+                tracing::error!(store_id = store.id, "Failed to get store_info: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
 
-        result.push(serde_json::json!({
-            "id": store.id,
-            "entity_id": store.entity_id,
-            "device_id": store.device_id,
-            "last_sync_at": store.last_sync_at,
-            "registered_at": store.registered_at,
-            "store_info": store_info,
-        }));
+        result.push(shared::cloud::StoreDetailResponse {
+            id: store.id,
+            entity_id: store.entity_id,
+            device_id: store.device_id,
+            last_sync_at: store.last_sync_at,
+            registered_at: store.registered_at,
+            store_info,
+        });
     }
 
     Ok(Json(result))
@@ -215,11 +218,11 @@ pub async fn get_order_detail(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, order_key)): Path<(i64, String)>,
-) -> ApiResult<serde_json::Value> {
+) -> ApiResult<shared::cloud::OrderDetailResponse> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
     // 1. Check cloud_order_details cache
-    if let Some(detail) =
+    if let Some(detail_json) =
         tenant_queries::get_order_detail(&state.pool, store_id, &identity.tenant_id, &order_key)
             .await
             .map_err(|e| {
@@ -227,20 +230,38 @@ pub async fn get_order_detail(
                 AppError::new(ErrorCode::InternalError)
             })?
     {
-        let desglose = tenant_queries::get_order_desglose(
+        let detail: shared::cloud::OrderDetailPayload = serde_json::from_value(detail_json)
+            .map_err(|e| {
+                tracing::error!("Failed to deserialize cached OrderDetailPayload: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
+
+        let desglose_entries = tenant_queries::get_order_desglose(
             &state.pool,
             store_id,
             &identity.tenant_id,
             &order_key,
         )
         .await
-        .unwrap_or_default();
+        .map_err(|e| {
+            tracing::error!(order_key = %order_key, "Failed to query desglose: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
 
-        return Ok(Json(serde_json::json!({
-            "source": "cache",
-            "detail": detail,
-            "desglose": desglose,
-        })));
+        let desglose = desglose_entries
+            .into_iter()
+            .map(|d| shared::cloud::TaxDesglose {
+                tax_rate: d.tax_rate,
+                base_amount: d.base_amount,
+                tax_amount: d.tax_amount,
+            })
+            .collect();
+
+        return Ok(Json(shared::cloud::OrderDetailResponse {
+            source: "cache".to_string(),
+            detail,
+            desglose,
+        }));
     }
 
     // 2. Not cached — try on-demand fetch from edge via WS command
@@ -256,7 +277,7 @@ pub async fn get_order_detail(
 
     // Create oneshot channel for response
     let (tx, rx) = tokio::sync::oneshot::channel();
-    state.pending_requests.insert(command_id.clone(), tx);
+    state.pending_requests.insert(command_id.clone(), (now, tx));
 
     // Send command to edge
     let cloud_cmd = shared::cloud::CloudCommand {
@@ -328,40 +349,77 @@ pub async fn get_order_detail(
     .unwrap_or(None);
 
     if let Some(order_id) = archived_order_id {
-        // Best-effort cache: write detail directly
-        let detail_json = serde_json::to_value(&detail_sync.detail).unwrap_or_default();
-        let _ = sqlx::query(
-            r#"
-            INSERT INTO cloud_order_details (archived_order_id, detail, synced_at)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (archived_order_id)
-            DO UPDATE SET detail = EXCLUDED.detail, synced_at = EXCLUDED.synced_at
-            "#,
-        )
-        .bind(order_id)
-        .bind(&detail_json)
-        .bind(now)
-        .execute(&state.pool)
-        .await;
+        // Best-effort cache: write detail + desglose atomically
+        if let Ok(mut tx) = state.pool.begin().await {
+            let detail_json = match serde_json::to_value(&detail_sync.detail) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!(order_key = %order_key, "Failed to serialize detail for cache: {e}");
+                    // Skip caching but don't fail the request
+                    serde_json::Value::Null
+                }
+            };
+            let detail_ok = sqlx::query(
+                r#"
+                INSERT INTO cloud_order_details (archived_order_id, detail, synced_at)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (archived_order_id)
+                DO UPDATE SET detail = EXCLUDED.detail, synced_at = EXCLUDED.synced_at
+                "#,
+            )
+            .bind(order_id)
+            .bind(&detail_json)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .is_ok();
+
+            if detail_ok {
+                for d in &detail_sync.desglose {
+                    let _ = sqlx::query(
+                        r#"
+                        INSERT INTO cloud_order_desglose (archived_order_id, tax_rate, base_amount, tax_amount)
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT (archived_order_id, tax_rate)
+                        DO UPDATE SET base_amount = EXCLUDED.base_amount, tax_amount = EXCLUDED.tax_amount
+                        "#,
+                    )
+                    .bind(order_id)
+                    .bind(d.tax_rate)
+                    .bind(d.base_amount)
+                    .bind(d.tax_amount)
+                    .execute(&mut *tx)
+                    .await;
+                }
+            }
+
+            if let Err(e) = tx.commit().await {
+                tracing::error!(order_key = %order_key, "Failed to commit on-demand cache: {e}");
+            }
+        }
     }
 
-    let desglose: Vec<serde_json::Value> = detail_sync
-        .desglose
-        .iter()
-        .map(|d| {
-            serde_json::json!({
-                "tax_rate": d.tax_rate,
-                "base_amount": d.base_amount,
-                "tax_amount": d.tax_amount,
-            })
-        })
-        .collect();
+    // Audit: on-demand order detail fetched from edge
+    let fetch_detail = serde_json::json!({
+        "order_key": order_key,
+        "store_id": store_id,
+        "cached": archived_order_id.is_some(),
+    });
+    let _ = crate::db::audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "order_detail_fetched",
+        Some(&fetch_detail),
+        None,
+        now,
+    )
+    .await;
 
-    Ok(Json(serde_json::json!({
-        "source": "edge",
-        "detail": serde_json::to_value(&detail_sync.detail).unwrap_or_default(),
-        "desglose": desglose,
-    })))
+    Ok(Json(shared::cloud::OrderDetailResponse {
+        source: "edge".to_string(),
+        detail: detail_sync.detail,
+        desglose: detail_sync.desglose,
+    }))
 }
 
 /// POST /api/tenant/stores/:id/commands
@@ -395,10 +453,9 @@ pub async fn create_command(
         AppError::new(ErrorCode::InternalError)
     })?;
 
-    // Try real-time push via WebSocket if edge is connected
-    // Note: try_send only enqueues to the mpsc channel — actual WS delivery
-    // is confirmed when the edge responds with CommandResult. We don't mark
-    // as delivered here; the WS handler will do that on actual send.
+    // Try real-time push via WebSocket if edge is connected.
+    // If try_send succeeds, mark as 'delivered' immediately to prevent
+    // get_pending on reconnect from picking it up again (double-delivery).
     let mut ws_pushed = false;
     if let Some(sender) = state.connected_edges.get(&store_id) {
         let cloud_cmd = shared::cloud::CloudCommand {
@@ -407,7 +464,10 @@ pub async fn create_command(
             payload: req.payload.clone(),
             created_at: now,
         };
-        ws_pushed = sender.try_send(cloud_cmd).is_ok();
+        if sender.try_send(cloud_cmd).is_ok() {
+            ws_pushed = true;
+            let _ = commands::mark_delivered(&state.pool, &[command_id]).await;
+        }
     }
 
     let detail = serde_json::json!({

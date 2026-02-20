@@ -57,9 +57,10 @@ pub struct AppState {
     pub stripe_pro_price_id: String,
     /// Connected edge-servers (edge_server_id → command sender)
     pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudCommand>>>,
-    /// Pending on-demand requests (command_id → response sender)
+    /// Pending on-demand requests (command_id → (created_at_ms, response sender))
     /// Used for tenant API to wait for edge command results (e.g., get_order_detail)
-    pub pending_requests: Arc<DashMap<String, oneshot::Sender<CloudCommandResult>>>,
+    /// Includes created_at for TTL-based cleanup of leaked entries.
+    pub pending_requests: Arc<DashMap<String, (i64, oneshot::Sender<CloudCommandResult>)>>,
 }
 
 impl AppState {

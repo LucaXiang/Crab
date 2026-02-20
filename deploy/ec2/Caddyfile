@@ -1,3 +1,18 @@
+redcoral.app {
+	root * /srv/portal
+	file_server
+	try_files {path} /index.html
+	encode gzip
+
+	# Immutable assets (hashed filenames) — cache aggressively
+	@immutable path /_app/immutable/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	# Other static assets — moderate cache
+	@static not path /_app/immutable/*
+	header @static Cache-Control "public, max-age=3600"
+}
+
 cloud.redcoral.app {
 	reverse_proxy crab-cloud:8080
 }

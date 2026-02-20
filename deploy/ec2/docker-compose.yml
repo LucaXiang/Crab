@@ -12,6 +12,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./portal:/srv/portal:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -65,6 +66,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       STRIPE_BASIC_PRICE_ID: ${STRIPE_BASIC_PRICE_ID}
+      STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID}
       JWT_SECRET: ${JWT_SECRET}
       REGISTRATION_SUCCESS_URL: https://redcoral.app/registration/success
       REGISTRATION_CANCEL_URL: https://redcoral.app/registration/cancel

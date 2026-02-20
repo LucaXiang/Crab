@@ -1,5 +1,7 @@
 //! Cloud server configuration
 
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
 /// Cloud server configuration
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -37,31 +39,36 @@ pub struct Config {
     pub update_download_base_url: String,
     /// JWT secret for tenant authentication
     pub jwt_secret: String,
-    /// Stripe Price ID for Basic plan (used in checkout session)
+    /// Stripe Price ID for Basic plan (monthly)
     pub stripe_basic_price_id: String,
+    /// Stripe Price ID for Pro plan (monthly)
+    pub stripe_pro_price_id: String,
 }
 
 impl Config {
     /// Require a secret env var: must be set and non-empty in non-development environments.
-    fn require_secret(name: &str, environment: &str) -> String {
-        let val = std::env::var(name).unwrap_or_else(|_| {
-            if environment != "development" {
-                panic!("{name} must be set in {environment} environment");
+    fn require_secret(name: &str, environment: &str) -> Result<String, BoxError> {
+        let val = match std::env::var(name) {
+            Ok(v) => v,
+            Err(_) => {
+                if environment != "development" {
+                    return Err(format!("{name} must be set in {environment} environment").into());
+                }
+                format!("dev-{name}-not-for-production")
             }
-            format!("dev-{name}-not-for-production")
-        });
+        };
         if val.is_empty() && environment != "development" {
-            panic!("{name} must not be empty in {environment} environment");
+            return Err(format!("{name} must not be empty in {environment} environment").into());
         }
-        val
+        Ok(val)
     }
 
     /// Load configuration from environment variables
-    pub fn from_env() -> Self {
+    pub fn from_env() -> Result<Self, BoxError> {
         let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into());
 
-        Self {
-            database_url: std::env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
+        Ok(Self {
+            database_url: std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set")?,
             http_port: std::env::var("HTTP_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())
@@ -86,8 +93,8 @@ impl Config {
             environment: environment.clone(),
             ses_from_email: std::env::var("SES_FROM_EMAIL")
                 .unwrap_or_else(|_| "noreply@redcoral.app".into()),
-            stripe_secret_key: Self::require_secret("STRIPE_SECRET_KEY", &environment),
-            stripe_webhook_secret: Self::require_secret("STRIPE_WEBHOOK_SECRET", &environment),
+            stripe_secret_key: Self::require_secret("STRIPE_SECRET_KEY", &environment)?,
+            stripe_webhook_secret: Self::require_secret("STRIPE_WEBHOOK_SECRET", &environment)?,
             registration_success_url: std::env::var("REGISTRATION_SUCCESS_URL")
                 .unwrap_or_else(|_| "https://redcoral.app/registration/success".into()),
             registration_cancel_url: std::env::var("REGISTRATION_CANCEL_URL")
@@ -96,10 +103,12 @@ impl Config {
                 .unwrap_or_else(|_| "crab-app-updates".into()),
             update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")
                 .unwrap_or_else(|_| "https://updates.redcoral.app".into()),
-            jwt_secret: Self::require_secret("JWT_SECRET", &environment),
+            jwt_secret: Self::require_secret("JWT_SECRET", &environment)?,
             stripe_basic_price_id: std::env::var("STRIPE_BASIC_PRICE_ID")
                 .unwrap_or_else(|_| "price_1Sj9YE3Ednyw0kfvhWD4TKci".into()),
-        }
+            stripe_pro_price_id: std::env::var("STRIPE_PRO_PRICE_ID")
+                .unwrap_or_else(|_| "price_pro_placeholder".into()),
+        })
     }
 
     #[allow(dead_code)]

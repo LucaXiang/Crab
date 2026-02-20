@@ -53,10 +53,7 @@ pub async fn activate_server_tenant(
                 details: Some(details),
             })
         }
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::ActivationFailed,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -95,10 +92,7 @@ pub async fn activate_client_tenant(
                 details: Some(details),
             })
         }
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::ActivationFailed,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -111,10 +105,7 @@ pub async fn verify_tenant(
 ) -> Result<ApiResponse<shared::activation::TenantVerifyData>, String> {
     match bridge.verify_tenant(&username, &password).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::ActivationFailed,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
