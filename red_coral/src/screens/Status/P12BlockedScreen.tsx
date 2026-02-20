@@ -113,11 +113,6 @@ export const P12BlockedScreen: React.FC = () => {
       setP12Password('');
       setP12FilePath(null);
       setP12FileName(null);
-
-      // Auto-refresh app state
-      setTimeout(async () => {
-        await handleCheckP12();
-      }, 1500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setUploadError(msg);
@@ -271,17 +266,38 @@ export const P12BlockedScreen: React.FC = () => {
 
         {/* Actions */}
         <div className="space-y-3">
-          {/* Recheck */}
-          <button
-            onClick={handleCheckP12}
-            disabled={isChecking}
-            className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={20} className={isChecking ? 'animate-spin' : ''} />
-            {isChecking
-              ? t('p12Blocked.rechecking')
-              : t('p12Blocked.button_recheck')}
-          </button>
+          {uploadSuccess ? (
+            /* Upload succeeded — confirm to proceed */
+            <button
+              onClick={handleCheckP12}
+              disabled={isChecking}
+              className="w-full py-3 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isChecking ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {t('p12Blocked.rechecking')}
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={20} />
+                  {t('common.confirm')}
+                </>
+              )}
+            </button>
+          ) : (
+            /* No upload yet — recheck button */
+            <button
+              onClick={handleCheckP12}
+              disabled={isChecking}
+              className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={20} className={isChecking ? 'animate-spin' : ''} />
+              {isChecking
+                ? t('p12Blocked.rechecking')
+                : t('p12Blocked.button_recheck')}
+            </button>
+          )}
 
           {/* Check result */}
           {checkMessage && (

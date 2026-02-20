@@ -187,8 +187,8 @@ export const zh: Record<string, string> = {
 	// === Registration Success/Cancel ===
 	'reg_success.page_title': '注册完成',
 	'reg_success.title': '欢迎加入 RedCoral！',
-	'reg_success.message': '你的订阅已激活。现在可以登录并开始配置你的餐厅了。',
-	'reg_success.next_steps': '下载 RedCoral 应用，使用你的账户登录。',
+	'reg_success.message': '邮箱验证成功。请前往控制面板选择套餐并完成配置。',
+	'reg_success.next_steps': '选择套餐、完成支付、上传 P12 证书。',
 	'reg_success.login_cta': '前往控制面板',
 
 	'reg_cancel.page_title': '支付取消',

@@ -105,9 +105,9 @@ impl Config {
                 .unwrap_or_else(|_| "https://updates.redcoral.app".into()),
             jwt_secret: Self::require_secret("JWT_SECRET", &environment)?,
             stripe_basic_price_id: std::env::var("STRIPE_BASIC_PRICE_ID")
-                .unwrap_or_else(|_| "price_1Sj9YE3Ednyw0kfvhWD4TKci".into()),
+                .unwrap_or_else(|_| "price_1T30z63Ednyw0kfvGYVXXDaB".into()),
             stripe_pro_price_id: std::env::var("STRIPE_PRO_PRICE_ID")
-                .unwrap_or_else(|_| "price_pro_placeholder".into()),
+                .unwrap_or_else(|_| "price_1T30zB3Ednyw0kfvoGku9ZbF".into()),
         })
     }
 }

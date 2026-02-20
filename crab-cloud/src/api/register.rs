@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use shared::error::{AppError, ErrorCode};
 
 use crate::state::AppState;
-use crate::{db, email, stripe};
+use crate::{db, email};
 
 use sqlx;
 
@@ -63,15 +63,35 @@ pub async fn register(
         return Err(AppError::new(ErrorCode::ValidationFailed));
     }
 
-    // Check email not taken
-    match db::tenants::find_by_email(&state.pool, &email).await {
-        Ok(Some(_)) => {
-            return Err(AppError::new(ErrorCode::AlreadyExists));
-        }
-        Ok(None) => {}
+    // Check email — allow re-registration if tenant is still pending
+    let existing = match db::tenants::find_by_email(&state.pool, &email).await {
+        Ok(t) => t,
         Err(e) => {
             tracing::error!(%e, "DB error checking email");
             return Err(AppError::new(ErrorCode::InternalError));
+        }
+    };
+
+    if let Some(ref tenant) = existing {
+        use shared::cloud::TenantStatus;
+        match TenantStatus::from_db(&tenant.status) {
+            Some(TenantStatus::Pending) => {
+                // Allow re-registration: update password + resend code (handled below)
+            }
+            Some(TenantStatus::Verified) => {
+                // Already verified — tell frontend to redirect to console login
+                return Ok((
+                    StatusCode::OK,
+                    Json(json!({
+                        "status": TenantStatus::Verified.as_db(),
+                        "message": "Email already verified. Please log in to continue setup."
+                    })),
+                ));
+            }
+            _ => {
+                // active, suspended, canceled — truly already exists
+                return Err(AppError::new(ErrorCode::AlreadyExists));
+            }
         }
     }
 
@@ -84,8 +104,6 @@ pub async fn register(
         }
     };
 
-    // Generate tenant_id
-    let tenant_id = uuid::Uuid::new_v4().to_string();
     let now = now_millis();
 
     // Generate + hash verification code before transaction
@@ -99,7 +117,13 @@ pub async fn register(
     };
     let expires_at = now + 5 * 60 * 1000; // 5 minutes
 
-    // Insert tenant + verification code in a single transaction
+    // Use existing tenant_id or generate new one
+    let tenant_id = match &existing {
+        Some(t) => t.id.clone(),
+        None => uuid::Uuid::new_v4().to_string(),
+    };
+
+    // Insert or update tenant + verification code in a single transaction
     let mut tx = match state.pool.begin().await {
         Ok(tx) => tx,
         Err(e) => {
@@ -108,19 +132,33 @@ pub async fn register(
         }
     };
 
-    if let Err(e) = sqlx::query(
-        "INSERT INTO tenants (id, email, hashed_password, status, created_at)
-         VALUES ($1, $2, $3, 'pending', $4)",
-    )
-    .bind(&tenant_id)
-    .bind(&email)
-    .bind(&hashed_password)
-    .bind(now)
-    .execute(&mut *tx)
-    .await
-    {
-        tracing::error!(%e, "Failed to create tenant");
-        return Err(AppError::new(ErrorCode::InternalError));
+    if existing.is_some() {
+        // Update existing pending tenant's password
+        if let Err(e) = sqlx::query("UPDATE tenants SET hashed_password = $1 WHERE id = $2")
+            .bind(&hashed_password)
+            .bind(&tenant_id)
+            .execute(&mut *tx)
+            .await
+        {
+            tracing::error!(%e, "Failed to update pending tenant");
+            return Err(AppError::new(ErrorCode::InternalError));
+        }
+    } else {
+        // Insert new tenant
+        if let Err(e) = sqlx::query(
+            "INSERT INTO tenants (id, email, hashed_password, status, created_at)
+             VALUES ($1, $2, $3, 'pending', $4)",
+        )
+        .bind(&tenant_id)
+        .bind(&email)
+        .bind(&hashed_password)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        {
+            tracing::error!(%e, "Failed to create tenant");
+            return Err(AppError::new(ErrorCode::InternalError));
+        }
     }
 
     if let Err(e) = sqlx::query(
@@ -230,53 +268,11 @@ pub async fn verify_email(
     // Delete verification record
     let _ = db::email_verifications::delete(&state.pool, &email, "registration").await;
 
-    // Create Stripe Customer
-    let customer_id =
-        match stripe::create_customer(&state.stripe_secret_key, &email, &tenant.id).await {
-            Ok(id) => id,
-            Err(e) => {
-                tracing::error!(%e, "Failed to create Stripe customer");
-                return Err(AppError::new(ErrorCode::PaymentSetupFailed));
-            }
-        };
-
-    // Save stripe_customer_id
-    if let Err(e) = db::tenants::set_stripe_customer(&state.pool, &tenant.id, &customer_id).await {
-        tracing::error!(%e, "Failed to save Stripe customer ID");
-        return Err(AppError::new(ErrorCode::InternalError));
-    }
-
-    // Determine plan from verification metadata
-    let plan = record.metadata.as_deref().unwrap_or("basic");
-    let price_id = match plan {
-        "pro" => &state.stripe_pro_price_id,
-        _ => &state.stripe_basic_price_id,
-    };
-
-    // Create Stripe Checkout Session
-    let checkout_url = match stripe::create_checkout_session(
-        &state.stripe_secret_key,
-        &customer_id,
-        price_id,
-        plan,
-        &state.registration_success_url,
-        &state.registration_cancel_url,
-    )
-    .await
-    {
-        Ok(url) => url,
-        Err(e) => {
-            tracing::error!(%e, "Failed to create Stripe checkout session");
-            return Err(AppError::new(ErrorCode::PaymentSetupFailed));
-        }
-    };
-
-    tracing::info!(tenant_id = %tenant.id, "Email verified, Stripe checkout created");
+    tracing::info!(tenant_id = %tenant.id, "Email verified successfully");
 
     Ok((
         StatusCode::OK,
         Json(json!({
-            "checkout_url": checkout_url,
             "message": "Email verified successfully"
         })),
     ))
@@ -293,7 +289,7 @@ pub async fn resend_code(
 
     // Find tenant — return identical response for all non-pending states to prevent email enumeration
     match db::tenants::find_by_email(&state.pool, &email).await {
-        Ok(Some(t)) if t.status == "pending" => {}
+        Ok(Some(t)) if t.status == shared::cloud::TenantStatus::Pending.as_db() => {}
         Ok(Some(_)) | Ok(None) => {
             return Ok((
                 StatusCode::OK,

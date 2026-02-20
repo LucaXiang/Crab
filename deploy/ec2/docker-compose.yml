@@ -13,6 +13,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./portal:/srv/portal:ro
+      - ./console:/srv/console:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

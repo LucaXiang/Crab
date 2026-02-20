@@ -44,7 +44,8 @@ pub async fn login(
         return Err(AppError::new(ErrorCode::InvalidCredentials));
     }
 
-    if tenant.status != "active" {
+    let status = shared::cloud::TenantStatus::from_db(&tenant.status);
+    if !status.is_some_and(|s| s.can_login()) {
         return Err(AppError::new(ErrorCode::AccountDisabled));
     }
 
@@ -593,6 +594,86 @@ pub async fn billing_portal(
     })?;
 
     Ok(Json(serde_json::json!({ "url": url })))
+}
+
+/// POST /api/tenant/create-checkout — create Stripe checkout session (for verified tenants)
+#[derive(Deserialize)]
+pub struct CreateCheckoutRequest {
+    pub plan: String,
+}
+
+pub async fn create_checkout(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Json(req): Json<CreateCheckoutRequest>,
+) -> ApiResult<serde_json::Value> {
+    let plan = req.plan.as_str();
+    if !matches!(plan, "basic" | "pro") {
+        return Err(AppError::new(ErrorCode::ValidationFailed));
+    }
+
+    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
+        .await
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?
+        .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
+
+    // Only verified (unpaid) tenants can create checkout
+    let status = shared::cloud::TenantStatus::from_db(&tenant.status);
+    if status != Some(shared::cloud::TenantStatus::Verified) {
+        return Err(AppError::new(ErrorCode::ValidationFailed));
+    }
+
+    // Create or reuse Stripe customer
+    let customer_id = if let Some(ref cid) = tenant.stripe_customer_id {
+        cid.clone()
+    } else {
+        let cid =
+            crate::stripe::create_customer(&state.stripe_secret_key, &tenant.email, &tenant.id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(%e, "Failed to create Stripe customer");
+                    AppError::new(ErrorCode::PaymentSetupFailed)
+                })?;
+        db::tenants::set_stripe_customer(&state.pool, &tenant.id, &cid)
+            .await
+            .map_err(|_| AppError::new(ErrorCode::InternalError))?;
+        cid
+    };
+
+    let price_id = match plan {
+        "pro" => &state.stripe_pro_price_id,
+        _ => &state.stripe_basic_price_id,
+    };
+
+    let checkout_url = crate::stripe::create_checkout_session(
+        &state.stripe_secret_key,
+        &customer_id,
+        price_id,
+        plan,
+        &state.registration_success_url,
+        &state.registration_cancel_url,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!(%e, "Failed to create Stripe checkout");
+        AppError::new(ErrorCode::PaymentSetupFailed)
+    })?;
+
+    let now = shared::util::now_millis();
+    let detail = serde_json::json!({ "plan": plan });
+    let _ = crate::db::audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "checkout_created",
+        Some(&detail),
+        None,
+        now,
+    )
+    .await;
+
+    Ok(Json(serde_json::json!({
+        "checkout_url": checkout_url,
+    })))
 }
 
 // ── Account management endpoints ──

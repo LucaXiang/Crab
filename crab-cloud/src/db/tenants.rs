@@ -115,9 +115,9 @@ pub async fn authenticate(
         return Ok(None);
     };
 
-    // pending = 邮箱未验证，不能登录；verified/active 都可以登录
-    // 订阅检查在 verify_tenant 端点中单独处理
-    if tenant.status == "pending" {
+    // Only verified/active tenants can log in
+    let status = shared::cloud::TenantStatus::from_db(&tenant.status);
+    if !status.is_some_and(|s| s.can_login()) {
         return Ok(None);
     }
 

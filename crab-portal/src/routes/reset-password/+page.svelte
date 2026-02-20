@@ -13,10 +13,15 @@
 	let error = $state('');
 	let success = $state(false);
 
-	// Read email from URL
+	// Read email from sessionStorage (not URL)
 	if (typeof window !== 'undefined') {
-		const params = new URLSearchParams(window.location.search);
-		email = params.get('email') ?? '';
+		email = sessionStorage.getItem('redcoral-reset-email') ?? '';
+	}
+
+	function handleCodeInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		code = input.value.replace(/\D/g, '').slice(0, 6);
+		input.value = code;
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -25,6 +30,7 @@
 		loading = true;
 		try {
 			await resetPassword({ email, code, new_password: newPassword });
+			sessionStorage.removeItem('redcoral-reset-email');
 			success = true;
 			setTimeout(() => goto('/login'), 2000);
 		} catch (err) {
@@ -87,10 +93,11 @@
 						id="code"
 						required
 						maxlength={6}
-						pattern="[0-9]{6}"
 						inputmode="numeric"
-						bind:value={code}
-						placeholder={$t('verify.placeholder_code')}
+						autocomplete="one-time-code"
+						value={code}
+						oninput={handleCodeInput}
+						placeholder="000000"
 						class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-coral-500/20 focus:border-coral-500 transition-all duration-150 tracking-[0.3em] text-center font-mono text-lg"
 					/>
 				</div>

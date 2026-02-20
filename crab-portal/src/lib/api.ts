@@ -41,8 +41,10 @@ export interface RegisterRequest {
 }
 
 export interface RegisterResponse {
-	tenant_id: string;
+	tenant_id?: string;
 	message: string;
+	status?: string;
+	checkout_url?: string;
 }
 
 export function register(body: RegisterRequest): Promise<RegisterResponse> {
@@ -55,7 +57,6 @@ export interface VerifyEmailRequest {
 }
 
 export interface VerifyEmailResponse {
-	checkout_url: string;
 	message: string;
 }
 

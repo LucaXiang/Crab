@@ -60,7 +60,7 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 ./deploy/build-cloud.sh push
 
 # 2. SSH 到 EC2
-ssh -i deploy/ec2/crab-ec2.pem ec2-user@<EC2_IP>
+ssh -i deploy/ec2/crab-ec2.pem ec2-user@51.92.72.162
 
 # 3. ECR 登录 + 拉取新镜像
 aws ecr get-login-password --region eu-south-2 | \

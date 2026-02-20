@@ -1,23 +1,23 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Store, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-svelte';
+	import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { register, ApiError } from '$lib/api';
 	import AuthLayout from '$lib/components/AuthLayout.svelte';
 
 	let email = $state('');
 	let password = $state('');
-	let selectedPlan = $state('basic');
 	let showPassword = $state(false);
 	let loading = $state(false);
 	let error = $state('');
 	let termsAccepted = $state(false);
 
-	// Read plan from URL if provided (from pricing CTA)
+	// Plan from URL param (from pricing CTA), hidden from user
+	let selectedPlan = $state('basic');
 	if (typeof window !== 'undefined') {
 		const params = new URLSearchParams(window.location.search);
 		const plan = params.get('plan');
-		if (plan && ['basic', 'pro', 'enterprise'].includes(plan)) {
+		if (plan && ['basic', 'pro'].includes(plan)) {
 			selectedPlan = plan;
 		}
 	}
@@ -27,8 +27,13 @@
 		error = '';
 		loading = true;
 		try {
-			await register({ email, password, plan: selectedPlan });
-			goto(`/verify?email=${encodeURIComponent(email)}`);
+			const res = await register({ email, password, plan: selectedPlan });
+			if (res.status === 'verified' && res.checkout_url) {
+				window.location.href = res.checkout_url;
+			} else {
+				sessionStorage.setItem('redcoral-verify-email', email);
+				goto('/verify');
+			}
 		} catch (err) {
 			if (err instanceof ApiError) {
 				error = err.message;
@@ -96,37 +101,6 @@
 						<Eye class="w-4 h-4" />
 					{/if}
 				</button>
-			</div>
-		</div>
-
-		<div>
-			<span class="block text-sm font-medium text-slate-700 mb-1.5">{$t('register.label_plan')}</span>
-			<div class="grid grid-cols-3 gap-2">
-				{#each [
-					{ value: 'basic', nameKey: 'pricing.starter.name', price: '€50' },
-					{ value: 'pro', nameKey: 'pricing.pro.name', price: '€79' },
-					{ value: 'enterprise', nameKey: 'pricing.enterprise.name', priceKey: 'common.custom' }
-				] as plan}
-					<label class="cursor-pointer">
-						<input
-							type="radio"
-							name="plan"
-							value={plan.value}
-							bind:group={selectedPlan}
-							class="peer sr-only"
-						/>
-						<div
-							class="peer-checked:border-coral-500 peer-checked:bg-coral-50 peer-checked:text-coral-700 border border-slate-200 rounded-lg p-2.5 text-center transition-all duration-150 hover:border-slate-300"
-						>
-							<div class="text-xs font-semibold text-slate-800">{$t(plan.nameKey)}</div>
-							<div class="text-[11px] text-slate-500 mt-0.5">
-								{plan.priceKey
-									? $t(plan.priceKey)
-									: `${plan.price}${$t('common.per_month')}`}
-							</div>
-						</div>
-					</label>
-				{/each}
 			</div>
 		</div>
 

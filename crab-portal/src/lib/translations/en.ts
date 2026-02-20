@@ -190,8 +190,8 @@ export const en: Record<string, string> = {
 	// === Registration Success/Cancel ===
 	'reg_success.page_title': 'Registration complete',
 	'reg_success.title': 'Welcome to RedCoral!',
-	'reg_success.message': 'Your subscription is active. You can now log in and start setting up your restaurant.',
-	'reg_success.next_steps': 'Download the RedCoral app and log in with your account.',
+	'reg_success.message': 'Your email has been verified. Go to the dashboard to choose your plan and complete setup.',
+	'reg_success.next_steps': 'Select a plan, complete payment, and upload your P12 certificate.',
 	'reg_success.login_cta': 'Go to dashboard',
 
 	'reg_cancel.page_title': 'Payment cancelled',

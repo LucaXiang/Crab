@@ -111,7 +111,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
         return Some(ErrorCode::TenantNotFound);
     };
 
-    if status != "active" {
+    if status != shared::cloud::TenantStatus::Active.as_db() {
         tracing::warn!(tenant_id = %identity.tenant_id, status = %status, "Tenant not active");
         return Some(ErrorCode::SubscriptionBlocked);
     }

@@ -293,15 +293,20 @@ async fn delete_resource(
     resource: &str,
     resource_id: &str,
 ) -> Result<(), BoxError> {
-    let table = match resource {
-        "product" => "cloud_products",
-        "category" => "cloud_categories",
-        "daily_report" => "cloud_daily_reports",
+    let query = match resource {
+        "product" => {
+            sqlx::query("DELETE FROM cloud_products WHERE edge_server_id = $1 AND source_id = $2")
+        }
+        "category" => {
+            sqlx::query("DELETE FROM cloud_categories WHERE edge_server_id = $1 AND source_id = $2")
+        }
+        "daily_report" => sqlx::query(
+            "DELETE FROM cloud_daily_reports WHERE edge_server_id = $1 AND source_id = $2",
+        ),
         other => return Err(format!("Cannot delete resource type: {other}").into()),
     };
 
-    let sql = format!("DELETE FROM {table} WHERE edge_server_id = $1 AND source_id = $2");
-    sqlx::query(&sql)
+    query
         .bind(edge_server_id)
         .bind(resource_id)
         .execute(pool)

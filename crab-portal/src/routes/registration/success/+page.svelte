@@ -18,7 +18,7 @@
 			<p class="text-xs text-slate-400">{$t('reg_success.next_steps')}</p>
 		</div>
 		<a
-			href="/login"
+			href="https://console.redcoral.app"
 			class="inline-flex items-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-150 cursor-pointer"
 		>
 			<span>{$t('reg_success.login_cta')}</span>

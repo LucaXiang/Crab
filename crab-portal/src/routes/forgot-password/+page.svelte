@@ -45,13 +45,13 @@
 				<Mail class="w-6 h-6 text-green-600" />
 			</div>
 			<p class="text-sm text-slate-600">{$t('forgot.sent_message')}</p>
-			<a
-				href="/reset-password?email={encodeURIComponent(email)}"
+			<button
+				onclick={() => { sessionStorage.setItem('redcoral-reset-email', email); window.location.href = '/reset-password'; }}
 				class="inline-flex items-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors duration-150 cursor-pointer"
 			>
 				<span>{$t('forgot.enter_code')}</span>
 				<ArrowRight class="w-4 h-4" />
-			</a>
+			</button>
 		</div>
 	{:else}
 		<form class="space-y-4" onsubmit={handleSubmit}>

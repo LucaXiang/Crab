@@ -6,6 +6,8 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 
+use shared::cloud::TenantStatus;
+
 use crate::state::AppState;
 use crate::{db, email, stripe};
 
@@ -161,7 +163,9 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
     }
 
     // Activate tenant
-    if let Err(e) = db::tenants::update_status(&state.pool, &tenant.id, "active").await {
+    if let Err(e) =
+        db::tenants::update_status(&state.pool, &tenant.id, TenantStatus::Active.as_db()).await
+    {
         tracing::error!(%e, "Failed to activate tenant");
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
@@ -239,7 +243,8 @@ async fn handle_subscription_deleted(state: &AppState, event: &serde_json::Value
     // Find and cancel tenant
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ = db::tenants::update_status(&state.pool, &tenant_id, "canceled").await;
+        let _ = db::tenants::update_status(&state.pool, &tenant_id, TenantStatus::Canceled.as_db())
+            .await;
         tracing::info!(tenant_id = %tenant_id, "Tenant canceled (subscription deleted)");
 
         if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
@@ -284,7 +289,9 @@ async fn handle_payment_failed(state: &AppState, event: &serde_json::Value) -> S
     // Suspend tenant
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ = db::tenants::update_status(&state.pool, &tenant_id, "suspended").await;
+        let _ =
+            db::tenants::update_status(&state.pool, &tenant_id, TenantStatus::Suspended.as_db())
+                .await;
         tracing::info!(tenant_id = %tenant_id, "Tenant suspended (payment failed)");
 
         if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {

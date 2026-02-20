@@ -73,6 +73,7 @@ pub fn public_router(state: AppState) -> Router {
             get(tenant::list_products),
         )
         .route("/api/tenant/billing-portal", post(tenant::billing_portal))
+        .route("/api/tenant/create-checkout", post(tenant::create_checkout))
         .route("/api/tenant/audit-log", get(tenant::audit_log))
         .route(
             "/api/tenant/stores/{id}/commands",
@@ -118,7 +119,9 @@ pub fn public_router(state: AppState) -> Router {
         .allow_origin(AllowOrigin::list([
             "https://redcoral.app".parse().unwrap(),
             "https://www.redcoral.app".parse().unwrap(),
+            "https://console.redcoral.app".parse().unwrap(),
             "http://localhost:5173".parse().unwrap(), // dev
+            "http://localhost:5174".parse().unwrap(), // dev console
         ]))
         .allow_methods([
             http::Method::GET,

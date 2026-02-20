@@ -64,13 +64,13 @@
 				<div class="mb-6">
 					<div class="flex items-baseline gap-1">
 						<span class="text-4xl font-heading font-bold text-slate-900"
-							>&euro;{isAnnual ? 42 : 50}</span
+							>&euro;{isAnnual ? 31 : 39}</span
 						>
 						<span class="text-slate-400 text-sm">{$t('common.per_month')}</span>
 					</div>
 					{#if isAnnual}
 						<p class="text-xs text-slate-400 mt-1">
-							{$t('pricing.billed_annually')}, &euro;500{$t('common.per_year')}
+							{$t('pricing.billed_annually')}, &euro;375{$t('common.per_year')}
 						</p>
 					{/if}
 				</div>
@@ -106,13 +106,13 @@
 				<div class="mb-6">
 					<div class="flex items-baseline gap-1">
 						<span class="text-4xl font-heading font-bold text-coral-500"
-							>&euro;{isAnnual ? 66 : 79}</span
+							>&euro;{isAnnual ? 55 : 69}</span
 						>
 						<span class="text-coral-400 text-sm">{$t('common.per_month')}</span>
 					</div>
 					{#if isAnnual}
 						<p class="text-xs text-slate-400 mt-1">
-							{$t('pricing.billed_annually')}, &euro;790{$t('common.per_year')}
+							{$t('pricing.billed_annually')}, &euro;660{$t('common.per_year')}
 						</p>
 					{/if}
 				</div>
