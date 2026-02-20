@@ -91,6 +91,103 @@ pub struct CloudCommandResult {
     pub executed_at: i64,
 }
 
+/// 归档订单完整详情（edge→cloud 推送）
+///
+/// 包含摘要层（永久保存，含 VeriFactu desglose）和详情层（30 天滚动）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderDetailSync {
+    // ── 摘要层（永久保存） ──
+    /// UUID (OrderSnapshot.order_id)，全局唯一
+    pub order_key: String,
+    pub receipt_number: String,
+    pub status: String,
+    pub total_amount: f64,
+    pub tax: f64,
+    pub end_time: Option<i64>,
+    pub prev_hash: String,
+    pub curr_hash: String,
+    pub created_at: i64,
+    /// VeriFactu 税率分拆
+    pub desglose: Vec<TaxDesglose>,
+
+    // ── 详情层（30 天滚动） ──
+    pub detail: OrderDetailPayload,
+}
+
+/// VeriFactu 税率分拆
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaxDesglose {
+    /// 税率: 0, 4, 10, 21
+    pub tax_rate: i32,
+    /// 税前金额 (BaseImponible)
+    pub base_amount: f64,
+    /// 税额 (CuotaRepercutida)
+    pub tax_amount: f64,
+}
+
+/// 订单详情载荷（items + payments，不含 events/timeline）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderDetailPayload {
+    pub zone_name: Option<String>,
+    pub table_name: Option<String>,
+    pub is_retail: bool,
+    pub guest_count: Option<i32>,
+    pub original_total: f64,
+    pub subtotal: f64,
+    pub paid_amount: f64,
+    pub discount_amount: f64,
+    pub surcharge_amount: f64,
+    pub comp_total_amount: f64,
+    pub order_manual_discount_amount: f64,
+    pub order_manual_surcharge_amount: f64,
+    pub order_rule_discount_amount: f64,
+    pub order_rule_surcharge_amount: f64,
+    pub start_time: i64,
+    pub operator_name: Option<String>,
+    pub void_type: Option<String>,
+    pub loss_reason: Option<String>,
+    pub loss_amount: Option<f64>,
+    pub void_note: Option<String>,
+    pub member_name: Option<String>,
+    pub items: Vec<OrderItemSync>,
+    pub payments: Vec<OrderPaymentSync>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderItemSync {
+    pub name: String,
+    pub spec_name: Option<String>,
+    pub category_name: Option<String>,
+    pub price: f64,
+    pub quantity: i32,
+    pub unit_price: f64,
+    pub line_total: f64,
+    pub discount_amount: f64,
+    pub surcharge_amount: f64,
+    pub tax: f64,
+    pub tax_rate: i32,
+    pub is_comped: bool,
+    pub note: Option<String>,
+    pub options: Vec<OrderItemOptionSync>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderItemOptionSync {
+    pub attribute_name: String,
+    pub option_name: String,
+    pub price: f64,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderPaymentSync {
+    pub seq: i32,
+    pub method: String,
+    pub amount: f64,
+    pub timestamp: i64,
+    pub cancelled: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

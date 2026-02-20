@@ -257,6 +257,13 @@ async fn handle_edge_message<S>(
         }
 
         CloudMessage::CommandResult { results } => {
+            // Check for pending on-demand requests and notify waiters
+            for result in &results {
+                if let Some((_, sender)) = state.pending_requests.remove(&result.command_id) {
+                    let _ = sender.send(result.clone());
+                }
+            }
+
             if let Err(e) = commands::complete_commands(&state.pool, &results, now).await {
                 tracing::warn!("Failed to process WS command results: {e}");
             } else {

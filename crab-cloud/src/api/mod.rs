@@ -61,6 +61,10 @@ pub fn public_router(state: AppState) -> Router {
         .route("/api/tenant/change-password", post(tenant::change_password))
         .route("/api/tenant/stores", get(tenant::list_stores))
         .route("/api/tenant/stores/{id}/orders", get(tenant::list_orders))
+        .route(
+            "/api/tenant/stores/{id}/orders/{order_key}/detail",
+            get(tenant::get_order_detail),
+        )
         .route("/api/tenant/stores/{id}/stats", get(tenant::get_stats))
         .route(
             "/api/tenant/stores/{id}/products",

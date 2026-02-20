@@ -207,6 +207,163 @@ pub async fn list_products(
     Ok(Json(products))
 }
 
+/// GET /api/tenant/stores/:id/orders/:order_key/detail
+///
+/// Returns order detail from cache (30-day rolling).
+/// If not cached, attempts on-demand fetch from connected edge via WS command.
+pub async fn get_order_detail(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, order_key)): Path<(i64, String)>,
+) -> ApiResult<serde_json::Value> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    // 1. Check cloud_order_details cache
+    if let Some(detail) =
+        tenant_queries::get_order_detail(&state.pool, store_id, &identity.tenant_id, &order_key)
+            .await
+            .map_err(|e| {
+                tracing::error!("Order detail query error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?
+    {
+        let desglose = tenant_queries::get_order_desglose(
+            &state.pool,
+            store_id,
+            &identity.tenant_id,
+            &order_key,
+        )
+        .await
+        .unwrap_or_default();
+
+        return Ok(Json(serde_json::json!({
+            "source": "cache",
+            "detail": detail,
+            "desglose": desglose,
+        })));
+    }
+
+    // 2. Not cached — try on-demand fetch from edge via WS command
+    let Some(sender) = state.connected_edges.get(&store_id).map(|s| s.clone()) else {
+        return Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Order detail not cached and edge server is offline",
+        ));
+    };
+
+    let now = shared::util::now_millis();
+    let command_id = uuid::Uuid::new_v4().to_string();
+
+    // Create oneshot channel for response
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    state.pending_requests.insert(command_id.clone(), tx);
+
+    // Send command to edge
+    let cloud_cmd = shared::cloud::CloudCommand {
+        id: command_id.clone(),
+        command_type: "get_order_detail".to_string(),
+        payload: serde_json::json!({ "order_key": order_key }),
+        created_at: now,
+    };
+
+    if sender.try_send(cloud_cmd).is_err() {
+        state.pending_requests.remove(&command_id);
+        return Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Edge server command queue full",
+        ));
+    }
+
+    // 3. Wait for response with timeout (10 seconds)
+    let result = match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(_)) => {
+            state.pending_requests.remove(&command_id);
+            return Err(AppError::with_message(
+                ErrorCode::NotFound,
+                "Edge server disconnected during fetch",
+            ));
+        }
+        Err(_) => {
+            state.pending_requests.remove(&command_id);
+            return Err(AppError::with_message(
+                ErrorCode::NotFound,
+                "Order detail fetch timed out (edge may be slow or offline)",
+            ));
+        }
+    };
+
+    if !result.success {
+        return Err(AppError::with_message(
+            ErrorCode::NotFound,
+            result
+                .error
+                .unwrap_or_else(|| "Edge could not find order detail".to_string()),
+        ));
+    }
+
+    let Some(data) = result.data else {
+        return Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Edge returned empty order detail",
+        ));
+    };
+
+    let detail_sync: shared::cloud::OrderDetailSync =
+        serde_json::from_value(data).map_err(|e| {
+            tracing::error!("Failed to deserialize on-demand OrderDetailSync: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
+
+    // Cache the fetched detail directly into cloud_order_details (bypass version guard)
+    // First find or create the archived_order row, then write detail + desglose
+    let archived_order_id: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM cloud_archived_orders WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3",
+    )
+    .bind(store_id)
+    .bind(&identity.tenant_id)
+    .bind(&order_key)
+    .fetch_optional(&state.pool)
+    .await
+    .unwrap_or(None);
+
+    if let Some(order_id) = archived_order_id {
+        // Best-effort cache: write detail directly
+        let detail_json = serde_json::to_value(&detail_sync.detail).unwrap_or_default();
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO cloud_order_details (archived_order_id, detail, synced_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (archived_order_id)
+            DO UPDATE SET detail = EXCLUDED.detail, synced_at = EXCLUDED.synced_at
+            "#,
+        )
+        .bind(order_id)
+        .bind(&detail_json)
+        .bind(now)
+        .execute(&state.pool)
+        .await;
+    }
+
+    let desglose: Vec<serde_json::Value> = detail_sync
+        .desglose
+        .iter()
+        .map(|d| {
+            serde_json::json!({
+                "tax_rate": d.tax_rate,
+                "base_amount": d.base_amount,
+                "tax_amount": d.tax_amount,
+            })
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({
+        "source": "edge",
+        "detail": serde_json::to_value(&detail_sync.detail).unwrap_or_default(),
+        "desglose": desglose,
+    })))
+}
+
 /// POST /api/tenant/stores/:id/commands
 #[derive(Deserialize)]
 pub struct CreateCommandRequest {

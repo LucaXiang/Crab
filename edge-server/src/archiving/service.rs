@@ -375,7 +375,7 @@ impl OrderArchiveService {
                 operator_id, operator_name, \
                 void_type, loss_reason, loss_amount, void_note, \
                 member_id, member_name, \
-                prev_hash, curr_hash, created_at\
+                prev_hash, curr_hash, created_at, order_key\
             ) VALUES (\
                 ?1, ?2, ?3, ?4, ?5, ?6, \
                 ?7, ?8, ?9, ?10, \
@@ -386,7 +386,7 @@ impl OrderArchiveService {
                 ?21, ?22, \
                 ?23, ?24, ?25, ?26, \
                 ?27, ?28, \
-                ?29, ?30, ?31\
+                ?29, ?30, ?31, ?32\
             ) RETURNING id",
         )
         .bind(&snapshot.receipt_number)
@@ -430,6 +430,7 @@ impl OrderArchiveService {
         .bind(&prev_hash)
         .bind(&order_hash)
         .bind(now)
+        .bind(&snapshot.order_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;

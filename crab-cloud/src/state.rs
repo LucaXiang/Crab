@@ -5,10 +5,10 @@ use aws_sdk_secretsmanager::Client as SmClient;
 use aws_sdk_sesv2::Client as SesClient;
 use crab_cert::{CaProfile, CertificateAuthority};
 use dashmap::DashMap;
-use shared::cloud::CloudCommand;
+use shared::cloud::{CloudCommand, CloudCommandResult};
 use sqlx::PgPool;
 use std::sync::Arc;
-use tokio::sync::{OnceCell, mpsc};
+use tokio::sync::{OnceCell, mpsc, oneshot};
 
 use crate::auth::QuotaCache;
 use crate::config::Config;
@@ -57,6 +57,9 @@ pub struct AppState {
     pub stripe_pro_price_id: String,
     /// Connected edge-servers (edge_server_id → command sender)
     pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudCommand>>>,
+    /// Pending on-demand requests (command_id → response sender)
+    /// Used for tenant API to wait for edge command results (e.g., get_order_detail)
+    pub pending_requests: Arc<DashMap<String, oneshot::Sender<CloudCommandResult>>>,
 }
 
 impl AppState {
@@ -168,6 +171,7 @@ impl AppState {
             stripe_basic_price_id: config.stripe_basic_price_id.clone(),
             stripe_pro_price_id: config.stripe_pro_price_id.clone(),
             connected_edges: Arc::new(DashMap::new()),
+            pending_requests: Arc::new(DashMap::new()),
         })
     }
 }

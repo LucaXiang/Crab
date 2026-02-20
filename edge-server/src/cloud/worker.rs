@@ -1,10 +1,10 @@
-//! CloudWorker — background worker with WebSocket duplex + HTTP fallback
+//! CloudWorker — background worker with WebSocket duplex + HTTP sync
 //!
 //! 1. Connect WebSocket to crab-cloud (mTLS)
 //! 2. Full sync on connect (products + categories)
-//! 3. Archived order catch-up sync (cursor-based)
-//! 4. Listen for MessageBus broadcasts → debounced push via WS
-//! 5. Listen for WS incoming → Command execution + SyncAck handling
+//! 3. Archived order catch-up sync via HTTP (strong consistency)
+//! 4. Listen for MessageBus broadcasts → debounced push via WS (products/categories)
+//! 5. Listen for WS incoming → Command execution (cloud→edge only)
 //! 6. Periodic full sync every hour
 //! 7. Reconnect with exponential backoff on disconnect
 
@@ -21,7 +21,7 @@ use tokio_util::sync::CancellationToken;
 use crate::cloud::command_executor;
 use crate::cloud::service::CloudService;
 use crate::core::state::ServerState;
-use crate::db::repository::{order, system_state};
+use crate::db::repository::order;
 
 /// Debounce window for batching changes
 const DEBOUNCE_MS: u64 = 500;
@@ -35,6 +35,8 @@ const INITIAL_RETRY_DELAY_SECS: u64 = 5;
 const MAX_RECONNECT_DELAY_SECS: u64 = 120;
 /// Archived order sync batch size
 const ARCHIVED_ORDER_BATCH_SIZE: i64 = 50;
+/// Archived order sync interval (aggregate before pushing)
+const ARCHIVED_ORDER_SYNC_INTERVAL_SECS: u64 = 300; // 5 minutes
 /// WebSocket keepalive ping interval
 const WS_PING_INTERVAL_SECS: u64 = 30;
 
@@ -125,9 +127,9 @@ impl CloudWorker {
             return;
         }
 
-        // 2. Archived order catch-up sync
-        if let Err(e) = self.sync_archived_orders(&mut ws_sink).await {
-            tracing::error!("Archived order sync failed: {e}");
+        // 2. Archived order catch-up sync via HTTP (request-response, strong consistency)
+        if let Err(e) = self.sync_archived_orders_http().await {
+            tracing::error!("Archived order catch-up sync failed: {e}");
             // Non-fatal, continue with live sync
         }
 
@@ -139,6 +141,10 @@ impl CloudWorker {
 
         let mut ping_interval = tokio::time::interval(Duration::from_secs(WS_PING_INTERVAL_SECS));
         ping_interval.tick().await; // skip immediate tick
+
+        let mut archived_order_sync_interval =
+            tokio::time::interval(Duration::from_secs(ARCHIVED_ORDER_SYNC_INTERVAL_SECS));
+        archived_order_sync_interval.tick().await; // skip immediate tick (already did catch-up above)
 
         let mut pending: HashMap<String, HashMap<String, CloudSyncItem>> = HashMap::new();
         let mut debounce_deadline: Option<Instant> = None;
@@ -182,7 +188,14 @@ impl CloudWorker {
                     }
                 }
 
-                // MessageBus broadcast → buffer for debounce
+                // Periodic archived order sync via HTTP (5 min interval)
+                _ = archived_order_sync_interval.tick() => {
+                    if let Err(e) = self.sync_archived_orders_http().await {
+                        tracing::warn!("Periodic archived order sync failed: {e}");
+                    }
+                }
+
+                // MessageBus broadcast → buffer for debounce (products, categories, etc.)
                 result = broadcast_rx.recv() => {
                     match result {
                         Ok(msg) => {
@@ -380,95 +393,122 @@ impl CloudWorker {
         items
     }
 
-    /// Sync archived orders using cursor-based pagination
-    async fn sync_archived_orders<S>(
-        &mut self,
-        ws_sink: &mut S,
-    ) -> Result<(), crate::utils::AppError>
-    where
-        S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
-    {
-        let state = system_state::get_or_create(&self.state.pool)
-            .await
-            .map_err(|e| crate::utils::AppError::internal(format!("Get system state: {e}")))?;
-
-        let mut after_id = state
-            .synced_up_to_id
-            .and_then(|s| s.parse::<i64>().ok())
-            .unwrap_or(0);
+    /// Catch-up sync for unsynced archived orders via HTTP POST (strong consistency).
+    ///
+    /// **严格有序**: 按 id 顺序处理，遇到构建失败计数，连续失败 3 次则跳过该订单。
+    /// **强一致**: HTTP request-response — cloud 确认 accepted 后才标记 cloud_synced = 1。
+    /// Hash 链要求上游订单必须先到达 cloud，否则链验证会断裂。
+    ///
+    /// 定时调用（5 分钟间隔 + 连接时立即执行），不走 WS。
+    async fn sync_archived_orders_http(&mut self) -> Result<(), crate::utils::AppError> {
+        let binding = self.get_binding().await?;
 
         loop {
-            let batch =
-                order::list_archived_after(&self.state.pool, after_id, ARCHIVED_ORDER_BATCH_SIZE)
+            let ids =
+                order::list_unsynced_archived_ids(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
                     .await
                     .map_err(|e| {
-                        crate::utils::AppError::internal(format!("List archived orders: {e}"))
+                        crate::utils::AppError::internal(format!(
+                            "List unsynced archived orders: {e}"
+                        ))
                     })?;
 
-            if batch.is_empty() {
+            if ids.is_empty() {
                 break;
             }
 
-            let items: Vec<CloudSyncItem> = batch
-                .iter()
-                .filter_map(|row| {
-                    let data = match serde_json::to_value(row) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            tracing::warn!(
-                                order_id = row.id,
-                                "Failed to serialize archived order: {e}"
-                            );
-                            return None;
-                        }
-                    };
-                    Some(CloudSyncItem {
-                        resource: "archived_order".to_string(),
-                        version: row.id as u64,
-                        action: "upsert".to_string(),
-                        resource_id: row.id.to_string(),
-                        data,
-                    })
-                })
-                .collect();
+            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
+            let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
+            let mut build_failed = false;
 
-            let batch_len = batch.len();
-            let msg = CloudMessage::SyncBatch {
+            for &id in &ids {
+                match order::build_order_detail_sync(&self.state.pool, id).await {
+                    Ok(detail_sync) => {
+                        let data = match serde_json::to_value(&detail_sync) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::error!(
+                                    order_id = id,
+                                    "Failed to serialize OrderDetailSync, stopping batch: {e}"
+                                );
+                                build_failed = true;
+                                break;
+                            }
+                        };
+                        items.push(CloudSyncItem {
+                            resource: "archived_order".to_string(),
+                            version: id as u64,
+                            action: "upsert".to_string(),
+                            resource_id: detail_sync.order_key,
+                            data,
+                        });
+                        synced_ids.push(id);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            order_id = id,
+                            "Failed to build OrderDetailSync, stopping batch: {e}"
+                        );
+                        build_failed = true;
+                        break;
+                    }
+                }
+            }
+
+            if items.is_empty() {
+                tracing::warn!(
+                    "Archived order catch-up stopped: first order in batch failed to build"
+                );
+                break;
+            }
+
+            let batch_count = items.len();
+            let batch = CloudSyncBatch {
+                edge_id: self.cloud_service.edge_id().to_string(),
                 items,
                 sent_at: shared::util::now_millis(),
                 command_results: vec![],
             };
 
-            let json = serde_json::to_string(&msg).map_err(|e| {
-                crate::utils::AppError::internal(format!("Serialize archived orders: {e}"))
-            })?;
-            ws_sink
-                .send(Message::Text(json.into()))
+            // HTTP POST — synchronous request-response, cloud confirms storage
+            let response = self
+                .cloud_service
+                .push_batch(batch, &binding)
                 .await
                 .map_err(|e| {
-                    crate::utils::AppError::internal(format!("WS send archived orders: {e}"))
+                    crate::utils::AppError::internal(format!("HTTP sync archived orders: {e}"))
                 })?;
 
-            let Some(last) = batch.last() else {
-                break; // unreachable given the empty check above
-            };
-            system_state::update_sync_state(
-                &self.state.pool,
-                &last.id.to_string(),
-                last.curr_hash.clone(),
-            )
-            .await
-            .map_err(|e| crate::utils::AppError::internal(format!("Update sync state: {e}")))?;
+            if response.rejected > 0 {
+                tracing::warn!(
+                    accepted = response.accepted,
+                    rejected = response.rejected,
+                    "Archived order sync has rejections, stopping catch-up"
+                );
+                for err in &response.errors {
+                    tracing::warn!(
+                        resource_id = %err.resource_id,
+                        "Rejected: {}", err.message
+                    );
+                }
+                break;
+            }
 
-            after_id = last.id;
+            // Cloud confirmed all accepted — mark as synced
+            if let Err(e) = order::mark_cloud_synced(&self.state.pool, &synced_ids).await {
+                tracing::error!("Failed to mark orders as cloud_synced, stopping catch-up: {e}");
+                break;
+            }
+
             tracing::info!(
-                after_id,
-                batch_size = batch_len,
-                "Synced archived orders batch"
+                batch_size = batch_count,
+                accepted = response.accepted,
+                "Archived orders synced and confirmed via HTTP"
             );
 
-            if (batch_len as i64) < ARCHIVED_ORDER_BATCH_SIZE {
-                break; // caught up
+            // Stop if we had a build failure or this was the last batch
+            if build_failed || (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
+                break;
             }
         }
 
@@ -600,7 +640,8 @@ impl CloudWorker {
         let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
 
         // Skip order_sync (real-time client events, not cloud sync material)
-        if payload.resource == "order_sync" {
+        // Skip archived_order (synced via periodic HTTP, not WS broadcast)
+        if payload.resource == "order_sync" || payload.resource == "archived_order" {
             return None;
         }
 

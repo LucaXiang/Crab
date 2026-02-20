@@ -323,33 +323,250 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
     })
 }
 
-/// Archived order row for cloud sync (lightweight, no items/payments/events)
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
-pub struct ArchivedOrderSyncRow {
-    pub id: i64,
-    pub receipt_number: String,
-    pub status: String,
-    pub total_amount: f64,
-    pub end_time: Option<i64>,
-    pub prev_hash: String,
-    pub curr_hash: String,
-    pub created_at: i64,
-}
-
-/// List archived orders after a given ID for cursor-based sync
-pub async fn list_archived_after(
-    pool: &SqlitePool,
-    after_id: i64,
-    limit: i64,
-) -> RepoResult<Vec<ArchivedOrderSyncRow>> {
-    let rows = sqlx::query_as::<_, ArchivedOrderSyncRow>(
-        "SELECT id, receipt_number, status, total_amount, end_time, prev_hash, curr_hash, created_at \
-         FROM archived_order WHERE id > ? ORDER BY id LIMIT ?",
+/// List archived order IDs not yet synced to cloud
+pub async fn list_unsynced_archived_ids(pool: &SqlitePool, limit: i64) -> RepoResult<Vec<i64>> {
+    let rows = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM archived_order WHERE cloud_synced = 0 ORDER BY id LIMIT ?",
     )
-    .bind(after_id)
     .bind(limit)
     .fetch_all(pool)
     .await?;
 
     Ok(rows)
+}
+
+/// Mark archived orders as synced to cloud
+pub async fn mark_cloud_synced(pool: &SqlitePool, ids: &[i64]) -> RepoResult<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!("UPDATE archived_order SET cloud_synced = 1 WHERE id IN ({placeholders})");
+    let mut query = sqlx::query(&sql);
+    for id in ids {
+        query = query.bind(id);
+    }
+    query.execute(pool).await?;
+    Ok(())
+}
+
+/// Build full OrderDetailSync from archived tables for cloud sync
+pub async fn build_order_detail_sync(
+    pool: &SqlitePool,
+    order_pk: i64,
+) -> RepoResult<shared::cloud::OrderDetailSync> {
+    use shared::cloud::{
+        OrderDetailPayload, OrderDetailSync, OrderItemOptionSync, OrderItemSync, OrderPaymentSync,
+        TaxDesglose,
+    };
+
+    // 1. Query archived_order (reuse OrderRow + add hash/key fields)
+    #[derive(sqlx::FromRow)]
+    struct SyncOrderRow {
+        order_key: String,
+        receipt_number: String,
+        status: String,
+        total_amount: f64,
+        tax: f64,
+        end_time: Option<i64>,
+        prev_hash: String,
+        curr_hash: String,
+        created_at: i64,
+        zone_name: Option<String>,
+        table_name: Option<String>,
+        is_retail: bool,
+        guest_count: Option<i32>,
+        original_total: f64,
+        subtotal: f64,
+        paid_amount: f64,
+        discount_amount: f64,
+        surcharge_amount: f64,
+        comp_total_amount: f64,
+        order_manual_discount_amount: f64,
+        order_manual_surcharge_amount: f64,
+        order_rule_discount_amount: f64,
+        order_rule_surcharge_amount: f64,
+        start_time: i64,
+        operator_name: Option<String>,
+        void_type: Option<String>,
+        loss_reason: Option<String>,
+        loss_amount: Option<f64>,
+        void_note: Option<String>,
+        member_name: Option<String>,
+    }
+
+    let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
+        "SELECT order_key, receipt_number, status, total_amount, tax, end_time, \
+         prev_hash, curr_hash, created_at, zone_name, table_name, is_retail, guest_count, \
+         original_total, subtotal, paid_amount, discount_amount, surcharge_amount, \
+         comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, \
+         order_rule_discount_amount, order_rule_surcharge_amount, start_time, \
+         operator_name, void_type, loss_reason, loss_amount, void_note, member_name \
+         FROM archived_order WHERE id = ?",
+    )
+    .bind(order_pk)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| RepoError::NotFound(format!("Order {order_pk} not found")))?;
+
+    // 2. Query items
+    #[derive(sqlx::FromRow)]
+    struct SyncItemRow {
+        id: i64,
+        name: String,
+        spec_name: Option<String>,
+        category_name: Option<String>,
+        price: f64,
+        quantity: i32,
+        unit_price: f64,
+        line_total: f64,
+        discount_amount: f64,
+        surcharge_amount: f64,
+        tax: f64,
+        tax_rate: i32,
+        is_comped: bool,
+        note: Option<String>,
+    }
+
+    let item_rows: Vec<SyncItemRow> = sqlx::query_as::<_, SyncItemRow>(
+        "SELECT id, name, spec_name, category_name, price, quantity, unit_price, \
+         line_total, discount_amount, surcharge_amount, tax, tax_rate, is_comped, note \
+         FROM archived_order_item WHERE order_pk = ? ORDER BY id",
+    )
+    .bind(order_pk)
+    .fetch_all(pool)
+    .await?;
+
+    // Batch load options
+    let item_ids: Vec<i64> = item_rows.iter().map(|r| r.id).collect();
+    let mut options_map: HashMap<i64, Vec<OrderItemOptionSync>> = HashMap::new();
+    if !item_ids.is_empty() {
+        let placeholders = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT item_pk, attribute_name, option_name, price, quantity \
+             FROM archived_order_item_option WHERE item_pk IN ({placeholders})"
+        );
+        let mut query = sqlx::query_as::<_, (i64, String, String, f64, i32)>(&sql);
+        for id in &item_ids {
+            query = query.bind(id);
+        }
+        let all_options = query.fetch_all(pool).await?;
+        for (item_pk, attr, opt, price, qty) in all_options {
+            options_map
+                .entry(item_pk)
+                .or_default()
+                .push(OrderItemOptionSync {
+                    attribute_name: attr,
+                    option_name: opt,
+                    price,
+                    quantity: qty,
+                });
+        }
+    }
+
+    let items: Vec<OrderItemSync> = item_rows
+        .into_iter()
+        .map(|row| {
+            let options = options_map.remove(&row.id).unwrap_or_default();
+            OrderItemSync {
+                name: row.name,
+                spec_name: row.spec_name,
+                category_name: row.category_name,
+                price: row.price,
+                quantity: row.quantity,
+                unit_price: row.unit_price,
+                line_total: row.line_total,
+                discount_amount: row.discount_amount,
+                surcharge_amount: row.surcharge_amount,
+                tax: row.tax,
+                tax_rate: row.tax_rate,
+                is_comped: row.is_comped,
+                note: row.note,
+                options,
+            }
+        })
+        .collect();
+
+    // 3. Query payments
+    let payments: Vec<OrderPaymentSync> = sqlx::query_as::<_, (i32, String, f64, i64, bool)>(
+        "SELECT seq, method, amount, time, cancelled \
+         FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
+    )
+    .bind(order_pk)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(
+        |(seq, method, amount, timestamp, cancelled)| OrderPaymentSync {
+            seq,
+            method,
+            amount,
+            timestamp,
+            cancelled,
+        },
+    )
+    .collect();
+
+    // 4. Aggregate desglose from items (GROUP BY tax_rate) using rust_decimal
+    use crate::order_money::{to_decimal, to_f64};
+    use rust_decimal::Decimal;
+
+    let mut desglose_map: HashMap<i32, (Decimal, Decimal)> = HashMap::new();
+    for item in &items {
+        // comped items have line_total=0 and tax=0, include them for completeness
+        // (matches archived_order.tax which is computed from all items)
+        let entry = desglose_map
+            .entry(item.tax_rate)
+            .or_insert((Decimal::ZERO, Decimal::ZERO));
+        let line_total = to_decimal(item.line_total);
+        let tax = to_decimal(item.tax);
+        entry.0 += line_total - tax; // base_amount (Decimal precision)
+        entry.1 += tax; // tax_amount (Decimal precision)
+    }
+    let desglose: Vec<TaxDesglose> = desglose_map
+        .into_iter()
+        .map(|(tax_rate, (base_amount, tax_amount))| TaxDesglose {
+            tax_rate,
+            base_amount: to_f64(base_amount),
+            tax_amount: to_f64(tax_amount),
+        })
+        .collect();
+
+    Ok(OrderDetailSync {
+        order_key: order.order_key,
+        receipt_number: order.receipt_number,
+        status: order.status,
+        total_amount: order.total_amount,
+        tax: order.tax,
+        end_time: order.end_time,
+        prev_hash: order.prev_hash,
+        curr_hash: order.curr_hash,
+        created_at: order.created_at,
+        desglose,
+        detail: OrderDetailPayload {
+            zone_name: order.zone_name,
+            table_name: order.table_name,
+            is_retail: order.is_retail,
+            guest_count: order.guest_count,
+            original_total: order.original_total,
+            subtotal: order.subtotal,
+            paid_amount: order.paid_amount,
+            discount_amount: order.discount_amount,
+            surcharge_amount: order.surcharge_amount,
+            comp_total_amount: order.comp_total_amount,
+            order_manual_discount_amount: order.order_manual_discount_amount,
+            order_manual_surcharge_amount: order.order_manual_surcharge_amount,
+            order_rule_discount_amount: order.order_rule_discount_amount,
+            order_rule_surcharge_amount: order.order_rule_surcharge_amount,
+            start_time: order.start_time,
+            operator_name: order.operator_name,
+            void_type: order.void_type,
+            loss_reason: order.loss_reason,
+            loss_amount: order.loss_amount,
+            void_note: order.void_note,
+            member_name: order.member_name,
+            items,
+            payments,
+        },
+    })
 }

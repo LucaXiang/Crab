@@ -6,6 +6,7 @@
 use shared::cloud::{CloudCommand, CloudCommandResult};
 
 use crate::core::state::ServerState;
+use crate::db::repository::order;
 
 /// Execute a cloud command and return the result
 pub async fn execute(state: &ServerState, cmd: &CloudCommand) -> CloudCommandResult {
@@ -14,6 +15,7 @@ pub async fn execute(state: &ServerState, cmd: &CloudCommand) -> CloudCommandRes
     match cmd.command_type.as_str() {
         "get_status" => get_status(state, cmd, executed_at),
         "refresh_subscription" => refresh_subscription(state, cmd, executed_at).await,
+        "get_order_detail" => get_order_detail(state, cmd, executed_at).await,
         _ => CloudCommandResult {
             command_id: cmd.id.clone(),
             success: false,
@@ -46,6 +48,67 @@ fn get_status(state: &ServerState, cmd: &CloudCommand, executed_at: i64) -> Clou
         })),
         error: None,
         executed_at,
+    }
+}
+
+/// Fetch order detail by order_key or order_pk (on-demand from cloud)
+async fn get_order_detail(
+    state: &ServerState,
+    cmd: &CloudCommand,
+    executed_at: i64,
+) -> CloudCommandResult {
+    // Accept either order_key (UUID string) or order_id (i64 pk)
+    let order_pk: Option<i64> =
+        if let Some(pk) = cmd.payload.get("order_id").and_then(|v| v.as_i64()) {
+            Some(pk)
+        } else if let Some(key) = cmd.payload.get("order_key").and_then(|v| v.as_str()) {
+            match sqlx::query_scalar::<_, i64>(
+                "SELECT id FROM archived_order WHERE order_key = ? LIMIT 1",
+            )
+            .bind(key)
+            .fetch_optional(&state.pool)
+            .await
+            {
+                Ok(pk) => pk,
+                Err(e) => {
+                    return CloudCommandResult {
+                        command_id: cmd.id.clone(),
+                        success: false,
+                        data: None,
+                        error: Some(format!("DB query failed: {e}")),
+                        executed_at,
+                    };
+                }
+            }
+        } else {
+            None
+        };
+
+    let Some(pk) = order_pk else {
+        return CloudCommandResult {
+            command_id: cmd.id.clone(),
+            success: false,
+            data: None,
+            error: Some("Missing order_id or order_key in payload".to_string()),
+            executed_at,
+        };
+    };
+
+    match order::build_order_detail_sync(&state.pool, pk).await {
+        Ok(detail_sync) => CloudCommandResult {
+            command_id: cmd.id.clone(),
+            success: true,
+            data: serde_json::to_value(&detail_sync).ok(),
+            error: None,
+            executed_at,
+        },
+        Err(e) => CloudCommandResult {
+            command_id: cmd.id.clone(),
+            success: false,
+            data: None,
+            error: Some(format!("Order not found or query failed: {e}")),
+            executed_at,
+        },
     }
 }
 

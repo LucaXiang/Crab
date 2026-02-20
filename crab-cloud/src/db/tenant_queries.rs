@@ -215,6 +215,59 @@ pub async fn list_products(
     Ok(rows)
 }
 
+/// Get cached order detail (from cloud_order_details, 30-day rolling)
+pub async fn get_order_detail(
+    pool: &PgPool,
+    edge_server_id: i64,
+    tenant_id: &str,
+    order_key: &str,
+) -> Result<Option<serde_json::Value>, BoxError> {
+    let row: Option<(serde_json::Value,)> = sqlx::query_as(
+        r#"
+        SELECT d.detail
+        FROM cloud_order_details d
+        JOIN cloud_archived_orders o ON o.id = d.archived_order_id
+        WHERE o.edge_server_id = $1 AND o.tenant_id = $2 AND o.order_key = $3
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(tenant_id)
+    .bind(order_key)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|r| r.0))
+}
+
+/// Get order desglose (VeriFactu tax breakdown, permanent)
+pub async fn get_order_desglose(
+    pool: &PgPool,
+    edge_server_id: i64,
+    tenant_id: &str,
+    order_key: &str,
+) -> Result<Vec<DesgloseEntry>, BoxError> {
+    let rows: Vec<DesgloseEntry> = sqlx::query_as(
+        r#"
+        SELECT d.tax_rate, d.base_amount, d.tax_amount
+        FROM cloud_order_desglose d
+        JOIN cloud_archived_orders o ON o.id = d.archived_order_id
+        WHERE o.edge_server_id = $1 AND o.tenant_id = $2 AND o.order_key = $3
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(tenant_id)
+    .bind(order_key)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct DesgloseEntry {
+    pub tax_rate: i32,
+    pub base_amount: f64,
+    pub tax_amount: f64,
+}
+
 /// Verify edge-server belongs to tenant, return edge_server_id
 pub async fn verify_store_ownership(
     pool: &PgPool,
