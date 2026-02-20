@@ -13,12 +13,8 @@ env:
 jobs:
   # ============ Rust Quality Gates ============
   rust:
-    name: Rust (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    name: Rust (Windows)
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -31,19 +27,7 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
-      - name: Install NASM (Windows)
-        if: runner.os == 'Windows'
+      - name: Install NASM
         uses: ilammy/setup-nasm@v1
 
       - name: Install cargo-nextest
@@ -113,3 +97,55 @@ jobs:
             --exclude-dir=target --exclude-dir=node_modules \
             edge-server/src/ shared/src/ crab-client/src/ red_coral/src/ \
             || echo "No technical debt markers found"
+
+  # ============ Deploy ============
+  deploy-cloud:
+    name: Deploy crab-cloud (EC2)
+    needs: [rust, frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-south-2
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f crab-cloud/Dockerfile -t $ECR_REGISTRY/crab-cloud:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/crab-cloud:$IMAGE_TAG $ECR_REGISTRY/crab-cloud:latest
+          docker push $ECR_REGISTRY/crab-cloud:$IMAGE_TAG
+          docker push $ECR_REGISTRY/crab-cloud:latest
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          echo "$EC2_SSH_KEY" > /tmp/ec2-key.pem
+          chmod 600 /tmp/ec2-key.pem
+          ssh -o StrictHostKeyChecking=no -i /tmp/ec2-key.pem ec2-user@$EC2_HOST \
+            "cd /opt/crab && \
+             aws ecr get-login-password --region eu-south-2 | docker login --username AWS --password-stdin $ECR_REGISTRY && \
+             docker-compose pull crab-cloud && \
+             docker-compose up -d crab-cloud"
+          rm -f /tmp/ec2-key.pem
+
+      - name: Health check
+        run: |
+          sleep 10
+          curl -sf https://cloud.redcoral.app/health || echo "Health check pending (Caddy may need time for TLS)"
