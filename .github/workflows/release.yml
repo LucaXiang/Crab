@@ -67,7 +67,13 @@ jobs:
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           set -euo pipefail
-          NSIS_DIR="red_coral/target/release/bundle/nsis"
+
+          # Tauri workspace member outputs to workspace root target/
+          NSIS_DIR="target/release/bundle/nsis"
+          if [ ! -d "$NSIS_DIR" ]; then
+            # Fallback: check under red_coral/ in case of non-workspace build
+            NSIS_DIR="red_coral/target/release/bundle/nsis"
+          fi
 
           echo "==> NSIS directory contents:"
           ls -la "${NSIS_DIR}/" || { echo "ERROR: NSIS dir not found"; exit 1; }
