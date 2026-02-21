@@ -100,11 +100,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 
 # ========== Database ==========
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "postgres", "macros", "migrate", "json"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "postgres", "macros", "migrate", "json", "rust_decimal"] }
 redb = "3.0"
 
 # ========== Decimal Precision ==========
-rust_decimal = "1.37"
+rust_decimal = { version = "1.37", features = ["serde"] }
 
 # ========== Utilities ==========
 dotenvy = "0.15"

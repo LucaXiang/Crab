@@ -264,8 +264,8 @@ pub async fn get_order_desglose(
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct DesgloseEntry {
     pub tax_rate: i32,
-    pub base_amount: f64,
-    pub tax_amount: f64,
+    pub base_amount: rust_decimal::Decimal,
+    pub tax_amount: rust_decimal::Decimal,
 }
 
 /// Verify edge-server belongs to tenant, return edge_server_id

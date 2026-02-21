@@ -508,7 +508,7 @@ pub async fn build_order_detail_sync(
     .collect();
 
     // 4. Aggregate desglose from items (GROUP BY tax_rate) using rust_decimal
-    use crate::order_money::{to_decimal, to_f64};
+    use crate::order_money::to_decimal;
     use rust_decimal::Decimal;
 
     let mut desglose_map: HashMap<i32, (Decimal, Decimal)> = HashMap::new();
@@ -527,8 +527,8 @@ pub async fn build_order_detail_sync(
         .into_iter()
         .map(|(tax_rate, (base_amount, tax_amount))| TaxDesglose {
             tax_rate,
-            base_amount: to_f64(base_amount),
-            tax_amount: to_f64(tax_amount),
+            base_amount,
+            tax_amount,
         })
         .collect();
 

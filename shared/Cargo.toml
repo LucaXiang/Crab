@@ -32,6 +32,9 @@ uuid.workspace = true
 # Logging
 tracing.workspace = true
 
+# Decimal
+rust_decimal = { workspace = true, features = ["serde-with-float"] }
+
 # Database (optional, feature-gated)
 sqlx = { workspace = true, features = ["derive"], optional = true }
 

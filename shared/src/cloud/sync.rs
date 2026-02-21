@@ -120,9 +120,9 @@ pub struct TaxDesglose {
     /// 税率: 0, 4, 10, 21
     pub tax_rate: i32,
     /// 税前金额 (BaseImponible)
-    pub base_amount: f64,
+    pub base_amount: rust_decimal::Decimal,
     /// 税额 (CuotaRepercutida)
-    pub tax_amount: f64,
+    pub tax_amount: rust_decimal::Decimal,
 }
 
 /// 订单详情载荷（items + payments，不含 events/timeline）

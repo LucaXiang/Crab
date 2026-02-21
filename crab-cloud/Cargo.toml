@@ -21,6 +21,7 @@ base64.workspace = true
 
 # Database (PostgreSQL)
 sqlx = { workspace = true, features = ["postgres"] }
+rust_decimal.workspace = true
 
 # Logging
 tracing.workspace = true
