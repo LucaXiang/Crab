@@ -1,4 +1,4 @@
-use crate::db::{p12, subscriptions};
+use crate::db::{p12, subscriptions, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -39,6 +39,27 @@ pub async fn get_subscription_status(
             "error": "Invalid binding signature",
             "error_code": ErrorCode::TenantCredentialsInvalid
         }));
+    }
+
+    // 检查 tenant 是否存在于 PG（CA 在 Secrets Manager 可能仍存在，但 PG 记录可能已删除）
+    match tenants::find_by_id(&state.pool, tenant_id).await {
+        Ok(Some(_)) => {} // tenant 存在，继续
+        Ok(None) => {
+            tracing::warn!(tenant_id = %tenant_id, "Tenant not found in database (CA exists in Secrets Manager but PG record missing)");
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Tenant not found",
+                "error_code": ErrorCode::TenantNotFound
+            }));
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Database error checking tenant existence");
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Internal error",
+                "error_code": ErrorCode::InternalError
+            }));
+        }
     }
 
     // 获取最新订阅（不过滤 status）— 返回真实状态让 edge-server 判断

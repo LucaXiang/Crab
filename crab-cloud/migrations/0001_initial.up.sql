@@ -87,7 +87,6 @@ CREATE TABLE IF NOT EXISTS client_connections (
 
 CREATE INDEX IF NOT EXISTS idx_client_connections_tenant_status ON client_connections(tenant_id, status);
 
--- P12 certificates metadata (binary + password in Secrets Manager)
 CREATE TABLE IF NOT EXISTS p12_certificates (
     tenant_id         TEXT PRIMARY KEY,
     secret_name       TEXT NOT NULL,
@@ -174,38 +173,75 @@ CREATE TABLE IF NOT EXISTS cloud_categories (
 
 CREATE INDEX IF NOT EXISTS idx_cloud_categories_tenant ON cloud_categories (tenant_id);
 
+-- ── Orders (archived) ──
+
 CREATE TABLE IF NOT EXISTS cloud_archived_orders (
     id BIGSERIAL PRIMARY KEY,
     edge_server_id BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
     tenant_id TEXT NOT NULL,
     source_id TEXT NOT NULL,
+    order_key TEXT NOT NULL,
     receipt_number TEXT,
     status TEXT NOT NULL,
     end_time BIGINT,
     total DOUBLE PRECISION,
-    data JSONB NOT NULL,
+    tax NUMERIC(12,2),
+    desglose JSONB NOT NULL DEFAULT '[]'::JSONB,
+    guest_count INTEGER,
+    discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    void_type TEXT,
+    loss_amount NUMERIC(12,2),
+    start_time BIGINT,
+    prev_hash TEXT,
+    curr_hash TEXT,
     version BIGINT NOT NULL DEFAULT 0,
-    synced_at BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    synced_at BIGINT NOT NULL
 );
 
+CREATE UNIQUE INDEX uq_cloud_archived_orders_key
+    ON cloud_archived_orders (tenant_id, edge_server_id, order_key);
 CREATE INDEX IF NOT EXISTS idx_cloud_archived_orders_tenant ON cloud_archived_orders (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_cloud_archived_orders_receipt ON cloud_archived_orders (tenant_id, receipt_number);
 CREATE INDEX IF NOT EXISTS idx_cloud_archived_orders_end_time ON cloud_archived_orders (tenant_id, end_time);
 CREATE INDEX IF NOT EXISTS idx_cloud_archived_orders_status ON cloud_archived_orders (tenant_id, status);
+CREATE INDEX idx_cloud_archived_orders_list
+    ON cloud_archived_orders (edge_server_id, tenant_id, status, end_time DESC);
 
-CREATE TABLE IF NOT EXISTS cloud_active_orders (
+-- Order items (permanent, for statistics)
+CREATE TABLE IF NOT EXISTS cloud_order_items (
     id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
-    tenant_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    data JSONB NOT NULL,
-    version BIGINT NOT NULL DEFAULT 0,
-    synced_at BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    archived_order_id BIGINT NOT NULL REFERENCES cloud_archived_orders(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    category_name TEXT,
+    quantity INTEGER NOT NULL,
+    line_total NUMERIC(12,2) NOT NULL,
+    tax_rate INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_cloud_active_orders_tenant ON cloud_active_orders (tenant_id);
+CREATE INDEX idx_cloud_order_items_order ON cloud_order_items (archived_order_id);
+
+-- Order payments (permanent, for statistics)
+CREATE TABLE IF NOT EXISTS cloud_order_payments (
+    id BIGSERIAL PRIMARY KEY,
+    archived_order_id BIGINT NOT NULL REFERENCES cloud_archived_orders(id) ON DELETE CASCADE,
+    method TEXT NOT NULL,
+    amount NUMERIC(12,2) NOT NULL
+);
+
+CREATE INDEX idx_cloud_order_payments_order ON cloud_order_payments (archived_order_id);
+
+-- Order details (30-day rolling cache, JSONB)
+CREATE TABLE IF NOT EXISTS cloud_order_details (
+    id BIGSERIAL PRIMARY KEY,
+    archived_order_id BIGINT NOT NULL REFERENCES cloud_archived_orders(id) ON DELETE CASCADE,
+    detail JSONB NOT NULL,
+    synced_at BIGINT NOT NULL,
+    UNIQUE (archived_order_id)
+);
+
+CREATE INDEX idx_cloud_order_details_synced_at ON cloud_order_details (synced_at);
+
+-- ── Daily Reports ──
 
 CREATE TABLE IF NOT EXISTS cloud_daily_reports (
     id BIGSERIAL PRIMARY KEY,
@@ -220,6 +256,8 @@ CREATE TABLE IF NOT EXISTS cloud_daily_reports (
 
 CREATE INDEX IF NOT EXISTS idx_cloud_daily_reports_tenant ON cloud_daily_reports (tenant_id);
 
+-- ── Store Info ──
+
 CREATE TABLE IF NOT EXISTS cloud_store_info (
     id BIGSERIAL PRIMARY KEY,
     edge_server_id BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
@@ -229,6 +267,8 @@ CREATE TABLE IF NOT EXISTS cloud_store_info (
     synced_at BIGINT NOT NULL,
     UNIQUE (edge_server_id, tenant_id)
 );
+
+-- ── Commands ──
 
 CREATE TABLE IF NOT EXISTS cloud_commands (
     id BIGSERIAL PRIMARY KEY,

@@ -6,8 +6,22 @@ use tokio_util::sync::CancellationToken;
 
 use crate::services::tenant_binding::TenantBinding;
 use crate::utils::AppError;
-use shared::activation::SubscriptionInfo;
+use shared::activation::{SubscriptionInfo, SubscriptionStatus};
 use shared::app_state::{P12BlockedInfo, P12BlockedReason, SubscriptionBlockedInfo};
+use shared::error::ErrorCode;
+
+/// 订阅同步结果 — 区分网络错误和服务端明确拒绝
+enum SubscriptionFetchResult {
+    /// 成功获取到新的订阅信息
+    Ok(SubscriptionInfo),
+    /// 网络错误/超时 — 可用缓存兜底（离线优先）
+    NetworkError,
+    /// 服务端明确拒绝，附带全栈统一 ErrorCode
+    Rejected {
+        error: String,
+        code: Option<ErrorCode>,
+    },
+}
 
 /// 激活服务 - 管理边缘节点激活状态
 ///
@@ -514,6 +528,7 @@ impl ActivationService {
             success: bool,
             binding: Option<shared::activation::SignedBinding>,
             error: Option<String>,
+            error_code: Option<ErrorCode>,
         }
 
         let data: RefreshResponse = match resp.json().await {
@@ -525,7 +540,20 @@ impl ActivationService {
         };
 
         if !data.success {
-            tracing::warn!("Binding refresh failed: {}", data.error.unwrap_or_default());
+            let error = data.error.unwrap_or_default();
+            tracing::warn!(
+                "Binding refresh failed (code={:?}): {}",
+                data.error_code,
+                error
+            );
+
+            if Self::is_terminal_error(data.error_code.as_ref()) {
+                tracing::error!("Terminal error during binding refresh. Deactivating.");
+                drop(cache); // 释放写锁再调 deactivate
+                if let Err(e) = self.deactivate().await {
+                    tracing::error!("Failed to deactivate: {}", e);
+                }
+            }
             return;
         }
 
@@ -564,67 +592,114 @@ impl ActivationService {
             }
         };
 
-        // Fetch subscription from remote
-        if let Some(sub) = self
+        match self
             .fetch_subscription_from_auth_server(&credential.binding.tenant_id)
             .await
         {
-            tracing::info!(
-                "Subscription sync successful for tenant {}: {:?}",
-                credential.binding.tenant_id,
-                sub.status
-            );
-
-            // Update credential with new subscription
-            credential.subscription = Some(sub);
-
-            // 1. Persist to disk
-            if let Err(e) = credential.save(&self.cert_dir) {
-                tracing::error!(
-                    "Failed to save updated subscription to credential file: {}",
-                    e
+            SubscriptionFetchResult::Ok(sub) => {
+                tracing::info!(
+                    "Subscription sync successful for tenant {}: {:?}",
+                    credential.binding.tenant_id,
+                    sub.status
                 );
+                credential.subscription = Some(sub);
+                self.save_credential(&mut credential).await;
             }
 
-            // 2. Update memory cache
-            {
-                let mut cache = self.credential_cache.write().await;
-                *cache = Some(credential);
-            }
-        } else {
-            // 网络失败 → 检查签名是否过期
-            if let Some(sub) = &credential.subscription {
-                if sub.is_signature_expired() {
-                    let remaining_ms = (sub.signature_valid_until
-                        + SubscriptionInfo::SIGNATURE_GRACE_PERIOD_MS)
-                        - shared::util::now_millis();
-                    let remaining_days = (remaining_ms / 86_400_000).max(0);
-                    tracing::warn!(
-                        "Subscription sync failed AND signature expired! \
-                         Offline grace period applies ({}d remaining).",
-                        remaining_days
+            SubscriptionFetchResult::Rejected { error, code } => {
+                if Self::is_terminal_error(code.as_ref()) {
+                    // 终端错误 → 清除凭据，强制回到激活页
+                    tracing::error!(
+                        "Terminal error from cloud (code={:?}): {}. Deactivating.",
+                        code,
+                        error
                     );
+                    if let Err(e) = self.deactivate().await {
+                        tracing::error!("Failed to deactivate: {}", e);
+                    }
                 } else {
-                    let remaining_hours =
-                        (sub.signature_valid_until - shared::util::now_millis()) / 3_600_000;
-                    tracing::info!(
-                        "Subscription sync failed but signature still valid \
-                         (expires in {}h). Using cached data.",
-                        remaining_hours
+                    // 非终端拒绝（无订阅等）→ 标记 Inactive，显示续费页面
+                    tracing::error!(
+                        "Subscription rejected (code={:?}): {}. Marking as Inactive.",
+                        code,
+                        error
+                    );
+                    let inactive_sub = SubscriptionInfo {
+                        tenant_id: credential.binding.tenant_id.clone(),
+                        status: SubscriptionStatus::Inactive,
+                        signature_valid_until: 0,
+                        last_checked_at: shared::util::now_millis(),
+                        ..credential
+                            .subscription
+                            .clone()
+                            .unwrap_or_else(SubscriptionInfo::inactive_placeholder)
+                    };
+                    credential.subscription = Some(inactive_sub);
+                    self.save_credential(&mut credential).await;
+                }
+            }
+
+            SubscriptionFetchResult::NetworkError => {
+                // 网络失败 → 离线优先，检查签名是否过期
+                if let Some(sub) = &credential.subscription {
+                    if sub.is_signature_expired() {
+                        let remaining_ms = (sub.signature_valid_until
+                            + SubscriptionInfo::SIGNATURE_GRACE_PERIOD_MS)
+                            - shared::util::now_millis();
+                        let remaining_days = (remaining_ms / 86_400_000).max(0);
+                        tracing::warn!(
+                            "Subscription sync failed AND signature expired! \
+                             Offline grace period applies ({}d remaining).",
+                            remaining_days
+                        );
+                    } else {
+                        let remaining_hours =
+                            (sub.signature_valid_until - shared::util::now_millis()) / 3_600_000;
+                        tracing::info!(
+                            "Subscription sync failed but signature still valid \
+                             (expires in {}h). Using cached data.",
+                            remaining_hours
+                        );
+                    }
+                } else {
+                    tracing::warn!(
+                        "Subscription sync failed (network error). No cached subscription."
                     );
                 }
-            } else {
-                tracing::warn!(
-                    "Subscription sync failed (network/auth error). No cached subscription."
-                );
             }
         }
     }
 
-    pub async fn fetch_subscription_from_auth_server(
+    /// 保存凭证到磁盘和内存缓存
+    async fn save_credential(&self, credential: &mut TenantBinding) {
+        if let Err(e) = credential.save(&self.cert_dir) {
+            tracing::error!("Failed to save credential file: {}", e);
+        }
+        let mut cache = self.credential_cache.write().await;
+        *cache = Some(credential.clone());
+    }
+
+    /// 判断 Cloud API 返回的 ErrorCode 是否为终端错误
+    ///
+    /// 终端错误意味着本地凭据已失效，必须清除并重新激活：
+    /// - `TenantNotFound`: 租户在 Cloud DB 中不存在
+    /// - `TenantCredentialsInvalid`: CA 不存在或签名验证失败
+    /// - `ActivationFailed`: 设备被停用/替换
+    fn is_terminal_error(code: Option<&ErrorCode>) -> bool {
+        matches!(
+            code,
+            Some(
+                ErrorCode::TenantNotFound
+                    | ErrorCode::TenantCredentialsInvalid
+                    | ErrorCode::ActivationFailed
+            )
+        )
+    }
+
+    async fn fetch_subscription_from_auth_server(
         &self,
         _tenant_id: &str,
-    ) -> Option<SubscriptionInfo> {
+    ) -> SubscriptionFetchResult {
         // Use SignedBinding for authentication (no password stored on device)
         let binding = {
             let cache = self.credential_cache.read().await;
@@ -634,7 +709,7 @@ impl ActivationService {
             Some(b) => b,
             None => {
                 tracing::warn!("No credential available for subscription sync");
-                return None;
+                return SubscriptionFetchResult::NetworkError;
             }
         };
 
@@ -649,13 +724,22 @@ impl ActivationService {
             Ok(r) => r,
             Err(e) => {
                 tracing::error!("Failed to contact Auth Server: {}", e);
-                return None;
+                return SubscriptionFetchResult::NetworkError;
             }
         };
 
         if !resp.status().is_success() {
-            tracing::warn!("Auth Server error: {}", resp.status());
-            return None;
+            let status = resp.status();
+            tracing::warn!("Auth Server HTTP error: {}", status);
+            // 4xx = 服务端明确拒绝; 5xx = 服务端内部错误，按网络错误处理
+            return if status.is_client_error() {
+                SubscriptionFetchResult::Rejected {
+                    error: format!("HTTP {status}"),
+                    code: None,
+                }
+            } else {
+                SubscriptionFetchResult::NetworkError
+            };
         }
 
         // Parse response
@@ -663,6 +747,7 @@ impl ActivationService {
         struct SubResponse {
             success: bool,
             error: Option<String>,
+            error_code: Option<ErrorCode>,
             subscription: Option<SubscriptionInfo>,
         }
 
@@ -670,23 +755,32 @@ impl ActivationService {
             Ok(d) => d,
             Err(e) => {
                 tracing::error!("Failed to parse subscription response: {}", e);
-                return None;
+                return SubscriptionFetchResult::NetworkError;
             }
         };
 
         if !data.success {
+            let error = data.error.unwrap_or_default();
             tracing::warn!(
-                "Auth Server returned error: {}",
-                data.error.unwrap_or_default()
+                "Auth Server returned error: {} (code: {:?})",
+                error,
+                data.error_code
             );
-            return None;
+
+            return SubscriptionFetchResult::Rejected {
+                error,
+                code: data.error_code,
+            };
         }
 
         let mut sub_info = match data.subscription {
             Some(s) => s,
             None => {
                 tracing::warn!("Auth Server returned no subscription");
-                return None;
+                return SubscriptionFetchResult::Rejected {
+                    error: "No subscription in response".to_string(),
+                    code: None,
+                };
             }
         };
 
@@ -699,13 +793,13 @@ impl ActivationService {
                     "Failed to read tenant CA for subscription verification: {}",
                     e
                 );
-                return None;
+                return SubscriptionFetchResult::NetworkError;
             }
         };
 
         if let Err(e) = sub_info.validate(&tenant_ca_pem) {
             tracing::error!("Subscription signature validation failed: {}", e);
-            return None;
+            return SubscriptionFetchResult::NetworkError;
         }
 
         tracing::debug!("Subscription signature verified successfully");
@@ -713,6 +807,6 @@ impl ActivationService {
         // 更新本地检查时间
         sub_info.last_checked_at = shared::util::now_millis();
 
-        Some(sub_info)
+        SubscriptionFetchResult::Ok(sub_info)
     }
 }

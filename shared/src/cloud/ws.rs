@@ -1,5 +1,7 @@
 //! WebSocket protocol types for edge-server ↔ crab-cloud duplex communication
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::{CloudCommand, CloudCommandResult, CloudSyncError, CloudSyncItem};
@@ -35,6 +37,10 @@ pub enum CloudMessage {
 
     /// Command pushed from cloud to edge
     Command(CloudCommand),
+
+    // === cloud → edge (handshake) ===
+    /// Cloud → Edge: 连接建立后发送，包含 cloud 已确认的各资源版本号
+    Welcome { cursors: HashMap<String, u64> },
 }
 
 #[cfg(test)]
@@ -115,6 +121,27 @@ mod tests {
                 assert_eq!(cmd.command_type, "get_status");
             }
             _ => panic!("Expected Command"),
+        }
+    }
+
+    #[test]
+    fn test_cloud_message_welcome_roundtrip() {
+        let mut cursors = std::collections::HashMap::new();
+        cursors.insert("product".to_string(), 42u64);
+        cursors.insert("category".to_string(), 5u64);
+
+        let msg = CloudMessage::Welcome { cursors };
+
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"Welcome"#));
+
+        let deserialized: CloudMessage = serde_json::from_str(&json).unwrap();
+        match deserialized {
+            CloudMessage::Welcome { cursors } => {
+                assert_eq!(cursors.get("product"), Some(&42));
+                assert_eq!(cursors.get("category"), Some(&5));
+            }
+            _ => panic!("Expected Welcome"),
         }
     }
 }

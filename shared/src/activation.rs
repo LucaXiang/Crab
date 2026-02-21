@@ -322,6 +322,25 @@ impl SubscriptionInfo {
     /// 超过此限制必须联网刷新，否则阻止使用。
     pub const SIGNATURE_GRACE_PERIOD_MS: i64 = 3 * 24 * 60 * 60 * 1000;
 
+    /// 创建一个已失活的占位订阅（服务端拒绝时使用）
+    pub fn inactive_placeholder() -> Self {
+        Self {
+            tenant_id: String::new(),
+            id: None,
+            status: SubscriptionStatus::Inactive,
+            plan: PlanType::Basic,
+            starts_at: 0,
+            expires_at: None,
+            features: Vec::new(),
+            max_stores: 0,
+            max_clients: 0,
+            p12: None,
+            signature_valid_until: 0,
+            signature: String::new(),
+            last_checked_at: 0,
+        }
+    }
+
     /// 检查签名是否陈旧 (过期 + 宽限期也已过)
     pub fn is_signature_stale(&self) -> bool {
         crate::util::now_millis() > self.signature_valid_until + Self::SIGNATURE_GRACE_PERIOD_MS

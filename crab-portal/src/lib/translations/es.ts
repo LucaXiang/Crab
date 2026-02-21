@@ -199,5 +199,29 @@ export const es: Record<string, string> = {
 	'reg_cancel.message': 'El proceso de pago ha sido cancelado. Tu cuenta ha sido creada pero no tiene una suscripción activa.',
 	'reg_cancel.hint': 'Puedes iniciar sesión y completar el pago en cualquier momento.',
 	'reg_cancel.back_home': 'Volver al inicio',
-	'reg_cancel.try_login': 'Iniciar sesión'
+	'reg_cancel.try_login': 'Iniciar sesión',
+
+	// === Support ===
+	'support.page_title': 'Soporte',
+	'support.title': 'Centro de soporte',
+	'support.subtitle': 'Estamos aquí para ayudarte. Elige el canal que prefieras.',
+	'support.email_title': 'Soporte por email',
+	'support.whatsapp_title': 'WhatsApp',
+	'support.whatsapp_desc': 'Respuesta en horario laboral',
+	'support.faq_title': 'Preguntas frecuentes',
+	'support.faq_desc': 'Respuestas a las dudas más comunes',
+	'support.back_home': 'Volver al inicio',
+
+	// === Renew ===
+	'renew.page_title': 'Renovar suscripción',
+	'renew.title': 'Renovar suscripción',
+	'renew.subtitle': 'Tu suscripción ha expirado o está inactiva. Renueva para continuar usando RedCoral.',
+	'renew.notice': 'Tu sistema POS está bloqueado porque la suscripción ha expirado. Renueva para restaurar el acceso.',
+	'renew.steps_title': 'Pasos para renovar',
+	'renew.step1': 'Accede al panel de control con tu cuenta',
+	'renew.step2': 'Selecciona un plan y completa el pago',
+	'renew.step3': 'Tu POS se desbloqueará automáticamente',
+	'renew.cta': 'Ir al panel de control',
+	'renew.secure': 'Pago seguro con Stripe',
+	'renew.back_home': 'Volver al inicio'
 };

@@ -2,11 +2,11 @@
 //!
 //! ```text
 //! CloudWorker
-//!   ├── Startup: WebSocket connect → full sync (products + categories)
+//!   ├── Connect: WebSocket → receive Welcome{cursors}
+//!   ├── Initial sync: compare cursors with local versions → skip unchanged resources
 //!   ├── Startup: archived_order catch-up sync (cursor-based)
 //!   ├── Listen: MessageBus server broadcast (Sync events) → debounced push via WS
 //!   ├── Listen: WS incoming → Command execution + SyncAck handling
-//!   ├── Periodic: full sync every hour
 //!   └── Reconnect: exponential backoff on WS disconnect
 //! ```
 

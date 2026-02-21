@@ -199,5 +199,29 @@ export const en: Record<string, string> = {
 	'reg_cancel.message': 'The payment process was cancelled. Your account has been created but does not have an active subscription.',
 	'reg_cancel.hint': 'You can log in and complete the payment at any time.',
 	'reg_cancel.back_home': 'Back to home',
-	'reg_cancel.try_login': 'Log in'
+	'reg_cancel.try_login': 'Log in',
+
+	// === Support ===
+	'support.page_title': 'Support',
+	'support.title': 'Support Center',
+	'support.subtitle': 'We are here to help. Choose your preferred channel.',
+	'support.email_title': 'Email support',
+	'support.whatsapp_title': 'WhatsApp',
+	'support.whatsapp_desc': 'Response during business hours',
+	'support.faq_title': 'FAQ',
+	'support.faq_desc': 'Answers to the most common questions',
+	'support.back_home': 'Back to home',
+
+	// === Renew ===
+	'renew.page_title': 'Renew subscription',
+	'renew.title': 'Renew subscription',
+	'renew.subtitle': 'Your subscription has expired or is inactive. Renew to continue using RedCoral.',
+	'renew.notice': 'Your POS system is blocked because the subscription has expired. Renew to restore access.',
+	'renew.steps_title': 'Steps to renew',
+	'renew.step1': 'Log in to the dashboard with your account',
+	'renew.step2': 'Select a plan and complete the payment',
+	'renew.step3': 'Your POS will be unlocked automatically',
+	'renew.cta': 'Go to dashboard',
+	'renew.secure': 'Secure payment with Stripe',
+	'renew.back_home': 'Back to home'
 };

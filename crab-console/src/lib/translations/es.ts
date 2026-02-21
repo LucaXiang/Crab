@@ -20,6 +20,8 @@ export const es: Record<string, string> = {
 	'nav.logout': 'Cerrar sesión',
 	'nav.orders': 'Pedidos',
 	'nav.stats': 'Estadísticas',
+	'nav.overview': 'Resumen',
+	'nav.daily_report': 'Informe diario',
 	'nav.products': 'Productos',
 	'nav.commands': 'Comandos',
 
@@ -114,6 +116,17 @@ export const es: Record<string, string> = {
 	'stats.history': 'Historial',
 	'stats.all_stores': 'Total locales',
 	'stats.overview': 'Resumen de negocio',
+	'stats.today_summary': 'Resumen de hoy',
+	'stats.today': 'Hoy',
+	'stats.average_order': 'Ticket medio',
+	'stats.revenue_trend': 'Tendencia de ingresos',
+	'stats.orders_label': 'pedidos',
+	'stats.top_products': 'Productos más vendidos',
+	'stats.category_sales': 'Ventas por categoría',
+	'stats.guests': 'Comensales',
+	'stats.per_guest': 'Por comensal',
+	'stats.avg_dining_time': 'Tiempo medio',
+	'stats.loss_orders': 'Pérdidas',
 
 	// Products
 	'products.title': 'Productos',

@@ -224,6 +224,79 @@ export function getStats(
 	return request('GET', path, undefined, token);
 }
 
+// === Store Overview (real-time statistics) ===
+
+export interface RevenueTrendPoint {
+	hour: number;
+	revenue: number;
+	orders: number;
+}
+
+export interface TaxBreakdownStat {
+	tax_rate: number;
+	base_amount: number;
+	tax_amount: number;
+}
+
+export interface PaymentBreakdownStat {
+	method: string;
+	amount: number;
+	count: number;
+}
+
+export interface TopProductStat {
+	name: string;
+	quantity: number;
+	revenue: number;
+}
+
+export interface CategorySaleStat {
+	name: string;
+	revenue: number;
+}
+
+export interface StoreOverview {
+	revenue: number;
+	orders: number;
+	guests: number;
+	average_order_value: number;
+	per_guest_spend: number;
+	average_dining_minutes: number;
+	total_tax: number;
+	total_discount: number;
+	voided_orders: number;
+	voided_amount: number;
+	loss_orders: number;
+	loss_amount: number;
+	revenue_trend: RevenueTrendPoint[];
+	tax_breakdown: TaxBreakdownStat[];
+	payment_breakdown: PaymentBreakdownStat[];
+	top_products: TopProductStat[];
+	category_sales: CategorySaleStat[];
+}
+
+export function getTenantOverview(
+	token: string,
+	from: number,
+	to: number
+): Promise<StoreOverview> {
+	return request('GET', `/api/tenant/overview?from=${from}&to=${to}`, undefined, token);
+}
+
+export function getStoreOverview(
+	token: string,
+	storeId: number,
+	from: number,
+	to: number
+): Promise<StoreOverview> {
+	return request(
+		'GET',
+		`/api/tenant/stores/${storeId}/overview?from=${from}&to=${to}`,
+		undefined,
+		token
+	);
+}
+
 // === Products ===
 
 export interface ProductEntry {

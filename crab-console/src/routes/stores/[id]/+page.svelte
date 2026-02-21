@@ -6,6 +6,7 @@
 		ArrowLeft,
 		ShoppingBag,
 		BarChart3,
+		ScrollText,
 		Package,
 		Terminal,
 		Server,
@@ -28,7 +29,8 @@
 
 	const subNav = [
 		{ key: 'nav.orders', href: `/stores/${storeId}/orders`, icon: ShoppingBag },
-		{ key: 'nav.stats', href: `/stores/${storeId}/stats`, icon: BarChart3 },
+		{ key: 'nav.overview', href: `/stores/${storeId}/overview`, icon: BarChart3 },
+		{ key: 'nav.daily_report', href: `/stores/${storeId}/stats`, icon: ScrollText },
 		{ key: 'nav.products', href: `/stores/${storeId}/products`, icon: Package },
 		{ key: 'nav.commands', href: `/stores/${storeId}/commands`, icon: Terminal }
 	];
@@ -95,7 +97,7 @@
 			</div>
 
 			<!-- Sub-navigation -->
-			<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+			<div class="grid grid-cols-2 md:grid-cols-5 gap-3">
 				{#each subNav as item}
 					<a
 						href={item.href}

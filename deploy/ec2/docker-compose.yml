@@ -62,8 +62,8 @@ services:
       ENVIRONMENT: production
       HTTP_PORT: "8080"
       MTLS_PORT: "8443"
-      SES_FROM_EMAIL: noreply@redcoral.app
-      SES_REGION: eu-west-1
+      EMAIL_FROM: "Red Coral <noreply@redcoral.app>"
+      RESEND_API_KEY: ${RESEND_API_KEY}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       STRIPE_BASIC_PRICE_ID: ${STRIPE_BASIC_PRICE_ID}

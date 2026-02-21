@@ -1,12 +1,11 @@
 //! CloudWorker — background worker with WebSocket duplex + HTTP sync
 //!
 //! 1. Connect WebSocket to crab-cloud (mTLS)
-//! 2. Full sync on connect (products + categories)
+//! 2. Wait for Welcome{cursors} → compare with local ResourceVersions → incremental sync
 //! 3. Archived order catch-up sync via HTTP (strong consistency)
 //! 4. Listen for MessageBus broadcasts → debounced push via WS (products/categories)
 //! 5. Listen for WS incoming → Command execution (cloud→edge only)
-//! 6. Periodic full sync every hour
-//! 7. Reconnect with exponential backoff on disconnect
+//! 6. Reconnect with exponential backoff on disconnect
 
 use futures::{SinkExt, StreamExt};
 use shared::cloud::{CloudCommandResult, CloudMessage, CloudSyncBatch, CloudSyncItem};
@@ -25,8 +24,6 @@ use crate::db::repository::order;
 
 /// Debounce window for batching changes
 const DEBOUNCE_MS: u64 = 500;
-/// Full sync interval
-const FULL_SYNC_INTERVAL_SECS: u64 = 3600;
 /// Max retry attempts for HTTP fallback
 const MAX_RETRIES: u32 = 3;
 /// Initial retry delay
@@ -39,6 +36,9 @@ const ARCHIVED_ORDER_BATCH_SIZE: i64 = 50;
 const ARCHIVED_ORDER_SYNC_INTERVAL_SECS: u64 = 300; // 5 minutes
 /// WebSocket keepalive ping interval
 const WS_PING_INTERVAL_SECS: u64 = 30;
+
+/// Timeout for receiving Welcome message after WS connect
+const WELCOME_TIMEOUT_SECS: u64 = 5;
 
 pub struct CloudWorker {
     state: ServerState,
@@ -121,23 +121,30 @@ impl CloudWorker {
     async fn run_ws_session(&mut self, ws: crate::cloud::service::WsStream) {
         let (mut ws_sink, mut ws_stream) = ws.split();
 
-        // 1. Full sync (products + categories) via WS
-        if let Err(e) = self.send_full_sync(&mut ws_sink).await {
-            tracing::error!("Initial full sync via WS failed: {e}");
+        // 1. Wait for Welcome{cursors} from cloud (timeout 5s)
+        let cursors = match self.wait_for_welcome(&mut ws_stream).await {
+            Some(c) => c,
+            None => {
+                // Timeout or error — fall back to full sync (empty cursors = cloud has nothing)
+                tracing::warn!("No Welcome received, falling back to full sync");
+                HashMap::new()
+            }
+        };
+
+        // 2. Incremental sync based on cursors
+        if let Err(e) = self.send_initial_sync(&cursors, &mut ws_sink).await {
+            tracing::error!("Initial sync failed: {e}");
             return;
         }
 
-        // 2. Archived order catch-up sync via HTTP (request-response, strong consistency)
+        // 3. Archived order catch-up sync via HTTP (request-response, strong consistency)
         if let Err(e) = self.sync_archived_orders_http().await {
             tracing::error!("Archived order catch-up sync failed: {e}");
             // Non-fatal, continue with live sync
         }
 
-        // 3. Enter main select loop
+        // 4. Enter main select loop
         let mut broadcast_rx = self.state.message_bus().subscribe();
-        let mut full_sync_interval =
-            tokio::time::interval(Duration::from_secs(FULL_SYNC_INTERVAL_SECS));
-        full_sync_interval.tick().await; // skip immediate tick
 
         let mut ping_interval = tokio::time::interval(Duration::from_secs(WS_PING_INTERVAL_SECS));
         ping_interval.tick().await; // skip immediate tick
@@ -172,14 +179,6 @@ impl CloudWorker {
                     debounce_deadline = None;
                 }
 
-                // Periodic full sync
-                _ = full_sync_interval.tick() => {
-                    if let Err(e) = self.send_full_sync(&mut ws_sink).await {
-                        tracing::error!("Periodic full sync via WS failed: {e}");
-                        return;
-                    }
-                }
-
                 // Keepalive ping
                 _ = ping_interval.tick() => {
                     if ws_sink.send(Message::Ping(vec![].into())).await.is_err() {
@@ -210,10 +209,10 @@ impl CloudWorker {
                             }
                         }
                         Err(broadcast::error::RecvError::Lagged(n)) => {
-                            tracing::warn!("CloudWorker lagged {n} messages, scheduling full sync");
+                            tracing::warn!("CloudWorker lagged {n} messages, sending full sync");
                             debounce_deadline = None;
                             pending.clear();
-                            if let Err(e) = self.send_full_sync(&mut ws_sink).await {
+                            if let Err(e) = self.send_initial_sync(&HashMap::new(), &mut ws_sink).await {
                                 tracing::error!("Recovery full sync failed: {e}");
                                 return;
                             }
@@ -319,16 +318,113 @@ impl CloudWorker {
         }
     }
 
-    /// Send full sync (products + categories) via WebSocket
-    async fn send_full_sync<S>(&mut self, ws_sink: &mut S) -> Result<(), crate::utils::AppError>
+    /// Wait for Welcome message from cloud (timeout)
+    async fn wait_for_welcome(
+        &self,
+        ws_stream: &mut futures::stream::SplitStream<crate::cloud::service::WsStream>,
+    ) -> Option<HashMap<String, u64>> {
+        let timeout = Duration::from_secs(WELCOME_TIMEOUT_SECS);
+
+        match tokio::time::timeout(timeout, async {
+            while let Some(msg) = ws_stream.next().await {
+                match msg {
+                    Ok(Message::Text(text)) => {
+                        if let Ok(CloudMessage::Welcome { cursors }) =
+                            serde_json::from_str::<CloudMessage>(&text)
+                        {
+                            return Some(cursors);
+                        }
+                        // Not a Welcome — unexpected first message
+                        tracing::warn!("Expected Welcome but got other message");
+                        return None;
+                    }
+                    Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => continue,
+                    _ => return None,
+                }
+            }
+            None
+        })
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::warn!("Timed out waiting for Welcome message");
+                None
+            }
+        }
+    }
+
+    /// Send initial sync based on cloud cursors — only send resources where local version > cursor
+    async fn send_initial_sync<S>(
+        &mut self,
+        cursors: &HashMap<String, u64>,
+        ws_sink: &mut S,
+    ) -> Result<(), crate::utils::AppError>
     where
         S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
     {
-        tracing::info!("Starting full cloud sync via WS");
-        let items = self.collect_full_sync_items();
+        let mut items = Vec::new();
+
+        // Check each resource: skip if cloud cursor matches local version
+        for resource in &["product", "category"] {
+            let local_version = self.state.resource_versions.get(resource);
+            let cloud_cursor = cursors.get(*resource).copied().unwrap_or(0);
+
+            if local_version == cloud_cursor && local_version > 0 {
+                tracing::debug!(
+                    resource,
+                    version = local_version,
+                    "Skipping sync: cloud already up-to-date"
+                );
+                continue;
+            }
+
+            // Version mismatch or cloud has nothing → send full resource
+            match *resource {
+                "product" => {
+                    let products = self.state.catalog_service.list_products();
+                    for product in &products {
+                        let data = match serde_json::to_value(product) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::warn!(product_id = %product.id, "Failed to serialize product: {e}");
+                                continue;
+                            }
+                        };
+                        items.push(CloudSyncItem {
+                            resource: "product".to_string(),
+                            version: local_version,
+                            action: "upsert".to_string(),
+                            resource_id: product.id.to_string(),
+                            data,
+                        });
+                    }
+                }
+                "category" => {
+                    let categories = self.state.catalog_service.list_categories();
+                    for category in &categories {
+                        let data = match serde_json::to_value(category) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::warn!(category_id = %category.id, "Failed to serialize category: {e}");
+                                continue;
+                            }
+                        };
+                        items.push(CloudSyncItem {
+                            resource: "category".to_string(),
+                            version: local_version,
+                            action: "upsert".to_string(),
+                            resource_id: category.id.to_string(),
+                            data,
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
 
         if items.is_empty() && self.pending_results.is_empty() {
-            tracing::info!("Full sync: nothing to sync");
+            tracing::info!("Initial sync: all resources up-to-date, zero transfer");
             return Ok(());
         }
 
@@ -346,51 +442,8 @@ impl CloudWorker {
             .await
             .map_err(|e| crate::utils::AppError::internal(format!("WS send failed: {e}")))?;
 
-        tracing::info!("Full sync sent: {total} items via WS");
+        tracing::info!("Initial sync sent: {total} items via WS");
         Ok(())
-    }
-
-    /// Collect full sync items (products + categories)
-    fn collect_full_sync_items(&self) -> Vec<CloudSyncItem> {
-        let mut items = Vec::new();
-
-        let products = self.state.catalog_service.list_products();
-        for product in &products {
-            let data = match serde_json::to_value(product) {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::warn!(product_id = %product.id, "Failed to serialize product: {e}");
-                    continue;
-                }
-            };
-            items.push(CloudSyncItem {
-                resource: "product".to_string(),
-                version: self.state.resource_versions.get("product"),
-                action: "upsert".to_string(),
-                resource_id: product.id.to_string(),
-                data,
-            });
-        }
-
-        let categories = self.state.catalog_service.list_categories();
-        for category in &categories {
-            let data = match serde_json::to_value(category) {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::warn!(category_id = %category.id, "Failed to serialize category: {e}");
-                    continue;
-                }
-            };
-            items.push(CloudSyncItem {
-                resource: "category".to_string(),
-                version: self.state.resource_versions.get("category"),
-                action: "upsert".to_string(),
-                resource_id: category.id.to_string(),
-                data,
-            });
-        }
-
-        items
     }
 
     /// Catch-up sync for unsynced archived orders via HTTP POST (strong consistency).
@@ -551,10 +604,43 @@ impl CloudWorker {
         Ok(())
     }
 
+    /// Collect all sync items (products + categories) — used by HTTP fallback
+    fn collect_all_sync_items(&self) -> Vec<CloudSyncItem> {
+        let mut items = Vec::new();
+
+        let product_version = self.state.resource_versions.get("product");
+        for product in &self.state.catalog_service.list_products() {
+            if let Ok(data) = serde_json::to_value(product) {
+                items.push(CloudSyncItem {
+                    resource: "product".to_string(),
+                    version: product_version,
+                    action: "upsert".to_string(),
+                    resource_id: product.id.to_string(),
+                    data,
+                });
+            }
+        }
+
+        let category_version = self.state.resource_versions.get("category");
+        for category in &self.state.catalog_service.list_categories() {
+            if let Ok(data) = serde_json::to_value(category) {
+                items.push(CloudSyncItem {
+                    resource: "category".to_string(),
+                    version: category_version,
+                    action: "upsert".to_string(),
+                    resource_id: category.id.to_string(),
+                    data,
+                });
+            }
+        }
+
+        items
+    }
+
     /// Full sync via HTTP POST (fallback when WS unavailable)
     async fn full_sync_http(&mut self) -> Result<(), crate::utils::AppError> {
         tracing::info!("Starting full cloud sync via HTTP fallback");
-        let items = self.collect_full_sync_items();
+        let items = self.collect_all_sync_items();
 
         if items.is_empty() && self.pending_results.is_empty() {
             return Ok(());

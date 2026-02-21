@@ -12,8 +12,8 @@
 		Sparkles,
 		DollarSign,
 		ShoppingBag,
-		Wallet,
-		Percent,
+		Users,
+		TrendingUp,
 		BarChart3
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
@@ -21,33 +21,20 @@
 	import {
 		getProfile,
 		getStores,
-		getStats,
+		getTenantOverview,
 		createBillingPortal,
 		createCheckout,
 		ApiError,
 		type ProfileResponse,
 		type StoreDetail,
-		type DailyReportEntry
+		type StoreOverview
 	} from '$lib/api';
 	import { formatDate, formatCurrency, timeAgo } from '$lib/format';
-	import Decimal from 'decimal.js';
 	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
-
-	interface AggregateStats {
-		total_sales: number;
-		completed_orders: number;
-		total_orders: number;
-		void_orders: number;
-		total_paid: number;
-		total_discount: number;
-		total_tax: number;
-		total_unpaid: number;
-		stores_with_data: number;
-	}
 
 	let profile = $state<ProfileResponse | null>(null);
 	let stores = $state<StoreDetail[]>([]);
-	let aggregate = $state<AggregateStats | null>(null);
+	let overview = $state<StoreOverview | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 	let billingLoading = $state(false);
@@ -56,47 +43,14 @@
 	let token = '';
 	authToken.subscribe((v) => (token = v ?? ''));
 
-	// Tenant is verified but has no subscription yet
 	let needsOnboarding = $derived(
 		profile !== null && profile.profile.status === 'verified' && !profile.subscription
 	);
 
-	function aggregateReports(allReports: DailyReportEntry[][]): AggregateStats {
-		let totalSales = new Decimal(0);
-		let totalPaid = new Decimal(0);
-		let totalDiscount = new Decimal(0);
-		let totalTax = new Decimal(0);
-		let totalUnpaid = new Decimal(0);
-		let completedOrders = 0;
-		let totalOrders = 0;
-		let voidOrders = 0;
-		let storesWithData = 0;
-
-		for (const reports of allReports) {
-			if (reports.length === 0) continue;
-			storesWithData++;
-			const d = reports[0].data as Record<string, number>;
-			totalSales = totalSales.plus(d.total_sales ?? 0);
-			completedOrders += d.completed_orders ?? 0;
-			totalOrders += d.total_orders ?? 0;
-			voidOrders += d.void_orders ?? 0;
-			totalPaid = totalPaid.plus(d.total_paid ?? 0);
-			totalDiscount = totalDiscount.plus(d.total_discount ?? 0);
-			totalTax = totalTax.plus(d.total_tax ?? 0);
-			totalUnpaid = totalUnpaid.plus(d.total_unpaid ?? 0);
-		}
-
-		return {
-			total_sales: totalSales.toNumber(),
-			completed_orders: completedOrders,
-			total_orders: totalOrders,
-			void_orders: voidOrders,
-			total_paid: totalPaid.toNumber(),
-			total_discount: totalDiscount.toNumber(),
-			total_tax: totalTax.toNumber(),
-			total_unpaid: totalUnpaid.toNumber(),
-			stores_with_data: storesWithData
-		};
+	function getTodayRange(): { from: number; to: number } {
+		const now = new Date();
+		const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		return { from: start.getTime(), to: now.getTime() + 60000 };
 	}
 
 	onMount(async () => {
@@ -111,17 +65,14 @@
 			const profileRes = await getProfile(token);
 			profile = profileRes;
 
-			// Only fetch stores if tenant is active (has subscription)
 			if (profileRes.subscription) {
-				stores = await getStores(token);
-
-				// Fetch latest stats for all stores in parallel
-				if (stores.length > 0) {
-					const allStats = await Promise.all(
-						stores.map((s) => getStats(token, s.id).catch(() => []))
-					);
-					aggregate = aggregateReports(allStats);
-				}
+				const { from, to } = getTodayRange();
+				const [storeList, ov] = await Promise.all([
+					getStores(token),
+					getTenantOverview(token, from, to)
+				]);
+				stores = storeList;
+				overview = ov;
 			}
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 401) {
@@ -412,79 +363,50 @@
 				</div>
 			</div>
 
-			<!-- Aggregate Overview (all stores combined) -->
-			{#if aggregate && aggregate.stores_with_data > 0}
-				<div class="bg-white rounded-2xl border border-slate-200 p-6">
-					<div class="flex items-center gap-2 mb-4">
+			<!-- Tenant-wide KPI summary (all stores combined, today) -->
+			<div class="space-y-4">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
 						<BarChart3 class="w-5 h-5 text-coral-500" />
-						<h2 class="font-heading font-bold text-lg text-slate-900">
-							{$t('stats.overview')}
-						</h2>
+						<h2 class="font-heading font-bold text-lg text-slate-900">{$t('stats.today_summary')}</h2>
 						<span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-							{$t('stats.all_stores')} ({aggregate.stores_with_data})
+							{$t('stats.all_stores')}
 						</span>
 					</div>
-					<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-						<div class="bg-coral-50/50 rounded-xl p-4">
-							<div class="flex items-center gap-2 mb-1">
-								<DollarSign class="w-4 h-4 text-coral-500" />
-								<span class="text-xs text-slate-500">{$t('stats.total_sales')}</span>
-							</div>
-							<p class="text-lg font-bold text-slate-900">
-								{formatCurrency(aggregate.total_sales)}
-							</p>
+					<span class="text-sm text-slate-400">{new Date().toLocaleDateString()}</span>
+				</div>
+
+				<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+					<div class="bg-white rounded-xl border border-slate-200 p-4">
+						<div class="w-8 h-8 bg-coral-100 rounded-lg flex items-center justify-center mb-2">
+							<DollarSign class="w-4 h-4 text-coral-600" />
 						</div>
-						<div class="bg-green-50/50 rounded-xl p-4">
-							<div class="flex items-center gap-2 mb-1">
-								<ShoppingBag class="w-4 h-4 text-green-500" />
-								<span class="text-xs text-slate-500">{$t('stats.completed_orders')}</span>
-							</div>
-							<p class="text-lg font-bold text-slate-900">
-								{aggregate.completed_orders}
-								<span class="text-xs font-normal text-slate-400"
-									>/ {aggregate.total_orders}</span
-								>
-							</p>
-						</div>
-						<div class="bg-blue-50/50 rounded-xl p-4">
-							<div class="flex items-center gap-2 mb-1">
-								<Wallet class="w-4 h-4 text-blue-500" />
-								<span class="text-xs text-slate-500">{$t('stats.total_paid')}</span>
-							</div>
-							<p class="text-lg font-bold text-slate-900">
-								{formatCurrency(aggregate.total_paid)}
-							</p>
-						</div>
-						<div class="bg-orange-50/50 rounded-xl p-4">
-							<div class="flex items-center gap-2 mb-1">
-								<Percent class="w-4 h-4 text-orange-500" />
-								<span class="text-xs text-slate-500">{$t('stats.total_discount')}</span>
-							</div>
-							<p class="text-lg font-bold text-slate-900">
-								{formatCurrency(aggregate.total_discount)}
-							</p>
-						</div>
+						<p class="text-lg font-bold text-slate-900">{formatCurrency(overview?.revenue ?? 0)}</p>
+						<p class="text-xs text-slate-400">{$t('stats.total_sales')}</p>
 					</div>
-					<div class="grid grid-cols-3 gap-3 mt-3">
-						<div class="bg-slate-50 rounded-xl p-3">
-							<p class="text-xs text-slate-400 mb-0.5">{$t('stats.void_orders')}</p>
-							<p class="text-sm font-semibold text-slate-900">{aggregate.void_orders}</p>
+					<div class="bg-white rounded-xl border border-slate-200 p-4">
+						<div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mb-2">
+							<ShoppingBag class="w-4 h-4 text-green-600" />
 						</div>
-						<div class="bg-slate-50 rounded-xl p-3">
-							<p class="text-xs text-slate-400 mb-0.5">{$t('stats.total_tax')}</p>
-							<p class="text-sm font-semibold text-slate-900">
-								{formatCurrency(aggregate.total_tax)}
-							</p>
+						<p class="text-lg font-bold text-slate-900">{overview?.orders ?? 0}</p>
+						<p class="text-xs text-slate-400">{$t('stats.completed_orders')}</p>
+					</div>
+					<div class="bg-white rounded-xl border border-slate-200 p-4">
+						<div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
+							<Users class="w-4 h-4 text-blue-600" />
 						</div>
-						<div class="bg-slate-50 rounded-xl p-3">
-							<p class="text-xs text-slate-400 mb-0.5">{$t('stats.total_unpaid')}</p>
-							<p class="text-sm font-semibold text-slate-900">
-								{formatCurrency(aggregate.total_unpaid)}
-							</p>
+						<p class="text-lg font-bold text-slate-900">{overview?.guests ?? 0}</p>
+						<p class="text-xs text-slate-400">{$t('stats.guests')}</p>
+					</div>
+					<div class="bg-white rounded-xl border border-slate-200 p-4">
+						<div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
+							<TrendingUp class="w-4 h-4 text-purple-600" />
 						</div>
+						<p class="text-lg font-bold text-slate-900">{formatCurrency(overview?.average_order_value ?? 0)}</p>
+						<p class="text-xs text-slate-400">{$t('stats.average_order')}</p>
 					</div>
 				</div>
-			{/if}
+			</div>
 
 			<!-- Stores -->
 			<div class="bg-white rounded-2xl border border-slate-200 p-6">

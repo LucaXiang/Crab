@@ -23,8 +23,10 @@ pub struct Config {
     pub server_key_path: String,
     /// Environment: development | staging | production
     pub environment: String,
-    /// SES sender email address
-    pub ses_from_email: String,
+    /// Sender email address (e.g. noreply@redcoral.app)
+    pub email_from: String,
+    /// Resend API key for transactional emails
+    pub resend_api_key: String,
     /// Stripe secret key
     pub stripe_secret_key: String,
     /// Stripe webhook signing secret
@@ -89,8 +91,9 @@ impl Config {
             server_key_path: std::env::var("SERVER_KEY_PATH")
                 .unwrap_or_else(|_| "certs/server.key".into()),
             environment: environment.clone(),
-            ses_from_email: std::env::var("SES_FROM_EMAIL")
+            email_from: std::env::var("EMAIL_FROM")
                 .unwrap_or_else(|_| "noreply@redcoral.app".into()),
+            resend_api_key: Self::require_secret("RESEND_API_KEY", &environment)?,
             stripe_secret_key: Self::require_secret("STRIPE_SECRET_KEY", &environment)?,
             stripe_webhook_secret: Self::require_secret("STRIPE_WEBHOOK_SECRET", &environment)?,
             console_base_url: std::env::var("CONSOLE_BASE_URL")

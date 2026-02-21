@@ -4,6 +4,8 @@
 //! All data is stored as JSONB mirrors — crab-cloud is a data mirror,
 //! not a business engine.
 
+use std::collections::HashMap;
+
 use shared::cloud::CloudSyncItem;
 use sqlx::PgPool;
 
@@ -79,6 +81,24 @@ pub async fn update_cursor(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// Get all sync cursors for an edge-server (resource → last_version)
+pub async fn get_cursors(
+    pool: &PgPool,
+    edge_server_id: i64,
+) -> Result<HashMap<String, u64>, BoxError> {
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT resource, last_version FROM cloud_sync_cursors WHERE edge_server_id = $1",
+    )
+    .bind(edge_server_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(resource, version)| (resource, version.max(0) as u64))
+        .collect())
 }
 
 /// Upsert a resource based on its type
@@ -158,10 +178,11 @@ async fn upsert_generic(
     Ok(())
 }
 
-/// Upsert archived order with three-layer storage:
-/// 1. cloud_archived_orders (永久摘要 + VeriFactu 字段)
-/// 2. cloud_order_desglose (永久税率分拆)
-/// 3. cloud_order_details (30 天滚动 JSONB)
+/// Upsert archived order with four-layer storage:
+/// 1. cloud_archived_orders (永久摘要 + desglose JSONB)
+/// 2. cloud_order_items (永久轻量级菜品统计，含 tax_rate)
+/// 3. cloud_order_payments (永久轻量级支付统计)
+/// 4. cloud_order_details (30 天缓存，完整详情 JSONB)
 async fn upsert_archived_order(
     pool: &PgPool,
     edge_server_id: i64,
@@ -173,18 +194,21 @@ async fn upsert_archived_order(
 
     let detail_sync: OrderDetailSync = serde_json::from_value(item.data.clone())?;
 
-    // 事务包裹三层写入：任何一步失败全部回滚
+    // 事务包裹所有写入：任何一步失败全部回滚
     let mut tx = pool.begin().await?;
 
-    // 1. UPSERT cloud_archived_orders (永久摘要，不含 detail)
+    // 1. UPSERT cloud_archived_orders (永久摘要 + desglose + 统计字段)
+    let desglose_json = serde_json::to_value(&detail_sync.desglose)?;
     let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO cloud_archived_orders (
             edge_server_id, tenant_id, source_id, order_key,
             receipt_number, status, end_time, total, tax,
-            prev_hash, curr_hash, version, synced_at
+            prev_hash, curr_hash, desglose,
+            guest_count, discount_amount, void_type, loss_amount, start_time,
+            version, synced_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         ON CONFLICT (tenant_id, edge_server_id, order_key)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -193,6 +217,12 @@ async fn upsert_archived_order(
                       tax = EXCLUDED.tax,
                       prev_hash = EXCLUDED.prev_hash,
                       curr_hash = EXCLUDED.curr_hash,
+                      desglose = EXCLUDED.desglose,
+                      guest_count = EXCLUDED.guest_count,
+                      discount_amount = EXCLUDED.discount_amount,
+                      void_type = EXCLUDED.void_type,
+                      loss_amount = EXCLUDED.loss_amount,
+                      start_time = EXCLUDED.start_time,
                       version = EXCLUDED.version,
                       synced_at = EXCLUDED.synced_at
         WHERE cloud_archived_orders.version <= EXCLUDED.version
@@ -201,7 +231,7 @@ async fn upsert_archived_order(
     )
     .bind(edge_server_id)
     .bind(tenant_id)
-    .bind(&item.resource_id) // source_id = order_key
+    .bind(&item.resource_id)
     .bind(&detail_sync.order_key)
     .bind(&detail_sync.receipt_number)
     .bind(&detail_sync.status)
@@ -210,37 +240,70 @@ async fn upsert_archived_order(
     .bind(detail_sync.tax)
     .bind(&detail_sync.prev_hash)
     .bind(&detail_sync.curr_hash)
+    .bind(&desglose_json)
+    .bind(detail_sync.detail.guest_count)
+    .bind(detail_sync.detail.discount_amount)
+    .bind(&detail_sync.detail.void_type)
+    .bind(detail_sync.detail.loss_amount)
+    .bind(detail_sync.detail.start_time)
     .bind(version_to_i64(item.version))
     .bind(now)
     .fetch_optional(&mut *tx)
     .await?;
 
-    // If RETURNING id is None, version was not newer — skip desglose/detail update
+    // If RETURNING id is None, version was not newer — skip sub-table updates
     let Some((order_row_id,)) = row else {
         tx.commit().await?;
         return Ok(());
     };
 
-    // 2. UPSERT cloud_order_desglose (永久税率分拆)
-    for d in &detail_sync.desglose {
+    // 2. Replace cloud_order_items (永久轻量级菜品，用于统计)
+    sqlx::query("DELETE FROM cloud_order_items WHERE archived_order_id = $1")
+        .bind(order_row_id)
+        .execute(&mut *tx)
+        .await?;
+
+    for item_sync in &detail_sync.detail.items {
         sqlx::query(
             r#"
-            INSERT INTO cloud_order_desglose (archived_order_id, tax_rate, base_amount, tax_amount)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (archived_order_id, tax_rate)
-            DO UPDATE SET base_amount = EXCLUDED.base_amount,
-                          tax_amount = EXCLUDED.tax_amount
+            INSERT INTO cloud_order_items (archived_order_id, name, category_name, quantity, line_total, tax_rate)
+            VALUES ($1, $2, $3, $4, $5, $6)
             "#,
         )
         .bind(order_row_id)
-        .bind(d.tax_rate)
-        .bind(d.base_amount)
-        .bind(d.tax_amount)
+        .bind(&item_sync.name)
+        .bind(&item_sync.category_name)
+        .bind(item_sync.quantity)
+        .bind(item_sync.line_total)
+        .bind(item_sync.tax_rate)
         .execute(&mut *tx)
         .await?;
     }
 
-    // 3. UPSERT cloud_order_details (30 天滚动 JSONB)
+    // 4. Replace cloud_order_payments (永久轻量级支付，用于统计)
+    sqlx::query("DELETE FROM cloud_order_payments WHERE archived_order_id = $1")
+        .bind(order_row_id)
+        .execute(&mut *tx)
+        .await?;
+
+    for pay in &detail_sync.detail.payments {
+        if pay.cancelled {
+            continue; // 跳过已取消的支付
+        }
+        sqlx::query(
+            r#"
+            INSERT INTO cloud_order_payments (archived_order_id, method, amount)
+            VALUES ($1, $2, $3)
+            "#,
+        )
+        .bind(order_row_id)
+        .bind(&pay.method)
+        .bind(pay.amount)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // 5. UPSERT cloud_order_details (30 天缓存，完整详情)
     let detail_json = serde_json::to_value(&detail_sync.detail)?;
     sqlx::query(
         r#"

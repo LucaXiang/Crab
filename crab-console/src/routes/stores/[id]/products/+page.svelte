@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { ArrowLeft, Package, Search } from 'lucide-svelte';
+	import { ArrowLeft, Package, Search, Tag } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import { getProducts, ApiError, type ProductEntry } from '$lib/api';
@@ -14,15 +14,22 @@
 	interface ProductSpec {
 		name: string;
 		price: number;
+		is_default: boolean;
+		is_active: boolean;
+	}
+
+	interface ProductTag {
+		id: number;
+		name: string;
 	}
 
 	interface ProductData {
 		name: string;
 		category_name: string | null;
-		price: number;
 		is_active: boolean;
+		tax_rate: number;
 		specs: ProductSpec[];
-		image_url: string | null;
+		tags: ProductTag[];
 	}
 
 	let products = $state<ProductEntry[]>([]);
@@ -35,15 +42,30 @@
 
 	function parseProduct(entry: ProductEntry): ProductData {
 		const d = entry.data as Record<string, unknown>;
-		const specs = (d.specs as ProductSpec[]) ?? [];
+		const specs = ((d.specs as ProductSpec[]) ?? []).filter((s) => s.is_active);
+		const tags = (d.tags as ProductTag[]) ?? [];
 		return {
 			name: (d.name as string) ?? entry.source_id,
 			category_name: (d.category_name as string) ?? null,
-			price: (d.price as number) ?? 0,
 			is_active: (d.is_active as boolean) ?? true,
+			tax_rate: (d.tax_rate as number) ?? 0,
 			specs,
-			image_url: (d.image_url as string) ?? null
+			tags
 		};
+	}
+
+	function getDisplayPrice(specs: ProductSpec[]): { label: string; isRange: boolean } {
+		if (specs.length === 0) return { label: formatCurrency(0), isRange: false };
+		if (specs.length === 1) return { label: formatCurrency(specs[0].price), isRange: false };
+
+		const defaultSpec = specs.find((s) => s.is_default);
+		if (defaultSpec) return { label: formatCurrency(defaultSpec.price), isRange: false };
+
+		const prices = specs.map((s) => s.price);
+		const min = Math.min(...prices);
+		const max = Math.max(...prices);
+		if (min === max) return { label: formatCurrency(min), isRange: false };
+		return { label: `${formatCurrency(min)} – ${formatCurrency(max)}`, isRange: true };
 	}
 
 	let filtered = $derived.by(() => {
@@ -53,7 +75,8 @@
 			const data = parseProduct(p);
 			return (
 				data.name.toLowerCase().includes(q) ||
-				(data.category_name?.toLowerCase().includes(q) ?? false)
+				(data.category_name?.toLowerCase().includes(q) ?? false) ||
+				data.tags.some((tag) => tag.name.toLowerCase().includes(q))
 			);
 		});
 	});
@@ -69,6 +92,9 @@
 		}
 		return groups;
 	});
+
+	let activeCount = $derived(products.filter((p) => parseProduct(p).is_active).length);
+	let inactiveCount = $derived(products.length - activeCount);
 
 	onMount(async () => {
 		let authenticated = false;
@@ -105,12 +131,15 @@
 					<ArrowLeft class="w-5 h-5" />
 				</a>
 				<h1 class="font-heading text-xl font-bold text-slate-900">{$t('products.title')}</h1>
-				{#if !loading && products.length > 0}
-					<span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full"
-						>{products.length}</span
-					>
-				{/if}
 			</div>
+			{#if !loading && products.length > 0}
+				<div class="flex items-center gap-2 text-xs text-slate-400">
+					<span class="bg-slate-100 px-2 py-0.5 rounded-full">{activeCount} {$t('products.active')}</span>
+					{#if inactiveCount > 0}
+						<span class="bg-slate-50 px-2 py-0.5 rounded-full">{inactiveCount} {$t('products.inactive')}</span>
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		{#if loading}
@@ -121,14 +150,7 @@
 					fill="none"
 					viewBox="0 0 24 24"
 				>
-					<circle
-						class="opacity-25"
-						cx="12"
-						cy="12"
-						r="10"
-						stroke="currentColor"
-						stroke-width="4"
-					/>
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
 					<path
 						class="opacity-75"
 						fill="currentColor"
@@ -164,26 +186,19 @@
 						{category}
 						<span class="text-slate-300">({items.length})</span>
 					</h3>
-					<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-						{#each items as { data }, i}
-							<div
-								class="flex items-center justify-between px-5 py-3 {i > 0
-									? 'border-t border-slate-50'
-									: ''}"
-							>
+					<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+						{#each items as { data }}
+							{@const priceInfo = getDisplayPrice(data.specs)}
+							<div class="flex items-center justify-between px-5 py-3.5">
 								<div class="flex items-center gap-3 min-w-0">
 									<div
-										class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {data.is_active
-											? 'bg-coral-100'
-											: 'bg-slate-100'}"
+										class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {data.is_active
+											? 'bg-coral-50'
+											: 'bg-slate-50'}"
 									>
-										<Package
-											class="w-4 h-4 {data.is_active
-												? 'text-coral-600'
-												: 'text-slate-400'}"
-										/>
+										<Package class="w-4 h-4 {data.is_active ? 'text-coral-500' : 'text-slate-300'}" />
 									</div>
-									<div class="min-w-0">
+									<div class="min-w-0 space-y-0.5">
 										<p
 											class="text-sm font-medium truncate {data.is_active
 												? 'text-slate-900'
@@ -191,23 +206,35 @@
 										>
 											{data.name}
 										</p>
-										{#if data.specs.length > 0}
+										{#if data.specs.length > 1}
 											<p class="text-xs text-slate-400 truncate">
-												{data.specs.map((s) => `${s.name} ${formatCurrency(s.price)}`).join(' / ')}
+												{data.specs.map((s) => `${s.name} ${formatCurrency(s.price)}`).join(' · ')}
 											</p>
+										{/if}
+										{#if data.tags.length > 0}
+											<div class="flex items-center gap-1 flex-wrap">
+												{#each data.tags as tag}
+													<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
+														<Tag class="w-2.5 h-2.5" />
+														{tag.name}
+													</span>
+												{/each}
+											</div>
 										{/if}
 									</div>
 								</div>
-								<div class="flex items-center gap-3 shrink-0">
+								<div class="flex items-center gap-2 shrink-0 ml-4">
 									{#if !data.is_active}
-										<span
-											class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500"
-											>{$t('products.inactive')}</span
-										>
+										<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400">
+											{$t('products.inactive')}
+										</span>
 									{/if}
-									<span class="text-sm font-semibold text-slate-900"
-										>{formatCurrency(data.price)}</span
-									>
+									{#if data.tax_rate > 0}
+										<span class="text-[10px] text-slate-300">{data.tax_rate}%</span>
+									{/if}
+									<span class="text-sm font-semibold {data.is_active ? 'text-slate-900' : 'text-slate-400'}">
+										{priceInfo.label}
+									</span>
 								</div>
 							</div>
 						{/each}

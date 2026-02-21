@@ -196,5 +196,29 @@ export const zh: Record<string, string> = {
 	'reg_cancel.message': '支付流程已取消。你的账户已创建，但尚未激活订阅。',
 	'reg_cancel.hint': '你可以随时登录并完成支付。',
 	'reg_cancel.back_home': '返回首页',
-	'reg_cancel.try_login': '登录'
+	'reg_cancel.try_login': '登录',
+
+	// === Support ===
+	'support.page_title': '技术支持',
+	'support.title': '支持中心',
+	'support.subtitle': '我们随时为你提供帮助，请选择你偏好的联系方式。',
+	'support.email_title': '邮件支持',
+	'support.whatsapp_title': 'WhatsApp',
+	'support.whatsapp_desc': '工作时间内回复',
+	'support.faq_title': '常见问题',
+	'support.faq_desc': '最常见问题的解答',
+	'support.back_home': '返回首页',
+
+	// === Renew ===
+	'renew.page_title': '续费订阅',
+	'renew.title': '续费订阅',
+	'renew.subtitle': '你的订阅已过期或处于非活跃状态。续费后即可继续使用 RedCoral。',
+	'renew.notice': '你的 POS 系统因订阅过期已被锁定。续费后将自动恢复使用。',
+	'renew.steps_title': '续费步骤',
+	'renew.step1': '使用你的账户登录控制面板',
+	'renew.step2': '选择套餐并完成支付',
+	'renew.step3': '你的 POS 将自动解锁',
+	'renew.cta': '前往控制面板',
+	'renew.secure': '通过 Stripe 安全支付',
+	'renew.back_home': '返回首页'
 };

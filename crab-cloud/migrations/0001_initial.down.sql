@@ -1,7 +1,9 @@
 DROP TABLE IF EXISTS cloud_commands;
 DROP TABLE IF EXISTS cloud_store_info;
 DROP TABLE IF EXISTS cloud_daily_reports;
-DROP TABLE IF EXISTS cloud_active_orders;
+DROP TABLE IF EXISTS cloud_order_details;
+DROP TABLE IF EXISTS cloud_order_payments;
+DROP TABLE IF EXISTS cloud_order_items;
 DROP TABLE IF EXISTS cloud_archived_orders;
 DROP TABLE IF EXISTS cloud_categories;
 DROP TABLE IF EXISTS cloud_products;

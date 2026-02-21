@@ -9,7 +9,10 @@ const config = {
 			fallback: '200.html',
 			precompress: false,
 			strict: false
-		})
+		}),
+		prerender: {
+			entries: ['*', '/support', '/renew']
+		}
 	}
 };
 

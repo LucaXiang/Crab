@@ -84,6 +84,24 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     // Register in connected_edges
     state.connected_edges.insert(edge_server_id, cmd_tx.clone());
 
+    // Send Welcome with sync cursors
+    match sync_store::get_cursors(&state.pool, edge_server_id).await {
+        Ok(cursors) => {
+            let welcome = CloudMessage::Welcome { cursors };
+            if let Ok(json) = serde_json::to_string(&welcome)
+                && ws_sink.send(Message::Text(json.into())).await.is_err()
+            {
+                tracing::warn!(edge_server_id, "Failed to send Welcome, disconnecting");
+                state.connected_edges.remove(&edge_server_id);
+                return;
+            }
+        }
+        Err(e) => {
+            tracing::error!(edge_server_id, "Failed to get cursors for Welcome: {e}");
+            // Non-fatal: edge will do full sync if no Welcome received
+        }
+    }
+
     // Send any pending commands immediately on connect
     if let Ok(pending) = commands::get_pending(&state.pool, edge_server_id, 10).await
         && !pending.is_empty()

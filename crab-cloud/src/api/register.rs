@@ -11,8 +11,8 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use shared::error::{AppError, ErrorCode};
 
+use crate::db;
 use crate::state::AppState;
-use crate::{db, email};
 
 use sqlx;
 
@@ -186,9 +186,7 @@ pub async fn register(
     }
 
     // Send email after commit — if this fails, user can resend
-    if let Err(e) =
-        email::send_verification_code(&state.ses, &state.ses_from_email, &email, &code).await
-    {
+    if let Err(e) = state.email.send_verification_code(&email, &code).await {
         tracing::warn!(%e, "Failed to send verification email (user can resend)");
     }
 
@@ -330,9 +328,7 @@ pub async fn resend_code(
         return Err(AppError::new(ErrorCode::InternalError));
     }
 
-    if let Err(e) =
-        email::send_verification_code(&state.ses, &state.ses_from_email, &email, &code).await
-    {
+    if let Err(e) = state.email.send_verification_code(&email, &code).await {
         tracing::error!(%e, "Failed to send verification email");
         return Err(AppError::new(ErrorCode::InternalError));
     }

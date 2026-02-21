@@ -10,7 +10,6 @@ use sqlx;
 
 use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::{self, commands, tenant_queries};
-use crate::email;
 use crate::state::AppState;
 
 type ApiResult<T> = Result<Json<T>, AppError>;
@@ -193,6 +192,58 @@ pub async fn get_stats(
     Ok(Json(reports))
 }
 
+/// GET /api/tenant/overview?from=&to=
+///
+/// Tenant-wide overview: all stores combined.
+#[derive(Deserialize)]
+pub struct OverviewQuery {
+    pub from: i64,
+    pub to: i64,
+}
+
+pub async fn get_tenant_overview(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Query(query): Query<OverviewQuery>,
+) -> ApiResult<tenant_queries::StoreOverview> {
+    let overview =
+        tenant_queries::get_tenant_overview(&state.pool, &identity.tenant_id, query.from, query.to)
+            .await
+            .map_err(|e| {
+                tracing::error!("Tenant overview query error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
+
+    Ok(Json(overview))
+}
+
+/// GET /api/tenant/stores/:id/overview?from=&to=
+///
+/// Real-time statistics computed from cloud_archived_orders + desglose + details.
+pub async fn get_store_overview(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Query(query): Query<OverviewQuery>,
+) -> ApiResult<tenant_queries::StoreOverview> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let overview = tenant_queries::get_store_overview(
+        &state.pool,
+        store_id,
+        &identity.tenant_id,
+        query.from,
+        query.to,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Overview query error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    Ok(Json(overview))
+}
+
 /// GET /api/tenant/stores/:id/products
 pub async fn list_products(
     State(state): State<AppState>,
@@ -213,8 +264,7 @@ pub async fn list_products(
 
 /// GET /api/tenant/stores/:id/orders/:order_key/detail
 ///
-/// Returns order detail from cache (30-day rolling).
-/// If not cached, attempts on-demand fetch from connected edge via WS command.
+/// 30-day cache first, fallback to on-demand edge fetch if edge is online.
 pub async fn get_order_detail(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
@@ -222,7 +272,7 @@ pub async fn get_order_detail(
 ) -> ApiResult<shared::cloud::OrderDetailResponse> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    // 1. Check cloud_order_details cache
+    // 1. Check 30-day cache
     if let Some(detail_json) =
         tenant_queries::get_order_detail(&state.pool, store_id, &identity.tenant_id, &order_key)
             .await
@@ -237,7 +287,7 @@ pub async fn get_order_detail(
                 AppError::new(ErrorCode::InternalError)
             })?;
 
-        let desglose_entries = tenant_queries::get_order_desglose(
+        let desglose = tenant_queries::get_order_desglose(
             &state.pool,
             store_id,
             &identity.tenant_id,
@@ -249,15 +299,6 @@ pub async fn get_order_detail(
             AppError::new(ErrorCode::InternalError)
         })?;
 
-        let desglose = desglose_entries
-            .into_iter()
-            .map(|d| shared::cloud::TaxDesglose {
-                tax_rate: d.tax_rate,
-                base_amount: d.base_amount,
-                tax_amount: d.tax_amount,
-            })
-            .collect();
-
         return Ok(Json(shared::cloud::OrderDetailResponse {
             source: "cache".to_string(),
             detail,
@@ -265,22 +306,20 @@ pub async fn get_order_detail(
         }));
     }
 
-    // 2. Not cached — try on-demand fetch from edge via WS command
+    // 2. Cache miss — fetch from edge via WS command (requires edge online)
     let Some(sender) = state.connected_edges.get(&store_id).map(|s| s.clone()) else {
         return Err(AppError::with_message(
             ErrorCode::NotFound,
-            "Order detail not cached and edge server is offline",
+            "Order detail expired and edge server is offline",
         ));
     };
 
     let now = shared::util::now_millis();
     let command_id = uuid::Uuid::new_v4().to_string();
 
-    // Create oneshot channel for response
     let (tx, rx) = tokio::sync::oneshot::channel();
     state.pending_requests.insert(command_id.clone(), (now, tx));
 
-    // Send command to edge
     let cloud_cmd = shared::cloud::CloudCommand {
         id: command_id.clone(),
         command_type: "get_order_detail".to_string(),
@@ -296,7 +335,6 @@ pub async fn get_order_detail(
         ));
     }
 
-    // 3. Wait for response with timeout (10 seconds)
     let result = match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
         Ok(Ok(r)) => r,
         Ok(Err(_)) => {
@@ -310,7 +348,7 @@ pub async fn get_order_detail(
             state.pending_requests.remove(&command_id);
             return Err(AppError::with_message(
                 ErrorCode::NotFound,
-                "Order detail fetch timed out (edge may be slow or offline)",
+                "Order detail fetch timed out",
             ));
         }
     };
@@ -337,8 +375,7 @@ pub async fn get_order_detail(
             AppError::new(ErrorCode::InternalError)
         })?;
 
-    // Cache the fetched detail directly into cloud_order_details (bypass version guard)
-    // First find or create the archived_order row, then write detail + desglose
+    // 3. Write fetched detail back to cache (best-effort)
     let archived_order_id: Option<i64> = sqlx::query_scalar(
         "SELECT id FROM cloud_archived_orders WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3",
     )
@@ -349,62 +386,28 @@ pub async fn get_order_detail(
     .await
     .unwrap_or(None);
 
-    if let Some(order_id) = archived_order_id {
-        // Best-effort cache: write detail + desglose atomically
-        if let Ok(mut tx) = state.pool.begin().await {
-            let detail_json = match serde_json::to_value(&detail_sync.detail) {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::error!(order_key = %order_key, "Failed to serialize detail for cache: {e}");
-                    // Skip caching but don't fail the request
-                    serde_json::Value::Null
-                }
-            };
-            let detail_ok = sqlx::query(
-                r#"
+    if let Some(order_id) = archived_order_id
+        && let Ok(detail_json) = serde_json::to_value(&detail_sync.detail)
+    {
+        let _ = sqlx::query(
+            r#"
                 INSERT INTO cloud_order_details (archived_order_id, detail, synced_at)
                 VALUES ($1, $2, $3)
                 ON CONFLICT (archived_order_id)
                 DO UPDATE SET detail = EXCLUDED.detail, synced_at = EXCLUDED.synced_at
                 "#,
-            )
-            .bind(order_id)
-            .bind(&detail_json)
-            .bind(now)
-            .execute(&mut *tx)
-            .await
-            .is_ok();
-
-            if detail_ok {
-                for d in &detail_sync.desglose {
-                    let _ = sqlx::query(
-                        r#"
-                        INSERT INTO cloud_order_desglose (archived_order_id, tax_rate, base_amount, tax_amount)
-                        VALUES ($1, $2, $3, $4)
-                        ON CONFLICT (archived_order_id, tax_rate)
-                        DO UPDATE SET base_amount = EXCLUDED.base_amount, tax_amount = EXCLUDED.tax_amount
-                        "#,
-                    )
-                    .bind(order_id)
-                    .bind(d.tax_rate)
-                    .bind(d.base_amount)
-                    .bind(d.tax_amount)
-                    .execute(&mut *tx)
-                    .await;
-                }
-            }
-
-            if let Err(e) = tx.commit().await {
-                tracing::error!(order_key = %order_key, "Failed to commit on-demand cache: {e}");
-            }
-        }
+        )
+        .bind(order_id)
+        .bind(&detail_json)
+        .bind(now)
+        .execute(&state.pool)
+        .await;
     }
 
-    // Audit: on-demand order detail fetched from edge
+    // Audit
     let fetch_detail = serde_json::json!({
         "order_key": order_key,
         "store_id": store_id,
-        "cached": archived_order_id.is_some(),
     });
     let _ = crate::db::audit::log(
         &state.pool,
@@ -727,8 +730,7 @@ pub async fn change_email(
     .await
     .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
-    let _ =
-        email::send_email_change_code(&state.ses, &state.ses_from_email, &new_email, &code).await;
+    let _ = state.email.send_email_change_code(&new_email, &code).await;
 
     Ok(Json(
         serde_json::json!({ "message": "Verification code sent to new email" }),
@@ -923,13 +925,10 @@ pub async fn forgot_password(
     )
     .await;
 
-    let _ = crate::email::send_password_reset_code(
-        &state.ses,
-        &state.ses_from_email,
-        &email_addr,
-        &code,
-    )
-    .await;
+    let _ = state
+        .email
+        .send_password_reset_code(&email_addr, &code)
+        .await;
 
     Ok(Json(serde_json::json!({
         "message": "If the email exists, a reset code has been sent"

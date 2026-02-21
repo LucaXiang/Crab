@@ -2,7 +2,6 @@
 
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
-use aws_sdk_sesv2::Client as SesClient;
 use crab_cert::{CaProfile, CertificateAuthority};
 use dashmap::DashMap;
 use shared::cloud::{CloudCommand, CloudCommandResult};
@@ -25,16 +24,14 @@ pub struct AppState {
     pub ca_store: CaStore,
     /// Root CA PEM for mTLS verification
     pub root_ca_pem: String,
-    /// AWS SES client for sending emails
-    pub ses: SesClient,
+    /// Email service (Resend API)
+    pub email: crate::email::EmailService,
     /// AWS Secrets Manager client (for P12 password storage)
     pub sm: SmClient,
     /// Stripe secret key
     pub stripe_secret_key: String,
     /// Stripe webhook signing secret
     pub stripe_webhook_secret: String,
-    /// SES sender email address
-    pub ses_from_email: String,
     /// Console base URL (e.g. https://console.redcoral.app)
     pub console_base_url: String,
     /// AWS S3 client (update artifacts)
@@ -114,15 +111,10 @@ impl AppState {
         let sm_client = SmClient::new(&aws_config);
         let s3 = S3Client::new(&aws_config);
 
-        let ses = if let Ok(ses_region) = std::env::var("SES_REGION") {
-            let ses_config = aws_config
-                .to_builder()
-                .region(aws_config::Region::new(ses_region))
-                .build();
-            SesClient::new(&ses_config)
-        } else {
-            SesClient::new(&aws_config)
-        };
+        let email = crate::email::EmailService::new(
+            config.resend_api_key.clone(),
+            config.email_from.clone(),
+        );
 
         let ca_store = CaStore::new(sm_client.clone());
 
@@ -154,11 +146,10 @@ impl AppState {
             pool,
             ca_store,
             root_ca_pem,
-            ses,
+            email,
             sm: sm_client,
             stripe_secret_key: config.stripe_secret_key.clone(),
             stripe_webhook_secret: config.stripe_webhook_secret.clone(),
-            ses_from_email: config.ses_from_email.clone(),
             console_base_url: config.console_base_url.clone(),
             s3,
             update_s3_bucket: config.update_s3_bucket.clone(),

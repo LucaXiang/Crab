@@ -9,7 +9,7 @@ use axum::http::{HeaderMap, StatusCode};
 use shared::cloud::TenantStatus;
 
 use crate::state::AppState;
-use crate::{db, email, stripe};
+use crate::{db, stripe};
 
 use chrono;
 use sqlx;
@@ -177,9 +177,10 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
         "Tenant activated via Stripe checkout"
     );
 
-    let _ =
-        email::send_subscription_activated(&state.ses, &state.ses_from_email, &tenant.email, plan)
-            .await;
+    let _ = state
+        .email
+        .send_subscription_activated(&tenant.email, plan)
+        .await;
 
     let detail = serde_json::json!({ "subscription_id": subscription_id, "plan": plan });
     let _ = crate::db::audit::log(
@@ -248,9 +249,7 @@ async fn handle_subscription_deleted(state: &AppState, event: &serde_json::Value
         tracing::info!(tenant_id = %tenant_id, "Tenant canceled (subscription deleted)");
 
         if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
-            let _ =
-                email::send_subscription_canceled(&state.ses, &state.ses_from_email, &tenant.email)
-                    .await;
+            let _ = state.email.send_subscription_canceled(&tenant.email).await;
         }
 
         let detail = serde_json::json!({ "subscription_id": sub_id });
@@ -295,8 +294,7 @@ async fn handle_payment_failed(state: &AppState, event: &serde_json::Value) -> S
         tracing::info!(tenant_id = %tenant_id, "Tenant suspended (payment failed)");
 
         if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
-            let _ =
-                email::send_payment_failed(&state.ses, &state.ses_from_email, &tenant.email).await;
+            let _ = state.email.send_payment_failed(&tenant.email).await;
         }
     }
 
@@ -316,8 +314,7 @@ async fn handle_charge_refunded(state: &AppState, event: &serde_json::Value) -> 
     };
 
     if let Ok(Some(tenant)) = db::tenants::find_by_stripe_customer(&state.pool, customer_id).await {
-        let _ =
-            email::send_refund_processed(&state.ses, &state.ses_from_email, &tenant.email).await;
+        let _ = state.email.send_refund_processed(&tenant.email).await;
         tracing::info!(tenant_id = %tenant.id, "Refund notification sent");
     }
 
@@ -370,7 +367,7 @@ async fn handle_payment_action_required(state: &AppState, event: &serde_json::Va
     };
 
     if let Ok(Some(tenant)) = db::tenants::find_by_stripe_customer(&state.pool, customer_id).await {
-        let _ = email::send_payment_failed(&state.ses, &state.ses_from_email, &tenant.email).await;
+        let _ = state.email.send_payment_failed(&tenant.email).await;
         tracing::info!(tenant_id = %tenant.id, "Payment action required notification sent");
     }
 
