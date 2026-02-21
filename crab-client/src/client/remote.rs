@@ -400,6 +400,24 @@ impl CrabClient<Remote, Connected> {
         Ok(self.transition())
     }
 
+    /// Restores an authenticated session from cached token.
+    ///
+    /// This allows restoring a previous login session without re-authenticating.
+    /// Use this when the app restarts and has a cached token.
+    ///
+    /// On failure, returns the error and the original Connected client for retry.
+    pub async fn restore_session(
+        mut self,
+        token: String,
+        user: shared::client::UserInfo,
+    ) -> Result<CrabClient<Remote, Authenticated>, (ClientError, Self)> {
+        // Store session data
+        self.session.set_login(token, user.clone());
+
+        tracing::info!(username = %user.username, "Session restored from cache (remote)");
+        Ok(self.transition())
+    }
+
     /// Disconnects from the server.
     ///
     /// This closes the message connection but preserves cached certificates.

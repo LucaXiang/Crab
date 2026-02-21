@@ -196,7 +196,7 @@ impl ClientBridge {
                 }
                 Err(e) => {
                     tracing::warn!("Failed to restore session: {}", e);
-                    let tenant_manager = self.tenant_manager.read().await;
+                    let mut tenant_manager = self.tenant_manager.write().await;
                     let _ = tenant_manager.clear_current_session();
                     let client = CrabClient::local()
                         .with_router(state_arc.https_service().router().ok_or_else(|| {
@@ -289,20 +289,25 @@ impl ClientBridge {
             drop(mode_guard);
         }
 
-        let tenant_manager = self.tenant_manager.read().await;
-        let paths = tenant_manager
-            .current_paths()
-            .ok_or(TenantError::NoTenantSelected)?;
+        let (certs_dir, auth_url) = {
+            let tenant_manager = self.tenant_manager.read().await;
+            let paths = tenant_manager
+                .current_paths()
+                .ok_or(TenantError::NoTenantSelected)?;
 
-        let config = self.config.read().await;
-        let auth_url = config.auth_url.clone();
-        drop(config);
+            if !paths.has_client_certificates() {
+                return Err(BridgeError::Config(
+                    "No cached certificates. Please activate tenant first.".into(),
+                ));
+            }
 
-        if !paths.has_client_certificates() {
-            return Err(BridgeError::Config(
-                "No cached certificates. Please activate tenant first.".into(),
-            ));
-        }
+            let certs_dir = paths.certs_dir().to_path_buf();
+            drop(tenant_manager);
+
+            let config = self.config.read().await;
+            let auth_url = config.auth_url.clone();
+            (certs_dir, auth_url)
+        };
 
         // CrabClient 使用 cert_path + client_name 构建 CertManager
         // 我们传 certs_dir 作为 cert_path，空字符串作为 client_name
@@ -311,7 +316,7 @@ impl ClientBridge {
         let client = CrabClient::remote()
             .auth_server(&auth_url)
             .edge_server(edge_url)
-            .cert_path(paths.certs_dir())
+            .cert_path(&certs_dir)
             .client_name("") // 空字符串使 CertManager 直接使用 certs_dir
             .build()?;
 
@@ -472,6 +477,36 @@ impl ClientBridge {
             }
         }
 
+        // 尝试加载缓存的员工会话
+        let cached_session = {
+            let tm = self.tenant_manager.read().await;
+            tm.load_current_session().ok().flatten()
+        };
+
+        let client_state = if let Some(session) = cached_session {
+            tracing::debug!(username = %session.username, "Restoring cached session (client mode)");
+            match connected_client
+                .restore_session(session.token.clone(), session.user_info.clone())
+                .await
+            {
+                Ok(authenticated_client) => {
+                    tracing::debug!(username = %session.username, "Session restored (client mode)");
+                    let mut tm = self.tenant_manager.write().await;
+                    tm.set_current_session(session);
+                    RemoteClientState::Authenticated(authenticated_client)
+                }
+                Err((e, connected)) => {
+                    tracing::warn!("Failed to restore session (client mode): {}", e);
+                    let mut tm = self.tenant_manager.write().await;
+                    let _ = tm.clear_current_session();
+                    RemoteClientState::Connected(connected)
+                }
+            }
+        } else {
+            tracing::debug!("No cached employee session found (client mode)");
+            RemoteClientState::Connected(connected_client)
+        };
+
         {
             let mut mode_guard = self.mode.write().await;
             if !matches!(&*mode_guard, ClientMode::Disconnected) {
@@ -482,7 +517,7 @@ impl ClientBridge {
                 ));
             }
             *mode_guard = ClientMode::Client {
-                client: Some(RemoteClientState::Connected(connected_client)),
+                client: Some(client_state),
                 edge_url: edge_url.to_string(),
                 message_addr: message_addr.to_string(),
                 shutdown_token: client_shutdown_token,
@@ -604,7 +639,7 @@ impl ClientBridge {
         })
     }
 
-    /// 退出当前租户：停止服务器 → 清除当前租户选择（保留文件）
+    /// 退出当前租户：清除 session → 停止服务器 → 清除当前租户选择（保留文件）
     pub async fn exit_tenant(&self) -> Result<(), BridgeError> {
         let tenant_id = {
             let tm = self.tenant_manager.read().await;
@@ -614,6 +649,12 @@ impl ClientBridge {
         let Some(tenant_id) = tenant_id else {
             return Err(BridgeError::Config("No current tenant".to_string()));
         };
+
+        // 0. 先清除员工 session
+        {
+            let mut tm = self.tenant_manager.write().await;
+            let _ = tm.clear_current_session();
+        }
 
         // 1. 停止服务器模式（切换到 Disconnected）
         self.stop().await?;

@@ -895,8 +895,9 @@ impl TenantManager {
             .map_err(TenantError::SessionCache)
     }
 
-    /// 清除缓存的当前活动会话
-    pub fn clear_current_session(&self) -> Result<(), TenantError> {
+    /// 清除缓存的当前活动会话（同时清内存 + 磁盘）
+    pub fn clear_current_session(&mut self) -> Result<(), TenantError> {
+        self.current_session = None;
         if let Some(tenant_id) = &self.current_tenant {
             if let Some(cache) = self.session_caches.get(tenant_id) {
                 cache

@@ -153,7 +153,7 @@ impl ClientBridge {
 
         drop(mode_guard);
 
-        let tenant_manager = self.tenant_manager.read().await;
+        let mut tenant_manager = self.tenant_manager.write().await;
         if let Err(e) = tenant_manager.clear_current_session() {
             tracing::warn!("Failed to clear cached session: {}", e);
         }

@@ -117,11 +117,8 @@ impl ClientBridge {
                         return AppState::ServerP12Blocked { info };
                     }
 
-                    // 检查员工登录状态
+                    // 检查员工登录状态（只依赖 CrabClient typestate）
                     if matches!(client, Some(LocalClientState::Authenticated(_))) {
-                        return AppState::ServerAuthenticated;
-                    }
-                    if tenant_manager.current_session().is_some() {
                         return AppState::ServerAuthenticated;
                     }
                     AppState::ServerReady
