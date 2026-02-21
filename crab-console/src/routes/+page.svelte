@@ -30,6 +30,7 @@
 		type DailyReportEntry
 	} from '$lib/api';
 	import { formatDate, formatCurrency, timeAgo } from '$lib/format';
+	import Decimal from 'decimal.js';
 	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 
 	interface AggregateStats {
@@ -61,31 +62,41 @@
 	);
 
 	function aggregateReports(allReports: DailyReportEntry[][]): AggregateStats {
-		const stats: AggregateStats = {
-			total_sales: 0,
-			completed_orders: 0,
-			total_orders: 0,
-			void_orders: 0,
-			total_paid: 0,
-			total_discount: 0,
-			total_tax: 0,
-			total_unpaid: 0,
-			stores_with_data: 0
-		};
+		let totalSales = new Decimal(0);
+		let totalPaid = new Decimal(0);
+		let totalDiscount = new Decimal(0);
+		let totalTax = new Decimal(0);
+		let totalUnpaid = new Decimal(0);
+		let completedOrders = 0;
+		let totalOrders = 0;
+		let voidOrders = 0;
+		let storesWithData = 0;
+
 		for (const reports of allReports) {
 			if (reports.length === 0) continue;
-			stats.stores_with_data++;
+			storesWithData++;
 			const d = reports[0].data as Record<string, number>;
-			stats.total_sales += d.total_sales ?? 0;
-			stats.completed_orders += d.completed_orders ?? 0;
-			stats.total_orders += d.total_orders ?? 0;
-			stats.void_orders += d.void_orders ?? 0;
-			stats.total_paid += d.total_paid ?? 0;
-			stats.total_discount += d.total_discount ?? 0;
-			stats.total_tax += d.total_tax ?? 0;
-			stats.total_unpaid += d.total_unpaid ?? 0;
+			totalSales = totalSales.plus(d.total_sales ?? 0);
+			completedOrders += d.completed_orders ?? 0;
+			totalOrders += d.total_orders ?? 0;
+			voidOrders += d.void_orders ?? 0;
+			totalPaid = totalPaid.plus(d.total_paid ?? 0);
+			totalDiscount = totalDiscount.plus(d.total_discount ?? 0);
+			totalTax = totalTax.plus(d.total_tax ?? 0);
+			totalUnpaid = totalUnpaid.plus(d.total_unpaid ?? 0);
 		}
-		return stats;
+
+		return {
+			total_sales: totalSales.toNumber(),
+			completed_orders: completedOrders,
+			total_orders: totalOrders,
+			void_orders: voidOrders,
+			total_paid: totalPaid.toNumber(),
+			total_discount: totalDiscount.toNumber(),
+			total_tax: totalTax.toNumber(),
+			total_unpaid: totalUnpaid.toNumber(),
+			stores_with_data: storesWithData
+		};
 	}
 
 	onMount(async () => {
