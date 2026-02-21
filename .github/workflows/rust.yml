@@ -26,6 +26,8 @@ jobs:
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Install NASM
         uses: ilammy/setup-nasm@v1

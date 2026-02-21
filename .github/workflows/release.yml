@@ -30,7 +30,7 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: release-windows
+          cache-on-failure: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
