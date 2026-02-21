@@ -60,47 +60,32 @@
 		profile !== null && profile.profile.status === 'verified' && !profile.subscription
 	);
 
-	// Accumulate monetary values as integer cents to avoid floating-point drift
-	function toCents(v: number): number {
-		return Math.round(v * 100);
-	}
-
 	function aggregateReports(allReports: DailyReportEntry[][]): AggregateStats {
-		let salesCents = 0;
-		let paidCents = 0;
-		let discountCents = 0;
-		let taxCents = 0;
-		let unpaidCents = 0;
-		let completedOrders = 0;
-		let totalOrders = 0;
-		let voidOrders = 0;
-		let storesWithData = 0;
-
+		const stats: AggregateStats = {
+			total_sales: 0,
+			completed_orders: 0,
+			total_orders: 0,
+			void_orders: 0,
+			total_paid: 0,
+			total_discount: 0,
+			total_tax: 0,
+			total_unpaid: 0,
+			stores_with_data: 0
+		};
 		for (const reports of allReports) {
 			if (reports.length === 0) continue;
-			storesWithData++;
+			stats.stores_with_data++;
 			const d = reports[0].data as Record<string, number>;
-			salesCents += toCents(d.total_sales ?? 0);
-			completedOrders += d.completed_orders ?? 0;
-			totalOrders += d.total_orders ?? 0;
-			voidOrders += d.void_orders ?? 0;
-			paidCents += toCents(d.total_paid ?? 0);
-			discountCents += toCents(d.total_discount ?? 0);
-			taxCents += toCents(d.total_tax ?? 0);
-			unpaidCents += toCents(d.total_unpaid ?? 0);
+			stats.total_sales += d.total_sales ?? 0;
+			stats.completed_orders += d.completed_orders ?? 0;
+			stats.total_orders += d.total_orders ?? 0;
+			stats.void_orders += d.void_orders ?? 0;
+			stats.total_paid += d.total_paid ?? 0;
+			stats.total_discount += d.total_discount ?? 0;
+			stats.total_tax += d.total_tax ?? 0;
+			stats.total_unpaid += d.total_unpaid ?? 0;
 		}
-
-		return {
-			total_sales: salesCents / 100,
-			completed_orders: completedOrders,
-			total_orders: totalOrders,
-			void_orders: voidOrders,
-			total_paid: paidCents / 100,
-			total_discount: discountCents / 100,
-			total_tax: taxCents / 100,
-			total_unpaid: unpaidCents / 100,
-			stores_with_data: storesWithData
-		};
+		return stats;
 	}
 
 	onMount(async () => {
