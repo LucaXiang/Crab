@@ -500,6 +500,8 @@ pub struct TenantVerifyData {
     pub has_active_server: bool,
     /// 当前设备是否已有 Client 激活
     pub has_active_client: bool,
+    /// 租户是否已上传 P12 电子签名证书
+    pub has_p12: bool,
 }
 
 /// Token 刷新请求

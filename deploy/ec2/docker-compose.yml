@@ -69,8 +69,7 @@ services:
       STRIPE_BASIC_PRICE_ID: ${STRIPE_BASIC_PRICE_ID}
       STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID}
       JWT_SECRET: ${JWT_SECRET}
-      REGISTRATION_SUCCESS_URL: https://redcoral.app/registration/success
-      REGISTRATION_CANCEL_URL: https://redcoral.app/registration/cancel
+      CONSOLE_BASE_URL: https://console.redcoral.app
       RUST_LOG: crab_cloud=info,tower_http=info
       # mTLS certs — mounted from host
       ROOT_CA_PATH: /certs/root_ca.pem

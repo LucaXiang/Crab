@@ -575,12 +575,7 @@ pub async fn billing_portal(
         .as_deref()
         .ok_or_else(|| AppError::new(ErrorCode::ValidationFailed))?;
 
-    let return_url = format!(
-        "{}/dashboard",
-        state
-            .registration_success_url
-            .trim_end_matches("/registration/success")
-    );
+    let return_url = state.console_base_url.clone();
 
     let url = crate::stripe::create_billing_portal_session(
         &state.stripe_secret_key,
@@ -650,8 +645,8 @@ pub async fn create_checkout(
         &customer_id,
         price_id,
         plan,
-        &state.registration_success_url,
-        &state.registration_cancel_url,
+        &state.console_base_url,
+        &state.console_base_url,
     )
     .await
     .map_err(|e| {

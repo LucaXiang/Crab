@@ -87,8 +87,16 @@ impl CloudService {
             .replace("http://", "ws://");
         let url = format!("{ws_url}/api/edge/ws");
 
+        // Extract host from URL for the Host header (required by WebSocket protocol)
+        let host = url
+            .split("://")
+            .nth(1)
+            .and_then(|s| s.split('/').next())
+            .unwrap_or("localhost");
+
         let request = tungstenite::http::Request::builder()
             .uri(&url)
+            .header("Host", host)
             .header("X-Signed-Binding", &binding_json)
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")

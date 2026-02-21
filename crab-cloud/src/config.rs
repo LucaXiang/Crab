@@ -29,10 +29,8 @@ pub struct Config {
     pub stripe_secret_key: String,
     /// Stripe webhook signing secret
     pub stripe_webhook_secret: String,
-    /// URL to redirect after successful registration checkout
-    pub registration_success_url: String,
-    /// URL to redirect after cancelled registration checkout
-    pub registration_cancel_url: String,
+    /// Console base URL (e.g. https://console.redcoral.app)
+    pub console_base_url: String,
     /// S3 bucket for update artifacts
     pub update_s3_bucket: String,
     /// CloudFront or S3 base URL for download
@@ -95,10 +93,8 @@ impl Config {
                 .unwrap_or_else(|_| "noreply@redcoral.app".into()),
             stripe_secret_key: Self::require_secret("STRIPE_SECRET_KEY", &environment)?,
             stripe_webhook_secret: Self::require_secret("STRIPE_WEBHOOK_SECRET", &environment)?,
-            registration_success_url: std::env::var("REGISTRATION_SUCCESS_URL")
-                .unwrap_or_else(|_| "https://redcoral.app/registration/success".into()),
-            registration_cancel_url: std::env::var("REGISTRATION_CANCEL_URL")
-                .unwrap_or_else(|_| "https://redcoral.app/registration/cancel".into()),
+            console_base_url: std::env::var("CONSOLE_BASE_URL")
+                .unwrap_or_else(|_| "https://console.redcoral.app".into()),
             update_s3_bucket: std::env::var("UPDATE_S3_BUCKET")
                 .unwrap_or_else(|_| "crab-app-updates".into()),
             update_download_base_url: std::env::var("UPDATE_DOWNLOAD_BASE_URL")

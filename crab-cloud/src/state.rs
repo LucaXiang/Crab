@@ -35,10 +35,8 @@ pub struct AppState {
     pub stripe_webhook_secret: String,
     /// SES sender email address
     pub ses_from_email: String,
-    /// URL to redirect after successful registration checkout
-    pub registration_success_url: String,
-    /// URL to redirect after cancelled registration checkout
-    pub registration_cancel_url: String,
+    /// Console base URL (e.g. https://console.redcoral.app)
+    pub console_base_url: String,
     /// AWS S3 client (update artifacts)
     pub s3: S3Client,
     /// S3 bucket for update artifacts
@@ -161,8 +159,7 @@ impl AppState {
             stripe_secret_key: config.stripe_secret_key.clone(),
             stripe_webhook_secret: config.stripe_webhook_secret.clone(),
             ses_from_email: config.ses_from_email.clone(),
-            registration_success_url: config.registration_success_url.clone(),
-            registration_cancel_url: config.registration_cancel_url.clone(),
+            console_base_url: config.console_base_url.clone(),
             s3,
             update_s3_bucket: config.update_s3_bucket.clone(),
             update_download_base_url: config.update_download_base_url.clone(),

@@ -41,7 +41,8 @@ pub async fn get_subscription_status(
         }));
     }
 
-    let sub = match subscriptions::get_active_subscription(&state.pool, tenant_id).await {
+    // 获取最新订阅（不过滤 status）— 返回真实状态让 edge-server 判断
+    let sub = match subscriptions::get_latest_subscription(&state.pool, tenant_id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             return Json(serde_json::json!({

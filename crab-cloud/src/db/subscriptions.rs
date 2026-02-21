@@ -69,8 +69,12 @@ pub struct Subscription {
     pub current_period_end: Option<i64>,
 }
 
-/// 获取租户当前有效订阅 (从 crab-auth 合并)
-pub async fn get_active_subscription(
+/// 获取租户最新订阅 (不过滤 status)
+///
+/// 返回真实订阅状态，由调用方决定如何处理：
+/// - 激活端点：签发证书不受订阅状态限制，运行时由 edge-server 检查
+/// - verify/subscription 端点：返回真实状态让前端展示拦截页面
+pub async fn get_latest_subscription(
     pool: &PgPool,
     tenant_id: &str,
 ) -> Result<Option<Subscription>, sqlx::Error> {
@@ -78,7 +82,7 @@ pub async fn get_active_subscription(
         "SELECT id, tenant_id, status, plan, max_edge_servers, max_clients,
             features, current_period_end
             FROM subscriptions
-            WHERE tenant_id = $1 AND status = 'active'
+            WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT 1",
     )

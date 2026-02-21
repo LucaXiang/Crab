@@ -170,6 +170,7 @@ export interface TenantVerifyData {
   client_slots_remaining: number;
   has_active_server: boolean;
   has_active_client: boolean;
+  has_p12: boolean;
 }
 
 interface BridgeStore {

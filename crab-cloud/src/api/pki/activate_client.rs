@@ -47,12 +47,15 @@ pub async fn activate_client(
         }
     };
 
-    let sub = match subscriptions::get_active_subscription(&state.pool, &tenant.id).await {
+    // 获取最新订阅（不过滤 status）
+    // 激活 = 证书签发 + 设备绑定，不应因订阅状态而拒绝。
+    // 订阅检查由 edge-server 运行时处理。
+    let sub = match subscriptions::get_latest_subscription(&state.pool, &tenant.id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             return Json(fail(
                 ErrorCode::TenantNoSubscription,
-                "No active subscription",
+                "No subscription found",
             ));
         }
         Err(e) => {
@@ -62,12 +65,6 @@ pub async fn activate_client(
     };
 
     let sub_status = parse_subscription_status(&sub.status);
-    if sub_status.is_blocked() {
-        return Json(fail(
-            ErrorCode::SubscriptionBlocked,
-            &format!("Subscription {}", sub.status),
-        ));
-    }
 
     let plan = parse_plan_type(&sub.plan);
     let max_clients = sub.max_clients;

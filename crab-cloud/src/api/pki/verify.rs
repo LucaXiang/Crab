@@ -1,5 +1,5 @@
 use crate::auth::tenant_auth;
-use crate::db::{activations, client_connections, refresh_tokens, subscriptions, tenants};
+use crate::db::{activations, client_connections, p12, refresh_tokens, subscriptions, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -40,8 +40,8 @@ pub async fn verify_tenant(
         }
     };
 
-    // 无订阅时仍允许登录，前端根据 subscription_status 决定后续流程
-    let sub = match subscriptions::get_active_subscription(&state.pool, &tenant.id).await {
+    // 获取最新订阅（不过滤 status），前端根据 subscription_status 决定后续流程
+    let sub = match subscriptions::get_latest_subscription(&state.pool, &tenant.id).await {
         Ok(s) => s, // Some or None
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching subscription");
@@ -135,6 +135,11 @@ pub async fn verify_tenant(
         }
     };
 
+    let has_p12 = p12::get_p12_info(&state.pool, &tenant.id)
+        .await
+        .map(|info| info.has_p12)
+        .unwrap_or(false);
+
     Json(TenantVerifyResponse {
         success: true,
         error: None,
@@ -149,6 +154,7 @@ pub async fn verify_tenant(
             client_slots_remaining,
             has_active_server,
             has_active_client,
+            has_p12,
         }),
     })
 }
