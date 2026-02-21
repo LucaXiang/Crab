@@ -147,12 +147,12 @@ pub fn public_router(state: AppState) -> Router {
         .merge(password_reset)
         .merge(pki_routes)
         .merge(pki_auth_limited)
-        .layer(cors)
-        .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB
         .layer(middleware::from_fn_with_state(
             state.clone(),
             global_rate_limit,
         ))
+        .layer(DefaultBodyLimit::max(1024 * 1024)) // 1MB
+        .layer(cors)
         .with_state(state)
 }
 
