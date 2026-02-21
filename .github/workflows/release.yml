@@ -78,38 +78,32 @@ jobs:
           echo "==> NSIS directory contents:"
           ls -la "${NSIS_DIR}/" || { echo "ERROR: NSIS dir not found"; exit 1; }
 
-          # Upload .exe installer (for fresh installs)
-          INSTALLER=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.exe" | head -1)
+          # Upload .exe installer (for fresh installs + Tauri v2 updater)
+          INSTALLER=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.exe" ! -name "*.sig" | head -1)
           if [ -z "$INSTALLER" ]; then
             echo "ERROR: No .exe installer found in ${NSIS_DIR}"
             exit 1
           fi
+          INSTALLER_NAME="redcoral-pos_${VERSION}_x64-setup.exe"
           aws s3 cp "$INSTALLER" \
-            "s3://${S3_BUCKET}/releases/${VERSION}/redcoral-pos_${VERSION}_x64-setup.exe"
+            "s3://${S3_BUCKET}/releases/${VERSION}/${INSTALLER_NAME}"
+          # Also upload to updates/ for Tauri updater
+          aws s3 cp "$INSTALLER" \
+            "s3://${S3_BUCKET}/updates/${INSTALLER_NAME}"
           echo "Uploaded installer: $INSTALLER"
 
-          # Upload .nsis.zip (for Tauri updater)
-          NSIS_ZIP=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.nsis.zip" | head -1)
-          if [ -z "$NSIS_ZIP" ]; then
-            echo "ERROR: No .nsis.zip found — TAURI_SIGNING_PRIVATE_KEY may not be set"
+          # Read updater signature (.exe.sig — Tauri v2 signs the .exe directly)
+          EXE_SIG=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.exe.sig" | head -1)
+          if [ -z "$EXE_SIG" ]; then
+            echo "ERROR: No .exe.sig found — TAURI_SIGNING_PRIVATE_KEY may not be set"
             exit 1
           fi
-          aws s3 cp "$NSIS_ZIP" \
-            "s3://${S3_BUCKET}/updates/redcoral-pos_${VERSION}_x64-setup.nsis.zip"
-          echo "Uploaded updater zip: $NSIS_ZIP"
+          SIGNATURE=$(cat "$EXE_SIG")
+          echo "Signature loaded from: $EXE_SIG"
 
-          # Read updater signature
-          NSIS_SIG=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.nsis.zip.sig" | head -1)
-          if [ -z "$NSIS_SIG" ]; then
-            echo "ERROR: No .sig file found — updater verification will fail"
-            exit 1
-          fi
-          SIGNATURE=$(cat "$NSIS_SIG")
-          echo "Signature loaded from: $NSIS_SIG"
-
-          # Generate update manifest (Tauri updater format)
-          printf '{\n  "version": "%s",\n  "notes": "Release %s",\n  "pub_date": "%s",\n  "platforms": {\n    "windows-x86_64": {\n      "signature": "%s",\n      "url": "%s/updates/redcoral-pos_%s_x64-setup.nsis.zip"\n    }\n  }\n}\n' \
-            "${VERSION#v}" "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIGNATURE" "$DOWNLOAD_BASE" "$VERSION" \
+          # Generate update manifest (Tauri v2 updater format)
+          printf '{\n  "version": "%s",\n  "notes": "Release %s",\n  "pub_date": "%s",\n  "platforms": {\n    "windows-x86_64": {\n      "signature": "%s",\n      "url": "%s/updates/%s"\n    }\n  }\n}\n' \
+            "${VERSION#v}" "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIGNATURE" "$DOWNLOAD_BASE" "$INSTALLER_NAME" \
             > latest.json
 
           aws s3 cp latest.json "s3://${S3_BUCKET}/updates/latest.json" \
