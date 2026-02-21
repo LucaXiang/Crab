@@ -11,6 +11,17 @@
 	let showPassword = $state(false);
 	let loading = $state(false);
 	let error = $state('');
+	let info = $state('');
+
+	// Pre-fill email and show info from register redirect
+	if (typeof window !== 'undefined') {
+		const params = new URLSearchParams(window.location.search);
+		const emailParam = params.get('email');
+		if (emailParam) email = emailParam;
+		if (params.get('verified') === '1') {
+			info = $t('login.already_verified');
+		}
+	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -47,6 +58,11 @@
 </svelte:head>
 
 <AuthLayout title={$t('login.title')} subtitle={$t('login.subtitle')}>
+	{#if info}
+		<div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-600">
+			{info}
+		</div>
+	{/if}
 	{#if error}
 		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
 			{error}

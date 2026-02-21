@@ -164,6 +164,7 @@ export const zh: Record<string, string> = {
 	'login.register_link': '注册',
 	'login.error_invalid': '邮箱或密码不正确。',
 	'login.error_disabled': '你的账户已被禁用，请联系客服。',
+	'login.already_verified': '该邮箱已注册并验证，请直接登录。',
 
 	// === Forgot Password ===
 	'forgot.page_title': '找回密码',

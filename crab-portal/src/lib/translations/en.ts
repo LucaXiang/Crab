@@ -167,6 +167,7 @@ export const en: Record<string, string> = {
 	'login.register_link': 'Sign up',
 	'login.error_invalid': 'Invalid email or password.',
 	'login.error_disabled': 'Your account is disabled. Contact support.',
+	'login.already_verified': 'This email is already registered and verified. Please log in.',
 
 	// === Forgot Password ===
 	'forgot.page_title': 'Recover password',

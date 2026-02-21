@@ -167,6 +167,7 @@ export const es: Record<string, string> = {
 	'login.register_link': 'Regístrate',
 	'login.error_invalid': 'Correo o contraseña incorrectos.',
 	'login.error_disabled': 'Tu cuenta está desactivada. Contacta con soporte.',
+	'login.already_verified': 'Este correo ya está registrado y verificado. Inicia sesión.',
 
 	// === Forgot Password ===
 	'forgot.page_title': 'Recuperar contraseña',

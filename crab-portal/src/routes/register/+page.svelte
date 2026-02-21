@@ -28,8 +28,9 @@
 		loading = true;
 		try {
 			const res = await register({ email, password, plan: selectedPlan });
-			if (res.status === 'verified' && res.checkout_url) {
-				window.location.href = res.checkout_url;
+			if (res.status === 'verified') {
+				// Already verified — redirect to login
+				goto('/login?email=' + encodeURIComponent(email) + '&verified=1');
 			} else {
 				sessionStorage.setItem('redcoral-verify-email', email);
 				goto('/verify');
