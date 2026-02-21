@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, RefreshCw, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAppState, useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { logger } from '@/utils/logger';
@@ -58,8 +58,7 @@ export const SubscriptionBlockedScreen: React.FC = () => {
 
   if (appState?.type !== 'ServerSubscriptionBlocked') {
     const target = AppStateHelpers.getRouteForState(appState);
-    navigate(target, { replace: true });
-    return null;
+    return <Navigate to={target} replace />;
   }
 
   const { info } = appState.data;

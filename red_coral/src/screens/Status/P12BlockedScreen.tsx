@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Power, RefreshCw, LogOut, Upload, FileKey, Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useAppState, useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
@@ -37,8 +37,7 @@ export const P12BlockedScreen: React.FC = () => {
 
   if (appState?.type !== 'ServerP12Blocked') {
     const target = AppStateHelpers.getRouteForState(appState);
-    navigate(target, { replace: true });
-    return null;
+    return <Navigate to={target} replace />;
   }
 
   const { info } = appState.data;

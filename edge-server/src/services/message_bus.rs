@@ -1,5 +1,4 @@
 use crate::core::Config;
-use crate::core::ServerState;
 use crate::message::{MessageBus, TransportConfig};
 use std::sync::Arc;
 
@@ -49,28 +48,5 @@ impl MessageBusService {
         self.bus
             .start_tcp_server(Some(tls_config), credential_cache)
             .await
-    }
-
-    /// 启动后台消息处理器
-    ///
-    /// MessageHandler 订阅 client_tx，接收来自客户端的消息
-    pub fn start_background_tasks(&self, state: ServerState) {
-        // 1. 启动 MessageHandler
-        let handler_receiver = self.bus.subscribe_to_clients();
-        let handler_shutdown = self.bus.shutdown_token().clone();
-        let server_tx = self.bus.sender().clone();
-
-        let handler = crate::message::MessageHandler::with_default_processors(
-            handler_receiver,
-            handler_shutdown,
-            state.clone().into(),
-        )
-        .with_broadcast_tx(server_tx);
-
-        tokio::spawn(async move {
-            handler.run().await;
-        });
-
-        tracing::debug!("Message handler started in background");
     }
 }

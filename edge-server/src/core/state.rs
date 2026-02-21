@@ -527,11 +527,13 @@ impl ServerState {
                 archive_service.clone(),
                 self.audit_service.clone(),
                 self.pool.clone(),
-                self.clone(),
+                self.message_bus.bus().clone(),
+                self.resource_versions.clone(),
             );
 
+            let shutdown = tasks.shutdown_token();
             tasks.spawn("archive_worker", TaskKind::Worker, async move {
-                worker.run(event_rx).await;
+                worker.run(event_rx, shutdown).await;
             });
         }
     }
@@ -638,6 +640,7 @@ impl ServerState {
         const MAX_AGE_SECS: i64 = 3 * 24 * 3600; // 3 days
 
         let print_service = self.kitchen_print_service.clone();
+        let shutdown = tasks.shutdown_token();
 
         tasks.spawn("print_record_cleanup", TaskKind::Periodic, async move {
             tracing::info!("Print record cleanup task started (interval: 1h, max_age: 3d)");
@@ -661,16 +664,23 @@ impl ServerState {
             interval.tick().await; // Skip the first immediate tick (already cleaned up above)
 
             loop {
-                interval.tick().await;
-                match print_service.cleanup_old_records(MAX_AGE_SECS) {
-                    Ok(count) if count > 0 => {
-                        tracing::info!("Cleaned up {} old print records", count);
+                tokio::select! {
+                    _ = shutdown.cancelled() => {
+                        tracing::info!("Print record cleanup received shutdown signal");
+                        break;
                     }
-                    Ok(_) => {
-                        tracing::debug!("No old print records to cleanup");
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to cleanup print records: {:?}", e);
+                    _ = interval.tick() => {
+                        match print_service.cleanup_old_records(MAX_AGE_SECS) {
+                            Ok(count) if count > 0 => {
+                                tracing::info!("Cleaned up {} old print records", count);
+                            }
+                            Ok(_) => {
+                                tracing::debug!("No old print records to cleanup");
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to cleanup print records: {:?}", e);
+                            }
+                        }
                     }
                 }
             }

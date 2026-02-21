@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Clock, Shield, Wifi } from 'lucide-react';
 import { useBridgeStore, useAppState, AppStateHelpers } from '@/core/stores/bridge';
 import { t } from '@/infrastructure/i18n';
@@ -34,8 +34,7 @@ export const ActivationRequiredScreen: React.FC = () => {
 
   if (appState?.type !== 'ServerNeedActivation' && appState?.type !== 'ClientNeedActivation') {
     const target = AppStateHelpers.getRouteForState(appState);
-    navigate(target, { replace: true });
-    return null;
+    return <Navigate to={target} replace />;
   }
 
   const { reason, can_auto_recover, recovery_hint } = appState.data;

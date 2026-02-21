@@ -8,16 +8,19 @@
 
 use crate::archiving::service::OrderArchiveService;
 use crate::audit::{AuditAction, AuditService};
-use crate::core::state::ServerState;
+use crate::core::state::ResourceVersions;
 use crate::db::repository::{marketing_group, member, payment, shift};
+use crate::message::MessageBus;
 use crate::order_money::{to_decimal, to_f64};
 use crate::orders::storage::{OrderStorage, PendingArchive};
 use rust_decimal::prelude::*;
+use shared::message::{BusMessage, SyncPayload};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 /// Arc-wrapped OrderEvent (from EventRouter)
 type ArcOrderEvent = Arc<OrderEvent>;
@@ -45,7 +48,8 @@ pub struct ArchiveWorker {
     archive_service: OrderArchiveService,
     audit_service: Arc<AuditService>,
     pool: SqlitePool,
-    state: ServerState,
+    message_bus: Arc<MessageBus>,
+    resource_versions: Arc<ResourceVersions>,
     semaphore: Arc<tokio::sync::Semaphore>,
 }
 
@@ -55,14 +59,16 @@ impl ArchiveWorker {
         archive_service: OrderArchiveService,
         audit_service: Arc<AuditService>,
         pool: SqlitePool,
-        state: ServerState,
+        message_bus: Arc<MessageBus>,
+        resource_versions: Arc<ResourceVersions>,
     ) -> Self {
         Self {
             storage,
             archive_service,
             audit_service,
             pool,
-            state,
+            message_bus,
+            resource_versions,
             semaphore: Arc::new(tokio::sync::Semaphore::new(ARCHIVE_CONCURRENCY)),
         }
     }
@@ -70,7 +76,11 @@ impl ArchiveWorker {
     /// Run the archive worker (并发处理归档)
     ///
     /// 接收来自 EventRouter 的 mpsc 通道（已过滤为终端事件）
-    pub async fn run(self, mut event_rx: mpsc::Receiver<ArcOrderEvent>) {
+    pub async fn run(
+        self,
+        mut event_rx: mpsc::Receiver<ArcOrderEvent>,
+        shutdown: CancellationToken,
+    ) {
         tracing::info!(
             "ArchiveWorker started with concurrency={}",
             ARCHIVE_CONCURRENCY
@@ -90,9 +100,14 @@ impl ArchiveWorker {
 
         let mut scan_interval =
             tokio::time::interval(Duration::from_secs(QUEUE_SCAN_INTERVAL_SECS));
+        let mut join_set = tokio::task::JoinSet::new();
 
         loop {
             tokio::select! {
+                _ = shutdown.cancelled() => {
+                    tracing::info!("ArchiveWorker received shutdown signal");
+                    break;
+                }
                 // Handle new terminal events (EventRouter 已过滤)
                 event_opt = event_rx.recv() => {
                     match event_opt {
@@ -101,7 +116,7 @@ impl ArchiveWorker {
                             // 并发处理归档
                             let w = worker.clone();
                             let order_id = event.order_id.clone();
-                            tokio::spawn(async move {
+                            join_set.spawn(async move {
                                 w.process_order_concurrent(&order_id).await;
                             });
                         }
@@ -115,8 +130,14 @@ impl ArchiveWorker {
                 _ = scan_interval.tick() => {
                     worker.process_pending_queue().await;
                 }
+                // Reap completed tasks
+                Some(_) = join_set.join_next(), if !join_set.is_empty() => {}
             }
         }
+
+        // Wait for in-flight archive tasks to complete
+        join_set.shutdown().await;
+        tracing::info!("ArchiveWorker shutdown complete");
     }
 
     /// 带并发限制的订单处理
@@ -542,14 +563,17 @@ impl ArchiveWorker {
 
             // Broadcast shift update so frontend stores stay current
             if let Ok(Some(updated_shift)) = shift::find_any_open(&self.pool).await {
-                self.state
-                    .broadcast_sync(
-                        "shift",
-                        "updated",
-                        &updated_shift.id.to_string(),
-                        Some(&updated_shift),
-                    )
-                    .await;
+                let version = self.resource_versions.increment("shift");
+                let payload = SyncPayload {
+                    resource: "shift".to_string(),
+                    version,
+                    action: "updated".to_string(),
+                    id: updated_shift.id.to_string(),
+                    data: serde_json::to_value(&updated_shift).ok(),
+                };
+                if let Err(e) = self.message_bus.publish(BusMessage::sync(&payload)).await {
+                    tracing::error!("Shift sync broadcast failed: {}", e);
+                }
             }
         }
     }

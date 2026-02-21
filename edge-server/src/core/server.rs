@@ -182,6 +182,9 @@ impl Server {
 
         background_tasks.shutdown().await;
 
+        // 显式关闭 SqlitePool，确保所有连接释放
+        state.pool.close().await;
+
         // 取出 audit worker handle，然后 drop state 释放所有 audit tx → channel 关闭 → worker drain
         let audit_handle = state.audit_worker_handle.lock().await.take();
         drop(state);
