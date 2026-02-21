@@ -61,7 +61,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: red_coral
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: TypeScript type check
         working-directory: red_coral
