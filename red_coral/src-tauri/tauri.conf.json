@@ -50,7 +50,7 @@
       "endpoints": [
         "https://cloud.redcoral.app/api/update/{{target}}/{{arch}}/{{current_version}}"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZGQUFCRjE3NTFDQTU3NjIKUldSaVY4cFJGNytxYjJaUmtyaXF6c1huWERvNVdCU0hHZk9CTkg0YTJpY1QrNHdnK1IwQjA0bXgK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY5N0Y4MTc5QzM1NTE3NzkKUldSNUYxWERlWUYvK2NNUUphUFFhbWVLVXlwWUNpNmZVcVhSZmsvbGNSUW91OTZra2ZKS0ZWT1MK"
     }
   }
 }
