@@ -1,12 +1,6 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g. v0.3.0)'
-        required: true
-        type: string
   push:
     tags:
       - 'v*'
@@ -24,6 +18,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -65,47 +64,47 @@ jobs:
         env:
           S3_BUCKET: ${{ secrets.UPDATE_S3_BUCKET }}
           DOWNLOAD_BASE: ${{ secrets.UPDATE_DOWNLOAD_BASE_URL }}
-          VERSION: ${{ inputs.version || github.ref_name }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
+          set -euo pipefail
           NSIS_DIR="red_coral/target/release/bundle/nsis"
 
+          echo "==> NSIS directory contents:"
+          ls -la "${NSIS_DIR}/" || { echo "ERROR: NSIS dir not found"; exit 1; }
+
           # Upload .exe installer (for fresh installs)
-          INSTALLER=$(ls ${NSIS_DIR}/*.exe 2>/dev/null | head -1)
-          if [ -n "$INSTALLER" ]; then
-            aws s3 cp "$INSTALLER" \
-              "s3://${S3_BUCKET}/releases/${VERSION}/redcoral-pos_${VERSION}_x64-setup.exe"
+          INSTALLER=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.exe" | head -1)
+          if [ -z "$INSTALLER" ]; then
+            echo "ERROR: No .exe installer found in ${NSIS_DIR}"
+            exit 1
           fi
+          aws s3 cp "$INSTALLER" \
+            "s3://${S3_BUCKET}/releases/${VERSION}/redcoral-pos_${VERSION}_x64-setup.exe"
+          echo "Uploaded installer: $INSTALLER"
 
           # Upload .nsis.zip (for Tauri updater)
-          NSIS_ZIP=$(ls ${NSIS_DIR}/*.nsis.zip 2>/dev/null | head -1)
-          if [ -n "$NSIS_ZIP" ]; then
-            aws s3 cp "$NSIS_ZIP" \
-              "s3://${S3_BUCKET}/updates/redcoral-pos_${VERSION}_x64-setup.nsis.zip"
+          NSIS_ZIP=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.nsis.zip" | head -1)
+          if [ -z "$NSIS_ZIP" ]; then
+            echo "ERROR: No .nsis.zip found — TAURI_SIGNING_PRIVATE_KEY may not be set"
+            exit 1
           fi
+          aws s3 cp "$NSIS_ZIP" \
+            "s3://${S3_BUCKET}/updates/redcoral-pos_${VERSION}_x64-setup.nsis.zip"
+          echo "Uploaded updater zip: $NSIS_ZIP"
 
           # Read updater signature
-          NSIS_SIG=$(ls ${NSIS_DIR}/*.nsis.zip.sig 2>/dev/null | head -1)
-          if [ -n "$NSIS_SIG" ]; then
-            SIGNATURE=$(cat "$NSIS_SIG")
-          else
-            echo "WARNING: No .sig file found, updater verification will fail"
-            SIGNATURE=""
+          NSIS_SIG=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.nsis.zip.sig" | head -1)
+          if [ -z "$NSIS_SIG" ]; then
+            echo "ERROR: No .sig file found — updater verification will fail"
+            exit 1
           fi
+          SIGNATURE=$(cat "$NSIS_SIG")
+          echo "Signature loaded from: $NSIS_SIG"
 
           # Generate update manifest (Tauri updater format)
-          cat > latest.json <<MANIFEST
-          {
-            "version": "${VERSION#v}",
-            "notes": "Release ${VERSION}",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "${SIGNATURE}",
-                "url": "${DOWNLOAD_BASE}/updates/redcoral-pos_${VERSION}_x64-setup.nsis.zip"
-              }
-            }
-          }
-          MANIFEST
+          printf '{\n  "version": "%s",\n  "notes": "Release %s",\n  "pub_date": "%s",\n  "platforms": {\n    "windows-x86_64": {\n      "signature": "%s",\n      "url": "%s/updates/redcoral-pos_%s_x64-setup.nsis.zip"\n    }\n  }\n}\n' \
+            "${VERSION#v}" "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIGNATURE" "$DOWNLOAD_BASE" "$VERSION" \
+            > latest.json
 
           aws s3 cp latest.json "s3://${S3_BUCKET}/updates/latest.json" \
             --content-type "application/json"
