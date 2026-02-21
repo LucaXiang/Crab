@@ -43,27 +43,25 @@ impl ClientBridge {
     /// 激活设备并保存证书
     ///
     /// 仅保存证书到磁盘，不启动任何模式。
+    /// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
     /// 返回 (tenant_id, subscription_status)，前端据此决定下一步。
-    pub async fn handle_activation(
-        &self,
-        auth_url: &str,
-        token: &str,
-    ) -> Result<(String, Option<String>), BridgeError> {
-        self.handle_activation_with_replace(auth_url, token, None)
-            .await
+    pub async fn handle_activation(&self) -> Result<(String, Option<String>), BridgeError> {
+        self.handle_activation_with_replace(None).await
     }
 
     /// 激活设备（支持替换已有设备）
+    ///
+    /// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
     pub async fn handle_activation_with_replace(
         &self,
-        auth_url: &str,
-        token: &str,
         replace_entity_id: Option<&str>,
     ) -> Result<(String, Option<String>), BridgeError> {
+        let token = self.get_fresh_token().await?;
+        let auth_url = self.get_auth_url().await;
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let (tenant_id, entity_id) = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_device(auth_url, token, replace_entity_id)
+            tm.activate_device(&auth_url, &token, replace_entity_id)
                 .await?
         };
 
@@ -91,27 +89,25 @@ impl ClientBridge {
     /// 激活客户端并保存证书
     ///
     /// 仅保存客户端证书到磁盘，不启动任何模式。
+    /// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
     /// 返回 (tenant_id, subscription_status)，前端据此决定下一步。
-    pub async fn handle_client_activation(
-        &self,
-        auth_url: &str,
-        token: &str,
-    ) -> Result<(String, Option<String>), BridgeError> {
-        self.handle_client_activation_with_replace(auth_url, token, None)
-            .await
+    pub async fn handle_client_activation(&self) -> Result<(String, Option<String>), BridgeError> {
+        self.handle_client_activation_with_replace(None).await
     }
 
     /// 激活客户端（支持替换已有客户端）
+    ///
+    /// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
     pub async fn handle_client_activation_with_replace(
         &self,
-        auth_url: &str,
-        token: &str,
         replace_entity_id: Option<&str>,
     ) -> Result<(String, Option<String>), BridgeError> {
+        let token = self.get_fresh_token().await?;
+        let auth_url = self.get_auth_url().await;
         // 1. 调用 TenantManager 客户端激活
         let (tenant_id, entity_id) = {
             let mut tm = self.tenant_manager.write().await;
-            tm.activate_client(auth_url, token, replace_entity_id)
+            tm.activate_client(&auth_url, &token, replace_entity_id)
                 .await?
         };
 

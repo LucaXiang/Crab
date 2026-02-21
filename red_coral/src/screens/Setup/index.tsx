@@ -73,6 +73,8 @@ export const SetupScreen: React.FC = () => {
   const [activationError, setActivationError] = useState('');
   const [quotaInfo, setQuotaInfo] = useState<QuotaInfo | null>(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
+  // 跟踪已成功激活的模式，避免切换模式时重复激活产生孤立 entity
+  const [activatedMode, setActivatedMode] = useState<ModeChoice>(null);
 
   // Configuration state
   const [configError, setConfigError] = useState('');
@@ -80,8 +82,6 @@ export const SetupScreen: React.FC = () => {
   const [messagePort, setMessagePort] = useState(DEFAULT_MESSAGE_PORT);
   const [edgeUrl, setEdgeUrl] = useState('https://edge.example.com');
   const [messageAddr, setMessageAddr] = useState('edge.example.com:9626');
-
-  const hasCredentials = username.trim() !== '' && password.trim() !== '';
 
   // Step 1: Verify credentials
   const handleVerify = async (e: React.FormEvent) => {
@@ -225,6 +225,9 @@ export const SetupScreen: React.FC = () => {
   // Step 2: Mode selection
   const handleModeSelect = (mode: ModeChoice) => {
     setModeChoice(mode);
+    setConfigError('');
+    setActivationError('');
+    useBridgeStore.setState({ error: null });
     setStep('configure');
   };
 
@@ -234,23 +237,20 @@ export const SetupScreen: React.FC = () => {
     setConfigError('');
     setActivationError('');
     setQuotaInfo(null);
-
-    // 无 token 说明 verify 步骤未完成，回退到登录
-    const token = tenantInfo?.token;
-    if (!token) {
-      setStep('credentials');
-      return;
-    }
+    useBridgeStore.setState({ error: null });
 
     try {
-      // Activate (download cert)
-      const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
-      const result = await activateFn(token);
+      // 如果当前模式已激活（激活成功但启动失败的重试场景），跳过激活直接启动
+      if (activatedMode !== modeChoice) {
+        const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
+        const result = await activateFn();
 
-      if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
-        setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
-        setStep('subscription_blocked');
-        return;
+        if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
+          setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
+          setStep('subscription_blocked');
+          return;
+        }
+        setActivatedMode(modeChoice);
       }
 
       // Configure + start
@@ -286,14 +286,10 @@ export const SetupScreen: React.FC = () => {
     setConfigError('');
 
     try {
-      const token = tenantInfo?.token;
-      if (!token) {
-        setConfigError('Session expired, please re-enter credentials');
-        return;
-      }
       const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
-      const result = await activateFn(token, device.entity_id);
+      const result = await activateFn(device.entity_id);
       setQuotaInfo(null);
+      setActivatedMode(modeChoice);
 
       if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
         setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
@@ -790,7 +786,13 @@ export const SetupScreen: React.FC = () => {
             setTenantInfo(null);
             setUsername('');
             setPassword('');
-            await exitTenant();
+            setActivatedMode(null);
+            useBridgeStore.setState({ error: null });
+            try {
+              await exitTenant();
+            } catch (err) {
+              logger.error('Failed to exit tenant', err);
+            }
             setStep('credentials');
           }}
           className="text-sm text-gray-500 hover:text-gray-700"
@@ -817,8 +819,6 @@ export const SetupScreen: React.FC = () => {
       </div>
 
       <form onSubmit={handleConfigure} className="space-y-6">
-        {/* 无 token 时回退到登录步骤，不在配置页重复要求输入凭据 */}
-
         {isServer ? (
           <>
             <div className="space-y-1">
@@ -891,7 +891,7 @@ export const SetupScreen: React.FC = () => {
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => { setStep('mode'); setConfigError(''); }}
+            onClick={() => { setStep('mode'); setConfigError(''); useBridgeStore.setState({ error: null }); }}
             disabled={isLoading}
             className="px-6 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
           >

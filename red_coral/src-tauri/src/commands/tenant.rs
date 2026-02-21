@@ -20,17 +20,14 @@ pub struct P12UploadResult {
 /// 激活 Server 模式设备
 ///
 /// 调用 /api/server/activate，保存 Server 证书到磁盘。
-/// auth_url 从 AppConfig 全局配置获取，前端不再传递。
+/// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
 #[tauri::command]
 pub async fn activate_server_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    token: String,
     replace_entity_id: Option<String>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
-    let auth_url = bridge.get_auth_url().await;
-
     match bridge
-        .handle_activation_with_replace(&auth_url, &token, replace_entity_id.as_deref())
+        .handle_activation_with_replace(replace_entity_id.as_deref())
         .await
     {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
@@ -60,16 +57,14 @@ pub async fn activate_server_tenant(
 /// 激活 Client 模式设备
 ///
 /// 调用 /api/client/activate，保存 Client 证书到磁盘。
+/// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
 #[tauri::command]
 pub async fn activate_client_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    token: String,
     replace_entity_id: Option<String>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
-    let auth_url = bridge.get_auth_url().await;
-
     match bridge
-        .handle_client_activation_with_replace(&auth_url, &token, replace_entity_id.as_deref())
+        .handle_client_activation_with_replace(replace_entity_id.as_deref())
         .await
     {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {

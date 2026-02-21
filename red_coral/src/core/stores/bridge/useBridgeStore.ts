@@ -198,8 +198,8 @@ interface BridgeStore {
 
   // Tenant Actions
   verifyTenant: (username: string, password: string) => Promise<TenantVerifyData>;
-  activateServerTenant: (token: string, replaceEntityId?: string) => Promise<ActivationResult>;
-  activateClientTenant: (token: string, replaceEntityId?: string) => Promise<ActivationResult>;
+  activateServerTenant: (replaceEntityId?: string) => Promise<ActivationResult>;
+  activateClientTenant: (replaceEntityId?: string) => Promise<ActivationResult>;
   deactivateCurrentMode: () => Promise<void>;
   exitTenant: () => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
@@ -341,11 +341,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateServerTenant: async (token, replaceEntityId?) => {
+      activateServerTenant: async (replaceEntityId?) => {
         try {
           set({ isLoading: true, error: null });
           const result = await invokeApi<ActivationResult>('activate_server_tenant', {
-            token,
             replaceEntityId: replaceEntityId ?? null,
           });
           await get().fetchAppState();
@@ -358,11 +357,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateClientTenant: async (token, replaceEntityId?) => {
+      activateClientTenant: async (replaceEntityId?) => {
         try {
           set({ isLoading: true, error: null });
           const result = await invokeApi<ActivationResult>('activate_client_tenant', {
-            token,
             replaceEntityId: replaceEntityId ?? null,
           });
           await get().fetchAppState();

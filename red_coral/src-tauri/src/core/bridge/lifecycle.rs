@@ -60,9 +60,10 @@ impl ClientBridge {
             return Ok(());
         }
 
-        // 如果在 Client 模式，先停止再切换
-        if matches!(&*mode_guard, ClientMode::Client { .. }) {
-            tracing::debug!("Stopping Client mode to switch to Server mode");
+        // 如果在 Client 模式，先完整停止再切换
+        if let ClientMode::Client { shutdown_token, .. } = &*mode_guard {
+            tracing::info!("Stopping Client mode to switch to Server mode...");
+            shutdown_token.cancel();
             *mode_guard = ClientMode::Disconnected;
         }
 
@@ -647,7 +648,8 @@ impl ClientBridge {
         };
 
         let Some(tenant_id) = tenant_id else {
-            return Err(BridgeError::Config("No current tenant".to_string()));
+            tracing::debug!("exit_tenant called with no current tenant, treating as success");
+            return Ok(());
         };
 
         // 0. 先清除员工 session
