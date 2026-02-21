@@ -2,6 +2,72 @@
 
 use super::*;
 
+/// 等待旧模式的 task 完成并清理资源
+pub(crate) async fn await_mode_shutdown(old_mode: ClientMode) {
+    match old_mode {
+        ClientMode::Server {
+            server_task,
+            listener_task,
+            shutdown_token,
+            ..
+        } => {
+            // 防御性 cancel（调用方通常已 cancel，但确保不遗漏）
+            shutdown_token.cancel();
+            let server_abort = server_task.abort_handle();
+            let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
+
+            match tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                let server_result = server_task.await;
+                if let Some(lt) = listener_task {
+                    let _ = lt.await;
+                }
+                server_result
+            })
+            .await
+            {
+                Ok(Ok(())) => tracing::debug!("Server tasks completed gracefully"),
+                Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
+                Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
+                Err(_) => {
+                    tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
+                    server_abort.abort();
+                    if let Some(la) = listener_abort {
+                        la.abort();
+                    }
+                }
+            }
+        }
+        ClientMode::Client {
+            listener_tasks,
+            shutdown_token,
+            ..
+        } => {
+            // 防御性 cancel（调用方通常已 cancel，但确保不遗漏）
+            shutdown_token.cancel();
+            let abort_handles: Vec<_> = listener_tasks.iter().map(|t| t.abort_handle()).collect();
+
+            match tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                for task in listener_tasks {
+                    let _ = task.await;
+                }
+            })
+            .await
+            {
+                Ok(()) => tracing::debug!("Client listener tasks completed gracefully"),
+                Err(_) => {
+                    tracing::warn!(
+                        "Client listener shutdown timed out (5s), aborting remaining tasks"
+                    );
+                    for handle in abort_handles {
+                        handle.abort();
+                    }
+                }
+            }
+        }
+        ClientMode::Disconnected => {}
+    }
+}
+
 impl ClientBridge {
     /// 恢复上次的会话状态 (启动时调用)
     pub async fn restore_last_session(self: &Arc<Self>) -> Result<(), BridgeError> {
@@ -48,31 +114,50 @@ impl ClientBridge {
         result
     }
 
-    /// 以 Server 模式启动
+    /// 以 Server 模式启动（两阶段锁）
     ///
-    /// 如果已经在 Server 模式，直接返回成功（幂等操作）
+    /// 阶段 1: 短暂写锁 → 检查+关闭旧模式 → 释放锁 → await_mode_shutdown
+    /// 阶段 2: 无锁 → ServerState::initialize, connect, restore_session
+    /// 阶段 3: 短暂写锁 → 竞态检查 + 原子写入
     pub async fn start_server_mode(&self) -> Result<(), BridgeError> {
-        let mut mode_guard = self.mode.write().await;
+        let _lifecycle = self.lifecycle_lock.lock().await;
 
-        // 如果已经在 Server 模式，直接返回成功
-        if matches!(&*mode_guard, ClientMode::Server { .. }) {
-            tracing::debug!("Already in Server mode, skipping start");
-            return Ok(());
+        // === 阶段 1: 短暂写锁 — 检查 + 关闭旧模式 ===
+        {
+            let mut mode_guard = self.mode.write().await;
+
+            if matches!(&*mode_guard, ClientMode::Server { .. }) {
+                tracing::debug!("Already in Server mode, skipping start");
+                return Ok(());
+            }
+
+            // 如果在其他模式，取出旧模式并发送 shutdown 信号
+            let old_mode = match &*mode_guard {
+                ClientMode::Client { shutdown_token, .. } => {
+                    tracing::info!("Stopping Client mode to switch to Server mode...");
+                    shutdown_token.cancel();
+                    Some(std::mem::replace(
+                        &mut *mode_guard,
+                        ClientMode::Disconnected,
+                    ))
+                }
+                _ => None,
+            };
+
+            drop(mode_guard);
+
+            // 等待旧模式 task 完成（无锁）
+            if let Some(old) = old_mode {
+                await_mode_shutdown(old).await;
+            }
         }
 
-        // 如果在 Client 模式，先完整停止再切换
-        if let ClientMode::Client { shutdown_token, .. } = &*mode_guard {
-            tracing::info!("Stopping Client mode to switch to Server mode...");
-            shutdown_token.cancel();
-            *mode_guard = ClientMode::Disconnected;
-        }
-
+        // === 阶段 2: 无锁 — 执行耗时的初始化操作 ===
         let config = self.config.read().await;
         let server_config = &config.server_config;
 
         let tenant_manager = self.tenant_manager.read().await;
         let work_dir = if let Some(path) = tenant_manager.current_tenant_path() {
-            // Server work_dir is {tenant}/server/
             let server_dir = path.join("server");
             tracing::debug!(path = %server_dir.display(), "Using server directory");
             server_dir.to_string_lossy().to_string()
@@ -87,6 +172,7 @@ impl ClientBridge {
 
         let auth_url = config.auth_url.clone();
         let cloud_url = server_config.cloud_url.clone();
+        let http_port = server_config.http_port;
 
         let edge_config = edge_server::Config::builder()
             .work_dir(work_dir)
@@ -95,6 +181,8 @@ impl ClientBridge {
             .auth_server_url(auth_url)
             .cloud_url(cloud_url)
             .build();
+
+        drop(config);
 
         let server_state = edge_server::ServerState::initialize(&edge_config)
             .await
@@ -138,7 +226,6 @@ impl ClientBridge {
                         result = server_rx.recv() => {
                             match result {
                                 Ok(msg) => {
-                                    // Route messages to appropriate channels
                                     use crate::events::MessageRoute;
                                     match MessageRoute::from_bus_message(msg) {
                                         MessageRoute::OrderSync(order_sync) => {
@@ -216,16 +303,28 @@ impl ClientBridge {
             LocalClientState::Connected(connected_client)
         };
 
-        *mode_guard = ClientMode::Server {
-            server_state: state_arc,
-            client: Some(client_state),
-            server_task,
-            listener_task,
-            shutdown_token,
-        };
+        // === 阶段 3: 短暂写锁 — 竞态检查 + 原子写入 ===
+        {
+            let mut mode_guard = self.mode.write().await;
 
-        let http_port = server_config.http_port;
-        drop(config);
+            // 竞态检查：如果阶段 2 期间有人把模式改了，abort 新启动的 server
+            if !matches!(&*mode_guard, ClientMode::Disconnected) {
+                tracing::warn!("Mode changed during Server setup, aborting new server");
+                shutdown_token.cancel();
+                return Err(BridgeError::Server(
+                    "Mode changed during server setup".to_string(),
+                ));
+            }
+
+            *mode_guard = ClientMode::Server {
+                server_state: state_arc,
+                client: Some(client_state),
+                server_task,
+                listener_task,
+                shutdown_token,
+            };
+        }
+
         {
             let mut config = self.config.write().await;
             config.current_mode = Some(ModeType::Server);
@@ -242,54 +341,40 @@ impl ClientBridge {
         edge_url: &str,
         message_addr: &str,
     ) -> Result<(), BridgeError> {
-        let mut mode_guard = self.mode.write().await;
+        let _lifecycle = self.lifecycle_lock.lock().await;
 
-        // 如果在其他模式，先停止
-        if let ClientMode::Server { shutdown_token, .. } = &*mode_guard {
-            tracing::info!("Stopping Server mode to switch to Client mode...");
-            shutdown_token.cancel();
-            let old_mode = std::mem::replace(&mut *mode_guard, ClientMode::Disconnected);
-            drop(mode_guard);
+        // === 阶段 1: 短暂写锁 — 关闭旧模式 ===
+        {
+            let mut mode_guard = self.mode.write().await;
 
-            if let ClientMode::Server {
-                server_task,
-                listener_task,
-                ..
-            } = old_mode
-            {
-                let server_abort = server_task.abort_handle();
-                let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
-
-                match tokio::time::timeout(std::time::Duration::from_secs(10), async {
-                    let server_result = server_task.await;
-                    if let Some(lt) = listener_task {
-                        let _ = lt.await;
-                    }
-                    server_result
-                })
-                .await
-                {
-                    Ok(Ok(())) => tracing::debug!("Server tasks completed gracefully"),
-                    Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
-                    Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
-                    Err(_) => {
-                        tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
-                        server_abort.abort();
-                        if let Some(la) = listener_abort {
-                            la.abort();
-                        }
-                    }
+            let old_mode = match &*mode_guard {
+                ClientMode::Server { shutdown_token, .. } => {
+                    tracing::info!("Stopping Server mode to switch to Client mode...");
+                    shutdown_token.cancel();
+                    Some(std::mem::replace(
+                        &mut *mode_guard,
+                        ClientMode::Disconnected,
+                    ))
                 }
+                ClientMode::Client { shutdown_token, .. } => {
+                    tracing::info!("Already in Client mode, stopping first...");
+                    shutdown_token.cancel();
+                    Some(std::mem::replace(
+                        &mut *mode_guard,
+                        ClientMode::Disconnected,
+                    ))
+                }
+                ClientMode::Disconnected => None,
+            };
+
+            drop(mode_guard);
+
+            if let Some(old) = old_mode {
+                await_mode_shutdown(old).await;
             }
-        } else if let ClientMode::Client { shutdown_token, .. } = &*mode_guard {
-            tracing::info!("Already in Client mode, stopping first...");
-            shutdown_token.cancel();
-            *mode_guard = ClientMode::Disconnected;
-            drop(mode_guard);
-        } else {
-            drop(mode_guard);
         }
 
+        // === 阶段 2: 无锁 — 建立连接 ===
         let (certs_dir, auth_url) = {
             let tenant_manager = self.tenant_manager.read().await;
             let paths = tenant_manager
@@ -310,15 +395,11 @@ impl ClientBridge {
             (certs_dir, auth_url)
         };
 
-        // CrabClient 使用 cert_path + client_name 构建 CertManager
-        // 我们传 certs_dir 作为 cert_path，空字符串作为 client_name
-        // 这样 CertManager 会在 {tenant}/certs/ 查找证书
-        // 握手时 CrabClient 会自动从证书中读取正确的 name
         let client = CrabClient::remote()
             .auth_server(&auth_url)
             .edge_server(edge_url)
             .cert_path(&certs_dir)
-            .client_name("") // 空字符串使 CertManager 直接使用 certs_dir
+            .client_name("")
             .build()?;
 
         let connected_client = client.connect_with_credentials(message_addr).await?;
@@ -326,6 +407,7 @@ impl ClientBridge {
         tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client mode connected");
 
         let client_shutdown_token = tokio_util::sync::CancellationToken::new();
+        let mut listener_tasks = Vec::new();
 
         // 启动消息广播订阅 (转发给前端)
         if let Some(handle) = &self.app_handle {
@@ -335,7 +417,7 @@ impl ClientBridge {
                 let handle_clone = handle.clone();
                 let token = client_shutdown_token.clone();
 
-                tokio::spawn(async move {
+                listener_tasks.push(tokio::spawn(async move {
                     loop {
                         tokio::select! {
                             _ = token.cancelled() => {
@@ -373,19 +455,17 @@ impl ClientBridge {
                             }
                         }
                     }
-                });
+                }));
 
                 tracing::debug!("Client message listener started");
 
-                // 重连事件监听 (心跳失败或网络断开时触发)
+                // 重连事件监听
                 let mut reconnect_rx = mc.subscribe_reconnect();
                 let handle_reconnect = handle.clone();
                 let token = client_shutdown_token.clone();
-
-                // 获取 bridge 自身引用（用于 ReconnectFailed 时触发重建）
                 let bridge_for_rebuild = Arc::clone(self);
 
-                tokio::spawn(async move {
+                listener_tasks.push(tokio::spawn(async move {
                     loop {
                         tokio::select! {
                             _ = token.cancelled() => {
@@ -415,14 +495,12 @@ impl ClientBridge {
                                                     tracing::warn!("Failed to emit connection state: {}", e);
                                                 }
 
-                                                // 在独立 task 中执行重建
                                                 let bridge_arc = Arc::clone(&bridge_for_rebuild);
                                                 let rebuild_handle = handle_reconnect.clone();
                                                 tauri::async_runtime::spawn(async move {
                                                     do_rebuild_connection(bridge_arc, rebuild_handle).await;
                                                 });
 
-                                                // 退出此监听器（start_client_mode 会创建新的监听器）
                                                 break;
                                             }
                                         }
@@ -438,16 +516,16 @@ impl ClientBridge {
                             }
                         }
                     }
-                });
+                }));
 
                 tracing::debug!("Client reconnection listener started");
 
-                // 心跳状态监听 (每次心跳成功/失败都会触发)
+                // 心跳状态监听
                 let mut heartbeat_rx = mc.subscribe_heartbeat();
                 let handle_heartbeat = handle.clone();
                 let token = client_shutdown_token.clone();
 
-                tokio::spawn(async move {
+                listener_tasks.push(tokio::spawn(async move {
                     loop {
                         tokio::select! {
                             _ = token.cancelled() => {
@@ -472,7 +550,7 @@ impl ClientBridge {
                             }
                         }
                     }
-                });
+                }));
 
                 tracing::debug!("Client heartbeat listener started");
             }
@@ -508,6 +586,7 @@ impl ClientBridge {
             RemoteClientState::Connected(connected_client)
         };
 
+        // === 阶段 3: 短暂写锁 — 竞态检查 + 原子写入 ===
         {
             let mut mode_guard = self.mode.write().await;
             if !matches!(&*mode_guard, ClientMode::Disconnected) {
@@ -522,6 +601,7 @@ impl ClientBridge {
                 edge_url: edge_url.to_string(),
                 message_addr: message_addr.to_string(),
                 shutdown_token: client_shutdown_token,
+                listener_tasks,
             };
         }
 
@@ -540,62 +620,34 @@ impl ClientBridge {
 
     /// 停止当前模式（优雅关闭）
     ///
-    /// Server 模式: cancel shutdown_token → 等待 server_task + listener_task（10s 超时）
-    /// Client 模式: cancel shutdown_token → 监听器自行退出
+    /// Server 模式: cancel shutdown_token → await_mode_shutdown（10s 超时）
+    /// Client 模式: cancel shutdown_token → await_mode_shutdown（5s 超时）
     pub async fn stop(&self) -> Result<(), BridgeError> {
-        let mut mode_guard = self.mode.write().await;
+        let _lifecycle = self.lifecycle_lock.lock().await;
 
-        // 1. 发送 graceful shutdown 信号
-        match &*mode_guard {
-            ClientMode::Server { shutdown_token, .. } => {
-                shutdown_token.cancel();
-                tracing::info!("Server shutdown signal sent, waiting for tasks to stop...");
-            }
-            ClientMode::Client { shutdown_token, .. } => {
-                shutdown_token.cancel();
-                tracing::info!("Client shutdown signal sent");
-            }
-            ClientMode::Disconnected => {}
-        }
+        // 1. 短暂写锁：发送 shutdown 信号 + 取出 mode
+        let old_mode = {
+            let mut mode_guard = self.mode.write().await;
 
-        // 2. 取出 mode（move ownership of server_task 才能 await）
-        let old_mode = std::mem::replace(&mut *mode_guard, ClientMode::Disconnected);
-        drop(mode_guard);
-
-        // 3. 等待 server_task + listener_task 完成（10s 超时保底）
-        if let ClientMode::Server {
-            server_task,
-            listener_task,
-            ..
-        } = old_mode
-        {
-            let server_abort = server_task.abort_handle();
-            let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
-
-            match tokio::time::timeout(std::time::Duration::from_secs(10), async {
-                // 并行等待 server_task 和 listener_task
-                let server_result = server_task.await;
-                if let Some(lt) = listener_task {
-                    let _ = lt.await;
+            match &*mode_guard {
+                ClientMode::Server { shutdown_token, .. } => {
+                    shutdown_token.cancel();
+                    tracing::info!("Server shutdown signal sent, waiting for tasks to stop...");
                 }
-                server_result
-            })
-            .await
-            {
-                Ok(Ok(())) => tracing::debug!("Server tasks completed gracefully"),
-                Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
-                Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
-                Err(_) => {
-                    tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
-                    server_abort.abort();
-                    if let Some(la) = listener_abort {
-                        la.abort();
-                    }
+                ClientMode::Client { shutdown_token, .. } => {
+                    shutdown_token.cancel();
+                    tracing::info!("Client shutdown signal sent");
                 }
+                ClientMode::Disconnected => {}
             }
-        }
 
-        // 4. 更新配置
+            std::mem::replace(&mut *mode_guard, ClientMode::Disconnected)
+        };
+
+        // 2. 无锁等待 task 完成
+        await_mode_shutdown(old_mode).await;
+
+        // 3. 更新配置
         {
             let mut config = self.config.write().await;
             config.current_mode = None;
@@ -610,9 +662,6 @@ impl ClientBridge {
     /// 从当前 `ClientMode::Client` 读取连接参数，销毁旧 client 并重新连接。
     ///
     /// 仅在 Client 模式下有效，复用 `start_client_mode` 的逻辑。
-    /// 返回 boxed future 显式标注 `Send`，
-    /// 打破 start_client_mode → spawn(do_rebuild_connection) → rebuild_client_connection → start_client_mode
-    /// 的递归 opaque type 循环。
     pub fn rebuild_client_connection(
         self: &Arc<Self>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), BridgeError>> + Send + '_>>
@@ -642,6 +691,8 @@ impl ClientBridge {
 
     /// 退出当前租户：清除 session → 停止服务器 → 清除当前租户选择（保留文件）
     pub async fn exit_tenant(&self) -> Result<(), BridgeError> {
+        let _lifecycle = self.lifecycle_lock.lock().await;
+
         let tenant_id = {
             let tm = self.tenant_manager.read().await;
             tm.current_tenant_id().map(|s| s.to_string())
@@ -658,8 +709,21 @@ impl ClientBridge {
             let _ = tm.clear_current_session();
         }
 
-        // 1. 停止服务器模式（切换到 Disconnected）
-        self.stop().await?;
+        // 1. 停止当前模式（内联 stop 逻辑，因为 lifecycle_lock 已持有）
+        {
+            let old_mode = {
+                let mut mode_guard = self.mode.write().await;
+                match &*mode_guard {
+                    ClientMode::Server { shutdown_token, .. }
+                    | ClientMode::Client { shutdown_token, .. } => {
+                        shutdown_token.cancel();
+                    }
+                    ClientMode::Disconnected => {}
+                }
+                std::mem::replace(&mut *mode_guard, ClientMode::Disconnected)
+            };
+            await_mode_shutdown(old_mode).await;
+        }
 
         // 2. 清除当前租户选择（不删除文件）
         {
@@ -667,9 +731,10 @@ impl ClientBridge {
             tm.clear_current_tenant();
         }
 
-        // 3. 清除配置中的当前租户
+        // 3. 清除配置（mode + tenant 一次性保存）
         {
             let mut config = self.config.write().await;
+            config.current_mode = None;
             config.current_tenant = None;
             config.save(&self.config_path)?;
         }
@@ -683,14 +748,14 @@ impl ClientBridge {
 // 独立重建函数（在 tokio::spawn 中使用，避免 Send 问题）
 // ============================================================================
 
-/// Client 模式连接重建（限次 + 指数退避）。
+/// Client 模式连接重建（限次 + 指数退避 + 取消感知）。
 ///
 /// 当 `NetworkMessageClient` 的 `reconnect_loop` 耗尽所有重连尝试后，
 /// bridge 层会调用此函数进行更高层级的重建：销毁旧 client，重新执行
 /// `start_client_mode` 建立全新连接。
 ///
 /// - 最多 5 次重建，每次间隔指数退避 (5s → 10s → 20s → 40s → 80s)
-/// - 每次重建内部 CrabClient 会持续网络重连
+/// - 每次重建前检查是否仍是 Client 模式（取消感知）
 /// - 全部失败后切换到 `ClientMode::Disconnected`，通知前端
 pub(super) async fn do_rebuild_connection(bridge: Arc<ClientBridge>, app_handle: tauri::AppHandle) {
     const MAX_REBUILDS: u32 = 5;
@@ -705,7 +770,38 @@ pub(super) async fn do_rebuild_connection(bridge: Arc<ClientBridge>, app_handle:
             "Bridge rebuild attempt"
         );
 
-        tokio::time::sleep(delay).await;
+        // 每次迭代重新读取 shutdown_token（rebuild 成功后 token 会更新）
+        let cancel_token = {
+            let guard = bridge.mode.read().await;
+            match &*guard {
+                ClientMode::Client { shutdown_token, .. } => Some(shutdown_token.clone()),
+                _ => None,
+            }
+        };
+
+        // 带取消感知的 sleep
+        if let Some(ref token) = cancel_token {
+            tokio::select! {
+                _ = tokio::time::sleep(delay) => {}
+                _ = token.cancelled() => {
+                    tracing::info!("Bridge rebuild cancelled during sleep");
+                    return;
+                }
+            }
+        } else {
+            // 不再是 Client 模式，停止 rebuild
+            tracing::info!("No longer in Client mode, stopping rebuild");
+            return;
+        }
+
+        // 每次重试前再次检查是否仍是 Client 模式
+        {
+            let guard = bridge.mode.read().await;
+            if !matches!(&*guard, ClientMode::Client { .. }) {
+                tracing::info!("No longer in Client mode, stopping rebuild");
+                return;
+            }
+        }
 
         let result = bridge.rebuild_client_connection().await;
 
@@ -722,17 +818,25 @@ pub(super) async fn do_rebuild_connection(bridge: Arc<ClientBridge>, app_handle:
         delay *= 2;
     }
 
-    // 全部失败：切换到 Disconnected
+    // 全部失败：检查模式后切换到 Disconnected
     tracing::error!(
         MAX_REBUILDS,
         "All bridge rebuild attempts exhausted, switching to Disconnected"
     );
     {
-        let mut guard = bridge.mode.write().await;
-        if let ClientMode::Client { shutdown_token, .. } = &*guard {
-            shutdown_token.cancel();
-        }
-        *guard = ClientMode::Disconnected;
+        let old_mode = {
+            let mut guard = bridge.mode.write().await;
+            if matches!(&*guard, ClientMode::Client { .. }) {
+                if let ClientMode::Client { shutdown_token, .. } = &*guard {
+                    shutdown_token.cancel();
+                }
+                std::mem::replace(&mut *guard, ClientMode::Disconnected)
+            } else {
+                // 已经不是 Client 模式，不覆盖
+                ClientMode::Disconnected
+            }
+        };
+        await_mode_shutdown(old_mode).await;
     }
 
     let _ = app_handle.emit("connection-state-changed", false);

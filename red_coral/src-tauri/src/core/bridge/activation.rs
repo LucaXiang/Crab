@@ -4,17 +4,46 @@ use super::*;
 
 impl ClientBridge {
     /// 切换当前租户并保存配置
-    pub async fn switch_tenant(&self, tenant_id: &str) -> Result<(), BridgeError> {
-        // Check if we need to restart server
-        let is_server_mode = {
+    ///
+    /// Server 和 Client 模式都会先 stop，切换后重启对应模式
+    pub async fn switch_tenant(self: &Arc<Self>, tenant_id: &str) -> Result<(), BridgeError> {
+        let _lifecycle = self.lifecycle_lock.lock().await;
+
+        // 检查当前模式，决定切换后是否重启
+        let current_mode_type = {
             let mode = self.mode.read().await;
-            matches!(*mode, ClientMode::Server { .. })
+            match &*mode {
+                ClientMode::Server { .. } => Some(ModeType::Server),
+                ClientMode::Client { .. } => Some(ModeType::Client),
+                ClientMode::Disconnected => None,
+            }
         };
 
-        // If server mode, stop it first to release resources/locks
-        if is_server_mode {
-            tracing::info!("Stopping server to switch tenant...");
-            self.stop().await?;
+        let client_config_for_restart = if current_mode_type == Some(ModeType::Client) {
+            self.config.read().await.client_config.clone()
+        } else {
+            None
+        };
+
+        // 如果在 Server 或 Client 模式，先停止（内联 stop 逻辑，lifecycle_lock 已持有）
+        if current_mode_type.is_some() {
+            tracing::info!("Stopping current mode to switch tenant...");
+            let old_mode = {
+                let mut mode_guard = self.mode.write().await;
+                match &*mode_guard {
+                    ClientMode::Server { shutdown_token, .. }
+                    | ClientMode::Client { shutdown_token, .. } => {
+                        shutdown_token.cancel();
+                    }
+                    ClientMode::Disconnected => {}
+                }
+                std::mem::replace(&mut *mode_guard, ClientMode::Disconnected)
+            };
+            super::lifecycle::await_mode_shutdown(old_mode).await;
+
+            let mut config = self.config.write().await;
+            config.current_mode = None;
+            config.save(&self.config_path)?;
         }
 
         // 1. 切换内存状态
@@ -30,10 +59,26 @@ impl ClientBridge {
             config.save(&self.config_path)?;
         }
 
-        // If it was server mode, restart it with new tenant data
-        if is_server_mode {
-            tracing::info!("Restarting server with new tenant...");
-            self.start_server_mode().await?;
+        // 3. 重启对应模式（释放 lifecycle_lock 前，因为 start 方法也会获取）
+        drop(_lifecycle);
+
+        match current_mode_type {
+            Some(ModeType::Server) => {
+                tracing::info!("Restarting server with new tenant...");
+                self.start_server_mode().await?;
+            }
+            Some(ModeType::Client) => {
+                if let Some(cfg) = client_config_for_restart {
+                    tracing::info!("Restarting client with new tenant...");
+                    self.start_client_mode(&cfg.edge_url, &cfg.message_addr)
+                        .await?;
+                } else {
+                    tracing::warn!(
+                        "Client mode was active but no client_config found, staying disconnected"
+                    );
+                }
+            }
+            None => {}
         }
 
         tracing::info!(tenant_id = %tenant_id, "Switched tenant and saved config");
@@ -175,7 +220,10 @@ impl ClientBridge {
     /// 注销当前模式 (释放配额 + 删除本地证书)
     ///
     /// 内部自动通过 refresh_token 获取 JWT，无需前端传入 token。
+    /// 远端注销成功后，stop() 和 delete_certs() 失败只 warn 不 return Err（best-effort）。
     pub async fn deactivate_current_mode(&self) -> Result<(), BridgeError> {
+        let _lifecycle = self.lifecycle_lock.lock().await;
+
         let token = self.get_fresh_token().await?;
         let auth_url = self.get_auth_url().await;
 
@@ -204,20 +252,36 @@ impl ClientBridge {
             }
         }
 
-        // 2. 停止当前模式
-        self.stop().await?;
+        // 2. 停止当前模式 (best-effort: 远端已成功，本地失败只 warn)
+        {
+            let old_mode = {
+                let mut mode_guard = self.mode.write().await;
+                match &*mode_guard {
+                    ClientMode::Server { shutdown_token, .. }
+                    | ClientMode::Client { shutdown_token, .. } => {
+                        shutdown_token.cancel();
+                    }
+                    ClientMode::Disconnected => {}
+                }
+                std::mem::replace(&mut *mode_guard, ClientMode::Disconnected)
+            };
+            super::lifecycle::await_mode_shutdown(old_mode).await;
+        }
 
-        // 3. 删除本地证书
+        // 3. 删除本地证书 (best-effort)
         {
             let tm = self.tenant_manager.read().await;
-            match current_mode {
-                Some(ModeType::Server) => tm.delete_server_certs()?,
-                Some(ModeType::Client) => tm.delete_client_certs()?,
-                None => unreachable!(),
+            let cert_result = match current_mode {
+                Some(ModeType::Server) => tm.delete_server_certs(),
+                Some(ModeType::Client) => tm.delete_client_certs(),
+                None => Ok(()),
+            };
+            if let Err(e) = cert_result {
+                tracing::warn!("Failed to delete certificates (best-effort): {}", e);
             }
         }
 
-        // 4. 清除配置中的 entity_id 和模式
+        // 4. 清除配置中的 entity_id 和模式（保留 ? — 配置保存失败是真正的错误）
         {
             let mut config = self.config.write().await;
             config.active_entity_id = None;

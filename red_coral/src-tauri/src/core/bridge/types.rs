@@ -150,6 +150,7 @@ pub(crate) enum ClientMode {
         edge_url: String,
         message_addr: String,
         shutdown_token: CancellationToken,
+        listener_tasks: Vec<tokio::task::JoinHandle<()>>,
     },
     /// 未连接状态 (内部运行时状态)
     Disconnected,

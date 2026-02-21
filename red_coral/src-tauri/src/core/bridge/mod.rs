@@ -68,6 +68,8 @@ pub struct ClientBridge {
     app_handle: Option<tauri::AppHandle>,
     /// 后端初始化状态 (可重置，支持 retry)
     init_state: Mutex<InitState>,
+    /// Lifecycle 操作互斥锁 (防止并发 start/stop 竞态)
+    lifecycle_lock: tokio::sync::Mutex<()>,
 }
 
 impl ClientBridge {
@@ -106,6 +108,7 @@ impl ClientBridge {
             config_path,
             app_handle,
             init_state: Mutex::new(InitState::Pending),
+            lifecycle_lock: tokio::sync::Mutex::new(()),
         })
     }
 
