@@ -115,6 +115,55 @@ pub async fn check_update(
     .into_response()
 }
 
+/// GET /api/download/latest
+///
+/// Reads latest.json from S3 and redirects to the Windows installer URL.
+/// Used by the portal download button.
+pub async fn download_latest(State(state): State<AppState>) -> impl IntoResponse {
+    let manifest = match state
+        .s3
+        .get_object()
+        .bucket(&state.update_s3_bucket)
+        .key("updates/latest.json")
+        .send()
+        .await
+    {
+        Ok(output) => {
+            let bytes = match output.body.collect().await {
+                Ok(b) => b.to_vec(),
+                Err(e) => {
+                    tracing::error!("Failed to read S3 body: {e}");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            };
+            match serde_json::from_slice::<UpdateManifest>(&bytes) {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::error!("Failed to parse update manifest: {e}");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("No update manifest in S3: {e}");
+            return StatusCode::NOT_FOUND.into_response();
+        }
+    };
+
+    // Build the release download URL (not the updater URL)
+    let version = &manifest.version;
+    let download_url = format!(
+        "{}/releases/v{}/redcoral-pos_v{}_x64-setup.exe",
+        state.update_download_base_url, version, version
+    );
+
+    (
+        StatusCode::FOUND,
+        [(axum::http::header::LOCATION, download_url)],
+    )
+        .into_response()
+}
+
 /// Simple semver comparison: returns true if `latest` > `current`
 fn is_newer(latest: &str, current: &str) -> bool {
     let parse = |v: &str| -> (u32, u32, u32) {

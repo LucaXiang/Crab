@@ -71,22 +71,30 @@ impl RateLimiter {
     }
 }
 
-/// Extract client IP: last entry in X-Forwarded-For (ALB appends real client IP), then peer address.
+/// Extract client IP: X-Real-IP (Caddy sets from remote_host), then X-Forwarded-For last entry, then peer address.
 fn extract_ip(request: &Request) -> String {
-    if let Some(forwarded) = request.headers().get("x-forwarded-for")
-        && let Ok(val) = forwarded.to_str()
+    // Caddy sets X-Real-IP to the direct client IP (not spoofable by client)
+    if let Some(real_ip) = request.headers().get("x-real-ip")
+        && let Ok(ip) = real_ip.to_str()
     {
-        // ALB appends the real client IP as the last entry in X-Forwarded-For.
-        // Taking the first would allow attackers to spoof via: X-Forwarded-For: fake_ip
-        if let Some(last) = val.rsplit(',').next() {
-            let ip = last.trim();
-            if !ip.is_empty() {
-                return ip.to_owned();
-            }
+        let ip = ip.trim();
+        if !ip.is_empty() {
+            return ip.to_owned();
         }
     }
 
-    // Fallback: peer address from extensions (ConnectInfo)
+    // Fallback: last entry in X-Forwarded-For
+    if let Some(forwarded) = request.headers().get("x-forwarded-for")
+        && let Ok(val) = forwarded.to_str()
+        && let Some(last) = val.rsplit(',').next()
+    {
+        let ip = last.trim();
+        if !ip.is_empty() {
+            return ip.to_owned();
+        }
+    }
+
+    // Fallback: peer address from ConnectInfo
     request
         .extensions()
         .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()

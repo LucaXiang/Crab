@@ -44,10 +44,12 @@ pub fn public_router(state: AppState) -> Router {
     let webhook = Router::new().route("/stripe/webhook", post(stripe_webhook::handle_webhook));
 
     // App update check (public, no auth)
-    let app_update = Router::new().route(
-        "/api/update/{target}/{arch}/{current_version}",
-        get(update::check_update),
-    );
+    let app_update = Router::new()
+        .route(
+            "/api/update/{target}/{arch}/{current_version}",
+            get(update::check_update),
+        )
+        .route("/api/download/latest", get(update::download_latest));
 
     // Tenant management API (JWT authenticated)
     let tenant_api = Router::new()
