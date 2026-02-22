@@ -1,11 +1,16 @@
 <script lang="ts">
-	import { Globe, ArrowRight } from 'lucide-svelte';
+	import { Globe, ArrowRight, Menu, X } from 'lucide-svelte';
 	import { t, locale, setLang, LANG_LABELS, SUPPORTED_LANGS, type Lang } from '$lib/i18n';
 
 	let menuOpen = $state(false);
+	let mobileMenuOpen = $state(false);
 
 	function toggleMenu() {
 		menuOpen = !menuOpen;
+	}
+
+	function toggleMobileMenu() {
+		mobileMenuOpen = !mobileMenuOpen;
 	}
 
 	function selectLang(lang: Lang) {
@@ -95,6 +100,56 @@
 				<span>{$t('nav.cta')}</span>
 				<ArrowRight class="w-3.5 h-3.5" />
 			</a>
+
+			<!-- Mobile menu button -->
+			<button
+				class="md:hidden p-2 text-slate-500 hover:text-slate-900 transition-colors"
+				onclick={toggleMobileMenu}
+				aria-label="Toggle menu"
+			>
+				{#if mobileMenuOpen}
+					<X class="w-6 h-6" />
+				{:else}
+					<Menu class="w-6 h-6" />
+				{/if}
+			</button>
 		</div>
 	</div>
+
+	<!-- Mobile menu -->
+	{#if mobileMenuOpen}
+		<div class="md:hidden absolute top-16 left-0 right-0 bg-white border-b border-slate-100 shadow-lg animate-in slide-in-from-top-2 duration-200">
+			<div class="flex flex-col p-4 gap-2">
+				<a
+					href="#features"
+					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					onclick={() => (mobileMenuOpen = false)}
+				>
+					{$t('nav.features')}
+				</a>
+				<a
+					href="#pricing"
+					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					onclick={() => (mobileMenuOpen = false)}
+				>
+					{$t('nav.pricing')}
+				</a>
+				<a
+					href="#faq"
+					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					onclick={() => (mobileMenuOpen = false)}
+				>
+					{$t('nav.faq')}
+				</a>
+				<div class="h-px bg-slate-100 my-1"></div>
+				<a
+					href="/login"
+					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					onclick={() => (mobileMenuOpen = false)}
+				>
+					{$t('nav.login')}
+				</a>
+			</div>
+		</div>
+	{/if}
 </nav>

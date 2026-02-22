@@ -35,18 +35,18 @@
 			<p class="text-slate-500 leading-relaxed">{$t('features.subtitle')}</p>
 		</div>
 
-		<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-slate-100 rounded-2xl overflow-hidden border border-slate-100">
+		<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-slate-100 rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
 			{#each features as feature}
-				<div class="bg-white p-8 group cursor-default hover:bg-slate-50/80 transition-colors duration-150">
+				<div class="bg-white p-8 group cursor-default hover:bg-slate-50 transition-all duration-300 hover:shadow-lg relative z-0 hover:z-10">
 					<div
-						class="w-10 h-10 rounded-lg bg-coral-50 flex items-center justify-center mb-5 group-hover:bg-coral-100 transition-colors duration-150"
+						class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-6 group-hover:bg-coral-500 group-hover:text-white group-hover:scale-110 transition-all duration-300"
 					>
-						<feature.icon class="w-5 h-5 text-coral-500" />
+						<feature.icon class="w-6 h-6 text-coral-500 group-hover:text-white transition-colors duration-300" />
 					</div>
-					<h3 class="text-[15px] font-heading font-bold text-slate-900 mb-2">
+					<h3 class="text-lg font-heading font-bold text-slate-900 mb-3 group-hover:text-coral-600 transition-colors duration-300">
 						{$t(feature.titleKey)}
 					</h3>
-					<p class="text-sm text-slate-500 leading-relaxed">{$t(feature.descKey)}</p>
+					<p class="text-sm text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors duration-300">{$t(feature.descKey)}</p>
 				</div>
 			{/each}
 		</div>

@@ -90,10 +90,10 @@
 			</div>
 
 			<!-- Professional -->
-			<div class="bg-white rounded-2xl p-7 flex flex-col pricing-popular relative">
+			<div class="bg-white rounded-2xl p-7 flex flex-col relative ring-2 ring-coral-500 shadow-2xl shadow-coral-500/10 scale-105 z-10 transform transition-transform duration-300">
 				<div class="absolute -top-3 left-1/2 -translate-x-1/2">
 					<span
-						class="bg-coral-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md shadow-coral-500/20"
+						class="bg-coral-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md shadow-coral-500/20 tracking-wide uppercase"
 						>{$t('pricing.popular')}</span
 					>
 				</div>
