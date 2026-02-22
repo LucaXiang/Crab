@@ -14,6 +14,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{DiningTable, Zone, ZoneCreate, ZoneUpdate};
 
 const RESOURCE: &str = "zone";
@@ -124,7 +125,13 @@ pub async fn delete(
         .flatten()
         .map(|z| z.name.clone())
         .unwrap_or_default();
-    let result = zone::delete(&state.pool, id).await?;
+    let result = zone::delete(&state.pool, id).await.map_err(|e| {
+        if e.to_string().contains("active tables") {
+            AppError::with_message(ErrorCode::ZoneHasTables, e.to_string())
+        } else {
+            AppError::from(e)
+        }
+    })?;
 
     if result {
         let id_str = id.to_string();

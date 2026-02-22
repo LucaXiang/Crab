@@ -14,6 +14,7 @@ use crate::db::repository::attribute;
 use crate::utils::types::{BatchUpdateResponse, SortOrderUpdate};
 use crate::utils::validation::{MAX_NAME_LEN, validate_optional_text, validate_required_text};
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
 const RESOURCE: &str = "category";
@@ -129,7 +130,18 @@ pub async fn delete(
         .get_category(id)
         .map(|c| c.name.clone())
         .unwrap_or_default();
-    state.catalog_service.delete_category(id).await?;
+    state
+        .catalog_service
+        .delete_category(id)
+        .await
+        .map_err(|e| {
+            // Map generic Validation error to specific CategoryHasProducts error code
+            if e.to_string().contains("active products") {
+                AppError::with_message(ErrorCode::CategoryHasProducts, e.to_string())
+            } else {
+                AppError::from(e)
+            }
+        })?;
 
     audit_log!(
         state.audit_service,
