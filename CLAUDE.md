@@ -144,6 +144,33 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 - 提交前必须通过零警告零错误: `cargo clippy --workspace` + `cd red_coral && npx tsc --noEmit`
 - 只 stage 当前任务范围内的文件，不包含无关 crate/目录的变更
 
+## 版本管理
+
+**统一版本号**: 所有组件共享同一个语义化版本号 (SemVer)。
+
+### 版本定义位置 (必须同步)
+
+| 文件 | 字段 | 说明 |
+|------|------|------|
+| `Cargo.toml` (workspace root) | `workspace.package.version` | Rust crates 唯一版本源 |
+| `red_coral/src-tauri/Cargo.toml` | `version` | Tauri crate (不继承 workspace，手动同步) |
+| `red_coral/src-tauri/tauri.conf.json` | `version` | Tauri 安装包 + 自动更新版本 |
+| `red_coral/package.json` | `version` | 前端 npm 版本 |
+
+### 发版流程
+
+1. 修改上述 4 个文件的版本号 (必须完全一致)
+2. 提交: `chore: bump version to X.Y.Z`
+3. 打 tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+4. CI 自动构建 + 上传 S3 + 生成更新清单
+
+### 版本规则
+
+- 所有组件版本 **必须一致**，禁止组件间版本分裂
+- `crab-portal` 和 `crab-console` 是独立 Web 项目，不参与版本同步
+- Git tag 格式: `vX.Y.Z` (带 `v` 前缀)
+- 运行时版本通过 `env!("CARGO_PKG_VERSION")` 编译期嵌入，无需手动维护
+
 ## 执行风格
 
 - 设计意图明确时直接实现，不要过度提问或扩大范围
