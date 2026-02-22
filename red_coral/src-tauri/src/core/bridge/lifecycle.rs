@@ -16,7 +16,7 @@ pub(crate) async fn await_mode_shutdown(old_mode: ClientMode) {
             let server_abort = server_task.abort_handle();
             let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
 
-            match tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            match tokio::time::timeout(std::time::Duration::from_secs(3), async {
                 let server_result = server_task.await;
                 if let Some(lt) = listener_task {
                     let _ = lt.await;
@@ -29,7 +29,7 @@ pub(crate) async fn await_mode_shutdown(old_mode: ClientMode) {
                 Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
                 Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
                 Err(_) => {
-                    tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
+                    tracing::warn!("Server shutdown timed out (3s), aborting remaining tasks");
                     server_abort.abort();
                     if let Some(la) = listener_abort {
                         la.abort();
@@ -620,7 +620,7 @@ impl ClientBridge {
 
     /// 停止当前模式（优雅关闭）
     ///
-    /// Server 模式: cancel shutdown_token → await_mode_shutdown（10s 超时）
+    /// Server 模式: cancel shutdown_token → await_mode_shutdown（3s 超时）
     /// Client 模式: cancel shutdown_token → await_mode_shutdown（5s 超时）
     pub async fn stop(&self) -> Result<(), BridgeError> {
         let _lifecycle = self.lifecycle_lock.lock().await;
