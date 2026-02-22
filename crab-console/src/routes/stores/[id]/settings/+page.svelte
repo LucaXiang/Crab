@@ -13,6 +13,7 @@
 	let phone = $state('');
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	let success = $state<string | null>(null);
 	let copied = $state('');
 
 	function copyToClipboard(text: string) {
@@ -47,12 +48,16 @@
 		if (!name.trim()) return;
 		loading = true;
 		error = null;
+		success = null;
 		try {
 			const token = localStorage.getItem('token');
 			if (!token) throw new Error('No token');
 			await updateStore(token, storeId, name, address, phone);
 			await loadStore(); // Reload to confirm
-			// No alert, just UI feedback
+			success = 'Store settings updated successfully';
+			setTimeout(() => {
+				success = null;
+			}, 3000);
 		} catch (e: any) {
 			error = e.message;
 		} finally {
@@ -146,9 +151,20 @@
 				<div>
 					<p class="text-sm font-medium text-slate-700 mb-1"> Device ID </p>
 					<div
-						class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-mono text-sm break-all"
+						class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
 					>
-						{store.device_id}
+						<code class="text-sm text-slate-500 font-mono break-all">{store.device_id}</code>
+						<button
+							onclick={() => copyToClipboard(store?.device_id || '')}
+							class="text-slate-400 hover:text-slate-600 transition-colors ml-2 shrink-0"
+							aria-label="Copy Device ID"
+						>
+							{#if copied === store.device_id}
+								<Check class="w-4 h-4 text-green-500" />
+							{:else}
+								<Copy class="w-4 h-4" />
+							{/if}
+						</button>
 					</div>
 				</div>
 			</div>
@@ -179,6 +195,11 @@
 			{#if error}
 				<div class="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
 					{error}
+				</div>
+			{/if}
+			{#if success}
+				<div class="mt-4 p-3 bg-green-50 text-green-600 rounded-lg text-sm">
+					{success}
 				</div>
 			{/if}
 		</div>

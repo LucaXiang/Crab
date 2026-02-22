@@ -90,7 +90,20 @@ auth.redcoral.app {
 		}
 		format json
 	}
-	reverse_proxy crab-cloud:8080 {
+
+	# 仅允许 POS 设备使用的认证/PKI 路由
+	@allowed {
+		path /health /pki/root_ca
+		path /api/tenant/verify /api/tenant/subscription /api/tenant/refresh
+		path /api/server/activate /api/server/deactivate
+		path /api/client/activate /api/client/deactivate
+		path /api/binding/refresh /api/p12/upload
+	}
+
+	reverse_proxy @allowed crab-cloud:8080 {
 		header_up X-Real-IP {remote_host}
 	}
+
+	# 拒绝所有其他路由
+	respond 404
 }

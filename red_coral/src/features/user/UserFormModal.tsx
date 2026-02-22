@@ -36,7 +36,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     role_id: 0 as number,
     isActive: true,
   });
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         role_id: editingUser.role_id,
         isActive: editingUser.is_active,
       });
+      setConfirmPassword('');
     } else if (roles.length > 0) {
       const defaultRole = roles.find(r => r.name !== 'admin') || roles[0];
       setFormData({
@@ -74,6 +77,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         role_id: defaultRole.id,
         isActive: true,
       });
+      setConfirmPassword('');
     }
   }, [editingUser, roles]); // Added roles dependency so it updates when roles are loaded
 
@@ -85,9 +89,19 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       toast.error(t('settings.user.form.username_required'));
       return;
     }
-    if (!editingUser && !formData.password) {
-      toast.error(t('settings.user.form.password_required'));
-      return;
+    if (!editingUser) {
+      if (!formData.password) {
+        toast.error(t('settings.user.form.password_required'));
+        return;
+      }
+      if (formData.password.length < 6) {
+        toast.error(t('settings.user.form.password_too_short'));
+        return;
+      }
+      if (formData.password !== confirmPassword) {
+        toast.error(t('settings.user.form.password_mismatch'));
+        return;
+      }
     }
     if (!formData.displayName.trim()) {
       toast.error(t('settings.user.form.display_name_required'));
@@ -173,29 +187,55 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             </FormField>
 
             {!editingUser && (
-              <FormField label={t('settings.user.form.password')} required>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className={`${inputClass} pr-10`}
-                    placeholder={t('settings.user.form.password_placeholder')}
-                    maxLength={MAX_PASSWORD_LEN}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOff size={16} className="text-gray-400" />
-                    ) : (
-                      <Eye size={16} className="text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </FormField>
+              <>
+                <FormField label={t('settings.user.form.password')} required>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className={`${inputClass} pr-10`}
+                      placeholder={t('settings.user.form.password_placeholder')}
+                      maxLength={MAX_PASSWORD_LEN}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff size={16} className="text-gray-400" />
+                      ) : (
+                        <Eye size={16} className="text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </FormField>
+
+                <FormField label={t('settings.confirm_password')} required>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={`${inputClass} pr-10`}
+                      placeholder={t('settings.confirm_password_placeholder')}
+                      maxLength={MAX_PASSWORD_LEN}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff size={16} className="text-gray-400" />
+                      ) : (
+                        <Eye size={16} className="text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </FormField>
+              </>
             )}
           </FormSection>
 

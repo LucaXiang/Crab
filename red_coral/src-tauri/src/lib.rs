@@ -180,6 +180,7 @@ pub async fn run() {
             commands::exit_tenant,
             commands::upload_p12,
             commands::get_current_tenant,
+            commands::get_tenant_details,
             commands::check_subscription,
             // Auth commands (ClientBridge-based - unified)
             commands::login_employee,

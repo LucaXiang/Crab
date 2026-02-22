@@ -16,13 +16,14 @@ import {
   Clock,
   Crown,
   UserCheck,
+  Building2,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsCategory, useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 
-type SettingsCategory = 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'MARKETING_GROUPS' | 'MEMBERS' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
+type SettingsCategory = 'TENANT_INFO' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'MARKETING_GROUPS' | 'MEMBERS' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -83,6 +84,15 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto py-4 px-2 custom-scrollbar">
+        {/* 租户信息 */}
+        <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
+          <CategoryItem
+            category="TENANT_INFO"
+            icon={Building2}
+            label={t('settings.tenant_info.title')}
+          />
+        </ProtectedGate>
+
         {/* 店铺信息 & 桌台管理 */}
         <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
           <CategoryItem

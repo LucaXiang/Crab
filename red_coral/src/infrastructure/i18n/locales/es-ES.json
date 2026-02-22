@@ -1689,6 +1689,49 @@
       "confirm_exit_tenant": "¿Salir del establecimiento actual? El servidor se detendrá.",
       "debug_orders": "Depuración pedidos"
     },
+    "tenant_info": {
+      "title": "Información",
+      "description": "Ver estado del establecimiento, suscripción y certificados",
+      "no_data": "Sin datos",
+      "expired": "Expirado",
+      "no_expiry": "Sin vencimiento",
+      "device": {
+        "title": "Dispositivo",
+        "tenant_id": "ID Establecimiento",
+        "mode": "Modo",
+        "device_id": "ID Dispositivo",
+        "entity_id": "ID Entidad",
+        "bound_at": "Fecha vinculación"
+      },
+      "subscription": {
+        "title": "Suscripción",
+        "status": "Estado",
+        "plan": "Plan",
+        "next_billing": "Próximo cobro",
+        "max_stores": "Máx. tiendas",
+        "max_clients": "Máx. clientes",
+        "interval_month": "Mensual",
+        "interval_year": "Anual",
+        "cancel_warning": "La suscripción se cancelará al final del periodo actual"
+      },
+      "p12": {
+        "title": "Certificado P12",
+        "status": "Estado",
+        "uploaded": "Subido",
+        "not_uploaded": "No subido",
+        "subject": "Sujeto",
+        "fingerprint": "Huella",
+        "expires_at": "Vencimiento"
+      },
+      "certificate": {
+        "title": "Certificado dispositivo",
+        "common_name": "Nombre cert.",
+        "expires_at": "Vencimiento",
+        "days_remaining": "Días restantes",
+        "days": "días",
+        "fingerprint": "Huella"
+      }
+    },
     "permissions": {
       "menu_manage": "Gestión carta",
       "tables_manage": "Gestión mesas",

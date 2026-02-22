@@ -127,6 +127,10 @@ pub async fn list_stores(
             name: store.name,
             address: store.address,
             phone: store.phone,
+            nif: store.nif,
+            email: store.email,
+            website: store.website,
+            business_day_cutoff: store.business_day_cutoff,
             device_id: store.device_id,
             last_sync_at: store.last_sync_at,
             registered_at: store.registered_at,
@@ -143,6 +147,10 @@ pub struct UpdateStoreRequest {
     pub name: Option<String>,
     pub address: Option<String>,
     pub phone: Option<String>,
+    pub nif: Option<String>,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub business_day_cutoff: Option<String>,
 }
 
 pub async fn update_store(
@@ -160,6 +168,10 @@ pub async fn update_store(
         payload.name,
         payload.address,
         payload.phone,
+        payload.nif,
+        payload.email,
+        payload.website,
+        payload.business_day_cutoff,
     )
     .await
     .map_err(|e| {

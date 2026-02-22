@@ -210,8 +210,25 @@ async fn handle_subscription_updated(state: &AppState, event: &serde_json::Value
 
     let status = obj["status"].as_str().unwrap_or("active");
 
-    if let Err(e) = db::subscriptions::update_status(&state.pool, sub_id, status).await {
-        tracing::error!(%e, "Failed to update subscription status");
+    // Extract billing fields from subscription object
+    let current_period_end = obj["current_period_end"].as_i64().map(|s| s * 1000); // Stripe sends seconds
+    let cancel_at_period_end = obj["cancel_at_period_end"].as_bool();
+    let billing_interval = obj
+        .get("plan")
+        .and_then(|p| p["interval"].as_str())
+        .map(|s| s.to_string());
+
+    if let Err(e) = db::subscriptions::update_subscription_fields(
+        &state.pool,
+        sub_id,
+        status,
+        current_period_end,
+        cancel_at_period_end,
+        billing_interval.as_deref(),
+    )
+    .await
+    {
+        tracing::error!(%e, "Failed to update subscription");
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
 

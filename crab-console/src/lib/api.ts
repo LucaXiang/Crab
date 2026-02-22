@@ -65,6 +65,8 @@ export interface Subscription {
 	max_edge_servers: number;
 	max_clients: number;
 	current_period_end: number | null;
+	cancel_at_period_end: boolean;
+	billing_interval: string | null;
 	created_at: number;
 }
 
@@ -97,6 +99,10 @@ export interface StoreDetail {
 	name?: string;
 	address?: string;
 	phone?: string;
+	nif?: string;
+	email?: string;
+	website?: string;
+	business_day_cutoff?: string;
 	device_id: string;
 	last_sync_at: number | null;
 	registered_at: number;
@@ -112,9 +118,18 @@ export function updateStore(
 	storeId: number,
 	name?: string,
 	address?: string,
-	phone?: string
+	phone?: string,
+	nif?: string,
+	email?: string,
+	website?: string,
+	business_day_cutoff?: string
 ): Promise<void> {
-	return request('PATCH', `/api/tenant/stores/${storeId}`, { name, address, phone }, token);
+	return request(
+		'PATCH',
+		`/api/tenant/stores/${storeId}`,
+		{ name, address, phone, nif, email, website, business_day_cutoff },
+		token
+	);
 }
 
 // === Orders ===

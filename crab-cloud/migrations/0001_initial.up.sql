@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     max_clients        INT NOT NULL DEFAULT 5,
     features           TEXT[] NOT NULL DEFAULT '{}',
     current_period_end BIGINT,
+    cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
+    billing_interval   TEXT,
     created_at         BIGINT NOT NULL
 );
 
@@ -132,6 +134,12 @@ CREATE TABLE IF NOT EXISTS cloud_edge_servers (
     tenant_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
     name TEXT,
+    address TEXT,
+    phone TEXT,
+    nif TEXT,
+    email TEXT,
+    website TEXT,
+    business_day_cutoff TEXT DEFAULT '06:00',
     last_sync_at BIGINT,
     registered_at BIGINT NOT NULL,
     UNIQUE (entity_id, tenant_id)

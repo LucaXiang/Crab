@@ -161,6 +161,8 @@ pub async fn activate(
         features: sub.features.clone(),
         max_stores: plan.max_stores() as u32,
         max_clients: sub.max_clients as u32,
+        cancel_at_period_end: sub.cancel_at_period_end,
+        billing_interval: sub.billing_interval.clone(),
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,

@@ -1689,6 +1689,49 @@
       "confirm_exit_tenant": "确定退出当前租户？服务器将停止运行，需要重新选择租户。",
       "debug_orders": "订单调试"
     },
+    "tenant_info": {
+      "title": "租户信息",
+      "description": "查看当前租户、订阅和证书状态",
+      "no_data": "暂无数据",
+      "expired": "已过期",
+      "no_expiry": "无期限",
+      "device": {
+        "title": "设备信息",
+        "tenant_id": "租户 ID",
+        "mode": "运行模式",
+        "device_id": "设备 ID",
+        "entity_id": "实体 ID",
+        "bound_at": "绑定时间"
+      },
+      "subscription": {
+        "title": "订阅信息",
+        "status": "订阅状态",
+        "plan": "订阅计划",
+        "next_billing": "下次扣费",
+        "max_stores": "最大门店数",
+        "max_clients": "最大客户端数",
+        "interval_month": "月付",
+        "interval_year": "年付",
+        "cancel_warning": "订阅将在当前周期结束后取消"
+      },
+      "p12": {
+        "title": "P12 电子签名证书",
+        "status": "证书状态",
+        "uploaded": "已上传",
+        "not_uploaded": "未上传",
+        "subject": "证书主体",
+        "fingerprint": "证书指纹",
+        "expires_at": "到期时间"
+      },
+      "certificate": {
+        "title": "设备证书",
+        "common_name": "证书名称",
+        "expires_at": "到期时间",
+        "days_remaining": "剩余天数",
+        "days": "天",
+        "fingerprint": "证书指纹"
+      }
+    },
     "permissions": {
       "menu_manage": "菜单管理",
       "tables_manage": "桌台管理",

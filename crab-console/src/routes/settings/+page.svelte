@@ -30,6 +30,7 @@
 	// Password
 	let currentPassword = $state('');
 	let newPassword = $state('');
+	let confirmPassword = $state('');
 	let pwSaving = $state(false);
 	let pwMsg = $state('');
 	let pwError = $state('');
@@ -84,11 +85,19 @@
 		pwSaving = true;
 		pwMsg = '';
 		pwError = '';
+
+		if (newPassword !== confirmPassword) {
+			pwError = $t('auth.password_mismatch');
+			pwSaving = false;
+			return;
+		}
+
 		try {
 			await changePassword(token, currentPassword, newPassword);
 			pwMsg = $t('settings.password_changed');
 			currentPassword = '';
 			newPassword = '';
+			confirmPassword = '';
 		} catch (err) {
 			pwError = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
@@ -203,6 +212,11 @@
 							<p class="text-xs text-slate-400 mb-0.5">{$t('dash.plan')}</p>
 							<p class="text-sm font-semibold text-slate-900 capitalize">
 								{profile?.subscription?.plan}
+								{#if profile?.subscription?.billing_interval}
+									<span class="text-xs text-slate-400 font-normal ml-1">
+										({profile.subscription.billing_interval === 'month' ? $t('dash.monthly') : $t('dash.yearly')})
+									</span>
+								{/if}
 							</p>
 						</div>
 						{#if profile?.subscription?.current_period_end}
@@ -226,6 +240,13 @@
 							</p>
 						</div>
 					</div>
+
+					{#if profile?.subscription?.cancel_at_period_end}
+						<div class="flex items-center gap-2 p-2.5 mb-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+							<AlertTriangle class="w-3.5 h-3.5 text-yellow-600 shrink-0" />
+							<span class="text-xs text-yellow-700">{$t('dash.cancel_warning')}</span>
+						</div>
+					{/if}
 
 					<button
 						onclick={handleBillingPortal}
@@ -295,6 +316,14 @@
 						type="password"
 						bind:value={newPassword}
 						placeholder={$t('settings.new_password')}
+						required
+						minlength="8"
+						class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-coral-500/20 focus:border-coral-500"
+					/>
+					<input
+						type="password"
+						bind:value={confirmPassword}
+						placeholder={$t('auth.password_confirm')}
 						required
 						minlength="8"
 						class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-coral-500/20 focus:border-coral-500"

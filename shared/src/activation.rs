@@ -302,6 +302,12 @@ pub struct SubscriptionInfo {
     /// 每个 edge-server 允许的最大 Client 数，0 = 无限
     #[serde(default)]
     pub max_clients: u32,
+    /// 是否在当前周期结束后取消
+    #[serde(default)]
+    pub cancel_at_period_end: bool,
+    /// 计费间隔 (month / year)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing_interval: Option<String>,
     /// P12 电子签名证书状态 (由 crab-auth 返回)
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub p12: Option<P12Info>,
@@ -334,6 +340,8 @@ impl SubscriptionInfo {
             features: Vec::new(),
             max_stores: 0,
             max_clients: 0,
+            cancel_at_period_end: false,
+            billing_interval: None,
             p12: None,
             signature_valid_until: 0,
             signature: String::new(),

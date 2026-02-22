@@ -285,6 +285,189 @@ pub async fn get_current_tenant(
     ))
 }
 
+/// 租户详情 (设置页面展示用)
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TenantDetails {
+    pub tenant_id: String,
+    pub mode: Option<String>,
+    pub device_id: String,
+    pub entity_id: Option<String>,
+    pub entity_type: Option<String>,
+    pub bound_at: Option<i64>,
+    pub subscription: Option<SubscriptionDetail>,
+    pub p12: Option<P12Detail>,
+    pub certificate: Option<CertificateDetail>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SubscriptionDetail {
+    pub id: Option<String>,
+    pub status: String,
+    pub plan: String,
+    pub starts_at: i64,
+    pub expires_at: Option<i64>,
+    pub max_stores: u32,
+    pub max_clients: u32,
+    pub features: Vec<String>,
+    pub cancel_at_period_end: bool,
+    pub billing_interval: Option<String>,
+    pub signature_valid_until: i64,
+    pub last_checked_at: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct P12Detail {
+    pub has_p12: bool,
+    pub fingerprint: Option<String>,
+    pub subject: Option<String>,
+    pub expires_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CertificateDetail {
+    pub expires_at: Option<i64>,
+    pub days_remaining: Option<i64>,
+    pub fingerprint: Option<String>,
+    pub issuer: Option<String>,
+}
+
+/// 获取当前租户的详细信息 (只读，本地数据)
+///
+/// 从 credential.json 和证书文件读取，不访问云端。
+/// 同时支持 Server 和 Client 模式。
+#[tauri::command]
+pub async fn get_tenant_details(
+    bridge: State<'_, Arc<ClientBridge>>,
+) -> Result<ApiResponse<Option<TenantDetails>>, String> {
+    let tenant_manager = bridge.tenant_manager().read().await;
+    let mode_info = bridge.get_mode_info().await;
+
+    let tenant_id = match tenant_manager.current_tenant_id() {
+        Some(id) => id.to_string(),
+        None => return Ok(ApiResponse::success(None)),
+    };
+
+    let paths = match tenant_manager.current_paths() {
+        Some(p) => p,
+        None => return Ok(ApiResponse::success(None)),
+    };
+
+    let device_id = crab_cert::generate_hardware_id();
+    let is_server = mode_info.mode == Some(crate::core::bridge::ModeType::Server);
+
+    // 读取 credential.json → TenantBinding
+    // Server 模式: {tenant}/server/credential.json
+    // Client 模式: 也读 server/credential.json (activate_client 写入同一位置)
+    // 如果 server credential 不存在，尝试读 client credential
+    let binding = {
+        let cred_path = paths.credential_file();
+        std::fs::read_to_string(&cred_path)
+            .ok()
+            .and_then(|content| {
+                serde_json::from_str::<edge_server::services::tenant_binding::TenantBinding>(
+                    &content,
+                )
+                .ok()
+            })
+            .or_else(|| {
+                // Client 模式 fallback: 尝试 certs/credential.json
+                let client_cred_path = paths.client_credential();
+                std::fs::read_to_string(&client_cred_path)
+                    .ok()
+                    .and_then(|content| {
+                        serde_json::from_str::<
+                            edge_server::services::tenant_binding::TenantBinding,
+                        >(&content)
+                        .ok()
+                    })
+            })
+    };
+
+    let entity_id = binding.as_ref().map(|b| b.binding.entity_id.clone());
+    let entity_type = binding
+        .as_ref()
+        .map(|b| b.binding.entity_type.as_str().to_string());
+    let bound_at = binding.as_ref().map(|b| b.binding.bound_at);
+
+    // 订阅信息
+    let subscription = binding.as_ref().and_then(|b| {
+        b.subscription.as_ref().map(|sub| SubscriptionDetail {
+            id: sub.id.clone(),
+            status: sub.status.as_str().to_string(),
+            plan: sub.plan.as_str().to_string(),
+            starts_at: sub.starts_at,
+            expires_at: sub.expires_at,
+            max_stores: sub.max_stores,
+            max_clients: sub.max_clients,
+            features: sub.features.clone(),
+            cancel_at_period_end: sub.cancel_at_period_end,
+            billing_interval: sub.billing_interval.clone(),
+            signature_valid_until: sub.signature_valid_until,
+            last_checked_at: sub.last_checked_at,
+        })
+    });
+
+    // P12 信息
+    let p12 = binding.as_ref().and_then(|b| {
+        b.subscription.as_ref().and_then(|sub| {
+            sub.p12.as_ref().map(|p| P12Detail {
+                has_p12: p.has_p12,
+                fingerprint: p.fingerprint.clone(),
+                subject: p.subject.clone(),
+                expires_at: p.expires_at,
+            })
+        })
+    });
+
+    // 证书信息 — Server 模式读 edge_cert, Client 模式读 client_cert
+    let cert_path = if is_server {
+        paths.edge_cert()
+    } else {
+        paths.client_cert()
+    };
+
+    let certificate = std::fs::read_to_string(&cert_path)
+        .ok()
+        .and_then(|pem| crab_cert::CertMetadata::from_pem(&pem).ok())
+        .map(|meta| {
+            let now = time::OffsetDateTime::now_utc();
+            let days_remaining = (meta.not_after - now).whole_days();
+            let expires_at_millis =
+                meta.not_after.unix_timestamp() * 1000 + meta.not_after.millisecond() as i64;
+            CertificateDetail {
+                expires_at: Some(expires_at_millis),
+                days_remaining: Some(days_remaining),
+                fingerprint: Some(meta.fingerprint_sha256.clone()),
+                issuer: meta.common_name.clone(),
+            }
+        });
+
+    let mode_str = mode_info.mode.map(|m| match m {
+        crate::core::bridge::ModeType::Server => "Server".to_string(),
+        crate::core::bridge::ModeType::Client => "Client".to_string(),
+    });
+
+    Ok(ApiResponse::success(Some(TenantDetails {
+        tenant_id,
+        mode: mode_str,
+        device_id: if device_id.len() >= 12 {
+            format!(
+                "{}...{}",
+                &device_id[..8],
+                &device_id[device_id.len() - 4..]
+            )
+        } else {
+            device_id
+        },
+        entity_id,
+        entity_type,
+        bound_at,
+        subscription,
+        p12,
+        certificate,
+    })))
+}
+
 /// 重新检查订阅状态
 ///
 /// 从 auth-server 同步最新订阅信息，返回更新后的 AppState。

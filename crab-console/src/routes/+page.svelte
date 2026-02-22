@@ -38,6 +38,7 @@
 	} from '$lib/api';
 	import { formatDate, formatCurrency, timeAgo } from '$lib/format';
 	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
+	import StoreOverviewDisplay from '$lib/components/StoreOverviewDisplay.svelte';
 
 	let profile = $state<ProfileResponse | null>(null);
 	let stores = $state<StoreDetail[]>([]);
@@ -600,7 +601,7 @@
 						</div>
 					</div>
 					<a
-						href="https://auth.redcoral.app/api/download/latest"
+						href="https://cloud.redcoral.app/api/download/latest"
 						class="inline-flex items-center justify-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors w-full md:w-auto"
 					>
 						<Download class="w-4 h-4" />

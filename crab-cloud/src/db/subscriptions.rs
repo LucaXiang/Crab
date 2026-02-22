@@ -43,6 +43,32 @@ pub async fn update_status(
     Ok(())
 }
 
+pub async fn update_subscription_fields(
+    pool: &PgPool,
+    subscription_id: &str,
+    status: &str,
+    current_period_end: Option<i64>,
+    cancel_at_period_end: Option<bool>,
+    billing_interval: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE subscriptions SET
+            status = $1,
+            current_period_end = COALESCE($2, current_period_end),
+            cancel_at_period_end = COALESCE($3, cancel_at_period_end),
+            billing_interval = COALESCE($4, billing_interval)
+         WHERE id = $5",
+    )
+    .bind(status)
+    .bind(current_period_end)
+    .bind(cancel_at_period_end)
+    .bind(billing_interval)
+    .bind(subscription_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn find_tenant_by_sub_id(
     pool: &PgPool,
     stripe_sub_id: &str,
@@ -67,6 +93,8 @@ pub struct Subscription {
     pub max_clients: i32,
     pub features: Vec<String>,
     pub current_period_end: Option<i64>,
+    pub cancel_at_period_end: bool,
+    pub billing_interval: Option<String>,
 }
 
 /// 获取租户最新订阅 (不过滤 status)
@@ -80,7 +108,7 @@ pub async fn get_latest_subscription(
 ) -> Result<Option<Subscription>, sqlx::Error> {
     sqlx::query_as::<_, Subscription>(
         "SELECT id, tenant_id, status, plan, max_edge_servers, max_clients,
-            features, current_period_end
+            features, current_period_end, cancel_at_period_end, billing_interval
             FROM subscriptions
             WHERE tenant_id = $1
             ORDER BY created_at DESC

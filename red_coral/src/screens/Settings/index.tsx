@@ -12,6 +12,7 @@ import { ShiftManagement } from '@/features/shift';
 import { DataTransfer } from './DataTransfer';
 import { StoreSettings } from './StoreSettings';
 import { SystemSettings } from './SystemSettings';
+import { TenantInfoPanel } from './TenantInfoPanel';
 import { UserManagement } from '@/features/user';
 import { MarketingGroupManagement } from '@/features/marketing-group';
 import { MemberManagement } from '@/features/member';
@@ -96,6 +97,11 @@ const SettingsContent: React.FC = React.memo(() => {
         {activeCategory === 'STORE' && (
           <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
             <StoreSettings />
+          </ProtectedGate>
+        )}
+        {activeCategory === 'TENANT_INFO' && (
+          <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
+            <TenantInfoPanel />
           </ProtectedGate>
         )}
         {activeCategory === 'SYSTEM' && (

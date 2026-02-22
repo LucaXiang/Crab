@@ -36,7 +36,7 @@
 						<ArrowRight class="w-4 h-4" />
 					</a>
 					<a
-						href="https://auth.redcoral.app/api/download/latest"
+						href="https://cloud.redcoral.app/api/download/latest"
 						class="inline-flex items-center gap-2 bg-white/8 hover:bg-white/14 text-white font-semibold px-7 py-3.5 rounded-xl border border-white/10 transition-colors duration-150 cursor-pointer"
 					>
 						<Download class="w-4 h-4" />
