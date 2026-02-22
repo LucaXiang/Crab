@@ -37,6 +37,8 @@ pub struct SubscriptionInfo {
     pub max_edge_servers: i32,
     pub max_clients: i32,
     pub current_period_end: Option<i64>,
+    pub cancel_at_period_end: bool,
+    pub billing_interval: Option<String>,
     pub created_at: i64,
 }
 
@@ -45,7 +47,7 @@ pub async fn get_subscription(
     tenant_id: &str,
 ) -> Result<Option<SubscriptionInfo>, BoxError> {
     let row: Option<SubscriptionInfo> = sqlx::query_as(
-        "SELECT id, status, plan, max_edge_servers, max_clients, current_period_end, created_at FROM subscriptions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1",
+        "SELECT id, status, plan, max_edge_servers, max_clients, current_period_end, cancel_at_period_end, billing_interval, created_at FROM subscriptions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1",
     )
     .bind(tenant_id)
     .fetch_optional(pool)
@@ -61,6 +63,10 @@ pub struct StoreSummary {
     pub name: Option<String>,
     pub address: Option<String>,
     pub phone: Option<String>,
+    pub nif: Option<String>,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub business_day_cutoff: Option<String>,
     pub device_id: String,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,
@@ -69,7 +75,7 @@ pub struct StoreSummary {
 pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
-        SELECT id, entity_id, name, address, phone, device_id, last_sync_at, registered_at
+        SELECT id, entity_id, name, address, phone, nif, email, website, business_day_cutoff, device_id, last_sync_at, registered_at
         FROM cloud_edge_servers
         WHERE tenant_id = $1
         ORDER BY registered_at DESC
@@ -82,6 +88,7 @@ pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSumm
 }
 
 /// Update store
+#[allow(clippy::too_many_arguments)]
 pub async fn update_store(
     pool: &PgPool,
     store_id: i64,
@@ -89,6 +96,10 @@ pub async fn update_store(
     name: Option<String>,
     address: Option<String>,
     phone: Option<String>,
+    nif: Option<String>,
+    email: Option<String>,
+    website: Option<String>,
+    business_day_cutoff: Option<String>,
 ) -> Result<(), BoxError> {
     sqlx::query(
         r#"
@@ -96,13 +107,21 @@ pub async fn update_store(
         SET 
             name = COALESCE($1, name),
             address = COALESCE($2, address),
-            phone = COALESCE($3, phone)
-        WHERE id = $4 AND tenant_id = $5
+            phone = COALESCE($3, phone),
+            nif = COALESCE($4, nif),
+            email = COALESCE($5, email),
+            website = COALESCE($6, website),
+            business_day_cutoff = COALESCE($7, business_day_cutoff)
+        WHERE id = $8 AND tenant_id = $9
         "#,
     )
     .bind(name)
     .bind(address)
     .bind(phone)
+    .bind(nif)
+    .bind(email)
+    .bind(website)
+    .bind(business_day_cutoff)
     .bind(store_id)
     .bind(tenant_id)
     .execute(pool)

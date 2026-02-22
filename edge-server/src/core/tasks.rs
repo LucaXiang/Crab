@@ -12,7 +12,7 @@
 use futures::FutureExt;
 use std::fmt;
 use std::panic::AssertUnwindSafe;
-use tokio::task::JoinHandle;
+use tokio::task::{AbortHandle, JoinHandle};
 use tokio_util::sync::CancellationToken;
 
 /// 任务类型
@@ -47,6 +47,8 @@ struct RegisteredTask {
     kind: TaskKind,
     /// 任务句柄
     handle: JoinHandle<()>,
+    /// 中止句柄
+    abort_handle: AbortHandle,
 }
 
 /// 后台任务管理器
@@ -136,8 +138,14 @@ impl BackgroundTasks {
         };
 
         let handle = tokio::spawn(wrapped_future);
+        let abort_handle = handle.abort_handle();
         tracing::debug!(task = %name, kind = %kind, "Registered background task");
-        self.tasks.push(RegisteredTask { name, kind, handle });
+        self.tasks.push(RegisteredTask {
+            name,
+            kind,
+            handle,
+            abort_handle,
+        });
     }
 
     /// 获取已注册任务数量
@@ -210,29 +218,57 @@ impl BackgroundTasks {
 
     /// Graceful shutdown - 取消所有任务并等待完成
     ///
-    /// 发送取消信号后，等待所有任务完成或超时。
-    pub async fn shutdown(self) {
+    /// 发送取消信号后，等待所有任务完成或超时（5秒）。
+    /// 超时后会强制 abort 所有残留任务。
+    pub async fn shutdown(mut self) {
         tracing::info!("Shutting down {} background tasks...", self.tasks.len());
 
-        // 发送取消信号
         self.shutdown.cancel();
 
-        // 等待所有任务完成
-        for task in self.tasks {
-            match task.handle.await {
-                Ok(()) => {
-                    tracing::debug!(task = %task.name, "Task completed");
-                }
-                Err(e) if e.is_cancelled() => {
-                    tracing::debug!(task = %task.name, "Task cancelled");
-                }
-                Err(e) => {
-                    tracing::error!(task = %task.name, error = ?e, "Task panicked");
+        // 收集 abort handles 用于超时后强制终止
+        let abort_handles: Vec<AbortHandle> =
+            self.tasks.iter().map(|t| t.abort_handle.clone()).collect();
+        let tasks = std::mem::take(&mut self.tasks);
+        let deadline = std::time::Duration::from_secs(5);
+
+        match tokio::time::timeout(deadline, Self::await_all(tasks)).await {
+            Ok(()) => {
+                tracing::info!("All background tasks stopped gracefully");
+            }
+            Err(_) => {
+                tracing::warn!("Background tasks shutdown timed out after 5s, aborting remaining");
+                for handle in &abort_handles {
+                    handle.abort();
                 }
             }
         }
+    }
 
-        tracing::info!("All background tasks stopped");
+    async fn await_all(tasks: Vec<RegisteredTask>) {
+        for task in tasks {
+            match task.handle.await {
+                Ok(()) => tracing::debug!(task = %task.name, "Task completed"),
+                Err(e) if e.is_cancelled() => {
+                    tracing::debug!(task = %task.name, "Task cancelled")
+                }
+                Err(e) => {
+                    tracing::error!(task = %task.name, error = ?e, "Task panicked")
+                }
+            }
+        }
+    }
+}
+
+impl Drop for BackgroundTasks {
+    fn drop(&mut self) {
+        self.shutdown.cancel();
+        let count = self.tasks.len();
+        for task in &self.tasks {
+            task.abort_handle.abort();
+        }
+        if count > 0 {
+            tracing::warn!(count, "BackgroundTasks dropped — all tasks force-aborted");
+        }
     }
 }
 

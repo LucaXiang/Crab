@@ -13,7 +13,7 @@ use shared::error::ErrorCode;
 /// 订阅同步结果 — 区分网络错误和服务端明确拒绝
 enum SubscriptionFetchResult {
     /// 成功获取到新的订阅信息
-    Ok(SubscriptionInfo),
+    Ok(Box<SubscriptionInfo>),
     /// 网络错误/超时 — 可用缓存兜底（离线优先）
     NetworkError,
     /// 服务端明确拒绝，附带全栈统一 ErrorCode
@@ -629,7 +629,7 @@ impl ActivationService {
                     credential.binding.tenant_id,
                     sub.status
                 );
-                credential.subscription = Some(sub);
+                credential.subscription = Some(*sub);
                 self.save_credential(&mut credential).await;
             }
 
@@ -834,6 +834,6 @@ impl ActivationService {
         // 更新本地检查时间
         sub_info.last_checked_at = shared::util::now_millis();
 
-        SubscriptionFetchResult::Ok(sub_info)
+        SubscriptionFetchResult::Ok(Box::new(sub_info))
     }
 }
