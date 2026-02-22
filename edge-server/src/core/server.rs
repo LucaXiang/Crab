@@ -15,6 +15,7 @@
 //! 7. shutdown()                     - Graceful shutdown
 //! ```
 
+use crate::core::tasks::BackgroundTasks;
 use crate::core::{Config, ServerState};
 use crate::utils::AppError;
 use axum_server::tls_rustls::RustlsConfig;
@@ -71,8 +72,7 @@ impl Server {
             Some(cfg) => cfg,
             None => {
                 tracing::info!("Shutdown requested during activation wait");
-                state.audit_service.on_shutdown();
-                background_tasks.shutdown().await;
+                Self::cleanup(state, background_tasks).await;
                 return Ok(());
             }
         };
@@ -90,8 +90,7 @@ impl Server {
             tokio::select! {
                 _ = self.shutdown_token.cancelled() => {
                     tracing::info!("Shutdown requested during subscription check");
-                    state.audit_service.on_shutdown();
-                    background_tasks.shutdown().await;
+                    Self::cleanup(state, background_tasks).await;
                     return Ok(());
                 }
                 _ = tokio::time::sleep(retry_delay) => {}
@@ -117,8 +116,7 @@ impl Server {
             tokio::select! {
                 _ = self.shutdown_token.cancelled() => {
                     tracing::info!("Shutdown requested during P12 check");
-                    state.audit_service.on_shutdown();
-                    background_tasks.shutdown().await;
+                    Self::cleanup(state, background_tasks).await;
                     return Ok(());
                 }
                 _ = tokio::time::sleep(p12_retry_delay) => {}
@@ -177,18 +175,18 @@ impl Server {
         {
             tracing::error!("Failed to log system shutdown: {:?}", e);
         }
-        // 删除 LOCK 文件，标记正常关闭
+
+        Self::cleanup(state, background_tasks).await;
+        Ok(())
+    }
+
+    /// 统一清理：停止后台任务 + 关闭数据库 + drain audit worker
+    async fn cleanup(state: ServerState, background_tasks: BackgroundTasks) {
         state.audit_service.on_shutdown();
-
         background_tasks.shutdown().await;
-
-        // 显式关闭 SqlitePool，确保所有连接释放
         state.pool.close().await;
-
-        // 取出 audit worker handle，然后 drop state 释放所有 audit tx → channel 关闭 → worker drain
         let audit_handle = state.audit_worker_handle.lock().await.take();
         drop(state);
-        // 等待 worker 处理完残留条目
         if let Some(handle) = audit_handle
             && tokio::time::timeout(std::time::Duration::from_secs(5), handle)
                 .await
@@ -196,8 +194,6 @@ impl Server {
         {
             tracing::warn!("Audit worker drain timed out after 5s");
         }
-
-        Ok(())
     }
 
     /// Wait for activation and load TLS config (可取消)
