@@ -1687,7 +1687,19 @@
       "button_exit_tenant": "Salir del establecimiento",
       "exit_tenant_desc": "Detener servicio y volver a selección de establecimiento",
       "confirm_exit_tenant": "¿Salir del establecimiento actual? El servidor se detendrá.",
-      "debug_orders": "Depuración pedidos"
+      "debug_orders": "Depuración pedidos",
+      "about": {
+        "title": "Acerca de",
+        "version": "Versión actual",
+        "check_update": "Buscar actualizaciones",
+        "checking": "Comprobando...",
+        "install_update": "Actualizar a v{version}",
+        "downloading": "Descargando {progress}%",
+        "restart_to_update": "Reiniciar para actualizar",
+        "retry": "Reintentar",
+        "copyright": "Red Coral Technology",
+        "tech_stack": "Tauri 2 · React 19 · Rust · Arquitectura offline-first"
+      }
     },
     "tenant_info": {
       "title": "Información",

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useUIScale, useSetUIScale } from '@/core/stores/ui';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
 import type { Locale } from '@/infrastructure/i18n';
-import { Monitor, Zap, Trash2, ZoomIn, Plus, Minus, Languages, Keyboard, LogOut } from 'lucide-react';
+import { Monitor, Zap, Trash2, ZoomIn, Plus, Minus, Languages, Keyboard, LogOut, Info, Download, RefreshCw, Loader2, CheckCircle2 } from 'lucide-react';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useVirtualKeyboardStore, useVirtualKeyboardMode } from '@/core/stores/ui';
+import { useUpdateChecker, type UpdateStatus } from '@/core/hooks/useUpdateChecker';
 
 const SCALE_STEPS = [0.9, 0.95, 1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3];
 
@@ -28,6 +29,14 @@ export const SystemSettings: React.FC = () => {
   const { exitTenant, fetchAppState } = useBridgeStore();
 
   const isDev = import.meta.env.DEV;
+  const { status: updateStatus, updateInfo, progress, checkForUpdate, installUpdate, restartApp } = useUpdateChecker();
+
+  const [appVersion, setAppVersion] = useState('');
+  useEffect(() => {
+    if ('__TAURI__' in window) {
+      import('@tauri-apps/api/app').then(({ getVersion }) => getVersion()).then(setAppVersion);
+    }
+  }, []);
 
   const scalePercent = Math.round(uiScale * 100);
 
@@ -186,6 +195,43 @@ export const SystemSettings: React.FC = () => {
 
           <div className="border-t border-gray-100 my-6" />
 
+          {/* About */}
+          <div>
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
+              <Info className="w-4 h-4 text-gray-400" />
+              {t('settings.system.about.title')}
+            </h3>
+
+            <div className="space-y-4">
+              {/* Version */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">{t('settings.system.about.version')}</span>
+                  {appVersion && (
+                    <span className="ml-2 text-sm font-mono text-gray-500">v{appVersion}</span>
+                  )}
+                </div>
+                <UpdateButton
+                  status={updateStatus}
+                  version={updateInfo?.version}
+                  progress={progress}
+                  onCheck={checkForUpdate}
+                  onInstall={installUpdate}
+                  onRestart={restartApp}
+                  t={t}
+                />
+              </div>
+
+              {/* Product info */}
+              <div className="text-xs text-gray-400 space-y-0.5">
+                <p>RedCoral POS · {t('settings.system.about.copyright')}</p>
+                <p>{t('settings.system.about.tech_stack')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 my-6" />
+
           {/* Danger Zone */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
@@ -270,4 +316,71 @@ export const SystemSettings: React.FC = () => {
       />
     </div>
   );
+};
+
+const UpdateButton: React.FC<{
+  status: UpdateStatus;
+  version?: string;
+  progress: number;
+  onCheck: () => void;
+  onInstall: () => void;
+  onRestart: () => void;
+  t: (key: string, params?: Record<string, string>) => string;
+}> = ({ status, version, progress, onCheck, onInstall, onRestart, t }) => {
+  switch (status) {
+    case 'checking':
+      return (
+        <span className="flex items-center gap-1.5 text-xs text-gray-400">
+          <Loader2 size={14} className="animate-spin" />
+          {t('settings.system.about.checking')}
+        </span>
+      );
+    case 'available':
+      return (
+        <button
+          onClick={onInstall}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+        >
+          <Download size={14} />
+          {t('settings.system.about.install_update', { version: version ?? '' })}
+        </button>
+      );
+    case 'downloading':
+      return (
+        <span className="flex items-center gap-1.5 text-xs text-blue-600">
+          <Loader2 size={14} className="animate-spin" />
+          {t('settings.system.about.downloading', { progress: String(progress) })}
+        </span>
+      );
+    case 'ready':
+      return (
+        <button
+          onClick={onRestart}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+        >
+          <RefreshCw size={14} />
+          {t('settings.system.about.restart_to_update')}
+        </button>
+      );
+    case 'error':
+      return (
+        <button
+          onClick={onCheck}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <RefreshCw size={14} />
+          {t('settings.system.about.retry')}
+        </button>
+      );
+    default:
+      return (
+        <button
+          onClick={onCheck}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <CheckCircle2 size={14} className="text-green-500" />
+          {t('settings.system.about.check_update')}
+        </button>
+      );
+  }
 };

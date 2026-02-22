@@ -1687,7 +1687,19 @@
       "button_exit_tenant": "退出当前租户",
       "exit_tenant_desc": "停止服务并退出当前租户，返回租户选择页面",
       "confirm_exit_tenant": "确定退出当前租户？服务器将停止运行，需要重新选择租户。",
-      "debug_orders": "订单调试"
+      "debug_orders": "订单调试",
+      "about": {
+        "title": "关于",
+        "version": "当前版本",
+        "check_update": "检查更新",
+        "checking": "检查中...",
+        "install_update": "更新到 v{version}",
+        "downloading": "下载中 {progress}%",
+        "restart_to_update": "重启以完成更新",
+        "retry": "重试",
+        "copyright": "Red Coral Technology",
+        "tech_stack": "Tauri 2 · React 19 · Rust · 离线优先架构"
+      }
     },
     "tenant_info": {
       "title": "租户信息",
