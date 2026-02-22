@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS cloud_edge_servers (
     entity_id TEXT NOT NULL,
     tenant_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
+    name TEXT,
     last_sync_at BIGINT,
     registered_at BIGINT NOT NULL,
     UNIQUE (entity_id, tenant_id)

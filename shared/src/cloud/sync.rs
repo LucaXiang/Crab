@@ -213,6 +213,9 @@ pub struct EdgeStatusResult {
 pub struct StoreDetailResponse {
     pub id: i64,
     pub entity_id: String,
+    pub name: Option<String>,
+    pub address: Option<String>,
+    pub phone: Option<String>,
     pub device_id: String,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,

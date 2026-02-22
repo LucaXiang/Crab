@@ -22,7 +22,7 @@ use crate::auth::rate_limit::{
 use crate::auth::tenant_auth::tenant_auth_middleware;
 use crate::state::AppState;
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{get, post};
+use axum::routing::{get, patch, post};
 use axum::{Router, middleware};
 use http::HeaderName;
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -66,6 +66,7 @@ pub fn public_router(state: AppState) -> Router {
         .route("/api/tenant/change-password", post(tenant::change_password))
         .route("/api/tenant/overview", get(tenant::get_tenant_overview))
         .route("/api/tenant/stores", get(tenant::list_stores))
+        .route("/api/tenant/stores/{id}", patch(tenant::update_store))
         .route("/api/tenant/stores/{id}/orders", get(tenant::list_orders))
         .route(
             "/api/tenant/stores/{id}/orders/{order_key}/detail",

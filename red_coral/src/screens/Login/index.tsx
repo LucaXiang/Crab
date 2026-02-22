@@ -120,9 +120,9 @@ export const LoginScreen: React.FC = () => {
       <div className="hidden lg:flex lg:w-1/2 relative bg-primary-500 overflow-hidden items-center justify-center p-12 text-white">
         {/* Abstract Background Patterns */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[37.5rem] h-[37.5rem] rounded-full bg-white/5 blur-[6.25rem]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[31.25rem] h-[31.25rem] rounded-full bg-black/10 blur-[5rem]" />
-          <div className="absolute top-[40%] right-[20%] w-[18.75rem] h-[18.75rem] rounded-full bg-orange-400/20 blur-[3.75rem]" />
+          <div className="absolute top-[-10%] left-[-10%] w-150 h-150 rounded-full bg-white/5 blur-[6.25rem]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-125 h-125 rounded-full bg-black/10 blur-[5rem]" />
+          <div className="absolute top-[40%] right-[20%] w-75 h-75 rounded-full bg-orange-400/20 blur-[3.75rem]" />
         </div>
 
         {/* Brand Content */}

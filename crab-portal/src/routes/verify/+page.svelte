@@ -122,7 +122,7 @@
 					value={code}
 					oninput={handleCodeInput}
 					placeholder="000000"
-					class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-coral-500/20 focus:border-coral-500 transition-all duration-150 tracking-[0.3em] text-center font-mono text-lg"
+					class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-coral-500/20 focus:border-coral-500 transition-all duration-150 tracking-[0.3em] text-center font-mono"
 				/>
 			</div>
 		</div>

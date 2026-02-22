@@ -58,6 +58,9 @@ pub async fn get_subscription(
 pub struct StoreSummary {
     pub id: i64,
     pub entity_id: String,
+    pub name: Option<String>,
+    pub address: Option<String>,
+    pub phone: Option<String>,
     pub device_id: String,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,
@@ -66,7 +69,7 @@ pub struct StoreSummary {
 pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
-        SELECT id, entity_id, device_id, last_sync_at, registered_at
+        SELECT id, entity_id, name, address, phone, device_id, last_sync_at, registered_at
         FROM cloud_edge_servers
         WHERE tenant_id = $1
         ORDER BY registered_at DESC
@@ -76,6 +79,35 @@ pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSumm
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+/// Update store
+pub async fn update_store(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    name: Option<String>,
+    address: Option<String>,
+    phone: Option<String>,
+) -> Result<(), BoxError> {
+    sqlx::query(
+        r#"
+        UPDATE cloud_edge_servers 
+        SET 
+            name = COALESCE($1, name),
+            address = COALESCE($2, address),
+            phone = COALESCE($3, phone)
+        WHERE id = $4 AND tenant_id = $5
+        "#,
+    )
+    .bind(name)
+    .bind(address)
+    .bind(phone)
+    .bind(store_id)
+    .bind(tenant_id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 /// Get store info data for a specific edge-server

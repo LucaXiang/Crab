@@ -124,6 +124,9 @@ pub async fn list_stores(
         result.push(shared::cloud::StoreDetailResponse {
             id: store.id,
             entity_id: store.entity_id,
+            name: store.name,
+            address: store.address,
+            phone: store.phone,
             device_id: store.device_id,
             last_sync_at: store.last_sync_at,
             registered_at: store.registered_at,
@@ -132,6 +135,39 @@ pub async fn list_stores(
     }
 
     Ok(Json(result))
+}
+
+/// PATCH /api/tenant/stores/:id
+#[derive(Deserialize)]
+pub struct UpdateStoreRequest {
+    pub name: Option<String>,
+    pub address: Option<String>,
+    pub phone: Option<String>,
+}
+
+pub async fn update_store(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Json(payload): Json<UpdateStoreRequest>,
+) -> ApiResult<()> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    tenant_queries::update_store(
+        &state.pool,
+        store_id,
+        &identity.tenant_id,
+        payload.name,
+        payload.address,
+        payload.phone,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Update store error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    Ok(Json(()))
 }
 
 /// GET /api/tenant/stores/:id/orders
