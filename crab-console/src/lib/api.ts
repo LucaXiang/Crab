@@ -70,7 +70,7 @@ export interface Subscription {
 
 export interface ProfileResponse {
 	profile: TenantProfile;
-	subscription: Subscription;
+	subscription: Subscription | null;
 }
 
 export function getProfile(token: string): Promise<ProfileResponse> {

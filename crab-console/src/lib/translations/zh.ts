@@ -180,6 +180,13 @@ export const zh: Record<string, string> = {
 	'settings.manage_billing': '在 Stripe 管理账单',
 	'settings.language': '语言',
 
+	'error.title': '错误',
+	'error.not_found': '页面未找到',
+	'error.not_found_desc': '你访问的页面不存在或已被移动。',
+	'error.generic_desc': '出了点问题，请重试。',
+	'error.go_back': '返回',
+	'error.go_home': '首页',
+
 	'onboard.title': '选择你的方案',
 	'onboard.subtitle': '开始使用 RedCoral 管理你的餐厅。随时可以升级或降级。',
 	'onboard.basic_desc': '适合单店运营的小型餐厅。',

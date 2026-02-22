@@ -180,6 +180,13 @@ export const en: Record<string, string> = {
 	'settings.manage_billing': 'Manage billing on Stripe',
 	'settings.language': 'Language',
 
+	'error.title': 'Error',
+	'error.not_found': 'Page not found',
+	'error.not_found_desc': 'The page you are looking for does not exist or has been moved.',
+	'error.generic_desc': 'Something went wrong. Please try again.',
+	'error.go_back': 'Go back',
+	'error.go_home': 'Home',
+
 	'onboard.title': 'Choose your plan',
 	'onboard.subtitle': 'Start managing your restaurant with RedCoral. Upgrade or downgrade anytime.',
 	'onboard.basic_desc': 'For small restaurants with a single location.',

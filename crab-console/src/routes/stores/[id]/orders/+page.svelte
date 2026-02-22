@@ -66,10 +66,19 @@
 
 	function statusBadge(status: string): string {
 		switch (status) {
-			case 'completed': return 'bg-green-50 text-green-600';
-			case 'void': return 'bg-red-50 text-red-600';
-			case 'merged': return 'bg-blue-50 text-blue-600';
+			case 'COMPLETED': return 'bg-green-50 text-green-600';
+			case 'VOID': return 'bg-red-50 text-red-600';
+			case 'MERGED': return 'bg-blue-50 text-blue-600';
 			default: return 'bg-slate-50 text-slate-600';
+		}
+	}
+
+	function statusLabel(status: string): string {
+		switch (status) {
+			case 'COMPLETED': return $t('orders.completed');
+			case 'VOID': return $t('orders.void');
+			case 'MERGED': return $t('orders.merged');
+			default: return status;
 		}
 	}
 </script>
@@ -93,9 +102,9 @@
 		<div class="flex gap-2">
 			{#each [
 				{ value: undefined, label: 'orders.all' },
-				{ value: 'completed', label: 'orders.completed' },
-				{ value: 'void', label: 'orders.void' },
-				{ value: 'merged', label: 'orders.merged' }
+				{ value: 'COMPLETED', label: 'orders.completed' },
+				{ value: 'VOID', label: 'orders.void' },
+				{ value: 'MERGED', label: 'orders.merged' }
 			] as filter}
 				<button
 					onclick={() => setFilter(filter.value)}
@@ -137,7 +146,7 @@
 								<td class="px-4 py-3 font-medium text-slate-900">{order.receipt_number ?? order.source_id.slice(0, 8)}</td>
 								<td class="px-4 py-3">
 									<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {statusBadge(order.status)}">
-										{order.status}
+										{statusLabel(order.status)}
 									</span>
 								</td>
 								<td class="px-4 py-3 text-right font-medium text-slate-900">{order.total != null ? formatCurrency(order.total) : '—'}</td>

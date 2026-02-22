@@ -47,6 +47,10 @@
 		profile !== null && profile.profile.status === 'verified' && !profile.subscription
 	);
 
+	let isCanceled = $derived(
+		profile !== null && profile.subscription?.status === 'canceled'
+	);
+
 	function getTodayRange(): { from: number; to: number } {
 		const now = new Date();
 		const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -65,7 +69,7 @@
 			const profileRes = await getProfile(token);
 			profile = profileRes;
 
-			if (profileRes.subscription) {
+			if (profileRes.subscription && profileRes.subscription.status !== 'canceled') {
 				const { from, to } = getTodayRange();
 				const [storeList, ov] = await Promise.all([
 					getStores(token),
@@ -300,7 +304,41 @@
 					</button>
 				</div>
 			</div>
-		{:else if profile}
+		{:else if isCanceled && profile}
+			<!-- Canceled subscription -->
+			<div class="bg-white rounded-2xl border border-red-200 p-6">
+				<div class="flex items-start justify-between">
+					<div>
+						<h2 class="font-heading font-bold text-lg text-slate-900 mb-1">
+							{$t('dash.subscription')}
+						</h2>
+						<p class="text-sm text-slate-500">{profile.profile.email}</p>
+					</div>
+					<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-red-600 bg-red-50">
+						<XCircle class="w-3.5 h-3.5" />
+						{$t('dash.cancelled')}
+					</span>
+				</div>
+				<div class="mt-4 grid grid-cols-2 gap-4">
+					<div>
+						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.plan')}</p>
+						<p class="text-sm font-semibold text-slate-900 capitalize">
+							{profile.subscription.plan}
+						</p>
+					</div>
+				</div>
+				<div class="mt-4">
+					<button
+						onclick={handleBillingPortal}
+						disabled={billingLoading}
+						class="inline-flex items-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-50"
+					>
+						<CreditCard class="w-4 h-4" />
+						<span>{$t('dash.manage_billing')}</span>
+					</button>
+				</div>
+			</div>
+		{:else if profile?.subscription}
 			<!-- Subscription Card -->
 			<div class="bg-white rounded-2xl border border-slate-200 p-6">
 				<div class="flex items-start justify-between">

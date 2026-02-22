@@ -190,6 +190,13 @@ export const es: Record<string, string> = {
 	'settings.manage_billing': 'Gestionar facturación en Stripe',
 	'settings.language': 'Idioma',
 
+	'error.title': 'Error',
+	'error.not_found': 'Página no encontrada',
+	'error.not_found_desc': 'La página que buscas no existe o ha sido movida.',
+	'error.generic_desc': 'Algo salió mal. Inténtalo de nuevo.',
+	'error.go_back': 'Volver',
+	'error.go_home': 'Inicio',
+
 	'onboard.title': 'Elige tu plan',
 	'onboard.subtitle': 'Empieza a gestionar tu restaurante con RedCoral. Cambia de plan en cualquier momento.',
 	'onboard.basic_desc': 'Para restaurantes pequeños con un solo local.',
