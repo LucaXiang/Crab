@@ -9,6 +9,7 @@ export const en: Record<string, string> = {
 	'nav.pricing': 'Pricing',
 	'nav.faq': 'FAQ',
 	'nav.login': 'Log in',
+	'nav.signup': 'Sign up',
 	'nav.cta': 'Free trial',
 
 	'hero.badge': 'Works offline · Never miss a sale',

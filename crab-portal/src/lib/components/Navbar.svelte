@@ -67,7 +67,7 @@
 		<div class="flex items-center gap-2">
 			<div class="relative lang-switcher">
 				<button
-					class="flex items-center gap-1 text-[13px] font-medium text-slate-400 hover:text-slate-600 transition-colors duration-150 cursor-pointer px-2 py-1.5 rounded-lg"
+					class="flex items-center gap-1 text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors duration-150 cursor-pointer px-2 py-1.5 rounded-lg"
 					onclick={toggleMenu}
 				>
 					<Globe class="w-3.5 h-3.5" />
@@ -90,13 +90,13 @@
 			</div>
 			<div class="hidden md:flex items-center gap-4">
 				<a
-					href="https://console.redcoral.app/login"
-					class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+					href="/login"
+					class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
 				>
 					{$t('nav.login')}
 				</a>
 				<a
-					href="https://console.redcoral.app/register"
+					href="/register"
 					class="px-4 py-2 text-sm font-medium text-white bg-coral-500 hover:bg-coral-600 rounded-lg transition-colors shadow-lg shadow-coral-500/20 min-w-20 text-center"
 				>
 					{$t('nav.signup')}

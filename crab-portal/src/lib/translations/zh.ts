@@ -9,6 +9,7 @@ export const zh: Record<string, string> = {
 	'nav.pricing': '订阅',
 	'nav.faq': '常见问题',
 	'nav.login': '登录',
+	'nav.signup': '注册',
 	'nav.cta': '免费试用',
 
 	'hero.badge': '断网也能用 · 不漏一笔单',
