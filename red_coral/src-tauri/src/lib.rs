@@ -321,6 +321,23 @@ pub async fn run() {
             commands::get_statistics,
             commands::get_sales_report,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Graceful shutdown: stop the bridge so Server::cleanup() runs
+                // and audit.lock is removed (preventing false "abnormal shutdown" on next start)
+                if let Some(bridge) = app.try_state::<Arc<ClientBridge>>() {
+                    let bridge = Arc::clone(&*bridge);
+                    // block_on is safe here — Tauri calls Exit after the event loop ends
+                    tauri::async_runtime::block_on(async move {
+                        if let Err(e) = bridge.stop().await {
+                            tracing::error!("Failed to stop bridge on exit: {}", e);
+                        } else {
+                            tracing::info!("Bridge stopped gracefully on app exit");
+                        }
+                    });
+                }
+            }
+        });
 }
