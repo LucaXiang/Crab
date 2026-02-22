@@ -333,6 +333,46 @@ export function getStoreOverview(
 	);
 }
 
+// === Red Flags ===
+
+export interface RedFlagsSummary {
+	item_removals: number;
+	item_comps: number;
+	order_voids: number;
+	order_discounts: number;
+	price_modifications: number;
+}
+
+export interface OperatorRedFlags {
+	operator_id: number | null;
+	operator_name: string | null;
+	item_removals: number;
+	item_comps: number;
+	order_voids: number;
+	order_discounts: number;
+	price_modifications: number;
+	total_flags: number;
+}
+
+export interface RedFlagsResponse {
+	summary: RedFlagsSummary;
+	operator_breakdown: OperatorRedFlags[];
+}
+
+export function getStoreRedFlags(
+	token: string,
+	storeId: number,
+	from: number,
+	to: number
+): Promise<RedFlagsResponse> {
+	return request(
+		'GET',
+		`/api/tenant/stores/${storeId}/red-flags?from=${from}&to=${to}`,
+		undefined,
+		token
+	);
+}
+
 // === Products ===
 
 export interface ProductEntry {

@@ -12,7 +12,8 @@
 		Server,
 		Clock,
 		Pencil,
-		Save
+		Save,
+		ShieldAlert
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
@@ -45,7 +46,8 @@
     { key: 'nav.orders', href: `/stores/${storeId}/orders`, icon: ShoppingBag },
     { key: 'nav.overview', href: `/stores/${storeId}/overview`, icon: BarChart3 },
     { key: 'nav.daily_report', href: `/stores/${storeId}/stats`, icon: ScrollText },
-    { key: 'nav.products', href: `/stores/${storeId}/products`, icon: Package }
+    { key: 'nav.products', href: `/stores/${storeId}/products`, icon: Package },
+    { key: 'nav.red_flags', href: `/stores/${storeId}/red-flags`, icon: ShieldAlert }
   ];
 
 	onMount(async () => {

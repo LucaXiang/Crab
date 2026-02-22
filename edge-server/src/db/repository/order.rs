@@ -487,7 +487,40 @@ pub async fn build_order_detail_sync(
         })
         .collect();
 
-    // 3. Query payments
+    // 3. Query events (for Red Flags monitoring)
+    let events: Vec<shared::cloud::OrderEventSync> = sqlx::query_as::<
+        _,
+        (
+            i32,
+            String,
+            i64,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        ),
+    >(
+        "SELECT seq, event_type, timestamp, operator_id, operator_name, data \
+         FROM archived_order_event WHERE order_pk = ? ORDER BY seq",
+    )
+    .bind(order_pk)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(
+        |(seq, event_type, timestamp, operator_id, operator_name, data)| {
+            shared::cloud::OrderEventSync {
+                seq,
+                event_type,
+                timestamp,
+                operator_id,
+                operator_name,
+                data,
+            }
+        },
+    )
+    .collect();
+
+    // 4. Query payments
     let payments: Vec<OrderPaymentSync> = sqlx::query_as::<_, (i32, String, f64, i64, bool)>(
         "SELECT seq, method, amount, time, cancelled \
          FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
@@ -567,6 +600,7 @@ pub async fn build_order_detail_sync(
             member_name: order.member_name,
             items,
             payments,
+            events,
         },
     })
 }

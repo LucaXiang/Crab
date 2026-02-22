@@ -293,3 +293,44 @@ CREATE TABLE IF NOT EXISTS cloud_commands (
 
 CREATE INDEX IF NOT EXISTS idx_cloud_commands_pending
     ON cloud_commands (edge_server_id, status) WHERE status = 'pending';
+
+-- ── Red Flags 监控 ──
+
+-- 订单事件（永久存储，用于红旗监控）
+CREATE TABLE IF NOT EXISTS cloud_order_events (
+    id                BIGSERIAL PRIMARY KEY,
+    archived_order_id BIGINT NOT NULL REFERENCES cloud_archived_orders(id) ON DELETE CASCADE,
+    seq               INTEGER NOT NULL,
+    event_type        TEXT NOT NULL,
+    timestamp         BIGINT NOT NULL,
+    operator_id       BIGINT,
+    operator_name     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_coe_order ON cloud_order_events(archived_order_id);
+CREATE INDEX IF NOT EXISTS idx_coe_red_flags ON cloud_order_events(event_type, timestamp, operator_id);
+
+-- 班次（JSONB 镜像）
+CREATE TABLE IF NOT EXISTS cloud_shifts (
+    id              BIGSERIAL PRIMARY KEY,
+    edge_server_id  BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
+    tenant_id       TEXT NOT NULL,
+    source_id       TEXT NOT NULL,
+    data            JSONB NOT NULL,
+    version         BIGINT NOT NULL DEFAULT 0,
+    synced_at       BIGINT NOT NULL,
+    UNIQUE (edge_server_id, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_cloud_shifts_tenant ON cloud_shifts(tenant_id);
+
+-- 员工（JSONB 镜像）
+CREATE TABLE IF NOT EXISTS cloud_employees (
+    id              BIGSERIAL PRIMARY KEY,
+    edge_server_id  BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
+    tenant_id       TEXT NOT NULL,
+    source_id       TEXT NOT NULL,
+    data            JSONB NOT NULL,
+    version         BIGINT NOT NULL DEFAULT 0,
+    synced_at       BIGINT NOT NULL,
+    UNIQUE (edge_server_id, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_cloud_employees_tenant ON cloud_employees(tenant_id);

@@ -484,6 +484,31 @@ pub async fn get_order_detail(
     }))
 }
 
+/// GET /api/tenant/stores/:id/red-flags?from=&to=
+pub async fn get_store_red_flags(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Query(query): Query<OverviewQuery>,
+) -> ApiResult<tenant_queries::RedFlagsResponse> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let red_flags = tenant_queries::get_red_flags(
+        &state.pool,
+        store_id,
+        &identity.tenant_id,
+        query.from,
+        query.to,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Red flags query error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    Ok(Json(red_flags))
+}
+
 /// POST /api/tenant/stores/:id/commands
 #[derive(Deserialize)]
 pub struct CreateCommandRequest {

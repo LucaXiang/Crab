@@ -836,6 +836,118 @@ pub async fn get_tenant_overview(
     })
 }
 
+// ── Red Flags 监控 ──
+
+#[derive(Debug, serde::Serialize)]
+pub struct RedFlagsSummary {
+    pub item_removals: i64,
+    pub item_comps: i64,
+    pub order_voids: i64,
+    pub order_discounts: i64,
+    pub price_modifications: i64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct OperatorRedFlags {
+    pub operator_id: Option<i64>,
+    pub operator_name: Option<String>,
+    pub item_removals: i64,
+    pub item_comps: i64,
+    pub order_voids: i64,
+    pub order_discounts: i64,
+    pub price_modifications: i64,
+    pub total_flags: i64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RedFlagsResponse {
+    pub summary: RedFlagsSummary,
+    pub operator_breakdown: Vec<OperatorRedFlags>,
+}
+
+pub async fn get_red_flags(
+    pool: &PgPool,
+    edge_server_id: i64,
+    tenant_id: &str,
+    from: i64,
+    to: i64,
+) -> Result<RedFlagsResponse, BoxError> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        operator_id: Option<i64>,
+        operator_name: Option<String>,
+        item_removals: i64,
+        item_comps: i64,
+        order_voids: i64,
+        order_discounts: i64,
+        price_modifications: i64,
+    }
+
+    let rows: Vec<Row> = sqlx::query_as(
+        r#"
+        SELECT
+            e.operator_id,
+            e.operator_name,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_REMOVED') AS item_removals,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_COMPED') AS item_comps,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_VOIDED') AS order_voids,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_MODIFIED') AS price_modifications
+        FROM cloud_order_events e
+        JOIN cloud_archived_orders o ON o.id = e.archived_order_id
+        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
+            AND e.timestamp >= $3 AND e.timestamp < $4
+            AND e.event_type IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
+        GROUP BY e.operator_id, e.operator_name
+        ORDER BY COUNT(*) DESC
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(tenant_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await?;
+
+    let mut summary = RedFlagsSummary {
+        item_removals: 0,
+        item_comps: 0,
+        order_voids: 0,
+        order_discounts: 0,
+        price_modifications: 0,
+    };
+
+    let mut operator_breakdown = Vec::new();
+    for row in rows {
+        summary.item_removals += row.item_removals;
+        summary.item_comps += row.item_comps;
+        summary.order_voids += row.order_voids;
+        summary.order_discounts += row.order_discounts;
+        summary.price_modifications += row.price_modifications;
+
+        let total_flags = row.item_removals
+            + row.item_comps
+            + row.order_voids
+            + row.order_discounts
+            + row.price_modifications;
+        operator_breakdown.push(OperatorRedFlags {
+            operator_id: row.operator_id,
+            operator_name: row.operator_name,
+            item_removals: row.item_removals,
+            item_comps: row.item_comps,
+            order_voids: row.order_voids,
+            order_discounts: row.order_discounts,
+            price_modifications: row.price_modifications,
+            total_flags,
+        });
+    }
+
+    Ok(RedFlagsResponse {
+        summary,
+        operator_breakdown,
+    })
+}
+
 /// Verify edge-server belongs to tenant, return edge_server_id
 pub async fn verify_store_ownership(
     pool: &PgPool,

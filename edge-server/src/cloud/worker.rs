@@ -733,9 +733,8 @@ impl CloudWorker {
         let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
 
         // Whitelist: only forward resources that crab-cloud knows how to store.
-        // Everything else (shift, table, zone, employee, etc.) is local-only.
         match payload.resource.as_str() {
-            "product" | "category" | "daily_report" | "store_info" => {}
+            "product" | "category" | "daily_report" | "store_info" | "shift" | "employee" => {}
             _ => return None,
         }
 

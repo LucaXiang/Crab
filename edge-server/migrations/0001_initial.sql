@@ -640,17 +640,20 @@ CREATE INDEX idx_archived_payment_method ON archived_order_payment(method);
 CREATE INDEX idx_archived_payment_time ON archived_order_payment(time);
 
 CREATE TABLE archived_order_event (
-    id          INTEGER PRIMARY KEY,
-    order_pk    INTEGER NOT NULL REFERENCES archived_order(id),
-    seq         INTEGER NOT NULL DEFAULT 0,
-    event_type  TEXT    NOT NULL,
-    timestamp   INTEGER NOT NULL,
-    data        TEXT,           -- JSON string (event payload)
-    prev_hash   TEXT    NOT NULL,
-    curr_hash   TEXT    NOT NULL
+    id            INTEGER PRIMARY KEY,
+    order_pk      INTEGER NOT NULL REFERENCES archived_order(id),
+    seq           INTEGER NOT NULL DEFAULT 0,
+    event_type    TEXT    NOT NULL,
+    timestamp     INTEGER NOT NULL,
+    data          TEXT,           -- JSON string (event payload)
+    prev_hash     TEXT    NOT NULL,
+    curr_hash     TEXT    NOT NULL,
+    operator_id   INTEGER,
+    operator_name TEXT
 );
 CREATE INDEX idx_archived_event_order ON archived_order_event(order_pk);
 CREATE INDEX idx_archived_event_time ON archived_order_event(timestamp);
+CREATE INDEX idx_archived_event_operator ON archived_order_event(operator_id);
 
 -- Independent payment table for statistics
 CREATE TABLE payment (

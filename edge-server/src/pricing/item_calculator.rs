@@ -12,7 +12,10 @@ use shared::models::{AdjustmentType, PriceRule, ProductScope, RuleType};
 use shared::order::AppliedRule;
 use tracing::{debug, trace};
 
+use crate::order_money::{to_decimal, to_f64};
+
 /// Rounding strategy for monetary values (2 decimal places, half-up)
+#[allow(dead_code)]
 const DECIMAL_PLACES: u32 = 2;
 
 /// Result of item price calculation
@@ -49,23 +52,6 @@ impl Default for ItemCalculationResult {
             applied_rules: vec![],
         }
     }
-}
-
-// ==================== Conversion Helpers ====================
-
-/// Convert f64 to Decimal for calculation
-#[inline]
-pub fn to_decimal(value: f64) -> Decimal {
-    Decimal::from_f64(value).unwrap_or_default()
-}
-
-/// Convert Decimal back to f64 for storage, rounded to 2 decimal places
-#[inline]
-pub fn to_f64(value: Decimal) -> f64 {
-    value
-        .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
-        .to_f64()
-        .unwrap_or_default()
 }
 
 // ==================== Priority Calculation ====================

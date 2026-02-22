@@ -627,10 +627,14 @@ impl OrderArchiveService {
 
             let seq = i32::try_from(i).unwrap_or(i32::MAX);
 
+            let op_id = Some(event.operator_id);
+            let op_name = Some(event.operator_name.as_str());
+
             sqlx::query!(
                 "INSERT INTO archived_order_event (\
-                    order_pk, seq, event_type, timestamp, data, prev_hash, curr_hash\
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    order_pk, seq, event_type, timestamp, data, prev_hash, curr_hash, \
+                    operator_id, operator_name\
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 order_pk,
                 seq,
                 event_type_str,
@@ -638,6 +642,8 @@ impl OrderArchiveService {
                 payload_str,
                 prev_event_hash,
                 curr_event_hash,
+                op_id,
+                op_name,
             )
             .execute(&mut *tx)
             .await

@@ -141,6 +141,18 @@ pub async fn upsert_resource(
             .await
         }
         "store_info" => upsert_store_info(pool, edge_server_id, tenant_id, item, now).await,
+        "shift" => upsert_generic(pool, "cloud_shifts", edge_server_id, tenant_id, item, now).await,
+        "employee" => {
+            upsert_generic(
+                pool,
+                "cloud_employees",
+                edge_server_id,
+                tenant_id,
+                item,
+                now,
+            )
+            .await
+        }
         other => Err(format!("Unknown resource type: {other}").into()),
     }
 }
@@ -303,7 +315,30 @@ async fn upsert_archived_order(
         .await?;
     }
 
-    // 5. UPSERT cloud_order_details (30 天缓存，完整详情)
+    // 5. Replace cloud_order_events (永久，用于 Red Flags 监控)
+    sqlx::query("DELETE FROM cloud_order_events WHERE archived_order_id = $1")
+        .bind(order_row_id)
+        .execute(&mut *tx)
+        .await?;
+
+    for ev in &detail_sync.detail.events {
+        sqlx::query(
+            r#"
+            INSERT INTO cloud_order_events (archived_order_id, seq, event_type, timestamp, operator_id, operator_name)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            "#,
+        )
+        .bind(order_row_id)
+        .bind(ev.seq)
+        .bind(&ev.event_type)
+        .bind(ev.timestamp)
+        .bind(ev.operator_id)
+        .bind(&ev.operator_name)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // 6. UPSERT cloud_order_details (30 天缓存，完整详情)
     let detail_json = serde_json::to_value(&detail_sync.detail)?;
     sqlx::query(
         r#"
@@ -366,6 +401,12 @@ async fn delete_resource(
         "daily_report" => sqlx::query(
             "DELETE FROM cloud_daily_reports WHERE edge_server_id = $1 AND source_id = $2",
         ),
+        "shift" => {
+            sqlx::query("DELETE FROM cloud_shifts WHERE edge_server_id = $1 AND source_id = $2")
+        }
+        "employee" => {
+            sqlx::query("DELETE FROM cloud_employees WHERE edge_server_id = $1 AND source_id = $2")
+        }
         other => return Err(format!("Cannot delete resource type: {other}").into()),
     };
 

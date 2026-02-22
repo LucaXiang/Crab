@@ -37,6 +37,20 @@ export const es: Record<string, string> = {
 	'nav.daily_report': 'Informe diario',
 	'nav.products': 'Productos',
 	'nav.commands': 'Comandos',
+	'nav.red_flags': 'Alertas',
+
+	// Red Flags
+	'red_flags.title': 'Alertas de operación',
+	'red_flags.item_removals': 'Eliminaciones',
+	'red_flags.item_comps': 'Invitaciones',
+	'red_flags.order_voids': 'Anulaciones',
+	'red_flags.order_discounts': 'Descuentos',
+	'red_flags.price_modifications': 'Modificaciones',
+	'red_flags.operator': 'Empleado',
+	'red_flags.total': 'Total alertas',
+	'red_flags.no_data': 'Sin alertas en este período',
+	'red_flags.unknown_operator': 'Sistema',
+	'red_flags.compliance': 'Datos protegidos bajo normativa VeriFactu. Cadena de hashes SHA-256 verificable.',
 
 	// Dashboard
 	'dash.title': 'Resumen',

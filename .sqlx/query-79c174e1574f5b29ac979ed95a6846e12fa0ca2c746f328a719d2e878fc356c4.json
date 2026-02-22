@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO archived_order_event (order_pk, seq, event_type, timestamp, data, prev_hash, curr_hash, operator_id, operator_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "79c174e1574f5b29ac979ed95a6846e12fa0ca2c746f328a719d2e878fc356c4"
+}

@@ -125,7 +125,18 @@ pub struct TaxDesglose {
     pub tax_amount: rust_decimal::Decimal,
 }
 
-/// 订单详情载荷（items + payments，不含 events/timeline）
+/// 订单事件同步载荷（edge→cloud 推送，用于 Red Flags 监控）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderEventSync {
+    pub seq: i32,
+    pub event_type: String,
+    pub timestamp: i64,
+    pub operator_id: Option<i64>,
+    pub operator_name: Option<String>,
+    pub data: Option<String>,
+}
+
+/// 订单详情载荷（items + payments + events）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderDetailPayload {
     pub zone_name: Option<String>,
@@ -151,6 +162,8 @@ pub struct OrderDetailPayload {
     pub member_name: Option<String>,
     pub items: Vec<OrderItemSync>,
     pub payments: Vec<OrderPaymentSync>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<OrderEventSync>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
