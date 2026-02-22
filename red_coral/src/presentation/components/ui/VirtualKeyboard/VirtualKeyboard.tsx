@@ -152,13 +152,15 @@ export const VirtualKeyboard: React.FC = () => {
   const [useSymbols, setUseSymbols] = React.useState(false);
 
   // Sync input value from activeElement to simple-keyboard
+  // Also re-syncs when useSymbols changes, because the key prop change causes
+  // simple-keyboard to unmount/remount with empty internal state.
   useEffect(() => {
     if (visible && keyboardRef.current) {
       const val = getCurrentInputValue();
       keyboardRef.current.setInput(val);
       keyboardRef.current.setCaretPosition(val.length);
     }
-  }, [visible, activeElement]);
+  }, [visible, activeElement, useSymbols]);
 
   // Set CSS variable + body class based on keyboard visibility
   useEffect(() => {
@@ -339,7 +341,16 @@ export const VirtualKeyboard: React.FC = () => {
     >
       <Keyboard
         key={`${language}-${layout}-${useSymbols}`}
-        keyboardRef={(r) => { keyboardRef.current = r; }}
+        keyboardRef={(r) => {
+          keyboardRef.current = r;
+          // Sync DOM value into newly mounted keyboard instance
+          // (key prop changes cause unmount/remount with empty internal state)
+          if (r) {
+            const val = getCurrentInputValue();
+            r.setInput(val);
+            r.setCaretPosition(val.length);
+          }
+        }}
         layout={currentLayout}
         layoutName={layoutName}
         display={currentDisplay}
