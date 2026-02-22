@@ -184,7 +184,8 @@ impl Server {
     async fn cleanup(state: ServerState, background_tasks: BackgroundTasks) {
         state.audit_service.on_shutdown();
         background_tasks.shutdown().await;
-        state.pool.close().await;
+        // 取出 audit worker handle，drop state 关闭 audit mpsc sender → worker drain 残留消息
+        let pool = state.pool.clone();
         let audit_handle = state.audit_worker_handle.lock().await.take();
         drop(state);
         if let Some(handle) = audit_handle
@@ -194,6 +195,8 @@ impl Server {
         {
             tracing::warn!("Audit worker drain timed out after 5s");
         }
+        // audit worker 完成后再关闭 pool，确保残留审计消息写入成功
+        pool.close().await;
     }
 
     /// Wait for activation and load TLS config (可取消)
