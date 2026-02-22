@@ -129,10 +129,17 @@ const patchedSpanish = patchBottomRow(spanishLayout.layout);
 const patchedEnglish = patchBottomRow(englishLayout.layout);
 const patchedChinese = patchBottomRow(chineseLayout.layout);
 
+/** Merge the symbols rows into every language layout as a "symbols" layoutName.
+ *  This avoids changing the `key` prop (which would unmount/remount the keyboard
+ *  and lose its internal input buffer). */
+function addSymbolsLayout(layout: Record<string, string[]>): Record<string, string[]> {
+  return { ...layout, symbols: symbolsLayout.default };
+}
+
 const layoutsByLanguage: Record<KeyboardLanguage, Record<string, string[]>> = {
-  spanish: patchedSpanish,
-  english: patchedEnglish,
-  chinese: patchedChinese,
+  spanish: addSymbolsLayout(patchedSpanish),
+  english: addSymbolsLayout(patchedEnglish),
+  chinese: addSymbolsLayout(patchedChinese),
 };
 
 /** Set the --vkb-height CSS variable on :root */
@@ -149,18 +156,15 @@ export const VirtualKeyboard: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const layoutNameRef = useRef<string>('default');
   const [layoutName, setLayoutName] = React.useState('default');
-  const [useSymbols, setUseSymbols] = React.useState(false);
 
   // Sync input value from activeElement to simple-keyboard
-  // Also re-syncs when useSymbols changes, because the key prop change causes
-  // simple-keyboard to unmount/remount with empty internal state.
   useEffect(() => {
     if (visible && keyboardRef.current) {
       const val = getCurrentInputValue();
       keyboardRef.current.setInput(val);
       keyboardRef.current.setCaretPosition(val.length);
     }
-  }, [visible, activeElement, useSymbols]);
+  }, [visible, activeElement]);
 
   // Set CSS variable + body class based on keyboard visibility
   useEffect(() => {
@@ -207,9 +211,8 @@ export const VirtualKeyboard: React.FC = () => {
     });
   }, [visible, activeElement]);
 
-  // Reset symbols state when layout or language changes
+  // Reset to default layout when layout type or language changes
   useEffect(() => {
-    setUseSymbols(false);
     setLayoutName('default');
     layoutNameRef.current = 'default';
     if (keyboardRef.current) {
@@ -292,11 +295,13 @@ export const VirtualKeyboard: React.FC = () => {
       return;
     }
     if (button === '{symbols}') {
-      setUseSymbols(true);
+      layoutNameRef.current = 'symbols';
+      setLayoutName('symbols');
       return;
     }
     if (button === '{abc}') {
-      setUseSymbols(false);
+      layoutNameRef.current = 'default';
+      setLayoutName('default');
       return;
     }
     if (button === '{enter}') {
@@ -320,11 +325,10 @@ export const VirtualKeyboard: React.FC = () => {
 
   const isNumber = layout === 'number';
   const isChinese = language === 'chinese';
+  const isSymbols = layoutName === 'symbols';
   const currentLayout = isNumber
     ? numberLayout
-    : useSymbols
-      ? symbolsLayout
-      : layoutsByLanguage[language];
+    : layoutsByLanguage[language];
   const currentDisplay = isNumber
     ? numberDisplay
     : { ...textDisplay, '{lang}': langLabel[language] };
@@ -340,11 +344,11 @@ export const VirtualKeyboard: React.FC = () => {
       }}
     >
       <Keyboard
-        key={`${language}-${layout}-${useSymbols}`}
+        key={`${language}-${layout}`}
         keyboardRef={(r) => {
           keyboardRef.current = r;
-          // Sync DOM value into newly mounted keyboard instance
-          // (key prop changes cause unmount/remount with empty internal state)
+          // Language/layout changes still cause remount via key prop —
+          // sync DOM value into the newly mounted keyboard instance.
           if (r) {
             const val = getCurrentInputValue();
             r.setInput(val);
@@ -361,7 +365,7 @@ export const VirtualKeyboard: React.FC = () => {
         physicalKeyboardHighlight={false}
         mergeDisplay
         theme={`hg-theme-default hg-layout-default vkb-theme ${isNumber ? 'vkb-number' : 'vkb-text'}`}
-        {...(!isNumber && isChinese && !useSymbols ? {
+        {...(!isNumber && isChinese && !isSymbols ? {
           layoutCandidates: chineseCandidates,
           layoutCandidatesPageSize: 5,
         } : {})}
