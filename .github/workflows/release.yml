@@ -15,7 +15,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       id-token: write
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +60,7 @@ jobs:
           aws-region: eu-south-2
 
       - name: Upload to S3 and generate manifest
+        id: upload
         shell: bash
         env:
           S3_BUCKET: ${{ secrets.UPDATE_S3_BUCKET }}
@@ -102,9 +103,28 @@ jobs:
           echo "Signature loaded from: $EXE_SIG"
 
           # Generate update manifest (Tauri v2 updater format)
-          printf '{\n  "version": "%s",\n  "notes": "Release %s",\n  "pub_date": "%s",\n  "platforms": {\n    "windows-x86_64": {\n      "signature": "%s",\n      "url": "%s/updates/%s"\n    }\n  }\n}\n' \
-            "${VERSION#v}" "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIGNATURE" "$DOWNLOAD_BASE" "$INSTALLER_NAME" \
-            > latest.json
+          # MANDATORY_MIN_VERSION: clients below this version are forced to update.
+          # Set via GitHub Actions variable for critical releases, e.g. "1.1.0"
+          # Persists across subsequent non-critical releases — only bump forward.
+          if [ -n "${MANDATORY_MIN_VERSION:-}" ]; then
+            MANDATORY_FIELD="\"mandatory_min_version\": \"${MANDATORY_MIN_VERSION}\","
+          else
+            MANDATORY_FIELD=""
+          fi
+          cat > latest.json <<MANIFEST
+{
+  "version": "${VERSION#v}",
+  "notes": "Release ${VERSION}",
+  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  ${MANDATORY_FIELD}
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "${SIGNATURE}",
+      "url": "${DOWNLOAD_BASE}/updates/${INSTALLER_NAME}"
+    }
+  }
+}
+MANIFEST
 
           aws s3 cp latest.json "s3://${S3_BUCKET}/updates/latest.json" \
             --content-type "application/json"
@@ -113,3 +133,18 @@ jobs:
           echo "==> Release ${VERSION} uploaded successfully"
           echo "    Installer: s3://${S3_BUCKET}/releases/${VERSION}/"
           echo "    Updater:   s3://${S3_BUCKET}/updates/latest.json"
+
+          # Save paths for GitHub Release step
+          echo "INSTALLER_PATH=${INSTALLER}" >> "$GITHUB_OUTPUT"
+          echo "INSTALLER_NAME=${INSTALLER_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          gh release create "$VERSION" \
+            --title "RedCoral POS $VERSION" \
+            --generate-notes \
+            --draft \
+            "${{ steps.upload.outputs.INSTALLER_PATH }}#${{ steps.upload.outputs.INSTALLER_NAME }}"

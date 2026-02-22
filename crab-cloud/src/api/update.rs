@@ -11,11 +11,17 @@ use axum::response::IntoResponse;
 use crate::state::AppState;
 
 /// S3 manifest structure (uploaded by CI)
+///
+/// `mandatory_min_version`: 低于此版本的客户端强制更新。
+/// 例如 v1.1 是关键修复，设为 "1.1.0"；之后发 v1.2/v1.3 时保留该值，
+/// v1.0 用户仍会被强制更新，v1.1+ 用户则正常提示。
 #[derive(serde::Deserialize)]
 struct UpdateManifest {
     version: String,
     notes: String,
     pub_date: String,
+    #[serde(default)]
+    mandatory_min_version: Option<String>,
     platforms: std::collections::HashMap<String, PlatformEntry>,
 }
 
@@ -106,9 +112,35 @@ pub async fn check_update(
         },
     );
 
+    // Client version < mandatory_min_version → forced update
+    let is_mandatory = manifest
+        .mandatory_min_version
+        .as_deref()
+        .is_some_and(|min| {
+            !is_newer(&current_version, min)
+                && current_version
+                    .strip_prefix('v')
+                    .unwrap_or(&current_version)
+                    != min.strip_prefix('v').unwrap_or(min)
+        });
+
+    if is_mandatory {
+        tracing::info!(
+            current = %current_version,
+            mandatory_min = ?manifest.mandatory_min_version,
+            "Mandatory update required"
+        );
+    }
+
+    let notes = if is_mandatory {
+        format!("[MANDATORY]\n{}", manifest.notes)
+    } else {
+        manifest.notes
+    };
+
     Json(UpdateResponse {
         version: manifest.version,
-        notes: manifest.notes,
+        notes,
         pub_date: manifest.pub_date,
         platforms,
     })
@@ -189,5 +221,29 @@ mod tests {
         assert!(!is_newer("1.1.2", "1.1.2"));
         assert!(!is_newer("1.1.1", "1.1.2"));
         assert!(is_newer("v1.2.0", "1.1.2"));
+    }
+
+    /// Helper to test mandatory logic in isolation (mirrors check_update logic)
+    fn is_mandatory(mandatory_min_version: Option<&str>, current: &str) -> bool {
+        mandatory_min_version.is_some_and(|min| {
+            !is_newer(current, min)
+                && current.strip_prefix('v').unwrap_or(current)
+                    != min.strip_prefix('v').unwrap_or(min)
+        })
+    }
+
+    #[test]
+    fn test_mandatory_min_version() {
+        // v1.0 < min 1.1.0 → forced
+        assert!(is_mandatory(Some("1.1.0"), "1.0.0"));
+        // v1.1.0 == min 1.1.0 → NOT forced (already at min)
+        assert!(!is_mandatory(Some("1.1.0"), "1.1.0"));
+        // v1.2.0 > min 1.1.0 → NOT forced
+        assert!(!is_mandatory(Some("1.1.0"), "1.2.0"));
+        // no mandatory_min_version → NOT forced
+        assert!(!is_mandatory(None, "1.0.0"));
+        // v prefix handling
+        assert!(is_mandatory(Some("1.1.0"), "v1.0.0"));
+        assert!(!is_mandatory(Some("1.1.0"), "v1.1.0"));
     }
 }

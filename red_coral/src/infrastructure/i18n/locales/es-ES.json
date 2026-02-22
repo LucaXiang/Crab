@@ -735,6 +735,7 @@
       "avg_guest_spend": "Gasto/comensal",
       "avg_dining_time": "Tiempo medio",
       "voided_orders": "Anulados",
+      "loss_orders": "Pérdidas",
       "total_discount": "Descuentos",
       "orders": "Pedidos",
       "revenue": "Ingresos",
@@ -2599,9 +2600,12 @@
   },
   "update": {
     "available": "Nueva versión v{version} disponible",
+    "mandatory_available": "Actualización crítica v{version}, instalación obligatoria",
     "install": "Actualizar",
     "downloading": "Descargando actualización... {progress}%",
     "ready": "Actualización lista, reinicie para completar",
-    "restart": "Reiniciar"
+    "restart": "Reiniciar",
+    "error": "Error al verificar actualizaciones",
+    "later": "Más tarde"
   }
 }

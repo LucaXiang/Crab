@@ -734,7 +734,8 @@
       "other_revenue": "其他收入",
       "avg_guest_spend": "人均消费",
       "avg_dining_time": "平均用餐时间",
-      "voided_orders": "作废订单数",
+      "voided_orders": "作废订单",
+      "loss_orders": "损失订单",
       "total_discount": "总折扣",
       "orders": "订单",
       "revenue": "营业额",
@@ -2599,9 +2600,12 @@
   },
   "update": {
     "available": "新版本 v{version} 可用",
+    "mandatory_available": "关键更新 v{version}，必须立即安装",
     "install": "立即更新",
     "downloading": "正在下载更新... {progress}%",
     "ready": "更新已就绪，重启以完成安装",
-    "restart": "重启"
+    "restart": "重启",
+    "error": "更新检查失败",
+    "later": "稍后"
   }
 }
