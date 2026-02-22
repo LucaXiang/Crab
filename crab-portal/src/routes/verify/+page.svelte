@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Mail, KeyRound, ArrowRight, RotateCw } from 'lucide-svelte';
 	import { t, apiErrorMessage } from '$lib/i18n';
@@ -14,7 +15,7 @@
 	let resendCooldown = $state(0);
 
 	// Read email from sessionStorage or URL fallback
-	if (typeof window !== 'undefined') {
+	onMount(() => {
 		email = sessionStorage.getItem('redcoral-verify-email') ?? '';
 		if (!email) {
 			// Fallback: check URL param (for users who refreshed or bookmarked)
@@ -24,7 +25,7 @@
 		if (!email) {
 			goto('/register');
 		}
-	}
+	});
 
 	function handleCodeInput(e: Event) {
 		const input = e.target as HTMLInputElement;

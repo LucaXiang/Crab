@@ -10,7 +10,7 @@
 	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 
 	const storeId = Number(page.params.id);
-	const orderKey = page.params.key;
+	const orderKey = page.params.key ?? '';
 
 	let detail = $state<OrderDetailResponse | null>(null);
 	let loading = $state(true);

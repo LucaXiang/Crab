@@ -18,7 +18,9 @@
 		Download,
 		Upload,
 		ShieldCheck,
-		FileKey
+		FileKey,
+		MapPin,
+		Phone
 	} from 'lucide-svelte';
 	import { t, apiErrorMessage } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
@@ -160,28 +162,6 @@
 			error = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
 			checkoutLoading = '';
-		}
-	}
-
-	function statusLabel(status: string): string {
-		switch (status) {
-			case 'active':
-				return $t('dash.active');
-			case 'suspended':
-				return $t('dash.suspended');
-			default:
-				return $t('dash.cancelled');
-		}
-	}
-
-	function statusColor(status: string): string {
-		switch (status) {
-			case 'active':
-				return 'text-green-600 bg-green-50';
-			case 'suspended':
-				return 'text-amber-600 bg-amber-50';
-			default:
-				return 'text-red-600 bg-red-50';
 		}
 	}
 </script>
@@ -365,6 +345,7 @@
 						{$t('onboard.monthly')}
 					</span>
 					<button
+						aria-label="Toggle annual billing"
 						onclick={() => (isAnnual = !isAnnual)}
 						class="relative w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coral-500 focus:ring-offset-2 {isAnnual
 							? 'bg-coral-500'
@@ -500,68 +481,6 @@
 				</div>
 			</div>
 		{:else if profile?.subscription}
-			<!-- Subscription Card -->
-			<div class="bg-white rounded-2xl border border-slate-200 p-6">
-				<div class="flex items-start justify-between">
-					<div>
-						<h2 class="font-heading font-bold text-lg text-slate-900 mb-1">
-							{$t('dash.subscription')}
-						</h2>
-						<p class="text-sm text-slate-500">{profile.profile.email}</p>
-					</div>
-					<span
-						class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium {statusColor(
-							profile?.subscription?.status ?? ''
-						)}"
-					>
-						{#if profile?.subscription?.status === 'active'}
-							<CheckCircle class="w-3.5 h-3.5" />
-						{:else if profile?.subscription?.status === 'suspended'}
-							<AlertTriangle class="w-3.5 h-3.5" />
-						{:else}
-							<XCircle class="w-3.5 h-3.5" />
-						{/if}
-						{statusLabel(profile?.subscription?.status ?? '')}
-					</span>
-				</div>
-				<div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-					<div>
-						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.plan')}</p>
-						<p class="text-sm font-semibold text-slate-900 capitalize">
-							{profile?.subscription?.plan}
-						</p>
-					</div>
-					{#if profile?.subscription?.current_period_end}
-						<div>
-							<p class="text-xs text-slate-400 mb-0.5">{$t('dash.next_billing')}</p>
-							<p class="text-sm font-semibold text-slate-900">
-								{formatDate((profile?.subscription?.current_period_end ?? 0) * 1000)}
-							</p>
-						</div>
-					{/if}
-					<div>
-						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.quota_servers')}</p>
-						<p class="text-sm font-semibold text-slate-900">
-							{stores.length} / {profile?.subscription?.max_edge_servers ?? 0}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.stores_count')}</p>
-						<p class="text-sm font-semibold text-slate-900">{stores.length}</p>
-					</div>
-				</div>
-				<div class="mt-4">
-					<button
-						onclick={handleBillingPortal}
-						disabled={billingLoading}
-						class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm px-4 py-2 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-50"
-					>
-						<CreditCard class="w-4 h-4" />
-						<span>{$t('dash.manage_billing')}</span>
-					</button>
-				</div>
-			</div>
-
 			<!-- Tenant-wide KPI summary (all stores combined, today) -->
 			<div class="space-y-4">
 				<div class="flex items-center justify-between">
@@ -621,22 +540,34 @@
 						{#each stores as store}
 							<a
 								href="/stores/{store.id}"
-								class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors duration-150"
+								class="flex flex-col md:flex-row md:items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors duration-150 gap-3 md:gap-0"
 							>
 								<div class="flex items-center gap-3">
-									<div class="w-10 h-10 bg-coral-100 rounded-lg flex items-center justify-center">
+									<div class="w-10 h-10 bg-coral-100 rounded-lg flex items-center justify-center shrink-0">
 										<Server class="w-5 h-5 text-coral-600" />
 									</div>
-									<div>
-										<p class="text-sm font-medium text-slate-900">
-											{store.store_info?.name ?? `Store #${store.id}`}
+									<div class="min-w-0">
+										<p class="text-sm font-medium text-slate-900 truncate">
+											{store.name ?? store.store_info?.name ?? `Store #${store.id}`}
 										</p>
-										<p class="text-xs text-slate-400">
+										<p class="text-xs text-slate-400 truncate mb-1">
 											ID: {store.device_id.slice(0, 12)}...
 										</p>
+										{#if store.address}
+											<div class="flex items-center gap-1 text-xs text-slate-500 truncate mb-0.5">
+												<MapPin class="w-3 h-3 text-slate-400" />
+												<span>{store.address}</span>
+											</div>
+										{/if}
+										{#if store.phone}
+											<div class="flex items-center gap-1 text-xs text-slate-500 truncate">
+												<Phone class="w-3 h-3 text-slate-400" />
+												<span>{store.phone}</span>
+											</div>
+										{/if}
 									</div>
 								</div>
-								<div class="flex items-center gap-3">
+								<div class="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto pl-13 md:pl-0">
 									<div class="text-right">
 										<div class="inline-flex items-center gap-1 text-xs text-slate-500">
 											<Clock class="w-3.5 h-3.5" />
@@ -655,11 +586,12 @@
 				{/if}
 			</div>
 
+
 			<!-- Download App -->
 			<div class="bg-white rounded-2xl border border-slate-200 p-6">
-				<div class="flex items-center justify-between">
+				<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
 					<div class="flex items-center gap-3">
-						<div class="w-10 h-10 bg-coral-100 rounded-lg flex items-center justify-center">
+						<div class="w-10 h-10 bg-coral-100 rounded-lg flex items-center justify-center shrink-0">
 							<Download class="w-5 h-5 text-coral-600" />
 						</div>
 						<div>
@@ -669,7 +601,7 @@
 					</div>
 					<a
 						href="https://auth.redcoral.app/api/download/latest"
-						class="inline-flex items-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors"
+						class="inline-flex items-center justify-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors w-full md:w-auto"
 					>
 						<Download class="w-4 h-4" />
 						{$t('dash.download_windows')}

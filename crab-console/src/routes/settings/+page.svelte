@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { Lock, Mail, CreditCard, Check } from 'lucide-svelte';
+	import { Lock, Mail, CreditCard, Check, AlertTriangle, XCircle, CheckCircle } from 'lucide-svelte';
 	import { t, apiErrorMessage } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import {
@@ -14,6 +14,7 @@
 		ApiError,
 		type ProfileResponse
 	} from '$lib/api';
+	import { formatDate } from '$lib/format';
 	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 
 	let profile = $state<ProfileResponse | null>(null);
@@ -133,6 +134,28 @@
 			billingLoading = false;
 		}
 	}
+
+	function statusLabel(status: string): string {
+		switch (status) {
+			case 'active':
+				return $t('dash.active');
+			case 'suspended':
+				return $t('dash.suspended');
+			default:
+				return $t('dash.cancelled');
+		}
+	}
+
+	function statusColor(status: string): string {
+		switch (status) {
+			case 'active':
+				return 'text-green-600 bg-green-50';
+			case 'suspended':
+				return 'text-amber-600 bg-amber-50';
+			default:
+				return 'text-red-600 bg-red-50';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -151,6 +174,70 @@
 				</svg>
 			</div>
 		{:else}
+			<!-- Subscription -->
+			{#if profile?.subscription}
+				<section class="bg-white rounded-2xl border border-slate-200 p-6">
+					<div class="flex items-start justify-between mb-4">
+						<h2 class="font-heading font-bold text-base text-slate-900 flex items-center gap-2">
+							<CreditCard class="w-4 h-4 text-slate-500" />
+							{$t('dash.subscription')}
+						</h2>
+						<span
+							class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium {statusColor(
+								profile?.subscription?.status ?? ''
+							)}"
+						>
+							{#if profile?.subscription?.status === 'active'}
+								<CheckCircle class="w-3.5 h-3.5" />
+							{:else if profile?.subscription?.status === 'suspended'}
+								<AlertTriangle class="w-3.5 h-3.5" />
+							{:else}
+								<XCircle class="w-3.5 h-3.5" />
+							{/if}
+							{statusLabel(profile?.subscription?.status ?? '')}
+						</span>
+					</div>
+					
+					<div class="grid grid-cols-2 gap-4 mb-4">
+						<div>
+							<p class="text-xs text-slate-400 mb-0.5">{$t('dash.plan')}</p>
+							<p class="text-sm font-semibold text-slate-900 capitalize">
+								{profile?.subscription?.plan}
+							</p>
+						</div>
+						{#if profile?.subscription?.current_period_end}
+							<div>
+								<p class="text-xs text-slate-400 mb-0.5">{$t('dash.next_billing')}</p>
+								<p class="text-sm font-semibold text-slate-900">
+									{formatDate((profile?.subscription?.current_period_end ?? 0) * 1000)}
+								</p>
+							</div>
+						{/if}
+						<div>
+							<p class="text-xs text-slate-400 mb-0.5">{$t('dash.quota_servers')}</p>
+							<p class="text-sm font-semibold text-slate-900">
+								{profile?.subscription?.max_edge_servers ?? 0}
+							</p>
+						</div>
+						<div>
+							<p class="text-xs text-slate-400 mb-0.5">{$t('dash.quota_clients')}</p>
+							<p class="text-sm font-semibold text-slate-900">
+								{profile?.subscription?.max_clients ?? 0}
+							</p>
+						</div>
+					</div>
+
+					<button
+						onclick={handleBillingPortal}
+						disabled={billingLoading}
+						class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+					>
+						<CreditCard class="w-4 h-4" />
+						{$t('dash.manage_billing')}
+					</button>
+				</section>
+			{/if}
+
 			<!-- Profile -->
 			<section class="bg-white rounded-2xl border border-slate-200 p-6">
 				<h2 class="font-heading font-bold text-base text-slate-900 mb-4">{$t('settings.profile')}</h2>
@@ -178,7 +265,7 @@
 						{/if}
 					</div>
 					<div>
-						<label class="block text-sm font-medium text-slate-700 mb-1">{$t('settings.email')}</label>
+						<p class="text-sm font-medium text-slate-700 mb-1">{$t('settings.email')}</p>
 						<p class="text-sm text-slate-600">{profile?.profile.email}</p>
 					</div>
 				</div>

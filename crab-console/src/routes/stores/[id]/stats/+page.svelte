@@ -5,18 +5,27 @@
 	import { ArrowLeft, ScrollText } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
-	import { getStats, ApiError, type DailyReportEntry } from '$lib/api';
+	import { getStats, getStoreOverview, ApiError, type DailyReportEntry, type StoreOverview } from '$lib/api';
 	import { formatCurrency } from '$lib/format';
 	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
+	import StoreOverviewDisplay from '$lib/components/StoreOverviewDisplay.svelte';
 
 	const storeId = Number(page.params.id);
 
 	let reports = $state<DailyReportEntry[]>([]);
+	let todayOverview = $state<StoreOverview | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 
 	let token = '';
 	authToken.subscribe((v) => (token = v ?? ''));
+
+	function getTodayRange(): { from: number; to: number } {
+		const now = new Date();
+		const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+		const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+		return { from: start.getTime(), to: end.getTime() };
+	}
 
 	interface DailyReport {
 		business_date: string;
@@ -50,7 +59,13 @@
 		}
 
 		try {
-			reports = await getStats(token, storeId);
+			const { from, to } = getTodayRange();
+			const [reportsData, overviewData] = await Promise.all([
+				getStats(token, storeId),
+				getStoreOverview(token, storeId, from, to)
+			]);
+			reports = reportsData;
+			todayOverview = overviewData;
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 401) {
 				clearAuth();
@@ -97,41 +112,56 @@
 			<div class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
 				{error}
 			</div>
-		{:else if reports.length > 0}
-			<div class="bg-white rounded-2xl border border-slate-200 p-6">
-				<div class="overflow-x-auto">
-					<table class="w-full text-sm">
-						<thead>
-							<tr class="border-b border-slate-100">
-								<th class="text-left py-2 text-xs font-medium text-slate-400">{$t('stats.business_date')}</th>
-								<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.total_sales')}</th>
-								<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.completed_orders')}</th>
-								<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.void_orders')}</th>
-								<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.total_paid')}</th>
-								<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.total_discount')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each reports as entry}
-								{@const r = parseReport(entry)}
-								<tr class="border-b border-slate-50 last:border-0">
-									<td class="py-2 text-slate-700">{r.business_date}</td>
-									<td class="py-2 text-right font-semibold text-slate-900">{formatCurrency(r.total_sales)}</td>
-									<td class="py-2 text-right text-slate-700">{r.completed_orders}</td>
-									<td class="py-2 text-right text-slate-700">{r.void_orders}</td>
-									<td class="py-2 text-right text-slate-700">{formatCurrency(r.total_paid)}</td>
-									<td class="py-2 text-right text-orange-500">{formatCurrency(r.total_discount)}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			</div>
 		{:else}
-			<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-				<ScrollText class="w-10 h-10 text-slate-300 mx-auto mb-3" />
-				<p class="text-sm text-slate-500">{$t('stats.no_data')}</p>
-			</div>
+			{#if todayOverview}
+				<div class="mb-6">
+					<StoreOverviewDisplay overview={todayOverview} />
+				</div>
+			{/if}
+
+			{#if reports.length > 0}
+				<div class="bg-white rounded-2xl border border-slate-200 p-6">
+					<div class="overflow-x-auto">
+						<table class="w-full text-sm">
+							<thead>
+								<tr class="border-b border-slate-100">
+									<th class="text-left py-2 text-xs font-medium text-slate-400">{$t('stats.business_date')}</th>
+									<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.total_sales')}</th>
+									<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.completed_orders')}</th>
+									<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.void_orders')}</th>
+									<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.total_paid')}</th>
+									<th class="text-right py-2 text-xs font-medium text-slate-400">{$t('stats.total_discount')}</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each reports as entry}
+									{@const r = parseReport(entry)}
+									<tr class="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+										<td class="py-2 text-slate-700">
+											<a
+												href="/stores/{storeId}/stats/{r.business_date}"
+												class="text-coral-500 hover:text-coral-600 font-medium hover:underline"
+											>
+												{r.business_date}
+											</a>
+										</td>
+										<td class="py-2 text-right font-semibold text-slate-900">{formatCurrency(r.total_sales)}</td>
+										<td class="py-2 text-right text-slate-700">{r.completed_orders}</td>
+										<td class="py-2 text-right text-slate-700">{r.void_orders}</td>
+										<td class="py-2 text-right text-slate-700">{formatCurrency(r.total_paid)}</td>
+										<td class="py-2 text-right text-orange-500">{formatCurrency(r.total_discount)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{:else if !todayOverview}
+				<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+					<ScrollText class="w-10 h-10 text-slate-300 mx-auto mb-3" />
+					<p class="text-sm text-slate-500">{$t('stats.no_data')}</p>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </ConsoleLayout>

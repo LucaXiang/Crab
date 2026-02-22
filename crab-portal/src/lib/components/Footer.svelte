@@ -30,13 +30,13 @@
 				</div>
 				<p class="text-slate-400 text-sm leading-relaxed mb-6">{$t('footer.tagline')}</p>
 				<div class="flex gap-4">
-					<a href="#" class="text-slate-500 hover:text-white transition-colors duration-200" aria-label="Twitter">
+					<a href="https://twitter.com" class="text-slate-500 hover:text-white transition-colors duration-200" aria-label="Twitter">
 						<Twitter class="w-5 h-5" />
 					</a>
-					<a href="#" class="text-slate-500 hover:text-white transition-colors duration-200" aria-label="GitHub">
+					<a href="https://github.com" class="text-slate-500 hover:text-white transition-colors duration-200" aria-label="GitHub">
 						<Github class="w-5 h-5" />
 					</a>
-					<a href="#" class="text-slate-500 hover:text-white transition-colors duration-200" aria-label="LinkedIn">
+					<a href="https://linkedin.com" class="text-slate-500 hover:text-white transition-colors duration-200" aria-label="LinkedIn">
 						<Linkedin class="w-5 h-5" />
 					</a>
 				</div>

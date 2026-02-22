@@ -94,6 +94,9 @@ export function updateProfile(token: string, name: string): Promise<{ message: s
 export interface StoreDetail {
 	id: number;
 	entity_id: string;
+	name?: string;
+	address?: string;
+	phone?: string;
 	device_id: string;
 	last_sync_at: number | null;
 	registered_at: number;
@@ -102,6 +105,16 @@ export interface StoreDetail {
 
 export function getStores(token: string): Promise<StoreDetail[]> {
 	return request('GET', '/api/tenant/stores', undefined, token);
+}
+
+export function updateStore(
+	token: string,
+	storeId: number,
+	name?: string,
+	address?: string,
+	phone?: string
+): Promise<void> {
+	return request('PATCH', `/api/tenant/stores/${storeId}`, { name, address, phone }, token);
 }
 
 // === Orders ===

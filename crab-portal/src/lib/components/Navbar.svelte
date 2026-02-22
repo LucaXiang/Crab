@@ -35,7 +35,7 @@
 				<svg
 					viewBox="0 0 24 24"
 					fill="none"
-					class="w-[18px] h-[18px] text-white"
+					class="w-4.5 h-4.5 text-white"
 					stroke="currentColor"
 					stroke-width="2.5"
 					stroke-linecap="round"
@@ -75,7 +75,7 @@
 				</button>
 				{#if menuOpen}
 					<div
-						class="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg shadow-slate-200/50 border border-slate-100 py-1 min-w-[80px] z-50"
+						class="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg shadow-slate-200/50 border border-slate-100 py-1 min-w-20 z-50"
 					>
 						{#each SUPPORTED_LANGS as lang}
 							<button
@@ -88,18 +88,20 @@
 					</div>
 				{/if}
 			</div>
-			<a
-				href="/login"
-				class="hidden sm:inline-flex text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors duration-150 cursor-pointer px-3 py-1.5"
-				>{$t('nav.login')}</a
-			>
-			<a
-				href="/register"
-				class="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold px-4 py-2 rounded-lg transition-colors duration-150 cursor-pointer"
-			>
-				<span>{$t('nav.cta')}</span>
-				<ArrowRight class="w-3.5 h-3.5" />
-			</a>
+			<div class="hidden md:flex items-center gap-4">
+				<a
+					href="https://console.redcoral.app/login"
+					class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+				>
+					{$t('nav.login')}
+				</a>
+				<a
+					href="https://console.redcoral.app/register"
+					class="px-4 py-2 text-sm font-medium text-white bg-coral-500 hover:bg-coral-600 rounded-lg transition-colors shadow-lg shadow-coral-500/20 min-w-20 text-center"
+				>
+					{$t('nav.signup')}
+				</a>
+			</div>
 
 			<!-- Mobile menu button -->
 			<button
@@ -118,36 +120,59 @@
 
 	<!-- Mobile menu -->
 	{#if mobileMenuOpen}
-		<div class="md:hidden absolute top-16 left-0 right-0 bg-white border-b border-slate-100 shadow-lg animate-in slide-in-from-top-2 duration-200">
-			<div class="flex flex-col p-4 gap-2">
+		<!-- Backdrop -->
+		<div 
+			class="md:hidden fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+			onclick={() => (mobileMenuOpen = false)}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Escape' && (mobileMenuOpen = false)}
+		></div>
+
+		<!-- Menu Panel -->
+		<div class="md:hidden fixed top-16 left-0 right-0 bg-white border-b border-slate-100 shadow-xl z-50 animate-in slide-in-from-top-2 duration-200">
+			<div class="flex flex-col p-4 gap-2 max-h-[calc(100dvh-4rem)] overflow-y-auto">
 				<a
 					href="#features"
-					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					class="p-4 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-colors font-medium flex items-center justify-between group"
 					onclick={() => (mobileMenuOpen = false)}
 				>
-					{$t('nav.features')}
+					<span>{$t('nav.features')}</span>
+					<ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
 				</a>
 				<a
 					href="#pricing"
-					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					class="p-4 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-colors font-medium flex items-center justify-between group"
 					onclick={() => (mobileMenuOpen = false)}
 				>
-					{$t('nav.pricing')}
+					<span>{$t('nav.pricing')}</span>
+					<ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
 				</a>
 				<a
 					href="#faq"
-					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					class="p-4 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-colors font-medium flex items-center justify-between group"
 					onclick={() => (mobileMenuOpen = false)}
 				>
-					{$t('nav.faq')}
+					<span>{$t('nav.faq')}</span>
+					<ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
 				</a>
-				<div class="h-px bg-slate-100 my-1"></div>
+				
+				<div class="h-px bg-slate-100 my-2"></div>
+				
 				<a
 					href="/login"
-					class="p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors font-medium"
+					class="p-4 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-colors font-medium flex items-center gap-3"
 					onclick={() => (mobileMenuOpen = false)}
 				>
-					{$t('nav.login')}
+					<span>{$t('nav.login')}</span>
+				</a>
+				<a
+					href="/register"
+					class="p-4 bg-slate-900 text-white hover:bg-slate-800 rounded-xl transition-colors font-semibold flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10"
+					onclick={() => (mobileMenuOpen = false)}
+				>
+					<span>{$t('nav.cta')}</span>
+					<ArrowRight class="w-4 h-4" />
 				</a>
 			</div>
 		</div>

@@ -39,7 +39,7 @@
 	}
 </script>
 
-<div class="flex h-[100dvh] overflow-hidden">
+<div class="flex h-dvh overflow-hidden">
 	<!-- Sidebar (desktop) -->
 	<aside class="hidden md:flex md:w-60 flex-col bg-white border-r border-slate-200">
 		<!-- Logo -->
@@ -49,7 +49,7 @@
 					<svg
 						viewBox="0 0 24 24"
 						fill="none"
-						class="w-[18px] h-[18px] text-white"
+						class="w-4.5 h-4.5 text-white"
 						stroke="currentColor"
 						stroke-width="2.5"
 						stroke-linecap="round"
@@ -79,7 +79,7 @@
 						? 'bg-coral-50 text-coral-600'
 						: 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}"
 				>
-					<item.icon class="w-[18px] h-[18px]" />
+					<item.icon class="w-4.5 h-4.5" />
 					<span>{$t(item.key)}</span>
 				</a>
 			{/each}
@@ -132,9 +132,9 @@
 	</aside>
 
 	<!-- Mobile header + content -->
-	<div class="flex-1 flex flex-col min-w-0">
+	<div class="flex-1 flex flex-col min-w-0 relative">
 		<!-- Mobile header -->
-		<header class="md:hidden h-14 flex items-center justify-between px-4 bg-white border-b border-slate-200">
+		<header class="md:hidden h-14 flex items-center justify-between px-4 bg-white border-b border-slate-200 shrink-0 relative z-50">
 			<a href="/" class="flex items-center gap-2">
 				<div class="w-7 h-7 bg-coral-500 rounded-lg flex items-center justify-center">
 					<svg
@@ -180,7 +180,7 @@
 			></div>
 			
 			<!-- Menu -->
-			<div class="md:hidden absolute inset-x-0 top-14 bg-white border-b border-slate-200 shadow-xl z-50 px-4 py-3 space-y-1">
+			<div class="md:hidden absolute inset-x-0 top-14 bg-white border-b border-slate-200 shadow-xl z-50 px-4 py-3 space-y-1 max-h-[calc(100vh-3.5rem)] overflow-y-auto">
 				{#each navItems as item}
 					<a
 						href={item.href}
@@ -196,7 +196,25 @@
 						<span>{$t(item.key)}</span>
 					</a>
 				{/each}
-				<div class="border-t border-slate-100 my-2 pt-2">
+				<div class="border-t border-slate-100 my-2 pt-2 space-y-1">
+					<!-- Mobile Language Switcher -->
+					<div class="px-3 py-2">
+						<p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Language</p>
+						<div class="flex flex-wrap gap-2">
+							{#each SUPPORTED_LANGS as lang}
+								<button
+									onclick={() => {
+										setLang(lang as Lang);
+										// Don't close menu, user might want to see language change
+									}}
+									class="px-3 py-1.5 text-xs rounded-lg border transition-colors {$locale === lang ? 'bg-coral-50 border-coral-200 text-coral-600 font-medium' : 'bg-white border-slate-200 text-slate-600'}"
+								>
+									{LANG_LABELS[lang as Lang]}
+								</button>
+							{/each}
+						</div>
+					</div>
+
 					<button
 						onclick={handleLogout}
 						class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-slate-600 w-full cursor-pointer hover:bg-slate-50"
