@@ -114,12 +114,16 @@
 				class="mt-0.5 w-4 h-4 accent-coral-500 border-slate-300 rounded cursor-pointer"
 			/>
 			<label for="terms" class="text-xs text-slate-500 cursor-pointer leading-relaxed">
-				{$t('signup.terms_pre')}<span
-					class="text-coral-500 hover:text-coral-600 font-medium underline underline-offset-2 cursor-pointer"
-					>{$t('signup.terms_link')}</span
-				>{$t('signup.terms_mid')}<span
-					class="text-coral-500 hover:text-coral-600 font-medium underline underline-offset-2 cursor-pointer"
-					>{$t('signup.privacy_link')}</span
+				{$t('signup.terms_pre')}<a
+					href="/terms"
+					target="_blank"
+					class="text-coral-500 hover:text-coral-600 font-medium underline underline-offset-2"
+					>{$t('signup.terms_link')}</a
+				>{$t('signup.terms_mid')}<a
+					href="/privacy"
+					target="_blank"
+					class="text-coral-500 hover:text-coral-600 font-medium underline underline-offset-2"
+					>{$t('signup.privacy_link')}</a
 				>
 			</label>
 		</div>

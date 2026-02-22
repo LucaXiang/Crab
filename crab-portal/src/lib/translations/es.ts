@@ -130,6 +130,8 @@ export const es: Record<string, string> = {
 	'footer.legal': 'Legal',
 	'footer.terms': 'Términos de servicio',
 	'footer.privacy': 'Política de privacidad',
+	'footer.cookies': 'Política de cookies',
+	'footer.aviso_legal': 'Aviso legal',
 	'footer.copyright': '© 2026 RedCoral. Todos los derechos reservados.',
 
 	// === Auth shared ===
@@ -230,6 +232,14 @@ export const es: Record<string, string> = {
 	'renew.secure': 'Pago seguro con Stripe',
 	'renew.back_home': 'Volver al inicio',
 
+	// === Error pages ===
+	'error.title': 'Error',
+	'error.not_found': 'Página no encontrada',
+	'error.not_found_desc': 'La página que buscas no existe o ha sido movida.',
+	'error.generic_desc': 'Algo salió mal. Inténtalo de nuevo.',
+	'error.go_back': 'Volver',
+	'error.go_home': 'Inicio',
+
 	// === API error codes ===
 	'error.2': 'Los datos introducidos no son válidos.',
 	'error.4': 'Este correo ya está registrado. Inicia sesión o usa otro correo.',
@@ -240,5 +250,194 @@ export const es: Record<string, string> = {
 	'error.3014': 'Código de verificación incorrecto.',
 	'error.3015': 'Demasiados intentos. Espera unos minutos.',
 	'error.3016': 'Tu correo aún no ha sido verificado.',
-	'error.3018': 'La contraseña debe tener al menos 8 caracteres.'
+	'error.3018': 'La contraseña debe tener al menos 8 caracteres.',
+
+	// === Legal pages ===
+	'legal.page_title': 'Aviso Legal',
+	'legal.title': 'Aviso Legal',
+	'legal.last_updated': 'Última actualización: 22 de febrero de 2026',
+	'legal.back_home': 'Volver al inicio',
+	'legal.content': `
+<h2>1. Datos identificativos</h2>
+<p>En cumplimiento del artículo 10 de la Ley 34/2002, de 11 de julio, de Servicios de la Sociedad de la Información y de Comercio Electrónico (LSSI-CE), se informa a los usuarios de los datos del titular de este sitio web:</p>
+<ul>
+<li><strong>Denominación social:</strong> RedCoral Software S.L.</li>
+<li><strong>CIF:</strong> B-XXXXXXXX</li>
+<li><strong>Domicilio social:</strong> [Dirección fiscal], España</li>
+<li><strong>Correo electrónico:</strong> legal@redcoral.app</li>
+<li><strong>Sitio web:</strong> https://redcoral.app</li>
+</ul>
+
+<h2>2. Objeto</h2>
+<p>Este sitio web tiene como finalidad la promoción y comercialización del software de punto de venta (POS) RedCoral, dirigido a negocios de hostelería. A través de la web, los usuarios pueden informarse sobre las funcionalidades del producto, consultar precios y registrarse para una prueba gratuita.</p>
+
+<h2>3. Propiedad intelectual e industrial</h2>
+<p>Todos los contenidos de este sitio web, incluyendo textos, imágenes, logotipos, marcas, gráficos, diseño y código fuente, son propiedad de RedCoral Software S.L. o de sus legítimos licenciantes y están protegidos por la legislación vigente en materia de propiedad intelectual e industrial.</p>
+<p>Queda prohibida la reproducción, distribución, comunicación pública o transformación, total o parcial, de los contenidos de este sitio web sin la autorización expresa y por escrito de RedCoral Software S.L.</p>
+
+<h2>4. Responsabilidad</h2>
+<p>RedCoral Software S.L. no se responsabiliza de los daños o perjuicios que pudieran derivarse del acceso o uso de este sitio web, incluyendo errores u omisiones en los contenidos, falta de disponibilidad del portal o la transmisión de virus o programas maliciosos.</p>
+
+<h2>5. Enlaces a terceros</h2>
+<p>Este sitio web puede contener enlaces a sitios web de terceros. RedCoral Software S.L. no asume responsabilidad alguna sobre el contenido, la política de privacidad o las prácticas de dichos sitios web.</p>
+
+<h2>6. Legislación aplicable y jurisdicción</h2>
+<p>Las presentes condiciones se rigen por la legislación española. Para cualquier controversia derivada del uso de este sitio web, las partes se someten a los juzgados y tribunales de la ciudad donde se encuentra el domicilio social de RedCoral Software S.L.</p>
+`,
+
+	'terms.page_title': 'Términos de Servicio',
+	'terms.title': 'Términos de Servicio',
+	'terms.last_updated': 'Última actualización: 22 de febrero de 2026',
+	'terms.content': `
+<h2>1. Aceptación de los términos</h2>
+<p>Al acceder y utilizar el servicio RedCoral ("Servicio"), usted acepta cumplir con estos Términos de Servicio. Si no está de acuerdo con alguna parte de estos términos, no podrá utilizar el Servicio.</p>
+
+<h2>2. Descripción del servicio</h2>
+<p>RedCoral es un sistema de punto de venta (POS) diseñado para negocios de hostelería. El servicio incluye software de escritorio, sincronización en la nube, gestión de dispositivos y panel de administración.</p>
+
+<h2>3. Registro y cuenta</h2>
+<p>Para usar el Servicio, debe registrarse proporcionando información veraz y completa. Usted es responsable de mantener la confidencialidad de sus credenciales de acceso y de todas las actividades que ocurran bajo su cuenta.</p>
+
+<h2>4. Período de prueba y suscripción</h2>
+<p>RedCoral ofrece un período de prueba gratuito de 14 días. Tras la prueba, deberá seleccionar un plan de suscripción para continuar usando el Servicio. Los pagos se procesan a través de Stripe y se facturan según el ciclo elegido (mensual o anual).</p>
+
+<h2>5. Cancelación y reembolso</h2>
+<p>Puede cancelar su suscripción en cualquier momento. La cancelación será efectiva al final del período de facturación vigente. No se realizan reembolsos por períodos parciales de uso.</p>
+
+<h2>6. Uso aceptable</h2>
+<p>Usted se compromete a utilizar el Servicio exclusivamente para fines legítimos y de acuerdo con la legislación aplicable. Queda prohibido:</p>
+<ul>
+<li>Intentar acceder a sistemas o datos de otros usuarios</li>
+<li>Utilizar el Servicio para actividades ilegales o fraudulentas</li>
+<li>Realizar ingeniería inversa del software</li>
+<li>Sobrecargar intencionalmente la infraestructura del Servicio</li>
+</ul>
+
+<h2>7. Propiedad de los datos</h2>
+<p>Usted conserva todos los derechos sobre los datos que introduce en el Servicio. RedCoral no accederá ni utilizará sus datos de negocio excepto para proporcionar y mejorar el Servicio.</p>
+
+<h2>8. Disponibilidad del servicio</h2>
+<p>RedCoral se esfuerza por mantener el Servicio disponible de forma continua, pero no garantiza su disponibilidad ininterrumpida. El funcionamiento offline del software de escritorio mitiga el impacto de interrupciones en la nube.</p>
+
+<h2>9. Limitación de responsabilidad</h2>
+<p>En la máxima medida permitida por la ley, RedCoral Software S.L. no será responsable de daños indirectos, incidentales, especiales o consecuentes derivados del uso o la imposibilidad de uso del Servicio.</p>
+
+<h2>10. Modificaciones</h2>
+<p>Nos reservamos el derecho de modificar estos términos en cualquier momento. Le notificaremos los cambios significativos con al menos 30 días de antelación por correo electrónico o mediante un aviso destacado en el Servicio.</p>
+
+<h2>11. Legislación aplicable</h2>
+<p>Estos términos se rigen por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales del domicilio social de RedCoral Software S.L.</p>
+
+<h2>12. Contacto</h2>
+<p>Para cualquier consulta sobre estos términos, contacte con nosotros en <a href="mailto:legal@redcoral.app">legal@redcoral.app</a>.</p>
+`,
+
+	'privacy.page_title': 'Política de Privacidad',
+	'privacy.title': 'Política de Privacidad',
+	'privacy.last_updated': 'Última actualización: 22 de febrero de 2026',
+	'privacy.content': `
+<h2>1. Responsable del tratamiento</h2>
+<p>RedCoral Software S.L. ("nosotros") es responsable del tratamiento de sus datos personales conforme al Reglamento General de Protección de Datos (RGPD) y la Ley Orgánica 3/2018, de Protección de Datos Personales (LOPDGDD).</p>
+<p>Contacto del delegado de protección de datos: <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a></p>
+
+<h2>2. Datos que recopilamos</h2>
+<p>Recopilamos los siguientes datos personales:</p>
+<ul>
+<li><strong>Datos de registro:</strong> dirección de correo electrónico y contraseña (almacenada con hash seguro)</li>
+<li><strong>Datos de suscripción:</strong> plan seleccionado, estado de la suscripción y datos de facturación gestionados por Stripe</li>
+<li><strong>Datos técnicos:</strong> dirección IP, tipo de navegador, sistema operativo e idioma preferido</li>
+<li><strong>Datos de uso:</strong> páginas visitadas y acciones realizadas en el portal web</li>
+</ul>
+
+<h2>3. Finalidad del tratamiento</h2>
+<p>Tratamos sus datos para las siguientes finalidades:</p>
+<ul>
+<li>Gestión de su cuenta y prestación del Servicio</li>
+<li>Procesamiento de pagos y facturación</li>
+<li>Comunicación de actualizaciones del servicio y soporte técnico</li>
+<li>Mejora del Servicio y análisis de uso</li>
+<li>Cumplimiento de obligaciones legales</li>
+</ul>
+
+<h2>4. Base legal</h2>
+<p>El tratamiento de sus datos se basa en:</p>
+<ul>
+<li><strong>Ejecución contractual:</strong> para prestar el Servicio contratado</li>
+<li><strong>Interés legítimo:</strong> para mejorar el Servicio y prevenir fraude</li>
+<li><strong>Consentimiento:</strong> para cookies analíticas y comunicaciones comerciales</li>
+<li><strong>Obligación legal:</strong> para cumplir con la legislación fiscal y mercantil</li>
+</ul>
+
+<h2>5. Destinatarios de los datos</h2>
+<p>Sus datos pueden ser comunicados a:</p>
+<ul>
+<li><strong>Stripe Inc.:</strong> procesamiento de pagos (bajo su propia política de privacidad)</li>
+<li><strong>Amazon Web Services:</strong> alojamiento de infraestructura (servidores en la UE)</li>
+<li><strong>Autoridades públicas:</strong> cuando sea requerido por ley</li>
+</ul>
+
+<h2>6. Transferencias internacionales</h2>
+<p>Algunos de nuestros proveedores de servicios pueden estar ubicados fuera del Espacio Económico Europeo. En tales casos, garantizamos que existen las salvaguardas adecuadas, como cláusulas contractuales tipo aprobadas por la Comisión Europea.</p>
+
+<h2>7. Conservación de datos</h2>
+<p>Conservamos sus datos personales mientras mantenga una cuenta activa. Tras la cancelación, conservaremos los datos necesarios para cumplir con obligaciones legales (fiscales, mercantiles) durante los plazos legalmente establecidos.</p>
+
+<h2>8. Sus derechos</h2>
+<p>Conforme al RGPD, usted tiene derecho a:</p>
+<ul>
+<li><strong>Acceso:</strong> obtener una copia de sus datos personales</li>
+<li><strong>Rectificación:</strong> corregir datos inexactos</li>
+<li><strong>Supresión:</strong> solicitar la eliminación de sus datos</li>
+<li><strong>Limitación:</strong> restringir el tratamiento en determinadas circunstancias</li>
+<li><strong>Portabilidad:</strong> recibir sus datos en formato estructurado</li>
+<li><strong>Oposición:</strong> oponerse al tratamiento basado en interés legítimo</li>
+</ul>
+<p>Para ejercer estos derechos, contacte con nosotros en <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a>.</p>
+<p>También tiene derecho a presentar una reclamación ante la Agencia Española de Protección de Datos (AEPD) en <a href="https://www.aepd.es" target="_blank" rel="noopener">www.aepd.es</a>.</p>
+
+<h2>9. Seguridad</h2>
+<p>Implementamos medidas de seguridad técnicas y organizativas adecuadas para proteger sus datos personales, incluyendo cifrado de extremo a extremo, certificados de seguridad por dispositivo y almacenamiento cifrado.</p>
+
+<h2>10. Modificaciones</h2>
+<p>Nos reservamos el derecho de actualizar esta política. Cualquier cambio significativo será comunicado con antelación.</p>
+`,
+
+	'cookies.page_title': 'Política de Cookies',
+	'cookies.title': 'Política de Cookies',
+	'cookies.last_updated': 'Última actualización: 22 de febrero de 2026',
+	'cookies.content': `
+<h2>1. ¿Qué son las cookies?</h2>
+<p>Las cookies son pequeños archivos de texto que los sitios web almacenan en su dispositivo cuando los visita. Se utilizan ampliamente para hacer que los sitios web funcionen de manera más eficiente y proporcionar información a los propietarios del sitio.</p>
+
+<h2>2. Cookies que utilizamos</h2>
+
+<h3>Cookies estrictamente necesarias</h3>
+<p>Estas cookies son esenciales para el funcionamiento del sitio web:</p>
+<table>
+<thead><tr><th>Cookie</th><th>Finalidad</th><th>Duración</th></tr></thead>
+<tbody>
+<tr><td>redcoral-lang</td><td>Almacena la preferencia de idioma del usuario</td><td>Persistente</td></tr>
+<tr><td>redcoral-auth</td><td>Mantiene la sesión de usuario autenticado</td><td>Sesión</td></tr>
+<tr><td>cookie_consent</td><td>Registra su decisión sobre cookies</td><td>1 año</td></tr>
+</tbody>
+</table>
+
+<h3>Cookies analíticas</h3>
+<p>Actualmente, RedCoral no utiliza cookies analíticas de terceros. Si en el futuro incorporamos herramientas de análisis, actualizaremos esta política y solicitaremos su consentimiento.</p>
+
+<h2>3. Gestión de cookies</h2>
+<p>Puede gestionar las cookies a través del banner de consentimiento que aparece al visitar el sitio por primera vez. También puede configurar su navegador para bloquear o eliminar cookies, aunque esto podría afectar al funcionamiento del sitio.</p>
+
+<h2>4. Más información</h2>
+<p>Para más información sobre las cookies, puede consultar <a href="https://www.aepd.es/guias/guia-uso-de-las-cookies.pdf" target="_blank" rel="noopener">la guía de la AEPD sobre el uso de cookies</a>.</p>
+
+<h2>5. Contacto</h2>
+<p>Para cualquier consulta sobre nuestra política de cookies, contacte con nosotros en <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a>.</p>
+`,
+
+	// === Cookie banner ===
+	'cookie_banner.message': 'Utilizamos cookies propias para el funcionamiento del sitio. Puede aceptar todas las cookies o solo las estrictamente necesarias.',
+	'cookie_banner.accept': 'Aceptar todas',
+	'cookie_banner.reject': 'Solo necesarias',
+	'cookie_banner.link': 'Política de cookies'
 };

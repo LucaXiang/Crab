@@ -48,10 +48,7 @@
 							>{$t('footer.pricing')}</a
 						>
 					</li>
-					<li>
-						<span class="text-sm text-slate-600 cursor-default">{$t('footer.changelog')}</span>
-					</li>
-				</ul>
+					</ul>
 			</div>
 			<div>
 				<h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
@@ -66,10 +63,18 @@
 						>
 					</li>
 					<li>
-						<span class="text-sm text-slate-600 cursor-default">{$t('footer.docs')}</span>
+						<a
+							href="/support"
+							class="text-sm text-slate-500 hover:text-white transition-colors duration-150 cursor-pointer"
+							>{$t('footer.docs')}</a
+						>
 					</li>
 					<li>
-						<span class="text-sm text-slate-600 cursor-default">{$t('footer.contact')}</span>
+						<a
+							href="/support"
+							class="text-sm text-slate-500 hover:text-white transition-colors duration-150 cursor-pointer"
+							>{$t('footer.contact')}</a
+						>
 					</li>
 				</ul>
 			</div>
@@ -79,16 +84,38 @@
 				</h4>
 				<ul class="space-y-2">
 					<li>
-						<span class="text-sm text-slate-600 cursor-default">{$t('footer.terms')}</span>
+						<a
+							href="/terms"
+							class="text-sm text-slate-500 hover:text-white transition-colors duration-150 cursor-pointer"
+							>{$t('footer.terms')}</a
+						>
 					</li>
 					<li>
-						<span class="text-sm text-slate-600 cursor-default">{$t('footer.privacy')}</span>
+						<a
+							href="/privacy"
+							class="text-sm text-slate-500 hover:text-white transition-colors duration-150 cursor-pointer"
+							>{$t('footer.privacy')}</a
+						>
+					</li>
+					<li>
+						<a
+							href="/cookies"
+							class="text-sm text-slate-500 hover:text-white transition-colors duration-150 cursor-pointer"
+							>{$t('footer.cookies')}</a
+						>
+					</li>
+					<li>
+						<a
+							href="/legal"
+							class="text-sm text-slate-500 hover:text-white transition-colors duration-150 cursor-pointer"
+							>{$t('footer.aviso_legal')}</a
+						>
 					</li>
 				</ul>
 			</div>
 		</div>
 		<div class="border-t border-slate-800/60 pt-6 text-center">
-			<p class="text-xs text-slate-600">{$t('footer.copyright')}</p>
+			<p class="text-xs text-slate-600">{$t('footer.copyright')} · v{__BUILD_VERSION__}</p>
 		</div>
 	</div>
 </footer>

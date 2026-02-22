@@ -98,6 +98,21 @@ docker-compose up -d            # 重启，自动 migrate
 | `deploy/ec2/certs/` | mTLS 证书 (root_ca, server.pem/key) |
 | `deploy/ec2/crab-ec2.pem` | SSH 密钥 (不入 git) |
 
+### Portal 部署 (crab-portal → EC2)
+
+```bash
+# 在 crab-portal/ 目录下
+cd crab-portal
+npm run build                    # 构建静态站点到 build/
+
+# 上传到 EC2
+scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal/
+```
+
+**关键**: Caddy 容器挂载 `/opt/crab/portal/` → `/srv/portal` (只读)，部署目标是 `/opt/crab/portal/`，**不是** `/srv/portal/`。
+**域名**: `redcoral.app` → Caddy file_server → `/srv/portal`
+**缓存**: HTML `max-age=3600` (1h), `_app/immutable/*` 永久缓存
+
 ### 安全要求
 
 - **全栈 HTTPS**: 所有 auth_url 强制 `https://`，无 `danger_accept_invalid_certs`

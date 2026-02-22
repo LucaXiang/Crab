@@ -127,6 +127,8 @@ export const zh: Record<string, string> = {
 	'footer.legal': '法律',
 	'footer.terms': '服务条款',
 	'footer.privacy': '隐私政策',
+	'footer.cookies': 'Cookie 政策',
+	'footer.aviso_legal': '法律声明',
 	'footer.copyright': '© 2026 RedCoral. 保留所有权利。',
 
 	// === Auth shared ===
@@ -227,6 +229,14 @@ export const zh: Record<string, string> = {
 	'renew.secure': '通过 Stripe 安全支付',
 	'renew.back_home': '返回首页',
 
+	// === 错误页面 ===
+	'error.title': '错误',
+	'error.not_found': '页面未找到',
+	'error.not_found_desc': '你访问的页面不存在或已被移动。',
+	'error.generic_desc': '出了点问题，请重试。',
+	'error.go_back': '返回',
+	'error.go_home': '首页',
+
 	// === API 错误码 ===
 	'error.2': '输入的信息无效。',
 	'error.4': '该邮箱已注册，请直接登录或使用其他邮箱。',
@@ -237,5 +247,194 @@ export const zh: Record<string, string> = {
 	'error.3014': '验证码不正确。',
 	'error.3015': '尝试次数过多，请稍后再试。',
 	'error.3016': '邮箱尚未验证。',
-	'error.3018': '密码至少需要 8 个字符。'
+	'error.3018': '密码至少需要 8 个字符。',
+
+	// === Legal pages ===
+	'legal.page_title': '法律声明',
+	'legal.title': '法律声明 (Aviso Legal)',
+	'legal.last_updated': '最后更新：2026 年 2 月 22 日',
+	'legal.back_home': '返回首页',
+	'legal.content': `
+<h2>1. 身份信息</h2>
+<p>根据西班牙第 34/2002 号法律（信息社会服务和电子商务法，LSSI-CE）第 10 条规定，向用户披露本网站所有者信息如下：</p>
+<ul>
+<li><strong>公司名称：</strong>RedCoral Software S.L.</li>
+<li><strong>税号 (CIF)：</strong>B-XXXXXXXX</li>
+<li><strong>注册地址：</strong>西班牙 [地址]</li>
+<li><strong>电子邮箱：</strong>legal@redcoral.app</li>
+<li><strong>网站：</strong>https://redcoral.app</li>
+</ul>
+
+<h2>2. 目的</h2>
+<p>本网站旨在推广和销售面向餐饮行业的 RedCoral 收银系统 (POS) 软件。用户可以在本网站上了解产品功能、查询价格并注册免费试用。</p>
+
+<h2>3. 知识产权</h2>
+<p>本网站所有内容，包括文本、图片、标志、商标、图形、设计和源代码，均为 RedCoral Software S.L. 或其合法许可方所有，受知识产权相关法律保护。</p>
+<p>未经 RedCoral Software S.L. 明确书面授权，禁止对本网站内容进行全部或部分复制、分发、公开传播或改编。</p>
+
+<h2>4. 免责声明</h2>
+<p>RedCoral Software S.L. 不对因访问或使用本网站而可能产生的任何损害承担责任，包括内容中的错误或遗漏、网站不可用或病毒传播等。</p>
+
+<h2>5. 第三方链接</h2>
+<p>本网站可能包含指向第三方网站的链接。RedCoral Software S.L. 对这些网站的内容、隐私政策或做法不承担任何责任。</p>
+
+<h2>6. 适用法律与管辖</h2>
+<p>本条款受西班牙法律管辖。因使用本网站产生的任何争议，双方同意提交至 RedCoral Software S.L. 注册所在地的法院管辖。</p>
+`,
+
+	'terms.page_title': '服务条款',
+	'terms.title': '服务条款',
+	'terms.last_updated': '最后更新：2026 年 2 月 22 日',
+	'terms.content': `
+<h2>1. 条款接受</h2>
+<p>使用 RedCoral 服务（"服务"）即表示您同意遵守本服务条款。如果您不同意其中任何部分，则不得使用本服务。</p>
+
+<h2>2. 服务说明</h2>
+<p>RedCoral 是面向餐饮行业的收银系统 (POS)。服务包括桌面软件、云端同步、设备管理和管理后台。</p>
+
+<h2>3. 注册与账户</h2>
+<p>使用本服务需要注册并提供真实完整的信息。您有责任保管好登录凭据，并对账户下发生的所有活动负责。</p>
+
+<h2>4. 试用期与订阅</h2>
+<p>RedCoral 提供 14 天免费试用期。试用期结束后，您需选择订阅方案以继续使用。付款通过 Stripe 处理，按照所选周期（月付或年付）计费。</p>
+
+<h2>5. 取消与退款</h2>
+<p>您可以随时取消订阅。取消将在当前计费期结束时生效。不提供部分使用期的退款。</p>
+
+<h2>6. 合理使用</h2>
+<p>您同意仅出于合法目的使用本服务，并遵守适用法律。禁止以下行为：</p>
+<ul>
+<li>试图访问其他用户的系统或数据</li>
+<li>将服务用于非法或欺诈活动</li>
+<li>对软件进行逆向工程</li>
+<li>故意使服务基础设施过载</li>
+</ul>
+
+<h2>7. 数据所有权</h2>
+<p>您保留对输入服务中的数据的所有权利。RedCoral 不会访问或使用您的业务数据，除非是为了提供和改进服务。</p>
+
+<h2>8. 服务可用性</h2>
+<p>RedCoral 努力维持服务的持续可用性，但不保证不间断访问。桌面软件的离线功能可以缓解云端中断的影响。</p>
+
+<h2>9. 责任限制</h2>
+<p>在法律允许的最大范围内，RedCoral Software S.L. 不对因使用或无法使用本服务而产生的间接、附带、特殊或后果性损害承担责任。</p>
+
+<h2>10. 条款修改</h2>
+<p>我们保留随时修改本条款的权利。重大变更将至少提前 30 天通过电子邮件或服务内显著通知告知您。</p>
+
+<h2>11. 适用法律</h2>
+<p>本条款受西班牙法律管辖。争议提交至 RedCoral Software S.L. 注册所在地法院管辖。</p>
+
+<h2>12. 联系方式</h2>
+<p>如有任何关于本条款的问题，请联系 <a href="mailto:legal@redcoral.app">legal@redcoral.app</a>。</p>
+`,
+
+	'privacy.page_title': '隐私政策',
+	'privacy.title': '隐私政策',
+	'privacy.last_updated': '最后更新：2026 年 2 月 22 日',
+	'privacy.content': `
+<h2>1. 数据控制者</h2>
+<p>RedCoral Software S.L.（"我们"）是根据《通用数据保护条例》(GDPR) 和西班牙第 3/2018 号个人数据保护组织法 (LOPDGDD) 处理您个人数据的数据控制者。</p>
+<p>数据保护官联系方式：<a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a></p>
+
+<h2>2. 我们收集的数据</h2>
+<p>我们收集以下个人数据：</p>
+<ul>
+<li><strong>注册数据：</strong>电子邮箱和密码（使用安全哈希存储）</li>
+<li><strong>订阅数据：</strong>所选方案、订阅状态和由 Stripe 管理的计费数据</li>
+<li><strong>技术数据：</strong>IP 地址、浏览器类型、操作系统和首选语言</li>
+<li><strong>使用数据：</strong>在门户网站上访问的页面和执行的操作</li>
+</ul>
+
+<h2>3. 处理目的</h2>
+<p>我们处理您的数据用于以下目的：</p>
+<ul>
+<li>管理您的账户并提供服务</li>
+<li>处理付款和计费</li>
+<li>发送服务更新和技术支持通信</li>
+<li>改进服务和使用分析</li>
+<li>遵守法律义务</li>
+</ul>
+
+<h2>4. 法律依据</h2>
+<p>数据处理的法律依据包括：</p>
+<ul>
+<li><strong>合同履行：</strong>为提供约定的服务</li>
+<li><strong>正当利益：</strong>为改进服务和防止欺诈</li>
+<li><strong>同意：</strong>用于分析性 Cookie 和营销通信</li>
+<li><strong>法律义务：</strong>遵守税务和商业法规</li>
+</ul>
+
+<h2>5. 数据接收方</h2>
+<p>您的数据可能共享给：</p>
+<ul>
+<li><strong>Stripe Inc.：</strong>支付处理（受其自身隐私政策约束）</li>
+<li><strong>Amazon Web Services：</strong>基础设施托管（欧盟服务器）</li>
+<li><strong>公共机构：</strong>在法律要求时</li>
+</ul>
+
+<h2>6. 国际传输</h2>
+<p>部分服务提供商可能位于欧洲经济区以外。在此类情况下，我们确保已采取适当的保障措施，例如欧盟委员会批准的标准合同条款。</p>
+
+<h2>7. 数据保留</h2>
+<p>我们在您保持活跃账户期间保留您的个人数据。账户取消后，我们将在法定期限内保留遵守法律义务（税务、商业）所需的数据。</p>
+
+<h2>8. 您的权利</h2>
+<p>根据 GDPR，您有权：</p>
+<ul>
+<li><strong>访问权：</strong>获取您个人数据的副本</li>
+<li><strong>更正权：</strong>更正不准确的数据</li>
+<li><strong>删除权：</strong>请求删除您的数据</li>
+<li><strong>限制处理权：</strong>在特定情况下限制数据处理</li>
+<li><strong>数据可携权：</strong>以结构化格式接收您的数据</li>
+<li><strong>反对权：</strong>反对基于正当利益的数据处理</li>
+</ul>
+<p>如需行使这些权利，请联系 <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a>。</p>
+<p>您还有权向西班牙数据保护局 (AEPD) 提出投诉：<a href="https://www.aepd.es" target="_blank" rel="noopener">www.aepd.es</a>。</p>
+
+<h2>9. 安全</h2>
+<p>我们实施了适当的技术和组织安全措施来保护您的个人数据，包括端到端加密、每设备安全证书和加密存储。</p>
+
+<h2>10. 政策变更</h2>
+<p>我们保留更新本政策的权利。重大变更将提前通知。</p>
+`,
+
+	'cookies.page_title': 'Cookie 政策',
+	'cookies.title': 'Cookie 政策',
+	'cookies.last_updated': '最后更新：2026 年 2 月 22 日',
+	'cookies.content': `
+<h2>1. 什么是 Cookie？</h2>
+<p>Cookie 是网站在您访问时存储在您设备上的小型文本文件。它们被广泛用于提高网站运行效率并向网站所有者提供信息。</p>
+
+<h2>2. 我们使用的 Cookie</h2>
+
+<h3>严格必要的 Cookie</h3>
+<p>这些 Cookie 对网站运行必不可少：</p>
+<table>
+<thead><tr><th>Cookie</th><th>用途</th><th>有效期</th></tr></thead>
+<tbody>
+<tr><td>redcoral-lang</td><td>存储用户语言偏好</td><td>持久</td></tr>
+<tr><td>redcoral-auth</td><td>维持已登录用户的会话</td><td>会话</td></tr>
+<tr><td>cookie_consent</td><td>记录您的 Cookie 偏好选择</td><td>1 年</td></tr>
+</tbody>
+</table>
+
+<h3>分析性 Cookie</h3>
+<p>目前，RedCoral 不使用第三方分析性 Cookie。如果将来引入分析工具，我们将更新本政策并征求您的同意。</p>
+
+<h2>3. Cookie 管理</h2>
+<p>您可以通过首次访问网站时出现的同意横幅来管理 Cookie。您也可以在浏览器中设置阻止或删除 Cookie，但这可能会影响网站功能。</p>
+
+<h2>4. 更多信息</h2>
+<p>如需了解更多关于 Cookie 的信息，请访问 <a href="https://www.aepd.es/guias/guia-uso-de-las-cookies.pdf" target="_blank" rel="noopener">AEPD Cookie 使用指南</a>。</p>
+
+<h2>5. 联系方式</h2>
+<p>如有任何关于 Cookie 政策的问题，请联系 <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a>。</p>
+`,
+
+	// === Cookie banner ===
+	'cookie_banner.message': '我们使用自有 Cookie 以确保网站正常运行。您可以接受全部 Cookie 或仅接受必要的 Cookie。',
+	'cookie_banner.accept': '全部接受',
+	'cookie_banner.reject': '仅必要',
+	'cookie_banner.link': 'Cookie 政策'
 };

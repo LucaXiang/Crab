@@ -23,6 +23,9 @@
 	/>
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://redcoral.app" />
+	<meta property="og:image" content="https://redcoral.app/og-image.png" />
+	<meta property="og:locale" content="es_ES" />
+	<link rel="canonical" href="https://redcoral.app" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content="RedCoral — POS para restaurantes que funciona sin internet" />
 	<meta

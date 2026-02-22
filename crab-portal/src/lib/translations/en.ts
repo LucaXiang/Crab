@@ -130,6 +130,8 @@ export const en: Record<string, string> = {
 	'footer.legal': 'Legal',
 	'footer.terms': 'Terms of Service',
 	'footer.privacy': 'Privacy Policy',
+	'footer.cookies': 'Cookie Policy',
+	'footer.aviso_legal': 'Legal Notice',
 	'footer.copyright': '© 2026 RedCoral. All rights reserved.',
 
 	// === Auth shared ===
@@ -230,6 +232,14 @@ export const en: Record<string, string> = {
 	'renew.secure': 'Secure payment with Stripe',
 	'renew.back_home': 'Back to home',
 
+	// === Error pages ===
+	'error.title': 'Error',
+	'error.not_found': 'Page not found',
+	'error.not_found_desc': 'The page you are looking for does not exist or has been moved.',
+	'error.generic_desc': 'Something went wrong. Please try again.',
+	'error.go_back': 'Go back',
+	'error.go_home': 'Home',
+
 	// === API error codes ===
 	'error.2': 'The information you entered is not valid.',
 	'error.4': 'This email is already registered. Please sign in or use a different email.',
@@ -240,5 +250,194 @@ export const en: Record<string, string> = {
 	'error.3014': 'Invalid verification code.',
 	'error.3015': 'Too many attempts. Please wait a few minutes.',
 	'error.3016': 'Your email has not been verified yet.',
-	'error.3018': 'Password must be at least 8 characters.'
+	'error.3018': 'Password must be at least 8 characters.',
+
+	// === Legal pages ===
+	'legal.page_title': 'Legal Notice',
+	'legal.title': 'Legal Notice',
+	'legal.last_updated': 'Last updated: February 22, 2026',
+	'legal.back_home': 'Back to home',
+	'legal.content': `
+<h2>1. Identification</h2>
+<p>In compliance with Article 10 of Spanish Law 34/2002 on Information Society Services and Electronic Commerce (LSSI-CE), we inform users of the following details about the owner of this website:</p>
+<ul>
+<li><strong>Company name:</strong> RedCoral Software S.L.</li>
+<li><strong>Tax ID (CIF):</strong> B-XXXXXXXX</li>
+<li><strong>Registered address:</strong> [Business address], Spain</li>
+<li><strong>Email:</strong> legal@redcoral.app</li>
+<li><strong>Website:</strong> https://redcoral.app</li>
+</ul>
+
+<h2>2. Purpose</h2>
+<p>This website is intended for the promotion and commercialization of the RedCoral point-of-sale (POS) software, designed for hospitality businesses. Through the website, users can learn about product features, check pricing, and sign up for a free trial.</p>
+
+<h2>3. Intellectual and industrial property</h2>
+<p>All content on this website, including text, images, logos, trademarks, graphics, design, and source code, is owned by RedCoral Software S.L. or its licensors and is protected by applicable intellectual and industrial property laws.</p>
+<p>Reproduction, distribution, public communication, or transformation of any content from this website, in whole or in part, without the express written consent of RedCoral Software S.L. is prohibited.</p>
+
+<h2>4. Liability</h2>
+<p>RedCoral Software S.L. shall not be liable for any damages arising from access to or use of this website, including errors or omissions in content, unavailability of the portal, or transmission of viruses or malicious programs.</p>
+
+<h2>5. Third-party links</h2>
+<p>This website may contain links to third-party websites. RedCoral Software S.L. assumes no responsibility for the content, privacy policies, or practices of such websites.</p>
+
+<h2>6. Applicable law and jurisdiction</h2>
+<p>These conditions are governed by Spanish law. For any disputes arising from the use of this website, the parties submit to the courts and tribunals of the city where RedCoral Software S.L. is registered.</p>
+`,
+
+	'terms.page_title': 'Terms of Service',
+	'terms.title': 'Terms of Service',
+	'terms.last_updated': 'Last updated: February 22, 2026',
+	'terms.content': `
+<h2>1. Acceptance of terms</h2>
+<p>By accessing and using the RedCoral service ("Service"), you agree to comply with these Terms of Service. If you do not agree with any part of these terms, you may not use the Service.</p>
+
+<h2>2. Description of service</h2>
+<p>RedCoral is a point-of-sale (POS) system designed for hospitality businesses. The service includes desktop software, cloud synchronization, device management, and an administration dashboard.</p>
+
+<h2>3. Registration and account</h2>
+<p>To use the Service, you must register by providing accurate and complete information. You are responsible for maintaining the confidentiality of your login credentials and for all activities that occur under your account.</p>
+
+<h2>4. Trial period and subscription</h2>
+<p>RedCoral offers a 14-day free trial period. After the trial, you must select a subscription plan to continue using the Service. Payments are processed through Stripe and billed according to the chosen cycle (monthly or annual).</p>
+
+<h2>5. Cancellation and refunds</h2>
+<p>You may cancel your subscription at any time. Cancellation will take effect at the end of the current billing period. No refunds are provided for partial periods of use.</p>
+
+<h2>6. Acceptable use</h2>
+<p>You agree to use the Service only for lawful purposes and in accordance with applicable laws. The following is prohibited:</p>
+<ul>
+<li>Attempting to access other users' systems or data</li>
+<li>Using the Service for illegal or fraudulent activities</li>
+<li>Reverse engineering the software</li>
+<li>Intentionally overloading the Service infrastructure</li>
+</ul>
+
+<h2>7. Data ownership</h2>
+<p>You retain all rights to the data you enter into the Service. RedCoral will not access or use your business data except to provide and improve the Service.</p>
+
+<h2>8. Service availability</h2>
+<p>RedCoral strives to maintain continuous service availability but does not guarantee uninterrupted access. The offline functionality of the desktop software mitigates the impact of cloud disruptions.</p>
+
+<h2>9. Limitation of liability</h2>
+<p>To the maximum extent permitted by law, RedCoral Software S.L. shall not be liable for indirect, incidental, special, or consequential damages arising from the use or inability to use the Service.</p>
+
+<h2>10. Modifications</h2>
+<p>We reserve the right to modify these terms at any time. We will notify you of significant changes at least 30 days in advance by email or through a prominent notice in the Service.</p>
+
+<h2>11. Applicable law</h2>
+<p>These terms are governed by Spanish law. For any disputes, the parties submit to the courts and tribunals of the city where RedCoral Software S.L. is registered.</p>
+
+<h2>12. Contact</h2>
+<p>For any questions about these terms, contact us at <a href="mailto:legal@redcoral.app">legal@redcoral.app</a>.</p>
+`,
+
+	'privacy.page_title': 'Privacy Policy',
+	'privacy.title': 'Privacy Policy',
+	'privacy.last_updated': 'Last updated: February 22, 2026',
+	'privacy.content': `
+<h2>1. Data controller</h2>
+<p>RedCoral Software S.L. ("we") is the data controller responsible for processing your personal data in accordance with the General Data Protection Regulation (GDPR) and Spanish Organic Law 3/2018 on Personal Data Protection (LOPDGDD).</p>
+<p>Data protection officer contact: <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a></p>
+
+<h2>2. Data we collect</h2>
+<p>We collect the following personal data:</p>
+<ul>
+<li><strong>Registration data:</strong> email address and password (stored using secure hashing)</li>
+<li><strong>Subscription data:</strong> selected plan, subscription status, and billing data managed by Stripe</li>
+<li><strong>Technical data:</strong> IP address, browser type, operating system, and preferred language</li>
+<li><strong>Usage data:</strong> pages visited and actions taken on the web portal</li>
+</ul>
+
+<h2>3. Purpose of processing</h2>
+<p>We process your data for the following purposes:</p>
+<ul>
+<li>Managing your account and providing the Service</li>
+<li>Processing payments and billing</li>
+<li>Communicating service updates and technical support</li>
+<li>Improving the Service and usage analysis</li>
+<li>Compliance with legal obligations</li>
+</ul>
+
+<h2>4. Legal basis</h2>
+<p>The processing of your data is based on:</p>
+<ul>
+<li><strong>Contractual performance:</strong> to provide the contracted Service</li>
+<li><strong>Legitimate interest:</strong> to improve the Service and prevent fraud</li>
+<li><strong>Consent:</strong> for analytical cookies and marketing communications</li>
+<li><strong>Legal obligation:</strong> to comply with tax and commercial legislation</li>
+</ul>
+
+<h2>5. Data recipients</h2>
+<p>Your data may be shared with:</p>
+<ul>
+<li><strong>Stripe Inc.:</strong> payment processing (under their own privacy policy)</li>
+<li><strong>Amazon Web Services:</strong> infrastructure hosting (EU servers)</li>
+<li><strong>Public authorities:</strong> when required by law</li>
+</ul>
+
+<h2>6. International transfers</h2>
+<p>Some of our service providers may be located outside the European Economic Area. In such cases, we ensure appropriate safeguards are in place, such as Standard Contractual Clauses approved by the European Commission.</p>
+
+<h2>7. Data retention</h2>
+<p>We retain your personal data for as long as you maintain an active account. After cancellation, we will retain data necessary to comply with legal obligations (tax, commercial) for the legally established periods.</p>
+
+<h2>8. Your rights</h2>
+<p>Under the GDPR, you have the right to:</p>
+<ul>
+<li><strong>Access:</strong> obtain a copy of your personal data</li>
+<li><strong>Rectification:</strong> correct inaccurate data</li>
+<li><strong>Erasure:</strong> request deletion of your data</li>
+<li><strong>Restriction:</strong> restrict processing in certain circumstances</li>
+<li><strong>Portability:</strong> receive your data in a structured format</li>
+<li><strong>Objection:</strong> object to processing based on legitimate interest</li>
+</ul>
+<p>To exercise these rights, contact us at <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a>.</p>
+<p>You also have the right to file a complaint with the Spanish Data Protection Agency (AEPD) at <a href="https://www.aepd.es" target="_blank" rel="noopener">www.aepd.es</a>.</p>
+
+<h2>9. Security</h2>
+<p>We implement appropriate technical and organizational security measures to protect your personal data, including end-to-end encryption, per-device security certificates, and encrypted storage.</p>
+
+<h2>10. Changes</h2>
+<p>We reserve the right to update this policy. Any significant changes will be communicated in advance.</p>
+`,
+
+	'cookies.page_title': 'Cookie Policy',
+	'cookies.title': 'Cookie Policy',
+	'cookies.last_updated': 'Last updated: February 22, 2026',
+	'cookies.content': `
+<h2>1. What are cookies?</h2>
+<p>Cookies are small text files that websites store on your device when you visit them. They are widely used to make websites work more efficiently and provide information to site owners.</p>
+
+<h2>2. Cookies we use</h2>
+
+<h3>Strictly necessary cookies</h3>
+<p>These cookies are essential for the website to function:</p>
+<table>
+<thead><tr><th>Cookie</th><th>Purpose</th><th>Duration</th></tr></thead>
+<tbody>
+<tr><td>redcoral-lang</td><td>Stores the user's language preference</td><td>Persistent</td></tr>
+<tr><td>redcoral-auth</td><td>Maintains the authenticated user session</td><td>Session</td></tr>
+<tr><td>cookie_consent</td><td>Records your cookie preference</td><td>1 year</td></tr>
+</tbody>
+</table>
+
+<h3>Analytical cookies</h3>
+<p>Currently, RedCoral does not use third-party analytical cookies. If we incorporate analytics tools in the future, we will update this policy and request your consent.</p>
+
+<h2>3. Managing cookies</h2>
+<p>You can manage cookies through the consent banner that appears when you first visit the site. You can also configure your browser to block or delete cookies, although this may affect site functionality.</p>
+
+<h2>4. More information</h2>
+<p>For more information about cookies, you can visit <a href="https://www.aepd.es/guias/guia-uso-de-las-cookies.pdf" target="_blank" rel="noopener">the AEPD guide on cookie usage</a>.</p>
+
+<h2>5. Contact</h2>
+<p>For any questions about our cookie policy, contact us at <a href="mailto:privacy@redcoral.app">privacy@redcoral.app</a>.</p>
+`,
+
+	// === Cookie banner ===
+	'cookie_banner.message': 'We use our own cookies for site functionality. You can accept all cookies or only strictly necessary ones.',
+	'cookie_banner.accept': 'Accept all',
+	'cookie_banner.reject': 'Necessary only',
+	'cookie_banner.link': 'Cookie Policy'
 };

@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { initI18n } from '$lib/i18n';
+	import CookieBanner from '$lib/components/CookieBanner.svelte';
 
 	let { children } = $props();
 
@@ -11,3 +12,4 @@
 </script>
 
 {@render children()}
+<CookieBanner />

@@ -11,7 +11,7 @@ const config = {
 			strict: false
 		}),
 		prerender: {
-			entries: ['*', '/support', '/renew']
+			entries: ['*', '/support', '/renew', '/terms', '/privacy', '/cookies', '/legal']
 		}
 	}
 };
