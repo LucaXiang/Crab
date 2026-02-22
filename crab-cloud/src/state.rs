@@ -50,6 +50,10 @@ pub struct AppState {
     pub stripe_basic_price_id: String,
     /// Stripe Price ID for Pro plan
     pub stripe_pro_price_id: String,
+    /// Stripe Price ID for Basic plan (yearly)
+    pub stripe_basic_yearly_price_id: String,
+    /// Stripe Price ID for Pro plan (yearly)
+    pub stripe_pro_yearly_price_id: String,
     /// Connected edge-servers (edge_server_id → command sender)
     pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudCommand>>>,
     /// Pending on-demand requests (command_id → (created_at_ms, response sender))
@@ -159,6 +163,8 @@ impl AppState {
             rate_limiter: crate::auth::rate_limit::RateLimiter::new(),
             stripe_basic_price_id: config.stripe_basic_price_id.clone(),
             stripe_pro_price_id: config.stripe_pro_price_id.clone(),
+            stripe_basic_yearly_price_id: config.stripe_basic_yearly_price_id.clone(),
+            stripe_pro_yearly_price_id: config.stripe_pro_yearly_price_id.clone(),
             connected_edges: Arc::new(DashMap::new()),
             pending_requests: Arc::new(DashMap::new()),
         })

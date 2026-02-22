@@ -43,6 +43,10 @@ pub struct Config {
     pub stripe_basic_price_id: String,
     /// Stripe Price ID for Pro plan (monthly)
     pub stripe_pro_price_id: String,
+    /// Stripe Price ID for Basic plan (yearly)
+    pub stripe_basic_yearly_price_id: String,
+    /// Stripe Price ID for Pro plan (yearly)
+    pub stripe_pro_yearly_price_id: String,
 }
 
 impl Config {
@@ -107,6 +111,10 @@ impl Config {
                 .unwrap_or_else(|_| "price_1T30z63Ednyw0kfvGYVXXDaB".into()),
             stripe_pro_price_id: std::env::var("STRIPE_PRO_PRICE_ID")
                 .unwrap_or_else(|_| "price_1T30zB3Ednyw0kfvoGku9ZbF".into()),
+            stripe_basic_yearly_price_id: std::env::var("STRIPE_BASIC_YEARLY_PRICE_ID")
+                .unwrap_or_else(|_| "price_basic_yearly_placeholder".into()),
+            stripe_pro_yearly_price_id: std::env::var("STRIPE_PRO_YEARLY_PRICE_ID")
+                .unwrap_or_else(|_| "price_pro_yearly_placeholder".into()),
         })
     }
 }

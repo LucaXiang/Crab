@@ -11,11 +11,11 @@ pub struct PlanQuota {
 
 pub fn plan_quota(plan: &str) -> PlanQuota {
     match plan {
-        "basic" => PlanQuota {
+        "basic" | "basic_yearly" => PlanQuota {
             max_edge_servers: 1,
             max_clients: 5,
         },
-        "pro" => PlanQuota {
+        "pro" | "pro_yearly" => PlanQuota {
             max_edge_servers: 3,
             max_clients: 10,
         },

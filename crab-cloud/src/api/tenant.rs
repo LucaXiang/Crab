@@ -616,7 +616,7 @@ pub async fn create_checkout(
     Json(req): Json<CreateCheckoutRequest>,
 ) -> ApiResult<serde_json::Value> {
     let plan = req.plan.as_str();
-    if !matches!(plan, "basic" | "pro") {
+    if !matches!(plan, "basic" | "pro" | "basic_yearly" | "pro_yearly") {
         return Err(AppError::new(ErrorCode::ValidationFailed));
     }
 
@@ -658,6 +658,8 @@ pub async fn create_checkout(
 
     let price_id = match plan {
         "pro" => &state.stripe_pro_price_id,
+        "basic_yearly" => &state.stripe_basic_yearly_price_id,
+        "pro_yearly" => &state.stripe_pro_yearly_price_id,
         _ => &state.stripe_basic_price_id,
     };
 
