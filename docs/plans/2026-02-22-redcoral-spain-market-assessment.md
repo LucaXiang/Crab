@@ -364,11 +364,12 @@ RedCoral 的硬件来自中国供应链，**高配置 + 高颜值**，成本仅�
 - 从西班牙华人餐厅切入（沟通零成本）
 - 亲自上门安装、培训、收集反馈
 
-**第 2 步：申请 Kit Digital 认证供应商（同步进行）**
-- 小店可获 €2,000-12,000 补贴
-- 客户**不用自己掏钱**，政府报销
+**第 2 步：通过第三方 Agente Digitalizador 进入 Kit Digital 渠道（同步进行）**
+- 小店可获 €2,000-12,000 补贴，客户**不用自己掏钱**，政府报销
+- 自己不申请认证（需要西班牙公司实体 + 行政资质），找已有的 Agente Digitalizador 合作
+- 合作模式：Agent 负责行政流程（申请、报销、合规文件），你提供产品 + 安装，Agent 抽 20-30% 是行规
+- Agent 有动力帮你推——每签一家他们赚 €400-3,600
 - 参考：Qamarero、SumUp 都在利用这个渠道
-- ⚠️ 注意：Kit Digital 申请截止 2025 年 6 月（可能延期），行政流程慢
 
 **第 3 步：Verifactu 恐惧营销（持续）**
 - 博客 + SEO："TPV Verifactu restaurante"、"TPV hostelería sin internet"
