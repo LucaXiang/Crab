@@ -319,10 +319,20 @@ export const SetupScreen: React.FC = () => {
     // Clear sensitive credentials from memory
     setUsername('');
     setPassword('');
-    await fetchAppState();
+    try {
+      await fetchAppState();
+    } catch (err) {
+      logger.error('fetchAppState failed in handleComplete', err);
+    }
     const state = useBridgeStore.getState().appState;
     const route = AppStateHelpers.getRouteForState(state);
-    navigate(route, { replace: true });
+    // 防止循环: 如果 appState 仍指向 /setup（fetchAppState 失败或状态过时），
+    // 强制导航到 /login，因为 complete 步骤只有在 server/client 启动成功后才会显示
+    if (route === '/setup') {
+      navigate('/login', { replace: true });
+    } else {
+      navigate(route, { replace: true });
+    }
   };
 
   const handleCloseApp = async () => {

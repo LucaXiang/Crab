@@ -83,6 +83,8 @@ pub enum ErrorCode {
     CertificateInvalid = 3004,
     /// License has expired
     LicenseExpired = 3005,
+    /// Subscription blocked (canceled or unpaid)
+    SubscriptionBlocked = 3006,
     /// Device limit reached (quota full, need to replace an existing device)
     DeviceLimitReached = 3007,
     /// Client limit reached (quota full, need to replace an existing client)
@@ -195,6 +197,10 @@ pub enum ErrorCode {
     ImageProcessingFailed = 6508,
     /// File storage failed
     FileStorageFailed = 6509,
+    /// Print destination not found
+    PrintDestinationNotFound = 6511,
+    /// Print destination is in use by categories
+    PrintDestinationInUse = 6512,
 
     /// Marketing group not found
     MarketingGroupNotFound = 6601,
@@ -204,11 +210,6 @@ pub enum ErrorCode {
 
     /// Price rule not found
     PriceRuleNotFound = 6801,
-
-    /// Print destination not found
-    PrintDestinationNotFound = 6511,
-    /// Print destination is in use by categories
-    PrintDestinationInUse = 6512,
 
     // ==================== 7xxx: Table ====================
     /// Table not found
@@ -234,14 +235,14 @@ pub enum ErrorCode {
     // ==================== 8xxx: Employee ====================
     /// Employee not found
     EmployeeNotFound = 8001,
-    /// Member not found
-    MemberNotFound = 8005,
     /// Employee username already exists
     EmployeeUsernameExists = 8002,
     /// Cannot delete self
     EmployeeCannotDeleteSelf = 8003,
     /// Cannot modify/delete system employee
     EmployeeIsSystem = 8004,
+    /// Member not found
+    MemberNotFound = 8005,
     /// Role not found
     RoleNotFound = 8101,
     /// Role name already exists
@@ -274,8 +275,6 @@ pub enum ErrorCode {
     PrintFailed = 9202,
     /// Client disconnected
     ClientDisconnected = 9301,
-    /// Subscription blocked (canceled or unpaid)
-    SubscriptionBlocked = 3006,
 
     // ==================== 94xx: Storage ====================
     /// Storage full (disk space insufficient)
@@ -337,6 +336,7 @@ impl ErrorCode {
             ErrorCode::ActivationFailed => "Activation failed",
             ErrorCode::CertificateInvalid => "Certificate is invalid",
             ErrorCode::LicenseExpired => "License has expired",
+            ErrorCode::SubscriptionBlocked => "Subscription is blocked",
             ErrorCode::DeviceLimitReached => "Device limit reached",
             ErrorCode::ClientLimitReached => "Client limit reached",
             ErrorCode::TenantCredentialsInvalid => "Invalid tenant username or password",
@@ -417,11 +417,11 @@ impl ErrorCode {
             ErrorCode::DailyReportNotFound => "Daily report not found",
 
             // Employee
-            ErrorCode::MemberNotFound => "Member not found",
             ErrorCode::EmployeeNotFound => "Employee not found",
             ErrorCode::EmployeeUsernameExists => "Employee username already exists",
             ErrorCode::EmployeeCannotDeleteSelf => "Cannot delete own account",
             ErrorCode::EmployeeIsSystem => "Cannot modify system employee",
+            ErrorCode::MemberNotFound => "Member not found",
             ErrorCode::RoleNotFound => "Role not found",
             ErrorCode::RoleNameExists => "Role name already exists",
             ErrorCode::RoleInUse => "Role is currently in use",
@@ -439,7 +439,6 @@ impl ErrorCode {
             ErrorCode::PrinterNotAvailable => "Printer is not available",
             ErrorCode::PrintFailed => "Print operation failed",
             ErrorCode::ClientDisconnected => "Client disconnected",
-            ErrorCode::SubscriptionBlocked => "Subscription is blocked",
 
             // Storage
             ErrorCode::StorageFull => "Storage full (disk space insufficient)",
@@ -507,6 +506,7 @@ impl TryFrom<u16> for ErrorCode {
             3003 => Ok(ErrorCode::ActivationFailed),
             3004 => Ok(ErrorCode::CertificateInvalid),
             3005 => Ok(ErrorCode::LicenseExpired),
+            3006 => Ok(ErrorCode::SubscriptionBlocked),
             3007 => Ok(ErrorCode::DeviceLimitReached),
             3008 => Ok(ErrorCode::ClientLimitReached),
             3009 => Ok(ErrorCode::TenantCredentialsInvalid),
@@ -549,20 +549,15 @@ impl TryFrom<u16> for ErrorCode {
             6201 => Ok(ErrorCode::SpecNotFound),
             6202 => Ok(ErrorCode::ProductExternalIdExists),
             6203 => Ok(ErrorCode::ProductExternalIdRequired),
-            6301 => Ok(ErrorCode::AttributeNotFound),
             6204 => Ok(ErrorCode::ProductCategoryInvalid),
+            6301 => Ok(ErrorCode::AttributeNotFound),
             6302 => Ok(ErrorCode::AttributeBindFailed),
             6303 => Ok(ErrorCode::AttributeInUse),
             6304 => Ok(ErrorCode::AttributeDuplicateBinding),
             6401 => Ok(ErrorCode::TagNotFound),
             6402 => Ok(ErrorCode::TagInUse),
-            6511 => Ok(ErrorCode::PrintDestinationNotFound),
-            6512 => Ok(ErrorCode::PrintDestinationInUse),
-            6601 => Ok(ErrorCode::MarketingGroupNotFound),
-            6701 => Ok(ErrorCode::LabelTemplateNotFound),
-            6801 => Ok(ErrorCode::PriceRuleNotFound),
 
-            // File Upload
+            // File Upload + Print Destination
             6501 => Ok(ErrorCode::FileTooLarge),
             6502 => Ok(ErrorCode::UnsupportedFileFormat),
             6503 => Ok(ErrorCode::InvalidImageFile),
@@ -572,6 +567,11 @@ impl TryFrom<u16> for ErrorCode {
             6507 => Ok(ErrorCode::InvalidFileExtension),
             6508 => Ok(ErrorCode::ImageProcessingFailed),
             6509 => Ok(ErrorCode::FileStorageFailed),
+            6511 => Ok(ErrorCode::PrintDestinationNotFound),
+            6512 => Ok(ErrorCode::PrintDestinationInUse),
+            6601 => Ok(ErrorCode::MarketingGroupNotFound),
+            6701 => Ok(ErrorCode::LabelTemplateNotFound),
+            6801 => Ok(ErrorCode::PriceRuleNotFound),
 
             // Table
             7001 => Ok(ErrorCode::TableNotFound),
@@ -585,11 +585,11 @@ impl TryFrom<u16> for ErrorCode {
             7301 => Ok(ErrorCode::DailyReportNotFound),
 
             // Employee
-            8005 => Ok(ErrorCode::MemberNotFound),
             8001 => Ok(ErrorCode::EmployeeNotFound),
             8002 => Ok(ErrorCode::EmployeeUsernameExists),
             8003 => Ok(ErrorCode::EmployeeCannotDeleteSelf),
             8004 => Ok(ErrorCode::EmployeeIsSystem),
+            8005 => Ok(ErrorCode::MemberNotFound),
             8101 => Ok(ErrorCode::RoleNotFound),
             8102 => Ok(ErrorCode::RoleNameExists),
             8103 => Ok(ErrorCode::RoleInUse),
@@ -607,7 +607,6 @@ impl TryFrom<u16> for ErrorCode {
             9201 => Ok(ErrorCode::PrinterNotAvailable),
             9202 => Ok(ErrorCode::PrintFailed),
             9301 => Ok(ErrorCode::ClientDisconnected),
-            3006 => Ok(ErrorCode::SubscriptionBlocked),
 
             // Storage
             9401 => Ok(ErrorCode::StorageFull),
@@ -903,5 +902,62 @@ mod tests {
         assert_eq!(set.len(), 2);
         assert!(set.contains(&ErrorCode::Success));
         assert!(set.contains(&ErrorCode::NotFound));
+    }
+
+    /// Guard test: if this fails, a new ErrorCode variant was added but
+    /// build.rs TS template and this test were not updated.
+    /// Update EXPECTED_VARIANT_COUNT, then run `GENERATE_TS=1 cargo build -p shared`
+    /// to regenerate error-codes.ts.
+    #[test]
+    fn test_variant_count_sync_guard() {
+        // Exhaustive list of all ErrorCode values that must round-trip through TryFrom<u16>.
+        // When adding a new variant: add it here, bump the count, and update build.rs template.
+        let all_codes: Vec<u16> = vec![
+            0, 1, 2, 3, 4, 5, 6, 7, 8, // 0xxx General (9)
+            1001, 1002, 1003, 1004, 1005, 1006, 1007, // 1xxx Auth (7)
+            2001, 2002, 2003, 2004, 2005, // 2xxx Permission (5)
+            3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, // 3xxx Tenant
+            3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, // (21)
+            4001, 4002, 4003, 4004, 4005, 4006, 4007, // 4xxx Order (7)
+            5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
+            6001, 6002, 6003, // 6xxx Product
+            6101, 6102, 6103, // 61xx Category
+            6201, 6202, 6203, 6204, // 62xx Spec/ExtId
+            6301, 6302, 6303, 6304, // 63xx Attribute
+            6401, 6402, // 64xx Tag
+            6501, 6502, 6503, 6504, 6505, 6506, 6507, 6508, 6509, // 65xx File Upload
+            6511, 6512, // 65xx Print Dest
+            6601, // 66xx Marketing
+            6701, // 67xx Label Template
+            6801, // 68xx Price Rule (28)
+            7001, 7002, 7003, // 7xxx Table
+            7101, 7102, 7103, 7104, // 71xx Zone
+            7201, // 72xx Shift
+            7301, // 73xx Daily Report (9)
+            8001, 8002, 8003, 8004, 8005, // 8xxx Employee+Member
+            8101, 8102, 8103, 8104, // 81xx Role (9)
+            9001, 9002, 9003, 9004, 9005, // 9xxx System
+            9101, 9102, 9103, // 91xx Bridge
+            9201, 9202, // 92xx Printer
+            9301, // 93xx Client
+            9401, 9402, 9403, 9404, // 94xx Storage (15)
+        ];
+
+        const EXPECTED_VARIANT_COUNT: usize = 117;
+        assert_eq!(
+            all_codes.len(),
+            EXPECTED_VARIANT_COUNT,
+            "all_codes list length mismatch — did you add a variant to this list?"
+        );
+
+        // Verify every code round-trips
+        for code in &all_codes {
+            let ec = ErrorCode::try_from(*code).unwrap_or_else(|_| {
+                panic!("ErrorCode::try_from({code}) failed — missing TryFrom arm")
+            });
+            assert_eq!(ec.code(), *code, "Round-trip failed for code {code}");
+            // Ensure message() doesn't panic
+            let _ = ec.message();
+        }
     }
 }

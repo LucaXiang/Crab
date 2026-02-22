@@ -75,6 +75,7 @@ impl ErrorCode {
             | Self::DeviceLimitReached
             | Self::ClientLimitReached
             | Self::TenantNoSubscription
+            | Self::SubscriptionBlocked
             | Self::FeatureNotAvailable
             | Self::EmailNotVerified
             | Self::DeviceIdMismatch

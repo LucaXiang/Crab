@@ -41,8 +41,9 @@ impl DbService {
 
         tracing::info!("Database connection established (SQLite WAL, busy_timeout=5000ms)");
 
-        // Run migrations
+        // Run migrations (ignore previously applied but now removed migrations)
         sqlx::migrate!("./migrations")
+            .set_ignore_missing(true)
             .run(&pool)
             .await
             .map_err(|e| AppError::database(format!("Failed to apply migrations: {e}")))?;
