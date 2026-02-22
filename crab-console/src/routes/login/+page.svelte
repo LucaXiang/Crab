@@ -142,7 +142,11 @@
 			</button>
 		</form>
 
-		<p class="text-center text-sm text-slate-500 mt-6">
+			<div class="text-center mt-4">
+			<a href="/forgot-password" class="text-sm text-slate-500 hover:text-coral-500 transition-colors">{$t('auth.forgot')}</a>
+		</div>
+
+		<p class="text-center text-sm text-slate-500 mt-4">
 			{$t('auth.no_account')}
 			<a href="https://redcoral.app/register" class="text-coral-500 hover:text-coral-600 font-medium"
 				>{$t('auth.register')}</a

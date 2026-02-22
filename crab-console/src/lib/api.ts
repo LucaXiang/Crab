@@ -410,6 +410,22 @@ export function confirmEmailChange(
 	);
 }
 
+export function forgotPassword(email: string): Promise<{ message: string }> {
+	return request('POST', '/api/tenant/forgot-password', { email });
+}
+
+export function resetPassword(
+	email: string,
+	code: string,
+	newPassword: string
+): Promise<{ message: string }> {
+	return request('POST', '/api/tenant/reset-password', {
+		email,
+		code,
+		new_password: newPassword
+	});
+}
+
 export function createBillingPortal(token: string): Promise<{ url: string }> {
 	return request('POST', '/api/tenant/billing-portal', undefined, token);
 }

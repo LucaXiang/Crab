@@ -9,6 +9,17 @@ export const es: Record<string, string> = {
 	'auth.error_generic': 'Error, inténtalo de nuevo.',
 	'auth.error_invalid': 'Correo o contraseña incorrectos.',
 	'auth.forgot': '¿Olvidaste tu contraseña?',
+	'auth.forgot_desc': 'Introduce tu email y te enviaremos un código de recuperación.',
+	'auth.reset_desc': 'Introduce el código enviado a tu email y elige una nueva contraseña.',
+	'auth.send_code': 'Enviar código',
+	'auth.reset_code': 'Código de recuperación',
+	'auth.reset_code_sent': 'Si el email existe, se ha enviado un código de recuperación.',
+	'auth.reset_password': 'Restablecer contraseña',
+	'auth.password_reset_success': 'Contraseña restablecida. Redirigiendo...',
+	'auth.password_too_short': 'La contraseña debe tener al menos 8 caracteres.',
+	'auth.reset_code_invalid': 'Código de recuperación no válido.',
+	'auth.reset_code_expired': 'El código ha caducado. Inténtalo de nuevo.',
+	'auth.back_to_login': 'Volver a iniciar sesión',
 	'auth.no_account': '¿No tienes cuenta?',
 	'auth.register': 'Registrarse',
 
@@ -43,6 +54,9 @@ export const es: Record<string, string> = {
 	'dash.last_sync': 'Última sincronización',
 	'dash.never': 'Nunca',
 	'dash.view_store': 'Ver local',
+	'dash.download_app': 'RedCoral POS',
+	'dash.download_desc': 'Descarga la última versión para Windows.',
+	'dash.download_windows': 'Descargar',
 
 	// Store detail
 	'store.title': 'Local',

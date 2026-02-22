@@ -14,7 +14,8 @@
 		ShoppingBag,
 		Users,
 		TrendingUp,
-		BarChart3
+		BarChart3,
+		Download
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
@@ -492,6 +493,28 @@
 						{/each}
 					</div>
 				{/if}
+			</div>
+
+			<!-- Download App -->
+			<div class="bg-white rounded-2xl border border-slate-200 p-6">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 bg-coral-100 rounded-lg flex items-center justify-center">
+							<Download class="w-5 h-5 text-coral-600" />
+						</div>
+						<div>
+							<h3 class="text-sm font-semibold text-slate-900">{$t('dash.download_app')}</h3>
+							<p class="text-xs text-slate-400">{$t('dash.download_desc')}</p>
+						</div>
+					</div>
+					<a
+						href="https://auth.redcoral.app/api/download/latest"
+						class="inline-flex items-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors"
+					>
+						<Download class="w-4 h-4" />
+						{$t('dash.download_windows')}
+					</a>
+				</div>
 			</div>
 		{/if}
 	</div>
