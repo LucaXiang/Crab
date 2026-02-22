@@ -284,6 +284,23 @@ impl CatalogService {
         let products_count = self.products.read().len();
         tracing::debug!(count = products_count, "CatalogService loaded products");
 
+        // 6. Load persisted print defaults
+        match crate::db::repository::print_config::get(&self.pool).await {
+            Ok(row) => {
+                let mut defaults = self.print_defaults.write();
+                defaults.kitchen_destination = row.default_kitchen_printer;
+                defaults.label_destination = row.default_label_printer;
+                tracing::debug!(
+                    kitchen = ?defaults.kitchen_destination,
+                    label = ?defaults.label_destination,
+                    "CatalogService loaded print defaults"
+                );
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load print defaults: {:?}", e);
+            }
+        }
+
         Ok(())
     }
 

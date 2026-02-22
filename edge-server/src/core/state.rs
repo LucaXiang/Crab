@@ -645,6 +645,7 @@ impl ServerState {
             self.kitchen_print_service.clone(),
             self.catalog_service.clone(),
             self.pool.clone(),
+            self.config.timezone,
         );
 
         let shutdown = tasks.shutdown_token();
@@ -656,17 +657,17 @@ impl ServerState {
     /// 注册打印记录清理任务
     ///
     /// - 启动时立即执行一次清理
-    /// - 之后每小时执行一次
-    /// - 清理 3 天以前的记录 (kitchen_order, label_record)
+    /// - 之后每 6 小时执行一次
+    /// - 清理 7 天以前的记录 (kitchen_order, label_record)
     fn register_print_record_cleanup(&self, tasks: &mut BackgroundTasks) {
-        const CLEANUP_INTERVAL_SECS: u64 = 3600; // 1 hour
-        const MAX_AGE_SECS: i64 = 3 * 24 * 3600; // 3 days
+        const CLEANUP_INTERVAL_SECS: u64 = 6 * 3600; // 6 hours
+        const MAX_AGE_SECS: i64 = 7 * 24 * 3600; // 7 days
 
         let print_service = self.kitchen_print_service.clone();
         let shutdown = tasks.shutdown_token();
 
         tasks.spawn("print_record_cleanup", TaskKind::Periodic, async move {
-            tracing::info!("Print record cleanup task started (interval: 1h, max_age: 3d)");
+            tracing::info!("Print record cleanup task started (interval: 6h, max_age: 7d)");
 
             // Cleanup immediately on startup
             match print_service.cleanup_old_records(MAX_AGE_SECS) {

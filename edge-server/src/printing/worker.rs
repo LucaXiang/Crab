@@ -7,6 +7,7 @@ use crate::db::repository::print_destination;
 use crate::orders::OrdersManager;
 use crate::printing::{KitchenPrintService, PrintExecutor};
 use crate::services::CatalogService;
+use chrono_tz::Tz;
 use shared::order::OrderEvent;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -26,6 +27,7 @@ pub struct KitchenPrintWorker {
     kitchen_print_service: Arc<KitchenPrintService>,
     catalog_service: Arc<CatalogService>,
     pool: SqlitePool,
+    timezone: Tz,
 }
 
 impl KitchenPrintWorker {
@@ -34,12 +36,14 @@ impl KitchenPrintWorker {
         kitchen_print_service: Arc<KitchenPrintService>,
         catalog_service: Arc<CatalogService>,
         pool: SqlitePool,
+        timezone: Tz,
     ) -> Self {
         Self {
             orders_manager,
             kitchen_print_service,
             catalog_service,
             pool,
+            timezone,
         }
     }
 
@@ -52,7 +56,7 @@ impl KitchenPrintWorker {
         shutdown: CancellationToken,
     ) {
         tracing::info!("Kitchen print worker started");
-        let executor = PrintExecutor::new();
+        let executor = PrintExecutor::with_config(48, self.timezone);
 
         loop {
             tokio::select! {

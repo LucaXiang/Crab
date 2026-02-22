@@ -4,8 +4,7 @@
  * 本地打印功能通过 Tauri 命令调用：
  * - listPrinters: 获取本地驱动打印机列表
  * - openCashDrawer: 打开钱箱
- *
- * 收据/厨房票据/标签打印由服务端处理，前端无需调用。
+ * - printReceipt: 打印收据
  */
 
 import { invoke } from '@tauri-apps/api/core';
@@ -18,6 +17,63 @@ interface ApiResponse<T> {
   message: string;
   data: T;
 }
+
+// ── Receipt Data Types (与 Rust ReceiptData 对齐) ──
+
+export interface ReceiptStoreInfo {
+  name: string;
+  address: string;
+  nif: string;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  logo_url: string | null;
+}
+
+export interface ReceiptSurchargeInfo {
+  name: string;
+  type: string;
+  value: number;
+  amount: number;
+}
+
+export interface ReceiptSelectedOption {
+  attribute_name: string;
+  option_name: string;
+  receipt_name: string | null;
+  price_modifier: number;
+}
+
+export interface ReceiptItem {
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+  tax_rate: number | null;
+  discount_percent: number | null;
+  original_price: number | null;
+  selected_options: ReceiptSelectedOption[] | null;
+  spec_name: string | null;
+}
+
+export interface ReceiptData {
+  order_id: string;
+  timestamp: string;
+  table_name: string;
+  zone_name: string | null;
+  guest_count: number | null;
+  opened_at: string | null;
+  checkout_time: string | null;
+  void_reason: string | null;
+  reprint: boolean;
+  store_info: ReceiptStoreInfo | null;
+  surcharge: ReceiptSurchargeInfo | null;
+  items: ReceiptItem[];
+  total_amount: number;
+  qr_data: string | null;
+}
+
+// ── Service Functions ──
 
 /**
  * 获取本地驱动打印机列表
@@ -51,5 +107,20 @@ export async function openCashDrawer(printerName?: string): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(t('common.message.cash_drawer_failed', { message }));
+  }
+}
+
+/**
+ * 打印收据
+ * @param printerName Windows 驱动打印机名称
+ * @param receipt 收据数据
+ */
+export async function printReceipt(printerName: string | null, receipt: ReceiptData): Promise<void> {
+  const response = await invoke<ApiResponse<null>>('print_receipt', {
+    printer_name: printerName,
+    receipt,
+  });
+  if (response.code !== 0) {
+    throw new Error(response.message);
   }
 }

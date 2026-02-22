@@ -27,6 +27,7 @@ pub mod payment;
 
 // System
 pub mod label_template;
+pub mod print_config;
 pub mod store_info;
 pub mod system_issue;
 pub mod system_state;

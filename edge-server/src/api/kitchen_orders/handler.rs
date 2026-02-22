@@ -6,6 +6,8 @@
 //! - Reprint kitchen order
 //! - Label record management
 
+use std::collections::HashMap;
+
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -13,7 +15,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
-use crate::printing::{KitchenOrder, LabelPrintRecord};
+use crate::db::repository::print_destination;
+use crate::printing::{KitchenOrder, LabelPrintRecord, PrintExecutor};
 use crate::utils::{AppError, AppResult};
 
 /// Query params for listing kitchen orders
@@ -84,9 +87,35 @@ pub async fn reprint(
 ) -> AppResult<Json<bool>> {
     let service = state.kitchen_print_service();
 
-    service.reprint_kitchen_order(&id)?;
+    // 1. Increment print_count and get the order
+    let order = service.reprint_kitchen_order(&id)?;
 
-    tracing::info!(kitchen_order_id = %id, "Kitchen order reprinted via API");
+    tracing::info!(
+        kitchen_order_id = %id,
+        print_count = order.print_count,
+        "Kitchen order reprint requested"
+    );
+
+    // 2. Load print destinations
+    let destinations = print_destination::find_all(&state.pool)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    let dest_map: HashMap<String, _> = destinations
+        .into_iter()
+        .map(|d| (d.id.to_string(), d))
+        .collect();
+
+    // 3. Execute actual printing
+    let executor = PrintExecutor::with_config(48, state.config.timezone);
+    if let Err(e) = executor.print_kitchen_order(&order, &dest_map).await {
+        tracing::warn!(
+            kitchen_order_id = %id,
+            error = %e,
+            "Reprint failed"
+        );
+        return Ok(Json(false));
+    }
 
     Ok(Json(true))
 }
@@ -125,6 +154,10 @@ pub async fn get_label_by_id(
 }
 
 /// POST /api/label-records/:id/reprint - Reprint a label record
+///
+/// Note: Label reprint currently only increments the counter.
+/// Actual label re-printing requires the label template renderer (Windows GDI+),
+/// which is only available on the Tauri frontend.
 pub async fn reprint_label(
     State(state): State<ServerState>,
     Path(id): Path<String>,

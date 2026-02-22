@@ -4,6 +4,8 @@
 
 use std::collections::HashMap;
 
+use chrono_tz::Tz;
+
 use super::renderer::KitchenTicketRenderer;
 use super::types::KitchenOrder;
 use shared::models::{PrintDestination, Printer};
@@ -32,17 +34,17 @@ pub struct PrintExecutor {
 }
 
 impl PrintExecutor {
-    /// Create a new executor with default 80mm paper width
+    /// Create a new executor with default 80mm paper width and Europe/Madrid timezone
     pub fn new() -> Self {
         Self {
-            renderer: KitchenTicketRenderer::new(48),
+            renderer: KitchenTicketRenderer::default(),
         }
     }
 
-    /// Create an executor with custom paper width
-    pub fn with_width(width: usize) -> Self {
+    /// Create an executor with custom paper width and timezone
+    pub fn with_config(width: usize, timezone: Tz) -> Self {
         Self {
-            renderer: KitchenTicketRenderer::new(width),
+            renderer: KitchenTicketRenderer::new(width, timezone),
         }
     }
 

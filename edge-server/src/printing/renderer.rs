@@ -2,6 +2,7 @@
 //!
 //! Renders KitchenOrder data into ESC/POS format for thermal printers.
 
+use chrono_tz::Tz;
 use crab_printer::EscPosBuilder;
 
 use super::types::{KitchenOrder, PrintItemContext};
@@ -12,16 +13,17 @@ use super::types::{KitchenOrder, PrintItemContext};
 /// Groups items by category and sorts by external_id.
 pub struct KitchenTicketRenderer {
     width: usize,
+    timezone: Tz,
 }
 
 impl KitchenTicketRenderer {
-    /// Create a new renderer with specified paper width
+    /// Create a new renderer with specified paper width and timezone
     ///
     /// Common widths:
     /// - 58mm paper: 32 characters
     /// - 80mm paper: 48 characters
-    pub fn new(width: usize) -> Self {
-        Self { width }
+    pub fn new(width: usize, timezone: Tz) -> Self {
+        Self { width, timezone }
     }
 
     /// Render a kitchen order to ESC/POS bytes
@@ -58,8 +60,8 @@ impl KitchenTicketRenderer {
         b.bold_off();
         b.reset_size();
 
-        // Timestamp
-        let timestamp = format_timestamp(order.created_at);
+        // Timestamp (in configured timezone)
+        let timestamp = format_timestamp(order.created_at, self.timezone);
         b.line(&timestamp);
 
         b.left();
@@ -181,7 +183,7 @@ impl KitchenTicketRenderer {
             b.newline();
             b.center();
             b.bold();
-            b.line(&format!("*** 补打 #{} ***", order.print_count + 1));
+            b.line(&format!("*** 补打 #{} ***", order.print_count));
             b.bold_off();
             b.left();
         }
@@ -194,14 +196,14 @@ impl KitchenTicketRenderer {
 
 impl Default for KitchenTicketRenderer {
     fn default() -> Self {
-        Self::new(48) // 80mm paper
+        Self::new(48, chrono_tz::Europe::Madrid)
     }
 }
 
-/// Format unix timestamp (millis) to readable string (MM-DD HH:mm:ss)
-fn format_timestamp(ts: i64) -> String {
+/// Format unix timestamp (millis) to readable string (MM-DD HH:mm:ss) in given timezone
+fn format_timestamp(ts: i64, tz: Tz) -> String {
     if let Some(dt) = chrono::DateTime::from_timestamp_millis(ts) {
-        dt.format("%m-%d %H:%M:%S").to_string()
+        dt.with_timezone(&tz).format("%m-%d %H:%M:%S").to_string()
     } else {
         "时间未知".to_string()
     }
@@ -277,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_render_kitchen_ticket() {
-        let renderer = KitchenTicketRenderer::new(48);
+        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
         let order = create_test_order();
 
         let data = renderer.render(&order);
@@ -291,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_group_by_category() {
-        let renderer = KitchenTicketRenderer::new(48);
+        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
         let order = create_test_order();
 
         let grouped: Vec<_> = renderer

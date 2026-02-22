@@ -229,17 +229,25 @@ impl KitchenPrintService {
     }
 
     /// Reprint a kitchen order
+    ///
+    /// Increments print_count and returns the updated order (post-increment).
     pub fn reprint_kitchen_order(&self, id: &str) -> PrintServiceResult<KitchenOrder> {
-        let order = self
-            .storage
-            .get_kitchen_order(id)?
-            .ok_or_else(|| PrintServiceError::KitchenOrderNotFound(id.to_string()))?;
+        // Verify exists first
+        if self.storage.get_kitchen_order(id)?.is_none() {
+            return Err(PrintServiceError::KitchenOrderNotFound(id.to_string()));
+        }
 
         let txn = self.storage.begin_write()?;
         self.storage.increment_kitchen_order_print_count(&txn, id)?;
         txn.commit().map_err(PrintStorageError::from)?;
 
-        tracing::info!(kitchen_order_id = %id, print_count = order.print_count + 1, "Kitchen order reprinted");
+        // Re-read after increment to get updated print_count
+        let order = self
+            .storage
+            .get_kitchen_order(id)?
+            .ok_or_else(|| PrintServiceError::KitchenOrderNotFound(id.to_string()))?;
+
+        tracing::info!(kitchen_order_id = %id, print_count = order.print_count, "Kitchen order reprinted");
 
         Ok(order)
     }

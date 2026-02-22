@@ -41,6 +41,16 @@ pub async fn update(
     Extension(current_user): Extension<CurrentUser>,
     Json(config): Json<PrintConfig>,
 ) -> AppResult<Json<PrintConfig>> {
+    // Persist to DB first
+    crate::db::repository::print_config::update(
+        &state.pool,
+        config.default_kitchen_printer.as_deref(),
+        config.default_label_printer.as_deref(),
+    )
+    .await
+    .map_err(crate::utils::AppError::from)?;
+
+    // Then update in-memory cache
     state.catalog_service.set_print_defaults(
         config.default_kitchen_printer.clone(),
         config.default_label_printer.clone(),

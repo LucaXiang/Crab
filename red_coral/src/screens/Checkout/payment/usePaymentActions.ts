@@ -5,8 +5,9 @@ import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { useRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { openCashDrawer } from '@/core/services/order/paymentService';
+import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
 import { completeOrder, updateOrderInfo } from '@/core/stores/order/commands';
+import { usePrinterStore } from '@/core/stores/printer/usePrinterStore';
 
 interface SuccessModalState {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
   const { t } = useI18n();
   const serviceType = useRetailServiceType();
   const remaining = order.remaining_amount;
+  const receiptPrinter = usePrinterStore((state) => state.receiptPrinter);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
@@ -32,6 +34,19 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
     });
   }, [onComplete]);
 
+  /** 构建打印回调（未配置打印机时返回 undefined，SuccessModal 不显示打印按钮） */
+  const buildPrintHandler = useCallback(
+    (capturedOrder: HeldOrder) => {
+      if (!receiptPrinter) return undefined;
+      return () => {
+        printOrderReceipt(capturedOrder, receiptPrinter).catch(() => {
+          toast.error(t('settings.payment.receipt_print_failed'));
+        });
+      };
+    },
+    [receiptPrinter, t],
+  );
+
   const handleManualComplete = useCallback(async () => {
     setIsProcessing(true);
     try {
@@ -40,6 +55,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
         isOpen: true,
         type: 'NORMAL',
         onClose: handleComplete,
+        onPrint: buildPrintHandler(order),
         autoCloseDelay: order.is_retail ? 0 : 5000,
       });
     } catch (error) {
@@ -48,7 +64,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
     } finally {
       setIsProcessing(false);
     }
-  }, [order, handleComplete, serviceType, t]);
+  }, [order, handleComplete, serviceType, t, buildPrintHandler]);
 
   const handleFullCashPayment = useCallback(() => {
     setShowCashModal(true);
@@ -83,6 +99,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
           type: 'CASH',
           change: payment.change ?? undefined,
           onClose: handleComplete,
+          onPrint: buildPrintHandler(order),
           autoCloseDelay: is_retail ? 0 : 10000,
         });
       } catch (error) {
@@ -92,7 +109,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
         setIsProcessing(false);
       }
     },
-    [remaining, order, handleComplete, t, serviceType]
+    [remaining, order, handleComplete, t, serviceType, buildPrintHandler]
   );
 
   const handleFullCardPayment = useCallback(async () => {
@@ -117,6 +134,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
         isOpen: true,
         type: 'NORMAL',
         onClose: handleComplete,
+        onPrint: buildPrintHandler(order),
         autoCloseDelay: is_retail ? 0 : 5000,
       });
     } catch (error) {
@@ -125,7 +143,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
     } finally {
       setIsProcessing(false);
     }
-  }, [remaining, order, handleComplete, t, serviceType]);
+  }, [remaining, order, handleComplete, t, serviceType, buildPrintHandler]);
 
   const handlePrintPrePayment = useCallback(async () => {
     try {

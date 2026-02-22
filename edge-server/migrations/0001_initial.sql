@@ -364,6 +364,14 @@ CREATE TABLE system_state (
     updated_at         INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE print_config (
+    id                      INTEGER PRIMARY KEY,
+    default_kitchen_printer TEXT,
+    default_label_printer   TEXT,
+    updated_at              INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO print_config (id) VALUES (1);
+
 -- ── Label Template + Fields ──────────────────────────────────
 
 CREATE TABLE label_template (
@@ -558,12 +566,16 @@ CREATE TABLE archived_order (
     related_order_id                TEXT,
     prev_hash                       TEXT    NOT NULL,
     curr_hash                       TEXT    NOT NULL,
+    order_key                       TEXT    NOT NULL DEFAULT '',
+    cloud_synced                    INTEGER NOT NULL DEFAULT 0,
     created_at                      INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX idx_archived_order_receipt ON archived_order(receipt_number);
+CREATE UNIQUE INDEX idx_archived_order_order_key ON archived_order(order_key);
 CREATE INDEX idx_archived_order_status ON archived_order(status);
 CREATE INDEX idx_archived_order_end_time ON archived_order(end_time);
 CREATE INDEX idx_archived_order_hash ON archived_order(curr_hash);
+CREATE INDEX idx_archived_order_cloud_synced ON archived_order(cloud_synced);
 CREATE INDEX idx_archived_order_status_end ON archived_order(status, end_time);
 CREATE INDEX idx_archived_order_created ON archived_order(created_at);
 CREATE INDEX idx_archived_order_member ON archived_order(member_id);
