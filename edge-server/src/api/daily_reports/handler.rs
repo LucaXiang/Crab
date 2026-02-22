@@ -16,6 +16,7 @@ use crate::utils::validation::{
     MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{DailyReport, DailyReportGenerate};
 
 const RESOURCE: &str = "daily_report";
@@ -56,7 +57,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<DailyReport>> {
     let report = daily_report::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Daily report {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::DailyReportNotFound,
+                format!("Daily report {} not found", id),
+            )
+        })?;
     Ok(Json(report))
 }
 
@@ -67,7 +73,12 @@ pub async fn get_by_date(
 ) -> AppResult<Json<DailyReport>> {
     let report = daily_report::find_by_date(&state.pool, &date)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Daily report for {} not found", date)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::DailyReportNotFound,
+                format!("Daily report for {} not found", date),
+            )
+        })?;
     Ok(Json(report))
 }
 

@@ -1,6 +1,7 @@
 //! Zone Repository
 
 use super::{RepoError, RepoResult};
+use shared::error::ErrorCode;
 use shared::models::{Zone, ZoneCreate, ZoneUpdate};
 use sqlx::SqlitePool;
 
@@ -72,7 +73,8 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     .fetch_one(pool)
     .await?;
     if count > 0 {
-        return Err(RepoError::Validation(
+        return Err(RepoError::Business(
+            ErrorCode::ZoneHasTables,
             "Cannot delete zone with active tables".into(),
         ));
     }

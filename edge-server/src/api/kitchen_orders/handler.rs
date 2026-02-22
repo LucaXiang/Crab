@@ -18,6 +18,7 @@ use crate::core::ServerState;
 use crate::db::repository::print_destination;
 use crate::printing::{KitchenOrder, LabelPrintRecord, PrintExecutor};
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 
 /// Query params for listing kitchen orders
 #[derive(Debug, Deserialize)]
@@ -73,9 +74,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<KitchenOrder>> {
     let service = state.kitchen_print_service();
 
-    let order = service
-        .get_kitchen_order(&id)?
-        .ok_or_else(|| AppError::not_found(format!("Kitchen order {} not found", id)))?;
+    let order = service.get_kitchen_order(&id)?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::OrderNotFound,
+            format!("Kitchen order {} not found", id),
+        )
+    })?;
 
     Ok(Json(order))
 }
@@ -146,9 +150,12 @@ pub async fn get_label_by_id(
 ) -> AppResult<Json<LabelPrintRecord>> {
     let service = state.kitchen_print_service();
 
-    let record = service
-        .get_label_record(&id)?
-        .ok_or_else(|| AppError::not_found(format!("Label record {} not found", id)))?;
+    let record = service.get_label_record(&id)?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::OrderItemNotFound,
+            format!("Label record {} not found", id),
+        )
+    })?;
 
     Ok(Json(record))
 }

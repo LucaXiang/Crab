@@ -16,6 +16,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 
 const RESOURCE: &str = "shift";
@@ -77,9 +78,9 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Shift>> {
-    let shift = shift::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Shift {} not found", id)))?;
+    let shift = shift::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::ShiftNotFound, format!("Shift {} not found", id))
+    })?;
     Ok(Json(shift))
 }
 
@@ -135,9 +136,9 @@ pub async fn update(
     }
     validate_optional_text(&payload.note, "note", MAX_NOTE_LEN)?;
 
-    let old = shift::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Shift {} not found", id)))?;
+    let old = shift::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::ShiftNotFound, format!("Shift {} not found", id))
+    })?;
 
     let s = shift::update(&state.pool, id, payload).await?;
 

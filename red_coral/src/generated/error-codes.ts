@@ -41,6 +41,15 @@ export const ErrorCode = {
   FeatureNotAvailable: 3010,
   TenantNoSubscription: 3011,
   AuthServerError: 3012,
+  VerificationCodeExpired: 3013,
+  VerificationCodeInvalid: 3014,
+  TooManyAttempts: 3015,
+  EmailNotVerified: 3016,
+  PaymentSetupFailed: 3017,
+  PasswordTooShort: 3018,
+  P12Required: 3019,
+  DeviceIdMismatch: 3020,
+  CertificateMissingDeviceId: 3021,
 
   // 4xxx: Order
   OrderNotFound: 4001,
@@ -68,8 +77,29 @@ export const ErrorCode = {
   SpecNotFound: 6201,
   ProductExternalIdExists: 6202,
   ProductExternalIdRequired: 6203,
+  ProductCategoryInvalid: 6204,
   AttributeNotFound: 6301,
   AttributeBindFailed: 6302,
+  AttributeInUse: 6303,
+  AttributeDuplicateBinding: 6304,
+  TagNotFound: 6401,
+  TagInUse: 6402,
+
+  // 65xx: File Upload
+  FileTooLarge: 6501,
+  UnsupportedFileFormat: 6502,
+  InvalidImageFile: 6503,
+  NoFileProvided: 6504,
+  EmptyFile: 6505,
+  NoFilename: 6506,
+  InvalidFileExtension: 6507,
+  ImageProcessingFailed: 6508,
+  FileStorageFailed: 6509,
+  PrintDestinationNotFound: 6511,
+  PrintDestinationInUse: 6512,
+  MarketingGroupNotFound: 6601,
+  LabelTemplateNotFound: 6701,
+  PriceRuleNotFound: 6801,
 
   // 7xxx: Table
   TableNotFound: 7001,
@@ -78,14 +108,20 @@ export const ErrorCode = {
   ZoneNotFound: 7101,
   ZoneHasTables: 7102,
   ZoneNameExists: 7103,
+  TableHasOrders: 7104,
+  ShiftNotFound: 7201,
+  DailyReportNotFound: 7301,
 
   // 8xxx: Employee
   EmployeeNotFound: 8001,
   EmployeeUsernameExists: 8002,
   EmployeeCannotDeleteSelf: 8003,
+  EmployeeIsSystem: 8004,
+  MemberNotFound: 8005,
   RoleNotFound: 8101,
   RoleNameExists: 8102,
   RoleInUse: 8103,
+  RoleIsSystem: 8104,
 
   // 9xxx: System
   InternalError: 9001,
@@ -98,7 +134,6 @@ export const ErrorCode = {
   BridgeConnectionFailed: 9103,
   PrinterNotAvailable: 9201,
   PrintFailed: 9202,
-  LabelPrintingNotImplemented: 9203,
   ClientDisconnected: 9301,
 
   // 94xx: Storage

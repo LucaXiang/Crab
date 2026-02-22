@@ -1,6 +1,7 @@
 //! Employee Repository
 
 use super::{RepoError, RepoResult};
+use shared::error::ErrorCode;
 use shared::models::{Employee, EmployeeCreate, EmployeeUpdate};
 use sqlx::SqlitePool;
 
@@ -127,7 +128,8 @@ pub async fn update(pool: &SqlitePool, id: i64, data: EmployeeUpdate) -> RepoRes
             || data.is_active.is_some()
             || data.display_name.is_some())
     {
-        return Err(RepoError::Validation(
+        return Err(RepoError::Business(
+            ErrorCode::EmployeeIsSystem,
             "System user can only change password".into(),
         ));
     }
@@ -168,7 +170,10 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
         .ok_or_else(|| RepoError::NotFound(format!("Employee {id} not found")))?;
 
     if existing.is_system {
-        return Err(RepoError::Validation("Cannot delete system user".into()));
+        return Err(RepoError::Business(
+            ErrorCode::EmployeeIsSystem,
+            "Cannot delete system user".into(),
+        ));
     }
 
     sqlx::query!("DELETE FROM employee WHERE id = ?", id)

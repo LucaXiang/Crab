@@ -14,6 +14,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 
 const RESOURCE: &str = "label_template";
@@ -58,9 +59,12 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<LabelTemplate>> {
-    let template = label_template::get(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Label template {} not found", id)))?;
+    let template = label_template::get(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::LabelTemplateNotFound,
+            format!("Label template {} not found", id),
+        )
+    })?;
     Ok(Json(template))
 }
 
@@ -102,9 +106,12 @@ pub async fn update(
 ) -> AppResult<Json<LabelTemplate>> {
     validate_update(&payload)?;
 
-    let old_template = label_template::get(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Label template {} not found", id)))?;
+    let old_template = label_template::get(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::LabelTemplateNotFound,
+            format!("Label template {} not found", id),
+        )
+    })?;
 
     let template = label_template::update(&state.pool, id, payload).await?;
 

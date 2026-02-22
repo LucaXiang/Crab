@@ -15,6 +15,7 @@ use crate::utils::validation::{
     validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::price_rule::AdjustmentType;
 use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 
@@ -141,7 +142,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<PriceRule>> {
     let rule = price_rule::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Price rule {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::PriceRuleNotFound,
+                format!("Price rule {} not found", id),
+            )
+        })?;
     Ok(Json(rule))
 }
 
@@ -186,7 +192,12 @@ pub async fn update(
     // 查询旧值（用于审计 diff + 部分更新验证）
     let old_rule = price_rule::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Price rule {}", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::PriceRuleNotFound,
+                format!("Price rule {} not found", id),
+            )
+        })?;
 
     // 验证 adjustment_value（部分更新时用旧值补齐）
     let adj_type = payload

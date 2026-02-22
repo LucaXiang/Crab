@@ -10,6 +10,7 @@
 use super::ImageCleanupService;
 use crate::db::repository::{RepoError, RepoResult, attribute, image_ref};
 use parking_lot::RwLock;
+use shared::error::ErrorCode;
 use shared::models::{
     AttributeBindingFull, Category, CategoryCreate, CategoryUpdate, ImageRefEntityType, Product,
     ProductCreate, ProductFull, ProductSpec, ProductUpdate, Tag,
@@ -417,7 +418,8 @@ impl CatalogService {
             if let Some(cat) = categories.get(&data.category_id)
                 && cat.is_virtual
             {
-                return Err(RepoError::Validation(
+                return Err(RepoError::Business(
+                    ErrorCode::ProductCategoryInvalid,
                     "Product cannot belong to a virtual category".into(),
                 ));
             }
@@ -523,7 +525,8 @@ impl CatalogService {
             if let Some(cat) = categories.get(&new_cat_id)
                 && cat.is_virtual
             {
-                return Err(RepoError::Validation(
+                return Err(RepoError::Business(
+                    ErrorCode::ProductCategoryInvalid,
                     "Product cannot belong to a virtual category".into(),
                 ));
             }
@@ -999,7 +1002,8 @@ impl CatalogService {
         .await?;
 
         if count > 0 {
-            return Err(RepoError::Validation(
+            return Err(RepoError::Business(
+                ErrorCode::CategoryHasProducts,
                 "Cannot delete category with active products".into(),
             ));
         }

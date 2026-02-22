@@ -14,6 +14,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Tag, TagCreate, TagUpdate};
 
 const RESOURCE: &str = "tag";
@@ -43,9 +44,9 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Tag>> {
-    let t = tag::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Tag {} not found", id)))?;
+    let t = tag::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::TagNotFound, format!("Tag {} not found", id))
+    })?;
     Ok(Json(t))
 }
 
@@ -88,9 +89,9 @@ pub async fn update(
     validate_update(&payload)?;
 
     // 查询旧值（用于审计 diff）
-    let old_tag = tag::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Tag {}", id)))?;
+    let old_tag = tag::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::TagNotFound, format!("Tag {} not found", id))
+    })?;
 
     let t = tag::update(&state.pool, id, payload).await?;
 
@@ -126,10 +127,13 @@ pub async fn delete(
             .unwrap_or(0);
 
     if product_count > 0 {
-        return Err(AppError::validation(format!(
-            "Cannot delete tag: {} product(s) are using it",
-            product_count
-        )));
+        return Err(AppError::with_message(
+            ErrorCode::TagInUse,
+            format!(
+                "Cannot delete tag: {} product(s) are using it",
+                product_count
+            ),
+        ));
     }
 
     let name_for_audit = tag::find_by_id(&state.pool, id)

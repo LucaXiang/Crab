@@ -15,6 +15,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Role, RoleCreate, RoleUpdate};
 
 fn validate_create(payload: &RoleCreate) -> AppResult<()> {
@@ -89,9 +90,9 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Role>> {
-    let role = role::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
+    let role = role::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::RoleNotFound, format!("Role {} not found", id))
+    })?;
 
     Ok(Json(role))
 }
@@ -152,9 +153,9 @@ pub async fn update(
     }
 
     // 查询旧值（用于审计 diff）
-    let old_role = role::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Role {}", id)))?;
+    let old_role = role::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::RoleNotFound, format!("Role {} not found", id))
+    })?;
 
     let r = role::update(&state.pool, id, payload).await?;
 
@@ -220,9 +221,9 @@ pub async fn get_role_permissions(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Vec<String>>> {
-    let r = role::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
+    let r = role::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::RoleNotFound, format!("Role {} not found", id))
+    })?;
 
     Ok(Json(r.permissions))
 }
@@ -254,9 +255,9 @@ pub async fn update_role_permissions(
     };
 
     // 查询旧值（用于审计 diff）
-    let old_role = role::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Role {}", id)))?;
+    let old_role = role::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::RoleNotFound, format!("Role {} not found", id))
+    })?;
 
     let r = role::update(&state.pool, id, update).await?;
 

@@ -14,6 +14,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Attribute, AttributeCreate, AttributeOptionInput, AttributeUpdate};
 
 const RESOURCE: &str = "attribute";
@@ -84,7 +85,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<Attribute>> {
     let attr = attribute::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::AttributeNotFound,
+                format!("Attribute {} not found", id),
+            )
+        })?;
     Ok(Json(attr))
 }
 
@@ -129,7 +135,12 @@ pub async fn update(
     // 查询旧值（用于审计 diff）
     let old_attr = attribute::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Attribute {}", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::AttributeNotFound,
+                format!("Attribute {} not found", id),
+            )
+        })?;
 
     let attr = attribute::update(&state.pool, id, payload).await?;
 
@@ -177,10 +188,13 @@ pub async fn delete(
     .unwrap_or(0);
 
     if binding_count > 0 {
-        return Err(AppError::validation(format!(
-            "Cannot delete attribute: {} product/category binding(s) exist",
-            binding_count
-        )));
+        return Err(AppError::with_message(
+            ErrorCode::AttributeInUse,
+            format!(
+                "Cannot delete attribute: {} product/category binding(s) exist",
+                binding_count
+            ),
+        ));
     }
 
     let name_for_audit = attribute::find_by_id(&state.pool, id)
@@ -233,7 +247,12 @@ pub async fn add_option(
     // 读取当前属性，将新选项追加到现有选项列表后，整体替换
     let current = attribute::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::AttributeNotFound,
+                format!("Attribute {} not found", id),
+            )
+        })?;
 
     let mut options: Vec<AttributeOptionInput> = current
         .options
@@ -298,7 +317,12 @@ pub async fn update_option(
 
     let current = attribute::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::AttributeNotFound,
+                format!("Attribute {} not found", id),
+            )
+        })?;
 
     let mut options: Vec<AttributeOptionInput> = current
         .options
@@ -370,7 +394,12 @@ pub async fn remove_option(
 ) -> AppResult<Json<Attribute>> {
     let current = attribute::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::AttributeNotFound,
+                format!("Attribute {} not found", id),
+            )
+        })?;
 
     let mut options: Vec<AttributeOptionInput> = current
         .options

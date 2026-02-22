@@ -44,10 +44,12 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Category>> {
-    let category = state
-        .catalog_service
-        .get_category(id)
-        .ok_or_else(|| AppError::not_found(format!("Category {} not found", id)))?;
+    let category = state.catalog_service.get_category(id).ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::CategoryNotFound,
+            format!("Category {} not found", id),
+        )
+    })?;
     Ok(Json(category))
 }
 
@@ -92,10 +94,12 @@ pub async fn update(
     let id_str = id.to_string();
 
     // 查询旧值（用于审计 diff）
-    let old_category = state
-        .catalog_service
-        .get_category(id)
-        .ok_or_else(|| AppError::not_found(format!("Category {}", id)))?;
+    let old_category = state.catalog_service.get_category(id).ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::CategoryNotFound,
+            format!("Category {} not found", id),
+        )
+    })?;
 
     let category = state.catalog_service.update_category(id, payload).await?;
 
@@ -130,18 +134,7 @@ pub async fn delete(
         .get_category(id)
         .map(|c| c.name.clone())
         .unwrap_or_default();
-    state
-        .catalog_service
-        .delete_category(id)
-        .await
-        .map_err(|e| {
-            // Map generic Validation error to specific CategoryHasProducts error code
-            if e.to_string().contains("active products") {
-                AppError::with_message(ErrorCode::CategoryHasProducts, e.to_string())
-            } else {
-                AppError::from(e)
-            }
-        })?;
+    state.catalog_service.delete_category(id).await?;
 
     audit_log!(
         state.audit_service,

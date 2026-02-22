@@ -12,6 +12,7 @@ use crate::core::ServerState;
 use crate::db::repository::dining_table;
 use crate::utils::validation::{MAX_NAME_LEN, validate_required_text};
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 
 const RESOURCE: &str = "dining_table";
@@ -41,7 +42,9 @@ pub async fn get_by_id(
 ) -> AppResult<Json<DiningTable>> {
     let table = dining_table::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Table {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(ErrorCode::TableNotFound, format!("Table {} not found", id))
+        })?;
     Ok(Json(table))
 }
 
@@ -86,7 +89,9 @@ pub async fn update(
     // 查询旧值（用于审计 diff）
     let old_table = dining_table::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Table {}", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(ErrorCode::TableNotFound, format!("Table {} not found", id))
+        })?;
 
     let table = dining_table::update(&state.pool, id, payload).await?;
 
@@ -121,10 +126,10 @@ pub async fn delete(
         .storage()
         .find_active_order_for_table(id)
     {
-        return Err(AppError::validation(format!(
-            "Cannot delete table: active order {} exists",
-            order_id
-        )));
+        return Err(AppError::with_message(
+            ErrorCode::TableHasOrders,
+            format!("Cannot delete table: active order {} exists", order_id),
+        ));
     }
 
     let name_for_audit = dining_table::find_by_id(&state.pool, id)

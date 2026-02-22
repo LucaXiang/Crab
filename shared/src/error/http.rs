@@ -21,7 +21,15 @@ impl ErrorCode {
             | Self::TableNotFound
             | Self::ZoneNotFound
             | Self::EmployeeNotFound
-            | Self::RoleNotFound => StatusCode::NOT_FOUND,
+            | Self::RoleNotFound
+            | Self::TagNotFound
+            | Self::MarketingGroupNotFound
+            | Self::PrintDestinationNotFound
+            | Self::LabelTemplateNotFound
+            | Self::PriceRuleNotFound
+            | Self::ShiftNotFound
+            | Self::DailyReportNotFound
+            | Self::MemberNotFound => StatusCode::NOT_FOUND,
 
             // 409 Conflict
             Self::AlreadyExists
@@ -35,7 +43,12 @@ impl ErrorCode {
             | Self::ZoneHasTables
             | Self::EmployeeUsernameExists
             | Self::RoleNameExists
-            | Self::RoleInUse => StatusCode::CONFLICT,
+            | Self::RoleInUse
+            | Self::AttributeInUse
+            | Self::AttributeDuplicateBinding
+            | Self::TagInUse
+            | Self::PrintDestinationInUse
+            | Self::TableHasOrders => StatusCode::CONFLICT,
 
             // 401 Unauthorized
             Self::NotAuthenticated
@@ -63,7 +76,11 @@ impl ErrorCode {
             | Self::ClientLimitReached
             | Self::TenantNoSubscription
             | Self::FeatureNotAvailable
-            | Self::EmailNotVerified => StatusCode::FORBIDDEN,
+            | Self::EmailNotVerified
+            | Self::DeviceIdMismatch
+            | Self::CertificateMissingDeviceId
+            | Self::EmployeeIsSystem
+            | Self::RoleIsSystem => StatusCode::FORBIDDEN,
 
             // 410 Gone
             Self::VerificationCodeExpired => StatusCode::GONE,

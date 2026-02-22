@@ -12,6 +12,7 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Attribute, AttributeBinding};
 
 /// 创建绑定的请求体
@@ -59,9 +60,9 @@ pub async fn create(
     if let Some(cat_id) = category_id
         && attribute::has_binding(&state.pool, "category", cat_id, payload.attribute_id).await?
     {
-        return Err(AppError::validation(
-            "This attribute is already inherited from the category, cannot add duplicate binding"
-                .to_string(),
+        return Err(AppError::with_message(
+            ErrorCode::AttributeDuplicateBinding,
+            "This attribute is already inherited from the category, cannot add duplicate binding",
         ));
     }
 
@@ -125,7 +126,12 @@ pub async fn get_by_id(
     attribute::find_binding_by_id(&state.pool, id)
         .await?
         .map(Json)
-        .ok_or_else(|| AppError::not_found(format!("Binding {} not found", id)))
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::AttributeNotFound,
+                format!("Attribute binding {} not found", id),
+            )
+        })
 }
 
 /// PUT /api/has-attribute/{id} - 更新绑定

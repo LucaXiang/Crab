@@ -15,6 +15,7 @@ use crate::utils::validation::{
     validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::price_rule::AdjustmentType;
 use shared::models::{
     MarketingGroup, MgDiscountRule, MgDiscountRuleCreate, MgDiscountRuleUpdate, StampActivityDetail,
@@ -146,7 +147,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<MarketingGroupDetail>> {
     let group = marketing_group::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::MarketingGroupNotFound,
+                format!("Marketing group {} not found", id),
+            )
+        })?;
 
     let discount_rules = marketing_group::find_rules_by_group(&state.pool, id).await?;
     let activities = marketing_group::find_activities_by_group(&state.pool, id).await?;
@@ -212,7 +218,12 @@ pub async fn update(
 
     let old_group = marketing_group::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| crate::utils::AppError::not_found(format!("Marketing group {}", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::MarketingGroupNotFound,
+                format!("Marketing group {} not found", id),
+            )
+        })?;
 
     let group = marketing_group::update(&state.pool, id, payload).await?;
 
@@ -286,7 +297,10 @@ pub async fn create_rule(
     let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
         .ok_or_else(|| {
-            crate::utils::AppError::not_found(format!("Marketing group {}", group_id))
+            AppError::with_message(
+                ErrorCode::MarketingGroupNotFound,
+                format!("Marketing group {} not found", group_id),
+            )
         })?;
 
     let rule = marketing_group::create_rule(&state.pool, group_id, payload).await?;
@@ -404,7 +418,10 @@ pub async fn create_activity(
     let group = marketing_group::find_by_id(&state.pool, group_id)
         .await?
         .ok_or_else(|| {
-            crate::utils::AppError::not_found(format!("Marketing group {}", group_id))
+            AppError::with_message(
+                ErrorCode::MarketingGroupNotFound,
+                format!("Marketing group {} not found", group_id),
+            )
         })?;
 
     let detail = marketing_group::create_activity(&state.pool, group_id, payload).await?;

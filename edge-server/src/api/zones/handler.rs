@@ -44,9 +44,9 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Zone>> {
-    let z = zone::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Zone {} not found", id)))?;
+    let z = zone::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::ZoneNotFound, format!("Zone {} not found", id))
+    })?;
     Ok(Json(z))
 }
 
@@ -89,9 +89,9 @@ pub async fn update(
     validate_update(&payload)?;
 
     // 查询旧值（用于审计 diff）
-    let old_zone = zone::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("Zone {}", id)))?;
+    let old_zone = zone::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(ErrorCode::ZoneNotFound, format!("Zone {} not found", id))
+    })?;
 
     let z = zone::update(&state.pool, id, payload).await?;
 
@@ -125,13 +125,7 @@ pub async fn delete(
         .flatten()
         .map(|z| z.name.clone())
         .unwrap_or_default();
-    let result = zone::delete(&state.pool, id).await.map_err(|e| {
-        if e.to_string().contains("active tables") {
-            AppError::with_message(ErrorCode::ZoneHasTables, e.to_string())
-        } else {
-            AppError::from(e)
-        }
-    })?;
+    let result = zone::delete(&state.pool, id).await?;
 
     if result {
         let id_str = id.to_string();

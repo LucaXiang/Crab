@@ -61,6 +61,9 @@ pub enum RepoError {
 
     #[error("Validation error: {0}")]
     Validation(String),
+
+    #[error("{1}")]
+    Business(ErrorCode, String),
 }
 
 impl From<sqlx::Error> for RepoError {
@@ -89,6 +92,7 @@ impl From<RepoError> for AppError {
             RepoError::Duplicate(msg) => AppError::with_message(ErrorCode::AlreadyExists, msg),
             RepoError::Database(msg) => AppError::database(msg),
             RepoError::Validation(msg) => AppError::validation(msg),
+            RepoError::Business(code, msg) => AppError::with_message(code, msg),
         }
     }
 }

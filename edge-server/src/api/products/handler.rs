@@ -124,10 +124,12 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<ProductFull>> {
-    let product = state
-        .catalog_service
-        .get_product(id)
-        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
+    let product = state.catalog_service.get_product(id).ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::ProductNotFound,
+            format!("Product {} not found", id),
+        )
+    })?;
     Ok(Json(product))
 }
 
@@ -191,10 +193,12 @@ pub async fn update(
     );
 
     // 查询旧值（用于审计 diff）
-    let old_product = state
-        .catalog_service
-        .get_product(id)
-        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
+    let old_product = state.catalog_service.get_product(id).ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::ProductNotFound,
+            format!("Product {} not found", id),
+        )
+    })?;
 
     // 检查 external_id 是否已被其他商品使用
     if let Some(eid) = payload.external_id

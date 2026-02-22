@@ -14,6 +14,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_PASSWORD_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{Employee, EmployeeCreate, EmployeeUpdate};
 
 const RESOURCE: &str = "employee";
@@ -57,7 +58,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<Employee>> {
     let employee = employee::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Employee {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::EmployeeNotFound,
+                format!("Employee {} not found", id),
+            )
+        })?;
     Ok(Json(employee))
 }
 
@@ -102,7 +108,12 @@ pub async fn update(
     // 查询旧值（用于审计 diff）
     let old_employee = employee::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Employee {}", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::EmployeeNotFound,
+                format!("Employee {} not found", id),
+            )
+        })?;
 
     let emp = employee::update(&state.pool, id, payload).await?;
 

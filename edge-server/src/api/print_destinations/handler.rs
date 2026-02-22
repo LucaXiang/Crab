@@ -14,6 +14,7 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
 
 const RESOURCE: &str = "print_destination";
@@ -49,7 +50,12 @@ pub async fn get_by_id(
 ) -> AppResult<Json<PrintDestination>> {
     let item = print_destination::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Print destination {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::PrintDestinationNotFound,
+                format!("Print destination {} not found", id),
+            )
+        })?;
     Ok(Json(item))
 }
 
@@ -93,7 +99,12 @@ pub async fn update(
 
     let old_item = print_destination::find_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("Print destination {} not found", id)))?;
+        .ok_or_else(|| {
+            AppError::with_message(
+                ErrorCode::PrintDestinationNotFound,
+                format!("Print destination {} not found", id),
+            )
+        })?;
 
     let item = print_destination::update(&state.pool, id, payload).await?;
 
@@ -131,10 +142,13 @@ pub async fn delete(
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;
     if total_refs > 0 {
-        return Err(AppError::validation(format!(
-            "Cannot delete print destination: {} category reference(s) exist",
-            total_refs
-        )));
+        return Err(AppError::with_message(
+            ErrorCode::PrintDestinationInUse,
+            format!(
+                "Cannot delete print destination: {} category reference(s) exist",
+                total_refs
+            ),
+        ));
     }
 
     let name_for_audit = print_destination::find_by_id(&state.pool, id)

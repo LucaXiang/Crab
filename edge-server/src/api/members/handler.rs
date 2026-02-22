@@ -10,11 +10,12 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::{member, stamp};
-use crate::utils::AppResult;
 use crate::utils::validation::{
     MAX_EMAIL_LEN, MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text,
     validate_required_text,
 };
+use crate::utils::{AppError, AppResult};
+use shared::error::ErrorCode;
 use shared::models::MemberWithGroup;
 
 const RESOURCE: &str = "member";
@@ -91,9 +92,12 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<MemberDetail>> {
-    let member = member::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| crate::utils::AppError::not_found(format!("Member {}", id)))?;
+    let member = member::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::MemberNotFound,
+            format!("Member {} not found", id),
+        )
+    })?;
 
     let progress_list = stamp::find_progress_details_by_member(&state.pool, id).await?;
 
@@ -187,9 +191,12 @@ pub async fn update(
 ) -> AppResult<Json<MemberWithGroup>> {
     validate_update(&payload)?;
 
-    let old_member = member::find_by_id(&state.pool, id)
-        .await?
-        .ok_or_else(|| crate::utils::AppError::not_found(format!("Member {}", id)))?;
+    let old_member = member::find_by_id(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::MemberNotFound,
+            format!("Member {} not found", id),
+        )
+    })?;
 
     let member = member::update(&state.pool, id, payload).await?;
 

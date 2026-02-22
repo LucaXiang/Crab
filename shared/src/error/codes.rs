@@ -109,6 +109,10 @@ pub enum ErrorCode {
     PasswordTooShort = 3018,
     /// P12 certificate required before payment (Verifactu compliance)
     P12Required = 3019,
+    /// Hardware ID mismatch with certificate
+    DeviceIdMismatch = 3020,
+    /// Certificate missing device_id extension
+    CertificateMissingDeviceId = 3021,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -157,10 +161,20 @@ pub enum ErrorCode {
     ProductExternalIdExists = 6202,
     /// Product external_id is required
     ProductExternalIdRequired = 6203,
+    /// Product cannot belong to virtual category
+    ProductCategoryInvalid = 6204,
     /// Attribute not found
     AttributeNotFound = 6301,
     /// Attribute binding failed
     AttributeBindFailed = 6302,
+    /// Attribute is in use by products/categories
+    AttributeInUse = 6303,
+    /// Attribute binding already inherited from category
+    AttributeDuplicateBinding = 6304,
+    /// Tag not found
+    TagNotFound = 6401,
+    /// Tag is in use by products
+    TagInUse = 6402,
 
     // ==================== 65xx: File Upload ====================
     /// File too large
@@ -182,6 +196,20 @@ pub enum ErrorCode {
     /// File storage failed
     FileStorageFailed = 6509,
 
+    /// Marketing group not found
+    MarketingGroupNotFound = 6601,
+
+    /// Label template not found
+    LabelTemplateNotFound = 6701,
+
+    /// Price rule not found
+    PriceRuleNotFound = 6801,
+
+    /// Print destination not found
+    PrintDestinationNotFound = 6511,
+    /// Print destination is in use by categories
+    PrintDestinationInUse = 6512,
+
     // ==================== 7xxx: Table ====================
     /// Table not found
     TableNotFound = 7001,
@@ -195,20 +223,33 @@ pub enum ErrorCode {
     ZoneHasTables = 7102,
     /// Zone name already exists
     ZoneNameExists = 7103,
+    /// Table has active orders
+    TableHasOrders = 7104,
+
+    /// Shift not found
+    ShiftNotFound = 7201,
+    /// Daily report not found
+    DailyReportNotFound = 7301,
 
     // ==================== 8xxx: Employee ====================
     /// Employee not found
     EmployeeNotFound = 8001,
+    /// Member not found
+    MemberNotFound = 8005,
     /// Employee username already exists
     EmployeeUsernameExists = 8002,
     /// Cannot delete self
     EmployeeCannotDeleteSelf = 8003,
+    /// Cannot modify/delete system employee
+    EmployeeIsSystem = 8004,
     /// Role not found
     RoleNotFound = 8101,
     /// Role name already exists
     RoleNameExists = 8102,
     /// Role is in use
     RoleInUse = 8103,
+    /// Cannot modify/delete system role
+    RoleIsSystem = 8104,
 
     // ==================== 9xxx: System ====================
     /// Internal server error
@@ -309,6 +350,8 @@ impl ErrorCode {
             ErrorCode::PaymentSetupFailed => "Payment setup failed",
             ErrorCode::PasswordTooShort => "Password must be at least 8 characters",
             ErrorCode::P12Required => "P12 certificate must be uploaded before payment",
+            ErrorCode::DeviceIdMismatch => "Hardware ID mismatch with certificate",
+            ErrorCode::CertificateMissingDeviceId => "Certificate missing device_id extension",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -336,8 +379,18 @@ impl ErrorCode {
             ErrorCode::SpecNotFound => "Specification not found",
             ErrorCode::ProductExternalIdExists => "Product external_id already exists",
             ErrorCode::ProductExternalIdRequired => "Product external_id is required",
+            ErrorCode::ProductCategoryInvalid => "Product cannot belong to a virtual category",
             ErrorCode::AttributeNotFound => "Attribute not found",
             ErrorCode::AttributeBindFailed => "Failed to bind attribute",
+            ErrorCode::AttributeInUse => "Attribute is in use by products/categories",
+            ErrorCode::AttributeDuplicateBinding => {
+                "Attribute binding already inherited from category"
+            }
+            ErrorCode::TagNotFound => "Tag not found",
+            ErrorCode::TagInUse => "Tag is in use by products",
+            ErrorCode::MarketingGroupNotFound => "Marketing group not found",
+            ErrorCode::LabelTemplateNotFound => "Label template not found",
+            ErrorCode::PriceRuleNotFound => "Price rule not found",
 
             // File Upload
             ErrorCode::FileTooLarge => "File too large",
@@ -349,6 +402,8 @@ impl ErrorCode {
             ErrorCode::InvalidFileExtension => "Invalid file extension",
             ErrorCode::ImageProcessingFailed => "Image processing failed",
             ErrorCode::FileStorageFailed => "File storage failed",
+            ErrorCode::PrintDestinationNotFound => "Print destination not found",
+            ErrorCode::PrintDestinationInUse => "Print destination is in use by categories",
 
             // Table
             ErrorCode::TableNotFound => "Table not found",
@@ -357,14 +412,20 @@ impl ErrorCode {
             ErrorCode::ZoneNotFound => "Zone not found",
             ErrorCode::ZoneHasTables => "Zone has associated tables",
             ErrorCode::ZoneNameExists => "Zone name already exists",
+            ErrorCode::TableHasOrders => "Table has active orders",
+            ErrorCode::ShiftNotFound => "Shift not found",
+            ErrorCode::DailyReportNotFound => "Daily report not found",
 
             // Employee
+            ErrorCode::MemberNotFound => "Member not found",
             ErrorCode::EmployeeNotFound => "Employee not found",
             ErrorCode::EmployeeUsernameExists => "Employee username already exists",
             ErrorCode::EmployeeCannotDeleteSelf => "Cannot delete own account",
+            ErrorCode::EmployeeIsSystem => "Cannot modify system employee",
             ErrorCode::RoleNotFound => "Role not found",
             ErrorCode::RoleNameExists => "Role name already exists",
             ErrorCode::RoleInUse => "Role is currently in use",
+            ErrorCode::RoleIsSystem => "Cannot modify system role",
 
             // System
             ErrorCode::InternalError => "Internal server error",
@@ -459,6 +520,8 @@ impl TryFrom<u16> for ErrorCode {
             3017 => Ok(ErrorCode::PaymentSetupFailed),
             3018 => Ok(ErrorCode::PasswordTooShort),
             3019 => Ok(ErrorCode::P12Required),
+            3020 => Ok(ErrorCode::DeviceIdMismatch),
+            3021 => Ok(ErrorCode::CertificateMissingDeviceId),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
@@ -487,7 +550,17 @@ impl TryFrom<u16> for ErrorCode {
             6202 => Ok(ErrorCode::ProductExternalIdExists),
             6203 => Ok(ErrorCode::ProductExternalIdRequired),
             6301 => Ok(ErrorCode::AttributeNotFound),
+            6204 => Ok(ErrorCode::ProductCategoryInvalid),
             6302 => Ok(ErrorCode::AttributeBindFailed),
+            6303 => Ok(ErrorCode::AttributeInUse),
+            6304 => Ok(ErrorCode::AttributeDuplicateBinding),
+            6401 => Ok(ErrorCode::TagNotFound),
+            6402 => Ok(ErrorCode::TagInUse),
+            6511 => Ok(ErrorCode::PrintDestinationNotFound),
+            6512 => Ok(ErrorCode::PrintDestinationInUse),
+            6601 => Ok(ErrorCode::MarketingGroupNotFound),
+            6701 => Ok(ErrorCode::LabelTemplateNotFound),
+            6801 => Ok(ErrorCode::PriceRuleNotFound),
 
             // File Upload
             6501 => Ok(ErrorCode::FileTooLarge),
@@ -507,14 +580,20 @@ impl TryFrom<u16> for ErrorCode {
             7101 => Ok(ErrorCode::ZoneNotFound),
             7102 => Ok(ErrorCode::ZoneHasTables),
             7103 => Ok(ErrorCode::ZoneNameExists),
+            7104 => Ok(ErrorCode::TableHasOrders),
+            7201 => Ok(ErrorCode::ShiftNotFound),
+            7301 => Ok(ErrorCode::DailyReportNotFound),
 
             // Employee
+            8005 => Ok(ErrorCode::MemberNotFound),
             8001 => Ok(ErrorCode::EmployeeNotFound),
             8002 => Ok(ErrorCode::EmployeeUsernameExists),
             8003 => Ok(ErrorCode::EmployeeCannotDeleteSelf),
+            8004 => Ok(ErrorCode::EmployeeIsSystem),
             8101 => Ok(ErrorCode::RoleNotFound),
             8102 => Ok(ErrorCode::RoleNameExists),
             8103 => Ok(ErrorCode::RoleInUse),
+            8104 => Ok(ErrorCode::RoleIsSystem),
 
             // System
             9001 => Ok(ErrorCode::InternalError),
@@ -616,8 +695,18 @@ mod tests {
         assert_eq!(ErrorCode::CategoryHasProducts.code(), 6102);
         assert_eq!(ErrorCode::CategoryNameExists.code(), 6103);
         assert_eq!(ErrorCode::SpecNotFound.code(), 6201);
+        assert_eq!(ErrorCode::ProductCategoryInvalid.code(), 6204);
         assert_eq!(ErrorCode::AttributeNotFound.code(), 6301);
         assert_eq!(ErrorCode::AttributeBindFailed.code(), 6302);
+        assert_eq!(ErrorCode::AttributeInUse.code(), 6303);
+        assert_eq!(ErrorCode::AttributeDuplicateBinding.code(), 6304);
+        assert_eq!(ErrorCode::TagNotFound.code(), 6401);
+        assert_eq!(ErrorCode::TagInUse.code(), 6402);
+        assert_eq!(ErrorCode::PrintDestinationNotFound.code(), 6511);
+        assert_eq!(ErrorCode::PrintDestinationInUse.code(), 6512);
+        assert_eq!(ErrorCode::MarketingGroupNotFound.code(), 6601);
+        assert_eq!(ErrorCode::LabelTemplateNotFound.code(), 6701);
+        assert_eq!(ErrorCode::PriceRuleNotFound.code(), 6801);
 
         // Table
         assert_eq!(ErrorCode::TableNotFound.code(), 7001);
@@ -626,14 +715,20 @@ mod tests {
         assert_eq!(ErrorCode::ZoneNotFound.code(), 7101);
         assert_eq!(ErrorCode::ZoneHasTables.code(), 7102);
         assert_eq!(ErrorCode::ZoneNameExists.code(), 7103);
+        assert_eq!(ErrorCode::TableHasOrders.code(), 7104);
+        assert_eq!(ErrorCode::ShiftNotFound.code(), 7201);
+        assert_eq!(ErrorCode::DailyReportNotFound.code(), 7301);
 
         // Employee
+        assert_eq!(ErrorCode::MemberNotFound.code(), 8005);
         assert_eq!(ErrorCode::EmployeeNotFound.code(), 8001);
         assert_eq!(ErrorCode::EmployeeUsernameExists.code(), 8002);
         assert_eq!(ErrorCode::EmployeeCannotDeleteSelf.code(), 8003);
+        assert_eq!(ErrorCode::EmployeeIsSystem.code(), 8004);
         assert_eq!(ErrorCode::RoleNotFound.code(), 8101);
         assert_eq!(ErrorCode::RoleNameExists.code(), 8102);
         assert_eq!(ErrorCode::RoleInUse.code(), 8103);
+        assert_eq!(ErrorCode::RoleIsSystem.code(), 8104);
 
         // System
         assert_eq!(ErrorCode::InternalError.code(), 9001);
