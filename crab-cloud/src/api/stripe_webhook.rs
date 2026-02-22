@@ -196,7 +196,7 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
     StatusCode::OK
 }
 
-/// customer.subscription.updated → update subscription status/plan
+/// customer.subscription.updated → update subscription status/plan + sync tenant status
 async fn handle_subscription_updated(state: &AppState, event: &serde_json::Value) -> StatusCode {
     let obj = match event.get("data").and_then(|d| d.get("object")) {
         Some(o) => o,
@@ -213,6 +213,23 @@ async fn handle_subscription_updated(state: &AppState, event: &serde_json::Value
     if let Err(e) = db::subscriptions::update_status(&state.pool, sub_id, status).await {
         tracing::error!(%e, "Failed to update subscription status");
         return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    // Sync tenant status based on subscription status
+    if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
+    {
+        let tenant_status = match status {
+            "active" => TenantStatus::Active,
+            "past_due" => TenantStatus::Suspended,
+            "canceled" | "unpaid" => TenantStatus::Canceled,
+            _ => TenantStatus::Active,
+        };
+        let _ = db::tenants::update_status(&state.pool, &tenant_id, tenant_status.as_db()).await;
+        tracing::info!(
+            tenant_id = %tenant_id,
+            tenant_status = tenant_status.as_db(),
+            "Tenant status synced from subscription"
+        );
     }
 
     tracing::info!(
@@ -321,7 +338,7 @@ async fn handle_charge_refunded(state: &AppState, event: &serde_json::Value) -> 
     StatusCode::OK
 }
 
-/// invoice.paid → update current_period_end
+/// invoice.paid → update current_period_end + restore suspended tenant
 async fn handle_invoice_paid(state: &AppState, event: &serde_json::Value) -> StatusCode {
     let obj = match event.get("data").and_then(|d| d.get("object")) {
         Some(o) => o,
@@ -348,6 +365,16 @@ async fn handle_invoice_paid(state: &AppState, event: &serde_json::Value) -> Sta
             .bind(sub_id)
             .execute(&state.pool)
             .await;
+    }
+
+    // Restore subscription to active + restore suspended tenant
+    let _ = db::subscriptions::update_status(&state.pool, sub_id, "active").await;
+
+    if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
+    {
+        let _ =
+            db::tenants::update_status(&state.pool, &tenant_id, TenantStatus::Active.as_db()).await;
+        tracing::info!(tenant_id = %tenant_id, "Tenant restored to active (invoice paid)");
     }
 
     tracing::info!(subscription_id = sub_id, "Invoice paid, period updated");

@@ -45,7 +45,7 @@ pub async fn get_subscription(
     tenant_id: &str,
 ) -> Result<Option<SubscriptionInfo>, BoxError> {
     let row: Option<SubscriptionInfo> = sqlx::query_as(
-        "SELECT id, status, plan, max_edge_servers, max_clients, current_period_end, created_at FROM subscriptions WHERE tenant_id = $1 AND status = 'active'",
+        "SELECT id, status, plan, max_edge_servers, max_clients, current_period_end, created_at FROM subscriptions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1",
     )
     .bind(tenant_id)
     .fetch_optional(pool)
@@ -345,16 +345,16 @@ pub async fn get_store_overview(
         SELECT
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total ELSE 0 END), 0)::DOUBLE PRECISION,
             COUNT(*) FILTER (WHERE status = 'COMPLETED'),
-            COUNT(*) FILTER (WHERE status = 'VOID'),
+            COUNT(*) FILTER (WHERE status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED')),
             COALESCE(SUM(CASE WHEN status = 'VOID' THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(tax, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(guest_count, 0) ELSE 0 END), 0)::BIGINT,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(discount_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(AVG(CASE WHEN status = 'COMPLETED' AND start_time IS NOT NULL AND end_time IS NOT NULL
                 THEN (end_time - start_time) / 60000.0 END), 0)::DOUBLE PRECISION,
-            COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LossSettled'),
-            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LossSettled' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type != 'LossSettled' THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
+            COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LOSS_SETTLED'),
+            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
+            COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
         FROM cloud_archived_orders
         WHERE edge_server_id = $1 AND tenant_id = $2
             AND end_time >= $3 AND end_time < $4
@@ -577,16 +577,16 @@ pub async fn get_tenant_overview(
         SELECT
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total ELSE 0 END), 0)::DOUBLE PRECISION,
             COUNT(*) FILTER (WHERE status = 'COMPLETED'),
-            COUNT(*) FILTER (WHERE status = 'VOID'),
+            COUNT(*) FILTER (WHERE status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED')),
             COALESCE(SUM(CASE WHEN status = 'VOID' THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(tax, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(guest_count, 0) ELSE 0 END), 0)::BIGINT,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(discount_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(AVG(CASE WHEN status = 'COMPLETED' AND start_time IS NOT NULL AND end_time IS NOT NULL
                 THEN (end_time - start_time) / 60000.0 END), 0)::DOUBLE PRECISION,
-            COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LossSettled'),
-            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LossSettled' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type != 'LossSettled' THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
+            COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LOSS_SETTLED'),
+            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
+            COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
         FROM cloud_archived_orders
         WHERE tenant_id = $1
             AND end_time >= $2 AND end_time < $3

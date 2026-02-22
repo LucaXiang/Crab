@@ -24,6 +24,8 @@ pub struct OverviewStats {
     pub other_revenue: f64,
     pub voided_orders: i32,
     pub voided_amount: f64,
+    pub loss_orders: i32,
+    pub loss_amount: f64,
     pub total_discount: f64,
     pub avg_guest_spend: f64,
     pub avg_dining_time: Option<f64>,

@@ -187,10 +187,17 @@ impl CloudWorker {
                     }
                 }
 
-                // Periodic archived order sync via HTTP (5 min interval)
+                // Periodic archived order sync via HTTP (5 min interval, fallback scan)
                 _ = archived_order_sync_interval.tick() => {
                     if let Err(e) = self.sync_archived_orders_http().await {
                         tracing::warn!("Periodic archived order sync failed: {e}");
+                    }
+                }
+
+                // Immediate push on archive completion (push + periodic scan design)
+                _ = self.state.archive_notify.notified() => {
+                    if let Err(e) = self.sync_archived_orders_http().await {
+                        tracing::warn!("Archive-triggered sync failed: {e}");
                     }
                 }
 
@@ -725,10 +732,11 @@ impl CloudWorker {
 
         let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
 
-        // Skip order_sync (real-time client events, not cloud sync material)
-        // Skip archived_order (synced via periodic HTTP, not WS broadcast)
-        if payload.resource == "order_sync" || payload.resource == "archived_order" {
-            return None;
+        // Whitelist: only forward resources that crab-cloud knows how to store.
+        // Everything else (shift, table, zone, employee, etc.) is local-only.
+        match payload.resource.as_str() {
+            "product" | "category" | "daily_report" | "store_info" => {}
+            _ => return None,
         }
 
         Some(CloudSyncItem {

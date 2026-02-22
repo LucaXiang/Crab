@@ -1,5 +1,5 @@
 import React from 'react';
-import { Euro, ShoppingCart, Users, CreditCard, Banknote, TrendingUp, Ban, Tag, Clock, UserCheck } from 'lucide-react';
+import { Euro, ShoppingCart, Users, CreditCard, Banknote, TrendingUp, Ban, AlertTriangle, Tag, Clock, UserCheck } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OverviewStats } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
@@ -150,7 +150,22 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview }) => {
         </div>
       </div>
 
-      {/* 11. Total Discount */}
+      {/* 11. Loss Orders */}
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-3">
+          <div className="p-3 bg-orange-100 rounded-lg">
+            <AlertTriangle className="text-orange-600" size={20} />
+          </div>
+        </div>
+        <div className="text-2xl font-bold text-gray-800 mb-1">
+          {overview.loss_orders}
+        </div>
+        <div className="text-sm text-gray-500">
+             {t("statistics.metric.loss_orders")} ({formatCurrency(overview.loss_amount)})
+        </div>
+      </div>
+
+      {/* 12. Total Discount */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-3">
           <div className="p-3 bg-yellow-100 rounded-lg">

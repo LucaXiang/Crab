@@ -216,10 +216,40 @@ export const es: Record<string, string> = {
 	'onboard.basic_desc': 'Para restaurantes pequeños con un solo local.',
 	'onboard.pro_desc': 'Para cadenas multilocal o necesidades de soporte prioritario.',
 	'onboard.month': 'mes',
-	'onboard.edge_server': 'servidor edge',
-	'onboard.terminals': 'terminales',
+	'onboard.location': 'local',
+	'onboard.devices': 'dispositivos',
 	'onboard.cloud_sync': 'Sincronización cloud',
 	'onboard.priority_support': 'Soporte prioritario',
 	'onboard.choose': 'Elegir plan',
-	'onboard.popular': 'Popular'
+	'onboard.popular': 'Popular',
+
+	// P12 upload step
+	'onboard.p12_title': 'Sube tu certificado electrónico',
+	'onboard.p12_subtitle': 'Para cumplir con Verifactu, necesitamos tu certificado de firma electrónica (P12/FNMT) antes de continuar.',
+	'onboard.p12_label': 'Archivo P12 (.p12 o .pfx)',
+	'onboard.p12_password': 'Contraseña del certificado',
+	'onboard.p12_password_placeholder': 'Contraseña de tu P12',
+	'onboard.p12_upload': 'Subir certificado',
+	'onboard.p12_uploading': 'Subiendo...',
+	'onboard.p12_success': 'Certificado subido correctamente.',
+	'onboard.p12_skip_info': 'Este paso es obligatorio para cumplir con la normativa fiscal española.',
+	'onboard.p12_uploaded': 'Certificado subido',
+	'onboard.p12_subject': 'Titular',
+	'onboard.p12_expires': 'Válido hasta',
+	'onboard.p12_continue': 'Continuar',
+	'onboard.p12_change': 'Cambiar certificado',
+	'onboard.step_certificate': 'Certificado',
+	'onboard.step_plan': 'Plan',
+
+	// API error codes
+	'error.2': 'Los datos introducidos no son válidos.',
+	'error.4': 'Este recurso ya existe.',
+	'error.1001': 'Tu sesión ha expirado. Inicia sesión de nuevo.',
+	'error.1002': 'Correo o contraseña incorrectos.',
+	'error.1003': 'Tu sesión ha expirado. Inicia sesión de nuevo.',
+	'error.1007': 'Tu cuenta está desactivada. Contacta con soporte.',
+	'error.3011': 'No tienes una suscripción activa.',
+	'error.3017': 'Error al configurar el pago. Inténtalo de nuevo.',
+	'error.3018': 'La contraseña debe tener al menos 8 caracteres.',
+	'error.3019': 'Debes subir tu certificado electrónico (P12) antes de continuar.'
 };

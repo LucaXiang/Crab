@@ -2,9 +2,9 @@ const API_BASE = 'https://auth.redcoral.app';
 
 export class ApiError extends Error {
 	status: number;
-	code: string | null;
+	code: number | null;
 
-	constructor(status: number, message: string, code: string | null = null) {
+	constructor(status: number, message: string, code: number | null = null) {
 		super(message);
 		this.status = status;
 		this.code = code;
@@ -30,7 +30,7 @@ async function request<T>(
 
 	if (!res.ok) {
 		const msg = data?.error ?? data?.message ?? res.statusText;
-		const code = data?.code ?? null;
+		const code = typeof data?.code === 'number' ? data.code : null;
 		throw new ApiError(res.status, msg, code);
 	}
 
@@ -68,9 +68,17 @@ export interface Subscription {
 	created_at: number;
 }
 
+export interface P12Info {
+	has_p12: boolean;
+	fingerprint: string | null;
+	subject: string | null;
+	expires_at: number | null;
+}
+
 export interface ProfileResponse {
 	profile: TenantProfile;
 	subscription: Subscription | null;
+	p12: P12Info | null;
 }
 
 export function getProfile(token: string): Promise<ProfileResponse> {
@@ -432,4 +440,42 @@ export function createBillingPortal(token: string): Promise<{ url: string }> {
 
 export function createCheckout(token: string, plan: string): Promise<{ checkout_url: string }> {
 	return request('POST', '/api/tenant/create-checkout', { plan }, token);
+}
+
+// === P12 Certificate ===
+
+export interface P12UploadResponse {
+	success: boolean;
+	fingerprint: string;
+	common_name: string;
+	organization: string | null;
+	tax_id: string | null;
+	issuer: string;
+	expires_at: number;
+}
+
+export async function uploadP12(
+	token: string,
+	p12File: File,
+	p12Password: string
+): Promise<P12UploadResponse> {
+	const form = new FormData();
+	form.append('token', token);
+	form.append('p12_password', p12Password);
+	form.append('p12_file', p12File);
+
+	const res = await fetch(`${API_BASE}/api/p12/upload`, {
+		method: 'POST',
+		body: form
+	});
+
+	const data = await res.json().catch(() => null);
+
+	if (!res.ok || data?.success === false) {
+		const msg = data?.error ?? res.statusText;
+		const code = data?.error_code ?? null;
+		throw new ApiError(res.status, msg, code);
+	}
+
+	return data as P12UploadResponse;
 }

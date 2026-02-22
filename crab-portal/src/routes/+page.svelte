@@ -11,32 +11,32 @@
 </script>
 
 <svelte:head>
-	<title>RedCoral — Sistema POS Offline-First</title>
+	<title>RedCoral — POS para restaurantes que funciona sin internet</title>
 	<meta
 		name="description"
-		content="RedCoral es un sistema POS distribuido para restaurantes, impulsado por edge computing y comunicación mTLS."
+		content="RedCoral es un sistema POS para restaurantes que funciona sin internet. Seguro, rápido y fácil de usar. Gestiona pedidos, cobros e impresión desde cualquier dispositivo."
 	/>
-	<meta property="og:title" content="RedCoral — Sistema POS Offline-First" />
+	<meta property="og:title" content="RedCoral — POS para restaurantes que funciona sin internet" />
 	<meta
 		property="og:description"
-		content="Sistema POS distribuido para restaurantes con edge computing y mTLS."
+		content="Sistema POS para restaurantes que funciona sin internet. Seguro, rápido y fácil de usar."
 	/>
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://redcoral.app" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="RedCoral — Sistema POS Offline-First" />
+	<meta name="twitter:title" content="RedCoral — POS para restaurantes que funciona sin internet" />
 	<meta
 		name="twitter:description"
-		content="Sistema POS distribuido para restaurantes con edge computing y mTLS."
+		content="Sistema POS para restaurantes que funciona sin internet. Seguro, rápido y fácil de usar."
 	/>
 	{@html `<script type="application/ld+json">${JSON.stringify({
 		'@context': 'https://schema.org',
 		'@type': 'SoftwareApplication',
 		name: 'RedCoral',
 		applicationCategory: 'BusinessApplication',
-		operatingSystem: 'Windows, macOS',
+		operatingSystem: 'Windows',
 		description:
-			'Distributed POS system for restaurants powered by edge computing and mTLS communication.',
+			'POS system for restaurants that works offline. Secure, fast, and easy to use.',
 		offers: {
 			'@type': 'AggregateOffer',
 			lowPrice: '50',

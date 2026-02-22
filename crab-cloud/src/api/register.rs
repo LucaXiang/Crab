@@ -78,18 +78,8 @@ pub async fn register(
             Some(TenantStatus::Pending) => {
                 // Allow re-registration: update password + resend code (handled below)
             }
-            Some(TenantStatus::Verified) => {
-                // Already verified — tell frontend to redirect to console login
-                return Ok((
-                    StatusCode::OK,
-                    Json(json!({
-                        "status": TenantStatus::Verified.as_db(),
-                        "message": "Email already verified. Please log in to continue setup."
-                    })),
-                ));
-            }
             _ => {
-                // active, suspended, canceled — truly already exists
+                // verified, active, suspended, canceled — already exists
                 return Err(AppError::new(ErrorCode::AlreadyExists));
             }
         }

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Mail, Lock, ArrowRight } from 'lucide-svelte';
-	import { t } from '$lib/i18n';
+	import { t, apiErrorMessage } from '$lib/i18n';
 	import { login, ApiError } from '$lib/api';
 	import { setAuth, isAuthenticated } from '$lib/auth';
 	import { onMount } from 'svelte';
@@ -26,10 +26,10 @@
 			setAuth(res.token, res.tenant_id);
 			goto('/');
 		} catch (err) {
-			if (err instanceof ApiError && err.status === 401) {
-				error = $t('auth.error_invalid');
+			if (err instanceof ApiError) {
+				error = apiErrorMessage($t, err.code, err.message);
 			} else {
-				error = err instanceof ApiError ? err.message : $t('auth.error_generic');
+				error = $t('auth.error_generic');
 			}
 		} finally {
 			loading = false;

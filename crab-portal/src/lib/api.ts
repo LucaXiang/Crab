@@ -2,9 +2,9 @@ const API_BASE = 'https://auth.redcoral.app';
 
 export class ApiError extends Error {
 	status: number;
-	code: string | null;
+	code: number | null;
 
-	constructor(status: number, message: string, code: string | null = null) {
+	constructor(status: number, message: string, code: number | null = null) {
 		super(message);
 		this.status = status;
 		this.code = code;
@@ -25,7 +25,7 @@ async function request<T>(method: string, path: string, body?: unknown, token?: 
 
 	if (!res.ok) {
 		const msg = data?.error ?? data?.message ?? res.statusText;
-		const code = data?.code ?? null;
+		const code = typeof data?.code === 'number' ? data.code : null;
 		throw new ApiError(res.status, msg, code);
 	}
 

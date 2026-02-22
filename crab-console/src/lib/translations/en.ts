@@ -206,10 +206,40 @@ export const en: Record<string, string> = {
 	'onboard.basic_desc': 'For small restaurants with a single location.',
 	'onboard.pro_desc': 'For multi-location chains or priority support needs.',
 	'onboard.month': 'month',
-	'onboard.edge_server': 'edge server',
-	'onboard.terminals': 'terminals',
+	'onboard.location': 'location',
+	'onboard.devices': 'devices',
 	'onboard.cloud_sync': 'Cloud data sync',
 	'onboard.priority_support': 'Priority support',
 	'onboard.choose': 'Choose plan',
-	'onboard.popular': 'Popular'
+	'onboard.popular': 'Popular',
+
+	// P12 upload step
+	'onboard.p12_title': 'Upload your electronic certificate',
+	'onboard.p12_subtitle': 'To comply with Verifactu, we need your electronic signing certificate (P12/FNMT) before proceeding.',
+	'onboard.p12_label': 'P12 file (.p12 or .pfx)',
+	'onboard.p12_password': 'Certificate password',
+	'onboard.p12_password_placeholder': 'Your P12 password',
+	'onboard.p12_upload': 'Upload certificate',
+	'onboard.p12_uploading': 'Uploading...',
+	'onboard.p12_success': 'Certificate uploaded successfully.',
+	'onboard.p12_skip_info': 'This step is required to comply with Spanish tax regulations.',
+	'onboard.p12_uploaded': 'Certificate uploaded',
+	'onboard.p12_subject': 'Subject',
+	'onboard.p12_expires': 'Valid until',
+	'onboard.p12_continue': 'Continue',
+	'onboard.p12_change': 'Change certificate',
+	'onboard.step_certificate': 'Certificate',
+	'onboard.step_plan': 'Plan',
+
+	// API error codes
+	'error.2': 'The information you entered is not valid.',
+	'error.4': 'This resource already exists.',
+	'error.1001': 'Your session has expired. Please sign in again.',
+	'error.1002': 'Invalid email or password.',
+	'error.1003': 'Your session has expired. Please sign in again.',
+	'error.1007': 'Your account has been disabled. Please contact support.',
+	'error.3011': 'No active subscription.',
+	'error.3017': 'Payment setup failed. Please try again.',
+	'error.3018': 'Password must be at least 8 characters.',
+	'error.3019': 'You must upload your electronic certificate (P12) before proceeding.'
 };

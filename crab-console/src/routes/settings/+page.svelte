@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Lock, Mail, CreditCard, Check } from 'lucide-svelte';
-	import { t } from '$lib/i18n';
+	import { t, apiErrorMessage } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import {
 		getProfile,
@@ -89,7 +89,7 @@
 			currentPassword = '';
 			newPassword = '';
 		} catch (err) {
-			pwError = err instanceof ApiError ? err.message : $t('auth.error_generic');
+			pwError = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
 			pwSaving = false;
 		}
@@ -116,7 +116,7 @@
 				profile = await getProfile(token);
 			}
 		} catch (err) {
-			emailError = err instanceof ApiError ? err.message : $t('auth.error_generic');
+			emailError = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
 			emailSaving = false;
 		}

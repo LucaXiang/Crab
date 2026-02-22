@@ -124,6 +124,8 @@ pub struct ServerState {
     pub audit_service: Arc<AuditService>,
     /// 配置变更通知 (store_info 更新时触发，唤醒依赖配置的调度器)
     pub config_notify: Arc<tokio::sync::Notify>,
+    /// 归档完成通知 (唤醒 CloudWorker 立即同步归档订单)
+    pub archive_notify: Arc<tokio::sync::Notify>,
     /// 服务器实例 epoch (启动时生成的 UUID)
     /// 用于客户端检测服务器重启
     pub epoch: String,
@@ -150,6 +152,7 @@ impl ServerState {
         catalog_service: Arc<CatalogService>,
         audit_service: Arc<AuditService>,
         config_notify: Arc<tokio::sync::Notify>,
+        archive_notify: Arc<tokio::sync::Notify>,
         epoch: String,
         audit_worker_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
     ) -> Self {
@@ -167,6 +170,7 @@ impl ServerState {
             catalog_service,
             audit_service,
             config_notify,
+            archive_notify,
             epoch,
             audit_worker_handle,
         }
@@ -266,6 +270,9 @@ impl ServerState {
         // 8. Config change notifier (唤醒依赖配置的调度器)
         let config_notify = Arc::new(tokio::sync::Notify::new());
 
+        // 8b. Archive completion notifier (唤醒 CloudWorker 立即同步归档订单)
+        let archive_notify = Arc::new(tokio::sync::Notify::new());
+
         // 9. Generate epoch (UUID for server restart detection)
         let epoch = uuid::Uuid::new_v4().to_string();
 
@@ -283,6 +290,7 @@ impl ServerState {
             catalog_service,
             audit_service,
             config_notify,
+            archive_notify,
             epoch,
             audit_worker_handle,
         );
@@ -529,6 +537,7 @@ impl ServerState {
                 self.pool.clone(),
                 self.message_bus.bus().clone(),
                 self.resource_versions.clone(),
+                self.archive_notify.clone(),
             );
 
             let shutdown = tasks.shutdown_token();

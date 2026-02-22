@@ -50,6 +50,7 @@ pub struct ArchiveWorker {
     pool: SqlitePool,
     message_bus: Arc<MessageBus>,
     resource_versions: Arc<ResourceVersions>,
+    archive_notify: Arc<tokio::sync::Notify>,
     semaphore: Arc<tokio::sync::Semaphore>,
 }
 
@@ -61,6 +62,7 @@ impl ArchiveWorker {
         pool: SqlitePool,
         message_bus: Arc<MessageBus>,
         resource_versions: Arc<ResourceVersions>,
+        archive_notify: Arc<tokio::sync::Notify>,
     ) -> Self {
         Self {
             storage,
@@ -69,6 +71,7 @@ impl ArchiveWorker {
             pool,
             message_bus,
             resource_versions,
+            archive_notify,
             semaphore: Arc::new(tokio::sync::Semaphore::new(ARCHIVE_CONCURRENCY)),
         }
     }
@@ -242,6 +245,9 @@ impl ArchiveWorker {
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
+
+                // 8. Notify CloudWorker to sync immediately (push + periodic scan)
+                self.archive_notify.notify_one();
             }
             Err(e) => {
                 tracing::error!(order_id = %order_id, error = %e, "Archive failed");

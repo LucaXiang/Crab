@@ -28,6 +28,8 @@ pub struct OverviewStats {
     pub other_revenue: f64,
     pub voided_orders: i32,
     pub voided_amount: f64,
+    pub loss_orders: i32,
+    pub loss_amount: f64,
     pub total_discount: f64,
     pub avg_guest_spend: f64,
     pub avg_dining_time: Option<f64>,
@@ -233,13 +235,15 @@ pub async fn get_statistics(
     let pool = &state.pool;
 
     // Overview: single aggregate query (was 7 separate queries)
-    let (revenue, total_orders, total_customers, voided_orders, voided_amount, total_discount, avg_dining_time): (f64, i32, i32, i32, f64, f64, Option<f64>) = sqlx::query_as(
+    let (revenue, total_orders, total_customers, voided_orders, voided_amount, loss_orders, loss_amount, total_discount, avg_dining_time): (f64, i32, i32, i32, f64, i32, f64, f64, Option<f64>) = sqlx::query_as(
         "SELECT \
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0.0 END), 0.0), \
             CAST(COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) AS INTEGER), \
             CAST(COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN guest_count ELSE 0 END), 0) AS INTEGER), \
-            CAST(COUNT(CASE WHEN status = 'VOID' THEN 1 END) AS INTEGER), \
-            COALESCE(SUM(CASE WHEN status = 'VOID' THEN total_amount ELSE 0.0 END), 0.0), \
+            CAST(COUNT(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN 1 END) AS INTEGER), \
+            COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN total_amount ELSE 0.0 END), 0.0), \
+            CAST(COUNT(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN 1 END) AS INTEGER), \
+            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0.0) ELSE 0.0 END), 0.0), \
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN discount_amount ELSE 0.0 END), 0.0), \
             AVG(CASE WHEN status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL \
                 THEN CAST((end_time - start_time) AS REAL) / 60000.0 END) \
@@ -286,6 +290,8 @@ pub async fn get_statistics(
         other_revenue,
         voided_orders,
         voided_amount,
+        loss_orders,
+        loss_amount,
         total_discount,
         avg_guest_spend,
         avg_dining_time,

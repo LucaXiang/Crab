@@ -424,6 +424,33 @@ impl ActivationService {
         self.credential_cache.read().await.is_some()
     }
 
+    /// 从磁盘重新加载 credential 到内存缓存
+    ///
+    /// 当 Tauri 侧在 edge-server 运行期间更新了 credential.json 时调用
+    pub async fn reload_credential(&self) -> bool {
+        match TenantBinding::load(&self.cert_dir) {
+            Ok(Some(cred)) => {
+                tracing::info!(
+                    "Reloaded credential from disk: tenant={}, edge={}",
+                    cred.binding.tenant_id,
+                    cred.binding.entity_id
+                );
+                let mut cache = self.credential_cache.write().await;
+                *cache = Some(cred);
+                self.notify.notify_waiters();
+                true
+            }
+            Ok(None) => {
+                tracing::debug!("No credential file found on disk during reload");
+                false
+            }
+            Err(e) => {
+                tracing::error!("Failed to reload credential from disk: {}", e);
+                false
+            }
+        }
+    }
+
     pub async fn get_credential(&self) -> Result<Option<TenantBinding>, AppError> {
         let cache = self.credential_cache.read().await;
         Ok(cache.clone())

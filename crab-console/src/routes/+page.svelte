@@ -15,9 +15,12 @@
 		Users,
 		TrendingUp,
 		BarChart3,
-		Download
+		Download,
+		Upload,
+		ShieldCheck,
+		FileKey
 	} from 'lucide-svelte';
-	import { t } from '$lib/i18n';
+	import { t, apiErrorMessage } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import {
 		getProfile,
@@ -25,6 +28,7 @@
 		getTenantOverview,
 		createBillingPortal,
 		createCheckout,
+		uploadP12,
 		ApiError,
 		type ProfileResponse,
 		type StoreDetail,
@@ -40,6 +44,16 @@
 	let error = $state('');
 	let billingLoading = $state(false);
 	let checkoutLoading = $state('');
+
+	// P12 upload state
+	let onboardStep = $state<'p12' | 'plan'>('p12');
+	let p12File = $state<File | null>(null);
+	let p12Password = $state('');
+	let p12Uploading = $state(false);
+	let p12Error = $state('');
+	let p12Uploaded = $state(false);
+	let p12Subject = $state('');
+	let p12Expires = $state<number | null>(null);
 
 	let token = '';
 	authToken.subscribe((v) => (token = v ?? ''));
@@ -70,6 +84,14 @@
 			const profileRes = await getProfile(token);
 			profile = profileRes;
 
+			// Initialize P12 state from profile
+			if (profileRes.p12?.has_p12) {
+				p12Uploaded = true;
+				p12Subject = profileRes.p12.subject ?? '';
+				p12Expires = profileRes.p12.expires_at;
+				onboardStep = 'plan';
+			}
+
 			if (profileRes.subscription && profileRes.subscription.status !== 'canceled') {
 				const { from, to } = getTodayRange();
 				const [storeList, ov] = await Promise.all([
@@ -85,7 +107,7 @@
 				goto('/login');
 				return;
 			}
-			error = err instanceof ApiError ? err.message : $t('auth.error_generic');
+			error = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
 			loading = false;
 		}
@@ -97,9 +119,31 @@
 			const res = await createBillingPortal(token);
 			window.location.href = res.url;
 		} catch (err) {
-			error = err instanceof ApiError ? err.message : $t('auth.error_generic');
+			error = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
 			billingLoading = false;
+		}
+	}
+
+	function handleP12FileChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		p12File = input.files?.[0] ?? null;
+	}
+
+	async function handleP12Upload() {
+		if (!p12File) return;
+		p12Uploading = true;
+		p12Error = '';
+		try {
+			const res = await uploadP12(token, p12File, p12Password);
+			p12Uploaded = true;
+			p12Subject = res.common_name;
+			p12Expires = res.expires_at;
+			onboardStep = 'plan';
+		} catch (err) {
+			p12Error = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
+		} finally {
+			p12Uploading = false;
 		}
 	}
 
@@ -110,7 +154,7 @@
 			const res = await createCheckout(token, plan);
 			window.location.href = res.checkout_url;
 		} catch (err) {
-			error = err instanceof ApiError ? err.message : $t('auth.error_generic');
+			error = err instanceof ApiError ? apiErrorMessage($t, err.code, err.message) : $t('auth.error_generic');
 		} finally {
 			checkoutLoading = '';
 		}
@@ -173,138 +217,223 @@
 				{error}
 			</div>
 		{:else if needsOnboarding}
-			<!-- Onboarding: Choose plan -->
-			<div class="text-center mb-2">
-				<div
-					class="w-14 h-14 bg-coral-100 rounded-2xl flex items-center justify-center mx-auto mb-4"
+			<!-- Onboarding step indicator -->
+			<div class="flex items-center justify-center gap-4 mb-6">
+				<button
+					onclick={() => { if (p12Uploaded) onboardStep = 'p12'; }}
+					class="flex items-center gap-2 text-sm font-medium {onboardStep === 'p12' ? 'text-coral-600' : p12Uploaded ? 'text-green-600' : 'text-slate-400'}"
 				>
-					<Sparkles class="w-7 h-7 text-coral-500" />
-				</div>
-				<h1 class="font-heading text-2xl font-bold text-slate-900 mb-2">
-					{$t('onboard.title')}
-				</h1>
-				<p class="text-sm text-slate-500 max-w-md mx-auto">{$t('onboard.subtitle')}</p>
+					<span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold {onboardStep === 'p12' ? 'bg-coral-100 text-coral-600' : p12Uploaded ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}">
+						{#if p12Uploaded && onboardStep !== 'p12'}
+							<CheckCircle class="w-4 h-4" />
+						{:else}
+							1
+						{/if}
+					</span>
+					{$t('onboard.step_certificate')}
+				</button>
+				<div class="w-8 h-px {p12Uploaded ? 'bg-green-300' : 'bg-slate-200'}"></div>
+				<span class="flex items-center gap-2 text-sm font-medium {onboardStep === 'plan' ? 'text-coral-600' : 'text-slate-400'}">
+					<span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold {onboardStep === 'plan' ? 'bg-coral-100 text-coral-600' : 'bg-slate-100 text-slate-400'}">2</span>
+					{$t('onboard.step_plan')}
+				</span>
 			</div>
 
-			<div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-				<!-- Basic -->
-				<div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col">
-					<h3 class="font-heading font-bold text-lg text-slate-900">Basic</h3>
-					<p class="text-sm text-slate-500 mt-1">{$t('onboard.basic_desc')}</p>
-					<div class="mt-4 mb-6">
-						<span class="text-3xl font-bold text-slate-900">&euro;39</span>
-						<span class="text-sm text-slate-500">/{$t('onboard.month')}</span>
+			{#if onboardStep === 'p12'}
+				<!-- Step 1: P12 upload -->
+				<div class="text-center mb-6">
+					<div class="w-14 h-14 bg-coral-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+						<FileKey class="w-7 h-7 text-coral-500" />
 					</div>
-					<ul class="space-y-2 text-sm text-slate-600 mb-6 flex-1">
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 1 {$t(
-								'onboard.edge_server'
-							)}
-						</li>
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 5 {$t(
-								'onboard.terminals'
-							)}
-						</li>
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" />
-							{$t('onboard.cloud_sync')}
-						</li>
-					</ul>
-					<button
-						onclick={() => handleChoosePlan('basic')}
-						disabled={checkoutLoading !== ''}
-						class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-					>
-						{#if checkoutLoading === 'basic'}
-							<svg
-								class="animate-spin w-4 h-4"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="4"
-								/>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-								/>
-							</svg>
-						{/if}
-						{$t('onboard.choose')}
-					</button>
+					<h1 class="font-heading text-2xl font-bold text-slate-900 mb-2">
+						{$t('onboard.p12_title')}
+					</h1>
+					<p class="text-sm text-slate-500 max-w-md mx-auto">{$t('onboard.p12_subtitle')}</p>
 				</div>
 
-				<!-- Pro -->
-				<div class="bg-white rounded-2xl border-2 border-coral-500 p-6 flex flex-col relative">
-					<span
-						class="absolute -top-3 left-6 bg-coral-500 text-white text-xs font-bold px-3 py-0.5 rounded-full"
-						>{$t('onboard.popular')}</span
-					>
-					<h3 class="font-heading font-bold text-lg text-slate-900">Pro</h3>
-					<p class="text-sm text-slate-500 mt-1">{$t('onboard.pro_desc')}</p>
-					<div class="mt-4 mb-6">
-						<span class="text-3xl font-bold text-slate-900">&euro;69</span>
-						<span class="text-sm text-slate-500">/{$t('onboard.month')}</span>
-					</div>
-					<ul class="space-y-2 text-sm text-slate-600 mb-6 flex-1">
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 3 {$t(
-								'onboard.edge_server'
-							)}
-						</li>
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 10 {$t(
-								'onboard.terminals'
-							)}
-						</li>
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" />
-							{$t('onboard.cloud_sync')}
-						</li>
-						<li class="flex items-center gap-2">
-							<CheckCircle class="w-4 h-4 text-green-500 shrink-0" />
-							{$t('onboard.priority_support')}
-						</li>
-					</ul>
-					<button
-						onclick={() => handleChoosePlan('pro')}
-						disabled={checkoutLoading !== ''}
-						class="w-full py-3 bg-coral-500 hover:bg-coral-600 text-white font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-					>
-						{#if checkoutLoading === 'pro'}
-							<svg
-								class="animate-spin w-4 h-4"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
+				<div class="max-w-md mx-auto">
+					{#if p12Uploaded}
+						<!-- Already uploaded -->
+						<div class="bg-green-50 border border-green-200 rounded-xl p-5 mb-4">
+							<div class="flex items-center gap-3 mb-3">
+								<ShieldCheck class="w-6 h-6 text-green-600" />
+								<span class="font-semibold text-green-800">{$t('onboard.p12_uploaded')}</span>
+							</div>
+							<div class="space-y-1 text-sm text-green-700">
+								<p><span class="font-medium">{$t('onboard.p12_subject')}:</span> {p12Subject}</p>
+								{#if p12Expires}
+									<p><span class="font-medium">{$t('onboard.p12_expires')}:</span> {formatDate(p12Expires * 1000)}</p>
+								{/if}
+							</div>
+						</div>
+						<div class="flex gap-3">
+							<button
+								onclick={() => { p12Uploaded = false; p12File = null; p12Password = ''; }}
+								class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors cursor-pointer"
 							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="4"
+								{$t('onboard.p12_change')}
+							</button>
+							<button
+								onclick={() => { onboardStep = 'plan'; }}
+								class="flex-1 py-3 bg-coral-500 hover:bg-coral-600 text-white font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
+							>
+								{$t('onboard.p12_continue')}
+								<ArrowRight class="w-4 h-4" />
+							</button>
+						</div>
+					{:else}
+						<!-- Upload form -->
+						<div class="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+							{#if p12Error}
+								<div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+									{p12Error}
+								</div>
+							{/if}
+
+							<div>
+								<label for="p12-file" class="block text-sm font-medium text-slate-700 mb-1.5">
+									{$t('onboard.p12_label')}
+								</label>
+								<input
+									id="p12-file"
+									type="file"
+									accept=".p12,.pfx"
+									onchange={handleP12FileChange}
+									class="w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-coral-50 file:text-coral-600 hover:file:bg-coral-100 file:cursor-pointer"
 								/>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							</div>
+
+							<div>
+								<label for="p12-password" class="block text-sm font-medium text-slate-700 mb-1.5">
+									{$t('onboard.p12_password')}
+								</label>
+								<input
+									id="p12-password"
+									type="password"
+									bind:value={p12Password}
+									placeholder={$t('onboard.p12_password_placeholder')}
+									class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-coral-500 focus:border-transparent"
 								/>
-							</svg>
-						{/if}
-						{$t('onboard.choose')}
-					</button>
+							</div>
+
+							<button
+								onclick={handleP12Upload}
+								disabled={!p12File || p12Uploading}
+								class="w-full py-3 bg-coral-500 hover:bg-coral-600 text-white font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+							>
+								{#if p12Uploading}
+									<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+									</svg>
+									{$t('onboard.p12_uploading')}
+								{:else}
+									<Upload class="w-4 h-4" />
+									{$t('onboard.p12_upload')}
+								{/if}
+							</button>
+
+							<p class="text-xs text-slate-400 text-center">{$t('onboard.p12_skip_info')}</p>
+						</div>
+					{/if}
 				</div>
-			</div>
+			{:else}
+				<!-- Step 2: Choose plan -->
+				<div class="text-center mb-2">
+					<div
+						class="w-14 h-14 bg-coral-100 rounded-2xl flex items-center justify-center mx-auto mb-4"
+					>
+						<Sparkles class="w-7 h-7 text-coral-500" />
+					</div>
+					<h1 class="font-heading text-2xl font-bold text-slate-900 mb-2">
+						{$t('onboard.title')}
+					</h1>
+					<p class="text-sm text-slate-500 max-w-md mx-auto">{$t('onboard.subtitle')}</p>
+				</div>
+
+				{#if error}
+					<div class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 max-w-3xl mx-auto mb-4">
+						{error}
+					</div>
+				{/if}
+
+				<div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+					<!-- Basic -->
+					<div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col">
+						<h3 class="font-heading font-bold text-lg text-slate-900">Basic</h3>
+						<p class="text-sm text-slate-500 mt-1">{$t('onboard.basic_desc')}</p>
+						<div class="mt-4 mb-6">
+							<span class="text-3xl font-bold text-slate-900">&euro;39</span>
+							<span class="text-sm text-slate-500">/{$t('onboard.month')}</span>
+						</div>
+						<ul class="space-y-2 text-sm text-slate-600 mb-6 flex-1">
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 1 {$t('onboard.location')}
+							</li>
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 5 {$t('onboard.devices')}
+							</li>
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" />
+								{$t('onboard.cloud_sync')}
+							</li>
+						</ul>
+						<button
+							onclick={() => handleChoosePlan('basic')}
+							disabled={checkoutLoading !== ''}
+							class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+						>
+							{#if checkoutLoading === 'basic'}
+								<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+								</svg>
+							{/if}
+							{$t('onboard.choose')}
+						</button>
+					</div>
+
+					<!-- Pro -->
+					<div class="bg-white rounded-2xl border-2 border-coral-500 p-6 flex flex-col relative">
+						<span class="absolute -top-3 left-6 bg-coral-500 text-white text-xs font-bold px-3 py-0.5 rounded-full">{$t('onboard.popular')}</span>
+						<h3 class="font-heading font-bold text-lg text-slate-900">Pro</h3>
+						<p class="text-sm text-slate-500 mt-1">{$t('onboard.pro_desc')}</p>
+						<div class="mt-4 mb-6">
+							<span class="text-3xl font-bold text-slate-900">&euro;69</span>
+							<span class="text-sm text-slate-500">/{$t('onboard.month')}</span>
+						</div>
+						<ul class="space-y-2 text-sm text-slate-600 mb-6 flex-1">
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 3 {$t('onboard.location')}
+							</li>
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" /> 10 {$t('onboard.devices')}
+							</li>
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" />
+								{$t('onboard.cloud_sync')}
+							</li>
+							<li class="flex items-center gap-2">
+								<CheckCircle class="w-4 h-4 text-green-500 shrink-0" />
+								{$t('onboard.priority_support')}
+							</li>
+						</ul>
+						<button
+							onclick={() => handleChoosePlan('pro')}
+							disabled={checkoutLoading !== ''}
+							class="w-full py-3 bg-coral-500 hover:bg-coral-600 text-white font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+						>
+							{#if checkoutLoading === 'pro'}
+								<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+								</svg>
+							{/if}
+							{$t('onboard.choose')}
+						</button>
+					</div>
+				</div>
+			{/if}
 		{:else if isCanceled && profile}
 			<!-- Canceled subscription -->
 			<div class="bg-white rounded-2xl border border-red-200 p-6">

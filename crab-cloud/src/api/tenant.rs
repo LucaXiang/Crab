@@ -25,6 +25,7 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub token: String,
     pub tenant_id: String,
+    pub status: String,
 }
 
 pub async fn login(
@@ -60,7 +61,8 @@ pub async fn login(
 
     Ok(Json(LoginResponse {
         token,
-        tenant_id: tenant.id,
+        tenant_id: tenant.id.clone(),
+        status: tenant.status,
     }))
 }
 
@@ -84,9 +86,17 @@ pub async fn get_profile(
             AppError::new(ErrorCode::InternalError)
         })?;
 
+    let p12 = db::p12::get_p12_info(&state.pool, &identity.tenant_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("P12 query error: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
+
     Ok(Json(serde_json::json!({
         "profile": profile,
         "subscription": subscription,
+        "p12": p12,
     })))
 }
 
@@ -619,6 +629,14 @@ pub async fn create_checkout(
     let status = shared::cloud::TenantStatus::from_db(&tenant.status);
     if status != Some(shared::cloud::TenantStatus::Verified) {
         return Err(AppError::new(ErrorCode::ValidationFailed));
+    }
+
+    // P12 certificate must be uploaded before payment (Verifactu compliance)
+    let p12 = db::p12::find_by_tenant(&state.pool, &identity.tenant_id)
+        .await
+        .map_err(|_| AppError::new(ErrorCode::InternalError))?;
+    if p12.is_none() {
+        return Err(AppError::new(ErrorCode::P12Required));
     }
 
     // Create or reuse Stripe customer

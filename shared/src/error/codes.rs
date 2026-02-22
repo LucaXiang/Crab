@@ -107,6 +107,8 @@ pub enum ErrorCode {
     PaymentSetupFailed = 3017,
     /// Password too short
     PasswordTooShort = 3018,
+    /// P12 certificate required before payment (Verifactu compliance)
+    P12Required = 3019,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -306,6 +308,7 @@ impl ErrorCode {
             ErrorCode::EmailNotVerified => "Email not verified",
             ErrorCode::PaymentSetupFailed => "Payment setup failed",
             ErrorCode::PasswordTooShort => "Password must be at least 8 characters",
+            ErrorCode::P12Required => "P12 certificate must be uploaded before payment",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -455,6 +458,7 @@ impl TryFrom<u16> for ErrorCode {
             3016 => Ok(ErrorCode::EmailNotVerified),
             3017 => Ok(ErrorCode::PaymentSetupFailed),
             3018 => Ok(ErrorCode::PasswordTooShort),
+            3019 => Ok(ErrorCode::P12Required),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),

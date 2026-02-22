@@ -166,6 +166,8 @@ export interface OverviewStats {
   other_revenue: number;
   voided_orders: number;
   voided_amount: number;
+  loss_orders: number;
+  loss_amount: number;
   total_discount: number;
   avg_guest_spend: number;
   avg_dining_time?: number;

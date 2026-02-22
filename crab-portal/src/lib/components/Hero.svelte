@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowRight, ChevronDown } from 'lucide-svelte';
+	import { ArrowRight, ChevronDown, Download } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 </script>
 
@@ -35,6 +35,13 @@
 					<ArrowRight class="w-4 h-4" />
 				</a>
 				<a
+					href="https://auth.redcoral.app/api/download/latest"
+					class="inline-flex items-center gap-2 bg-white/[0.08] hover:bg-white/[0.14] text-white font-semibold px-7 py-3.5 rounded-xl border border-white/[0.1] transition-colors duration-150 cursor-pointer"
+				>
+					<Download class="w-4 h-4" />
+					<span>{$t('hero.cta_download')}</span>
+				</a>
+				<a
 					href="#features"
 					class="inline-flex items-center gap-2 text-slate-400 hover:text-white font-medium px-4 py-3.5 transition-colors duration-150 cursor-pointer"
 				>
@@ -49,17 +56,17 @@
 			class="mt-20 flex flex-wrap items-center gap-8 md:gap-12 border-t border-white/[0.06] pt-8"
 		>
 			<div>
-				<div class="text-2xl md:text-3xl font-heading font-bold text-white">&lt;5ms</div>
+				<div class="text-2xl md:text-3xl font-heading font-bold text-white">{$t('hero.stat_latency_value')}</div>
 				<div class="text-xs text-slate-500 mt-1">{$t('hero.stat_latency')}</div>
 			</div>
 			<div class="w-px h-8 bg-white/[0.06] hidden md:block"></div>
 			<div>
-				<div class="text-2xl md:text-3xl font-heading font-bold text-white">99.9%</div>
+				<div class="text-2xl md:text-3xl font-heading font-bold text-white">{$t('hero.stat_uptime_value')}</div>
 				<div class="text-xs text-slate-500 mt-1">{$t('hero.stat_uptime')}</div>
 			</div>
 			<div class="w-px h-8 bg-white/[0.06] hidden md:block"></div>
 			<div>
-				<div class="text-2xl md:text-3xl font-heading font-bold text-white">mTLS</div>
+				<div class="text-2xl md:text-3xl font-heading font-bold text-white">{$t('hero.stat_security_value')}</div>
 				<div class="text-xs text-slate-500 mt-1">{$t('hero.stat_security')}</div>
 			</div>
 		</div>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Mail, ArrowLeft, ArrowRight, Lock, KeyRound } from 'lucide-svelte';
-	import { t } from '$lib/i18n';
+	import { t, apiErrorMessage } from '$lib/i18n';
 	import { forgotPassword, resetPassword, ApiError } from '$lib/api';
 
 	let email = $state('');
@@ -21,7 +21,11 @@
 			success = $t('auth.reset_code_sent');
 			step = 'reset';
 		} catch (err) {
-			error = err instanceof ApiError ? err.message : $t('auth.error_generic');
+			if (err instanceof ApiError) {
+				error = apiErrorMessage($t, err.code, err.message);
+			} else {
+				error = $t('auth.error_generic');
+			}
 		} finally {
 			loading = false;
 		}
@@ -38,13 +42,7 @@
 			setTimeout(() => goto('/login'), 1500);
 		} catch (err) {
 			if (err instanceof ApiError) {
-				error = err.code === 'PASSWORD_TOO_SHORT'
-					? $t('auth.password_too_short')
-					: err.code === 'VERIFICATION_CODE_INVALID'
-						? $t('auth.reset_code_invalid')
-						: err.code === 'VERIFICATION_CODE_EXPIRED'
-							? $t('auth.reset_code_expired')
-							: err.message;
+				error = apiErrorMessage($t, err.code, err.message);
 			} else {
 				error = $t('auth.error_generic');
 			}

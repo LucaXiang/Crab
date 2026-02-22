@@ -35,6 +35,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
       other_revenue: 0,
       voided_orders: 0,
       voided_amount: 0,
+      loss_orders: 0,
+      loss_amount: 0,
       total_discount: 0,
       avg_guest_spend: 0,
       avg_dining_time: 0,

@@ -47,3 +47,20 @@ export const t = derived(locale, ($locale) => {
 		return translations[$locale]?.[key] ?? translations[DEFAULT_LANG]?.[key] ?? key;
 	};
 });
+
+/**
+ * Get a localized error message for an API error code.
+ * Falls back to the raw server message if no translation exists.
+ */
+export function apiErrorMessage(
+	translate: (key: string) => string,
+	code: number | null,
+	fallback: string
+): string {
+	if (code !== null) {
+		const key = `error.${code}`;
+		const msg = translate(key);
+		if (msg !== key) return msg;
+	}
+	return fallback;
+}

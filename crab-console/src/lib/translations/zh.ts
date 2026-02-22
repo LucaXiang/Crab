@@ -206,10 +206,40 @@ export const zh: Record<string, string> = {
 	'onboard.basic_desc': '适合单店运营的小型餐厅。',
 	'onboard.pro_desc': '适合多店连锁或需要优先支持的餐厅。',
 	'onboard.month': '月',
-	'onboard.edge_server': '边缘服务器',
-	'onboard.terminals': '终端设备',
+	'onboard.location': '门店',
+	'onboard.devices': '台设备',
 	'onboard.cloud_sync': '云端数据同步',
 	'onboard.priority_support': '优先技术支持',
 	'onboard.choose': '选择方案',
-	'onboard.popular': '推荐'
+	'onboard.popular': '推荐',
+
+	// P12 上传步骤
+	'onboard.p12_title': '上传电子签名证书',
+	'onboard.p12_subtitle': '为符合 Verifactu 合规要求，请在继续之前上传你的电子签名证书（P12/FNMT）。',
+	'onboard.p12_label': 'P12 文件（.p12 或 .pfx）',
+	'onboard.p12_password': '证书密码',
+	'onboard.p12_password_placeholder': '你的 P12 密码',
+	'onboard.p12_upload': '上传证书',
+	'onboard.p12_uploading': '上传中...',
+	'onboard.p12_success': '证书上传成功。',
+	'onboard.p12_skip_info': '此步骤为西班牙税务合规要求，必须完成。',
+	'onboard.p12_uploaded': '证书已上传',
+	'onboard.p12_subject': '持有人',
+	'onboard.p12_expires': '有效期至',
+	'onboard.p12_continue': '继续',
+	'onboard.p12_change': '更换证书',
+	'onboard.step_certificate': '证书',
+	'onboard.step_plan': '方案',
+
+	// API 错误码
+	'error.2': '输入的信息无效。',
+	'error.4': '该资源已存在。',
+	'error.1001': '登录已过期，请重新登录。',
+	'error.1002': '邮箱或密码不正确。',
+	'error.1003': '登录已过期，请重新登录。',
+	'error.1007': '你的账户已被禁用，请联系客服。',
+	'error.3011': '没有活跃的订阅。',
+	'error.3017': '支付设置失败，请重试。',
+	'error.3018': '密码至少需要 8 个字符。',
+	'error.3019': '请先上传电子签名证书（P12）。'
 };

@@ -49,7 +49,9 @@ impl TenantStatus {
     }
 
     /// Can this tenant log in?
+    /// All states except Pending can login — canceled/suspended tenants
+    /// can still access the console (view history, resubscribe).
     pub fn can_login(&self) -> bool {
-        matches!(self, Self::Verified | Self::Active)
+        !matches!(self, Self::Pending)
     }
 }

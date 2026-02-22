@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Mail, KeyRound, ArrowRight, RotateCw } from 'lucide-svelte';
-	import { t } from '$lib/i18n';
+	import { t, apiErrorMessage } from '$lib/i18n';
 	import { verifyEmail, resendCode, ApiError } from '$lib/api';
 	import AuthLayout from '$lib/components/AuthLayout.svelte';
 
@@ -44,7 +44,7 @@
 			goto('/registration/success');
 		} catch (err) {
 			if (err instanceof ApiError) {
-				error = err.message;
+				error = apiErrorMessage($t, err.code, err.message);
 			} else {
 				error = $t('auth.error_generic');
 			}
@@ -71,7 +71,7 @@
 			startCooldown();
 		} catch (err) {
 			if (err instanceof ApiError) {
-				error = err.message;
+				error = apiErrorMessage($t, err.code, err.message);
 			} else {
 				error = $t('auth.error_generic');
 			}

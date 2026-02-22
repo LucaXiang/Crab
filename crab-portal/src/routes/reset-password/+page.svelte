@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { KeyRound, Lock, Eye, EyeOff, ArrowRight } from 'lucide-svelte';
-	import { t } from '$lib/i18n';
+	import { t, apiErrorMessage } from '$lib/i18n';
 	import { resetPassword, ApiError } from '$lib/api';
 	import AuthLayout from '$lib/components/AuthLayout.svelte';
 
@@ -35,7 +35,7 @@
 			setTimeout(() => goto('/login'), 2000);
 		} catch (err) {
 			if (err instanceof ApiError) {
-				error = err.message;
+				error = apiErrorMessage($t, err.code, err.message);
 			} else {
 				error = $t('auth.error_generic');
 			}
