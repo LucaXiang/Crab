@@ -19,6 +19,7 @@
 use shared::order::{OrderEvent, OrderEventType};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
+use tokio_util::sync::CancellationToken;
 
 /// 终端事件类型（触发归档）
 const TERMINAL_EVENTS: &[OrderEventType] = &[
@@ -73,25 +74,36 @@ impl EventRouter {
         (router, channels)
     }
 
-    /// 运行路由器（阻塞直到源通道关闭）
-    pub async fn run(self, mut source: broadcast::Receiver<OrderEvent>) {
+    /// 运行路由器（阻塞直到源通道关闭或收到 shutdown 信号）
+    pub async fn run(
+        self,
+        mut source: broadcast::Receiver<OrderEvent>,
+        shutdown: CancellationToken,
+    ) {
         tracing::info!("Event router started");
 
         loop {
-            match source.recv().await {
-                Ok(event) => {
-                    self.dispatch(event).await;
-                }
-                Err(broadcast::error::RecvError::Lagged(n)) => {
-                    // ⚠️ Lag 是严重问题 - 可能丢失归档事件
-                    tracing::error!(
-                        skipped = n,
-                        "Event router lagged! Events skipped - archive data may be lost"
-                    );
-                }
-                Err(broadcast::error::RecvError::Closed) => {
-                    tracing::info!("Source channel closed, event router stopping");
+            tokio::select! {
+                _ = shutdown.cancelled() => {
+                    tracing::info!("Event router received shutdown signal");
                     break;
+                }
+                result = source.recv() => {
+                    match result {
+                        Ok(event) => {
+                            self.dispatch(event).await;
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::error!(
+                                skipped = n,
+                                "Event router lagged! Events skipped - archive data may be lost"
+                            );
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            tracing::info!("Source channel closed, event router stopping");
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -150,6 +162,7 @@ mod tests {
     use super::*;
     use shared::order::EventPayload;
     use shared::order::types::ServiceType;
+    use tokio_util::sync::CancellationToken;
 
     fn make_test_event(event_type: OrderEventType, sequence: u64) -> OrderEvent {
         let payload = match event_type {
@@ -188,7 +201,7 @@ mod tests {
 
         // Spawn router
         tokio::spawn(async move {
-            router.run(rx).await;
+            router.run(rx, CancellationToken::new()).await;
         });
 
         // Send ItemsAdded event
@@ -215,7 +228,7 @@ mod tests {
         let (tx, rx) = broadcast::channel(16);
 
         tokio::spawn(async move {
-            router.run(rx).await;
+            router.run(rx, CancellationToken::new()).await;
         });
 
         // Fill sync channel (buffer = 1)
@@ -232,5 +245,22 @@ mod tests {
         let archived = channels.archive_rx.recv().await;
         assert!(archived.is_some());
         assert_eq!(archived.unwrap().sequence, 3);
+    }
+    #[tokio::test]
+    async fn test_shutdown() {
+        let (router, _channels) = EventRouter::new(16, 16);
+        let (_tx, rx) = broadcast::channel::<OrderEvent>(16);
+        let shutdown = CancellationToken::new();
+        let shutdown_clone = shutdown.clone();
+
+        let handle = tokio::spawn(async move {
+            router.run(rx, shutdown_clone).await;
+        });
+
+        shutdown.cancel();
+        tokio::time::timeout(std::time::Duration::from_millis(100), handle)
+            .await
+            .expect("EventRouter should exit within 100ms")
+            .unwrap();
     }
 }

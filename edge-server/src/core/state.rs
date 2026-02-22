@@ -350,8 +350,9 @@ impl ServerState {
         let (router, channels) = EventRouter::new(512, 256);
         let source_rx = self.orders_manager.subscribe();
 
+        let event_router_shutdown = tasks.shutdown_token();
         tasks.spawn("event_router", TaskKind::Worker, async move {
-            router.run(source_rx).await;
+            router.run(source_rx, event_router_shutdown).await;
         });
 
         // ═══════════════════════════════════════════════════════════════════
@@ -552,7 +553,7 @@ impl ServerState {
     /// 处理来自客户端的消息
     fn register_message_handler(&self, tasks: &mut BackgroundTasks) {
         let handler_receiver = self.message_bus.bus().subscribe_to_clients();
-        let handler_shutdown = self.message_bus.bus().shutdown_token().clone();
+        let handler_shutdown = tasks.shutdown_token();
         let server_tx = self.message_bus.bus().sender().clone();
 
         let handler = crate::message::MessageHandler::with_default_processors(
@@ -578,42 +579,54 @@ impl ServerState {
         let message_bus = self.message_bus.bus().clone();
         let orders_manager = self.orders_manager.clone();
 
+        let shutdown = tasks.shutdown_token();
         tasks.spawn("order_sync_forwarder", TaskKind::Listener, async move {
             tracing::debug!("Order sync forwarder started");
 
-            while let Some(event) = event_rx.recv().await {
-                let order_id = event.order_id.clone();
-                let sequence = event.sequence;
-                let action = event.event_type.to_string();
-
-                // 获取快照，打包 event + snapshot 一起推送
-                match orders_manager.get_snapshot(&order_id) {
-                    Ok(Some(snapshot)) => {
-                        let payload = SyncPayload {
-                            resource: "order_sync".to_string(),
-                            version: sequence,
-                            action,
-                            id: order_id,
-                            data: serde_json::json!({
-                                "event": event,
-                                "snapshot": snapshot
-                            })
-                            .into(),
+            loop {
+                tokio::select! {
+                    _ = shutdown.cancelled() => {
+                        tracing::info!("Order sync forwarder received shutdown signal");
+                        break;
+                    }
+                    event = event_rx.recv() => {
+                        let Some(event) = event else {
+                            tracing::debug!("Sync channel closed, order sync forwarder stopping");
+                            break;
                         };
-                        if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
-                            tracing::warn!("Failed to forward order sync: {}", e);
+
+                        let order_id = event.order_id.clone();
+                        let sequence = event.sequence;
+                        let action = event.event_type.to_string();
+
+                        // 获取快照，打包 event + snapshot 一起推送
+                        match orders_manager.get_snapshot(&order_id) {
+                            Ok(Some(snapshot)) => {
+                                let payload = SyncPayload {
+                                    resource: "order_sync".to_string(),
+                                    version: sequence,
+                                    action,
+                                    id: order_id,
+                                    data: serde_json::json!({
+                                        "event": event,
+                                        "snapshot": snapshot
+                                    })
+                                    .into(),
+                                };
+                                if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
+                                    tracing::warn!("Failed to forward order sync: {}", e);
+                                }
+                            }
+                            Ok(None) => {
+                                tracing::warn!("Order {} not found after event", order_id);
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to get snapshot for {}: {}", order_id, e);
+                            }
                         }
-                    }
-                    Ok(None) => {
-                        tracing::warn!("Order {} not found after event", order_id);
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to get snapshot for {}: {}", order_id, e);
                     }
                 }
             }
-
-            tracing::debug!("Sync channel closed, order sync forwarder stopping");
         });
     }
 
@@ -634,8 +647,9 @@ impl ServerState {
             self.pool.clone(),
         );
 
+        let shutdown = tasks.shutdown_token();
         tasks.spawn("kitchen_print_worker", TaskKind::Listener, async move {
-            worker.run(event_rx).await;
+            worker.run(event_rx, shutdown).await;
         });
     }
 

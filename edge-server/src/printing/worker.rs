@@ -12,6 +12,7 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 /// Arc-wrapped OrderEvent (from EventRouter)
 type ArcOrderEvent = Arc<OrderEvent>;
@@ -45,16 +46,29 @@ impl KitchenPrintWorker {
     /// 运行工作者（阻塞直到通道关闭）
     ///
     /// 接收来自 EventRouter 的 mpsc 通道（已过滤为仅 ItemsAdded）
-    pub async fn run(self, mut event_rx: mpsc::Receiver<ArcOrderEvent>) {
+    pub async fn run(
+        self,
+        mut event_rx: mpsc::Receiver<ArcOrderEvent>,
+        shutdown: CancellationToken,
+    ) {
         tracing::info!("Kitchen print worker started");
         let executor = PrintExecutor::new();
 
-        while let Some(event) = event_rx.recv().await {
-            // EventRouter 已过滤，这里都是 ItemsAdded 事件
-            self.handle_items_added(&event, &executor).await;
+        loop {
+            tokio::select! {
+                _ = shutdown.cancelled() => {
+                    tracing::info!("Kitchen print worker received shutdown signal");
+                    break;
+                }
+                event = event_rx.recv() => {
+                    let Some(event) = event else {
+                        tracing::info!("Print channel closed, kitchen print worker stopping");
+                        break;
+                    };
+                    self.handle_items_added(&event, &executor).await;
+                }
+            }
         }
-
-        tracing::info!("Print channel closed, kitchen print worker stopping");
     }
 
     /// 处理 ItemsAdded 事件
