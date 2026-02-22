@@ -39,7 +39,7 @@
 	}
 </script>
 
-<div class="flex h-screen">
+<div class="flex h-[100dvh] overflow-hidden">
 	<!-- Sidebar (desktop) -->
 	<aside class="hidden md:flex md:w-60 flex-col bg-white border-r border-slate-200">
 		<!-- Logo -->
@@ -127,6 +127,7 @@
 					<LogOut class="w-4 h-4" />
 				</button>
 			</div>
+			<p class="px-3 pb-1 text-[10px] text-slate-300">v{__BUILD_VERSION__}</p>
 		</div>
 	</aside>
 
@@ -169,29 +170,41 @@
 
 		<!-- Mobile nav overlay -->
 		{#if mobileOpen}
-			<div class="md:hidden absolute inset-x-0 top-14 bg-white border-b border-slate-200 shadow-lg z-50 px-4 py-3 space-y-1">
+			<!-- Backdrop -->
+			<div 
+				class="md:hidden fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+				onclick={() => (mobileOpen = false)}
+				role="button"
+				tabindex="0"
+				onkeydown={(e) => e.key === 'Escape' && (mobileOpen = false)}
+			></div>
+			
+			<!-- Menu -->
+			<div class="md:hidden absolute inset-x-0 top-14 bg-white border-b border-slate-200 shadow-xl z-50 px-4 py-3 space-y-1">
 				{#each navItems as item}
 					<a
 						href={item.href}
 						onclick={() => (mobileOpen = false)}
-						class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {isActive(
+						class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium {isActive(
 							item.href,
 							item.match
 						)
 							? 'bg-coral-50 text-coral-600'
 							: 'text-slate-600'}"
 					>
-						<item.icon class="w-[18px] h-[18px]" />
+						<item.icon class="w-5 h-5" />
 						<span>{$t(item.key)}</span>
 					</a>
 				{/each}
-				<button
-					onclick={handleLogout}
-					class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 w-full cursor-pointer"
-				>
-					<LogOut class="w-[18px] h-[18px]" />
-					<span>{$t('nav.logout')}</span>
-				</button>
+				<div class="border-t border-slate-100 my-2 pt-2">
+					<button
+						onclick={handleLogout}
+						class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-slate-600 w-full cursor-pointer hover:bg-slate-50"
+					>
+						<LogOut class="w-5 h-5" />
+						<span>{$t('nav.logout')}</span>
+					</button>
+				</div>
 			</div>
 		{/if}
 

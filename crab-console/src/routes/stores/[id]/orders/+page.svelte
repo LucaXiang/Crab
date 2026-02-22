@@ -88,18 +88,18 @@
 </svelte:head>
 
 <ConsoleLayout>
-	<div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+	<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-3">
 				<a href="/stores/{storeId}" class="text-slate-400 hover:text-slate-600">
 					<ArrowLeft class="w-5 h-5" />
 				</a>
-				<h1 class="font-heading text-xl font-bold text-slate-900">{$t('orders.title')}</h1>
+				<h1 class="font-heading text-lg md:text-xl font-bold text-slate-900">{$t('orders.title')}</h1>
 			</div>
 		</div>
 
 		<!-- Filters -->
-		<div class="flex gap-2">
+		<div class="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
 			{#each [
 				{ value: undefined, label: 'orders.all' },
 				{ value: 'COMPLETED', label: 'orders.completed' },
@@ -108,7 +108,7 @@
 			] as filter}
 				<button
 					onclick={() => setFilter(filter.value)}
-					class="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors duration-150 {statusFilter === filter.value ? 'bg-coral-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"
+					class="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors duration-150 whitespace-nowrap {statusFilter === filter.value ? 'bg-coral-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"
 				>
 					{$t(filter.label)}
 				</button>
@@ -130,7 +130,8 @@
 				<p class="text-sm text-slate-500">{$t('orders.empty')}</p>
 			</div>
 		{:else}
-			<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+			<!-- Desktop Table View -->
+			<div class="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden">
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-slate-100 text-left">
@@ -157,8 +158,35 @@
 				</table>
 			</div>
 
+			<!-- Mobile Card View -->
+			<div class="md:hidden space-y-3">
+				{#each orders as order}
+					<div
+						class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+						onclick={() => goto(`/stores/${storeId}/orders/${order.source_id}`)}
+						onkeydown={(e) => e.key === 'Enter' && goto(`/stores/${storeId}/orders/${order.source_id}`)}
+						role="button"
+						tabindex="0"
+					>
+						<div class="flex items-start justify-between mb-3">
+							<div>
+								<p class="font-bold text-slate-900">#{order.receipt_number ?? order.source_id.slice(0, 8)}</p>
+								<p class="text-xs text-slate-400 mt-0.5">{order.end_time ? formatDateTime(order.end_time) : '—'}</p>
+							</div>
+							<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium {statusBadge(order.status)}">
+								{statusLabel(order.status)}
+							</span>
+						</div>
+						<div class="flex items-center justify-between pt-3 border-t border-slate-100">
+							<span class="text-sm text-slate-500">{$t('orders.total')}</span>
+							<span class="text-lg font-bold text-slate-900">{order.total != null ? formatCurrency(order.total) : '—'}</span>
+						</div>
+					</div>
+				{/each}
+			</div>
+
 			{#if hasMore}
-				<div class="text-center">
+				<div class="text-center pt-2">
 					<button
 						onclick={loadMore}
 						disabled={loadingMore}

@@ -55,6 +55,8 @@
 	let p12Subject = $state('');
 	let p12Expires = $state<number | null>(null);
 
+	let isAnnual = $state(true);
+
 	let token = '';
 	authToken.subscribe((v) => (token = v ?? ''));
 
@@ -147,8 +149,9 @@
 		}
 	}
 
-	async function handleChoosePlan(plan: string) {
-		checkoutLoading = plan;
+	async function handleChoosePlan(planBase: string) {
+		const plan = isAnnual ? `${planBase}_yearly` : planBase;
+		checkoutLoading = planBase;
 		error = '';
 		try {
 			const res = await createCheckout(token, plan);
@@ -357,14 +360,39 @@
 					</div>
 				{/if}
 
-				<div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+				<div class="flex items-center justify-center gap-3 mb-8">
+					<span class="text-sm font-medium transition-colors {isAnnual ? 'text-slate-400' : 'text-slate-900'}">
+						{$t('onboard.monthly')}
+					</span>
+					<button
+						onclick={() => (isAnnual = !isAnnual)}
+						class="relative w-12 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coral-500 focus:ring-offset-2 {isAnnual
+							? 'bg-coral-500'
+							: 'bg-slate-300'}"
+					>
+						<span
+							class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform {isAnnual
+								? 'translate-x-6'
+								: 'translate-x-0'}"
+						></span>
+					</button>
+					<span class="text-sm font-medium transition-colors {isAnnual ? 'text-slate-900' : 'text-slate-400'}">
+						{$t('onboard.yearly')}
+						<span class="text-coral-500 text-xs font-bold ml-1">{$t('onboard.save_20')}</span>
+					</span>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
 					<!-- Basic -->
 					<div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col">
 						<h3 class="font-heading font-bold text-lg text-slate-900">Basic</h3>
 						<p class="text-sm text-slate-500 mt-1">{$t('onboard.basic_desc')}</p>
 						<div class="mt-4 mb-6">
-							<span class="text-3xl font-bold text-slate-900">&euro;39</span>
+							<span class="text-3xl font-bold text-slate-900">&euro;{isAnnual ? '31' : '39'}</span>
 							<span class="text-sm text-slate-500">/{$t('onboard.month')}</span>
+							{#if isAnnual}
+								<p class="text-xs text-slate-400 mt-1">{$t('onboard.billed_yearly')}</p>
+							{/if}
 						</div>
 						<ul class="space-y-2 text-sm text-slate-600 mb-6 flex-1">
 							<li class="flex items-center gap-2">
@@ -399,8 +427,11 @@
 						<h3 class="font-heading font-bold text-lg text-slate-900">Pro</h3>
 						<p class="text-sm text-slate-500 mt-1">{$t('onboard.pro_desc')}</p>
 						<div class="mt-4 mb-6">
-							<span class="text-3xl font-bold text-slate-900">&euro;69</span>
+							<span class="text-3xl font-bold text-slate-900">&euro;{isAnnual ? '55' : '69'}</span>
 							<span class="text-sm text-slate-500">/{$t('onboard.month')}</span>
+							{#if isAnnual}
+								<p class="text-xs text-slate-400 mt-1">{$t('onboard.billed_yearly')}</p>
+							{/if}
 						</div>
 						<ul class="space-y-2 text-sm text-slate-600 mb-6 flex-1">
 							<li class="flex items-center gap-2">
@@ -453,7 +484,7 @@
 					<div>
 						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.plan')}</p>
 						<p class="text-sm font-semibold text-slate-900 capitalize">
-							{profile.subscription.plan}
+							{profile?.subscription?.plan}
 						</p>
 					</div>
 				</div>
@@ -480,38 +511,38 @@
 					</div>
 					<span
 						class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium {statusColor(
-							profile.subscription.status
+							profile?.subscription?.status ?? ''
 						)}"
 					>
-						{#if profile.subscription.status === 'active'}
+						{#if profile?.subscription?.status === 'active'}
 							<CheckCircle class="w-3.5 h-3.5" />
-						{:else if profile.subscription.status === 'suspended'}
+						{:else if profile?.subscription?.status === 'suspended'}
 							<AlertTriangle class="w-3.5 h-3.5" />
 						{:else}
 							<XCircle class="w-3.5 h-3.5" />
 						{/if}
-						{statusLabel(profile.subscription.status)}
+						{statusLabel(profile?.subscription?.status ?? '')}
 					</span>
 				</div>
 				<div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
 					<div>
 						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.plan')}</p>
 						<p class="text-sm font-semibold text-slate-900 capitalize">
-							{profile.subscription.plan}
+							{profile?.subscription?.plan}
 						</p>
 					</div>
-					{#if profile.subscription.current_period_end}
+					{#if profile?.subscription?.current_period_end}
 						<div>
 							<p class="text-xs text-slate-400 mb-0.5">{$t('dash.next_billing')}</p>
 							<p class="text-sm font-semibold text-slate-900">
-								{formatDate(profile.subscription.current_period_end * 1000)}
+								{formatDate((profile?.subscription?.current_period_end ?? 0) * 1000)}
 							</p>
 						</div>
 					{/if}
 					<div>
 						<p class="text-xs text-slate-400 mb-0.5">{$t('dash.quota_servers')}</p>
 						<p class="text-sm font-semibold text-slate-900">
-							{stores.length} / {profile.subscription.max_edge_servers}
+							{stores.length} / {profile?.subscription?.max_edge_servers ?? 0}
 						</p>
 					</div>
 					<div>

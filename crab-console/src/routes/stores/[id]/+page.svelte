@@ -58,7 +58,7 @@
 </svelte:head>
 
 <ConsoleLayout>
-	<div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+	<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
 		<a href="/" class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
 			<ArrowLeft class="w-4 h-4" />
 			<span>{$t('store.back')}</span>
@@ -75,21 +75,31 @@
 			<div class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
 		{:else if store}
 			<!-- Store header -->
-			<div class="bg-white rounded-2xl border border-slate-200 p-6">
-				<div class="flex items-center gap-4">
-					<div class="w-12 h-12 bg-coral-100 rounded-xl flex items-center justify-center">
-						<Server class="w-6 h-6 text-coral-600" />
+			<div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-6">
+				<div class="flex flex-col md:flex-row md:items-center gap-4">
+					<div class="flex items-center gap-4">
+						<div class="w-12 h-12 bg-coral-100 rounded-xl flex items-center justify-center shrink-0">
+							<Server class="w-6 h-6 text-coral-600" />
+						</div>
+						<div class="md:hidden">
+							<h1 class="font-heading text-xl font-bold text-slate-900">
+								{store.store_info?.name ?? `Store #${store.id}`}
+							</h1>
+						</div>
 					</div>
-					<div>
-						<h1 class="font-heading text-xl font-bold text-slate-900">
+					
+					<div class="flex-1 min-w-0">
+						<h1 class="hidden md:block font-heading text-xl font-bold text-slate-900">
 							{store.store_info?.name ?? `Store #${store.id}`}
 						</h1>
-						<div class="flex items-center gap-4 text-xs text-slate-400 mt-1">
-							<span>{$t('store.device_id')}: {store.device_id.slice(0, 16)}...</span>
+						<div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 text-xs text-slate-400 mt-1">
+							<span class="truncate">{$t('store.device_id')}: {store.device_id.slice(0, 16)}...</span>
+							<span class="hidden md:inline text-slate-300">•</span>
 							<span class="inline-flex items-center gap-1">
 								<Clock class="w-3 h-3" />
 								{$t('dash.last_sync')}: {store.last_sync_at ? timeAgo(store.last_sync_at) : $t('dash.never')}
 							</span>
+							<span class="hidden md:inline text-slate-300">•</span>
 							<span>{$t('store.registered')}: {formatDate(store.registered_at)}</span>
 						</div>
 					</div>

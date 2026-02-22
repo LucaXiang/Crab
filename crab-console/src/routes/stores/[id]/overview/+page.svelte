@@ -89,12 +89,12 @@
 </svelte:head>
 
 <ConsoleLayout>
-	<div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+	<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
 		<div class="flex items-center gap-3">
 			<a href="/stores/{storeId}" class="text-slate-400 hover:text-slate-600">
 				<ArrowLeft class="w-5 h-5" />
 			</a>
-			<h1 class="font-heading text-xl font-bold text-slate-900">{$t('stats.overview')}</h1>
+			<h1 class="font-heading text-lg md:text-xl font-bold text-slate-900">{$t('stats.overview')}</h1>
 		</div>
 
 		{#if loading}
