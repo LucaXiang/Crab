@@ -106,6 +106,9 @@ redb = "3.0"
 # ========== Decimal Precision ==========
 rust_decimal = { version = "1.37", features = ["serde"] }
 
+# ========== Security ==========
+zeroize = "1"
+
 # ========== Utilities ==========
 dotenvy = "0.15"
 image = { version = "0.25", features = ["jpeg", "png", "webp"] }

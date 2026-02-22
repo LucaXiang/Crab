@@ -145,6 +145,19 @@ pub async fn password_reset_rate_limit(
     Ok(next.run(request).await)
 }
 
+/// Rate limit middleware for P12 upload: 3 requests/minute per IP
+pub async fn p12_upload_rate_limit(
+    State(state): State<crate::state::AppState>,
+    request: Request,
+    next: Next,
+) -> Result<Response, Response> {
+    let ip = extract_ip(&request);
+    if !state.rate_limiter.check("p12_upload", &ip, 3, 60).await {
+        return Err(too_many_requests());
+    }
+    Ok(next.run(request).await)
+}
+
 /// Global rate limit middleware: 30 requests/minute per IP
 pub async fn global_rate_limit(
     State(state): State<crate::state::AppState>,

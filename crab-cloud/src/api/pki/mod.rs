@@ -37,6 +37,11 @@ pub fn pki_router() -> Router<AppState> {
         .route("/api/binding/refresh", post(binding::refresh_binding))
         .route("/api/tenant/refresh", post(refresh::refresh_token))
         .route("/pki/root_ca", get(root_ca::get_root_ca))
+}
+
+/// P12 上传路由 (独立 rate limit: 3 req/min per IP)
+pub fn p12_upload_router() -> Router<AppState> {
+    Router::new()
         .route("/api/p12/upload", post(p12::upload_p12))
         .layer(DefaultBodyLimit::max(5 * 1024 * 1024)) // 5MB for P12
 }

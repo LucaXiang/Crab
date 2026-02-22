@@ -4,6 +4,7 @@ use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Multipart, State};
 use shared::error::ErrorCode;
+use zeroize::Zeroize;
 
 pub async fn upload_p12(
     State(state): State<AppState>,
@@ -29,7 +30,8 @@ pub async fn upload_p12(
         }
     }
 
-    let (Some(token), Some(p12_password), Some(p12_data)) = (token, p12_password, p12_data) else {
+    let (Some(token), Some(mut p12_password), Some(p12_data)) = (token, p12_password, p12_data)
+    else {
         return Json(serde_json::json!({
             "success": false,
             "error": "Missing required fields: token, p12_password, p12_file",
@@ -41,6 +43,7 @@ pub async fn upload_p12(
     let tenant_id = match tenant_auth::verify_token(&token, &state.jwt_secret) {
         Ok(claims) => claims.sub,
         Err(_) => {
+            p12_password.zeroize();
             return Json(serde_json::json!({
                 "success": false,
                 "error": "Invalid or expired token",
@@ -52,6 +55,7 @@ pub async fn upload_p12(
     let tenant = match tenants::find_by_id(&state.pool, &tenant_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
+            p12_password.zeroize();
             return Json(serde_json::json!({
                 "success": false,
                 "error": "Tenant not found",
@@ -59,6 +63,7 @@ pub async fn upload_p12(
             }));
         }
         Err(e) => {
+            p12_password.zeroize();
             tracing::error!(error = %e, "Database error finding tenant");
             return Json(serde_json::json!({
                 "success": false,
@@ -72,6 +77,7 @@ pub async fn upload_p12(
     let cert_info = match crab_cert::parse_p12(&p12_data, &p12_password) {
         Ok(info) => info,
         Err(e) => {
+            p12_password.zeroize();
             tracing::warn!(
                 tenant_id = %tenant.id,
                 error = %e,
@@ -79,7 +85,7 @@ pub async fn upload_p12(
             );
             return Json(serde_json::json!({
                 "success": false,
-                "error": format!("Invalid P12 file: {e}"),
+                "error": "Invalid P12 file or password",
                 "error_code": ErrorCode::ValidationFailed
             }));
         }
@@ -102,6 +108,7 @@ pub async fn upload_p12(
     {
         Ok(name) => name,
         Err(e) => {
+            p12_password.zeroize();
             tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to store P12 in Secrets Manager");
             return Json(serde_json::json!({
                 "success": false,
@@ -110,6 +117,9 @@ pub async fn upload_p12(
             }));
         }
     };
+
+    // 密码已存入 Secrets Manager，立即清零内存
+    p12_password.zeroize();
 
     // Save metadata to PostgreSQL (upsert — 重复上传覆盖)
     if let Err(e) = p12::upsert(&state.pool, &tenant.id, &secret_name, &cert_info).await {

@@ -266,12 +266,20 @@ mod tests {
 
     /// 用真实 FNMT 证书测试完整流程
     ///
-    /// 需要: /tmp/test_fnmt.p12 (从 Documents 复制)
-    /// 跳过条件: 文件不存在时自动 skip
+    /// 需要:
+    /// - /tmp/test_fnmt.p12 (从 Documents 复制)
+    /// - 环境变量 TEST_P12_PASSWORD
+    /// 跳过条件: 文件不存在或未设置密码时自动 skip
     #[test]
     fn test_parse_real_fnmt_p12() {
         let p12_path = "/tmp/test_fnmt.p12";
-        let password = "yuqingxiang";
+        let password = match std::env::var("TEST_P12_PASSWORD") {
+            Ok(p) => p,
+            Err(_) => {
+                eprintln!("SKIP: TEST_P12_PASSWORD not set");
+                return;
+            }
+        };
 
         let data = match std::fs::read(p12_path) {
             Ok(d) => d,
@@ -281,7 +289,7 @@ mod tests {
             }
         };
 
-        let info = parse_p12(&data, password).expect("parse_p12 should succeed");
+        let info = parse_p12(&data, &password).expect("parse_p12 should succeed");
 
         // 基础字段
         assert!(!info.fingerprint.is_empty());

@@ -65,6 +65,9 @@ aws-sdk-secretsmanager.workspace = true
 aws-sdk-s3.workspace = true
 aws-sdk-kms.workspace = true
 
+# Security
+zeroize.workspace = true
+
 # Utilities
 dotenvy.workspace = true
 dashmap.workspace = true

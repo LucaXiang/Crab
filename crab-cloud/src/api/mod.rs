@@ -16,7 +16,8 @@ pub mod ws;
 use crate::auth::edge_auth::edge_auth_middleware;
 use crate::auth::quota::quota_middleware;
 use crate::auth::rate_limit::{
-    global_rate_limit, login_rate_limit, password_reset_rate_limit, register_rate_limit,
+    global_rate_limit, login_rate_limit, p12_upload_rate_limit, password_reset_rate_limit,
+    register_rate_limit,
 };
 use crate::auth::tenant_auth::tenant_auth_middleware;
 use crate::state::AppState;
@@ -111,6 +112,15 @@ pub fn public_router(state: AppState) -> Router {
     // PKI routes (merged from crab-auth)
     let pki_routes = pki::pki_router();
 
+    // P12 upload (rate-limited: 3 req/min per IP)
+    let p12_upload =
+        Router::new()
+            .merge(pki::p12_upload_router())
+            .layer(middleware::from_fn_with_state(
+                state.clone(),
+                p12_upload_rate_limit,
+            ));
+
     // PKI auth routes (accept password → login rate limit: 5 req/min per IP)
     let pki_auth_routes = pki::pki_auth_router();
     let pki_auth_limited =
@@ -153,6 +163,7 @@ pub fn public_router(state: AppState) -> Router {
         .merge(tenant_login)
         .merge(password_reset)
         .merge(pki_routes)
+        .merge(p12_upload)
         .merge(pki_auth_limited)
         .layer(middleware::from_fn_with_state(
             state.clone(),
