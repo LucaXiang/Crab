@@ -11,10 +11,14 @@ env:
   SQLX_OFFLINE: true
 
 jobs:
-  # ============ Rust Quality Gates ============
+  # ============ Rust: Multi-Platform ============
   rust:
-    name: Rust (Windows)
-    runs-on: windows-latest
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +33,8 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Install NASM
+      - name: Install NASM (Windows only)
+        if: runner.os == 'Windows'
         uses: ilammy/setup-nasm@v1
 
       - name: Install cargo-nextest
@@ -44,7 +49,7 @@ jobs:
       - name: Test
         run: cargo nextest run --workspace --exclude crab-cloud --lib
 
-  # ============ Frontend Quality Gates ============
+  # ============ Frontend Type Check ============
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -66,42 +71,3 @@ jobs:
       - name: TypeScript type check
         working-directory: red_coral
         run: npx tsc --noEmit
-
-  # ============ Production Code Hygiene ============
-  hygiene:
-    name: Code Hygiene
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check for unwrap in production code
-        run: |
-          # Find .unwrap() in non-test Rust files (excluding target/, tests.rs, #[cfg(test)] blocks)
-          # This is advisory — tracked as metric, not blocking
-          echo "=== Production unwrap() usage ==="
-          count=$(grep -rn '\.unwrap()' --include='*.rs' \
-            --exclude-dir=target \
-            --exclude='*tests.rs' \
-            --exclude='*test*.rs' \
-            edge-server/src/ shared/src/ crab-client/src/ red_coral/src-tauri/src/ \
-            | grep -v '#\[cfg(test)\]' \
-            | grep -v '#\[test\]' \
-            | grep -v '// SAFETY:' \
-            | wc -l || true)
-          echo "Found $count unwrap() calls in production code (excluding SAFETY-annotated)"
-          echo "unwrap_count=$count" >> $GITHUB_OUTPUT
-
-      - name: Check for TODO/FIXME/HACK
-        run: |
-          echo "=== Technical debt markers ==="
-          grep -rn 'TODO\|FIXME\|HACK\|XXX' --include='*.rs' --include='*.ts' --include='*.tsx' \
-            --exclude-dir=target --exclude-dir=node_modules \
-            edge-server/src/ shared/src/ crab-client/src/ red_coral/src/ \
-            || echo "No technical debt markers found"
-
-  # ============ Deploy ============
-  # crab-cloud 部署通过本地手动执行:
-  #   ./deploy/build-cloud.sh push  (ARM64 镜像)
-  #   然后 SSH 到 EC2 拉取重启
-  # CI 的 ubuntu runner 是 x86_64，无法直接构建 ARM64 镜像
