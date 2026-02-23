@@ -61,7 +61,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     let isMounted = true;
     const loadImages = async () => {
       const newImages: Record<string, HTMLImageElement> = {};
-      const imageFields = template.fields.filter(f => f.type === 'image' || f.type === 'barcode' || f.type === 'qrcode');
+      const imageFields = template.fields.filter(f => f.field_type === 'image' || f.field_type === 'barcode' || f.field_type === 'qrcode');
 
       await Promise.all(imageFields.map(async (field) => {
         const source_type = (field.source_type || 'image').toLowerCase();
@@ -112,7 +112,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
               img.onload = resolve;
               img.onerror = reject;
             });
-            newImages[field.id] = img;
+            newImages[field.field_id] = img;
           }
         } catch (e) {
           // Silently skip failed images
@@ -161,7 +161,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   useEffect(() => {
     if (!selectedFieldId || !containerSize.width || !containerSize.height) return;
 
-    const field = template.fields.find(f => f.id === selectedFieldId);
+    const field = template.fields.find(f => f.field_id === selectedFieldId);
     if (!field) return;
 
     // Calculate screen bounds of the field
@@ -325,10 +325,10 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     // Draw fields
     template.fields.forEach((field) => {
-      const isSelected = field.id === selectedFieldId;
-      const isDragging = field.id === draggingField;
+      const isSelected = field.field_id === selectedFieldId;
+      const isDragging = field.field_id === draggingField;
 
-      if (field.type === 'separator') {
+      if (field.field_type === 'separator') {
         ctx.strokeStyle = isSelected ? '#ef4444' : '#000000';
         ctx.lineWidth = (isSelected ? 2 : 1) / viewState.scale;
         if (isDragging) ctx.setLineDash([5 / viewState.scale, 3 / viewState.scale]);
@@ -353,7 +353,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
       // Fill
       ctx.fillStyle = isSelected
-        ? (field.type === 'text' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(59, 130, 246, 0.05)')
+        ? (field.field_type === 'text' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(59, 130, 246, 0.05)')
         : 'transparent';
       ctx.fillRect(field.x, field.y, field.width, field.height);
 
@@ -363,7 +363,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       ctx.rect(field.x, field.y, field.width, field.height);
       ctx.clip();
 
-      if (field.type === 'text') {
+      if (field.field_type === 'text') {
         const font_size = field.font_size;
         const fontStyle = field.font_weight === 'bold' ? 'bold' : 'normal';
         const font_family = field.font_family || 'Arial';
@@ -418,8 +418,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         // Render lines
         lines.forEach((ln, i) => ctx.fillText(ln, x, y + i * lineHeight));
 
-      } else if (field.type === 'image' || field.type === 'barcode' || field.type === 'qrcode') {
-        const img = fieldImages[field.id];
+      } else if (field.field_type === 'image' || field.field_type === 'barcode' || field.field_type === 'qrcode') {
+        const img = fieldImages[field.field_id];
         if (img?.complete && img.naturalWidth > 0) {
           if (field.maintain_aspect_ratio) {
             const aspect = img.width / img.height;
@@ -451,8 +451,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     });
 
     // Draw resize handles for selected field (on top of everything)
-    const selectedField = template.fields.find(f => f.id === selectedFieldId);
-    if (selectedField && !draggingField && selectedField.type !== 'separator') {
+    const selectedField = template.fields.find(f => f.field_id === selectedFieldId);
+    if (selectedField && !draggingField && selectedField.field_type !== 'separator') {
       const handleSize = 6 / viewState.scale;
       ctx.fillStyle = '#ef4444';
       const handles = [
@@ -533,7 +533,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   const getFieldAtPosition = useCallback((x: number, y: number): LabelField | null => {
     for (let i = template.fields.length - 1; i >= 0; i--) {
       const field = template.fields[i];
-      if (field.type === 'separator') {
+      if (field.field_type === 'separator') {
         // Separator is drawn relative to padding too
         if (x >= 8 && x <= (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE - 8 && Math.abs(y - field.y) <= 5) return field;
         continue;
@@ -549,7 +549,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   const getResizeHandle = useCallback((
     field: LabelField, x: number, y: number
   ): 'se' | 'sw' | 'ne' | 'nw' | null => {
-    if (field.type === 'separator') return null;
+    if (field.field_type === 'separator') return null;
     const threshold = 10 / viewState.scale;
     const adjX = x;
     const adjY = y;
@@ -593,12 +593,12 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     const adjY = worldPos.y;
 
     if (handle) {
-      setResizingField(field.id);
+      setResizingField(field.field_id);
       setResizeHandle(handle);
     } else {
-      setDraggingField(field.id);
+      setDraggingField(field.field_id);
       setDragOffset({
-        x: adjX - (field.type === 'separator' ? 0 : field.x),
+        x: adjX - (field.field_type === 'separator' ? 0 : field.x),
         y: adjY - field.y,
       });
     }
@@ -621,7 +621,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     if (resizingField && resizeHandle) {
       const updatedFields = template.fields.map((field) => {
-        if (field.id !== resizingField || field.type === 'separator') return field;
+        if (field.field_id !== resizingField || field.field_type === 'separator') return field;
 
         let newX = field.x, newY = field.y, newWidth = field.width, newHeight = field.height;
 
@@ -654,9 +654,9 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       onTemplateChange({ ...template, fields: updatedFields });
     } else if (draggingField) {
       const updatedFields = template.fields.map((field) => {
-        if (field.id !== draggingField) return field;
+        if (field.field_id !== draggingField) return field;
         const newY = adjY - dragOffset.y;
-        if (field.type === 'separator') return { ...field, y: newY };
+        if (field.field_type === 'separator') return { ...field, y: newY };
         const newX = adjX - dragOffset.x;
         return { ...field, x: newX, y: newY };
       });
@@ -674,7 +674,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
           const cursors = { se: 'nwse-resize', sw: 'nesw-resize', ne: 'nesw-resize', nw: 'nwse-resize' };
           canvas.style.cursor = cursors[handle];
         } else {
-          canvas.style.cursor = field.type === 'separator' ? 'ns-resize' : 'move';
+          canvas.style.cursor = field.field_type === 'separator' ? 'ns-resize' : 'move';
         }
       } else {
         canvas.style.cursor = 'grab';
@@ -738,7 +738,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         case 'Delete':
         case 'Backspace':
           e.preventDefault();
-          onTemplateChange({ ...template, fields: template.fields.filter(f => f.id !== selectedFieldId) });
+          onTemplateChange({ ...template, fields: template.fields.filter(f => f.field_id !== selectedFieldId) });
           onFieldSelect(null);
           return;
         default: return;
@@ -746,8 +746,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
       e.preventDefault();
       const updatedFields = template.fields.map((field) => {
-        if (field.id !== selectedFieldId) return field;
-        if (field.type === 'separator') return { ...field, y: field.y + dy };
+        if (field.field_id !== selectedFieldId) return field;
+        if (field.field_type === 'separator') return { ...field, y: field.y + dy };
         return { ...field, x: field.x + dx, y: field.y + dy };
       });
       onTemplateChange({ ...template, fields: updatedFields });

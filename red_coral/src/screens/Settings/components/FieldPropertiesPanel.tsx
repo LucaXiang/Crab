@@ -42,9 +42,9 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
     );
   }
 
-  const isTextField = field.type === 'text';
-  const isImageField = field.type === 'image' || field.type === 'barcode' || field.type === 'qrcode';
-  const isSeparatorField = field.type === 'separator';
+  const isTextField = field.field_type === 'text';
+  const isImageField = field.field_type === 'image' || field.field_type === 'barcode' || field.field_type === 'qrcode';
+  const isSeparatorField = field.field_type === 'separator';
 
   const handleUpdate = (updates: Partial<LabelField>) => {
     onFieldUpdate({ ...field, ...updates } as LabelField);

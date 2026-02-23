@@ -41,7 +41,7 @@ const SortableLayerItem = ({
     transform,
     transition,
     isDragging
-  } = useSortable({ id: field.id });
+  } = useSortable({ id: field.field_id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -136,8 +136,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
       // Create a reversed copy of fields (because the list is displayed in reverse)
       const reversedFields = [...template.fields].reverse();
       
-      const oldIndex = reversedFields.findIndex((f) => f.id === active.id);
-      const newIndex = reversedFields.findIndex((f) => f.id === over?.id);
+      const oldIndex = reversedFields.findIndex((f) => f.field_id === active.id);
+      const newIndex = reversedFields.findIndex((f) => f.field_id === over?.id);
       
       const newReversedFields = arrayMove(reversedFields, oldIndex, newIndex);
       
@@ -149,7 +149,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     }
   };
 
-  const selectedField = template.fields.find(f => f.id === selectedFieldId) || null;
+  const selectedField = template.fields.find(f => f.field_id === selectedFieldId) || null;
 
   const handleTemplateChange = (updatedTemplate: LabelTemplate) => {
     setTemplate(updatedTemplate);
@@ -158,7 +158,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
   const handleFieldUpdate = (updatedField: LabelField) => {
     const updatedFields = template.fields.map(f => 
-      f.id === updatedField.id ? updatedField : f
+      f.field_id === updatedField.field_id ? updatedField : f
     );
     handleTemplateChange({ ...template, fields: updatedFields });
   };
@@ -170,8 +170,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
     if (type === 'text') {
       newField = {
-        id: generateId(),
-        type: 'text',
+        field_id: generateId(),
+        field_type: 'text',
         name: t("settings.label.field.new_text"),
         x: 10, y: 10, width: 100, height: 20,
         font_size: 12, font_weight: 'normal', alignment: 'left',
@@ -181,8 +181,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
       };
     } else if (type === 'image') {
       newField = {
-        id: generateId(),
-        type: 'image',
+        field_id: generateId(),
+        field_type: 'image',
         name: t("settings.label.field.new_image"),
         x: 10, y: 10, width: 80, height: 80,
         font_size: 12,
@@ -193,8 +193,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
       };
     } else {
        newField = {
-         id: generateId(),
-         type: 'separator',
+         field_id: generateId(),
+         field_type: 'separator',
          name: t("settings.label.field.default_separator"),
          x: 8, y: 50, width: 100, height: 2,
          font_size: 12,
@@ -204,13 +204,13 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     }
 
     handleTemplateChange({ ...template, fields: [...template.fields, newField] });
-    setSelectedFieldId(newField.id);
+    setSelectedFieldId(newField.field_id);
   };
 
   const handleDeleteField = (fieldId: string) => {
     handleTemplateChange({
       ...template,
-      fields: template.fields.filter(f => f.id !== fieldId)
+      fields: template.fields.filter(f => f.field_id !== fieldId)
     });
     if (selectedFieldId === fieldId) {
       setSelectedFieldId(null);
@@ -234,12 +234,12 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           const hash = await invoke<string>('save_image', { sourcePath: field._pending_image_path });
           // Update the field with the hash and clear pending path
           updatedFields = updatedFields.map(f =>
-            f.id === field.id
+            f.field_id === field.field_id
               ? { ...f, template: hash, _pending_image_path: undefined }
               : f
           );
         } catch (e) {
-          logger.error('Failed to upload image for field', e, { component: 'LabelEditor', fieldId: field.id });
+          logger.error('Failed to upload image for field', e, { component: 'LabelEditor', fieldId: field.field_id });
           // Continue with other fields even if one fails
         }
       }
@@ -277,7 +277,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         }
 
         // Generate/Load Base64 images for all Image fields
-        const imageFields = template.fields.filter(f => f.type === 'image' || f.type === 'barcode' || f.type === 'qrcode');
+        const imageFields = template.fields.filter(f => f.field_type === 'image' || f.field_type === 'barcode' || f.field_type === 'qrcode');
         for (const field of imageFields) {
           const source_type = (field.source_type || 'image').toLowerCase();
 
@@ -314,7 +314,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                 test_data[field.data_key || field.name] = dataUri;
               }
             } catch (genError) {
-              logger.warn(`Failed to generate ${source_type} for field`, { component: 'LabelEditor', fieldId: field.id, detail: String(genError) });
+              logger.warn(`Failed to generate ${source_type} for field`, { component: 'LabelEditor', fieldId: field.field_id, detail: String(genError) });
             }
           } else if (source_type === 'image' || source_type === 'productimage') {
             // Load regular image and convert to Base64
@@ -354,7 +354,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                 test_data[field.data_key || field.name] = dataUri;
               }
             } catch (loadError) {
-              logger.warn('Failed to load image for field', { component: 'LabelEditor', fieldId: field.id, path: resolvedPath, detail: String(loadError) });
+              logger.warn('Failed to load image for field', { component: 'LabelEditor', fieldId: field.field_id, path: resolvedPath, detail: String(loadError) });
               // Continue without this image
             }
           }
@@ -389,7 +389,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   };
   
   const renderLayerIcon = (field: LabelField) => {
-      switch (field.type) {
+      switch (field.field_type) {
           case 'text': return <Type size={14} />;
           case 'image': return <ImageIcon size={14} />;
           case 'separator': return <Minus size={14} />;
@@ -398,7 +398,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   };
 
   const renderLayerInfo = (field: LabelField) => {
-      switch (field.type) {
+      switch (field.field_type) {
           case 'text': return field.template || field.name;
           case 'image': return field.data_key || field.name;
           case 'barcode': return field.data_key || field.name;
@@ -492,7 +492,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             <LabelTemplateEditor
               template={template}
               onTemplateChange={handleTemplateChange}
-              onFieldSelect={(field) => setSelectedFieldId(field?.id || null)}
+              onFieldSelect={(field) => setSelectedFieldId(field?.field_id || null)}
               selectedFieldId={selectedFieldId}
               visibleAreaInsets={{
                 left: showLayers ? 256 : 0,
@@ -546,16 +546,16 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={template.fields.slice().reverse().map(f => f.id)}
+                items={template.fields.slice().reverse().map(f => f.field_id)}
                 strategy={verticalListSortingStrategy}
               >
                 {template.fields.slice().reverse().map((field) => (
                   <SortableLayerItem
-                    key={field.id}
+                    key={field.field_id}
                     field={field}
-                    isSelected={selectedFieldId === field.id}
-                    onSelect={() => setSelectedFieldId(field.id)}
-                    onDelete={() => handleDeleteField(field.id)}
+                    isSelected={selectedFieldId === field.field_id}
+                    onSelect={() => setSelectedFieldId(field.field_id)}
+                    onDelete={() => handleDeleteField(field.field_id)}
                     renderIcon={renderLayerIcon}
                     renderInfo={renderLayerInfo}
                   />

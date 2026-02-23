@@ -35,7 +35,9 @@ pub enum LabelFieldAlignment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct LabelField {
+    #[serde(default)]
     pub id: i64,
+    #[serde(default)]
     pub template_id: i64,
     /// Client-generated UUID
     pub field_id: String,
@@ -113,7 +115,6 @@ pub struct LabelFieldInput {
     /// Client-generated UUID
     pub field_id: String,
     pub name: String,
-    #[serde(rename = "type")]
     pub field_type: LabelFieldType,
     pub x: f32,
     pub y: f32,

@@ -1,51 +1,41 @@
 /**
  * Label Template Store - Fetches and manages label templates from server API
  *
- * 类型统一使用 snake_case，与 Rust 后端 serde 一致，无需映射层
+ * 前端 LabelField 直接使用 field_id/field_type，与 Rust 后端 serde 完全对齐，无映射层
  */
 
 import { create } from 'zustand';
 import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
-import type { LabelTemplate, LabelField } from '@/core/domain/types/print';
+import type { LabelTemplate } from '@/core/domain/types/print';
 import type { LabelTemplateCreate, LabelTemplateUpdate } from '@/core/domain/types/api';
 import { DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 
 // Lazy-load API client to avoid initialization issues
 const getApi = () => createTauriClient();
 
-// 后端 LabelField → 前端 LabelField (field_id→id, field_type→type)
-function mapApiField(raw: Record<string, unknown>): LabelField {
-  const { field_id, field_type, id: _dbId, template_id: _tid, ...rest } = raw;
+/** 补全 API 响应中可能缺失的默认值 */
+function normalizeTemplate(t: LabelTemplate): LabelTemplate {
   return {
-    ...rest,
-    id: (field_id as string) || String(_dbId ?? ''),
-    type: (field_type as LabelField['type']) || (rest.type as LabelField['type']) || 'text',
-  } as LabelField;
-}
-
-function mapApiToFrontend(apiTemplate: LabelTemplate): LabelTemplate {
-  const rawFields = (apiTemplate.fields || []) as unknown as Record<string, unknown>[];
-  return {
-    ...apiTemplate,
-    padding: apiTemplate.padding || 2,
-    fields: rawFields.map(mapApiField),
-    is_default: apiTemplate.is_default || false,
-    is_active: apiTemplate.is_active ?? true,
-    created_at: apiTemplate.created_at || Date.now(),
-    updated_at: apiTemplate.updated_at || Date.now(),
-    width_mm: apiTemplate.width_mm ?? apiTemplate.width,
-    height_mm: apiTemplate.height_mm ?? apiTemplate.height,
+    ...t,
+    padding: t.padding || 2,
+    fields: (t.fields || []).map(f => ({
+      ...f,
+      // 后端 LabelField 有 id/template_id (DB 行号)，前端不关心，但不需要剥离
+      field_type: f.field_type || 'text',
+    })),
+    is_default: t.is_default || false,
+    is_active: t.is_active ?? true,
+    created_at: t.created_at || Date.now(),
+    updated_at: t.updated_at || Date.now(),
+    width_mm: t.width_mm ?? t.width,
+    height_mm: t.height_mm ?? t.height,
   };
 }
 
-// 前端 LabelField.id → 后端 LabelFieldInput.field_id
-function mapFieldsForApi(fields: LabelField[]) {
-  return fields.map(({ id, type, _pending_image_path, ...rest }) => ({
-    ...rest,
-    field_id: id,
-    type,
-  }));
+/** 从 LabelField[] 中剥离 _pending_image_path (编辑器临时字段，不入库) */
+function stripEditorFields(fields: LabelTemplate['fields']) {
+  return fields.map(({ _pending_image_path, ...rest }) => rest);
 }
 
 // 构造 Create payload
@@ -55,7 +45,7 @@ function toCreatePayload(template: Partial<LabelTemplate>): LabelTemplateCreate 
     description: template.description,
     width: template.width_mm || template.width || 40,
     height: template.height_mm || template.height || 30,
-    fields: mapFieldsForApi(template.fields || []),
+    fields: stripEditorFields(template.fields || []),
     is_default: template.is_default || false,
     is_active: template.is_active ?? true,
     padding_mm_x: template.padding_mm_x,
@@ -70,13 +60,14 @@ function toUpdatePayload(template: Partial<LabelTemplate>): LabelTemplateUpdate 
   const update: LabelTemplateUpdate = {};
   if (template.name !== undefined) update.name = template.name;
   if (template.description !== undefined) update.description = template.description;
-  if (template.width !== undefined) update.width = template.width;
-  if (template.height !== undefined) update.height = template.height;
-  if (template.fields !== undefined) update.fields = mapFieldsForApi(template.fields);
+  if (template.fields !== undefined) update.fields = stripEditorFields(template.fields);
   if (template.is_default !== undefined) update.is_default = template.is_default;
   if (template.is_active !== undefined) update.is_active = template.is_active;
+  // width_mm 是前端编辑器使用的字段名，对应后端 width
   if (template.width_mm !== undefined) update.width = template.width_mm;
+  else if (template.width !== undefined) update.width = template.width;
   if (template.height_mm !== undefined) update.height = template.height_mm;
+  else if (template.height !== undefined) update.height = template.height;
   if (template.padding_mm_x !== undefined) update.padding_mm_x = template.padding_mm_x;
   if (template.padding_mm_y !== undefined) update.padding_mm_y = template.padding_mm_y;
   if (template.render_dpi !== undefined) update.render_dpi = template.render_dpi;
@@ -130,7 +121,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const rawTemplates = await getApi().listLabelTemplates();
-      const templates = rawTemplates.map((t) => mapApiToFrontend(t));
+      const templates = rawTemplates.map(normalizeTemplate);
       set({ templates, isLoading: false, isLoaded: true });
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch label templates';
@@ -144,7 +135,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     try {
       const createData = toCreatePayload(templateData);
       const rawCreated = await getApi().createLabelTemplate(createData);
-      const created = mapApiToFrontend(rawCreated);
+      const created = normalizeTemplate(rawCreated);
       // 去重：sync 事件可能先于 API 响应到达，已经添加过
       set((state) => {
         const exists = state.templates.some((t) => t.id === created.id);
@@ -169,7 +160,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     try {
       const updateData = toUpdatePayload(templateData);
       const rawUpdated = await getApi().updateLabelTemplate(id, updateData);
-      const updated = mapApiToFrontend(rawUpdated);
+      const updated = normalizeTemplate(rawUpdated);
       set((state) => ({
         templates: state.templates.map((t) => (t.id === id || t.id === updated.id ? updated : t)),
         isLoading: false,
@@ -230,7 +221,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     switch (action) {
       case 'created':
         if (data) {
-          const template = mapApiToFrontend(data as LabelTemplate);
+          const template = normalizeTemplate(data as LabelTemplate);
           const exists = state.templates.some((t) => t.id === actualId || t.id === template.id);
           if (exists) {
             set((s) => ({
@@ -247,7 +238,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
         break;
       case 'updated':
         if (data) {
-          const template = mapApiToFrontend(data as LabelTemplate);
+          const template = normalizeTemplate(data as LabelTemplate);
           set((s) => ({
             templates: s.templates.map((t) => (t.id === actualId || t.id === template.id ? template : t)),
             lastVersion: version,

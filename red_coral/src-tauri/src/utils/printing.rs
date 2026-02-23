@@ -92,9 +92,13 @@ mod platform {
     }
 
     pub fn print_label(request: LabelPrintRequest) -> Result<(), String> {
-        let template: Option<LabelTemplate> = request
+        // Deserialize as shared::models::LabelTemplate (matches frontend field names exactly)
+        let shared_template: Option<shared::models::LabelTemplate> = request
             .template
             .and_then(|v| serde_json::from_value(v).ok());
+
+        // Convert shared → crab_printer types (same logic as edge-server executor)
+        let printer_template = shared_template.as_ref().map(convert_label_template);
 
         let options = PrintOptions {
             printer_name: request.printer_name,
@@ -109,15 +113,86 @@ mod platform {
 
         info!(?options, "printing label");
         tracing::debug!(
-            has_template = template.is_some(),
+            has_shared_template = shared_template.is_some(),
+            has_printer_template = printer_template.is_some(),
             "print_label: calling render_and_print_label"
         );
         crate::utils::label_printer::render_and_print_label(
             &request.data,
-            template.as_ref(),
+            printer_template.as_ref(),
             &options,
         )
         .map_err(|e| format!("{}", e))
+    }
+
+    /// Convert shared::models::LabelTemplate → crab_printer::label::LabelTemplate
+    fn convert_label_template(t: &shared::models::LabelTemplate) -> LabelTemplate {
+        use shared::models::{LabelFieldAlignment, LabelFieldType};
+
+        let fields = t
+            .fields
+            .iter()
+            .filter(|f| f.visible)
+            .filter_map(|f| match f.field_type {
+                LabelFieldType::Text
+                | LabelFieldType::Datetime
+                | LabelFieldType::Price
+                | LabelFieldType::Counter => Some(crab_printer::label::TemplateField::Text(
+                    crab_printer::label::TextField {
+                        x: f.x,
+                        y: f.y,
+                        width: f.width,
+                        height: f.height,
+                        font_size: f.font_size as f32,
+                        font_family: f.font_family.clone(),
+                        style: if f.font_weight.as_deref() == Some("bold") {
+                            crab_printer::label::TextStyle::Bold
+                        } else {
+                            crab_printer::label::TextStyle::Regular
+                        },
+                        align: match f.alignment {
+                            Some(LabelFieldAlignment::Center) => {
+                                crab_printer::label::TextAlign::Center
+                            }
+                            Some(LabelFieldAlignment::Right) => {
+                                crab_printer::label::TextAlign::Right
+                            }
+                            _ => crab_printer::label::TextAlign::Left,
+                        },
+                        template: f
+                            .template
+                            .clone()
+                            .or_else(|| f.data_key.as_ref().map(|k| format!("{{{}}}", k)))
+                            .unwrap_or_default(),
+                    },
+                )),
+                LabelFieldType::Image | LabelFieldType::Barcode | LabelFieldType::Qrcode => Some(
+                    crab_printer::label::TemplateField::Image(crab_printer::label::ImageField {
+                        x: f.x,
+                        y: f.y,
+                        width: f.width,
+                        height: f.height,
+                        maintain_aspect_ratio: f.maintain_aspect_ratio.unwrap_or(true),
+                        data_key: f.data_key.clone().unwrap_or_else(|| f.name.clone()),
+                    }),
+                ),
+                LabelFieldType::Separator => Some(crab_printer::label::TemplateField::Separator(
+                    crab_printer::label::SeparatorField {
+                        y: f.y,
+                        x_start: Some(f.x),
+                        x_end: Some(f.x + f.width),
+                    },
+                )),
+            })
+            .collect();
+
+        LabelTemplate {
+            width_mm: t.width_mm.unwrap_or(t.width),
+            height_mm: t.height_mm.unwrap_or(t.height),
+            padding_mm_x: t.padding_mm_x.unwrap_or(0.0),
+            padding_mm_y: t.padding_mm_y.unwrap_or(0.0),
+            fields,
+        }
     }
 }
 

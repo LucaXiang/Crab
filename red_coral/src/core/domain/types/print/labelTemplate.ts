@@ -20,9 +20,9 @@ export type LabelFieldType =
  * Label template field
  */
 export interface LabelField {
-  id: string;
+  field_id: string;
   name: string;
-  type: LabelFieldType;
+  field_type: LabelFieldType;
   x: number;  // X position in mm
   y: number;  // Y position in mm
   width: number;
@@ -129,9 +129,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     updated_at: Date.now(),
     fields: [
       {
-        id: 'name',
+        field_id: 'name',
         name: '商品名称',
-        type: 'text',
+        field_type: 'text',
         x: 1,
         y: 2,
         width: 28,
@@ -142,9 +142,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'price',
+        field_id: 'price',
         name: '价格',
-        type: 'price',
+        field_type: 'price',
         x: 1,
         y: 8,
         width: 28,
@@ -156,9 +156,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'barcode',
+        field_id: 'barcode',
         name: '条码',
-        type: 'barcode',
+        field_type: 'barcode',
         x: 1,
         y: 14,
         width: 28,
@@ -185,9 +185,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     updated_at: Date.now(),
     fields: [
       {
-        id: 'name',
+        field_id: 'name',
         name: '商品名称',
-        type: 'text',
+        field_type: 'text',
         x: 2,
         y: 2,
         width: 36,
@@ -198,9 +198,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'spec',
+        field_id: 'spec',
         name: '规格',
-        type: 'text',
+        field_type: 'text',
         x: 2,
         y: 10,
         width: 20,
@@ -210,9 +210,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'price',
+        field_id: 'price',
         name: '价格',
-        type: 'price',
+        field_type: 'price',
         x: 24,
         y: 10,
         width: 14,
@@ -225,9 +225,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'barcode',
+        field_id: 'barcode',
         name: '条码',
-        type: 'barcode',
+        field_type: 'barcode',
         x: 2,
         y: 16,
         width: 36,
@@ -238,9 +238,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'datetime',
+        field_id: 'datetime',
         name: '打印时间',
-        type: 'datetime',
+        field_type: 'datetime',
         x: 2,
         y: 28,
         width: 36,
@@ -268,9 +268,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     updated_at: Date.now(),
     fields: [
       {
-        id: 'orderNum',
+        field_id: 'orderNum',
         name: '订单号',
-        type: 'text',
+        field_type: 'text',
         x: 3,
         y: 3,
         width: 44,
@@ -282,9 +282,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'table',
+        field_id: 'table',
         name: '桌号',
-        type: 'text',
+        field_type: 'text',
         x: 3,
         y: 14,
         width: 22,
@@ -295,9 +295,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'quantity',
+        field_id: 'quantity',
         name: '数量',
-        type: 'text',
+        field_type: 'text',
         x: 28,
         y: 14,
         width: 19,
@@ -309,9 +309,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'itemName',
+        field_id: 'itemName',
         name: '菜品名称',
-        type: 'text',
+        field_type: 'text',
         x: 3,
         y: 23,
         width: 44,
@@ -323,9 +323,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         visible: true,
       },
       {
-        id: 'options',
+        field_id: 'options',
         name: '加料',
-        type: 'text',
+        field_type: 'text',
         x: 3,
         y: 35,
         width: 44,
@@ -349,9 +349,9 @@ export const LabelFieldHelpers = {
    */
   createField(overrides: Partial<LabelField> = {}): LabelField {
     return {
-      id: crypto.randomUUID(),
+      field_id: crypto.randomUUID(),
       name: '',
-      type: 'text',
+      field_type: 'text',
       x: 0,
       y: 0,
       width: 20,
@@ -377,7 +377,7 @@ export const LabelFieldHelpers = {
       return [
         this.createField({
           name: '商品名称',
-          type: 'text',
+          field_type: 'text',
           x: 1,
           y: 2,
           width: 28,
@@ -388,7 +388,7 @@ export const LabelFieldHelpers = {
         }),
         this.createField({
           name: '价格',
-          type: 'price',
+          field_type: 'price',
           x: 1,
           y: 10,
           width: 28,
@@ -402,7 +402,7 @@ export const LabelFieldHelpers = {
     return [
       this.createField({
         name: '商品名称',
-        type: 'text',
+        field_type: 'text',
         x: 2,
         y: 2,
         width: width - 4,
@@ -414,7 +414,7 @@ export const LabelFieldHelpers = {
       }),
       this.createField({
         name: '价格',
-        type: 'price',
+        field_type: 'price',
         x: 2,
         y: 14,
         width: width - 4,
