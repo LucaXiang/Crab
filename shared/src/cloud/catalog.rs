@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
-    attribute::{AttributeCreate, AttributeUpdate},
+    attribute::{Attribute, AttributeCreate, AttributeUpdate},
     category::{Category, CategoryCreate, CategoryUpdate},
     dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate},
     employee::{Employee, EmployeeCreate, EmployeeUpdate},
@@ -252,6 +252,7 @@ pub enum CatalogOpData {
     Product(ProductFull),
     Category(Category),
     Tag(Tag),
+    Attribute(Attribute),
     PriceRule(PriceRule),
     Employee(Employee),
     Zone(Zone),

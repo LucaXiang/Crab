@@ -145,7 +145,7 @@ pub async fn delete_product(
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    catalog::delete_product(&state.pool, store_id, product_id)
+    catalog::delete_product_direct(&state.pool, store_id, product_id)
         .await
         .map_err(internal)?;
     catalog::increment_catalog_version(&state.pool, store_id)
@@ -227,7 +227,7 @@ pub async fn delete_category(
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    catalog::delete_category(&state.pool, store_id, category_id)
+    catalog::delete_category_direct(&state.pool, store_id, category_id)
         .await
         .map_err(internal)?;
     catalog::increment_catalog_version(&state.pool, store_id)
@@ -325,7 +325,7 @@ pub async fn create_attribute(
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    let (source_id,) = catalog::create_attribute_direct(&state.pool, store_id, &data)
+    let (source_id, op_data) = catalog::create_attribute_direct(&state.pool, store_id, &data)
         .await
         .map_err(internal)?;
     catalog::increment_catalog_version(&state.pool, store_id)
@@ -341,7 +341,7 @@ pub async fn create_attribute(
         },
     );
 
-    Ok(Json(CatalogOpResult::created(source_id)))
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/attributes/:aid
