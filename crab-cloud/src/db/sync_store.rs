@@ -201,6 +201,18 @@ pub async fn upsert_resource(
             )
             .await
         }
+        "zone" => upsert_generic(pool, "cloud_zones", edge_server_id, tenant_id, item, now).await,
+        "dining_table" => {
+            upsert_generic(
+                pool,
+                "cloud_dining_tables",
+                edge_server_id,
+                tenant_id,
+                item,
+                now,
+            )
+            .await
+        }
         other => Err(format!("Unknown resource type: {other}").into()),
     }
 }
@@ -473,6 +485,12 @@ async fn delete_resource(
         ),
         "price_rule" => sqlx::query(
             "DELETE FROM catalog_price_rules WHERE edge_server_id = $1 AND source_id = $2",
+        ),
+        "zone" => {
+            sqlx::query("DELETE FROM cloud_zones WHERE edge_server_id = $1 AND source_id = $2")
+        }
+        "dining_table" => sqlx::query(
+            "DELETE FROM cloud_dining_tables WHERE edge_server_id = $1 AND source_id = $2",
         ),
         other => return Err(format!("Cannot delete resource type: {other}").into()),
     };

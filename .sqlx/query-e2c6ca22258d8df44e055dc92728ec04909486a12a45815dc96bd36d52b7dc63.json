@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) FROM product WHERE category_id = ?",
+  "query": "SELECT COUNT(*) FROM product WHERE category_id = ? AND is_active = 1",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "269cf6f512caa05bd4d83a9af5d369d874e9b6e573af049e99a880c7bf8a3e5c"
+  "hash": "e2c6ca22258d8df44e055dc92728ec04909486a12a45815dc96bd36d52b7dc63"
 }

@@ -18,7 +18,7 @@ use shared::cloud::ws::{CloudMessage, CloudRpc, CloudRpcResult};
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::tenant_auth::TenantIdentity;
-use crate::db::{catalog, tenant_queries};
+use crate::db::catalog;
 use crate::state::AppState;
 
 type ApiResult<T> = Result<Json<T>, AppError>;
@@ -334,6 +334,19 @@ pub async fn delete_price_rule(
 
 // ── Employee endpoints ──
 
+/// GET /api/tenant/stores/:id/catalog/employees
+pub async fn list_employees(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<Vec<shared::models::employee::Employee>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+    let employees = catalog::list_employees(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    Ok(Json(employees))
+}
+
 /// POST /api/tenant/stores/:id/catalog/employees
 pub async fn create_employee(
     State(state): State<AppState>,
@@ -381,6 +394,19 @@ pub async fn delete_employee(
 
 // ── Zone endpoints ──
 
+/// GET /api/tenant/stores/:id/catalog/zones
+pub async fn list_zones(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<Vec<shared::models::zone::Zone>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+    let zones = catalog::list_zones(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    Ok(Json(zones))
+}
+
 /// POST /api/tenant/stores/:id/catalog/zones
 pub async fn create_zone(
     State(state): State<AppState>,
@@ -419,6 +445,19 @@ pub async fn delete_zone(
 }
 
 // ── DiningTable endpoints ──
+
+/// GET /api/tenant/stores/:id/catalog/tables
+pub async fn list_tables(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<Vec<shared::models::dining_table::DiningTable>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+    let tables = catalog::list_tables(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    Ok(Json(tables))
+}
 
 /// POST /api/tenant/stores/:id/catalog/tables
 pub async fn create_table(
@@ -485,68 +524,21 @@ async fn send_catalog_rpc(
     store_id: i64,
     op: CatalogOp,
 ) -> ApiResult<CatalogOpResult> {
-    let sender = state
-        .connected_edges
-        .get(&store_id)
-        .map(|s| s.clone())
-        .ok_or_else(|| AppError::with_message(ErrorCode::NotFound, "Edge server is offline"))?;
+    let rpc = CloudRpc::CatalogOp(Box::new(op));
+    let result = crate::services::rpc::call_edge_rpc(&state.edges, store_id, rpc).await?;
 
-    let rpc_id = uuid::Uuid::new_v4().to_string();
-    let now = shared::util::now_millis();
-
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    state.pending_rpcs.insert(rpc_id.clone(), (now, tx));
-
-    let msg = CloudMessage::Rpc {
-        id: rpc_id.clone(),
-        payload: Box::new(CloudRpc::CatalogOp(Box::new(op))),
-    };
-
-    if sender.try_send(msg).is_err() {
-        state.pending_rpcs.remove(&rpc_id);
-        return Err(AppError::with_message(
-            ErrorCode::NotFound,
-            "Edge server message queue full",
-        ));
-    }
-
-    match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
-        Ok(Ok(CloudRpcResult::CatalogOp(result))) => Ok(Json(*result)),
-        Ok(Ok(CloudRpcResult::Json { error, .. })) => Err(AppError::with_message(
+    match result {
+        CloudRpcResult::CatalogOp(r) => Ok(Json(*r)),
+        CloudRpcResult::Json { error, .. } => Err(AppError::with_message(
             ErrorCode::InternalError,
             error.unwrap_or_else(|| "Unexpected RPC result type".to_string()),
         )),
-        Ok(Err(_)) => {
-            state.pending_rpcs.remove(&rpc_id);
-            Err(AppError::with_message(
-                ErrorCode::NotFound,
-                "Edge server disconnected during RPC",
-            ))
-        }
-        Err(_) => {
-            state.pending_rpcs.remove(&rpc_id);
-            Err(AppError::with_message(
-                ErrorCode::NotFound,
-                "Catalog RPC timed out (edge may be busy)",
-            ))
-        }
     }
 }
 
 // ── Helpers ──
 
-async fn verify_store(state: &AppState, store_id: i64, tenant_id: &str) -> Result<(), AppError> {
-    tenant_queries::verify_store_ownership(&state.pool, store_id, tenant_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Store verification error: {e}");
-            AppError::new(ErrorCode::InternalError)
-        })?
-        .ok_or_else(|| {
-            AppError::with_message(ErrorCode::NotFound, "Store not found or access denied")
-        })?;
-    Ok(())
-}
+use super::tenant::verify_store;
 
 fn internal(e: impl std::fmt::Display) -> AppError {
     tracing::error!("Catalog query error: {e}");
@@ -575,7 +567,7 @@ async fn fire_ensure_image(
         }
     };
 
-    let sender = match state.connected_edges.get(&store_id) {
+    let sender = match state.edges.connected.get(&store_id) {
         Some(s) => s.clone(),
         None => return, // edge offline, image will be downloaded on next connect
     };

@@ -82,7 +82,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     let (msg_tx, mut msg_rx) = mpsc::channel::<CloudMessage>(32);
 
     // Register in connected_edges
-    state.connected_edges.insert(edge_server_id, msg_tx.clone());
+    state.edges.connected.insert(edge_server_id, msg_tx.clone());
 
     // Send Welcome with sync cursors
     match sync_store::get_cursors(&state.pool, edge_server_id).await {
@@ -92,7 +92,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                 && ws_sink.send(Message::Text(json.into())).await.is_err()
             {
                 tracing::warn!(edge_server_id, "Failed to send Welcome, disconnecting");
-                state.connected_edges.remove(&edge_server_id);
+                state.edges.connected.remove(&edge_server_id);
                 return;
             }
         }
@@ -121,7 +121,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                 && ws_sink.send(Message::Text(json.into())).await.is_err()
             {
                 tracing::warn!(edge_server_id, "Failed to send FullSync, disconnecting");
-                state.connected_edges.remove(&edge_server_id);
+                state.edges.connected.remove(&edge_server_id);
                 return;
             }
         }
@@ -193,7 +193,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     let _ = ws_sink.close().await;
 
     // Cleanup: remove from connected edges
-    state.connected_edges.remove(&edge_server_id);
+    state.edges.connected.remove(&edge_server_id);
 
     // 通知 console 订阅者 edge 已离线
     state
@@ -312,7 +312,7 @@ async fn handle_edge_message<S>(
         }
 
         CloudMessage::RpcResult { id, result } => {
-            if let Some((_, (_, sender))) = state.pending_rpcs.remove(&id) {
+            if let Some((_, (_, sender))) = state.edges.pending_rpcs.remove(&id) {
                 let _ = sender.send(result);
             } else {
                 tracing::warn!(rpc_id = %id, "RpcResult for unknown or expired request");

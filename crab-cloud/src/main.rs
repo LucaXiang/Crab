@@ -11,7 +11,9 @@ mod auth;
 mod config;
 mod db;
 mod email;
+pub mod error;
 mod live;
+mod services;
 mod state;
 mod stripe;
 pub mod util;
@@ -121,7 +123,7 @@ async fn main() -> Result<(), BoxError> {
     });
 
     // Periodic pending_rpcs cleanup (every 30s, remove entries older than 60s)
-    let pending_rpcs = state.pending_rpcs.clone();
+    let pending_rpcs = state.edges.pending_rpcs.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
         loop {

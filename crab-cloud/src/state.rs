@@ -16,51 +16,57 @@ use crate::live::LiveOrderHub;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
+/// Stripe 相关配置
+#[derive(Clone)]
+pub struct StripeConfig {
+    pub secret_key: String,
+    pub webhook_secret: String,
+    pub basic_price_id: String,
+    pub pro_price_id: String,
+    pub basic_yearly_price_id: String,
+    pub pro_yearly_price_id: String,
+}
+
+/// S3 + 更新下载配置
+#[derive(Clone)]
+pub struct S3Config {
+    pub client: S3Client,
+    pub bucket: String,
+    pub download_base_url: String,
+}
+
+/// Edge 连接管理
+#[derive(Clone)]
+pub struct EdgeConnections {
+    pub connected: Arc<DashMap<i64, mpsc::Sender<CloudMessage>>>,
+    pub pending_rpcs: Arc<DashMap<String, (i64, oneshot::Sender<CloudRpcResult>)>>,
+}
+
+impl EdgeConnections {
+    pub fn new() -> Self {
+        Self {
+            connected: Arc::new(DashMap::new()),
+            pending_rpcs: Arc::new(DashMap::new()),
+        }
+    }
+}
+
 /// Shared application state
 #[derive(Clone)]
 #[allow(dead_code)]
 pub struct AppState {
-    /// PostgreSQL connection pool
     pub pool: PgPool,
-    /// Full CA store (PKI operations: create/load Root CA, Tenant CA, sign)
     pub ca_store: CaStore,
-    /// Root CA PEM for mTLS verification
     pub root_ca_pem: String,
-    /// Email service (Resend API)
     pub email: crate::email::EmailService,
-    /// AWS Secrets Manager client (for P12 password storage)
     pub sm: SmClient,
-    /// Stripe secret key
-    pub stripe_secret_key: String,
-    /// Stripe webhook signing secret
-    pub stripe_webhook_secret: String,
-    /// Console base URL (e.g. https://console.redcoral.app)
     pub console_base_url: String,
-    /// AWS S3 client (update artifacts)
-    pub s3: S3Client,
-    /// S3 bucket for update artifacts
-    pub update_s3_bucket: String,
-    /// Base URL for update downloads
-    pub update_download_base_url: String,
-    /// JWT secret for tenant authentication
     pub jwt_secret: String,
-    /// Quota validation cache
     pub quota_cache: QuotaCache,
-    /// Rate limiter for login/registration routes
     pub rate_limiter: crate::auth::rate_limit::RateLimiter,
-    /// Stripe Price ID for Basic plan
-    pub stripe_basic_price_id: String,
-    /// Stripe Price ID for Pro plan
-    pub stripe_pro_price_id: String,
-    /// Stripe Price ID for Basic plan (yearly)
-    pub stripe_basic_yearly_price_id: String,
-    /// Stripe Price ID for Pro plan (yearly)
-    pub stripe_pro_yearly_price_id: String,
-    /// Connected edge-servers (edge_server_id → message sender)
-    pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudMessage>>>,
-    /// Pending RPC requests (rpc_id → (created_at_ms, response sender))
-    pub pending_rpcs: Arc<DashMap<String, (i64, oneshot::Sender<CloudRpcResult>)>>,
-    /// 活跃订单实时分发 hub (edge → console fan-out)
+    pub stripe: StripeConfig,
+    pub s3: S3Config,
+    pub edges: EdgeConnections,
     pub live_orders: LiveOrderHub,
 }
 
@@ -115,7 +121,7 @@ impl AppState {
 
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let sm_client = SmClient::new(&aws_config);
-        let s3 = S3Client::new(&aws_config);
+        let s3_client = S3Client::new(&aws_config);
 
         let email = crate::email::EmailService::new(
             config.resend_api_key.clone(),
@@ -154,21 +160,24 @@ impl AppState {
             root_ca_pem,
             email,
             sm: sm_client,
-            stripe_secret_key: config.stripe_secret_key.clone(),
-            stripe_webhook_secret: config.stripe_webhook_secret.clone(),
             console_base_url: config.console_base_url.clone(),
-            s3,
-            update_s3_bucket: config.update_s3_bucket.clone(),
-            update_download_base_url: config.update_download_base_url.clone(),
             jwt_secret: config.jwt_secret.clone(),
             quota_cache: QuotaCache::new(),
             rate_limiter: crate::auth::rate_limit::RateLimiter::new(),
-            stripe_basic_price_id: config.stripe_basic_price_id.clone(),
-            stripe_pro_price_id: config.stripe_pro_price_id.clone(),
-            stripe_basic_yearly_price_id: config.stripe_basic_yearly_price_id.clone(),
-            stripe_pro_yearly_price_id: config.stripe_pro_yearly_price_id.clone(),
-            connected_edges: Arc::new(DashMap::new()),
-            pending_rpcs: Arc::new(DashMap::new()),
+            stripe: StripeConfig {
+                secret_key: config.stripe_secret_key.clone(),
+                webhook_secret: config.stripe_webhook_secret.clone(),
+                basic_price_id: config.stripe_basic_price_id.clone(),
+                pro_price_id: config.stripe_pro_price_id.clone(),
+                basic_yearly_price_id: config.stripe_basic_yearly_price_id.clone(),
+                pro_yearly_price_id: config.stripe_pro_yearly_price_id.clone(),
+            },
+            s3: S3Config {
+                client: s3_client,
+                bucket: config.update_s3_bucket.clone(),
+                download_base_url: config.update_download_base_url.clone(),
+            },
+            edges: EdgeConnections::new(),
             live_orders: LiveOrderHub::new(),
         })
     }
@@ -183,6 +192,8 @@ pub struct CaStore {
     sm: SmClient,
     /// Root CA in-process cache (cert + key, never changes after creation)
     root_ca_cache: std::sync::Arc<OnceCell<CaSecret>>,
+    /// Tenant CA in-process cache (tenant_id → CaSecret, never changes after creation)
+    tenant_ca_cache: Arc<DashMap<String, CaSecret>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -196,6 +207,7 @@ impl CaStore {
         Self {
             sm,
             root_ca_cache: std::sync::Arc::new(OnceCell::new()),
+            tenant_ca_cache: Arc::new(DashMap::new()),
         }
     }
 
@@ -211,12 +223,19 @@ impl CaStore {
         )?)
     }
 
-    /// Get or create Tenant CA (reads from Secrets Manager each time)
+    /// Get or create Tenant CA (cached in-process — CAs never change after creation)
     pub async fn get_or_create_tenant_ca(
         &self,
         tenant_id: &str,
         root_ca: &CertificateAuthority,
     ) -> Result<CertificateAuthority, BoxError> {
+        if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
+            return Ok(CertificateAuthority::load(
+                &cached.cert_pem,
+                &cached.key_pem,
+            )?);
+        }
+
         let secret_name = format!("crab/tenant/{tenant_id}");
         let secret = match self.read_secret(&secret_name).await? {
             Some(s) => s,
@@ -231,27 +250,44 @@ impl CaStore {
                 s
             }
         };
+
+        self.tenant_ca_cache
+            .insert(tenant_id.to_string(), secret.clone());
         Ok(CertificateAuthority::load(
             &secret.cert_pem,
             &secret.key_pem,
         )?)
     }
 
-    /// Load existing Tenant CA (errors if not found)
+    /// Load existing Tenant CA (cached, errors if not found)
     pub async fn load_tenant_ca(&self, tenant_id: &str) -> Result<CertificateAuthority, BoxError> {
+        if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
+            return Ok(CertificateAuthority::load(
+                &cached.cert_pem,
+                &cached.key_pem,
+            )?);
+        }
+
         let secret_name = format!("crab/tenant/{tenant_id}");
         let secret = self
             .read_secret(&secret_name)
             .await?
             .ok_or_else(|| format!("Tenant CA not found for {tenant_id}"))?;
+
+        self.tenant_ca_cache
+            .insert(tenant_id.to_string(), secret.clone());
         Ok(CertificateAuthority::load(
             &secret.cert_pem,
             &secret.key_pem,
         )?)
     }
 
-    /// Load Tenant CA cert PEM only (for mTLS verification in edge_auth)
+    /// Load Tenant CA cert PEM only (cached, for mTLS verification in edge_auth)
     pub async fn load_tenant_ca_cert(&self, tenant_id: &str) -> Result<String, BoxError> {
+        if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
+            return Ok(cached.cert_pem.clone());
+        }
+
         let secret_name = format!("crab/tenant/{tenant_id}");
         let output = self
             .sm
@@ -262,7 +298,9 @@ impl CaStore {
 
         let json = output.secret_string().ok_or("Secret has no string value")?;
         let secret: CaSecret = serde_json::from_str(json)?;
-        Ok(secret.cert_pem)
+        let pem = secret.cert_pem.clone();
+        self.tenant_ca_cache.insert(tenant_id.to_string(), secret);
+        Ok(pem)
     }
 
     async fn init_root_ca(&self) -> Result<CaSecret, BoxError> {

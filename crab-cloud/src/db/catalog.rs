@@ -8,8 +8,11 @@ use serde::{Deserialize, Serialize};
 use shared::models::{
     attribute::{Attribute, AttributeBinding},
     category::Category,
+    dining_table::DiningTable,
+    employee::Employee,
     product::{Product, ProductSpec},
     tag::Tag,
+    zone::Zone,
 };
 use sqlx::PgPool;
 
@@ -1032,4 +1035,53 @@ pub async fn upsert_price_rule_from_sync(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+// ════════════════════════════════════════════════════════════════
+// JSONB mirror table reads (employees, zones, dining_tables)
+// ════════════════════════════════════════════════════════════════
+
+/// List employees for a store (from JSONB mirror table)
+pub async fn list_employees(pool: &PgPool, edge_server_id: i64) -> Result<Vec<Employee>, BoxError> {
+    let rows: Vec<(serde_json::Value,)> = sqlx::query_as(
+        "SELECT data FROM cloud_employees WHERE edge_server_id = $1 ORDER BY synced_at DESC",
+    )
+    .bind(edge_server_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|(data,)| serde_json::from_value(data).ok())
+        .collect())
+}
+
+/// List zones for a store (from JSONB mirror table)
+pub async fn list_zones(pool: &PgPool, edge_server_id: i64) -> Result<Vec<Zone>, BoxError> {
+    let rows: Vec<(serde_json::Value,)> = sqlx::query_as(
+        "SELECT data FROM cloud_zones WHERE edge_server_id = $1 ORDER BY synced_at DESC",
+    )
+    .bind(edge_server_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|(data,)| serde_json::from_value(data).ok())
+        .collect())
+}
+
+/// List dining tables for a store (from JSONB mirror table)
+pub async fn list_tables(pool: &PgPool, edge_server_id: i64) -> Result<Vec<DiningTable>, BoxError> {
+    let rows: Vec<(serde_json::Value,)> = sqlx::query_as(
+        "SELECT data FROM cloud_dining_tables WHERE edge_server_id = $1 ORDER BY synced_at DESC",
+    )
+    .bind(edge_server_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|(data,)| serde_json::from_value(data).ok())
+        .collect())
 }

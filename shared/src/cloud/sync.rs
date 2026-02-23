@@ -198,6 +198,7 @@ pub struct StoreDetailResponse {
     pub website: Option<String>,
     pub business_day_cutoff: Option<String>,
     pub device_id: String,
+    pub is_online: bool,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]

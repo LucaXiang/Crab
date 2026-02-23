@@ -36,7 +36,7 @@ pub async fn handle_webhook(
 
     // 2. Verify signature
     if let Err(e) =
-        stripe::verify_webhook_signature(&body, sig_header, &state.stripe_webhook_secret)
+        stripe::verify_webhook_signature(&body, sig_header, &state.stripe.webhook_secret)
     {
         tracing::warn!(error = e, "Webhook signature verification failed");
         return StatusCode::BAD_REQUEST;

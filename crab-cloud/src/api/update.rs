@@ -51,8 +51,9 @@ pub async fn check_update(
     // Fetch latest.json from S3
     let manifest = match state
         .s3
+        .client
         .get_object()
-        .bucket(&state.update_s3_bucket)
+        .bucket(&state.s3.bucket)
         .key("updates/latest.json")
         .send()
         .await
@@ -154,8 +155,9 @@ pub async fn check_update(
 pub async fn download_latest(State(state): State<AppState>) -> impl IntoResponse {
     let manifest = match state
         .s3
+        .client
         .get_object()
-        .bucket(&state.update_s3_bucket)
+        .bucket(&state.s3.bucket)
         .key("updates/latest.json")
         .send()
         .await
@@ -186,7 +188,7 @@ pub async fn download_latest(State(state): State<AppState>) -> impl IntoResponse
     let version = &manifest.version;
     let download_url = format!(
         "{}/releases/v{}/redcoral-pos_v{}_x64-setup.exe",
-        state.update_download_base_url, version, version
+        state.s3.download_base_url, version, version
     );
 
     (

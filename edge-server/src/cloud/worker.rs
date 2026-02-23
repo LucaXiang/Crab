@@ -888,7 +888,9 @@ impl CloudWorker {
 
         // Whitelist: only forward resources that crab-cloud knows how to store.
         match payload.resource.as_str() {
-            "product" | "category" | "daily_report" | "store_info" | "shift" | "employee" => {}
+            "product" | "category" | "daily_report" | "store_info" | "shift" | "employee"
+            | "tag" | "attribute" | "attribute_binding" | "price_rule" | "zone"
+            | "dining_table" => {}
             _ => return None,
         }
 

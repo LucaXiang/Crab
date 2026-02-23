@@ -172,10 +172,21 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 - 添加转换函数/兼容层/适配器来修复类型不匹配 (从源头修)
 - 使用 INTEGER cents 存储金额 (用 REAL + `rust_decimal`)
 - 使用 JSON TEXT 列存储嵌套对象 (用独立关联表)
+- 绕过 `shared::ErrorCode` 自造错误码或字符串错误 (所有错误必须通过 ErrorCode → AppError → ApiResponse 链路)
 
 ## 修复原则
 
 类型不匹配或数据不一致时，**从 SOURCE 向外修**：数据库 schema → Rust shared 类型 → 前端 TypeScript 类型。禁止反向添加 `Number()`/`String()` 转换包装或适配代码。
+
+## 错误处理规范
+
+**全栈统一错误码**：`shared::ErrorCode` (u16) 是唯一的错误标识，贯穿 Rust → JSON → TypeScript → i18n。
+
+- **Rust 端**: 所有 API 错误必须通过 `AppError` 返回，携带 `ErrorCode`。禁止直接返回裸 `StatusCode` 或自定义错误 JSON
+- **JSON 响应**: 统一格式 `{ "code": u16, "message": "...", "data": T?, "details": {}? }`，前端靠 `code` 做 i18n 查表，`message` 仅作 fallback
+- **前端 i18n**: 错误码 → `errorCode.<CODE>` 翻译 key，新增错误码时必须同步添加中/西/英翻译
+- **新增错误码流程**: `shared/src/error/codes.rs` 添加 variant → `http.rs` 映射 HTTP 状态码 → `TryFrom<u16>` + `message()` + variant count guard 同步更新 → 前端 i18n 翻译
+- **Service 层错误**: DB 错误 (`sqlx::Error`) 通过 `From` 自动转为 `AppError(DatabaseError)`，业务错误直接用 `AppError` 便捷构造器 (`not_found()`, `validation()` 等)
 
 ## 提交规范
 

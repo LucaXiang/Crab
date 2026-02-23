@@ -104,6 +104,7 @@ export interface StoreDetail {
 	website?: string;
 	business_day_cutoff?: string;
 	device_id: string;
+	is_online: boolean;
 	last_sync_at: number | null;
 	registered_at: number;
 	store_info: Record<string, unknown> | null;
@@ -373,7 +374,14 @@ export function getStoreRedFlags(
 	);
 }
 
-// === Products ===
+// === Catalog Types ===
+
+export interface CatalogOpResult {
+	success: boolean;
+	created_id?: number;
+	data?: unknown;
+	error?: string;
+}
 
 export interface ProductSpec {
 	source_id: number;
@@ -404,8 +412,441 @@ export interface CatalogProduct {
 	tag_ids: number[];
 }
 
+export interface ProductSpecInput {
+	name: string;
+	price: number;
+	display_order: number;
+	is_default: boolean;
+	is_active: boolean;
+	receipt_name?: string | null;
+	is_root: boolean;
+}
+
+export interface ProductCreate {
+	name: string;
+	image?: string;
+	category_id: number;
+	sort_order?: number;
+	tax_rate?: number;
+	receipt_name?: string;
+	kitchen_print_name?: string;
+	is_kitchen_print_enabled?: number;
+	is_label_print_enabled?: number;
+	external_id?: number;
+	tags?: number[];
+	specs: ProductSpecInput[];
+}
+
+export interface ProductUpdate {
+	name?: string;
+	image?: string;
+	category_id?: number;
+	sort_order?: number;
+	tax_rate?: number;
+	receipt_name?: string;
+	kitchen_print_name?: string;
+	is_kitchen_print_enabled?: number;
+	is_label_print_enabled?: number;
+	is_active?: boolean;
+	external_id?: number;
+	tags?: number[];
+	specs?: ProductSpecInput[];
+}
+
+export interface CatalogCategory {
+	source_id: number;
+	name: string;
+	sort_order: number;
+	is_kitchen_print_enabled: boolean;
+	is_label_print_enabled: boolean;
+	is_active: boolean;
+	is_virtual: boolean;
+	match_mode: string;
+	is_display: boolean;
+	kitchen_print_destinations: number[];
+	label_print_destinations: number[];
+	tag_ids: number[];
+}
+
+export interface CategoryCreate {
+	name: string;
+	sort_order?: number;
+	is_kitchen_print_enabled?: boolean;
+	is_label_print_enabled?: boolean;
+	is_virtual?: boolean;
+	tag_ids?: number[];
+	match_mode?: string;
+	is_display?: boolean;
+}
+
+export interface CategoryUpdate {
+	name?: string;
+	sort_order?: number;
+	is_kitchen_print_enabled?: boolean;
+	is_label_print_enabled?: boolean;
+	is_virtual?: boolean;
+	tag_ids?: number[];
+	match_mode?: string;
+	is_active?: boolean;
+	is_display?: boolean;
+}
+
+export interface CatalogTag {
+	source_id: number;
+	name: string;
+	color: string;
+	display_order: number;
+	is_active: boolean;
+	is_system: boolean;
+}
+
+export interface TagCreate {
+	name: string;
+	color?: string;
+	display_order?: number;
+}
+
+export interface TagUpdate {
+	name?: string;
+	color?: string;
+	display_order?: number;
+	is_active?: boolean;
+}
+
+export interface CatalogAttributeOption {
+	source_id: number;
+	name: string;
+	price_modifier: number;
+	display_order: number;
+	is_active: boolean;
+	receipt_name: string | null;
+	kitchen_print_name: string | null;
+	enable_quantity: boolean;
+	max_quantity: number | null;
+}
+
+export interface CatalogAttribute {
+	source_id: number;
+	name: string;
+	is_multi_select: boolean;
+	max_selections: number | null;
+	default_option_ids: number[] | null;
+	display_order: number;
+	is_active: boolean;
+	show_on_receipt: boolean;
+	receipt_name: string | null;
+	show_on_kitchen_print: boolean;
+	kitchen_print_name: string | null;
+	options: CatalogAttributeOption[];
+}
+
+export interface AttributeOptionInput {
+	name: string;
+	price_modifier: number;
+	display_order: number;
+	receipt_name?: string;
+	kitchen_print_name?: string;
+	enable_quantity: boolean;
+	max_quantity?: number;
+}
+
+export interface AttributeCreate {
+	name: string;
+	is_multi_select?: boolean;
+	max_selections?: number;
+	display_order?: number;
+	show_on_receipt?: boolean;
+	receipt_name?: string;
+	show_on_kitchen_print?: boolean;
+	kitchen_print_name?: string;
+	options?: AttributeOptionInput[];
+}
+
+export interface AttributeUpdate {
+	name?: string;
+	is_multi_select?: boolean;
+	max_selections?: number;
+	display_order?: number;
+	show_on_receipt?: boolean;
+	receipt_name?: string;
+	show_on_kitchen_print?: boolean;
+	kitchen_print_name?: string;
+	options?: AttributeOptionInput[];
+	is_active?: boolean;
+}
+
+export interface PriceRule {
+	id: number;
+	name: string;
+	display_name: string;
+	receipt_name: string;
+	description: string | null;
+	rule_type: 'DISCOUNT' | 'SURCHARGE';
+	product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
+	target_id: number | null;
+	zone_scope: string | null;
+	adjustment_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
+	adjustment_value: number;
+	is_stackable: boolean;
+	is_exclusive: boolean;
+	valid_from: number | null;
+	valid_until: number | null;
+	active_days: number[] | null;
+	active_start_time: string | null;
+	active_end_time: string | null;
+	is_active: boolean;
+	created_by: number | null;
+}
+
+export interface PriceRuleCreate {
+	name: string;
+	display_name: string;
+	receipt_name: string;
+	description?: string;
+	rule_type: 'DISCOUNT' | 'SURCHARGE';
+	product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
+	target_id?: number;
+	zone_scope?: string;
+	adjustment_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
+	adjustment_value: number;
+	is_stackable?: boolean;
+	is_exclusive?: boolean;
+	valid_from?: number;
+	valid_until?: number;
+	active_days?: number[];
+	active_start_time?: string;
+	active_end_time?: string;
+}
+
+export interface PriceRuleUpdate {
+	name?: string;
+	display_name?: string;
+	receipt_name?: string;
+	description?: string;
+	rule_type?: 'DISCOUNT' | 'SURCHARGE';
+	product_scope?: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
+	target_id?: number;
+	zone_scope?: string;
+	adjustment_type?: 'PERCENTAGE' | 'FIXED_AMOUNT';
+	adjustment_value?: number;
+	is_stackable?: boolean;
+	is_exclusive?: boolean;
+	valid_from?: number;
+	valid_until?: number;
+	active_days?: number[];
+	active_start_time?: string;
+	active_end_time?: string;
+	is_active?: boolean;
+}
+
+// === Catalog API — Products ===
+
+const cat = (storeId: number) => `/api/tenant/stores/${storeId}/catalog`;
+
 export function getProducts(token: string, storeId: number): Promise<CatalogProduct[]> {
-	return request('GET', `/api/tenant/stores/${storeId}/products`, undefined, token);
+	return request('GET', `${cat(storeId)}/products`, undefined, token);
+}
+
+export function createProduct(token: string, storeId: number, data: ProductCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/products`, data, token);
+}
+
+export function updateProduct(token: string, storeId: number, id: number, data: ProductUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/products/${id}`, data, token);
+}
+
+export function deleteProduct(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/products/${id}`, undefined, token);
+}
+
+// === Catalog API — Categories ===
+
+export function getCategories(token: string, storeId: number): Promise<CatalogCategory[]> {
+	return request('GET', `${cat(storeId)}/categories`, undefined, token);
+}
+
+export function createCategory(token: string, storeId: number, data: CategoryCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/categories`, data, token);
+}
+
+export function updateCategory(token: string, storeId: number, id: number, data: CategoryUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/categories/${id}`, data, token);
+}
+
+export function deleteCategory(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/categories/${id}`, undefined, token);
+}
+
+// === Catalog API — Tags ===
+
+export function getTags(token: string, storeId: number): Promise<CatalogTag[]> {
+	return request('GET', `${cat(storeId)}/tags`, undefined, token);
+}
+
+export function createTag(token: string, storeId: number, data: TagCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/tags`, data, token);
+}
+
+export function updateTag(token: string, storeId: number, id: number, data: TagUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/tags/${id}`, data, token);
+}
+
+export function deleteTag(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/tags/${id}`, undefined, token);
+}
+
+// === Catalog API — Attributes ===
+
+export function getAttributes(token: string, storeId: number): Promise<CatalogAttribute[]> {
+	return request('GET', `${cat(storeId)}/attributes`, undefined, token);
+}
+
+export function createAttribute(token: string, storeId: number, data: AttributeCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/attributes`, data, token);
+}
+
+export function updateAttribute(token: string, storeId: number, id: number, data: AttributeUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/attributes/${id}`, data, token);
+}
+
+export function deleteAttribute(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/attributes/${id}`, undefined, token);
+}
+
+// === Catalog API — Price Rules ===
+
+export function getPriceRules(token: string, storeId: number): Promise<PriceRule[]> {
+	return request('GET', `${cat(storeId)}/price-rules`, undefined, token);
+}
+
+export function createPriceRule(token: string, storeId: number, data: PriceRuleCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/price-rules`, data, token);
+}
+
+export function updatePriceRule(token: string, storeId: number, id: number, data: PriceRuleUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/price-rules/${id}`, data, token);
+}
+
+export function deletePriceRule(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/price-rules/${id}`, undefined, token);
+}
+
+// === Catalog API — Employees ===
+
+export interface CatalogEmployee {
+	id: number;
+	username: string;
+	display_name: string;
+	role_id: number;
+	is_system: boolean;
+	is_active: boolean;
+	created_at: number;
+}
+
+export interface EmployeeCreate {
+	username: string;
+	password: string;
+	display_name?: string;
+	role_id: number;
+}
+
+export interface EmployeeUpdate {
+	username?: string;
+	password?: string;
+	display_name?: string;
+	role_id?: number;
+	is_active?: boolean;
+}
+
+export function getEmployees(token: string, storeId: number): Promise<CatalogEmployee[]> {
+	return request('GET', `${cat(storeId)}/employees`, undefined, token);
+}
+
+export function createEmployee(token: string, storeId: number, data: EmployeeCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/employees`, data, token);
+}
+
+export function updateEmployee(token: string, storeId: number, id: number, data: EmployeeUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/employees/${id}`, data, token);
+}
+
+export function deleteEmployee(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/employees/${id}`, undefined, token);
+}
+
+// === Catalog API — Zones ===
+
+export interface CatalogZone {
+	id: number;
+	name: string;
+	description: string | null;
+	is_active: boolean;
+}
+
+export interface ZoneCreate {
+	name: string;
+	description?: string;
+}
+
+export interface ZoneUpdate {
+	name?: string;
+	description?: string;
+	is_active?: boolean;
+}
+
+export function getZones(token: string, storeId: number): Promise<CatalogZone[]> {
+	return request('GET', `${cat(storeId)}/zones`, undefined, token);
+}
+
+export function createZone(token: string, storeId: number, data: ZoneCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/zones`, data, token);
+}
+
+export function updateZone(token: string, storeId: number, id: number, data: ZoneUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/zones/${id}`, data, token);
+}
+
+export function deleteZone(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/zones/${id}`, undefined, token);
+}
+
+// === Catalog API — Dining Tables ===
+
+export interface CatalogDiningTable {
+	id: number;
+	name: string;
+	zone_id: number;
+	capacity: number;
+	is_active: boolean;
+}
+
+export interface DiningTableCreate {
+	name: string;
+	zone_id: number;
+	capacity?: number;
+}
+
+export interface DiningTableUpdate {
+	name?: string;
+	zone_id?: number;
+	capacity?: number;
+	is_active?: boolean;
+}
+
+export function getTables(token: string, storeId: number): Promise<CatalogDiningTable[]> {
+	return request('GET', `${cat(storeId)}/tables`, undefined, token);
+}
+
+export function createTable(token: string, storeId: number, data: DiningTableCreate): Promise<CatalogOpResult> {
+	return request('POST', `${cat(storeId)}/tables`, data, token);
+}
+
+export function updateTable(token: string, storeId: number, id: number, data: DiningTableUpdate): Promise<CatalogOpResult> {
+	return request('PUT', `${cat(storeId)}/tables/${id}`, data, token);
+}
+
+export function deleteTable(token: string, storeId: number, id: number): Promise<CatalogOpResult> {
+	return request('DELETE', `${cat(storeId)}/tables/${id}`, undefined, token);
 }
 
 // === Commands ===

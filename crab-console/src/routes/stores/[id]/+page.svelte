@@ -14,7 +14,14 @@
 		ShieldAlert,
 		Radio,
 		Check,
-		Copy
+		Copy,
+		FolderTree,
+		Tag,
+		SlidersHorizontal,
+		Percent,
+		Users,
+		Map,
+		Grid3x3
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
@@ -50,6 +57,13 @@
 		{ key: 'nav.overview', href: `/stores/${storeId}/overview`, icon: BarChart3 },
 		{ key: 'nav.daily_report', href: `/stores/${storeId}/stats`, icon: ScrollText },
 		{ key: 'nav.products', href: `/stores/${storeId}/products`, icon: Package },
+		{ key: 'nav.categories', href: `/stores/${storeId}/categories`, icon: FolderTree },
+		{ key: 'nav.tags', href: `/stores/${storeId}/tags`, icon: Tag },
+		{ key: 'nav.attributes', href: `/stores/${storeId}/attributes`, icon: SlidersHorizontal },
+		{ key: 'nav.price_rules', href: `/stores/${storeId}/price-rules`, icon: Percent },
+		{ key: 'nav.employees', href: `/stores/${storeId}/employees`, icon: Users },
+		{ key: 'nav.zones', href: `/stores/${storeId}/zones`, icon: Map },
+		{ key: 'nav.tables', href: `/stores/${storeId}/tables`, icon: Grid3x3 },
 		{ key: 'nav.red_flags', href: `/stores/${storeId}/red-flags`, icon: ShieldAlert }
 	];
 
@@ -206,7 +220,7 @@
 			</div>
 
 			<!-- Sub-navigation -->
-			<div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+			<div class="grid grid-cols-3 md:grid-cols-4 gap-3">
 				{#each subNav as item}
 					<a
 						href={item.href}

@@ -85,7 +85,7 @@ CREATE TABLE catalog_product_specs (
     product_id    BIGINT  NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
     source_id     BIGINT  NOT NULL,  -- edge 本地 spec ID
     name          TEXT    NOT NULL,
-    price         REAL NOT NULL DEFAULT 0.0,
+    price         DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     display_order INTEGER NOT NULL DEFAULT 0,
     is_default    BOOLEAN NOT NULL DEFAULT FALSE,
     is_active     BOOLEAN NOT NULL DEFAULT TRUE,
@@ -128,7 +128,7 @@ CREATE TABLE catalog_attribute_options (
     attribute_id       BIGINT  NOT NULL REFERENCES catalog_attributes(id) ON DELETE CASCADE,
     source_id          BIGINT  NOT NULL,  -- edge 本地 option ID
     name               TEXT    NOT NULL,
-    price_modifier     REAL NOT NULL DEFAULT 0.0,
+    price_modifier     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     display_order      INTEGER NOT NULL DEFAULT 0,
     is_active          BOOLEAN NOT NULL DEFAULT TRUE,
     receipt_name       TEXT,
@@ -169,7 +169,7 @@ CREATE TABLE catalog_price_rules (
     target_id        BIGINT,
     zone_scope       TEXT NOT NULL DEFAULT 'all',
     adjustment_type  TEXT NOT NULL,
-    adjustment_value REAL NOT NULL,
+    adjustment_value DOUBLE PRECISION NOT NULL,
     is_stackable     BOOLEAN NOT NULL DEFAULT TRUE,
     is_exclusive     BOOLEAN NOT NULL DEFAULT FALSE,
     valid_from       BIGINT,

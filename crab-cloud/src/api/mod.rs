@@ -147,7 +147,7 @@ pub fn public_router(state: AppState) -> Router {
         // ── Employee CRUD ──
         .route(
             "/api/tenant/stores/{id}/catalog/employees",
-            post(catalog::create_employee),
+            get(catalog::list_employees).post(catalog::create_employee),
         )
         .route(
             "/api/tenant/stores/{id}/catalog/employees/{eid}",
@@ -156,7 +156,7 @@ pub fn public_router(state: AppState) -> Router {
         // ── Zone CRUD ──
         .route(
             "/api/tenant/stores/{id}/catalog/zones",
-            post(catalog::create_zone),
+            get(catalog::list_zones).post(catalog::create_zone),
         )
         .route(
             "/api/tenant/stores/{id}/catalog/zones/{zid}",
@@ -165,7 +165,7 @@ pub fn public_router(state: AppState) -> Router {
         // ── DiningTable CRUD ──
         .route(
             "/api/tenant/stores/{id}/catalog/tables",
-            post(catalog::create_table),
+            get(catalog::list_tables).post(catalog::create_table),
         )
         .route(
             "/api/tenant/stores/{id}/catalog/tables/{tid}",

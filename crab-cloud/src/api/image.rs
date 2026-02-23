@@ -132,8 +132,9 @@ pub async fn upload_image(
 
     state
         .s3
+        .client
         .put_object()
-        .bucket(&state.update_s3_bucket)
+        .bucket(&state.s3.bucket)
         .key(&key)
         .body(buffer.into())
         .content_type("image/jpeg")
@@ -170,8 +171,9 @@ pub async fn presigned_get_url(
 
     let presigned = state
         .s3
+        .client
         .get_object()
-        .bucket(&state.update_s3_bucket)
+        .bucket(&state.s3.bucket)
         .key(&key)
         .presigned(presigning)
         .await
