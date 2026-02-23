@@ -926,12 +926,41 @@ export interface StoreInfoUpdate {
 // Re-export LabelTemplate from print types for convenience
 export type { LabelTemplate } from '../print/labelTemplate';
 
+/** 后端 LabelFieldInput 格式 (field_id 而非前端的 id) */
+export interface LabelFieldInput {
+  field_id: string;
+  name: string;
+  type: import('../print/labelTemplate').LabelFieldType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  font_size: number;
+  font_weight?: string;
+  font_family?: string;
+  color?: string;
+  rotate?: number;
+  alignment?: 'left' | 'center' | 'right';
+  data_source: string;
+  format?: string;
+  visible: boolean;
+  label?: string;
+  template?: string;
+  data_key?: string;
+  source_type?: string;
+  maintain_aspect_ratio?: boolean;
+  style?: string;
+  align?: string;
+  vertical_align?: string;
+  line_style?: string;
+}
+
 export interface LabelTemplateCreate {
   name: string;
   description?: string;
   width: number;
   height: number;
-  fields?: import('../print/labelTemplate').LabelField[];
+  fields?: LabelFieldInput[];
   is_default?: boolean;
   is_active?: boolean;
   padding_mm_x?: number;
@@ -945,7 +974,7 @@ export interface LabelTemplateUpdate {
   description?: string;
   width?: number;
   height?: number;
-  fields?: import('../print/labelTemplate').LabelField[];
+  fields?: LabelFieldInput[];
   is_default?: boolean;
   is_active?: boolean;
   padding_mm_x?: number;

@@ -7,18 +7,29 @@
 import { create } from 'zustand';
 import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
-import type { LabelTemplate } from '@/core/domain/types/print';
+import type { LabelTemplate, LabelField } from '@/core/domain/types/print';
 import type { LabelTemplateCreate, LabelTemplateUpdate } from '@/core/domain/types/api';
 import { DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 
 // Lazy-load API client to avoid initialization issues
 const getApi = () => createTauriClient();
 
+// 后端 LabelField → 前端 LabelField (field_id→id, field_type→type)
+function mapApiField(raw: Record<string, unknown>): LabelField {
+  const { field_id, field_type, id: _dbId, template_id: _tid, ...rest } = raw;
+  return {
+    ...rest,
+    id: (field_id as string) || String(_dbId ?? ''),
+    type: (field_type as LabelField['type']) || (rest.type as LabelField['type']) || 'text',
+  } as LabelField;
+}
+
 function mapApiToFrontend(apiTemplate: LabelTemplate): LabelTemplate {
+  const rawFields = (apiTemplate.fields || []) as unknown as Record<string, unknown>[];
   return {
     ...apiTemplate,
     padding: apiTemplate.padding || 2,
-    fields: apiTemplate.fields || [],
+    fields: rawFields.map(mapApiField),
     is_default: apiTemplate.is_default || false,
     is_active: apiTemplate.is_active ?? true,
     created_at: apiTemplate.created_at || Date.now(),
@@ -28,6 +39,15 @@ function mapApiToFrontend(apiTemplate: LabelTemplate): LabelTemplate {
   };
 }
 
+// 前端 LabelField.id → 后端 LabelFieldInput.field_id
+function mapFieldsForApi(fields: LabelField[]) {
+  return fields.map(({ id, type, _pending_image_path, ...rest }) => ({
+    ...rest,
+    field_id: id,
+    type,
+  }));
+}
+
 // 构造 Create payload
 function toCreatePayload(template: Partial<LabelTemplate>): LabelTemplateCreate {
   return {
@@ -35,7 +55,7 @@ function toCreatePayload(template: Partial<LabelTemplate>): LabelTemplateCreate 
     description: template.description,
     width: template.width_mm || template.width || 40,
     height: template.height_mm || template.height || 30,
-    fields: template.fields || [],
+    fields: mapFieldsForApi(template.fields || []),
     is_default: template.is_default || false,
     is_active: template.is_active ?? true,
     padding_mm_x: template.padding_mm_x,
@@ -52,7 +72,7 @@ function toUpdatePayload(template: Partial<LabelTemplate>): LabelTemplateUpdate 
   if (template.description !== undefined) update.description = template.description;
   if (template.width !== undefined) update.width = template.width;
   if (template.height !== undefined) update.height = template.height;
-  if (template.fields !== undefined) update.fields = template.fields;
+  if (template.fields !== undefined) update.fields = mapFieldsForApi(template.fields);
   if (template.is_default !== undefined) update.is_default = template.is_default;
   if (template.is_active !== undefined) update.is_active = template.is_active;
   if (template.width_mm !== undefined) update.width = template.width_mm;

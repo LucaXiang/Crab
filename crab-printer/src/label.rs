@@ -482,7 +482,7 @@ pub struct SeparatorField {
 
 /// Template field types
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum TemplateField {
     Text(TextField),
     Image(ImageField),

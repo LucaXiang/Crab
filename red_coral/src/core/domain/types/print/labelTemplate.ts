@@ -473,16 +473,18 @@ export interface SupportedLabelField {
   source_type?: 'productImage' | 'qrCode' | 'barcode';
 }
 
+// key 必须与 edge-server/src/printing/executor.rs 的 build_label_data 一致
 export const SUPPORTED_LABEL_FIELDS: SupportedLabelField[] = [
-  { key: 'product.name', type: 'text', label: '商品名称', category: 'Product', description: '商品名称', example: 'Coffee' },
-  { key: 'product.price', type: 'text', label: '商品价格', category: 'Product', description: '商品价格', example: '$10.00' },
-  { key: 'product.barcode', type: 'text', label: '商品条码', category: 'Product', description: '商品条码', example: '123456789' },
-  { key: 'specification.name', type: 'text', label: '规格名称', category: 'Specification', description: '商品规格', example: 'Large' },
-  { key: 'product.image', type: 'image', label: '商品图片', category: 'Product', description: '商品图片', example: '/path/to/image.png' },
-  { key: 'order.receiptNumber', type: 'text', label: '订单号', category: 'Order', description: '订单编号', example: 'ORD-001' },
-  { key: 'order.tableName', type: 'text', label: '桌号', category: 'Order', description: '桌号名称', example: 'Table 5' },
-  { key: 'item.quantity', type: 'text', label: '数量', category: 'Item', description: '商品数量', example: '2' },
-  { key: 'item.productName', type: 'text', label: '商品名', category: 'Item', description: '订单中的商品名', example: 'Coffee' },
-  { key: 'item.options', type: 'text', label: '选项', category: 'Item', description: '商品选项/加料', example: 'No sugar' },
-  { key: 'print.time', type: 'text', label: '打印时间', category: 'Print', description: '打印时间戳', example: '2024-01-01 12:00' },
+  { key: 'product_name', type: 'text', label: '商品名称', category: 'Product', description: '商品原始名称', example: 'Coffee' },
+  { key: 'kitchen_name', type: 'text', label: '厨房显示名', category: 'Product', description: '厨房打印名(=商品名)', example: 'Coffee' },
+  { key: 'category_name', type: 'text', label: '分类名称', category: 'Product', description: '商品分类', example: 'Drinks' },
+  { key: 'spec_name', type: 'text', label: '规格名称', category: 'Product', description: '商品规格', example: 'Large' },
+  { key: 'options', type: 'text', label: '选项', category: 'Product', description: '商品选项/加料', example: 'No sugar' },
+  { key: 'quantity', type: 'text', label: '数量', category: 'Item', description: '商品数量', example: '2' },
+  { key: 'index', type: 'text', label: '序号', category: 'Item', description: '商品在订单中的序号', example: '1/3' },
+  { key: 'note', type: 'text', label: '备注', category: 'Item', description: '商品备注', example: '少辣' },
+  { key: 'external_id', type: 'text', label: '外部ID', category: 'Product', description: '商品外部ID', example: '10042' },
+  { key: 'table_name', type: 'text', label: '桌号', category: 'Order', description: '桌号名称', example: 'Mesa 5' },
+  { key: 'queue_number', type: 'text', label: '叫号', category: 'Order', description: '零售叫号(#001格式)', example: '#001' },
+  { key: 'time', type: 'text', label: '打印时间', category: 'Print', description: '打印时间(HH:MM)', example: '14:30' },
 ];
