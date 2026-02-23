@@ -204,6 +204,11 @@ export const es: Record<string, string> = {
 
 	// Nav catalog
 	'nav.categories': 'Categorías',
+	'nav.store_settings': 'Ajustes',
+	'nav.group_operations': 'Operaciones',
+	'nav.group_catalog': 'Catálogo',
+	'nav.group_manage': 'Gestión',
+	'nav.group_monitor': 'Monitoreo',
 	'nav.tags': 'Etiquetas',
 	'nav.attributes': 'Atributos',
 	'nav.price_rules': 'Reglas de precio',

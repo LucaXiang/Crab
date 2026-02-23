@@ -2,12 +2,11 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { ArrowLeft, Cloud, Wifi } from 'lucide-svelte';
+	import { Cloud, Wifi } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import { getOrderDetail, ApiError, type OrderDetailResponse } from '$lib/api';
 	import { formatDateTime, formatCurrency } from '$lib/format';
-	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 
 	const storeId = Number(page.params.id);
 	const orderKey = page.params.key ?? '';
@@ -39,16 +38,10 @@
 	<title>{$t('orders.detail')} — RedCoral Console</title>
 </svelte:head>
 
-<ConsoleLayout>
-	<div class="max-w-4xl mx-auto px-6 py-8 space-y-6">
-		<div class="flex items-center gap-3">
-			<a href="/stores/{storeId}/orders" class="text-slate-400 hover:text-slate-600">
-				<ArrowLeft class="w-5 h-5" />
-			</a>
-			<h1 class="font-heading text-xl font-bold text-slate-900">{$t('orders.detail')}</h1>
-		</div>
+<div class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+	<h1 class="font-heading text-xl font-bold text-slate-900">{$t('orders.detail')}</h1>
 
-		{#if loading}
+	{#if loading}
 			<div class="flex items-center justify-center py-20">
 				<svg class="animate-spin w-8 h-8 text-coral-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -235,4 +228,3 @@
 			{/if}
 		{/if}
 	</div>
-</ConsoleLayout>

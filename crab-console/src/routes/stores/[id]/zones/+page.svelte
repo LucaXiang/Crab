@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { ArrowLeft, Map, Plus, Pencil, Trash2, X } from 'lucide-svelte';
+	import { Map, Plus, Pencil, Trash2, X } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import {
@@ -15,8 +15,6 @@
 		type ZoneCreate,
 		type ZoneUpdate
 	} from '$lib/api';
-	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
-
 	const storeId = Number(page.params.id);
 
 	let zones = $state<CatalogZone[]>([]);
@@ -124,16 +122,10 @@
 	<title>{$t('zones.title')} — RedCoral Console</title>
 </svelte:head>
 
-<ConsoleLayout>
-	<div class="max-w-3xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
-		<div class="flex items-center justify-between">
-			<div class="flex items-center gap-3">
-				<a href="/stores/{storeId}" class="text-slate-400 hover:text-slate-600">
-					<ArrowLeft class="w-5 h-5" />
-				</a>
-				<h1 class="font-heading text-lg md:text-xl font-bold text-slate-900">{$t('zones.title')}</h1>
-			</div>
-			<button
+<div class="max-w-3xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
+	<div class="flex items-center justify-between">
+		<h1 class="font-heading text-lg md:text-xl font-bold text-slate-900">{$t('zones.title')}</h1>
+		<button
 				onclick={openCreate}
 				class="bg-coral-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-coral-700 flex items-center gap-1.5 cursor-pointer"
 			>
@@ -182,7 +174,6 @@
 			</div>
 		{/if}
 	</div>
-</ConsoleLayout>
 
 <!-- Create/Edit Modal -->
 {#if showModal}

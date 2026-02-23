@@ -195,6 +195,11 @@ export const zh: Record<string, string> = {
 	'catalog.search': '搜索...',
 
 	'nav.categories': '分类',
+	'nav.store_settings': '门店设置',
+	'nav.group_operations': '运营',
+	'nav.group_catalog': '目录',
+	'nav.group_manage': '管理',
+	'nav.group_monitor': '监控',
 	'nav.tags': '标签',
 	'nav.attributes': '属性',
 	'nav.price_rules': '价格规则',

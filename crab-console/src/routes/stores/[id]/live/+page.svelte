@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import {
-		ArrowLeft, Radio, Wifi, WifiOff, Users, Clock, Receipt,
+		Radio, Wifi, WifiOff, Users, Clock, Receipt,
 		X, CreditCard, Tag, Gift, StickyNote, User, CalendarClock, Hash,
 		Plus, Minus, Pencil, Trash2, Ban, ArrowRightLeft, Merge,
 		DollarSign, CircleDot, History, ChevronDown, ChevronUp
@@ -18,8 +18,6 @@
 		type LiveOrderSnapshot,
 		type OrderEvent,
 	} from '$lib/stores/liveOrders';
-	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
-
 	const storeId = Number(page.params.id);
 
 	let store = $state<StoreDetail | null>(null);
@@ -249,16 +247,10 @@
 	<title>{$t('live.title')} — RedCoral Console</title>
 </svelte:head>
 
-<ConsoleLayout>
-	<div class="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
-		<div class="flex items-center justify-between">
-			<a href="/stores/{storeId}" class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-				<ArrowLeft class="w-4 h-4" />
-				<span>{$t('store.back')}</span>
-			</a>
-
-			<!-- Connection status -->
-			<div class="flex items-center gap-2 text-sm">
+<div class="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
+	<div class="flex items-center justify-end">
+		<!-- Connection status -->
+		<div class="flex items-center gap-2 text-sm">
 				{#if !liveState.edgeOnline}
 					<WifiOff class="w-4 h-4 text-red-500" />
 					<span class="text-red-600 font-medium">{$t('live.edge_offline')}</span>
@@ -893,7 +885,6 @@
 			</div>
 		</div>
 	{/if}
-</ConsoleLayout>
 
 <style>
 	@keyframes slide-up {

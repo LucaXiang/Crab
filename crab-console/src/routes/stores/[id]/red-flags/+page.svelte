@@ -2,11 +2,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { ArrowLeft, ShieldAlert } from 'lucide-svelte';
+	import { ShieldAlert } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import { getStoreRedFlags, ApiError, type RedFlagsResponse } from '$lib/api';
-	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 
 	const storeId = Number(page.params.id);
 
@@ -66,17 +65,8 @@
 	<title>{$t('red_flags.title')} — RedCoral Console</title>
 </svelte:head>
 
-<ConsoleLayout>
-	<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
-		<a
-			href="/stores/{storeId}"
-			class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
-		>
-			<ArrowLeft class="w-4 h-4" />
-			<span>{$t('store.back')}</span>
-		</a>
-
-		<div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
+	<div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
 			<div class="flex items-center gap-3">
 				<div
 					class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0"
@@ -251,4 +241,3 @@
 			</div>
 		{/if}
 	</div>
-</ConsoleLayout>

@@ -2,11 +2,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { ArrowLeft, BarChart3, Calendar } from 'lucide-svelte';
+	import { BarChart3, Calendar } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import { getStoreOverview, ApiError, type StoreOverview } from '$lib/api';
-	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 	import StoreOverviewDisplay from '$lib/components/StoreOverviewDisplay.svelte';
 
 	const storeId = Number(page.params.id);
@@ -56,23 +55,17 @@
 	<title>{dateStr} — {$t('stats.daily_report')} — RedCoral Console</title>
 </svelte:head>
 
-<ConsoleLayout>
-	<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
-		<div class="flex items-center gap-3">
-			<a href="/stores/{storeId}/stats" class="text-slate-400 hover:text-slate-600">
-				<ArrowLeft class="w-5 h-5" />
-			</a>
-			<div class="flex items-center gap-2">
-				<h1 class="font-heading text-lg md:text-xl font-bold text-slate-900">{$t('stats.daily_report')}</h1>
-				<span class="text-slate-300">/</span>
-				<span class="text-slate-600 font-medium flex items-center gap-1">
-					<Calendar class="w-4 h-4" />
-					{dateStr}
-				</span>
-			</div>
-		</div>
+<div class="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
+	<div class="flex items-center gap-2">
+		<h1 class="font-heading text-lg md:text-xl font-bold text-slate-900">{$t('stats.daily_report')}</h1>
+		<span class="text-slate-300">/</span>
+		<span class="text-slate-600 font-medium flex items-center gap-1">
+			<Calendar class="w-4 h-4" />
+			{dateStr}
+		</span>
+	</div>
 
-		{#if loading}
+	{#if loading}
 			<div class="flex items-center justify-center py-20">
 				<svg
 					class="animate-spin w-8 h-8 text-coral-500"
@@ -101,4 +94,3 @@
 			</div>
 		{/if}
 	</div>
-</ConsoleLayout>

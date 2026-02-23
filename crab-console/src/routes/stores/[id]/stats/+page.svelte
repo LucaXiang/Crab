@@ -2,12 +2,11 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { ArrowLeft, ScrollText } from 'lucide-svelte';
+	import { ScrollText } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { authToken, isAuthenticated, clearAuth } from '$lib/auth';
 	import { getStats, getStoreOverview, ApiError, type DailyReportEntry, type StoreOverview } from '$lib/api';
 	import { formatCurrency } from '$lib/format';
-	import ConsoleLayout from '$lib/components/ConsoleLayout.svelte';
 	import StoreOverviewDisplay from '$lib/components/StoreOverviewDisplay.svelte';
 
 	const storeId = Number(page.params.id);
@@ -83,16 +82,10 @@
 	<title>{$t('stats.daily_report')} — RedCoral Console</title>
 </svelte:head>
 
-<ConsoleLayout>
-	<div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
-		<div class="flex items-center gap-3">
-			<a href="/stores/{storeId}" class="text-slate-400 hover:text-slate-600">
-				<ArrowLeft class="w-5 h-5" />
-			</a>
-			<h1 class="font-heading text-xl font-bold text-slate-900">{$t('stats.daily_report')}</h1>
-		</div>
+<div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+	<h1 class="font-heading text-xl font-bold text-slate-900">{$t('stats.daily_report')}</h1>
 
-		{#if loading}
+	{#if loading}
 			<div class="flex items-center justify-center py-20">
 				<svg
 					class="animate-spin w-8 h-8 text-coral-500"
@@ -164,4 +157,3 @@
 			{/if}
 		{/if}
 	</div>
-</ConsoleLayout>

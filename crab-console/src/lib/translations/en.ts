@@ -198,6 +198,11 @@ export const en: Record<string, string> = {
 	'nav.tags': 'Tags',
 	'nav.attributes': 'Attributes',
 	'nav.price_rules': 'Price Rules',
+	'nav.store_settings': 'Store Settings',
+	'nav.group_operations': 'Operations',
+	'nav.group_catalog': 'Catalog',
+	'nav.group_manage': 'Management',
+	'nav.group_monitor': 'Monitor',
 
 	'products.title': 'Products',
 	'products.empty': 'No products synced.',
