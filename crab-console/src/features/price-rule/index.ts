@@ -1,0 +1,1 @@
+export { PriceRuleManagement } from './PriceRuleManagement';
