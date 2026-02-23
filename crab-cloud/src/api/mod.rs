@@ -4,7 +4,10 @@
 //! - `public_router`: HTTP port (health, register, webhook, update, tenant API)
 //! - `edge_router`: mTLS port (edge sync with SignedBinding + quota validation)
 
+pub mod catalog;
+pub mod console_ws;
 pub mod health;
+pub mod image;
 pub mod pki;
 pub mod register;
 pub mod stripe_webhook;
@@ -22,7 +25,7 @@ use crate::auth::rate_limit::{
 use crate::auth::tenant_auth::tenant_auth_middleware;
 use crate::state::AppState;
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{get, patch, post};
+use axum::routing::{get, patch, post, put};
 use axum::{Router, middleware};
 use http::HeaderName;
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -92,6 +95,82 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/commands",
             post(tenant::create_command).get(tenant::list_commands),
         )
+        // ── Catalog CRUD ──
+        .route(
+            "/api/tenant/stores/{id}/catalog/products",
+            get(catalog::list_products).post(catalog::create_product),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/products/{pid}",
+            put(catalog::update_product).delete(catalog::delete_product),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/categories",
+            get(catalog::list_categories).post(catalog::create_category),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/categories/{cid}",
+            put(catalog::update_category).delete(catalog::delete_category),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/tags",
+            get(catalog::list_tags).post(catalog::create_tag),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/tags/{tid}",
+            put(catalog::update_tag).delete(catalog::delete_tag),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/attributes",
+            get(catalog::list_attributes).post(catalog::create_attribute),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/attributes/{aid}",
+            put(catalog::update_attribute).delete(catalog::delete_attribute),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/attributes/bind",
+            post(catalog::bind_attribute),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/attributes/unbind",
+            post(catalog::unbind_attribute),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/price-rules",
+            get(catalog::list_price_rules).post(catalog::create_price_rule),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/price-rules/{rid}",
+            put(catalog::update_price_rule).delete(catalog::delete_price_rule),
+        )
+        // ── Employee CRUD ──
+        .route(
+            "/api/tenant/stores/{id}/catalog/employees",
+            post(catalog::create_employee),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/employees/{eid}",
+            put(catalog::update_employee).delete(catalog::delete_employee),
+        )
+        // ── Zone CRUD ──
+        .route(
+            "/api/tenant/stores/{id}/catalog/zones",
+            post(catalog::create_zone),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/zones/{zid}",
+            put(catalog::update_zone).delete(catalog::delete_zone),
+        )
+        // ── DiningTable CRUD ──
+        .route(
+            "/api/tenant/stores/{id}/catalog/tables",
+            post(catalog::create_table),
+        )
+        .route(
+            "/api/tenant/stores/{id}/catalog/tables/{tid}",
+            put(catalog::update_table).delete(catalog::delete_table),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             tenant_auth_middleware,
@@ -113,6 +192,15 @@ pub fn public_router(state: AppState) -> Router {
             state.clone(),
             password_reset_rate_limit,
         ));
+
+    // Image upload (JWT authenticated, 20MB body limit)
+    let image_upload = Router::new()
+        .route("/api/tenant/images", post(image::upload_image))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            tenant_auth_middleware,
+        ))
+        .layer(DefaultBodyLimit::max(20 * 1024 * 1024));
 
     // PKI routes (merged from crab-auth)
     let pki_routes = pki::pki_router();
@@ -159,14 +247,22 @@ pub fn public_router(state: AppState) -> Router {
         ])
         .max_age(std::time::Duration::from_secs(3600));
 
+    // Console WebSocket (独立路由，token 通过 query param 传递，handler 内自行鉴权)
+    let console_ws = Router::new().route(
+        "/api/tenant/live-orders/ws",
+        get(console_ws::handle_console_ws),
+    );
+
     Router::new()
         .route("/health", get(health::health_check))
         .merge(registration)
         .merge(webhook)
         .merge(app_update)
         .merge(tenant_api)
+        .merge(console_ws)
         .merge(tenant_login)
         .merge(password_reset)
+        .merge(image_upload)
         .merge(pki_routes)
         .merge(p12_upload)
         .merge(pki_auth_limited)

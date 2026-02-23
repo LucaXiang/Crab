@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { logger } from '@/utils/logger';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Attribute, AttributeOption } from '@/core/domain/types/api';
+import type { Attribute, AttributeOption, AttributeOptionInput } from '@/core/domain/types/api';
 import type { SyncPayload } from '@/core/stores/factory/createResourceStore';
 import { useProductStore } from '@/features/product';
 
@@ -342,8 +342,11 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { ...opt, display_order: newIdx };
       });
 
-      // Single API call to update all options
-      await getApi().updateAttribute(attributeId, { options: reorderedOptions });
+      // Single API call to update all options (strip entity-only fields for input)
+      const optionInputs: AttributeOptionInput[] = reorderedOptions.map(({ name, price_modifier, display_order, receipt_name, kitchen_print_name, enable_quantity, max_quantity }) => ({
+        name, price_modifier, display_order, receipt_name, kitchen_print_name, enable_quantity, max_quantity,
+      }));
+      await getApi().updateAttribute(attributeId, { options: optionInputs });
 
       // Update local state directly (no extra API calls)
       set((state) => {
@@ -392,7 +395,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 // Convenience hooks
 export const useAttributes = () => useAttributeStore((state) => state.items);
 export const useAttributesLoading = () => useAttributeStore((state) => state.isLoading);
-export const useAttributeById = (id: number) =>
+const useAttributeById = (id: number) =>
   useAttributeStore((state) => state.items.find((a) => a.id === id));
 
 // Action hooks
@@ -434,4 +437,4 @@ export const attributeHelpers = {
   },
 };
 
-export const useAttributeHelpers = () => attributeHelpers;
+const useAttributeHelpers = () => attributeHelpers;

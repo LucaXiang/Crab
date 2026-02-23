@@ -1,12 +1,25 @@
 import { createTauriClient } from '@/infrastructure/api';
 import { useProductStore } from './store';
 import { logger } from '@/utils/logger';
-import type { Product, Category, ProductSpec, PrintState } from '@/core/domain/types';
+import type { Product, Category, ProductSpec, ProductSpecInput, PrintState } from '@/core/domain/types';
 import { syncAttributeBindings } from '@/screens/Settings/utils';
 
 const getApi = () => createTauriClient();
 
-export interface ProductFormData {
+/** Strip entity-only fields (id, product_id) when sending to backend */
+function toSpecInput(spec: ProductSpec | ProductSpecInput): ProductSpecInput {
+  return {
+    name: spec.name,
+    price: spec.price,
+    display_order: spec.display_order,
+    is_default: spec.is_default,
+    is_active: spec.is_active,
+    is_root: spec.is_root,
+    receipt_name: spec.receipt_name,
+  };
+}
+
+interface ProductFormData {
   id?: number;
   name: string;
   receipt_name?: string;
@@ -126,7 +139,7 @@ export async function updateProduct(
 
   const existingSpecs = formData.specs ?? [];
   const updatedSpecs = existingSpecs.length > 0
-    ? existingSpecs
+    ? existingSpecs.map(toSpecInput)
     : [{
         name: formData.name.trim(),
         price: Math.max(0.01, price),

@@ -11,7 +11,7 @@ import { logger } from '@/utils/logger';
 import { SpecificationFormModal } from './SpecificationFormModal';
 import { canDeleteSpec, setDefaultSpec } from './spec-utils';
 import { useProductStore } from './store';
-import type { ProductSpec } from '@/core/domain/types';
+import type { ProductSpec, ProductSpecInput } from '@/core/domain/types';
 
 const getApi = () => createTauriClient();
 
@@ -53,7 +53,10 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
   const saveSpecs = async (newSpecs: ProductSpec[]) => {
     setIsSaving(true);
     try {
-      const updated = await getApi().updateProduct(productId, { specs: newSpecs });
+      const specInputs: ProductSpecInput[] = newSpecs.map(({ name, price, display_order, is_default, is_active, is_root, receipt_name }) => ({
+        name, price, display_order, is_default, is_active, is_root, receipt_name,
+      }));
+      const updated = await getApi().updateProduct(productId, { specs: specInputs });
       setSpecs(newSpecs);
 
       // Optimistic update - sync mechanism will also update via broadcast

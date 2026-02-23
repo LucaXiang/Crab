@@ -22,6 +22,7 @@ export interface Tag {
   name: string;
   color: string;
   display_order: number;
+  is_active: boolean;
   /** 系统标签 */
   is_system: boolean;
 }
@@ -36,6 +37,7 @@ export interface TagUpdate {
   name?: string;
   color?: string;
   display_order?: number;
+  is_active?: boolean;
 }
 
 // ============ Category ============
@@ -51,6 +53,7 @@ export interface Category {
   /** Whether kitchen printing is enabled for this category */
   is_kitchen_print_enabled: boolean;
   is_label_print_enabled: boolean;
+  is_active: boolean;
   /** Whether this is a virtual category (filters by tags instead of direct assignment) */
   is_virtual: boolean;
   /** Tag IDs for virtual category filtering */
@@ -91,6 +94,7 @@ export interface CategoryUpdate {
   /** Whether kitchen printing is enabled */
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
+  is_active?: boolean;
   /** Whether this is a virtual category */
   is_virtual?: boolean;
   /** Tag IDs for virtual category filtering */
@@ -103,18 +107,29 @@ export interface CategoryUpdate {
 
 // ============ Product ============
 
-/** Product spec (from product_spec table) */
+/** Product spec (from product_spec table, id/product_id present on read) */
 export interface ProductSpec {
   id?: number;
   product_id?: number;
   name: string;
   /** 小票显示名称 */
-  receipt_name?: string;
+  receipt_name: string | null;
   /** Price in currency unit (e.g., 10.50 = €10.50) */
   price: number;
   display_order: number;
   is_default: boolean;
   /** 根规格 */
+  is_root: boolean;
+  is_active: boolean;
+}
+
+/** Product spec input (for create/update, without id/product_id) */
+export interface ProductSpecInput {
+  name: string;
+  receipt_name?: string | null;
+  price: number;
+  display_order: number;
+  is_default: boolean;
   is_root: boolean;
   is_active: boolean;
 }
@@ -140,7 +155,7 @@ export interface ProductCreate {
   external_id?: number | null;
   tags?: number[];
   /** 规格列表 */
-  specs: ProductSpec[];
+  specs: ProductSpecInput[];
 }
 
 export interface ProductUpdate {
@@ -160,7 +175,7 @@ export interface ProductUpdate {
   external_id?: number | null;
   tags?: number[];
   /** 规格列表 */
-  specs?: ProductSpec[];
+  specs?: ProductSpecInput[];
 }
 
 /** Attribute binding with full attribute data */
@@ -211,11 +226,23 @@ export interface AttributeOption {
   /** Price modifier in currency unit (e.g., 2.50 = €2.50) */
   price_modifier: number;
   display_order: number;
+  is_active: boolean;
   receipt_name: string | null;
   kitchen_print_name: string | null;
   /** Enable quantity control for this option (default: false) */
-  enable_quantity?: boolean;
+  enable_quantity: boolean;
   /** Maximum quantity allowed (only effective when enable_quantity=true) */
+  max_quantity: number | null;
+}
+
+/** Attribute option input (for create/update, without id/attribute_id/is_active) */
+export interface AttributeOptionInput {
+  name: string;
+  price_modifier?: number;
+  display_order?: number;
+  receipt_name?: string | null;
+  kitchen_print_name?: string | null;
+  enable_quantity?: boolean;
   max_quantity?: number | null;
 }
 
@@ -226,6 +253,7 @@ export interface Attribute {
   max_selections: number | null;
   default_option_ids: number[] | null;
   display_order: number;
+  is_active: boolean;
   show_on_receipt: boolean;
   receipt_name: string | null;
   show_on_kitchen_print: boolean;
@@ -243,7 +271,7 @@ export interface AttributeCreate {
   receipt_name?: string;
   show_on_kitchen_print?: boolean;
   kitchen_print_name?: string;
-  options?: AttributeOption[];
+  options?: AttributeOptionInput[];
 }
 
 export interface AttributeUpdate {
@@ -252,11 +280,12 @@ export interface AttributeUpdate {
   max_selections?: number | null;
   default_option_ids?: number[] | null;
   display_order?: number;
+  is_active?: boolean;
   show_on_receipt?: boolean;
   receipt_name?: string;
   show_on_kitchen_print?: boolean;
   kitchen_print_name?: string;
-  options?: AttributeOption[];
+  options?: AttributeOptionInput[];
 }
 
 export interface AttributeBinding {
@@ -328,16 +357,18 @@ export interface Zone {
   id: number;
   name: string;
   description: string | null;
+  is_active: boolean;
 }
 
-export interface ZoneCreate {
+interface ZoneCreate {
   name: string;
   description?: string;
 }
 
-export interface ZoneUpdate {
+interface ZoneUpdate {
   name?: string;
   description?: string;
+  is_active?: boolean;
 }
 
 // ============ Dining Table ============
@@ -350,13 +381,13 @@ export interface DiningTable {
   is_active: boolean;
 }
 
-export interface DiningTableCreate {
+interface DiningTableCreate {
   name: string;
   zone_id: number;
   capacity?: number;
 }
 
-export interface DiningTableUpdate {
+interface DiningTableUpdate {
   name?: string;
   zone_id?: number;
   capacity?: number;
@@ -513,7 +544,7 @@ export interface MarketingGroupDetail extends MarketingGroup {
 
 // ============ Member ============
 
-export interface Member {
+interface Member {
   id: number;
   name: string;
   phone: string | null;
@@ -559,7 +590,7 @@ export interface MemberWithGroup extends Member {
 export type RewardStrategy = 'ECONOMIZADOR' | 'GENEROSO' | 'DESIGNATED';
 export type StampTargetType = 'CATEGORY' | 'PRODUCT';
 
-export interface StampActivity {
+interface StampActivity {
   id: number;
   marketing_group_id: number;
   name: string;
@@ -618,7 +649,7 @@ export interface StampRewardTarget {
   target_id: number;
 }
 
-export interface MemberStampProgress {
+interface MemberStampProgress {
   id: number;
   member_id: number;
   stamp_activity_id: number;
@@ -673,17 +704,18 @@ export interface Employee {
   role_id: number;
   is_system: boolean;
   is_active: boolean;
+  created_at: number;
 }
 
 
-export interface EmployeeCreate {
+interface EmployeeCreate {
   username: string;
   password: string;
   display_name?: string;
   role_id: number;
 }
 
-export interface EmployeeUpdate {
+interface EmployeeUpdate {
   username?: string;
   password?: string;
   display_name?: string;
@@ -694,8 +726,8 @@ export interface EmployeeUpdate {
 // ============ Table Short Names ============
 
 export type Table = DiningTable;
-export type TableCreate = DiningTableCreate;
-export type TableUpdate = DiningTableUpdate;
+type TableCreate = DiningTableCreate;
+type TableUpdate = DiningTableUpdate;
 
 
 // ============ Role ============
@@ -710,14 +742,14 @@ export interface Role {
   is_active: boolean;
 }
 
-export interface RoleCreate {
+interface RoleCreate {
   name: string;
   display_name?: string;
   description?: string;
   permissions?: string[];
 }
 
-export interface RoleUpdate {
+interface RoleUpdate {
   name?: string;
   display_name?: string;
   description?: string;
@@ -760,7 +792,7 @@ export interface ProductAttribute extends AttributeBinding {
 /**
  * CategoryAttribute represents an AttributeBinding where owner is a Category
  */
-export interface CategoryAttribute extends AttributeBinding {
+interface CategoryAttribute extends AttributeBinding {
   /** The attribute details when fetched with relations */
   attribute?: Attribute;
 }
@@ -771,7 +803,7 @@ export interface CategoryAttribute extends AttributeBinding {
  * 打印上下文 (完整 JSON，模板自取所需字段)
  * Aligned with edge-server printing types
  */
-export interface PrintItemContext {
+interface PrintItemContext {
   // 分类
   category_id: number;
   category_name: string;
@@ -801,7 +833,7 @@ export interface PrintItemContext {
 }
 
 /** 厨房订单菜品 */
-export interface KitchenOrderItem {
+interface KitchenOrderItem {
   context: PrintItemContext;
 }
 
@@ -809,7 +841,7 @@ export interface KitchenOrderItem {
  * 一次点单的厨房记录（对应一个 ItemsAdded 事件）
  * Used for kitchen order display and reprint
  */
-export interface KitchenOrder {
+interface KitchenOrder {
   /** Kitchen order ID (= event_id, UUID) */
   id: string;
   /** Parent order ID (UUID) */
@@ -828,7 +860,7 @@ export interface KitchenOrder {
  * 标签打印记录（单品级别）
  * Each item in an order can have multiple labels (one per quantity unit)
  */
-export interface LabelPrintRecord {
+interface LabelPrintRecord {
   /** Label record ID (UUID) */
   id: string;
   /** Parent order ID (UUID) */
@@ -846,7 +878,7 @@ export interface LabelPrintRecord {
 }
 
 /** Response for kitchen order list */
-export interface KitchenOrderListResponse {
+interface KitchenOrderListResponse {
   items: KitchenOrder[];
   total: number | null;
 }
@@ -892,7 +924,7 @@ export interface StoreInfoUpdate {
 // ============ Label Template (API DTOs) ============
 
 // Re-export LabelTemplate from print types for convenience
-export type { LabelTemplate, LabelField } from '../print/labelTemplate';
+export type { LabelTemplate } from '../print/labelTemplate';
 
 export interface LabelTemplateCreate {
   name: string;
