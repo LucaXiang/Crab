@@ -39,6 +39,8 @@ pub struct HealthResponse {
     status: &'static str,
     /// 版本号
     version: &'static str,
+    /// Git commit hash (short)
+    git_hash: &'static str,
     /// 租户 ID (如果已激活)
     #[serde(skip_serializing_if = "Option::is_none")]
     tenant_id: Option<String>,
@@ -57,6 +59,7 @@ pub struct HealthResponse {
 pub struct DetailedHealthResponse {
     status: &'static str,
     version: &'static str,
+    git_hash: &'static str,
     /// 运行时间 (秒)
     uptime_seconds: u64,
     /// 各组件检查结果
@@ -140,6 +143,7 @@ pub async fn health(State(state): State<ServerState>) -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "healthy",
         version: env!("CARGO_PKG_VERSION"),
+        git_hash: shared::GIT_HASH,
         tenant_id: activation.tenant_id,
         edge_id: activation.edge_id,
         is_activated: activation.is_activated,
@@ -167,6 +171,7 @@ pub async fn detailed_health(State(state): State<ServerState>) -> Json<DetailedH
     Json(DetailedHealthResponse {
         status: if all_ok { "healthy" } else { "degraded" },
         version: env!("CARGO_PKG_VERSION"),
+        git_hash: shared::GIT_HASH,
         uptime_seconds: get_uptime_seconds(),
         checks: HealthChecks {
             database: db_check,

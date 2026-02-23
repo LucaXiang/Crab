@@ -130,6 +130,7 @@
 			<div class="flex flex-col md:flex-row items-center gap-4">
 				<p class="text-slate-500 text-sm">
 					&copy; {new Date().getFullYear()} RedCoral. All rights reserved.
+				<span class="text-slate-600 ml-2">v{__APP_VERSION__} ({__GIT_HASH__})</span>
 				</p>
 			</div>
 			<div class="flex items-center gap-6">

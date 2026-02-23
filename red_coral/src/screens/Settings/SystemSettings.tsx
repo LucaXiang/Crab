@@ -208,7 +208,7 @@ export const SystemSettings: React.FC = () => {
                 <div>
                   <span className="text-sm font-medium text-gray-700">{t('settings.system.about.version')}</span>
                   {appVersion && (
-                    <span className="ml-2 text-sm font-mono text-gray-500">v{appVersion}</span>
+                    <span className="ml-2 text-sm font-mono text-gray-500">v{appVersion} ({__GIT_HASH__})</span>
                   )}
                 </div>
                 <UpdateButton

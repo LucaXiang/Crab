@@ -127,7 +127,7 @@
 					<LogOut class="w-4 h-4" />
 				</button>
 			</div>
-			<p class="px-3 pb-1 text-[10px] text-slate-300">v{__BUILD_VERSION__}</p>
+			<p class="px-3 pb-1 text-[10px] text-slate-300">v{__APP_VERSION__} ({__GIT_HASH__})</p>
 		</div>
 	</aside>
 

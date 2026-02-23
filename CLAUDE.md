@@ -146,30 +146,36 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 
 ## 版本管理
 
-**统一版本号**: 所有组件共享同一个语义化版本号 (SemVer)。
+4 个独立产品，各自独立版本号 (SemVer)：
 
-### 版本定义位置 (必须同步)
+| 产品 | 说明 | 版本定义位置 |
+|------|------|-------------|
+| **RedCoral POS** | Tauri 桌面 POS 应用 | 见下方 4 文件 |
+| **crab-cloud** | 云端服务 | `Cargo.toml` workspace version |
+| **crab-portal** | 官网/落地页 | `crab-portal/package.json` |
+| **crab-console** | 管理后台 | `crab-console/package.json` |
 
-| 文件 | 字段 | 说明 |
-|------|------|------|
-| `Cargo.toml` (workspace root) | `workspace.package.version` | Rust crates 唯一版本源 |
-| `red_coral/src-tauri/Cargo.toml` | `version` | Tauri crate (不继承 workspace，手动同步) |
-| `red_coral/src-tauri/tauri.conf.json` | `version` | Tauri 安装包 + 自动更新版本 |
-| `red_coral/package.json` | `version` | 前端 npm 版本 |
+### RedCoral POS 版本定义 (4 文件必须同步)
+
+| 文件 | 字段 |
+|------|------|
+| `Cargo.toml` (workspace root) | `workspace.package.version` |
+| `red_coral/src-tauri/Cargo.toml` | `version` |
+| `red_coral/src-tauri/tauri.conf.json` | `version` |
+| `red_coral/package.json` | `version` |
+
+### Git Hash
+
+- `shared::GIT_HASH` — 编译期自动嵌入 (`shared/build.rs`)
+- 所有 health endpoint 返回 `git_hash` 字段
+- 无需手动维护
 
 ### 发版流程
 
-1. 修改上述 4 个文件的版本号 (必须完全一致)
-2. 提交: `chore: bump version to X.Y.Z`
-3. 打 tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
-4. CI 自动构建 + 上传 S3 + 生成更新清单
-
-### 版本规则
-
-- 所有组件版本 **必须一致**，禁止组件间版本分裂
-- `crab-portal` 和 `crab-console` 是独立 Web 项目，不参与版本同步
-- Git tag 格式: `vX.Y.Z` (带 `v` 前缀)
-- 运行时版本通过 `env!("CARGO_PKG_VERSION")` 编译期嵌入，无需手动维护
+1. 修改对应产品的版本号文件
+2. 提交: `chore(product): bump version to X.Y.Z`
+3. 打 tag: `git tag product-vX.Y.Z && git push origin product-vX.Y.Z`
+4. RedCoral POS tag 格式 `vX.Y.Z`，触发 CI 自动构建 + S3 上传
 
 ## 执行风格
 

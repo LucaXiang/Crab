@@ -1,11 +1,18 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execSync } from 'child_process';
+
+let gitHash = 'unknown';
+try { gitHash = execSync('git rev-parse --short HEAD').toString().trim(); } catch { /* not a git repo */ }
 
 export default defineConfig(({ mode }) => {
     const isProduction = mode === 'production';
 
     return {
+      define: {
+        __GIT_HASH__: JSON.stringify(gitHash),
+      },
       base: './',
       server: {
         port: 3000,

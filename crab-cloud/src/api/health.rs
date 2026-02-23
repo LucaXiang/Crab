@@ -17,7 +17,7 @@ pub async fn health_check(State(state): State<AppState>) -> Json<serde_json::Val
         "status": status,
         "service": "crab-cloud",
         "version": env!("CARGO_PKG_VERSION"),
-        "git_hash": option_env!("GIT_HASH").unwrap_or("dev"),
+        "git_hash": shared::GIT_HASH,
         "db": db_ok,
     }))
 }

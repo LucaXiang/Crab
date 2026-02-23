@@ -15,6 +15,9 @@ pub mod request;
 pub mod types;
 pub mod util;
 
+/// Git commit hash (short), embedded at compile time by build.rs
+pub const GIT_HASH: &str = env!("GIT_HASH");
+
 /// Default auth server URL (production, public HTTPS via Caddy)
 pub const DEFAULT_AUTH_SERVER_URL: &str = "https://auth.redcoral.app";
 
