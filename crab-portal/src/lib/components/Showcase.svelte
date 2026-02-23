@@ -42,10 +42,10 @@
 
 	let activeIndex = $state(0);
 	let sectionEl: HTMLElement | undefined = $state(undefined);
+	let clickLock = false;
 
 	function handleScroll() {
-		if (!sectionEl) return;
-		// Only activate sticky scroll on desktop (lg+)
+		if (!sectionEl || clickLock) return;
 		if (window.innerWidth < 1024) return;
 
 		const rect = sectionEl.getBoundingClientRect();
@@ -62,6 +62,12 @@
 			Math.floor(progress * showcaseItems.length)
 		);
 		activeIndex = newIndex;
+	}
+
+	function selectItem(i: number) {
+		activeIndex = i;
+		clickLock = true;
+		setTimeout(() => (clickLock = false), 800);
 	}
 </script>
 
@@ -148,7 +154,7 @@
 					<div class="space-y-2">
 						{#each showcaseItems as item, i}
 							<button
-								onclick={() => (activeIndex = i)}
+								onclick={() => selectItem(i)}
 								class="w-full text-left p-4 rounded-xl transition-all duration-300 cursor-pointer group {activeIndex === i
 									? 'bg-white/8 border border-white/10'
 									: 'bg-transparent border border-transparent hover:bg-white/4'}"
