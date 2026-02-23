@@ -4,7 +4,6 @@
 //! - Server 模式: 本地运行 edge-server，使用 In-Process 通信
 //! - Client 模式: 连接远程 edge-server，使用 mTLS 通信
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tracing_appender::rolling;
@@ -51,7 +50,8 @@ pub async fn run() {
     tauri::Builder::default()
         .setup(|app| {
             // 1. Initialize logging system
-            let log_dir = app.path().app_data_dir()?.join("logs");
+            let app_data_dir = app.path().app_data_dir()?;
+            let log_dir = app_data_dir.join("logs");
             std::fs::create_dir_all(&log_dir)
                 .map_err(|e| format!("Failed to create logs directory: {}", e))?;
 
@@ -104,16 +104,11 @@ pub async fn run() {
 
             tracing::info!(path = log_dir.display().to_string(), "Tracing initialized successfully");
 
-            // 2. Setup data directory
-            let app_data_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let work_dir = app_data_dir.join("redcoral");
-            std::fs::create_dir_all(&work_dir).ok();
+            // 2. Initialize ClientBridge
+            tracing::info!(app_data_dir = %app_data_dir.display(), "RedCoral POS starting...");
 
-            tracing::info!(work_dir = %work_dir.display(), "RedCoral POS starting...");
-
-            // 3. Initialize ClientBridge with AppHandle for event emission
             let client_name = format!("redcoral-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown"));
-            let bridge = ClientBridge::with_app_handle(&work_dir, &client_name, Some(app.handle().clone()))
+            let bridge = ClientBridge::with_app_handle(&app_data_dir, &client_name, Some(app.handle().clone()))
                 .map_err(|e| format!("Failed to initialize ClientBridge: {}", e))?;
 
             let bridge = Arc::new(bridge);

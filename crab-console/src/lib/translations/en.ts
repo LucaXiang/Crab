@@ -6,6 +6,7 @@ export const en: Record<string, string> = {
 	'auth.login_cta': 'Sign in',
 	'auth.loading': 'Processing...',
 	'auth.error_generic': 'An error occurred. Please try again.',
+	'auth.error_retry': 'Retry',
 	'auth.error_invalid': 'Invalid email or password.',
 	'auth.forgot': 'Forgot password?',
 	'auth.forgot_desc': 'Enter your email and we will send a reset code.',
@@ -86,7 +87,7 @@ export const en: Record<string, string> = {
 	'store.business_day_cutoff': 'Business Day Cutoff',
 	'store.save': 'Save Changes',
 	'store.saving': 'Saving...',
-	'store.edit': 'Edit Store',
+	'store.saved': 'Saved',
 
 	'orders.title': 'Orders',
 	'orders.receipt': 'Receipt',

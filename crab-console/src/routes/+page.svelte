@@ -197,8 +197,17 @@
 				</svg>
 			</div>
 		{:else if error}
-			<div class="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-				{error}
+			<div class="flex flex-col items-center justify-center py-16">
+				<div class="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+					<AlertTriangle class="w-7 h-7 text-red-400" />
+				</div>
+				<p class="text-sm text-slate-600 mb-4">{error}</p>
+				<button
+					onclick={() => window.location.reload()}
+					class="text-sm font-medium text-coral-600 hover:text-coral-700 transition-colors cursor-pointer"
+				>
+					{$t('auth.error_retry')}
+				</button>
 			</div>
 		{:else if needsOnboarding}
 			<!-- Onboarding step indicator -->

@@ -237,6 +237,7 @@ pub fn public_router(state: AppState) -> Router {
             http::Method::GET,
             http::Method::POST,
             http::Method::PUT,
+            http::Method::PATCH,
             http::Method::DELETE,
             http::Method::OPTIONS,
         ])

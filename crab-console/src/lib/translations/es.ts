@@ -7,6 +7,7 @@ export const es: Record<string, string> = {
 	'auth.login_cta': 'Iniciar sesión',
 	'auth.loading': 'Procesando...',
 	'auth.error_generic': 'Error, inténtalo de nuevo.',
+	'auth.error_retry': 'Reintentar',
 	'auth.error_invalid': 'Correo o contraseña incorrectos.',
 	'auth.forgot': '¿Olvidaste tu contraseña?',
 	'auth.forgot_desc': 'Introduce tu email y te enviaremos un código de recuperación.',

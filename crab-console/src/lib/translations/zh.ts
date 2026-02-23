@@ -6,6 +6,7 @@ export const zh: Record<string, string> = {
 	'auth.login_cta': '登录',
 	'auth.loading': '处理中...',
 	'auth.error_generic': '发生错误，请重试。',
+	'auth.error_retry': '重试',
 	'auth.error_invalid': '邮箱或密码不正确。',
 	'auth.forgot': '忘记密码？',
 	'auth.forgot_desc': '输入你的邮箱，我们将发送重置验证码。',
@@ -86,7 +87,7 @@ export const zh: Record<string, string> = {
 	'store.business_day_cutoff': '营业日分界时间',
 	'store.save': '保存更改',
 	'store.saving': '正在保存...',
-	'store.edit': '编辑门店',
+	'store.saved': '已保存',
 
 	'orders.title': '订单',
 	'orders.receipt': '小票号',
