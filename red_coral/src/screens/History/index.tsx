@@ -4,6 +4,8 @@ import { t } from '@/infrastructure/i18n';
 import { getErrorMessage } from '@/utils/error';
 import { useHistoryOrderList } from '@/hooks/useHistoryOrderList';
 import { useHistoryOrderDetail } from '@/hooks/useHistoryOrderDetail';
+import { usePrinterStore } from '@/core/stores/printer/usePrinterStore';
+import { reprintArchivedReceipt } from '@/core/services/order/paymentService';
 import { HistorySidebar } from './HistorySidebar';
 import { HistoryDetail } from './HistoryDetail';
 
@@ -44,10 +46,20 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
 
   const totalPages = Math.ceil(total / pageSize) || 1;
 
+  const receiptPrinter = usePrinterStore((state) => state.receiptPrinter);
+
   const handleReprint = async () => {
     if (!selectedOrder) return;
-    // TODO: 收据重打由服务端处理，待接入后端 API
-    toast.warning(t('common.message.not_implemented'));
+    if (!receiptPrinter) {
+      toast.warning(t('settings.printer.no_printer'));
+      return;
+    }
+    try {
+      await reprintArchivedReceipt(selectedOrder, receiptPrinter);
+      toast.success(t('common.message.receipt_print_success'));
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   return (

@@ -66,6 +66,7 @@ export interface ReceiptData {
   checkout_time: string | null;
   void_reason: string | null;
   reprint: boolean;
+  pre_payment: boolean;
   store_info: ReceiptStoreInfo | null;
   surcharge: ReceiptSurchargeInfo | null;
   items: ReceiptItem[];

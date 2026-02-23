@@ -3,11 +3,14 @@
 //! This module provides a high-level printing API for the Tauri application,
 //! using crab-printer for low-level printer operations.
 
+use crate::commands::printer::LabelPrintRequest;
 use tracing::instrument;
 
 #[cfg(target_os = "windows")]
 mod platform {
+    use crate::commands::printer::LabelPrintRequest;
     use crate::utils::escpos_text::{convert_mixed_utf8_to_gbk, process_logo};
+    use crate::utils::label_printer::{LabelTemplate, PrintOptions};
     use crate::utils::receipt_renderer::ReceiptRenderer;
     use crab_printer::WindowsPrinter;
     use tracing::{error, info, warn};
@@ -29,13 +32,7 @@ mod platform {
 
         let final_bytes = convert_mixed_utf8_to_gbk(&bytes);
         let printer = WindowsPrinter::new(&name);
-
-        tokio::runtime::Handle::current()
-            .block_on(async {
-                use crab_printer::Printer;
-                printer.print(&final_bytes).await
-            })
-            .map_err(|e| e.to_string())
+        printer.print_sync(&final_bytes).map_err(|e| e.to_string())
     }
 
     pub fn open_cash_drawer(printer_name: Option<String>) -> Result<(), String> {
@@ -75,19 +72,41 @@ mod platform {
         let text_bytes = convert_mixed_utf8_to_gbk(output.as_bytes());
         data.extend_from_slice(&text_bytes);
 
-        // Print using crab-printer
+        // Print using crab-printer (sync — no async overhead needed)
         let printer = WindowsPrinter::new(&name);
-        tokio::runtime::Handle::current()
-            .block_on(async {
-                use crab_printer::Printer;
-                printer.print(&data).await
-            })
-            .map_err(|e| e.to_string())
+        printer.print_sync(&data).map_err(|e| e.to_string())
+    }
+
+    pub fn print_label(request: LabelPrintRequest) -> Result<(), String> {
+        let template: Option<LabelTemplate> = request
+            .template
+            .and_then(|v| serde_json::from_value(v).ok());
+
+        let options = PrintOptions {
+            printer_name: request.printer_name,
+            doc_name: "label".to_string(),
+            label_width_mm: request.label_width_mm.unwrap_or(40.0),
+            label_height_mm: request.label_height_mm.unwrap_or(30.0),
+            copies: 1,
+            fit: crate::utils::label_printer::FitMode::Contain,
+            rotate: crate::utils::label_printer::Rotation::R0,
+            override_dpi: request.override_dpi,
+        };
+
+        info!(?options, "printing label");
+        crate::utils::label_printer::render_and_print_label(
+            &request.data,
+            template.as_ref(),
+            &options,
+        )
+        .map_err(|e| format!("{}", e))
     }
 }
 
 #[cfg(not(target_os = "windows"))]
 mod platform {
+    use crate::commands::printer::LabelPrintRequest;
+
     pub fn list_printers() -> Result<Vec<String>, String> {
         Ok(Vec::new())
     }
@@ -112,6 +131,10 @@ mod platform {
         _printer_name: Option<String>,
         _receipt: crate::api::ReceiptData,
     ) -> Result<(), String> {
+        Err("PRINTING_NOT_SUPPORTED".to_string())
+    }
+
+    pub fn print_label(_request: LabelPrintRequest) -> Result<(), String> {
         Err("PRINTING_NOT_SUPPORTED".to_string())
     }
 }
@@ -142,4 +165,9 @@ pub fn print_receipt(
     receipt: crate::api::ReceiptData,
 ) -> Result<(), String> {
     platform::print_receipt(printer_name, receipt)
+}
+
+#[instrument(skip(request))]
+pub fn print_label(request: LabelPrintRequest) -> Result<(), String> {
+    platform::print_label(request)
 }

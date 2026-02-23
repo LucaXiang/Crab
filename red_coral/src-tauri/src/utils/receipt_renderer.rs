@@ -22,6 +22,14 @@ impl<'a> ReceiptRenderer<'a> {
             b.bold_off();
             b.size_reset();
             b.write("\n");
+        } else if self.receipt.pre_payment {
+            b.align_center();
+            b.size_double();
+            b.bold_on();
+            b.write_line("*** CUENTA ***");
+            b.bold_off();
+            b.size_reset();
+            b.write("\n");
         } else if self.receipt.reprint {
             b.align_center();
             b.size_double();
@@ -384,13 +392,16 @@ impl<'a> ReceiptRenderer<'a> {
         b.write("\x1D\x28\x6B\x03\x00\x31\x43\x06");
         b.write("\x1D\x28\x6B\x03\x00\x31\x45\x31");
         let data_bytes = qr_payload.as_bytes();
-        let p_l = (data_bytes.len() + 3) as u8;
+        // GS ( k: pL pH = (data_len + 3) as u16 little-endian
+        let total_len = (data_bytes.len() + 3) as u16;
+        let p_l = (total_len & 0xFF) as u8;
+        let p_h = (total_len >> 8) as u8;
         let mut store_cmd = String::new();
         store_cmd.push('\x1D');
         store_cmd.push('(');
         store_cmd.push('k');
         store_cmd.push(char::from(p_l));
-        store_cmd.push('\x00');
+        store_cmd.push(char::from(p_h));
         store_cmd.push('\x31');
         store_cmd.push('\x50');
         store_cmd.push('\x30');

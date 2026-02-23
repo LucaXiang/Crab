@@ -61,6 +61,8 @@ pub struct ReceiptData {
     pub checkout_time: Option<String>,
     pub void_reason: Option<String>,
     pub reprint: bool,
+    #[serde(default)]
+    pub pre_payment: bool,
     pub store_info: Option<StoreInfo>,
     pub surcharge: Option<SurchargeInfo>,
     pub items: Vec<ReceiptItem>,

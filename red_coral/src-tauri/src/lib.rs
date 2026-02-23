@@ -300,6 +300,7 @@ pub async fn run() {
             commands::list_printers,
             commands::open_cash_drawer,
             commands::print_receipt,
+            commands::print_label,
             // Health commands
             commands::get_health_status,
             // Shift commands (班次管理)

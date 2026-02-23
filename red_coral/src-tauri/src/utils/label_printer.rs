@@ -1299,16 +1299,6 @@ pub fn render_and_print_label(
     // Apply threshold for sharper output on thermal printers
     apply_threshold(&mut rgba_data, width, height, 185);
 
-    // DEBUG: Save to D:/debug.png
-    // Ignore errors for debug saving
-    let _ = image::save_buffer(
-        "D:/debug.png",
-        &rgba_data,
-        width,
-        height,
-        image::ColorType::Rgba8,
-    );
-
     // Print the rendered label
     print_rgba_premul(&rgba_data, width, height, options)
 }

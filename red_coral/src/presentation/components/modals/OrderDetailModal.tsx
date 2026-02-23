@@ -5,6 +5,8 @@ import { useI18n } from '@/hooks/useI18n';
 import { HistoryDetail } from '@/screens/History/HistoryDetail';
 import { toast } from '@/presentation/components/Toast';
 import { getErrorMessage } from '@/utils/error';
+import { usePrinterStore } from '@/core/stores/printer/usePrinterStore';
+import { reprintArchivedReceipt } from '@/core/services/order/paymentService';
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -22,10 +24,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   if (!isOpen) return null;
 
+  const receiptPrinter = usePrinterStore((state) => state.receiptPrinter);
+
   const handleReprint = async () => {
     if (!order) return;
-    // TODO: 收据重打由服务端处理，待接入后端 API
-    toast.warning(t('common.message.not_implemented'));
+    if (!receiptPrinter) {
+      toast.warning(t('settings.printer.no_printer'));
+      return;
+    }
+    try {
+      await reprintArchivedReceipt(order, receiptPrinter);
+      toast.success(t('common.message.receipt_print_success'));
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   if (loading) {

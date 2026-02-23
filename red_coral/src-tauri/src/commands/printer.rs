@@ -5,6 +5,7 @@
 use crate::api::printers::ReceiptData;
 use crate::core::response::{ApiResponse, ErrorCode};
 use crate::utils::printing;
+use serde::Deserialize;
 
 /// 获取本地驱动打印机列表
 #[tauri::command]
@@ -50,6 +51,35 @@ pub fn print_receipt(
     receipt: ReceiptData,
 ) -> Result<ApiResponse<()>, String> {
     match printing::print_receipt(printer_name, receipt) {
+        Ok(()) => Ok(ApiResponse::success(())),
+        Err(e) => {
+            if e == "PRINTING_NOT_SUPPORTED" {
+                Ok(ApiResponse::error_with_code(
+                    ErrorCode::PrinterNotAvailable,
+                    ErrorCode::PrinterNotAvailable.message().to_string(),
+                ))
+            } else {
+                Ok(ApiResponse::error_with_code(ErrorCode::PrintFailed, e))
+            }
+        }
+    }
+}
+
+/// 标签打印请求参数
+#[derive(Debug, Deserialize)]
+pub struct LabelPrintRequest {
+    pub printer_name: Option<String>,
+    pub data: serde_json::Value,
+    pub template: Option<serde_json::Value>,
+    pub label_width_mm: Option<f32>,
+    pub label_height_mm: Option<f32>,
+    pub override_dpi: Option<f32>,
+}
+
+/// 打印标签
+#[tauri::command]
+pub fn print_label(request: LabelPrintRequest) -> Result<ApiResponse<()>, String> {
+    match printing::print_label(request) {
         Ok(()) => Ok(ApiResponse::success(())),
         Err(e) => {
             if e == "PRINTING_NOT_SUPPORTED" {

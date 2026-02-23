@@ -5,7 +5,7 @@ import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { useRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
+import { openCashDrawer, printOrderReceipt, printPrePaymentReceipt } from '@/core/services/order/paymentService';
 import { completeOrder, updateOrderInfo } from '@/core/stores/order/commands';
 import { usePrinterStore } from '@/core/stores/printer/usePrinterStore';
 
@@ -152,16 +152,22 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
         return;
       }
 
+      // 标记订单为预付状态
       await updateOrderInfo(order.order_id, {
         is_pre_payment: true,
       });
+
+      // 打印预付单
+      if (receiptPrinter) {
+        await printPrePaymentReceipt(order, receiptPrinter);
+      }
 
       toast.success(t('settings.payment.receipt_print_success'));
     } catch (error) {
       logger.error('Pre-payment print failed', error);
       toast.error(t('settings.payment.receipt_print_failed'));
     }
-  }, [order, t]);
+  }, [order, receiptPrinter, t]);
 
   return {
     isProcessing,

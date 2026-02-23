@@ -369,8 +369,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           override_dpi: template.render_dpi
         };
 
-        // TODO: Call server-side label print API for test printing
-        logger.warn('Label print API not yet implemented', { component: 'LabelEditor' });
+        await invokeApi('print_label', { request: ticketData });
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),

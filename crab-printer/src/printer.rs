@@ -338,6 +338,11 @@ impl WindowsPrinter {
         }
     }
 
+    /// Send raw ESC/POS data synchronously (for use from sync/blocking contexts)
+    pub fn print_sync(&self, data: &[u8]) -> PrintResult<()> {
+        self.write_raw(data)
+    }
+
     /// Send ESC/POS command to open cash drawer
     ///
     /// Tries pin 2 first, then pin 5 if that fails.
