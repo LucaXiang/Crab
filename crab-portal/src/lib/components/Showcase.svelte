@@ -45,11 +45,13 @@
 
 	function handleScroll() {
 		if (!sectionEl) return;
+		// Only activate sticky scroll on desktop (lg+)
+		if (window.innerWidth < 1024) return;
+
 		const rect = sectionEl.getBoundingClientRect();
 		const sectionHeight = sectionEl.offsetHeight;
 		const viewportHeight = window.innerHeight;
 
-		// Calculate scroll progress within the section
 		const scrolled = -rect.top;
 		const scrollableHeight = sectionHeight - viewportHeight;
 		if (scrollableHeight <= 0) return;
@@ -65,9 +67,59 @@
 
 <svelte:window onscroll={handleScroll} />
 
+<!-- Mobile: vertical card list (no sticky scroll) -->
+<section class="lg:hidden bg-slate-900 py-16 px-6">
+	<div class="max-w-lg mx-auto">
+		<p class="text-coral-500 text-sm font-semibold tracking-wide uppercase mb-3">
+			{$t('showcase.label')}
+		</p>
+		<h2 class="font-heading text-2xl font-bold text-white mb-3">
+			{$t('showcase.title')}
+		</h2>
+		<p class="text-slate-400 text-sm leading-relaxed mb-8">{$t('showcase.subtitle')}</p>
+
+		<div class="space-y-4">
+			{#each showcaseItems as item, i}
+				<div class="bg-white/5 border border-white/10 rounded-xl p-4">
+					<div class="flex items-start gap-3">
+						<div class="w-10 h-10 rounded-lg bg-coral-500/20 text-coral-400 flex items-center justify-center shrink-0">
+							<item.icon class="w-5 h-5" />
+						</div>
+						<div class="flex-1 min-w-0">
+							<h3 class="text-sm font-semibold text-white">{$t(item.titleKey)}</h3>
+							<p class="text-sm text-slate-400 mt-1 leading-relaxed">{$t(item.descKey)}</p>
+						</div>
+					</div>
+					<!-- Mobile screenshot -->
+					<div class="mt-3 rounded-lg overflow-hidden bg-slate-800 border border-white/5 aspect-[16/10]">
+						<img
+							src={item.image}
+							alt={$t(item.titleKey)}
+							class="w-full h-full object-cover object-top"
+							onerror={(e) => {
+								const target = e.currentTarget as HTMLImageElement;
+								target.style.display = 'none';
+								const parent = target.parentElement;
+								if (parent && !parent.querySelector('.placeholder')) {
+									const div = document.createElement('div');
+									div.className = 'placeholder absolute inset-0 flex items-center justify-center';
+									div.innerHTML = `<p class="text-slate-600 text-xs">Screenshot coming soon</p>`;
+									parent.style.position = 'relative';
+									parent.appendChild(div);
+								}
+							}}
+						/>
+					</div>
+				</div>
+			{/each}
+		</div>
+	</div>
+</section>
+
+<!-- Desktop: sticky scroll layout -->
 <section
 	bind:this={sectionEl}
-	class="relative bg-slate-900"
+	class="relative bg-slate-900 hidden lg:block"
 	style="height: {100 + showcaseItems.length * 80}vh;"
 >
 	<div class="sticky top-0 h-screen overflow-hidden">
@@ -79,7 +131,7 @@
 		</div>
 
 		<div class="relative h-full max-w-7xl mx-auto px-6 flex items-center">
-			<div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center w-full">
+			<div class="grid grid-cols-2 gap-16 items-center w-full">
 				<!-- Left: Text content -->
 				<div class="space-y-8">
 					<div>
@@ -132,23 +184,10 @@
 							</button>
 						{/each}
 					</div>
-
-					<!-- Progress dots (mobile) -->
-					<div class="flex gap-2 lg:hidden justify-center">
-						{#each showcaseItems as _, i}
-							<button
-								onclick={() => (activeIndex = i)}
-								aria-label="Go to slide {i + 1}"
-								class="w-2 h-2 rounded-full transition-all duration-300 cursor-pointer {activeIndex === i
-									? 'bg-coral-500 w-6'
-									: 'bg-slate-600'}"
-							></button>
-						{/each}
-					</div>
 				</div>
 
 				<!-- Right: Screenshot -->
-				<div class="relative hidden lg:block">
+				<div class="relative">
 					<div class="relative rounded-2xl overflow-hidden bg-slate-800 border border-white/10 shadow-2xl shadow-black/50 aspect-[4/3]">
 						{#each showcaseItems as item, i}
 							<div

@@ -146,6 +146,32 @@
 			</div>
 		</div>
 
+		<!-- Mobile: floating stat cards -->
+		<div class="flex lg:hidden gap-3 mt-10 justify-center">
+			<div class="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-lg animate-bounce" style="animation-duration: 3s;">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+					</div>
+					<div>
+						<div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Ventas Perdidas</div>
+						<div class="text-lg font-bold text-emerald-400">0</div>
+					</div>
+				</div>
+			</div>
+			<div class="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-lg animate-bounce" style="animation-duration: 4s; animation-delay: 0.5s;">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400">
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+					</div>
+					<div>
+						<div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Registrado</div>
+						<div class="text-lg font-bold text-amber-400">100%</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
 		<!-- Stats bar -->
 		<div
 			class="mt-24 flex flex-wrap justify-center md:justify-start items-center gap-x-12 gap-y-8 border-t border-white/6 pt-10"
