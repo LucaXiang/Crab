@@ -1199,6 +1199,12 @@ pub async fn create_product_direct(
         .await?;
     }
 
+    // Set spec source_id = id (consistent with all other entities)
+    sqlx::query("UPDATE catalog_product_specs SET source_id = id WHERE product_id = $1")
+        .bind(pg_id)
+        .execute(&mut *tx)
+        .await?;
+
     // Insert tags
     if let Some(ref tags) = data.tags {
         for tag_id in tags {
@@ -1212,34 +1218,33 @@ pub async fn create_product_direct(
         }
     }
 
+    // Query back real spec IDs after source_id = id
+    let spec_rows: Vec<CatalogProductSpecRow> = sqlx::query_as(
+        "SELECT id, product_id, source_id, name, price, display_order, is_default, is_active, receipt_name, is_root FROM catalog_product_specs WHERE product_id = $1 ORDER BY display_order",
+    )
+    .bind(pg_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
     tx.commit().await?;
 
-    let product_full = build_product_full_from_create(pg_id, data);
-    Ok((pg_id, CatalogOpData::Product(product_full)))
-}
-
-fn build_product_full_from_create(source_id: i64, data: &ProductCreate) -> ProductFull {
-    use shared::models::product::ProductSpec;
-
-    let specs: Vec<ProductSpec> = data
-        .specs
-        .iter()
-        .enumerate()
-        .map(|(i, s)| ProductSpec {
-            id: i as i64 + 1,
-            product_id: source_id,
-            name: s.name.clone(),
-            price: s.price,
-            display_order: s.display_order,
-            is_default: s.is_default,
-            is_active: s.is_active,
-            receipt_name: s.receipt_name.clone(),
-            is_root: s.is_root,
+    let specs: Vec<ProductSpec> = spec_rows
+        .into_iter()
+        .map(|r| ProductSpec {
+            id: r.source_id,
+            product_id: pg_id,
+            name: r.name,
+            price: r.price,
+            display_order: r.display_order,
+            is_default: r.is_default,
+            is_active: r.is_active,
+            receipt_name: r.receipt_name,
+            is_root: r.is_root,
         })
         .collect();
 
-    ProductFull {
-        id: source_id,
+    let product_full = ProductFull {
+        id: pg_id,
         name: data.name.clone(),
         image: data.image.clone().unwrap_or_default(),
         category_id: data.category_id,
@@ -1254,7 +1259,8 @@ fn build_product_full_from_create(source_id: i64, data: &ProductCreate) -> Produ
         specs,
         attributes: vec![],
         tags: vec![],
-    }
+    };
+    Ok((pg_id, CatalogOpData::Product(product_full)))
 }
 
 pub async fn update_product_direct(
@@ -1336,6 +1342,11 @@ pub async fn update_product_direct(
             .execute(&mut *tx)
             .await?;
         }
+        // Set spec source_id = id
+        sqlx::query("UPDATE catalog_product_specs SET source_id = id WHERE product_id = $1")
+            .bind(pg_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     if let Some(ref tags) = data.tags {
@@ -1492,22 +1503,28 @@ pub async fn update_category_direct(
     .execute(&mut *tx)
     .await?;
 
-    if data.kitchen_print_destinations.is_some() || data.label_print_destinations.is_some() {
-        sqlx::query("DELETE FROM catalog_category_print_dest WHERE category_id = $1")
-            .bind(pg_id)
-            .execute(&mut *tx)
-            .await?;
-        if let Some(ref dests) = data.kitchen_print_destinations {
-            for dest_id in dests {
-                sqlx::query("INSERT INTO catalog_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'kitchen')")
-                    .bind(pg_id).bind(dest_id).execute(&mut *tx).await?;
-            }
+    if let Some(ref dests) = data.kitchen_print_destinations {
+        sqlx::query(
+            "DELETE FROM catalog_category_print_dest WHERE category_id = $1 AND purpose = 'kitchen'",
+        )
+        .bind(pg_id)
+        .execute(&mut *tx)
+        .await?;
+        for dest_id in dests {
+            sqlx::query("INSERT INTO catalog_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'kitchen')")
+                .bind(pg_id).bind(dest_id).execute(&mut *tx).await?;
         }
-        if let Some(ref dests) = data.label_print_destinations {
-            for dest_id in dests {
-                sqlx::query("INSERT INTO catalog_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'label')")
-                    .bind(pg_id).bind(dest_id).execute(&mut *tx).await?;
-            }
+    }
+    if let Some(ref dests) = data.label_print_destinations {
+        sqlx::query(
+            "DELETE FROM catalog_category_print_dest WHERE category_id = $1 AND purpose = 'label'",
+        )
+        .bind(pg_id)
+        .execute(&mut *tx)
+        .await?;
+        for dest_id in dests {
+            sqlx::query("INSERT INTO catalog_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'label')")
+                .bind(pg_id).bind(dest_id).execute(&mut *tx).await?;
         }
     }
 
@@ -1542,6 +1559,8 @@ pub async fn create_tag_direct(
     let color = data.color.as_deref().unwrap_or("#3B82F6");
     let display_order = data.display_order.unwrap_or(0);
 
+    let mut tx = pool.begin().await?;
+
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"
         INSERT INTO catalog_tags (edge_server_id, source_id, name, color, display_order, is_active, is_system, updated_at)
@@ -1554,13 +1573,15 @@ pub async fn create_tag_direct(
     .bind(color)
     .bind(display_order)
     .bind(now)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     sqlx::query("UPDATE catalog_tags SET source_id = id WHERE id = $1")
         .bind(pg_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
 
     let tag = Tag {
         id: pg_id,
@@ -1725,13 +1746,15 @@ pub async fn bind_attribute_direct(
         .as_ref()
         .map(serde_json::to_value)
         .transpose()?;
+    let mut tx = pool.begin().await?;
     let (pg_id,): (i64,) = sqlx::query_as("INSERT INTO catalog_attribute_bindings (edge_server_id, source_id, owner_type, owner_source_id, attribute_source_id, is_required, display_order, default_option_ids) VALUES ($1, 0, $2, $3, $4, $5, $6, $7) RETURNING id")
         .bind(edge_server_id).bind(params.owner_type).bind(params.owner_id).bind(params.attribute_id).bind(params.is_required).bind(params.display_order).bind(&default_ids_json)
-        .fetch_one(pool).await?;
+        .fetch_one(&mut *tx).await?;
     sqlx::query("UPDATE catalog_attribute_bindings SET source_id = id WHERE id = $1")
         .bind(pg_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
     Ok(pg_id)
 }
 
@@ -1778,16 +1801,20 @@ pub async fn create_price_rule_direct(
         .and_then(|v| v.as_str().map(String::from))
         .unwrap_or_default();
 
+    let mut tx = pool.begin().await?;
+
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"INSERT INTO catalog_price_rules (edge_server_id, source_id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, TRUE, $19, $20, $20) RETURNING id"#,
     )
     .bind(edge_server_id).bind(&data.name).bind(&data.display_name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(is_stackable).bind(is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.created_by).bind(now)
-    .fetch_one(pool).await?;
+    .fetch_one(&mut *tx).await?;
 
     sqlx::query("UPDATE catalog_price_rules SET source_id = id WHERE id = $1")
         .bind(pg_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
 
     let rule = shared::models::PriceRule {
         id: pg_id,
@@ -1887,8 +1914,10 @@ pub async fn create_employee_direct(
             .to_string()
     };
 
+    let mut tx = pool.begin().await?;
+
     let (pg_id,): (i64,) = sqlx::query_as("INSERT INTO cloud_employees (edge_server_id, tenant_id, source_id, data, version, synced_at) VALUES ($1, $2, '0', '{}'::jsonb, 0, $3) RETURNING id")
-        .bind(edge_server_id).bind(tenant_id).bind(now).fetch_one(pool).await?;
+        .bind(edge_server_id).bind(tenant_id).bind(now).fetch_one(&mut *tx).await?;
 
     let employee = Employee {
         id: pg_id,
@@ -1911,8 +1940,10 @@ pub async fn create_employee_direct(
         .bind(pg_id.to_string())
         .bind(&stored_json)
         .bind(pg_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
 
     Ok((pg_id, CatalogOpData::Employee(employee)))
 }
@@ -1987,8 +2018,10 @@ pub async fn create_zone_direct(
     data: &ZoneCreate,
 ) -> Result<(i64, CatalogOpData), BoxError> {
     let now = shared::util::now_millis();
+    let mut tx = pool.begin().await?;
+
     let (pg_id,): (i64,) = sqlx::query_as("INSERT INTO cloud_zones (edge_server_id, tenant_id, source_id, data, version, synced_at) VALUES ($1, $2, '0', '{}'::jsonb, 0, $3) RETURNING id")
-        .bind(edge_server_id).bind(tenant_id).bind(now).fetch_one(pool).await?;
+        .bind(edge_server_id).bind(tenant_id).bind(now).fetch_one(&mut *tx).await?;
 
     let zone = Zone {
         id: pg_id,
@@ -2001,8 +2034,10 @@ pub async fn create_zone_direct(
         .bind(pg_id.to_string())
         .bind(&zone_json)
         .bind(pg_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
     Ok((pg_id, CatalogOpData::Zone(zone)))
 }
 
@@ -2056,8 +2091,10 @@ pub async fn create_table_direct(
     data: &DiningTableCreate,
 ) -> Result<(i64, CatalogOpData), BoxError> {
     let now = shared::util::now_millis();
+    let mut tx = pool.begin().await?;
+
     let (pg_id,): (i64,) = sqlx::query_as("INSERT INTO cloud_dining_tables (edge_server_id, tenant_id, source_id, data, version, synced_at) VALUES ($1, $2, '0', '{}'::jsonb, 0, $3) RETURNING id")
-        .bind(edge_server_id).bind(tenant_id).bind(now).fetch_one(pool).await?;
+        .bind(edge_server_id).bind(tenant_id).bind(now).fetch_one(&mut *tx).await?;
 
     let table = DiningTable {
         id: pg_id,
@@ -2071,8 +2108,10 @@ pub async fn create_table_direct(
         .bind(pg_id.to_string())
         .bind(&table_json)
         .bind(pg_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
     Ok((pg_id, CatalogOpData::Table(table)))
 }
 
