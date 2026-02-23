@@ -11,9 +11,9 @@
 //! │
 //! ├── certs/                   # [Client 模式] 客户端证书 (CertManager 兼容)
 //! │   ├── credential.json      # 客户端凭证 (CertManager 使用)
-//! │   ├── entity.crt           # 客户端证书
-//! │   ├── entity.key           # 客户端私钥
-//! │   └── tenant_ca.crt        # Tenant CA
+//! │   ├── entity.pem           # 客户端证书
+//! │   ├── entity.key.pem      # 客户端私钥
+//! │   └── tenant_ca.pem       # Tenant CA
 //! │
 //! ├── cache/                   # [Client 模式] 本地缓存
 //! │   └── images/              # 图片缓存 (只读)
@@ -124,8 +124,8 @@ impl TenantPaths {
 
     // ============ 具体文件路径 ============
 
-    /// SQLite 数据库路径: {tenant}/server/data/main.db
-    pub fn main_db_dir(&self) -> PathBuf {
+    /// SQLite 数据库文件路径: {tenant}/server/data/main.db
+    pub fn main_db_path(&self) -> PathBuf {
         self.server_data_dir().join("main.db")
     }
 
@@ -148,25 +148,19 @@ impl TenantPaths {
         self.certs_dir().join("credential.json")
     }
 
-    /// 客户端证书: {tenant}/certs/entity.crt
-    ///
-    /// 文件名与 CertManager 保持一致
+    /// 客户端证书: {tenant}/certs/entity.pem
     pub fn client_cert(&self) -> PathBuf {
-        self.certs_dir().join("entity.crt")
+        self.certs_dir().join("entity.pem")
     }
 
-    /// 客户端密钥: {tenant}/certs/entity.key
-    ///
-    /// 文件名与 CertManager 保持一致
+    /// 客户端密钥: {tenant}/certs/entity.key.pem
     pub fn client_key(&self) -> PathBuf {
-        self.certs_dir().join("entity.key")
+        self.certs_dir().join("entity.key.pem")
     }
 
-    /// 客户端 Tenant CA: {tenant}/certs/tenant_ca.crt
-    ///
-    /// 文件名与 CertManager 保持一致
+    /// 客户端 Tenant CA: {tenant}/certs/tenant_ca.pem
     pub fn client_tenant_ca(&self) -> PathBuf {
-        self.certs_dir().join("tenant_ca.crt")
+        self.certs_dir().join("tenant_ca.pem")
     }
 
     /// Edge Server 证书: {tenant}/server/certs/edge_cert.pem
@@ -220,7 +214,7 @@ impl TenantPaths {
 
     /// 检查 Client 模式证书是否存在
     ///
-    /// 检查 entity.crt, entity.key, tenant_ca.crt 三个文件
+    /// 检查 entity.pem, entity.key.pem, tenant_ca.pem 三个文件
     pub fn has_client_certificates(&self) -> bool {
         self.client_cert().exists()
             && self.client_key().exists()
@@ -291,7 +285,7 @@ mod tests {
             PathBuf::from("/data/tenants/tenant-123/auth/session.json")
         );
 
-        // Client 证书 (CertManager 兼容文件名)
+        // Client 证书
         assert_eq!(
             paths.certs_dir(),
             PathBuf::from("/data/tenants/tenant-123/certs")
@@ -302,15 +296,15 @@ mod tests {
         );
         assert_eq!(
             paths.client_cert(),
-            PathBuf::from("/data/tenants/tenant-123/certs/entity.crt")
+            PathBuf::from("/data/tenants/tenant-123/certs/entity.pem")
         );
         assert_eq!(
             paths.client_key(),
-            PathBuf::from("/data/tenants/tenant-123/certs/entity.key")
+            PathBuf::from("/data/tenants/tenant-123/certs/entity.key.pem")
         );
         assert_eq!(
             paths.client_tenant_ca(),
-            PathBuf::from("/data/tenants/tenant-123/certs/tenant_ca.crt")
+            PathBuf::from("/data/tenants/tenant-123/certs/tenant_ca.pem")
         );
 
         // Cache
@@ -333,7 +327,7 @@ mod tests {
             PathBuf::from("/data/tenants/tenant-123/server/certs")
         );
         assert_eq!(
-            paths.main_db_dir(),
+            paths.main_db_path(),
             PathBuf::from("/data/tenants/tenant-123/server/data/main.db")
         );
         assert_eq!(

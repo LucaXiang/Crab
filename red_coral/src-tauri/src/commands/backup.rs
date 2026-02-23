@@ -58,16 +58,6 @@ pub async fn export_data(app: AppHandle, path: String) -> Result<ApiResponse<()>
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
-    // Backup database directory
-    let db_dir = app_dir.join("database");
-    if db_dir.exists() {
-        if let Ok(mut it) = fs::read_dir(&db_dir) {
-            zip.add_directory("database/", options)
-                .map_err(|e| e.to_string())?;
-            zip_dir(&mut it, "database/", &mut zip, options).map_err(|e| e.to_string())?;
-        }
-    }
-
     // Backup config.json
     let config_file = app_dir.join("config.json");
     if config_file.exists() {

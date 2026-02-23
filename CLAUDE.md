@@ -46,6 +46,44 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 - **crab-cloud**: 云端统一服务 (租户管理 + PKI/认证 + 订阅校验 + Stripe + 数据同步)，EC2 + Docker Compose + Caddy 部署
 - **订单系统**: Event Sourcing + CQRS，redb 存储事件，SQLite 归档查询
 
+## 应用数据目录结构
+
+Tauri identifier: `com.craboss.redcoral`
+
+```
+~/Library/Application Support/com.craboss.redcoral/   (= app_data_dir)
+├── logs/                          # 应用日志
+├── config.json                    # AppConfig
+└── tenants/                       # 多租户根
+    └── {tenant_id}/               # TenantPaths.base
+        ├── auth/
+        │   └── session.json       # 员工会话缓存
+        ├── certs/                 # Client 模式 mTLS 证书
+        │   ├── credential.json    # Client 凭证 (CertManager)
+        │   ├── entity.pem         # 客户端证书
+        │   ├── entity.key.pem     # 客户端私钥
+        │   └── tenant_ca.pem     # Tenant CA
+        ├── cache/
+        │   └── images/            # Client 图片缓存
+        └── server/                # Server 模式 = edge-server work_dir
+            ├── credential.json    # TenantBinding (Server 凭证)
+            ├── certs/
+            │   ├── root_ca.pem
+            │   ├── tenant_ca.pem
+            │   ├── edge_cert.pem
+            │   └── edge_key.pem
+            ├── data/
+            │   ├── main.db
+            │   ├── orders.redb
+            │   └── print.redb
+            └── images/
+```
+
+路径管理:
+- `TenantPaths` (`red_coral/src-tauri/src/core/paths.rs`) — Tauri 侧统一路径 API
+- `Config` (`edge-server/src/core/config.rs`) — edge-server 侧路径方法 (`database_path()`, `certs_dir()`, `data_dir()` 等)
+- 证书扩展名统一使用 `.pem`
+
 ## 部署 (crab-cloud → EC2)
 
 **架构**: EC2 (Amazon Linux 2023) + Docker Compose + Caddy (自动 HTTPS) + PostgreSQL 16

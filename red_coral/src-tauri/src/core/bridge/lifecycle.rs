@@ -157,16 +157,12 @@ impl ClientBridge {
         let server_config = &config.server_config;
 
         let tenant_manager = self.tenant_manager.read().await;
-        let work_dir = if let Some(path) = tenant_manager.current_tenant_path() {
-            let server_dir = path.join("server");
+        let work_dir = if let Some(paths) = tenant_manager.current_paths() {
+            let server_dir = paths.server_dir();
             tracing::debug!(path = %server_dir.display(), "Using server directory");
             server_dir.to_string_lossy().to_string()
         } else {
-            tracing::warn!(
-                "No active tenant, falling back to default data dir: {:?}",
-                server_config.data_dir
-            );
-            server_config.data_dir.to_string_lossy().to_string()
+            return Err(BridgeError::Tenant(TenantError::NoTenantSelected));
         };
         drop(tenant_manager);
 

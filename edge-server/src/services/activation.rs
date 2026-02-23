@@ -38,15 +38,15 @@ enum SubscriptionFetchResult {
 ///
 /// # 状态存储
 ///
-/// 激活凭证存储在 `work_dir/auth_storage/credential.json`
+/// 激活凭证存储在 `work_dir/credential.json`
 #[derive(Clone, Debug)]
 pub struct ActivationService {
     /// 激活通知器 (用于等待/通知)
     notify: Arc<tokio::sync::Notify>,
     /// 认证服务器 URL
     auth_server_url: String,
-    /// 证书目录
-    cert_dir: PathBuf,
+    /// 工作目录 (= {tenant}/server/)
+    work_dir: PathBuf,
     /// 凭证缓存 (内存)
     pub credential_cache: Arc<RwLock<Option<TenantBinding>>>,
 }
@@ -70,9 +70,9 @@ impl ActivationService {
     /// 创建激活服务
     ///
     /// 启动时从磁盘加载凭证缓存
-    pub fn new(auth_server_url: String, cert_dir: PathBuf) -> Self {
+    pub fn new(auth_server_url: String, work_dir: PathBuf) -> Self {
         // Load credential from disk to memory cache on startup
-        let credential_cache = match TenantBinding::load(&cert_dir) {
+        let credential_cache = match TenantBinding::load(&work_dir) {
             Ok(cred) => {
                 if let Some(c) = &cred {
                     tracing::info!(
@@ -92,7 +92,7 @@ impl ActivationService {
         Self {
             notify: Arc::new(tokio::sync::Notify::new()),
             auth_server_url,
-            cert_dir,
+            work_dir,
             credential_cache,
         }
     }
@@ -407,7 +407,7 @@ impl ActivationService {
         }
 
         // 2. 删除可能损坏的 Credential.json
-        if let Err(e) = TenantBinding::delete(&self.cert_dir) {
+        if let Err(e) = TenantBinding::delete(&self.work_dir) {
             tracing::warn!("Failed to delete credential file: {}", e);
         }
 
@@ -428,7 +428,7 @@ impl ActivationService {
     ///
     /// 当 Tauri 侧在 edge-server 运行期间更新了 credential.json 时调用
     pub async fn reload_credential(&self) -> bool {
-        match TenantBinding::load(&self.cert_dir) {
+        match TenantBinding::load(&self.work_dir) {
             Ok(Some(cred)) => {
                 tracing::info!(
                     "Reloaded credential from disk: tenant={}, edge={}",
@@ -480,7 +480,7 @@ impl ActivationService {
 
         // 1. Save to disk
         credential
-            .save(&self.cert_dir)
+            .save(&self.work_dir)
             .map_err(|e| AppError::internal(format!("Failed to save credential: {}", e)))?;
 
         // 2. Update memory cache
@@ -498,7 +498,7 @@ impl ActivationService {
         tracing::warn!("Deactivating server and resetting state");
 
         // 1. Delete from disk
-        TenantBinding::delete(&self.cert_dir)
+        TenantBinding::delete(&self.work_dir)
             .map_err(|e| AppError::internal(format!("Failed to delete credential: {}", e)))?;
 
         // 2. Clear memory cache
@@ -597,7 +597,7 @@ impl ActivationService {
             cred.update_binding(new_binding);
 
             // 保存到磁盘
-            if let Err(e) = cred.save(&self.cert_dir) {
+            if let Err(e) = cred.save(&self.work_dir) {
                 tracing::error!("Failed to save refreshed binding: {}", e);
             } else {
                 tracing::debug!("Binding refreshed successfully (last_verified_at updated)");
@@ -699,7 +699,7 @@ impl ActivationService {
 
     /// 保存凭证到磁盘和内存缓存
     async fn save_credential(&self, credential: &mut TenantBinding) {
-        if let Err(e) = credential.save(&self.cert_dir) {
+        if let Err(e) = credential.save(&self.work_dir) {
             tracing::error!("Failed to save credential file: {}", e);
         }
         let mut cache = self.credential_cache.write().await;
@@ -812,7 +812,7 @@ impl ActivationService {
         };
 
         // Verify subscription signature using local tenant_ca.pem
-        let tenant_ca_path = self.cert_dir.join("certs").join("tenant_ca.pem");
+        let tenant_ca_path = self.work_dir.join("certs").join("tenant_ca.pem");
         let tenant_ca_pem = match std::fs::read_to_string(&tenant_ca_path) {
             Ok(pem) => pem,
             Err(e) => {

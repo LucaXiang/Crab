@@ -191,7 +191,7 @@ impl ServerState {
 
         // 1. Initialize DB
         // Database path: {tenant}/server/data/main.db/
-        let db_path = config.database_dir();
+        let db_path = config.database_path();
         let db_path_str = db_path.to_string_lossy();
 
         let db_service = DbService::new(&db_path_str).await.map_err(|e| {
@@ -200,8 +200,10 @@ impl ServerState {
         let pool = db_service.pool;
 
         // 2. Initialize Services
-        let activation =
-            ActivationService::new(config.auth_server_url.clone(), config.auth_storage_dir());
+        let activation = ActivationService::new(
+            config.auth_server_url.clone(),
+            PathBuf::from(&config.work_dir),
+        );
         let cert_service = CertService::new(PathBuf::from(&config.work_dir));
         let message_bus = MessageBusService::new(config);
         let https = HttpsService::new(config.clone());

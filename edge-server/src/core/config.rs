@@ -267,8 +267,8 @@ impl Config {
         PathBuf::from(&self.work_dir).join("data")
     }
 
-    /// 获取 SQLite 数据库目录路径: {tenant}/server/data/main.db/
-    pub fn database_dir(&self) -> PathBuf {
+    /// 获取 SQLite 数据库文件路径: {tenant}/server/data/main.db
+    pub fn database_path(&self) -> PathBuf {
         self.data_dir().join("main.db")
     }
 
@@ -285,13 +285,6 @@ impl Config {
     /// 获取图片存储目录路径: {tenant}/server/images/
     pub fn images_dir(&self) -> PathBuf {
         PathBuf::from(&self.work_dir).join("images")
-    }
-
-    /// 获取认证存储目录路径: {tenant}/server/ (与 work_dir 相同)
-    ///
-    /// credential.json 存储在 work_dir 根目录下
-    pub fn auth_storage_dir(&self) -> PathBuf {
-        PathBuf::from(&self.work_dir)
     }
 }
 

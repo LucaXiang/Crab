@@ -1,7 +1,5 @@
 //! Bridge configuration types
 
-use std::path::PathBuf;
-
 use serde::{Deserialize, Serialize};
 
 use super::error::BridgeError;
@@ -16,8 +14,6 @@ fn default_cloud_url() -> String {
 pub struct ServerModeConfig {
     /// HTTP 端口
     pub http_port: u16,
-    /// 数据目录
-    pub data_dir: PathBuf,
     /// 消息总线端口
     pub message_port: u16,
     /// Cloud sync URL (mTLS, port 8443)
@@ -29,7 +25,6 @@ impl Default for ServerModeConfig {
     fn default() -> Self {
         Self {
             http_port: 9625,
-            data_dir: PathBuf::from("./data"),
             message_port: 9626,
             cloud_url: default_cloud_url(),
         }
