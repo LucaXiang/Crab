@@ -325,14 +325,23 @@ pub async fn run() {
                 // and audit.lock is removed (preventing false "abnormal shutdown" on next start)
                 if let Some(bridge) = app.try_state::<Arc<ClientBridge>>() {
                     let bridge = Arc::clone(&*bridge);
-                    // block_on is safe here — Tauri calls Exit after the event loop ends
-                    tauri::async_runtime::block_on(async move {
-                        if let Err(e) = bridge.stop().await {
-                            tracing::error!("Failed to stop bridge on exit: {}", e);
-                        } else {
-                            tracing::info!("Bridge stopped gracefully on app exit");
-                        }
-                    });
+                    // Spawn a dedicated thread for shutdown to avoid
+                    // "Cannot start a runtime from within a runtime" panic
+                    // when Cmd+Q triggers Exit while the async runtime is still active.
+                    let _ = std::thread::spawn(move || {
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()
+                            .expect("shutdown runtime");
+                        rt.block_on(async move {
+                            if let Err(e) = bridge.stop().await {
+                                tracing::error!("Failed to stop bridge on exit: {}", e);
+                            } else {
+                                tracing::info!("Bridge stopped gracefully on app exit");
+                            }
+                        });
+                    })
+                    .join();
                 }
             }
         });

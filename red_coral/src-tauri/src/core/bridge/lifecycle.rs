@@ -13,28 +13,40 @@ pub(crate) async fn await_mode_shutdown(old_mode: ClientMode) {
         } => {
             // 防御性 cancel（调用方通常已 cancel，但确保不遗漏）
             shutdown_token.cancel();
-            let server_abort = server_task.abort_handle();
-            let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
 
-            match tokio::time::timeout(std::time::Duration::from_secs(3), async {
-                let server_result = server_task.await;
-                if let Some(lt) = listener_task {
-                    let _ = lt.await;
-                }
-                server_result
-            })
-            .await
-            {
-                Ok(Ok(())) => tracing::debug!("Server tasks completed gracefully"),
+            // 用 &mut 借用 — 超时后 handle 仍然存活，可以 abort + await
+            let mut server_task = server_task;
+            match tokio::time::timeout(std::time::Duration::from_secs(3), &mut server_task).await {
+                Ok(Ok(())) => tracing::debug!("Server task completed gracefully"),
                 Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
                 Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
                 Err(_) => {
-                    tracing::warn!("Server shutdown timed out (3s), aborting remaining tasks");
-                    server_abort.abort();
-                    if let Some(la) = listener_abort {
-                        la.abort();
+                    tracing::warn!("Server shutdown timed out (3s), aborting");
+                    server_task.abort();
+                    // 必须 await abort — 等待 task 真正结束、释放资源（redb 文件锁）
+                    match tokio::time::timeout(std::time::Duration::from_secs(5), server_task).await
+                    {
+                        Ok(Ok(())) => tracing::debug!("Server task stopped after abort"),
+                        Ok(Err(e)) if e.is_cancelled() => {
+                            tracing::debug!("Server task aborted successfully")
+                        }
+                        Ok(Err(e)) => {
+                            tracing::error!("Server task panicked during abort: {}", e)
+                        }
+                        Err(_) => {
+                            tracing::error!(
+                                "Server task did not stop within 5s after abort — \
+                                 redb lock may linger"
+                            );
+                        }
                     }
                 }
+            }
+
+            // listener 直接 abort + await
+            if let Some(lt) = listener_task {
+                lt.abort();
+                let _ = lt.await;
             }
         }
         ClientMode::Client {
@@ -126,13 +138,15 @@ impl ClientBridge {
         {
             let mut mode_guard = self.mode.write().await;
 
-            if matches!(&*mode_guard, ClientMode::Server { .. }) {
-                tracing::debug!("Already in Server mode, skipping start");
-                return Ok(());
-            }
-
-            // 如果在其他模式，取出旧模式并发送 shutdown 信号
             let old_mode = match &*mode_guard {
+                ClientMode::Server { shutdown_token, .. } => {
+                    tracing::info!("Already in Server mode, stopping first...");
+                    shutdown_token.cancel();
+                    Some(std::mem::replace(
+                        &mut *mode_guard,
+                        ClientMode::Disconnected,
+                    ))
+                }
                 ClientMode::Client { shutdown_token, .. } => {
                     tracing::info!("Stopping Client mode to switch to Server mode...");
                     shutdown_token.cancel();
@@ -141,7 +155,7 @@ impl ClientBridge {
                         ClientMode::Disconnected,
                     ))
                 }
-                _ => None,
+                ClientMode::Disconnected => None,
             };
 
             drop(mode_guard);

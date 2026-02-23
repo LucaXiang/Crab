@@ -18,7 +18,7 @@ import { logger } from '@/utils/logger';
 import { useI18n } from '@/hooks/useI18n';
 import { MAX_NAME_LEN, MAX_PASSWORD_LEN, MAX_URL_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
 
-const REGISTER_URL = 'https://auth.redcoral.app/register';
+const REGISTER_URL = 'https://redcoral.app/register';
 
 type SetupStep = 'credentials' | 'subscription_blocked' | 'p12_blocked' | 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
