@@ -11,6 +11,7 @@ mod auth;
 mod config;
 mod db;
 mod email;
+mod live;
 mod state;
 mod stripe;
 pub mod util;
@@ -138,6 +139,30 @@ async fn main() -> Result<(), BoxError> {
                 tracing::debug!(
                     cleaned = stale_keys.len(),
                     "Cleaned up stale pending_requests entries"
+                );
+            }
+        }
+    });
+
+    // Periodic pending_rpcs cleanup (same TTL as pending_requests)
+    let pending_rpcs = state.pending_rpcs.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            let cutoff = shared::util::now_millis() - 60_000;
+            let stale_keys: Vec<String> = pending_rpcs
+                .iter()
+                .filter(|entry| entry.value().0 < cutoff)
+                .map(|entry| entry.key().clone())
+                .collect();
+            for key in &stale_keys {
+                pending_rpcs.remove(key);
+            }
+            if !stale_keys.is_empty() {
+                tracing::debug!(
+                    cleaned = stale_keys.len(),
+                    "Cleaned up stale pending_rpcs entries"
                 );
             }
         }

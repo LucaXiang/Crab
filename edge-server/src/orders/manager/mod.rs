@@ -1133,6 +1133,11 @@ impl OrdersManager {
         Ok(self.storage.get_active_events_since(since_sequence)?)
     }
 
+    /// Get all events for a specific order
+    pub fn get_events_for_order(&self, order_id: &str) -> ManagerResult<Vec<OrderEvent>> {
+        Ok(self.storage.get_events_for_order(order_id)?)
+    }
+
     /// Rebuild a snapshot from events (for verification)
     ///
     /// Uses EventApplier to apply each event to build the snapshot.

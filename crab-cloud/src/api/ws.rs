@@ -8,7 +8,7 @@ use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures::{SinkExt, StreamExt};
-use shared::cloud::{CloudCommand, CloudMessage};
+use shared::cloud::CloudMessage;
 use shared::error::{AppError, ErrorCode};
 use tokio::sync::mpsc;
 
@@ -78,11 +78,11 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
 
     let (mut ws_sink, mut ws_stream) = socket.split();
 
-    // Create command channel for real-time push
-    let (cmd_tx, mut cmd_rx) = mpsc::channel::<CloudCommand>(32);
+    // Create message channel for real-time push (carries CloudMessage directly)
+    let (msg_tx, mut msg_rx) = mpsc::channel::<CloudMessage>(32);
 
     // Register in connected_edges
-    state.connected_edges.insert(edge_server_id, cmd_tx.clone());
+    state.connected_edges.insert(edge_server_id, msg_tx.clone());
 
     // Send Welcome with sync cursors
     match sync_store::get_cursors(&state.pool, edge_server_id).await {
@@ -102,6 +102,35 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         }
     }
 
+    // Check if edge needs initial catalog provisioning
+    // (no products synced yet = first-time activation)
+    match needs_catalog_provisioning(&state, edge_server_id).await {
+        Ok(true) => {
+            tracing::info!(
+                edge_server_id,
+                "Edge needs catalog provisioning, sending FullSync"
+            );
+            let snapshot = crate::db::catalog_templates::default_snapshot();
+            let rpc_msg = CloudMessage::Rpc {
+                id: format!("provision-{edge_server_id}"),
+                payload: Box::new(shared::cloud::ws::CloudRpc::CatalogOp(Box::new(
+                    shared::cloud::catalog::CatalogOp::FullSync { snapshot },
+                ))),
+            };
+            if let Ok(json) = serde_json::to_string(&rpc_msg)
+                && ws_sink.send(Message::Text(json.into())).await.is_err()
+            {
+                tracing::warn!(edge_server_id, "Failed to send FullSync, disconnecting");
+                state.connected_edges.remove(&edge_server_id);
+                return;
+            }
+        }
+        Ok(false) => {} // already provisioned
+        Err(e) => {
+            tracing::warn!(edge_server_id, "Failed to check provisioning status: {e}");
+        }
+    }
+
     // Send any pending commands immediately on connect
     if let Ok(pending) = commands::get_pending(&state.pool, edge_server_id, 10).await
         && !pending.is_empty()
@@ -109,7 +138,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         let mut sent_ids: Vec<i64> = Vec::new();
         for cmd in pending {
             let cmd_id = cmd.id;
-            let cloud_cmd = CloudCommand {
+            let cloud_cmd = shared::cloud::CloudCommand {
                 id: cmd.id.to_string(),
                 command_type: cmd.command_type,
                 payload: cmd.payload,
@@ -128,6 +157,11 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
             let _ = commands::mark_delivered(&state.pool, &sent_ids).await;
         }
     }
+
+    // 所有初始化发送完成后，标记 edge 上线（通知正在观看的 console）
+    state
+        .live_orders
+        .mark_edge_online(&identity.tenant_id, edge_server_id);
 
     // Main select loop
     loop {
@@ -166,14 +200,13 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                 }
             }
 
-            // Command to push to edge
-            cmd = cmd_rx.recv() => {
-                match cmd {
-                    Some(cloud_cmd) => {
-                        let msg = CloudMessage::Command(cloud_cmd);
-                        if let Ok(json) = serde_json::to_string(&msg)
+            // Message to push to edge (Command or Rpc)
+            msg = msg_rx.recv() => {
+                match msg {
+                    Some(cloud_msg) => {
+                        if let Ok(json) = serde_json::to_string(&cloud_msg)
                             && ws_sink.send(Message::Text(json.into())).await.is_err() {
-                                tracing::warn!("Failed to push command via WS");
+                                tracing::warn!("Failed to push message via WS");
                                 break;
                             }
                     }
@@ -188,6 +221,11 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
 
     // Cleanup: remove from connected edges
     state.connected_edges.remove(&edge_server_id);
+
+    // 通知 console 订阅者 edge 已离线
+    state
+        .live_orders
+        .clear_edge(&identity.tenant_id, edge_server_id);
 
     // Rollback delivered→pending so commands can be re-sent on reconnect
     match commands::rollback_delivered(&state.pool, edge_server_id).await {
@@ -378,8 +416,48 @@ async fn handle_edge_message<S>(
             }
         }
 
+        CloudMessage::RpcResult { id, result } => {
+            if let Some((_, (_, sender))) = state.pending_rpcs.remove(&id) {
+                let _ = sender.send(result);
+            } else {
+                tracing::warn!(rpc_id = %id, "RpcResult for unknown or expired request");
+            }
+        }
+
+        CloudMessage::ActiveOrderSnapshot { snapshot, events } => {
+            let live_snapshot = shared::console::LiveOrderSnapshot {
+                edge_server_id,
+                order: *snapshot,
+                events,
+            };
+            state
+                .live_orders
+                .publish_update(&identity.tenant_id, live_snapshot);
+        }
+
+        CloudMessage::ActiveOrderRemoved { order_id } => {
+            state
+                .live_orders
+                .publish_remove(&identity.tenant_id, &order_id, edge_server_id);
+        }
+
         _ => {
             tracing::debug!("Ignoring unexpected CloudMessage from edge");
         }
     }
+}
+
+/// Check if an edge server needs initial catalog provisioning.
+///
+/// Returns true if no products have been synced for this edge yet.
+async fn needs_catalog_provisioning(
+    state: &AppState,
+    edge_server_id: i64,
+) -> Result<bool, sqlx::Error> {
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM catalog_products WHERE edge_server_id = $1")
+            .bind(edge_server_id)
+            .fetch_one(&state.pool)
+            .await?;
+    Ok(count.0 == 0)
 }

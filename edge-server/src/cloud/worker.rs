@@ -143,8 +143,14 @@ impl CloudWorker {
             // Non-fatal, continue with live sync
         }
 
-        // 4. Enter main select loop
+        // 4. 订阅 MessageBus（在推送活跃订单之前，确保推送期间的事件不丢失）
         let mut broadcast_rx = self.state.message_bus().subscribe();
+
+        // 5. 推送全量活跃订单到 cloud
+        if let Err(e) = self.push_active_orders_full(&mut ws_sink).await {
+            tracing::warn!("Failed to push initial active orders: {e}");
+            // Non-fatal: console 会在 edge 下一次事件时更新
+        }
 
         let mut ping_interval = tokio::time::interval(Duration::from_secs(WS_PING_INTERVAL_SECS));
         ping_interval.tick().await; // skip immediate tick
@@ -205,6 +211,15 @@ impl CloudWorker {
                 result = broadcast_rx.recv() => {
                     match result {
                         Ok(msg) => {
+                            // 活跃订单事件 → 立即推送快照到 cloud (不走 debounce)
+                            if let Some(order_msg) = self.extract_order_push(&msg)
+                                && let Ok(json) = serde_json::to_string(&order_msg)
+                                && ws_sink.send(Message::Text(json.into())).await.is_err()
+                            {
+                                tracing::warn!("WS send order push failed, disconnecting");
+                                return;
+                            }
+
                             if let Some(item) = Self::extract_sync_item(&msg) {
                                 let resource = item.resource.clone();
                                 let resource_id = item.resource_id.clone();
@@ -222,6 +237,9 @@ impl CloudWorker {
                             if let Err(e) = self.send_initial_sync(&HashMap::new(), &mut ws_sink).await {
                                 tracing::error!("Recovery full sync failed: {e}");
                                 return;
+                            }
+                            if let Err(e) = self.push_active_orders_full(&mut ws_sink).await {
+                                tracing::warn!("Recovery active order push failed: {e}");
                             }
                         }
                         Err(broadcast::error::RecvError::Closed) => {
@@ -296,6 +314,18 @@ impl CloudWorker {
                     tracing::warn!("Failed to send command result via WS: {e}");
                 }
             }
+            CloudMessage::Rpc { id, payload } => {
+                tracing::info!(rpc_id = %id, "Received RPC via WS");
+                let result = self.handle_rpc(&payload).await;
+                tracing::info!(rpc_id = %id, kind = ?std::mem::discriminant(&result), "RPC executed");
+
+                let reply = CloudMessage::RpcResult { id, result };
+                if let Ok(json) = serde_json::to_string(&reply)
+                    && let Err(e) = ws_sink.send(Message::Text(json.into())).await
+                {
+                    tracing::warn!("Failed to send RPC result via WS: {e}");
+                }
+            }
             CloudMessage::SyncAck {
                 accepted,
                 rejected,
@@ -321,6 +351,85 @@ impl CloudWorker {
             }
             _ => {
                 tracing::debug!("Ignoring unexpected CloudMessage variant from cloud");
+            }
+        }
+    }
+
+    /// Handle a strongly-typed RPC payload
+    async fn handle_rpc(&self, payload: &shared::cloud::CloudRpc) -> shared::cloud::CloudRpcResult {
+        use shared::cloud::CloudRpcResult;
+
+        match payload {
+            shared::cloud::CloudRpc::GetStatus => {
+                let active_orders = self
+                    .state
+                    .orders_manager
+                    .get_active_orders()
+                    .map(|o| o.len())
+                    .unwrap_or(0);
+                let products = self.state.catalog_service.list_products().len();
+                let categories = self.state.catalog_service.list_categories().len();
+                CloudRpcResult::Json {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "active_orders": active_orders,
+                        "products": products,
+                        "categories": categories,
+                        "epoch": self.state.epoch,
+                    })),
+                    error: None,
+                }
+            }
+            shared::cloud::CloudRpc::GetOrderDetail { order_key } => {
+                match sqlx::query_scalar::<_, i64>(
+                    "SELECT id FROM archived_order WHERE order_key = ? LIMIT 1",
+                )
+                .bind(order_key)
+                .fetch_optional(&self.state.pool)
+                .await
+                {
+                    Ok(Some(pk)) => {
+                        match crate::db::repository::order::build_order_detail_sync(
+                            &self.state.pool,
+                            pk,
+                        )
+                        .await
+                        {
+                            Ok(detail) => CloudRpcResult::Json {
+                                success: true,
+                                data: serde_json::to_value(&detail).ok(),
+                                error: None,
+                            },
+                            Err(e) => CloudRpcResult::Json {
+                                success: false,
+                                data: None,
+                                error: Some(e.to_string()),
+                            },
+                        }
+                    }
+                    Ok(None) => CloudRpcResult::Json {
+                        success: false,
+                        data: None,
+                        error: Some(format!("Order not found: {order_key}")),
+                    },
+                    Err(e) => CloudRpcResult::Json {
+                        success: false,
+                        data: None,
+                        error: Some(e.to_string()),
+                    },
+                }
+            }
+            shared::cloud::CloudRpc::RefreshSubscription => {
+                self.state.activation.sync_subscription().await;
+                CloudRpcResult::Json {
+                    success: true,
+                    data: Some(serde_json::json!({ "message": "Subscription refresh triggered" })),
+                    error: None,
+                }
+            }
+            shared::cloud::CloudRpc::CatalogOp(op) => {
+                let result = crate::cloud::rpc_executor::execute(&self.state, op.as_ref()).await;
+                CloudRpcResult::CatalogOp(Box::new(result))
             }
         }
     }
@@ -722,6 +831,104 @@ impl CloudWorker {
         Err(crate::utils::AppError::internal(
             "push_with_retry: all retries exhausted",
         ))
+    }
+
+    /// 向 cloud 推送全量活跃订单快照（连接建立时调用一次）
+    async fn push_active_orders_full<S>(
+        &self,
+        ws_sink: &mut S,
+    ) -> Result<(), crate::utils::AppError>
+    where
+        S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
+    {
+        let orders = self
+            .state
+            .orders_manager
+            .get_active_orders()
+            .map_err(|e| crate::utils::AppError::internal(format!("get_active_orders: {e}")))?;
+
+        if orders.is_empty() {
+            return Ok(());
+        }
+
+        let count = orders.len();
+        for order in orders {
+            let events = self
+                .state
+                .orders_manager
+                .get_events_for_order(&order.order_id)
+                .unwrap_or_default();
+            let msg = CloudMessage::ActiveOrderSnapshot {
+                snapshot: Box::new(order),
+                events,
+            };
+            let json = serde_json::to_string(&msg).map_err(|e| {
+                crate::utils::AppError::internal(format!("serialize ActiveOrderSnapshot: {e}"))
+            })?;
+            ws_sink
+                .send(Message::Text(json.into()))
+                .await
+                .map_err(|e| {
+                    crate::utils::AppError::internal(format!("WS send ActiveOrderSnapshot: {e}"))
+                })?;
+        }
+
+        tracing::info!(count, "Active orders pushed to cloud on connect");
+        Ok(())
+    }
+
+    /// 从 MessageBus 的 Sync 事件中提取活跃订单推送消息
+    ///
+    /// 订单事件 (resource = "order") → 读取最新快照 → ActiveOrderSnapshot/ActiveOrderRemoved
+    fn extract_order_push(&self, msg: &BusMessage) -> Option<CloudMessage> {
+        if msg.event_type != EventType::Sync {
+            return None;
+        }
+
+        let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
+        if payload.resource != "order_sync" {
+            return None;
+        }
+
+        let order_id = &payload.id;
+
+        // deleted = 订单终结 (completed/voided/merged)
+        if payload.action == "deleted" {
+            return Some(CloudMessage::ActiveOrderRemoved {
+                order_id: order_id.clone(),
+            });
+        }
+
+        // created/updated = 活跃订单变更，读取最新快照 + 事件历史
+        match self.state.orders_manager.get_snapshot(order_id) {
+            Ok(Some(snap)) if snap.is_active() => {
+                let events = self
+                    .state
+                    .orders_manager
+                    .get_events_for_order(order_id)
+                    .unwrap_or_default();
+                Some(CloudMessage::ActiveOrderSnapshot {
+                    snapshot: Box::new(snap),
+                    events,
+                })
+            }
+            Ok(Some(_)) => {
+                // 非活跃状态（刚完成/作废），发送移除通知
+                Some(CloudMessage::ActiveOrderRemoved {
+                    order_id: order_id.clone(),
+                })
+            }
+            Ok(None) => {
+                // 快照不存在（已被清理），发送移除通知
+                Some(CloudMessage::ActiveOrderRemoved {
+                    order_id: order_id.clone(),
+                })
+            }
+            Err(e) => {
+                tracing::warn!(order_id, error = %e, "Failed to get snapshot for order push");
+                None
+            }
+        }
     }
 
     /// Extract a CloudSyncItem from a BusMessage if it's a Sync event

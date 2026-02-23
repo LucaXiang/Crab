@@ -7,6 +7,7 @@ pub mod activation;
 pub mod app_state;
 pub mod client;
 pub mod cloud;
+pub mod console;
 pub mod error;
 pub mod message;
 pub mod models;

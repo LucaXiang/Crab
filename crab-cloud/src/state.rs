@@ -4,13 +4,15 @@ use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
 use crab_cert::{CaProfile, CertificateAuthority};
 use dashmap::DashMap;
-use shared::cloud::{CloudCommand, CloudCommandResult};
+use shared::cloud::ws::CloudRpcResult;
+use shared::cloud::{CloudCommandResult, CloudMessage};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, mpsc, oneshot};
 
 use crate::auth::QuotaCache;
 use crate::config::Config;
+use crate::live::LiveOrderHub;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -54,12 +56,14 @@ pub struct AppState {
     pub stripe_basic_yearly_price_id: String,
     /// Stripe Price ID for Pro plan (yearly)
     pub stripe_pro_yearly_price_id: String,
-    /// Connected edge-servers (edge_server_id → command sender)
-    pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudCommand>>>,
-    /// Pending on-demand requests (command_id → (created_at_ms, response sender))
-    /// Used for tenant API to wait for edge command results (e.g., get_order_detail)
-    /// Includes created_at for TTL-based cleanup of leaked entries.
+    /// Connected edge-servers (edge_server_id → message sender)
+    pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudMessage>>>,
+    /// Pending legacy command requests (command_id → (created_at_ms, response sender))
     pub pending_requests: Arc<DashMap<String, (i64, oneshot::Sender<CloudCommandResult>)>>,
+    /// Pending typed RPC requests (rpc_id → (created_at_ms, response sender))
+    pub pending_rpcs: Arc<DashMap<String, (i64, oneshot::Sender<CloudRpcResult>)>>,
+    /// 活跃订单实时分发 hub (edge → console fan-out)
+    pub live_orders: LiveOrderHub,
 }
 
 impl AppState {
@@ -167,6 +171,8 @@ impl AppState {
             stripe_pro_yearly_price_id: config.stripe_pro_yearly_price_id.clone(),
             connected_edges: Arc::new(DashMap::new()),
             pending_requests: Arc::new(DashMap::new()),
+            pending_rpcs: Arc::new(DashMap::new()),
+            live_orders: LiveOrderHub::new(),
         })
     }
 }
