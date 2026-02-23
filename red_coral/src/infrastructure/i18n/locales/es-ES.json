@@ -213,6 +213,7 @@
         "last_refreshed": "Última actualización",
         "replacing": "Reemplazando...",
         "button_replace": "Reemplazar este servidor",
+        "button_upgrade": "Mejorar plan",
         "button_cancel": "Cancelar"
       },
       "client_limit": {
@@ -223,6 +224,7 @@
         "last_refreshed": "Última actualización",
         "replacing": "Reemplazando...",
         "button_replace": "Reemplazar este cliente",
+        "button_upgrade": "Mejorar plan",
         "button_cancel": "Cancelar"
       }
     },

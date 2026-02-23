@@ -213,6 +213,7 @@
         "last_refreshed": "最后刷新",
         "replacing": "替换中...",
         "button_replace": "替换此设备",
+        "button_upgrade": "升级计划",
         "button_cancel": "取消"
       },
       "client_limit": {
@@ -223,6 +224,7 @@
         "last_refreshed": "最后刷新",
         "replacing": "替换中...",
         "button_replace": "替换此客户端",
+        "button_upgrade": "升级计划",
         "button_cancel": "取消"
       }
     },

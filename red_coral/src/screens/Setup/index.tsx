@@ -19,6 +19,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { MAX_NAME_LEN, MAX_PASSWORD_LEN, MAX_URL_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
 
 const REGISTER_URL = 'https://redcoral.app/register';
+const PRICING_URL = 'https://redcoral.app/#pricing';
 
 type SetupStep = 'credentials' | 'subscription_blocked' | 'p12_blocked' | 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
@@ -436,6 +437,15 @@ export const SetupScreen: React.FC = () => {
           </div>
 
           <button
+            onClick={() => openUrl(PRICING_URL)}
+            disabled={replacingId !== null}
+            className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <ExternalLink size={18} />
+            {t(`${limitKey}.button_upgrade`)}
+          </button>
+
+          <button
             onClick={() => setQuotaInfo(null)}
             disabled={replacingId !== null}
             className="w-full py-3 text-gray-600 font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
@@ -485,6 +495,14 @@ export const SetupScreen: React.FC = () => {
 
         {/* Actions */}
         <div className="space-y-3">
+          <button
+            onClick={() => openUrl(PRICING_URL)}
+            className="w-full py-3 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <ExternalLink size={20} />
+            {t('subscriptionBlocked.button_renew')}
+          </button>
+
           <button
             onClick={handleRecheckSubscription}
             disabled={isRechecking}
