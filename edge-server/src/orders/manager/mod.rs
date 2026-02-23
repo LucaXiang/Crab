@@ -7,20 +7,21 @@
 //! - Snapshot updates
 //! - Event broadcasting (via callback)
 //!
-//! # Command Flow
+//! # Three-Phase Command Flow
 //!
 //! ```text
-//! execute_command(cmd)
-//!     ├─ 1. Idempotency check (command_id)
-//!     ├─ 2. Begin write transaction
-//!     ├─ 3. Create CommandContext
-//!     ├─ 4. Convert command to action and execute
-//!     ├─ 5. Apply events to snapshots via EventApplier
-//!     ├─ 6. Persist events and snapshots
-//!     ├─ 7. Mark command processed
-//!     ├─ 8. Commit transaction
-//!     ├─ 9. Broadcast event(s)
-//!     └─ 10. Return response
+//! execute_command(cmd)              // async
+//!   ├─ Phase A: prefetch_data()     // async — 预取 SQLite 数据
+//!   ├─ Phase B: process_command()   // sync — redb 写事务
+//!   │   ├─ 1. Idempotency check
+//!   │   ├─ 2. Begin write transaction
+//!   │   ├─ 3. Create CommandContext
+//!   │   ├─ 4. Convert command to action and execute (sync)
+//!   │   ├─ 5. Apply events to snapshots via EventApplier
+//!   │   ├─ 6. Persist events and snapshots
+//!   │   ├─ 7. Commit transaction
+//!   │   └─ 8. Broadcast events
+//!   └─ Phase C: post_actions()      // async — stamp 追踪等后置写入
 //! ```
 
 mod error;
@@ -49,6 +50,40 @@ const EVENT_CHANNEL_CAPACITY: usize = 65536;
 
 /// Rule cache size warning threshold
 const RULE_CACHE_WARN_THRESHOLD: usize = 500;
+
+// ========== Prefetch Data Structures ==========
+
+/// 预取的 SQLite 数据，在 redb 事务外 async 加载
+struct PrefetchedData {
+    /// AddItems: 会员营销组折扣规则
+    mg_rules: Vec<shared::models::MgDiscountRule>,
+    /// LinkMember: 会员 + 营销组 + 规则
+    link_member: Option<LinkMemberPrefetch>,
+    /// RedeemStamp: 活动 + 章数 + 目标
+    redeem_stamp: Option<RedeemStampPrefetch>,
+    /// RemoveItem/CompItem: 自动取消章兑换的预取数据
+    auto_cancel: Vec<StampCancelPrefetch>,
+}
+
+struct LinkMemberPrefetch {
+    member: shared::models::Member,
+    mg_display_name: String,
+    mg_rules: Vec<shared::models::MgDiscountRule>,
+}
+
+struct RedeemStampPrefetch {
+    activity: shared::models::StampActivity,
+    current_stamps: i32,
+    stamp_targets: Vec<shared::models::StampTarget>,
+    reward_targets: Vec<shared::models::StampRewardTarget>,
+}
+
+struct StampCancelPrefetch {
+    activity_id: i64,
+    activity: Option<shared::models::StampActivity>,
+    current_stamps: i32,
+    stamp_targets: Vec<shared::models::StampTarget>,
+}
 
 /// OrdersManager for command processing
 ///
@@ -246,16 +281,25 @@ impl OrdersManager {
     }
 
     /// Execute a command and return the response
-    pub fn execute_command(&self, cmd: OrderCommand) -> CommandResponse {
-        match self.process_command(cmd.clone()) {
+    pub async fn execute_command(&self, cmd: OrderCommand) -> CommandResponse {
+        // Phase A: prefetch SQLite data
+        let prefetched = match self.prefetch_data(&cmd).await {
+            Ok(data) => data,
+            Err(err) => return CommandResponse::error(cmd.command_id.clone(), err.into()),
+        };
+
+        // Phase B: sync redb transaction
+        match self.process_command(cmd.clone(), prefetched) {
             Ok((response, events)) => {
                 // Broadcast events after successful commit
-                for event in events {
-                    if self.event_tx.send(event).is_err() {
+                for event in &events {
+                    if self.event_tx.send(event.clone()).is_err() {
                         tracing::warn!("Event broadcast failed: no active receivers");
                         break;
                     }
                 }
+                // Phase C: post-transaction async actions
+                self.post_actions(&cmd, &events).await;
                 response
             }
             Err(err) => CommandResponse::error(cmd.command_id, err.into()),
@@ -265,13 +309,23 @@ impl OrdersManager {
     /// Execute a command and return both the response and generated events
     ///
     /// This is useful for Tauri integration where events need to be emitted to the frontend.
-    /// Unlike `execute_command`, this returns the events to the caller while still
-    /// broadcasting them internally.
-    pub fn execute_command_with_events(
+    pub async fn execute_command_with_events(
         &self,
         cmd: OrderCommand,
     ) -> (CommandResponse, Vec<OrderEvent>) {
-        match self.process_command(cmd.clone()) {
+        // Phase A: prefetch SQLite data
+        let prefetched = match self.prefetch_data(&cmd).await {
+            Ok(data) => data,
+            Err(err) => {
+                return (
+                    CommandResponse::error(cmd.command_id.clone(), err.into()),
+                    vec![],
+                );
+            }
+        };
+
+        // Phase B: sync redb transaction
+        match self.process_command(cmd.clone(), prefetched) {
             Ok((response, events)) => {
                 // Broadcast events after successful commit
                 for event in &events {
@@ -280,6 +334,8 @@ impl OrdersManager {
                         break;
                     }
                 }
+                // Phase C: post-transaction async actions
+                self.post_actions(&cmd, &events).await;
                 (response, events)
             }
             Err(err) => (CommandResponse::error(cmd.command_id, err.into()), vec![]),
@@ -298,16 +354,251 @@ impl OrdersManager {
         catalog.get_product_meta_batch(&product_ids)
     }
 
-    /// Process command and return response with events
+    // ========== Phase A: Async prefetch ==========
+
+    /// 预取 redb 事务所需的 SQLite 数据
     ///
-    /// Uses the action-based architecture:
-    /// 1. Convert command to CommandAction
-    /// 2. Execute action to generate events
-    /// 3. Apply events to snapshots via EventApplier
-    /// 4. Persist everything atomically
+    /// 在 redb 写事务之前执行，避免在事务内使用 block_on。
+    /// redb 单写者序列化保证预取数据在事务开始时仍然有效。
+    async fn prefetch_data(&self, cmd: &OrderCommand) -> ManagerResult<PrefetchedData> {
+        let mut data = PrefetchedData {
+            mg_rules: vec![],
+            link_member: None,
+            redeem_stamp: None,
+            auto_cancel: vec![],
+        };
+
+        let Some(pool) = &self.pool else {
+            return Ok(data);
+        };
+
+        match &cmd.payload {
+            shared::order::OrderCommandPayload::AddItems { order_id, .. } => {
+                // If member is linked, get MG rules for discount calculation
+                if let Ok(Some(snapshot)) = self.storage.get_snapshot(order_id)
+                    && let Some(mg_id) = snapshot.marketing_group_id
+                {
+                    data.mg_rules =
+                        crate::db::repository::marketing_group::find_active_rules_by_group(
+                            pool, mg_id,
+                        )
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::warn!(order_id, error = %e, "Failed to query MG rules for AddItems, proceeding without discounts");
+                            vec![]
+                        });
+                }
+            }
+            shared::order::OrderCommandPayload::LinkMember { member_id, .. } => {
+                let member = crate::db::repository::member::find_member_by_id(pool, *member_id)
+                    .await
+                    .map_err(|e| {
+                        ManagerError::from(OrderError::InvalidOperation(
+                            CommandErrorCode::InternalError,
+                            format!("Failed to query member: {e}"),
+                        ))
+                    })?
+                    .ok_or_else(|| {
+                        ManagerError::from(OrderError::InvalidOperation(
+                            CommandErrorCode::InternalError,
+                            format!("Member {} not found", member_id),
+                        ))
+                    })?;
+
+                if !member.is_active {
+                    return Err(ManagerError::from(OrderError::InvalidOperation(
+                        CommandErrorCode::InvalidOperation,
+                        format!("Member {} is not active", member_id),
+                    )));
+                }
+
+                let mg = crate::db::repository::marketing_group::find_by_id(
+                    pool,
+                    member.marketing_group_id,
+                )
+                .await
+                .map_err(|e| {
+                    ManagerError::from(OrderError::InvalidOperation(
+                        CommandErrorCode::InternalError,
+                        format!("Failed to query marketing group: {e}"),
+                    ))
+                })?
+                .ok_or_else(|| {
+                    ManagerError::from(OrderError::InvalidOperation(
+                        CommandErrorCode::InternalError,
+                        format!("Marketing group {} not found", member.marketing_group_id),
+                    ))
+                })?;
+
+                let mg_rules = crate::db::repository::marketing_group::find_active_rules_by_group(
+                    pool,
+                    member.marketing_group_id,
+                )
+                .await
+                .map_err(|e| {
+                    ManagerError::from(OrderError::InvalidOperation(
+                        CommandErrorCode::InternalError,
+                        format!("Failed to query MG rules: {e}"),
+                    ))
+                })?;
+
+                data.link_member = Some(LinkMemberPrefetch {
+                    member,
+                    mg_display_name: mg.display_name,
+                    mg_rules,
+                });
+            }
+            shared::order::OrderCommandPayload::RedeemStamp {
+                order_id,
+                stamp_activity_id,
+                ..
+            } => {
+                // Load snapshot to get member_id for stamp validation
+                let snapshot = self
+                    .storage
+                    .get_snapshot(order_id)?
+                    .ok_or_else(|| OrderError::OrderNotFound(order_id.clone()))?;
+                let member_id = snapshot.member_id.ok_or_else(|| {
+                    OrderError::InvalidOperation(
+                        CommandErrorCode::MemberRequired,
+                        "Must have a member linked to redeem stamps".to_string(),
+                    )
+                })?;
+
+                let activity = sqlx::query_as::<_, shared::models::StampActivity>(
+                    "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ? AND is_active = 1",
+                )
+                .bind(*stamp_activity_id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Failed to query stamp activity: {e}")))?
+                .ok_or_else(|| OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
+
+                let stamp_progress = crate::db::repository::stamp::find_progress(
+                    pool,
+                    member_id,
+                    *stamp_activity_id,
+                )
+                .await
+                .map_err(|e| {
+                    OrderError::InvalidOperation(
+                        CommandErrorCode::InternalError,
+                        format!("Failed to query stamp progress: {e}"),
+                    )
+                })?;
+                let current_stamps = stamp_progress.map(|p| p.current_stamps).unwrap_or(0);
+
+                let stamp_targets = crate::db::repository::marketing_group::find_stamp_targets(
+                    pool,
+                    *stamp_activity_id,
+                )
+                .await
+                .map_err(|e| {
+                    OrderError::InvalidOperation(
+                        CommandErrorCode::InternalError,
+                        format!("Failed to query stamp targets: {e}"),
+                    )
+                })?;
+
+                let mut reward_targets =
+                    crate::db::repository::marketing_group::find_reward_targets(
+                        pool,
+                        *stamp_activity_id,
+                    )
+                    .await
+                    .map_err(|e| {
+                        OrderError::InvalidOperation(
+                            CommandErrorCode::InternalError,
+                            format!("Failed to query reward targets: {e}"),
+                        )
+                    })?;
+
+                // 留空则同计章对象: if no reward targets configured, use stamp targets
+                if reward_targets.is_empty() {
+                    reward_targets = stamp_targets
+                        .iter()
+                        .map(|t| shared::models::StampRewardTarget {
+                            id: t.id,
+                            stamp_activity_id: t.stamp_activity_id,
+                            target_type: t.target_type.clone(),
+                            target_id: t.target_id,
+                        })
+                        .collect();
+                }
+
+                data.redeem_stamp = Some(RedeemStampPrefetch {
+                    activity,
+                    current_stamps,
+                    stamp_targets,
+                    reward_targets,
+                });
+            }
+            shared::order::OrderCommandPayload::RemoveItem { order_id, .. }
+            | shared::order::OrderCommandPayload::CompItem { order_id, .. } => {
+                // Prefetch stamp data for auto-cancel validation
+                if let Ok(Some(snapshot)) = self.storage.get_snapshot(order_id)
+                    && let Some(member_id) = snapshot.member_id
+                {
+                    for redemption in &snapshot.stamp_redemptions {
+                        let activity_id = redemption.stamp_activity_id;
+
+                        let activity = sqlx::query_as::<_, shared::models::StampActivity>(
+                            "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ?",
+                        )
+                        .bind(activity_id)
+                        .fetch_optional(pool)
+                        .await
+                        .map_err(|e| ManagerError::from(OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Failed to query stamp activity: {e}"))))?;
+
+                        let progress = crate::db::repository::stamp::find_progress(
+                            pool,
+                            member_id,
+                            activity_id,
+                        )
+                        .await
+                        .map_err(|e| {
+                            ManagerError::from(OrderError::InvalidOperation(
+                                CommandErrorCode::InternalError,
+                                format!("Failed to query stamp progress: {e}"),
+                            ))
+                        })?;
+                        let current_stamps = progress.map(|p| p.current_stamps).unwrap_or(0);
+
+                        let stamp_targets =
+                            crate::db::repository::marketing_group::find_stamp_targets(
+                                pool,
+                                activity_id,
+                            )
+                            .await
+                            .map_err(|e| {
+                                ManagerError::from(OrderError::InvalidOperation(
+                                    CommandErrorCode::InternalError,
+                                    format!("Failed to query stamp targets: {e}"),
+                                ))
+                            })?;
+
+                        data.auto_cancel.push(StampCancelPrefetch {
+                            activity_id,
+                            activity,
+                            current_stamps,
+                            stamp_targets,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        Ok(data)
+    }
+
+    // ========== Phase B: Sync transaction ==========
+
+    /// Process command in a sync redb transaction using prefetched data
     fn process_command(
         &self,
         cmd: OrderCommand,
+        prefetched: PrefetchedData,
     ) -> ManagerResult<(CommandResponse, Vec<OrderEvent>)> {
         tracing::debug!(command_id = %cmd.command_id, payload = ?cmd.payload, "Processing command");
 
@@ -318,7 +609,6 @@ impl OrdersManager {
         }
 
         // 2. For OpenTable: pre-check table availability before generating receipt_number
-        // This avoids wasting receipt numbers on failed table opens
         if let shared::order::OrderCommandPayload::OpenTable {
             table_id: Some(tid),
             table_name,
@@ -333,8 +623,7 @@ impl OrdersManager {
             )));
         }
 
-        // 3. Pre-generate receipt_number and queue_number for OpenTable (BEFORE transaction to avoid deadlock)
-        // redb doesn't allow nested write transactions
+        // 3. Pre-generate receipt_number and queue_number for OpenTable
         let pre_generated_receipt = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable { .. } => {
                 let receipt = self.next_receipt_number();
@@ -359,7 +648,7 @@ impl OrdersManager {
             _ => None,
         };
 
-        // 3. Begin write transaction
+        // 4. Begin write transaction
         let txn = self.storage.begin_write()?;
 
         // Double-check idempotency within transaction
@@ -370,10 +659,10 @@ impl OrdersManager {
             return Ok((CommandResponse::duplicate(cmd.command_id), vec![]));
         }
 
-        // 4. Get current sequence for context initialization
+        // 5. Get current sequence for context initialization
         let current_sequence = self.storage.get_current_sequence()?;
 
-        // 5. Create context and metadata
+        // 6. Create context and metadata
         let mut ctx = CommandContext::new(&txn, &self.storage, current_sequence);
         let metadata = CommandMetadata {
             command_id: cmd.command_id.clone(),
@@ -382,9 +671,7 @@ impl OrdersManager {
             timestamp: cmd.timestamp,
         };
 
-        // 6. Convert to action and execute
-        // For OpenTable: use pre-generated receipt_number
-        // For AddItems: inject cached price rules and product metadata from CatalogService
+        // 7. Convert to action and execute (all sync, no I/O)
         let action: CommandAction = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable {
                 table_id,
@@ -395,7 +682,6 @@ impl OrdersManager {
                 is_retail,
             } => {
                 tracing::debug!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
-                // Use pre-generated receipt_number (generated before transaction)
                 let receipt_number = pre_generated_receipt.ok_or_else(|| {
                     OrderError::InvalidOperation(
                         CommandErrorCode::InternalError,
@@ -415,7 +701,6 @@ impl OrdersManager {
             }
             shared::order::OrderCommandPayload::AddItems { order_id, items } => {
                 let cached_rules = self.get_cached_rules(order_id).unwrap_or_default();
-                // 按当前时间动态过滤（区域是静态缓存，时间是动态的）
                 let now = shared::util::now_millis();
                 let rules: Vec<PriceRule> = cached_rules
                     .into_iter()
@@ -423,98 +708,20 @@ impl OrdersManager {
                     .collect();
                 let product_metadata = self.get_product_metadata_for_items(items);
 
-                // If member is linked, get MG rules for discount calculation
-                let mg_rules = if let Some(pool) = &self.pool {
-                    if let Ok(Some(snapshot)) = self.storage.get_snapshot(order_id) {
-                        if let Some(mg_id) = snapshot.marketing_group_id {
-                            futures::executor::block_on(
-                                crate::db::repository::marketing_group::find_active_rules_by_group(
-                                    pool, mg_id,
-                                ),
-                            )
-                            .unwrap_or_default()
-                        } else {
-                            vec![]
-                        }
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                };
-
                 CommandAction::AddItems(super::actions::AddItemsAction {
                     order_id: order_id.clone(),
                     items: items.clone(),
                     rules,
                     product_metadata,
-                    mg_rules,
+                    mg_rules: prefetched.mg_rules,
                 })
             }
             shared::order::OrderCommandPayload::LinkMember {
                 order_id,
                 member_id,
             } => {
-                // Query member info and MG rules from SQLite
-                let pool = self.pool.as_ref().ok_or_else(|| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        "Database not available for member queries".to_string(),
-                    )
-                })?;
-                let member = futures::executor::block_on(
-                    crate::db::repository::member::find_member_by_id(pool, *member_id),
-                )
-                .map_err(|e| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Failed to query member: {e}"),
-                    )
-                })?
-                .ok_or_else(|| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Member {} not found", member_id),
-                    )
-                })?;
-
-                if !member.is_active {
-                    return Err(ManagerError::from(OrderError::InvalidOperation(
-                        CommandErrorCode::InvalidOperation,
-                        format!("Member {} is not active", member_id),
-                    )));
-                }
-
-                let mg = futures::executor::block_on(
-                    crate::db::repository::marketing_group::find_by_id(
-                        pool,
-                        member.marketing_group_id,
-                    ),
-                )
-                .map_err(|e| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Failed to query marketing group: {e}"),
-                    )
-                })?
-                .ok_or_else(|| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Marketing group {} not found", member.marketing_group_id),
-                    )
-                })?;
-
-                let mg_rules = futures::executor::block_on(
-                    crate::db::repository::marketing_group::find_active_rules_by_group(
-                        pool,
-                        member.marketing_group_id,
-                    ),
-                )
-                .map_err(|e| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Failed to query MG rules: {e}"),
-                    )
+                let lm = prefetched.link_member.ok_or_else(|| {
+                    ManagerError::Internal("LinkMember prefetch data missing".to_string())
                 })?;
 
                 // Get product metadata for existing items' MG scope matching
@@ -532,10 +739,10 @@ impl OrdersManager {
                 CommandAction::LinkMember(super::actions::LinkMemberAction {
                     order_id: order_id.clone(),
                     member_id: *member_id,
-                    member_name: member.name,
-                    marketing_group_id: member.marketing_group_id,
-                    marketing_group_name: mg.display_name,
-                    mg_rules,
+                    member_name: lm.member.name,
+                    marketing_group_id: lm.member.marketing_group_id,
+                    marketing_group_name: lm.mg_display_name,
+                    mg_rules: lm.mg_rules,
                     product_metadata,
                 })
             }
@@ -545,64 +752,17 @@ impl OrdersManager {
                 product_id,
                 comp_existing_instance_id,
             } => {
-                // Query stamp activity and reward targets from SQLite
-                let pool = self.pool.as_ref().ok_or_else(|| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        "Database not available for stamp queries".to_string(),
-                    )
+                let rs = prefetched.redeem_stamp.ok_or_else(|| {
+                    ManagerError::Internal("RedeemStamp prefetch data missing".to_string())
                 })?;
 
-                // Load snapshot to get member_id for stamp validation
+                // Re-read snapshot inside transaction for accurate stamp calculation
                 let snapshot = self
                     .storage
                     .get_snapshot(order_id)?
                     .ok_or_else(|| OrderError::OrderNotFound(order_id.clone()))?;
-                let member_id = snapshot.member_id.ok_or_else(|| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::MemberRequired,
-                        "Must have a member linked to redeem stamps".to_string(),
-                    )
-                })?;
 
-                let activity = futures::executor::block_on(
-                    sqlx::query_as::<_, shared::models::StampActivity>(
-                        "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ? AND is_active = 1",
-                    )
-                    .bind(*stamp_activity_id)
-                    .fetch_optional(pool),
-                )
-                .map_err(|e| OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Failed to query stamp activity: {e}")))?
-                .ok_or_else(|| OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
-
-                // Validate member has enough stamps (DB stamps + order bonus)
-                let stamp_progress =
-                    futures::executor::block_on(crate::db::repository::stamp::find_progress(
-                        pool,
-                        member_id,
-                        *stamp_activity_id,
-                    ))
-                    .map_err(|e| {
-                        OrderError::InvalidOperation(
-                            CommandErrorCode::InternalError,
-                            format!("Failed to query stamp progress: {e}"),
-                        )
-                    })?;
-                let current_stamps = stamp_progress.map(|p| p.current_stamps).unwrap_or(0);
-
-                // Count order bonus: qualifying non-comped items in the order
-                let stamp_targets = futures::executor::block_on(
-                    crate::db::repository::marketing_group::find_stamp_targets(
-                        pool,
-                        *stamp_activity_id,
-                    ),
-                )
-                .map_err(|e| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Failed to query stamp targets: {e}"),
-                    )
-                })?;
+                // Validate stamps: DB stamps + order bonus
                 let items_with_category: Vec<_> = snapshot
                     .items
                     .iter()
@@ -613,92 +773,48 @@ impl OrdersManager {
                     .collect();
                 let order_bonus = crate::marketing::stamp_tracker::count_stamps_for_order(
                     &items_with_category,
-                    &stamp_targets,
+                    &rs.stamp_targets,
                 );
-                let effective_stamps = current_stamps + order_bonus;
+                let effective_stamps = rs.current_stamps + order_bonus;
 
-                if effective_stamps < activity.stamps_required {
+                if effective_stamps < rs.activity.stamps_required {
                     return Err(ManagerError::InsufficientStamps {
                         current: effective_stamps,
-                        required: activity.stamps_required,
+                        required: rs.activity.stamps_required,
                     });
                 }
 
-                // Match mode: if the comped item contributes to stamp progress, verify
-                // that stamps still meet the threshold after it stops counting.
-                // Only items matching stamp_targets contribute; reward-only items (e.g.
-                // Designated potato when stamps come from coffee) don't reduce the count.
+                // Match mode validation
                 if let Some(cid) = &comp_existing_instance_id
                     && let Some(comp_item) = snapshot.items.iter().find(|i| i.instance_id == *cid)
                 {
-                    let is_stamp_contributor = stamp_targets.iter().any(|t| match t.target_type {
-                        shared::models::StampTargetType::Product => t.target_id == comp_item.id,
-                        shared::models::StampTargetType::Category => {
-                            comp_item.category_id == Some(t.target_id)
-                        }
-                    });
+                    let is_stamp_contributor =
+                        rs.stamp_targets.iter().any(|t| match t.target_type {
+                            shared::models::StampTargetType::Product => t.target_id == comp_item.id,
+                            shared::models::StampTargetType::Category => {
+                                comp_item.category_id == Some(t.target_id)
+                            }
+                        });
                     if is_stamp_contributor {
                         let post_comp_effective = effective_stamps - comp_item.quantity;
-                        if post_comp_effective < activity.stamps_required {
+                        if post_comp_effective < rs.activity.stamps_required {
                             return Err(ManagerError::InsufficientStamps {
                                 current: post_comp_effective,
-                                required: activity.stamps_required,
+                                required: rs.activity.stamps_required,
                             });
                         }
                     }
                 }
 
-                let mut reward_targets = futures::executor::block_on(
-                    crate::db::repository::marketing_group::find_reward_targets(
-                        pool,
-                        *stamp_activity_id,
-                    ),
-                )
-                .map_err(|e| {
-                    OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
-                        format!("Failed to query reward targets: {e}"),
-                    )
-                })?;
-
-                // 留空则同计章对象: if no reward targets configured, use stamp targets
-                if reward_targets.is_empty() {
-                    let stamp_targets = futures::executor::block_on(
-                        crate::db::repository::marketing_group::find_stamp_targets(
-                            pool,
-                            *stamp_activity_id,
-                        ),
-                    )
-                    .map_err(|e| {
-                        OrderError::InvalidOperation(
-                            CommandErrorCode::InternalError,
-                            format!("Failed to query stamp targets: {e}"),
-                        )
-                    })?;
-                    reward_targets = stamp_targets
-                        .into_iter()
-                        .map(|t| shared::models::StampRewardTarget {
-                            id: t.id,
-                            stamp_activity_id: t.stamp_activity_id,
-                            target_type: t.target_type,
-                            target_id: t.target_id,
-                        })
-                        .collect();
-                }
-
-                // Resolve reward product info for add-new modes:
-                // - Designated: use designated_product_id
-                // - Selection mode (Eco/Gen + product_id): use the provided product_id
-                // - Match mode (comp_existing): no product info needed (uses existing item)
-                // - Auto-match mode (Eco/Gen, no product_id): resolved by action from snapshot
+                // Resolve reward product info
                 let reward_product_info = if comp_existing_instance_id.is_some() {
-                    None // Match mode: product info comes from existing item
+                    None
                 } else {
-                    let pid = match activity.reward_strategy {
+                    let pid = match rs.activity.reward_strategy {
                         shared::models::RewardStrategy::Designated => {
-                            product_id.or(activity.designated_product_id)
+                            product_id.or(rs.activity.designated_product_id)
                         }
-                        _ => *product_id, // Selection mode: explicit product_id
+                        _ => *product_id,
                     };
                     pid.and_then(|pid| {
                         let catalog = self.catalog_service.as_ref()?;
@@ -727,40 +843,40 @@ impl OrdersManager {
                     stamp_activity_id: *stamp_activity_id,
                     product_id: *product_id,
                     comp_existing_instance_id: comp_existing_instance_id.clone(),
-                    activity,
-                    reward_targets,
+                    activity: rs.activity,
+                    reward_targets: rs.reward_targets,
                     reward_product_info,
                 })
             }
             _ => (&cmd).into(),
         };
-        let mut events = futures::executor::block_on(action.execute(&mut ctx, &metadata))
+        let mut events = action
+            .execute(&mut ctx, &metadata)
             .map_err(ManagerError::from)?;
 
-        // 6. Apply events to snapshots and update active order tracking
+        // 8. Apply events to snapshots and update active order tracking
         for event in &events {
-            // Load or create snapshot for this order
             let mut snapshot = ctx
                 .load_snapshot(&event.order_id)
                 .unwrap_or_else(|_| OrderSnapshot::new(event.order_id.clone()));
-
-            // Apply event using EventApplier
             let applier: EventAction = event.into();
             applier.apply(&mut snapshot, event);
-
-            // Save updated snapshot to context
             ctx.save_snapshot(snapshot);
         }
 
-        // 6b. Auto-cancel stamp redemptions if item removal/comp reduced stamps below threshold
+        // 8b. Auto-cancel stamp redemptions if item removal/comp reduced stamps below threshold
         let order_id_for_stamp_check: Option<&str> = match &cmd.payload {
             shared::order::OrderCommandPayload::RemoveItem { order_id, .. }
             | shared::order::OrderCommandPayload::CompItem { order_id, .. } => Some(order_id),
             _ => None,
         };
         if let Some(order_id) = order_id_for_stamp_check {
-            let cancel_events =
-                self.auto_cancel_invalid_stamp_redemptions(&mut ctx, &metadata, order_id)?;
+            let cancel_events = self.auto_cancel_invalid_stamp_redemptions(
+                &mut ctx,
+                &metadata,
+                order_id,
+                &prefetched.auto_cancel,
+            )?;
             for event in &cancel_events {
                 let mut snapshot = ctx
                     .load_snapshot(&event.order_id)
@@ -772,23 +888,20 @@ impl OrdersManager {
             events.extend(cancel_events);
         }
 
-        // 7. Persist events
+        // 9. Persist events
         for event in &events {
             self.storage.store_event(&txn, event)?;
         }
 
-        // 8. Persist snapshots and update active order tracking
+        // 10. Persist snapshots and update active order tracking
         for snapshot in ctx.modified_snapshots() {
             self.storage.store_snapshot(&txn, snapshot)?;
-
-            // Update active order tracking based on status
             match snapshot.status {
                 OrderStatus::Active => {
                     self.storage.mark_order_active(&txn, &snapshot.order_id)?;
                 }
                 OrderStatus::Completed | OrderStatus::Void | OrderStatus::Merged => {
                     self.storage.mark_order_inactive(&txn, &snapshot.order_id)?;
-                    // Queue for archive if archive service is configured
                     if self.archive_service.is_some() {
                         self.storage.queue_for_archive(&txn, &snapshot.order_id)?;
                     }
@@ -796,7 +909,7 @@ impl OrdersManager {
             }
         }
 
-        // 9. Update sequence counter
+        // 11. Update sequence counter
         let max_sequence = events
             .iter()
             .map(|e| e.sequence)
@@ -806,19 +919,16 @@ impl OrdersManager {
             self.storage.set_sequence(&txn, max_sequence)?;
         }
 
-        // 10. Mark command processed
+        // 12. Mark command processed
         self.storage.mark_command_processed(&txn, &cmd.command_id)?;
 
-        // 11. Commit transaction
+        // 13. Commit transaction
         txn.commit().map_err(StorageError::from)?;
 
-        // 12. Clean up rule cache for terminal orders (Complete/Void/Merge)
-        // Note: MoveOrder is NOT terminal — order stays Active, rules handled by callers
+        // 14. Clean up rule cache for terminal orders
         match &cmd.payload {
             shared::order::OrderCommandPayload::CompleteOrder { order_id, .. } => {
                 self.remove_cached_rules(order_id);
-                // Track stamps for completed orders with linked members
-                self.track_stamps_on_completion(order_id);
             }
             shared::order::OrderCommandPayload::VoidOrder { order_id, .. } => {
                 self.remove_cached_rules(order_id);
@@ -831,21 +941,30 @@ impl OrdersManager {
             _ => {}
         }
 
-        // 13. Return response
-        // Note: Archive is now handled by ArchiveWorker listening to event broadcasts
+        // 15. Return response
         let order_id = events.first().map(|e| e.order_id.clone());
         tracing::info!(command_id = %cmd.command_id, order_id = ?order_id, event_count = events.len(), "Command processed successfully");
         Ok((CommandResponse::success(cmd.command_id, order_id), events))
     }
 
+    // ========== Phase C: Post-transaction async actions ==========
+
+    /// 事务提交后的异步后置操作
+    async fn post_actions(&self, cmd: &OrderCommand, _events: &[OrderEvent]) {
+        // Track stamps for completed orders with linked members
+        if let shared::order::OrderCommandPayload::CompleteOrder { order_id, .. } = &cmd.payload {
+            self.track_stamps_on_completion(order_id).await;
+        }
+    }
+
     // ========== Stamp Tracking ==========
 
-    /// Track stamps for a completed order.
+    /// Track stamps for a completed order (async).
     ///
     /// Called after redb commit for CompleteOrder. If the order has a linked member,
     /// queries active stamp activities for the member's marketing group, counts matching
     /// items, and adds earned stamps to the member's progress in SQLite.
-    fn track_stamps_on_completion(&self, order_id: &str) {
+    async fn track_stamps_on_completion(&self, order_id: &str) {
         let Some(pool) = &self.pool else { return };
 
         let snapshot = match self.storage.get_snapshot(order_id) {
@@ -861,15 +980,18 @@ impl OrdersManager {
         };
 
         // Query active stamp activities for this marketing group
-        let activities = match futures::executor::block_on(
-            crate::db::repository::marketing_group::find_active_activities_by_group(pool, mg_id),
-        ) {
-            Ok(a) => a,
-            Err(e) => {
-                tracing::error!(order_id, error = %e, "Failed to query stamp activities for completion tracking");
-                return;
-            }
-        };
+        let activities =
+            match crate::db::repository::marketing_group::find_active_activities_by_group(
+                pool, mg_id,
+            )
+            .await
+            {
+                Ok(a) => a,
+                Err(e) => {
+                    tracing::error!(order_id, error = %e, "Failed to query stamp activities for completion tracking");
+                    return;
+                }
+            };
 
         if activities.is_empty() {
             return;
@@ -888,9 +1010,12 @@ impl OrdersManager {
         let now = shared::util::now_millis();
 
         for activity in &activities {
-            let stamp_targets = match futures::executor::block_on(
-                crate::db::repository::marketing_group::find_stamp_targets(pool, activity.id),
-            ) {
+            let stamp_targets = match crate::db::repository::marketing_group::find_stamp_targets(
+                pool,
+                activity.id,
+            )
+            .await
+            {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!(activity_id = activity.id, error = %e, "Failed to query stamp targets");
@@ -904,13 +1029,15 @@ impl OrdersManager {
             );
 
             if earned > 0 {
-                match futures::executor::block_on(crate::db::repository::stamp::add_stamps(
+                match crate::db::repository::stamp::add_stamps(
                     pool,
                     member_id,
                     activity.id,
                     earned,
                     now,
-                )) {
+                )
+                .await
+                {
                     Ok(progress) => {
                         tracing::debug!(
                             member_id,
@@ -945,14 +1072,16 @@ impl OrdersManager {
                 continue;
             };
 
-            match futures::executor::block_on(crate::db::repository::stamp::redeem(
+            match crate::db::repository::stamp::redeem(
                 pool,
                 member_id,
                 activity.id,
                 activity.stamps_required,
                 activity.is_cyclic,
                 now,
-            )) {
+            )
+            .await
+            {
                 Ok(progress) => {
                     tracing::debug!(
                         member_id,
@@ -975,29 +1104,19 @@ impl OrdersManager {
 
     /// Auto-cancel stamp redemptions that are no longer valid after item removal/comp.
     ///
-    /// When items are removed or comped, the effective stamp count may drop below the
-    /// redemption threshold. This method checks each active stamp redemption and generates
-    /// StampRedemptionCancelled events for those that are no longer valid.
+    /// Uses prefetched stamp data to avoid SQLite queries inside the redb transaction.
     fn auto_cancel_invalid_stamp_redemptions(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
         order_id: &str,
+        prefetched: &[StampCancelPrefetch],
     ) -> ManagerResult<Vec<OrderEvent>> {
-        let pool = match &self.pool {
-            Some(p) => p,
-            None => return Ok(vec![]),
-        };
-
         let snapshot = ctx.load_snapshot(order_id).map_err(ManagerError::from)?;
 
         if snapshot.stamp_redemptions.is_empty() {
             return Ok(vec![]);
         }
-
-        let Some(member_id) = snapshot.member_id else {
-            return Ok(vec![]);
-        };
 
         let items_with_category: Vec<_> = snapshot
             .items
@@ -1013,43 +1132,19 @@ impl OrdersManager {
         for redemption in &snapshot.stamp_redemptions {
             let activity_id = redemption.stamp_activity_id;
 
-            let activity = futures::executor::block_on(
-                sqlx::query_as::<_, shared::models::StampActivity>(
-                    "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ?",
-                )
-                .bind(activity_id)
-                .fetch_optional(pool),
-            )
-            .map_err(|e| ManagerError::from(OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Failed to query stamp activity: {e}"))))?;
-
-            let Some(activity) = activity else { continue };
-
-            let progress = futures::executor::block_on(
-                crate::db::repository::stamp::find_progress(pool, member_id, activity_id),
-            )
-            .map_err(|e| {
-                ManagerError::from(OrderError::InvalidOperation(
-                    CommandErrorCode::InternalError,
-                    format!("Failed to query stamp progress: {e}"),
-                ))
-            })?;
-            let current_stamps = progress.map(|p| p.current_stamps).unwrap_or(0);
-
-            let stamp_targets = futures::executor::block_on(
-                crate::db::repository::marketing_group::find_stamp_targets(pool, activity_id),
-            )
-            .map_err(|e| {
-                ManagerError::from(OrderError::InvalidOperation(
-                    CommandErrorCode::InternalError,
-                    format!("Failed to query stamp targets: {e}"),
-                ))
-            })?;
+            // Find prefetched data for this activity
+            let Some(pf) = prefetched.iter().find(|p| p.activity_id == activity_id) else {
+                continue;
+            };
+            let Some(activity) = &pf.activity else {
+                continue;
+            };
 
             let order_bonus = crate::marketing::stamp_tracker::count_stamps_for_order(
                 &items_with_category,
-                &stamp_targets,
+                &pf.stamp_targets,
             );
-            let effective_stamps = current_stamps + order_bonus;
+            let effective_stamps = pf.current_stamps + order_bonus;
 
             if effective_stamps < activity.stamps_required {
                 tracing::info!(
@@ -1070,7 +1165,7 @@ impl OrdersManager {
                     shared::order::OrderEventType::StampRedemptionCancelled,
                     shared::order::EventPayload::StampRedemptionCancelled {
                         stamp_activity_id: activity_id,
-                        stamp_activity_name: activity.display_name,
+                        stamp_activity_name: activity.display_name.clone(),
                         reward_instance_id: redemption.reward_instance_id.clone(),
                         is_comp_existing: redemption.is_comp_existing,
                         comp_source_instance_id: redemption.comp_source_instance_id.clone(),

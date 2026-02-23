@@ -3,8 +3,6 @@
 //! Adds or clears an order-level note. Replaces the previous note (not append).
 //! Empty string clears the note. No authorization required.
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NOTE_LEN, validate_order_text};
 use shared::order::types::CommandErrorCode;
@@ -17,9 +15,8 @@ pub struct AddOrderNoteAction {
     pub note: String,
 }
 
-#[async_trait]
 impl CommandHandler for AddOrderNoteAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -99,8 +96,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_add_note_to_active_order_succeeds() {
+    #[test]
+    fn test_add_note_to_active_order_succeeds() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -116,7 +113,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -135,8 +132,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_note_to_completed_order_fails() {
+    #[test]
+    fn test_add_note_to_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -153,12 +150,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_note_to_voided_order_fails() {
+    #[test]
+    fn test_add_note_to_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -175,12 +172,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_note_captures_previous_note() {
+    #[test]
+    fn test_add_note_captures_previous_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -197,7 +194,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderNoteAdded {
             note,
@@ -211,8 +208,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_clear_note_with_empty_string() {
+    #[test]
+    fn test_clear_note_with_empty_string() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -229,7 +226,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderNoteAdded {
@@ -244,8 +241,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_note_generates_correct_event_payload() {
+    #[test]
+    fn test_add_note_generates_correct_event_payload() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -267,7 +264,7 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         let event = &events[0];
         assert_eq!(event.command_id, "test-cmd-123");
@@ -277,8 +274,8 @@ mod tests {
         assert_eq!(event.event_type, OrderEventType::OrderNoteAdded);
     }
 
-    #[tokio::test]
-    async fn test_add_note_order_not_found_fails() {
+    #[test]
+    fn test_add_note_order_not_found_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -291,7 +288,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 }

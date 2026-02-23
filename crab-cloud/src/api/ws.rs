@@ -13,7 +13,7 @@ use shared::error::{AppError, ErrorCode};
 use tokio::sync::mpsc;
 
 use crate::auth::EdgeIdentity;
-use crate::db::{audit, commands, sync_store};
+use crate::db::{audit, sync_store};
 use crate::state::AppState;
 
 /// GET /api/edge/ws — upgrade to WebSocket
@@ -131,33 +131,6 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         }
     }
 
-    // Send any pending commands immediately on connect
-    if let Ok(pending) = commands::get_pending(&state.pool, edge_server_id, 10).await
-        && !pending.is_empty()
-    {
-        let mut sent_ids: Vec<i64> = Vec::new();
-        for cmd in pending {
-            let cmd_id = cmd.id;
-            let cloud_cmd = shared::cloud::CloudCommand {
-                id: cmd.id.to_string(),
-                command_type: cmd.command_type,
-                payload: cmd.payload,
-                created_at: cmd.created_at,
-            };
-            let msg = CloudMessage::Command(cloud_cmd);
-            if let Ok(json) = serde_json::to_string(&msg)
-                && ws_sink.send(Message::Text(json.into())).await.is_ok()
-            {
-                sent_ids.push(cmd_id);
-            } else {
-                break;
-            }
-        }
-        if !sent_ids.is_empty() {
-            let _ = commands::mark_delivered(&state.pool, &sent_ids).await;
-        }
-    }
-
     // 所有初始化发送完成后，标记 edge 上线（通知正在观看的 console）
     state
         .live_orders
@@ -227,24 +200,6 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         .live_orders
         .clear_edge(&identity.tenant_id, edge_server_id);
 
-    // Rollback delivered→pending so commands can be re-sent on reconnect
-    match commands::rollback_delivered(&state.pool, edge_server_id).await {
-        Ok(n) if n > 0 => {
-            tracing::info!(
-                edge_id = %identity.entity_id,
-                rolled_back = n,
-                "Rolled back delivered commands to pending on disconnect"
-            );
-        }
-        Err(e) => {
-            tracing::warn!(
-                edge_id = %identity.entity_id,
-                "Failed to rollback delivered commands: {e}"
-            );
-        }
-        _ => {}
-    }
-
     // Audit: edge disconnected
     let disconnect_now = shared::util::now_millis();
     let disconnect_detail = serde_json::json!({
@@ -290,22 +245,10 @@ async fn handle_edge_message<S>(
     let now = shared::util::now_millis();
 
     match cloud_msg {
-        CloudMessage::SyncBatch {
-            items,
-            command_results,
-            ..
-        } => {
+        CloudMessage::SyncBatch { items, .. } => {
             // Update last_sync_at
             if let Err(e) = sync_store::update_last_sync(&state.pool, edge_server_id, now).await {
                 tracing::warn!(edge_server_id, "Failed to update last_sync_at: {e}");
-            }
-
-            // Process command results
-            if !command_results.is_empty()
-                && let Err(e) =
-                    commands::complete_commands(&state.pool, &command_results, now).await
-            {
-                tracing::warn!("Failed to process command results: {e}");
             }
 
             let mut accepted = 0u32;
@@ -366,54 +309,6 @@ async fn handle_edge_message<S>(
                 rejected,
                 "WS sync batch processed"
             );
-        }
-
-        CloudMessage::CommandResult { results } => {
-            // Separate ephemeral on-demand results from persistent command results
-            let mut persistent_results = Vec::new();
-            for result in results {
-                if let Some((_, (_, sender))) = state.pending_requests.remove(&result.command_id) {
-                    let _ = sender.send(result);
-                } else {
-                    persistent_results.push(result);
-                }
-            }
-
-            if !persistent_results.is_empty() {
-                if let Err(e) =
-                    commands::complete_commands(&state.pool, &persistent_results, now).await
-                {
-                    tracing::warn!("Failed to process WS command results: {e}");
-                } else {
-                    // Audit each command result
-                    for r in &persistent_results {
-                        let cmd_detail = serde_json::json!({
-                            "command_id": r.command_id,
-                            "success": r.success,
-                            "error": r.error,
-                            "edge_server_id": edge_server_id,
-                        });
-                        let action = if r.success {
-                            "command_completed"
-                        } else {
-                            "command_failed"
-                        };
-                        let _ = audit::log(
-                            &state.pool,
-                            &identity.tenant_id,
-                            action,
-                            Some(&cmd_detail),
-                            None,
-                            now,
-                        )
-                        .await;
-                    }
-                    tracing::info!(
-                        count = persistent_results.len(),
-                        "Processed command results from WS"
-                    );
-                }
-            }
         }
 
         CloudMessage::RpcResult { id, result } => {

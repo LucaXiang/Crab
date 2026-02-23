@@ -2,8 +2,6 @@
 //!
 //! 订单级手动折扣和附加费操作。
 
-use async_trait::async_trait;
-
 use crate::order_money::{recalculate_totals, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
@@ -21,9 +19,8 @@ pub struct ApplyOrderDiscountAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for ApplyOrderDiscountAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -125,9 +122,8 @@ pub struct ApplyOrderSurchargeAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for ApplyOrderSurchargeAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -296,8 +292,8 @@ mod tests {
     // ApplyOrderDiscount tests
     // ==========================================================
 
-    #[tokio::test]
-    async fn test_apply_percentage_discount() {
+    #[test]
+    fn test_apply_percentage_discount() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -313,10 +309,7 @@ mod tests {
             authorizer_name: Some("Manager".to_string()),
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::OrderDiscountApplied);
 
@@ -343,8 +336,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_apply_fixed_discount() {
+    #[test]
+    fn test_apply_fixed_discount() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -360,10 +353,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
 
         if let EventPayload::OrderDiscountApplied {
             discount_fixed,
@@ -382,8 +372,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_clear_discount() {
+    #[test]
+    fn test_clear_discount() {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置一个已有折扣的订单
         let txn = storage.begin_write().unwrap();
@@ -408,10 +398,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
 
         if let EventPayload::OrderDiscountApplied {
             discount_percent,
@@ -434,8 +421,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_discount_percent_and_fixed_mutual_exclusion() {
+    #[test]
+    fn test_discount_percent_and_fixed_mutual_exclusion() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -451,15 +438,15 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("mutually exclusive"));
         }
     }
 
-    #[tokio::test]
-    async fn test_discount_percent_negative_rejected() {
+    #[test]
+    fn test_discount_percent_negative_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -473,12 +460,12 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
         };
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_discount_percent_over_100_rejected() {
+    #[test]
+    fn test_discount_percent_over_100_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -492,12 +479,12 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
         };
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_discount_fixed_must_be_positive() {
+    #[test]
+    fn test_discount_fixed_must_be_positive() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -513,12 +500,12 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_apply_discount_after_payment_fails() {
+    #[test]
+    fn test_apply_discount_after_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
@@ -541,15 +528,15 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("after payments have been made"));
         }
     }
 
-    #[tokio::test]
-    async fn test_discount_on_non_active_order() {
+    #[test]
+    fn test_discount_on_non_active_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
@@ -570,12 +557,12 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_discount_order_not_found() {
+    #[test]
+    fn test_discount_order_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -589,7 +576,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
@@ -597,8 +584,8 @@ mod tests {
     // ApplyOrderSurcharge tests
     // ==========================================================
 
-    #[tokio::test]
-    async fn test_apply_surcharge() {
+    #[test]
+    fn test_apply_surcharge() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -614,10 +601,7 @@ mod tests {
             authorizer_name: Some("Manager".to_string()),
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::OrderSurchargeApplied);
 
@@ -640,8 +624,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_apply_percent_surcharge() {
+    #[test]
+    fn test_apply_percent_surcharge() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(
             &storage,
@@ -663,10 +647,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
         assert_eq!(events.len(), 1);
 
         if let EventPayload::OrderSurchargeApplied {
@@ -688,8 +669,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_clear_surcharge() {
+    #[test]
+    fn test_clear_surcharge() {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置一个已有附加费的订单
         let txn = storage.begin_write().unwrap();
@@ -713,10 +694,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
 
         if let EventPayload::OrderSurchargeApplied {
             surcharge_amount,
@@ -737,8 +715,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_apply_surcharge_after_payment_fails() {
+    #[test]
+    fn test_apply_surcharge_after_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
@@ -761,15 +739,15 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("after payments have been made"));
         }
     }
 
-    #[tokio::test]
-    async fn test_surcharge_must_be_positive() {
+    #[test]
+    fn test_surcharge_must_be_positive() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -785,12 +763,12 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_surcharge_on_non_active_order() {
+    #[test]
+    fn test_surcharge_on_non_active_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
@@ -811,12 +789,12 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_surcharge_order_not_found() {
+    #[test]
+    fn test_surcharge_order_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -830,7 +808,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
@@ -838,8 +816,8 @@ mod tests {
     // Discount + Surcharge coexistence tests
     // ==========================================================
 
-    #[tokio::test]
-    async fn test_discount_and_surcharge_coexistence() {
+    #[test]
+    fn test_discount_and_surcharge_coexistence() {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置订单有附加费
         let txn = storage.begin_write().unwrap();
@@ -864,10 +842,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
 
         if let EventPayload::OrderDiscountApplied {
             subtotal,
@@ -886,8 +861,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_discount_nan_rejected() {
+    #[test]
+    fn test_discount_nan_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -903,12 +878,12 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_surcharge_nan_rejected() {
+    #[test]
+    fn test_surcharge_nan_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -924,12 +899,12 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_discount_event_metadata() {
+    #[test]
+    fn test_discount_event_metadata() {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
 
@@ -952,7 +927,7 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         let event = &events[0];
 
         assert_eq!(event.command_id, "cmd-discount-1");

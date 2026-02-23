@@ -3,8 +3,6 @@
 //! Reverses a comp, restoring the item's original price.
 //! If the source item still exists, the uncomped quantity is merged back.
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, validate_order_text};
 use shared::order::types::CommandErrorCode;
@@ -19,9 +17,8 @@ pub struct UncompItemAction {
     pub authorizer_name: String,
 }
 
-#[async_trait]
 impl CommandHandler for UncompItemAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -198,8 +195,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_uncomp_full_comp_no_merge() {
+    #[test]
+    fn test_uncomp_full_comp_no_merge() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -224,7 +221,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemUncomped {
@@ -242,8 +239,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_uncomp_partial_with_source_existing() {
+    #[test]
+    fn test_uncomp_partial_with_source_existing() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -277,7 +274,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemUncomped {
             instance_id,
@@ -294,8 +291,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_uncomp_partial_source_gone() {
+    #[test]
+    fn test_uncomp_partial_source_gone() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -326,7 +323,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemUncomped { merged_into, .. } = &events[0].payload {
             assert_eq!(*merged_into, None); // Source gone, no merge
@@ -335,8 +332,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_uncomp_non_comped_item_fails() {
+    #[test]
+    fn test_uncomp_non_comped_item_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -357,12 +354,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_uncomp_nonexistent_item_fails() {
+    #[test]
+    fn test_uncomp_nonexistent_item_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -380,12 +377,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::ItemNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_uncomp_empty_authorizer_fails() {
+    #[test]
+    fn test_uncomp_empty_authorizer_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -410,13 +407,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         // With i64 authorizer_id, "empty" validation no longer applies
         assert!(result.is_ok() || matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_uncomp_completed_order_fails() {
+    #[test]
+    fn test_uncomp_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -441,12 +438,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_uncomp_voided_order_fails() {
+    #[test]
+    fn test_uncomp_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -471,7 +468,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 }

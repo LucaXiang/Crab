@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 use crate::order::{OrderEvent, OrderSnapshot};
 
 use super::catalog::{CatalogOp, CatalogOpResult};
-use super::{CloudCommand, CloudCommandResult, CloudSyncError, CloudSyncItem};
+use super::{CloudSyncError, CloudSyncItem};
 
 /// Duplex message protocol over WebSocket
 ///
-/// Edge → Cloud: SyncBatch, CommandResult, RpcResult
-/// Cloud → Edge: SyncAck, Command, Rpc
+/// Edge → Cloud: SyncBatch, RpcResult, ActiveOrderSnapshot, ActiveOrderRemoved
+/// Cloud → Edge: SyncAck, Rpc
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CloudMessage {
@@ -21,13 +21,7 @@ pub enum CloudMessage {
     SyncBatch {
         items: Vec<CloudSyncItem>,
         sent_at: i64,
-        /// Results from previously executed commands (optional piggyback)
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        command_results: Vec<CloudCommandResult>,
     },
-
-    /// Standalone command result delivery
-    CommandResult { results: Vec<CloudCommandResult> },
 
     // === cloud → edge ===
     /// Acknowledgement of a SyncBatch
@@ -37,9 +31,6 @@ pub enum CloudMessage {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         errors: Vec<CloudSyncError>,
     },
-
-    /// Command pushed from cloud to edge (legacy string-based)
-    Command(CloudCommand),
 
     // === cloud → edge (handshake) ===
     /// Cloud → Edge: 连接建立后发送，包含 cloud 已确认的各资源版本号
@@ -65,7 +56,7 @@ pub enum CloudMessage {
     ActiveOrderRemoved { order_id: String },
 }
 
-/// 强类型 RPC 载荷 — 替代 CloudCommand 的 string command_type + JSON payload
+/// 强类型 RPC 载荷 (cloud↔edge 双向)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum CloudRpc {
@@ -112,7 +103,6 @@ mod tests {
                 data: serde_json::json!({"name": "Test"}),
             }],
             sent_at: 1700000000000,
-            command_results: vec![],
         };
 
         let json = serde_json::to_string(&msg).unwrap();
@@ -153,28 +143,6 @@ mod tests {
                 assert_eq!(errors.len(), 1);
             }
             _ => panic!("Expected SyncAck"),
-        }
-    }
-
-    #[test]
-    fn test_cloud_message_command_roundtrip() {
-        let msg = CloudMessage::Command(CloudCommand {
-            id: "cmd-1".into(),
-            command_type: "get_status".into(),
-            payload: serde_json::json!({}),
-            created_at: 1700000000000,
-        });
-
-        let json = serde_json::to_string(&msg).unwrap();
-        assert!(json.contains(r#""type":"Command"#));
-
-        let deserialized: CloudMessage = serde_json::from_str(&json).unwrap();
-        match deserialized {
-            CloudMessage::Command(cmd) => {
-                assert_eq!(cmd.id, "cmd-1");
-                assert_eq!(cmd.command_type, "get_status");
-            }
-            _ => panic!("Expected Command"),
         }
     }
 

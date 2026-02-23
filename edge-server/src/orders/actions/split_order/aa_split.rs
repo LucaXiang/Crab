@@ -3,8 +3,6 @@
 //! - **StartAaSplit**: lock headcount + pay first share(s)
 //! - **PayAaSplit**: pay additional shares in an existing AA split
 
-use async_trait::async_trait;
-
 use crate::order_money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
@@ -28,9 +26,8 @@ pub struct StartAaSplitAction {
     pub tendered: Option<f64>,
 }
 
-#[async_trait]
 impl CommandHandler for StartAaSplitAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -140,9 +137,8 @@ pub struct PayAaSplitAction {
     pub tendered: Option<f64>,
 }
 
-#[async_trait]
 impl CommandHandler for PayAaSplitAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,

@@ -8,7 +8,7 @@
 //! 6. Reconnect with exponential backoff on disconnect
 
 use futures::{SinkExt, StreamExt};
-use shared::cloud::{CloudCommandResult, CloudMessage, CloudSyncBatch, CloudSyncItem};
+use shared::cloud::{CloudMessage, CloudSyncBatch, CloudSyncItem};
 use shared::message::{BusMessage, EventType, SyncPayload};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,7 +17,6 @@ use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
-use crate::cloud::command_executor;
 use crate::cloud::service::CloudService;
 use crate::core::state::ServerState;
 use crate::db::repository::order;
@@ -44,8 +43,6 @@ pub struct CloudWorker {
     state: ServerState,
     cloud_service: Arc<CloudService>,
     shutdown: CancellationToken,
-    /// Results from previously executed commands
-    pending_results: Vec<CloudCommandResult>,
 }
 
 impl CloudWorker {
@@ -58,7 +55,6 @@ impl CloudWorker {
             state,
             cloud_service,
             shutdown,
-            pending_results: Vec::new(),
         }
     }
 
@@ -291,29 +287,6 @@ impl CloudWorker {
         };
 
         match cloud_msg {
-            CloudMessage::Command(cmd) => {
-                tracing::info!(
-                    command_id = %cmd.id,
-                    command_type = %cmd.command_type,
-                    "Received cloud command via WS"
-                );
-                let result = command_executor::execute(&self.state, &cmd).await;
-                tracing::info!(
-                    command_id = %cmd.id,
-                    success = result.success,
-                    "Cloud command executed"
-                );
-
-                // Send result immediately via WS
-                let reply = CloudMessage::CommandResult {
-                    results: vec![result],
-                };
-                if let Ok(json) = serde_json::to_string(&reply)
-                    && let Err(e) = ws_sink.send(Message::Text(json.into())).await
-                {
-                    tracing::warn!("Failed to send command result via WS: {e}");
-                }
-            }
             CloudMessage::Rpc { id, payload } => {
                 tracing::info!(rpc_id = %id, "Received RPC via WS");
                 let result = self.handle_rpc(&payload).await;
@@ -428,7 +401,8 @@ impl CloudWorker {
                 }
             }
             shared::cloud::CloudRpc::CatalogOp(op) => {
-                let result = crate::cloud::rpc_executor::execute(&self.state, op.as_ref()).await;
+                let result =
+                    crate::cloud::rpc_executor::execute_catalog_op(&self.state, op.as_ref()).await;
                 CloudRpcResult::CatalogOp(Box::new(result))
             }
         }
@@ -539,7 +513,7 @@ impl CloudWorker {
             }
         }
 
-        if items.is_empty() && self.pending_results.is_empty() {
+        if items.is_empty() {
             tracing::info!("Initial sync: all resources up-to-date, zero transfer");
             return Ok(());
         }
@@ -548,7 +522,6 @@ impl CloudWorker {
         let msg = CloudMessage::SyncBatch {
             items,
             sent_at: shared::util::now_millis(),
-            command_results: std::mem::take(&mut self.pending_results),
         };
 
         let json = serde_json::to_string(&msg)
@@ -636,7 +609,6 @@ impl CloudWorker {
                 edge_id: self.cloud_service.edge_id().to_string(),
                 items,
                 sent_at: shared::util::now_millis(),
-                command_results: vec![],
             };
 
             // HTTP POST — synchronous request-response, cloud confirms storage
@@ -698,7 +670,7 @@ impl CloudWorker {
             .flat_map(|(_, items)| items.into_values())
             .collect();
 
-        if items.is_empty() && self.pending_results.is_empty() {
+        if items.is_empty() {
             return Ok(());
         }
 
@@ -706,7 +678,6 @@ impl CloudWorker {
         let msg = CloudMessage::SyncBatch {
             items,
             sent_at: shared::util::now_millis(),
-            command_results: std::mem::take(&mut self.pending_results),
         };
 
         let json = serde_json::to_string(&msg)
@@ -758,7 +729,7 @@ impl CloudWorker {
         tracing::info!("Starting full cloud sync via HTTP fallback");
         let items = self.collect_all_sync_items();
 
-        if items.is_empty() && self.pending_results.is_empty() {
+        if items.is_empty() {
             return Ok(());
         }
 
@@ -767,7 +738,6 @@ impl CloudWorker {
             edge_id: self.cloud_service.edge_id().to_string(),
             items,
             sent_at: shared::util::now_millis(),
-            command_results: std::mem::take(&mut self.pending_results),
         };
 
         let response = self.push_with_retry(batch).await?;
@@ -777,30 +747,7 @@ impl CloudWorker {
             response.rejected,
         );
 
-        // Execute any pending commands from HTTP response
-        self.handle_http_commands(response.pending_commands).await;
-
         Ok(())
-    }
-
-    /// Execute cloud commands and cache results
-    async fn handle_http_commands(&mut self, commands: Vec<shared::cloud::CloudCommand>) {
-        if commands.is_empty() {
-            return;
-        }
-
-        tracing::info!(count = commands.len(), "Executing cloud commands from HTTP");
-
-        for cmd in &commands {
-            let result = command_executor::execute(&self.state, cmd).await;
-            tracing::info!(
-                command_id = %cmd.id,
-                command_type = %cmd.command_type,
-                success = result.success,
-                "Cloud command executed"
-            );
-            self.pending_results.push(result);
-        }
     }
 
     /// Push batch with exponential backoff retry (HTTP fallback)

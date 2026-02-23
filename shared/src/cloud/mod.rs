@@ -1,5 +1,6 @@
 //! Cloud sync types for edge-server → crab-cloud data synchronization
 
+pub mod catalog;
 pub mod sync;
 pub mod ws;
 

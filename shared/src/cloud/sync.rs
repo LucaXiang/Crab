@@ -14,9 +14,6 @@ pub struct CloudSyncBatch {
     pub items: Vec<CloudSyncItem>,
     /// Timestamp when the batch was sent (Unix millis)
     pub sent_at: i64,
-    /// Results from previously executed commands
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub command_results: Vec<CloudCommandResult>,
 }
 
 /// A single resource change to sync to the cloud
@@ -45,9 +42,6 @@ pub struct CloudSyncResponse {
     /// Errors for rejected items
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<CloudSyncError>,
-    /// Pending commands for the edge-server (future use)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub pending_commands: Vec<CloudCommand>,
 }
 
 /// Error detail for a rejected sync item
@@ -59,36 +53,6 @@ pub struct CloudSyncError {
     pub resource_id: String,
     /// Error message
     pub message: String,
-}
-
-/// A command from cloud to edge-server (future use)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudCommand {
-    /// Command ID
-    pub id: String,
-    /// Command type
-    pub command_type: String,
-    /// Command payload
-    pub payload: serde_json::Value,
-    /// Created at (Unix millis)
-    pub created_at: i64,
-}
-
-/// Result of executing a cloud command on edge-server
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudCommandResult {
-    /// Command ID
-    pub command_id: String,
-    /// Whether the command succeeded
-    pub success: bool,
-    /// Result data if succeeded
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
-    /// Error message if failed
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    /// Executed at (Unix millis)
-    pub executed_at: i64,
 }
 
 /// 归档订单完整详情（edge→cloud 推送）
@@ -256,7 +220,6 @@ mod tests {
                 data: serde_json::json!({"name": "Test Product", "price": 9.99}),
             }],
             sent_at: 1700000000000,
-            command_results: vec![],
         };
 
         let json = serde_json::to_string(&batch).unwrap();
@@ -277,7 +240,6 @@ mod tests {
                 resource_id: "99".to_string(),
                 message: "Invalid data".to_string(),
             }],
-            pending_commands: vec![],
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -293,11 +255,9 @@ mod tests {
             accepted: 10,
             rejected: 0,
             errors: vec![],
-            pending_commands: vec![],
         };
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(!json.contains("errors"));
-        assert!(!json.contains("pending_commands"));
     }
 }

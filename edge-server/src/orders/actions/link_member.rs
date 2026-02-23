@@ -4,7 +4,6 @@
 //! MG discount calculation is done here (CommandHandler = can access metadata),
 //! results are stored in the event payload for the pure-function applier.
 
-use async_trait::async_trait;
 use std::collections::HashMap;
 
 use shared::order::types::CommandErrorCode;
@@ -28,9 +27,8 @@ pub struct LinkMemberAction {
     pub product_metadata: HashMap<i64, ProductMeta>,
 }
 
-#[async_trait]
 impl CommandHandler for LinkMemberAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -171,8 +169,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_link_member_success() {
+    #[test]
+    fn test_link_member_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -194,7 +192,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -219,8 +217,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_link_member_no_retroactive_mg_discounts() {
+    #[test]
+    fn test_link_member_no_retroactive_mg_discounts() {
         // MG discounts are NOT applied retroactively to existing items.
         // Only items added after member link get MG discounts (via AddItems).
         let storage = OrderStorage::open_in_memory().unwrap();
@@ -277,7 +275,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::MemberLinked {
             mg_item_discounts, ..
@@ -296,8 +294,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_link_member_completed_order_fails() {
+    #[test]
+    fn test_link_member_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -319,12 +317,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_link_member_voided_order_fails() {
+    #[test]
+    fn test_link_member_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -346,12 +344,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_link_member_blocked_during_aa_split() {
+    #[test]
+    fn test_link_member_blocked_during_aa_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -374,12 +372,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_link_member_blocked_during_amount_split() {
+    #[test]
+    fn test_link_member_blocked_during_amount_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -402,12 +400,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_link_member_blocked_when_already_linked() {
+    #[test]
+    fn test_link_member_blocked_when_already_linked() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -431,12 +429,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_link_member_order_not_found() {
+    #[test]
+    fn test_link_member_order_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -454,7 +452,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 }

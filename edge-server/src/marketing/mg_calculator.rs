@@ -8,7 +8,7 @@ use rust_decimal::prelude::*;
 use shared::models::{AdjustmentType, MgDiscountRule, ProductScope};
 use shared::order::AppliedMgRule;
 
-use crate::pricing::{to_decimal, to_f64};
+use crate::order_money::{to_decimal, to_f64};
 
 /// Result of MG discount calculation for a single item
 pub struct MgCalculationResult {

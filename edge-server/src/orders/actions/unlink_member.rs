@@ -2,8 +2,6 @@
 //!
 //! Unlinks a member from an order, clearing member info and MG discounts.
 
-use async_trait::async_trait;
-
 use shared::order::types::CommandErrorCode;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
@@ -15,9 +13,8 @@ pub struct UnlinkMemberAction {
     pub order_id: String,
 }
 
-#[async_trait]
 impl CommandHandler for UnlinkMemberAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -108,8 +105,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_unlink_member_success() {
+    #[test]
+    fn test_unlink_member_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -129,7 +126,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -147,8 +144,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_unlink_member_no_member_linked_fails() {
+    #[test]
+    fn test_unlink_member_no_member_linked_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -165,12 +162,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_unlink_member_completed_order_fails() {
+    #[test]
+    fn test_unlink_member_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -187,12 +184,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_unlink_member_blocked_during_aa_split() {
+    #[test]
+    fn test_unlink_member_blocked_during_aa_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -211,7 +208,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 }

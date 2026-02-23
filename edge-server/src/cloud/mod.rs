@@ -6,11 +6,12 @@
 //!   ├── Initial sync: compare cursors with local versions → skip unchanged resources
 //!   ├── Startup: archived_order catch-up sync (cursor-based)
 //!   ├── Listen: MessageBus server broadcast (Sync events) → debounced push via WS
-//!   ├── Listen: WS incoming → Command execution + SyncAck handling
+//!   ├── Listen: WS incoming → RPC execution + SyncAck handling
 //!   └── Reconnect: exponential backoff on WS disconnect
 //! ```
 
-pub mod command_executor;
+pub mod ops;
+pub mod rpc_executor;
 mod service;
 mod worker;
 

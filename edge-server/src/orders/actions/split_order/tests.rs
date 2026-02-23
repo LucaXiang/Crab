@@ -84,8 +84,8 @@ fn create_active_order_with_items(order_id: &str) -> OrderSnapshot {
 
 // ========== SplitByItems tests ==========
 
-#[tokio::test]
-async fn test_split_by_items_success() {
+#[test]
+fn test_split_by_items_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -108,7 +108,7 @@ async fn test_split_by_items_success() {
     };
 
     let metadata = create_test_metadata();
-    let events = action.execute(&mut ctx, &metadata).await.unwrap();
+    let events = action.execute(&mut ctx, &metadata).unwrap();
 
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].event_type, OrderEventType::ItemSplit);
@@ -128,8 +128,8 @@ async fn test_split_by_items_success() {
     }
 }
 
-#[tokio::test]
-async fn test_split_by_items_empty_fails() {
+#[test]
+fn test_split_by_items_empty_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -147,14 +147,14 @@ async fn test_split_by_items_empty_fails() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }
 
 // ========== SplitByAmount tests ==========
 
-#[tokio::test]
-async fn test_split_by_amount_success() {
+#[test]
+fn test_split_by_amount_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -172,7 +172,7 @@ async fn test_split_by_amount_success() {
     };
 
     let metadata = create_test_metadata();
-    let events = action.execute(&mut ctx, &metadata).await.unwrap();
+    let events = action.execute(&mut ctx, &metadata).unwrap();
 
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].event_type, OrderEventType::AmountSplit);
@@ -190,8 +190,8 @@ async fn test_split_by_amount_success() {
     }
 }
 
-#[tokio::test]
-async fn test_split_by_amount_zero_fails() {
+#[test]
+fn test_split_by_amount_zero_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -209,14 +209,14 @@ async fn test_split_by_amount_zero_fails() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(matches!(result, Err(OrderError::InvalidAmount)));
 }
 
 // ========== StartAASplit tests ==========
 
-#[tokio::test]
-async fn test_start_aa_split_success() {
+#[test]
+fn test_start_aa_split_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -235,7 +235,7 @@ async fn test_start_aa_split_success() {
     };
 
     let metadata = create_test_metadata();
-    let events = action.execute(&mut ctx, &metadata).await.unwrap();
+    let events = action.execute(&mut ctx, &metadata).unwrap();
 
     // Should produce 2 events: AaSplitStarted + AaSplitPaid
     assert_eq!(events.len(), 2);
@@ -269,8 +269,8 @@ async fn test_start_aa_split_success() {
     }
 }
 
-#[tokio::test]
-async fn test_start_aa_split_invalid_total_shares() {
+#[test]
+fn test_start_aa_split_invalid_total_shares() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -289,14 +289,14 @@ async fn test_start_aa_split_invalid_total_shares() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }
 
 // ========== PayAASplit tests ==========
 
-#[tokio::test]
-async fn test_pay_aa_split_success() {
+#[test]
+fn test_pay_aa_split_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -318,7 +318,7 @@ async fn test_pay_aa_split_success() {
     };
 
     let metadata = create_test_metadata();
-    let events = action.execute(&mut ctx, &metadata).await.unwrap();
+    let events = action.execute(&mut ctx, &metadata).unwrap();
 
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].event_type, OrderEventType::AaSplitPaid);
@@ -338,8 +338,8 @@ async fn test_pay_aa_split_success() {
     }
 }
 
-#[tokio::test]
-async fn test_pay_aa_split_not_started_fails() {
+#[test]
+fn test_pay_aa_split_not_started_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -357,14 +357,14 @@ async fn test_pay_aa_split_not_started_fails() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }
 
 // ========== Mutual exclusion tests ==========
 
-#[tokio::test]
-async fn test_item_split_then_amount_split_allowed() {
+#[test]
+fn test_item_split_then_amount_split_allowed() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -388,15 +388,15 @@ async fn test_item_split_then_amount_split_allowed() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(
         result.is_ok(),
         "Amount split should be allowed after item split"
     );
 }
 
-#[tokio::test]
-async fn test_item_split_then_aa_split_allowed() {
+#[test]
+fn test_item_split_then_aa_split_allowed() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -421,15 +421,15 @@ async fn test_item_split_then_aa_split_allowed() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(
         result.is_ok(),
         "AA split should be allowed after item split"
     );
 }
 
-#[tokio::test]
-async fn test_amount_split_then_item_split_blocked() {
+#[test]
+fn test_amount_split_then_item_split_blocked() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -455,15 +455,15 @@ async fn test_amount_split_then_item_split_blocked() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(
         matches!(result, Err(OrderError::InvalidOperation(..))),
         "Item split should be blocked after amount split"
     );
 }
 
-#[tokio::test]
-async fn test_amount_split_then_aa_split_allowed() {
+#[test]
+fn test_amount_split_then_aa_split_allowed() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -485,15 +485,15 @@ async fn test_amount_split_then_aa_split_allowed() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(
         result.is_ok(),
         "AA split should be allowed after amount split"
     );
 }
 
-#[tokio::test]
-async fn test_aa_active_blocks_item_split() {
+#[test]
+fn test_aa_active_blocks_item_split() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -519,15 +519,15 @@ async fn test_aa_active_blocks_item_split() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(
         matches!(result, Err(OrderError::InvalidOperation(..))),
         "Item split should be blocked while AA is active"
     );
 }
 
-#[tokio::test]
-async fn test_aa_active_blocks_amount_split() {
+#[test]
+fn test_aa_active_blocks_amount_split() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -548,7 +548,7 @@ async fn test_aa_active_blocks_amount_split() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(
         matches!(result, Err(OrderError::InvalidOperation(..))),
         "Amount split should be blocked while AA is active"
@@ -557,8 +557,8 @@ async fn test_aa_active_blocks_amount_split() {
 
 // ========== Remaining AA tests ==========
 
-#[tokio::test]
-async fn test_pay_aa_split_exceeds_remaining_fails() {
+#[test]
+fn test_pay_aa_split_exceeds_remaining_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
@@ -579,6 +579,6 @@ async fn test_pay_aa_split_exceeds_remaining_fails() {
     };
 
     let metadata = create_test_metadata();
-    let result = action.execute(&mut ctx, &metadata).await;
+    let result = action.execute(&mut ctx, &metadata);
     assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 }

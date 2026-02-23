@@ -1,21 +1,19 @@
 //! POST /api/edge/sync — receive data batches from edge-servers
 
 use axum::{Extension, Json, extract::State};
-use shared::cloud::{CloudCommand, CloudSyncBatch, CloudSyncError, CloudSyncResponse};
+use shared::cloud::{CloudSyncBatch, CloudSyncError, CloudSyncResponse};
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::EdgeIdentity;
-use crate::db::{audit, commands, sync_store};
+use crate::db::{audit, sync_store};
 use crate::state::AppState;
 
 /// Handle sync batch from edge-server
 ///
 /// 1. Extract EdgeIdentity from middleware
 /// 2. Auto-register edge-server if new
-/// 3. Process command results from previous batch
-/// 4. Process each sync item
-/// 5. Query pending commands for this edge-server
-/// 6. Return response with accepted/rejected counts + pending commands
+/// 3. Process each sync item
+/// 4. Return response with accepted/rejected counts
 pub async fn handle_sync(
     State(state): State<AppState>,
     Extension(identity): Extension<EdgeIdentity>,
@@ -57,42 +55,6 @@ pub async fn handle_sync(
             tracing::error!("Failed to update last_sync: {e}");
             AppError::new(ErrorCode::InternalError)
         })?;
-
-    // Process command results from edge-server
-    if !batch.command_results.is_empty() {
-        if let Err(e) = commands::complete_commands(&state.pool, &batch.command_results, now).await
-        {
-            tracing::warn!("Failed to process command results: {e}");
-        } else {
-            for r in &batch.command_results {
-                let cmd_detail = serde_json::json!({
-                    "command_id": r.command_id,
-                    "success": r.success,
-                    "error": r.error,
-                    "edge_server_id": edge_server_id,
-                    "via": "http",
-                });
-                let action = if r.success {
-                    "command_completed"
-                } else {
-                    "command_failed"
-                };
-                let _ = audit::log(
-                    &state.pool,
-                    &identity.tenant_id,
-                    action,
-                    Some(&cmd_detail),
-                    None,
-                    now,
-                )
-                .await;
-            }
-            tracing::info!(
-                count = batch.command_results.len(),
-                "Processed command results from edge"
-            );
-        }
-    }
 
     let mut accepted = 0u32;
     let mut rejected = 0u32;
@@ -140,30 +102,23 @@ pub async fn handle_sync(
         }
     }
 
-    // Query pending commands for this edge-server
-    let pending_commands = match commands::get_pending(&state.pool, edge_server_id, 10).await {
-        Ok(pending) => {
-            if !pending.is_empty() {
-                let ids: Vec<i64> = pending.iter().map(|c| c.id).collect();
-                if let Err(e) = commands::mark_delivered(&state.pool, &ids).await {
-                    tracing::warn!("Failed to mark commands as delivered: {e}");
-                }
-            }
-            pending
-                .into_iter()
-                .map(|c| CloudCommand {
-                    id: c.id.to_string(),
-                    command_type: c.command_type,
-                    payload: c.payload,
-                    created_at: c.created_at,
-                })
-                .collect()
-        }
-        Err(e) => {
-            tracing::warn!("Failed to query pending commands: {e}");
-            vec![]
-        }
-    };
+    // Audit
+    let sync_detail = serde_json::json!({
+        "edge_id": identity.entity_id,
+        "edge_server_id": edge_server_id,
+        "accepted": accepted,
+        "rejected": rejected,
+        "total": batch.items.len(),
+    });
+    let _ = audit::log(
+        &state.pool,
+        &identity.tenant_id,
+        "sync_batch",
+        Some(&sync_detail),
+        None,
+        now,
+    )
+    .await;
 
     tracing::info!(
         edge_id = %identity.entity_id,
@@ -171,7 +126,6 @@ pub async fn handle_sync(
         accepted,
         rejected,
         total = batch.items.len(),
-        pending_cmds = pending_commands.len(),
         "Sync batch processed"
     );
 
@@ -179,6 +133,5 @@ pub async fn handle_sync(
         accepted,
         rejected,
         errors,
-        pending_commands,
     }))
 }

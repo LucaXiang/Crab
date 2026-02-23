@@ -3,7 +3,6 @@
 //! Moves an order from one table to another, optionally changing zone.
 //! Only applicable to orders in Active status.
 
-use async_trait::async_trait;
 use rust_decimal::Decimal;
 
 use crate::order_money::to_decimal;
@@ -24,9 +23,8 @@ pub struct MoveOrderAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for MoveOrderAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -131,8 +129,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_move_order_success() {
+    #[test]
+    fn test_move_order_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -153,7 +151,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -183,8 +181,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_move_order_with_items() {
+    #[test]
+    fn test_move_order_with_items() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -233,7 +231,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderMoved { items, .. } = &events[0].payload {
             assert_eq!(items.len(), 1);
@@ -244,8 +242,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_move_order_completed_fails() {
+    #[test]
+    fn test_move_order_completed_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -267,13 +265,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_move_order_voided_fails() {
+    #[test]
+    fn test_move_order_voided_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -295,13 +293,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_move_order_not_found_fails() {
+    #[test]
+    fn test_move_order_not_found_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -319,13 +317,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_move_order_sequence_allocation() {
+    #[test]
+    fn test_move_order_sequence_allocation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -346,13 +344,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events[0].sequence, current_seq + 1);
     }
 
-    #[tokio::test]
-    async fn test_move_order_metadata_propagation() {
+    #[test]
+    fn test_move_order_metadata_propagation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -379,15 +377,15 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events[0].command_id, "test-cmd-123");
         assert_eq!(events[0].operator_id, 456);
         assert_eq!(events[0].operator_name, "John Doe");
     }
 
-    #[tokio::test]
-    async fn test_move_order_without_source_table() {
+    #[test]
+    fn test_move_order_without_source_table() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -410,7 +408,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderMoved {
             source_table_id,
@@ -426,8 +424,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_move_order_target_table_occupied_fails() {
+    #[test]
+    fn test_move_order_target_table_occupied_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -462,13 +460,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::TableOccupied(_))));
     }
 
-    #[tokio::test]
-    async fn test_move_order_to_same_table_succeeds() {
+    #[test]
+    fn test_move_order_to_same_table_succeeds() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -495,13 +493,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_move_order_with_payment_fails() {
+    #[test]
+    fn test_move_order_with_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -523,7 +521,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }

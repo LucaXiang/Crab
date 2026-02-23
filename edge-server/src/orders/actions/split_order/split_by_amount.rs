@@ -1,7 +1,5 @@
 //! SplitByAmount (金额分单) — pays a fixed amount without item tracking
 
-use async_trait::async_trait;
-
 use crate::order_money::{MONEY_TOLERANCE, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::types::CommandErrorCode;
@@ -19,9 +17,8 @@ pub struct SplitByAmountAction {
     pub tendered: Option<f64>,
 }
 
-#[async_trait]
 impl CommandHandler for SplitByAmountAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,

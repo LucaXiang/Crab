@@ -417,7 +417,12 @@ export function createCommand(
 	storeId: number,
 	commandType: string,
 	payload: Record<string, unknown> = {}
-): Promise<{ command_id: number; status: string; ws_queued: boolean }> {
+): Promise<{
+	command_id: number;
+	success: boolean;
+	data?: unknown;
+	error?: string;
+}> {
 	return request(
 		'POST',
 		`/api/tenant/stores/${storeId}/commands`,

@@ -2,7 +2,6 @@
 //!
 //! Adds items to an existing order.
 
-use async_trait::async_trait;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
@@ -30,9 +29,8 @@ pub struct AddItemsAction {
     pub mg_rules: Vec<MgDiscountRule>,
 }
 
-#[async_trait]
 impl CommandHandler for AddItemsAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -247,8 +245,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_items_generates_event() {
+    #[test]
+    fn test_add_items_generates_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -270,7 +268,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -289,8 +287,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_items_to_completed_order_fails() {
+    #[test]
+    fn test_add_items_to_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -312,13 +310,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_items_to_voided_order_fails() {
+    #[test]
+    fn test_add_items_to_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -340,13 +338,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_items_to_nonexistent_order_fails() {
+    #[test]
+    fn test_add_items_to_nonexistent_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -362,13 +360,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_multiple_items() {
+    #[test]
+    fn test_add_multiple_items() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -393,7 +391,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemsAdded { items } = &events[0].payload {

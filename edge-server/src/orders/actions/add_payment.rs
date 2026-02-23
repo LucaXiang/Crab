@@ -2,8 +2,6 @@
 //!
 //! Adds a payment to an existing order.
 
-use async_trait::async_trait;
-
 use shared::order::types::CommandErrorCode;
 
 use crate::order_money::{MONEY_TOLERANCE, to_decimal, to_f64};
@@ -18,9 +16,8 @@ pub struct AddPaymentAction {
     pub payment: PaymentInput,
 }
 
-#[async_trait]
 impl CommandHandler for AddPaymentAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -146,8 +143,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_payment_generates_event() {
+    #[test]
+    fn test_add_payment_generates_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -167,7 +164,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -194,8 +191,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_cash_payment_with_change() {
+    #[test]
+    fn test_add_cash_payment_with_change() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -214,7 +211,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::PaymentAdded {
@@ -228,8 +225,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_payment_to_completed_order_fails() {
+    #[test]
+    fn test_add_payment_to_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -247,13 +244,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_payment_to_voided_order_fails() {
+    #[test]
+    fn test_add_payment_to_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -271,13 +268,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_payment_to_nonexistent_order_fails() {
+    #[test]
+    fn test_add_payment_to_nonexistent_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -290,13 +287,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_add_payment_with_zero_amount_fails() {
+    #[test]
+    fn test_add_payment_with_zero_amount_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -314,13 +311,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidAmount)));
     }
 
-    #[tokio::test]
-    async fn test_add_payment_with_negative_amount_fails() {
+    #[test]
+    fn test_add_payment_with_negative_amount_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -338,13 +335,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidAmount)));
     }
 
-    #[tokio::test]
-    async fn test_add_payment_exceeds_remaining_fails() {
+    #[test]
+    fn test_add_payment_exceeds_remaining_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -364,7 +361,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
@@ -372,8 +369,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_add_payment_exact_remaining_succeeds() {
+    #[test]
+    fn test_add_payment_exact_remaining_succeeds() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -393,12 +390,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_add_payment_with_note() {
+    #[test]
+    fn test_add_payment_with_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -424,7 +421,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::PaymentAdded { note, .. } = &events[0].payload {
             assert_eq!(*note, Some("Visa ending in 1234".to_string()));

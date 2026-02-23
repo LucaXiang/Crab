@@ -5,8 +5,6 @@
 //! MemberUnlinked applier reverses any pending redemptions.
 //! Stamps are consumed only on order completion (track_stamps_on_completion).
 
-use async_trait::async_trait;
-
 use crate::marketing::stamp_tracker::{self, StampItemInfo};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::models::{RewardStrategy, StampActivity, StampRewardTarget};
@@ -41,9 +39,8 @@ pub struct RedeemStampAction {
     pub reward_product_info: Option<RewardProductInfo>,
 }
 
-#[async_trait]
 impl CommandHandler for RedeemStampAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -354,8 +351,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_designated_emits_single_event() {
+    #[test]
+    fn test_redeem_stamp_designated_emits_single_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -389,7 +386,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Single event
         assert_eq!(events.len(), 1);
@@ -425,8 +422,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_no_member_fails() {
+    #[test]
+    fn test_redeem_stamp_no_member_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -448,12 +445,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_no_product_info_fails() {
+    #[test]
+    fn test_redeem_stamp_no_product_info_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -479,12 +476,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_economizador_category_match() {
+    #[test]
+    fn test_redeem_stamp_economizador_category_match() {
         // Economizador picks the cheapest item matching a category reward target
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -524,7 +521,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::StampRedeemed {
@@ -543,8 +540,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_generoso_category_match() {
+    #[test]
+    fn test_redeem_stamp_generoso_category_match() {
         // Generoso picks the most expensive item matching a category reward target
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -583,7 +580,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::StampRedeemed {
@@ -602,8 +599,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_product_target_match() {
+    #[test]
+    fn test_redeem_stamp_product_target_match() {
         // Product-type reward target matches by product_id
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -639,7 +636,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::StampRedeemed {
@@ -656,8 +653,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_no_matching_category_fails() {
+    #[test]
+    fn test_redeem_stamp_no_matching_category_fails() {
         // No items match the reward target category → error
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -690,12 +687,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_skips_comped_items() {
+    #[test]
+    fn test_redeem_stamp_skips_comped_items() {
         // Comped items should not be eligible for reward
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -731,7 +728,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::StampRedeemed { product_id, .. } = &events[0].payload {
             // Comped item (product 1) skipped, picks product 2
@@ -741,8 +738,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_completed_order_fails() {
+    #[test]
+    fn test_redeem_stamp_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -764,12 +761,12 @@ mod tests {
             reward_product_info: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_voided_order_fails() {
+    #[test]
+    fn test_redeem_stamp_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -791,12 +788,12 @@ mod tests {
             reward_product_info: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_category_id_propagated_to_event() {
+    #[test]
+    fn test_redeem_stamp_category_id_propagated_to_event() {
         // Verify category_id from snapshot item flows through to the event payload
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -828,10 +825,7 @@ mod tests {
             reward_product_info: None,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
 
         if let EventPayload::StampRedeemed {
             category_id,
@@ -846,8 +840,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_redeem_stamp_duplicate_activity_rejected() {
+    #[test]
+    fn test_redeem_stamp_duplicate_activity_rejected() {
         // Same stamp activity cannot be redeemed twice in the same order
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -890,7 +884,7 @@ mod tests {
             }),
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
 
         // Verify error message mentions "already redeemed"
@@ -906,8 +900,8 @@ mod tests {
     // Comp-existing action tests: full comp vs partial comp
     // =========================================================================
 
-    #[tokio::test]
-    async fn test_comp_existing_full_comp_uses_existing_instance_id() {
+    #[test]
+    fn test_comp_existing_full_comp_uses_existing_instance_id() {
         // Item qty=1, reward_qty=1 → full comp, reward_instance_id = existing_id
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -939,7 +933,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::StampRedeemed {
             reward_instance_id,
@@ -957,8 +951,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_existing_partial_comp_generates_new_instance_id() {
+    #[test]
+    fn test_comp_existing_partial_comp_generates_new_instance_id() {
         // Item qty=7, reward_qty=1 → partial comp, new reward_instance_id
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -991,7 +985,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::StampRedeemed {
             reward_instance_id,
@@ -1010,8 +1004,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_existing_caps_quantity_to_item() {
+    #[test]
+    fn test_comp_existing_caps_quantity_to_item() {
         // Item qty=2, reward_qty=5 → caps to 2, full comp
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -1044,7 +1038,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::StampRedeemed {
             reward_instance_id,
@@ -1060,8 +1054,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_existing_eco_gen_partial_comp() {
+    #[test]
+    fn test_comp_existing_eco_gen_partial_comp() {
         // Eco/Gen comp-existing with partial comp
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -1098,7 +1092,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::StampRedeemed {
             reward_instance_id,

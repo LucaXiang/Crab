@@ -2,7 +2,6 @@
 //!
 //! Creates a new order with table information.
 
-use async_trait::async_trait;
 use sqlx::SqlitePool;
 use tracing::debug;
 use uuid::Uuid;
@@ -86,9 +85,8 @@ pub struct OpenTableAction {
     pub receipt_number: String,
 }
 
-#[async_trait]
 impl CommandHandler for OpenTableAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -191,8 +189,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_open_table_success() {
+    #[test]
+    fn test_open_table_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -211,14 +209,14 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::TableOpened);
     }
 
-    #[tokio::test]
-    async fn test_open_table_occupied_fails() {
+    #[test]
+    fn test_open_table_occupied_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -246,13 +244,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::TableOccupied(_))));
     }
 
-    #[tokio::test]
-    async fn test_open_retail_order_no_table_validation() {
+    #[test]
+    fn test_open_retail_order_no_table_validation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -272,7 +270,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::TableOpened { is_retail, .. } = &events[0].payload {

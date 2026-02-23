@@ -6,8 +6,6 @@
 //!
 //! Operations include: APPLY_DISCOUNT, MODIFY_PRICE, MODIFY_QUANTITY, MODIFY_ITEM
 
-use async_trait::async_trait;
-
 use crate::orders::reducer::generate_instance_id_from_parts;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
@@ -28,9 +26,8 @@ pub struct ModifyItemAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for ModifyItemAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -403,8 +400,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_modify_item_full_price_change() {
+    #[test]
+    fn test_modify_item_full_price_change() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -429,7 +426,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -460,8 +457,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_modify_item_partial_creates_split() {
+    #[test]
+    fn test_modify_item_partial_creates_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -486,7 +483,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemModified {
@@ -521,8 +518,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_modify_item_apply_discount() {
+    #[test]
+    fn test_modify_item_apply_discount() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -546,7 +543,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified {
             operation,
@@ -563,8 +560,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_modify_item_not_found() {
+    #[test]
+    fn test_modify_item_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -588,13 +585,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::ItemNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_insufficient_quantity() {
+    #[test]
+    fn test_modify_item_insufficient_quantity() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -618,13 +615,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_completed_order_fails() {
+    #[test]
+    fn test_modify_item_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -650,13 +647,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_voided_order_fails() {
+    #[test]
+    fn test_modify_item_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -682,13 +679,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_zero_affected_quantity_fails() {
+    #[test]
+    fn test_modify_item_zero_affected_quantity_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -712,13 +709,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_note() {
+    #[test]
+    fn test_modify_item_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -742,7 +739,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified {
             operation, changes, ..
@@ -755,8 +752,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_determine_operation() {
+    #[test]
+    fn test_determine_operation() {
         // Discount takes precedence
         assert_eq!(
             determine_operation(&ItemChanges {
@@ -822,8 +819,8 @@ mod tests {
         assert_eq!(determine_operation(&ItemChanges::default()), "MODIFY_ITEM");
     }
 
-    #[tokio::test]
-    async fn test_modify_item_options() {
+    #[test]
+    fn test_modify_item_options() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -856,7 +853,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified {
             operation,
@@ -874,8 +871,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_modify_item_specification() {
+    #[test]
+    fn test_modify_item_specification() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -907,7 +904,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified {
             operation,
@@ -930,8 +927,8 @@ mod tests {
 
     // ---- No-op detection tests ----
 
-    #[tokio::test]
-    async fn test_modify_item_no_op_empty_changes_rejected() {
+    #[test]
+    fn test_modify_item_no_op_empty_changes_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -953,12 +950,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_no_op_same_price_rejected() {
+    #[test]
+    fn test_modify_item_no_op_same_price_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -983,12 +980,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_no_op_discount_none_vs_zero_rejected() {
+    #[test]
+    fn test_modify_item_no_op_discount_none_vs_zero_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1014,12 +1011,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_no_op_same_options_rejected() {
+    #[test]
+    fn test_modify_item_no_op_same_options_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1054,12 +1051,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_modify_item_no_op_same_spec_rejected() {
+    #[test]
+    fn test_modify_item_no_op_same_spec_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1093,7 +1090,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
@@ -1163,8 +1160,8 @@ mod tests {
     /// Test: changes.quantity is unpaid, not total.
     /// Item total=5, paid=2, unpaid=3. User changes unpaid 3→5.
     /// changes.quantity=5 must NOT be confused with item.quantity=5.
-    #[tokio::test]
-    async fn test_modify_paid_item_unpaid_quantity_semantics() {
+    #[test]
+    fn test_modify_paid_item_unpaid_quantity_semantics() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1193,7 +1190,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemModified {
@@ -1215,8 +1212,8 @@ mod tests {
 
     /// BUG FIX: paid item + price/discount change → result uses unique instance_id
     /// (prevents collision when discount cycles back to a previously-used value)
-    #[tokio::test]
-    async fn test_modify_paid_item_discount_generates_unique_id() {
+    #[test]
+    fn test_modify_paid_item_discount_generates_unique_id() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1243,7 +1240,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified { results, .. } = &events[0].payload {
             assert_eq!(results.len(), 1);
@@ -1260,8 +1257,8 @@ mod tests {
     }
 
     /// Non-price change on paid item → deterministic instance_id (no UUID suffix)
-    #[tokio::test]
-    async fn test_modify_paid_item_note_keeps_deterministic_id() {
+    #[test]
+    fn test_modify_paid_item_note_keeps_deterministic_id() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1288,7 +1285,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified { results, .. } = &events[0].payload {
             assert_eq!(results.len(), 1);
@@ -1304,8 +1301,8 @@ mod tests {
     }
 
     /// No paid items → deterministic instance_id regardless of change type
-    #[tokio::test]
-    async fn test_modify_unpaid_item_discount_keeps_deterministic_id() {
+    #[test]
+    fn test_modify_unpaid_item_discount_keeps_deterministic_id() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1330,7 +1327,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemModified { results, .. } = &events[0].payload {
             // No paid items → deterministic, no UUID suffix
@@ -1346,8 +1343,8 @@ mod tests {
 
     // ---- Comped item protection tests ----
 
-    #[tokio::test]
-    async fn test_modify_comped_item_rejected() {
+    #[test]
+    fn test_modify_comped_item_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -1372,7 +1369,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(

@@ -120,31 +120,7 @@ async fn main() -> Result<(), BoxError> {
         }
     });
 
-    // Periodic pending_requests cleanup (every 30s, remove entries older than 60s)
-    let pending_requests = state.pending_requests.clone();
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
-        loop {
-            interval.tick().await;
-            let cutoff = shared::util::now_millis() - 60_000; // 60s TTL
-            let stale_keys: Vec<String> = pending_requests
-                .iter()
-                .filter(|entry| entry.value().0 < cutoff)
-                .map(|entry| entry.key().clone())
-                .collect();
-            for key in &stale_keys {
-                pending_requests.remove(key);
-            }
-            if !stale_keys.is_empty() {
-                tracing::debug!(
-                    cleaned = stale_keys.len(),
-                    "Cleaned up stale pending_requests entries"
-                );
-            }
-        }
-    });
-
-    // Periodic pending_rpcs cleanup (same TTL as pending_requests)
+    // Periodic pending_rpcs cleanup (every 30s, remove entries older than 60s)
     let pending_rpcs = state.pending_rpcs.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));

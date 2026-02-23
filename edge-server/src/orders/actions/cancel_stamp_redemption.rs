@@ -3,8 +3,6 @@
 //! Emits a single StampRedemptionCancelled event. The applier removes the reward
 //! item and the stamp_redemption record from the snapshot.
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
@@ -16,9 +14,8 @@ pub struct CancelStampRedemptionAction {
     pub stamp_activity_id: i64,
 }
 
-#[async_trait]
 impl CommandHandler for CancelStampRedemptionAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -139,8 +136,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_cancel_stamp_redemption_emits_event() {
+    #[test]
+    fn test_cancel_stamp_redemption_emits_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -166,10 +163,7 @@ mod tests {
             stamp_activity_id: 1,
         };
 
-        let events = action
-            .execute(&mut ctx, &create_test_metadata())
-            .await
-            .unwrap();
+        let events = action.execute(&mut ctx, &create_test_metadata()).unwrap();
 
         assert_eq!(events.len(), 1);
         assert_eq!(
@@ -190,8 +184,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_cancel_stamp_redemption_no_redemption_fails() {
+    #[test]
+    fn test_cancel_stamp_redemption_no_redemption_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -208,12 +202,12 @@ mod tests {
             stamp_activity_id: 999,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_cancel_stamp_redemption_completed_order_fails() {
+    #[test]
+    fn test_cancel_stamp_redemption_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -229,7 +223,7 @@ mod tests {
             stamp_activity_id: 1,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 }

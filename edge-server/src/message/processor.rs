@@ -283,7 +283,7 @@ impl RequestCommandProcessor {
         };
 
         // Execute via OrdersManager (CatalogService is injected, metadata lookup is automatic)
-        let response = self.state.orders_manager().execute_command(command);
+        let response = self.state.orders_manager().execute_command(command).await;
 
         if response.success {
             // OpenTable 成功后加载并缓存价格规则

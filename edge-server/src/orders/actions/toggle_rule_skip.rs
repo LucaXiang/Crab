@@ -1,7 +1,5 @@
 //! ToggleRuleSkip command handler
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::types::CommandErrorCode;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
@@ -14,9 +12,8 @@ pub struct ToggleRuleSkipAction {
     pub skipped: bool,
 }
 
-#[async_trait]
 impl CommandHandler for ToggleRuleSkipAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -155,8 +152,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_item_rule_success() {
+    #[test]
+    fn test_toggle_rule_skip_item_rule_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -178,7 +175,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -196,8 +193,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_order_rule_success() {
+    #[test]
+    fn test_toggle_rule_skip_order_rule_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -220,7 +217,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -237,8 +234,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_rule_not_found() {
+    #[test]
+    fn test_toggle_rule_skip_rule_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -257,7 +254,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
@@ -265,8 +262,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_non_active_order() {
+    #[test]
+    fn test_toggle_rule_skip_non_active_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -286,7 +283,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
@@ -294,8 +291,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_order_not_found() {
+    #[test]
+    fn test_toggle_rule_skip_order_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -309,13 +306,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_unskip() {
+    #[test]
+    fn test_toggle_rule_skip_unskip() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -364,7 +361,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::RuleSkipToggled { skipped, .. } = &events[0].payload {
@@ -374,8 +371,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_event_metadata() {
+    #[test]
+    fn test_toggle_rule_skip_event_metadata() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -400,7 +397,7 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         let event = &events[0];
 
         assert_eq!(event.command_id, "cmd-toggle-1");
@@ -409,8 +406,8 @@ mod tests {
         assert_eq!(event.client_timestamp, Some(9999999999));
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_already_skipped_rule() {
+    #[test]
+    fn test_toggle_rule_skip_already_skipped_rule() {
         // Toggling skip on a rule that's already skipped should still succeed
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -459,7 +456,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::RuleSkipToggled { skipped, .. } = &events[0].payload {
@@ -469,8 +466,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_multiple_rules_on_item() {
+    #[test]
+    fn test_toggle_rule_skip_multiple_rules_on_item() {
         // Item has multiple rules, toggle one specific rule
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -517,7 +514,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         assert_eq!(events.len(), 1);
 
         if let EventPayload::RuleSkipToggled {
@@ -531,8 +528,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_rule_on_both_levels() {
+    #[test]
+    fn test_toggle_rule_skip_rule_on_both_levels() {
         // Same rule_id exists at both item and order level → action should find it
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -553,12 +550,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         assert_eq!(events.len(), 1);
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_blocked_during_aa_split() {
+    #[test]
+    fn test_toggle_rule_skip_blocked_during_aa_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -580,7 +577,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
@@ -588,8 +585,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_toggle_rule_skip_blocked_during_amount_split() {
+    #[test]
+    fn test_toggle_rule_skip_blocked_during_amount_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -610,7 +607,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {

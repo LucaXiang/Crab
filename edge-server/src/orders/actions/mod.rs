@@ -3,8 +3,6 @@
 //! Each action implements the `CommandHandler` trait and handles
 //! one specific command type.
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{OrderCommand, OrderCommandPayload, OrderEvent};
 
@@ -85,46 +83,45 @@ pub enum CommandAction {
 }
 
 /// Manual implementation of CommandHandler for CommandAction
-#[async_trait]
 impl CommandHandler for CommandAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         match self {
-            CommandAction::OpenTable(action) => action.execute(ctx, metadata).await,
-            CommandAction::AddItems(action) => action.execute(ctx, metadata).await,
-            CommandAction::ModifyItem(action) => action.execute(ctx, metadata).await,
-            CommandAction::RemoveItem(action) => action.execute(ctx, metadata).await,
-            CommandAction::CompItem(action) => action.execute(ctx, metadata).await,
-            CommandAction::UncompItem(action) => action.execute(ctx, metadata).await,
-            CommandAction::AddPayment(action) => action.execute(ctx, metadata).await,
-            CommandAction::CancelPayment(action) => action.execute(ctx, metadata).await,
-            CommandAction::CompleteOrder(action) => action.execute(ctx, metadata).await,
-            CommandAction::UpdateOrderInfo(action) => action.execute(ctx, metadata).await,
-            CommandAction::VoidOrder(action) => action.execute(ctx, metadata).await,
-            CommandAction::MoveOrder(action) => action.execute(ctx, metadata).await,
-            CommandAction::MergeOrders(action) => action.execute(ctx, metadata).await,
-            CommandAction::SplitByItems(action) => action.execute(ctx, metadata).await,
-            CommandAction::SplitByAmount(action) => action.execute(ctx, metadata).await,
-            CommandAction::StartAaSplit(action) => action.execute(ctx, metadata).await,
-            CommandAction::PayAaSplit(action) => action.execute(ctx, metadata).await,
-            CommandAction::ToggleRuleSkip(action) => action.execute(ctx, metadata).await,
-            CommandAction::ApplyOrderDiscount(action) => action.execute(ctx, metadata).await,
-            CommandAction::ApplyOrderSurcharge(action) => action.execute(ctx, metadata).await,
-            CommandAction::AddOrderNote(action) => action.execute(ctx, metadata).await,
-            CommandAction::LinkMember(action) => action.execute(ctx, metadata).await,
-            CommandAction::UnlinkMember(action) => action.execute(ctx, metadata).await,
-            CommandAction::RedeemStamp(action) => action.execute(ctx, metadata).await,
-            CommandAction::CancelStampRedemption(action) => action.execute(ctx, metadata).await,
+            CommandAction::OpenTable(action) => action.execute(ctx, metadata),
+            CommandAction::AddItems(action) => action.execute(ctx, metadata),
+            CommandAction::ModifyItem(action) => action.execute(ctx, metadata),
+            CommandAction::RemoveItem(action) => action.execute(ctx, metadata),
+            CommandAction::CompItem(action) => action.execute(ctx, metadata),
+            CommandAction::UncompItem(action) => action.execute(ctx, metadata),
+            CommandAction::AddPayment(action) => action.execute(ctx, metadata),
+            CommandAction::CancelPayment(action) => action.execute(ctx, metadata),
+            CommandAction::CompleteOrder(action) => action.execute(ctx, metadata),
+            CommandAction::UpdateOrderInfo(action) => action.execute(ctx, metadata),
+            CommandAction::VoidOrder(action) => action.execute(ctx, metadata),
+            CommandAction::MoveOrder(action) => action.execute(ctx, metadata),
+            CommandAction::MergeOrders(action) => action.execute(ctx, metadata),
+            CommandAction::SplitByItems(action) => action.execute(ctx, metadata),
+            CommandAction::SplitByAmount(action) => action.execute(ctx, metadata),
+            CommandAction::StartAaSplit(action) => action.execute(ctx, metadata),
+            CommandAction::PayAaSplit(action) => action.execute(ctx, metadata),
+            CommandAction::ToggleRuleSkip(action) => action.execute(ctx, metadata),
+            CommandAction::ApplyOrderDiscount(action) => action.execute(ctx, metadata),
+            CommandAction::ApplyOrderSurcharge(action) => action.execute(ctx, metadata),
+            CommandAction::AddOrderNote(action) => action.execute(ctx, metadata),
+            CommandAction::LinkMember(action) => action.execute(ctx, metadata),
+            CommandAction::UnlinkMember(action) => action.execute(ctx, metadata),
+            CommandAction::RedeemStamp(action) => action.execute(ctx, metadata),
+            CommandAction::CancelStampRedemption(action) => action.execute(ctx, metadata),
         }
     }
 }
 
 /// Convert OrderCommand to CommandAction
 ///
-/// This is the ONLY place with a match on OrderCommandPayload.
+/// 通用命令→Action 转换。需要 prefetch 数据注入的命令在 OrdersManager::process_command() 中直接构建。
 impl From<&OrderCommand> for CommandAction {
     fn from(cmd: &OrderCommand) -> Self {
         match &cmd.payload {

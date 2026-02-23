@@ -26,7 +26,7 @@ fn create_open_table_cmd(operator_id: i64) -> OrderCommand {
 // Helper: open a table with items
 // ========================================================================
 
-fn open_table_with_items(
+async fn open_table_with_items(
     manager: &OrdersManager,
     table_id: i64,
     items: Vec<CartItemInput>,
@@ -43,7 +43,7 @@ fn open_table_with_items(
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     assert!(resp.success, "Failed to open table");
     let order_id = resp.order_id.unwrap();
 
@@ -56,7 +56,7 @@ fn open_table_with_items(
                 items,
             },
         );
-        let resp = manager.execute_command(add_cmd);
+        let resp = manager.execute_command(add_cmd).await;
         assert!(resp.success, "Failed to add items");
     }
 
@@ -163,7 +163,7 @@ fn item_with_discount(
 }
 
 /// 快速完成订单
-fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
+async fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
     let complete_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -172,11 +172,11 @@ fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    manager.execute_command(complete_cmd)
+    manager.execute_command(complete_cmd).await
 }
 
 /// 快速作废订单
-fn void_order_helper(
+async fn void_order_helper(
     manager: &OrdersManager,
     order_id: &str,
     void_type: VoidType,
@@ -194,7 +194,7 @@ fn void_order_helper(
             authorizer_name: None,
         },
     );
-    manager.execute_command(void_cmd)
+    manager.execute_command(void_cmd).await
 }
 
 /// 断言订单状态
@@ -208,7 +208,7 @@ fn assert_order_status(manager: &OrdersManager, order_id: &str, expected: OrderS
 }
 
 /// 打开零售订单
-fn open_retail_order(manager: &OrdersManager) -> String {
+async fn open_retail_order(manager: &OrdersManager) -> String {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -221,7 +221,7 @@ fn open_retail_order(manager: &OrdersManager) -> String {
             is_retail: true,
         },
     );
-    let resp = manager.execute_command(cmd);
+    let resp = manager.execute_command(cmd).await;
     assert!(resp.success, "Failed to open retail order");
     resp.order_id.unwrap()
 }
@@ -231,7 +231,7 @@ fn open_retail_order(manager: &OrdersManager) -> String {
 // ========================================================================
 
 /// Helper: 修改商品（折扣/价格/数量）
-fn modify_item(
+async fn modify_item(
     manager: &OrdersManager,
     order_id: &str,
     instance_id: &str,
@@ -249,11 +249,16 @@ fn modify_item(
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 添加支付
-fn pay(manager: &OrdersManager, order_id: &str, amount: f64, method: &str) -> CommandResponse {
+async fn pay(
+    manager: &OrdersManager,
+    order_id: &str,
+    amount: f64,
+    method: &str,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -267,11 +272,15 @@ fn pay(manager: &OrdersManager, order_id: &str, amount: f64, method: &str) -> Co
             },
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 取消支付
-fn cancel_payment(manager: &OrdersManager, order_id: &str, payment_id: &str) -> CommandResponse {
+async fn cancel_payment(
+    manager: &OrdersManager,
+    order_id: &str,
+    payment_id: &str,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -283,11 +292,11 @@ fn cancel_payment(manager: &OrdersManager, order_id: &str, payment_id: &str) -> 
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 整单折扣
-fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
+async fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -299,11 +308,11 @@ fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> Comm
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 清除整单折扣
-fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
+async fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -315,11 +324,11 @@ fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 分单支付（按商品）
-fn split_by_items(
+async fn split_by_items(
     manager: &OrdersManager,
     order_id: &str,
     items: Vec<shared::order::SplitItem>,
@@ -335,11 +344,11 @@ fn split_by_items(
             tendered: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: comp 商品 (comp all unpaid quantity)
-fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
+async fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
     let s = manager.get_snapshot(order_id).unwrap().unwrap();
     let qty = s
         .items
@@ -359,7 +368,7 @@ fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> Comm
             authorizer_name: "Test".to_string(),
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 折扣 changes
@@ -426,7 +435,7 @@ fn assert_snapshot_consistent(manager: &OrdersManager, order_id: &str) {
 // ========================================================================
 
 /// Helper: 整单附加费
-fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
+async fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -438,11 +447,15 @@ fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) -> Com
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 整单固定附加费
-fn apply_surcharge_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -> CommandResponse {
+async fn apply_surcharge_fixed(
+    manager: &OrdersManager,
+    order_id: &str,
+    amount: f64,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -454,11 +467,15 @@ fn apply_surcharge_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 整单固定折扣
-fn apply_discount_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -> CommandResponse {
+async fn apply_discount_fixed(
+    manager: &OrdersManager,
+    order_id: &str,
+    amount: f64,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -470,11 +487,11 @@ fn apply_discount_fixed(manager: &OrdersManager, order_id: &str, amount: f64) ->
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 删除商品
-fn remove_item(
+async fn remove_item(
     manager: &OrdersManager,
     order_id: &str,
     instance_id: &str,
@@ -492,11 +509,15 @@ fn remove_item(
             authorizer_name: None,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: uncomp 商品
-fn uncomp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
+async fn uncomp_item(
+    manager: &OrdersManager,
+    order_id: &str,
+    instance_id: &str,
+) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -507,11 +528,11 @@ fn uncomp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> Co
             authorizer_name: "Test".to_string(),
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 添加更多商品
-fn add_items(
+async fn add_items(
     manager: &OrdersManager,
     order_id: &str,
     items: Vec<CartItemInput>,
@@ -524,7 +545,7 @@ fn add_items(
             items,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 验证 remaining_amount 字段和方法一致
@@ -545,7 +566,7 @@ fn assert_remaining_consistent(s: &shared::order::OrderSnapshot) {
 // ========================================================================
 
 /// Helper: 开台（不加商品）
-fn open_table(manager: &OrdersManager, table_id: i64) -> String {
+async fn open_table(manager: &OrdersManager, table_id: i64) -> String {
     let open_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -558,13 +579,13 @@ fn open_table(manager: &OrdersManager, table_id: i64) -> String {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     assert!(resp.success, "Failed to open table");
     resp.order_id.unwrap()
 }
 
 /// Helper: 跳过/恢复规则
-fn toggle_rule_skip(
+async fn toggle_rule_skip(
     manager: &OrdersManager,
     order_id: &str,
     rule_id: i64,
@@ -579,7 +600,7 @@ fn toggle_rule_skip(
             skipped,
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 /// Helper: 创建百分比折扣规则
@@ -752,7 +773,7 @@ fn assert_close(actual: f64, expected: f64, msg: &str) {
 // ========================================================================
 
 /// Helper: comp 指定数量
-fn comp_item_qty(
+async fn comp_item_qty(
     manager: &OrdersManager,
     order_id: &str,
     instance_id: &str,
@@ -770,7 +791,7 @@ fn comp_item_qty(
             authorizer_name: "Test".to_string(),
         },
     );
-    manager.execute_command(cmd)
+    manager.execute_command(cmd).await
 }
 
 // ========================================================================

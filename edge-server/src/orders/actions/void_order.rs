@@ -2,8 +2,6 @@
 //!
 //! Voids an active order, optionally with a reason.
 
-use async_trait::async_trait;
-
 use crate::order_money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_optional_text};
@@ -23,9 +21,8 @@ pub struct VoidOrderAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for VoidOrderAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -123,8 +120,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_void_order_success() {
+    #[test]
+    fn test_void_order_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -139,7 +136,7 @@ mod tests {
         let action = create_void_action("order-1", Some("Customer cancelled".to_string()));
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -161,8 +158,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_void_order_without_note() {
+    #[test]
+    fn test_void_order_without_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -176,7 +173,7 @@ mod tests {
         let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderVoided { note, .. } = &events[0].payload {
@@ -186,8 +183,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_void_already_completed_order() {
+    #[test]
+    fn test_void_already_completed_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -201,13 +198,13 @@ mod tests {
         let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_void_already_voided_order() {
+    #[test]
+    fn test_void_already_voided_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -221,13 +218,13 @@ mod tests {
         let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_void_nonexistent_order() {
+    #[test]
+    fn test_void_nonexistent_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -237,13 +234,13 @@ mod tests {
         let action = create_void_action("nonexistent", None);
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_void_merged_order() {
+    #[test]
+    fn test_void_merged_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -257,13 +254,13 @@ mod tests {
         let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_void_order_with_items_and_payments() {
+    #[test]
+    fn test_void_order_with_items_and_payments() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -281,15 +278,15 @@ mod tests {
         let action = create_void_action("order-1", Some("Order error".to_string()));
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Should succeed even with partial payment
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::OrderVoided);
     }
 
-    #[tokio::test]
-    async fn test_void_order_event_metadata() {
+    #[test]
+    fn test_void_order_event_metadata() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -309,7 +306,7 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         let event = &events[0];
 
         // Verify event metadata
@@ -320,8 +317,8 @@ mod tests {
         assert_eq!(event.client_timestamp, Some(9999999999));
     }
 
-    #[tokio::test]
-    async fn test_cancelled_void_strips_loss_fields() {
+    #[test]
+    fn test_cancelled_void_strips_loss_fields() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -344,7 +341,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderVoided {
             void_type,
@@ -361,8 +358,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_loss_settled_preserves_loss_fields() {
+    #[test]
+    fn test_loss_settled_preserves_loss_fields() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -386,7 +383,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderVoided {
             void_type,
@@ -403,8 +400,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_loss_settled_auto_calculates_loss_amount() {
+    #[test]
+    fn test_loss_settled_auto_calculates_loss_amount() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -429,7 +426,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderVoided { loss_amount, .. } = &events[0].payload {
             assert_eq!(

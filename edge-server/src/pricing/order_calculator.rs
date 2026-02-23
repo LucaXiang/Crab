@@ -11,7 +11,8 @@ use rust_decimal::prelude::*;
 use shared::models::PriceRule;
 use shared::order::AppliedRule;
 
-use super::item_calculator::{apply_discount_rules, apply_surcharge_rules, to_decimal, to_f64};
+use super::item_calculator::{apply_discount_rules, apply_surcharge_rules};
+use crate::order_money::{to_decimal, to_f64};
 
 /// Result of order price calculation
 #[derive(Debug, Clone)]

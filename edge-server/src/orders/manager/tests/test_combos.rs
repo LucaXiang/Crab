@@ -2,20 +2,21 @@ use super::*;
 
 // --- Test 1: 折扣循环 50%→20%→50%→0% ---
 
-#[test]
-fn test_combo_discount_cycling_no_payment() {
+#[tokio::test]
+async fn test_combo_discount_cycling_no_payment() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         277,
         vec![simple_item(1, "Coffee", 10.0, 3)], // total=30
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let iid = s.items[0].instance_id.clone();
 
     // 50% discount → total = 15
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(50.0)).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(s.items.len(), 1, "Should still be 1 item");
@@ -23,7 +24,7 @@ fn test_combo_discount_cycling_no_payment() {
     let iid = s.items[0].instance_id.clone();
 
     // 20% discount → total = 24
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(20.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(20.0)).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(s.items.len(), 1);
@@ -31,7 +32,7 @@ fn test_combo_discount_cycling_no_payment() {
     let iid = s.items[0].instance_id.clone();
 
     // Back to 50% → total = 15
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(50.0)).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(s.items.len(), 1);
@@ -39,7 +40,7 @@ fn test_combo_discount_cycling_no_payment() {
     let iid = s.items[0].instance_id.clone();
 
     // Remove discount → total = 30
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(0.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(0.0)).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(s.items.len(), 1, "Removing discount should merge back");
@@ -50,24 +51,25 @@ fn test_combo_discount_cycling_no_payment() {
 
 // --- Test 2: 折扣循环 + 部分支付 + 取消支付 ---
 
-#[test]
-fn test_combo_discount_cycle_with_partial_payment_and_cancel() {
+#[tokio::test]
+async fn test_combo_discount_cycle_with_partial_payment_and_cancel() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         278,
         vec![simple_item(1, "Coffee", 10.0, 4)], // total=40
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let iid = s.items[0].instance_id.clone();
 
     // 1. Apply 50% discount → total=20
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(50.0)).await;
     assert!(r.success);
 
     // 2. Pay 10 (partial)
-    let r = pay(&manager, &order_id, 10.0, "CASH");
+    let r = pay(&manager, &order_id, 10.0, "CASH").await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -85,7 +87,7 @@ fn test_combo_discount_cycle_with_partial_payment_and_cancel() {
         .unwrap()
         .instance_id
         .clone();
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(20.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(20.0)).await;
     assert!(
         r.success,
         "Item-level discount on unpaid portion should succeed"
@@ -100,7 +102,7 @@ fn test_combo_discount_cycle_with_partial_payment_and_cancel() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &payment_id);
+    let r = cancel_payment(&manager, &order_id, &payment_id).await;
     assert!(r.success);
 
     // 5. After cancel, paid_amount should be 0
@@ -118,7 +120,7 @@ fn test_combo_discount_cycle_with_partial_payment_and_cancel() {
         .map(|i| i.instance_id.clone())
         .collect();
     for iid in &items_snapshot {
-        modify_item(&manager, &order_id, iid, discount_changes(0.0));
+        modify_item(&manager, &order_id, iid, discount_changes(0.0)).await;
     }
 
     // 7. Verify: should be back to original total, no fragmentation
@@ -136,8 +138,8 @@ fn test_combo_discount_cycle_with_partial_payment_and_cancel() {
 
 // --- Test 3: 分单支付 + 改价 + 再支付 ---
 
-#[test]
-fn test_combo_split_payment_then_modify_then_pay() {
+#[tokio::test]
+async fn test_combo_split_payment_then_modify_then_pay() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -146,7 +148,8 @@ fn test_combo_split_payment_then_modify_then_pay() {
             simple_item(1, "Coffee", 10.0, 3), // 30
             simple_item(2, "Tea", 8.0, 2),     // 16 → total=46
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let coffee_iid = s
@@ -168,7 +171,8 @@ fn test_combo_split_payment_then_modify_then_pay() {
             unit_price: 10.0,
         }],
         "CARD",
-    );
+    )
+    .await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -183,18 +187,18 @@ fn test_combo_split_payment_then_modify_then_pay() {
         .find(|i| i.name == "Coffee" && i.unpaid_quantity > 0)
         .unwrap();
     let unpaid_iid = unpaid_coffee.instance_id.clone();
-    let r = modify_item(&manager, &order_id, &unpaid_iid, price_changes(15.0));
+    let r = modify_item(&manager, &order_id, &unpaid_iid, price_changes(15.0)).await;
     assert!(r.success, "Should be able to modify unpaid coffee price");
 
     // 3. Pay remaining
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let remaining = s.remaining_amount;
     assert!(remaining > 0.0);
-    let r = pay(&manager, &order_id, remaining, "CASH");
+    let r = pay(&manager, &order_id, remaining, "CASH").await;
     assert!(r.success, "Should pay remaining {}", remaining);
 
     // 4. Complete
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -202,8 +206,8 @@ fn test_combo_split_payment_then_modify_then_pay() {
 
 // --- Test 4: Comp + 折扣 + 支付 ---
 
-#[test]
-fn test_combo_comp_then_discount_then_pay() {
+#[tokio::test]
+async fn test_combo_comp_then_discount_then_pay() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -212,7 +216,8 @@ fn test_combo_comp_then_discount_then_pay() {
             simple_item(1, "Coffee", 10.0, 2), // 20
             simple_item(2, "Tea", 5.0, 2),     // 10 → total=30
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let tea_iid = s
@@ -224,7 +229,7 @@ fn test_combo_comp_then_discount_then_pay() {
         .clone();
 
     // 1. Comp the tea
-    let r = comp_item(&manager, &order_id, &tea_iid);
+    let r = comp_item(&manager, &order_id, &tea_iid).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -241,7 +246,7 @@ fn test_combo_comp_then_discount_then_pay() {
         .unwrap()
         .instance_id
         .clone();
-    let r = modify_item(&manager, &order_id, &coffee_iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &coffee_iid, discount_changes(50.0)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -252,11 +257,11 @@ fn test_combo_comp_then_discount_then_pay() {
     );
 
     // 3. Pay full amount
-    let r = pay(&manager, &order_id, s.total, "CARD");
+    let r = pay(&manager, &order_id, s.total, "CARD").await;
     assert!(r.success);
 
     // 4. Complete
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     // 5. Verify order is completed and totals are correct
@@ -271,17 +276,18 @@ fn test_combo_comp_then_discount_then_pay() {
 
 // --- Test 5: 整单折扣 100% → total=0 → 可完成 ---
 
-#[test]
-fn test_combo_100_percent_order_discount() {
+#[tokio::test]
+async fn test_combo_100_percent_order_discount() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         281,
         vec![simple_item(1, "Coffee", 10.0, 2)], // 20
-    );
+    )
+    .await;
 
     // 100% discount
-    let r = apply_discount(&manager, &order_id, 100.0);
+    let r = apply_discount(&manager, &order_id, 100.0).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -293,7 +299,7 @@ fn test_combo_100_percent_order_discount() {
     assert!((s.remaining_amount).abs() < 0.01);
 
     // Should be able to complete without payment
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success, "Should complete with 0 total");
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -301,14 +307,15 @@ fn test_combo_100_percent_order_discount() {
 
 // --- Test 6: 大量折扣 → total clamp 到 0 ---
 
-#[test]
-fn test_combo_fixed_discount_exceeds_total() {
+#[tokio::test]
+async fn test_combo_fixed_discount_exceeds_total() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         282,
         vec![simple_item(1, "Coffee", 10.0, 1)], // 10
-    );
+    )
+    .await;
 
     // Fixed discount of 50 on a 10 order
     let cmd = OrderCommand::new(
@@ -322,7 +329,7 @@ fn test_combo_fixed_discount_exceeds_total() {
             authorizer_name: None,
         },
     );
-    let r = manager.execute_command(cmd);
+    let r = manager.execute_command(cmd).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -342,23 +349,24 @@ fn test_combo_fixed_discount_exceeds_total() {
 
 // --- Test 7: 支付 → 取消 → 再支付 → 完成 ---
 
-#[test]
-fn test_combo_pay_cancel_repay_complete() {
+#[tokio::test]
+async fn test_combo_pay_cancel_repay_complete() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         283,
         vec![simple_item(1, "Coffee", 10.0, 3)], // 30
-    );
+    )
+    .await;
 
     // Pay 15
-    let r = pay(&manager, &order_id, 15.0, "CARD");
+    let r = pay(&manager, &order_id, 15.0, "CARD").await;
     assert!(r.success);
 
     // Cancel it
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let pid = s.payments[0].payment_id.clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -366,10 +374,10 @@ fn test_combo_pay_cancel_repay_complete() {
     assert!((s.remaining_amount - 30.0).abs() < 0.01);
 
     // Pay full
-    let r = pay(&manager, &order_id, 30.0, "CASH");
+    let r = pay(&manager, &order_id, 30.0, "CASH").await;
     assert!(r.success);
 
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -377,8 +385,8 @@ fn test_combo_pay_cancel_repay_complete() {
 
 // --- Test 8: 分单支付后 cancel → 重新分单 ---
 
-#[test]
-fn test_combo_split_cancel_resplit() {
+#[tokio::test]
+async fn test_combo_split_cancel_resplit() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -387,7 +395,8 @@ fn test_combo_split_cancel_resplit() {
             simple_item(1, "Coffee", 10.0, 2), // 20
             simple_item(2, "Tea", 5.0, 2),     // 10
         ], // total=30
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let coffee_iid = s
@@ -416,7 +425,8 @@ fn test_combo_split_cancel_resplit() {
             unit_price: 10.0,
         }],
         "CARD",
-    );
+    )
+    .await;
     assert!(r.success);
 
     // 2. Cancel that split payment
@@ -428,7 +438,7 @@ fn test_combo_split_cancel_resplit() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     // 3. Now split-pay tea instead
@@ -442,7 +452,8 @@ fn test_combo_split_cancel_resplit() {
             unit_price: 5.0,
         }],
         "CASH",
-    );
+    )
+    .await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -453,10 +464,10 @@ fn test_combo_split_cancel_resplit() {
     assert!((s.remaining_amount - 20.0).abs() < 0.01);
 
     // 4. Pay remaining
-    let r = pay(&manager, &order_id, 20.0, "CARD");
+    let r = pay(&manager, &order_id, 20.0, "CARD").await;
     assert!(r.success);
 
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -464,20 +475,21 @@ fn test_combo_split_cancel_resplit() {
 
 // --- Test 9: 多次部分支付 + 修改数量 ---
 
-#[test]
-fn test_combo_multiple_partial_payments_then_modify_qty() {
+#[tokio::test]
+async fn test_combo_multiple_partial_payments_then_modify_qty() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         285,
         vec![simple_item(1, "Coffee", 10.0, 5)], // 50
-    );
+    )
+    .await;
 
     // Pay 20, then 15
-    let r = pay(&manager, &order_id, 20.0, "CARD");
+    let r = pay(&manager, &order_id, 20.0, "CARD").await;
     assert!(r.success, "Pay 20 failed: {:?}", r.error);
 
-    let r = pay(&manager, &order_id, 15.0, "CASH");
+    let r = pay(&manager, &order_id, 15.0, "CASH").await;
     assert!(r.success, "Pay 15 failed: {:?}", r.error);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -501,18 +513,18 @@ fn test_combo_multiple_partial_payments_then_modify_qty() {
     );
 
     // Try to overpay — should fail
-    let r = pay(&manager, &order_id, actual_remaining + 1.0, "CARD");
+    let r = pay(&manager, &order_id, actual_remaining + 1.0, "CARD").await;
     assert!(!r.success, "Should reject overpayment");
 
     // Pay exact remaining
-    let r = pay(&manager, &order_id, actual_remaining, "CARD");
+    let r = pay(&manager, &order_id, actual_remaining, "CARD").await;
     assert!(
         r.success,
         "Paying remaining ({}) failed: {:?}",
         actual_remaining, r.error
     );
 
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -520,8 +532,8 @@ fn test_combo_multiple_partial_payments_then_modify_qty() {
 
 // --- Test 10: 折扣 + comp + 分单 + 完成 ---
 
-#[test]
-fn test_combo_discount_comp_split_complete() {
+#[tokio::test]
+async fn test_combo_discount_comp_split_complete() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -531,7 +543,8 @@ fn test_combo_discount_comp_split_complete() {
             simple_item(2, "Wine", 15.0, 2),  // 30
             simple_item(3, "Bread", 3.0, 1),  // 3
         ], // total=83
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let bread_iid = s
@@ -550,11 +563,11 @@ fn test_combo_discount_comp_split_complete() {
         .clone();
 
     // 1. Comp the bread
-    let r = comp_item(&manager, &order_id, &bread_iid);
+    let r = comp_item(&manager, &order_id, &bread_iid).await;
     assert!(r.success);
 
     // 2. 20% discount on steak → steak_total = 2 * 25 * 0.8 = 40
-    let r = modify_item(&manager, &order_id, &steak_iid, discount_changes(20.0));
+    let r = modify_item(&manager, &order_id, &steak_iid, discount_changes(20.0)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -581,17 +594,18 @@ fn test_combo_discount_comp_split_complete() {
             unit_price: 20.0,
         }],
         "CARD",
-    );
+    )
+    .await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!((s.paid_amount - 20.0).abs() < 0.01);
 
     // 4. Pay remaining (50)
-    let r = pay(&manager, &order_id, s.remaining_amount, "CASH");
+    let r = pay(&manager, &order_id, s.remaining_amount, "CASH").await;
     assert!(r.success);
 
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -599,14 +613,15 @@ fn test_combo_discount_comp_split_complete() {
 
 // --- Test 11: 同一商品多次添加 + 折扣 + 去折 → 自动合并 ---
 
-#[test]
-fn test_combo_add_twice_discount_undiscount_merges() {
+#[tokio::test]
+async fn test_combo_add_twice_discount_undiscount_merges() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         287,
         vec![simple_item(1, "Coffee", 10.0, 2)], // 20
-    );
+    )
+    .await;
 
     // Add same product again
     let add_cmd = OrderCommand::new(
@@ -617,7 +632,7 @@ fn test_combo_add_twice_discount_undiscount_merges() {
             items: vec![simple_item(1, "Coffee", 10.0, 3)],
         },
     );
-    let r = manager.execute_command(add_cmd);
+    let r = manager.execute_command(add_cmd).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -627,14 +642,14 @@ fn test_combo_add_twice_discount_undiscount_merges() {
     let iid = s.items[0].instance_id.clone();
 
     // Apply 30% discount
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(30.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(30.0)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let iid = s.items[0].instance_id.clone();
 
     // Remove discount → should return to original instance_id and stay as 1 item
-    let r = modify_item(&manager, &order_id, &iid, discount_changes(0.0));
+    let r = modify_item(&manager, &order_id, &iid, discount_changes(0.0)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -651,31 +666,32 @@ fn test_combo_add_twice_discount_undiscount_merges() {
 
 // --- Test 12: 支付后不能加整单折扣 ---
 
-#[test]
-fn test_combo_order_discount_blocked_after_payment() {
+#[tokio::test]
+async fn test_combo_order_discount_blocked_after_payment() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         288,
         vec![simple_item(1, "Coffee", 10.0, 3)], // 30
-    );
+    )
+    .await;
 
     // Pay 10
-    let r = pay(&manager, &order_id, 10.0, "CARD");
+    let r = pay(&manager, &order_id, 10.0, "CARD").await;
     assert!(r.success);
 
     // Try order-level discount — should fail
-    let r = apply_discount(&manager, &order_id, 20.0);
+    let r = apply_discount(&manager, &order_id, 20.0).await;
     assert!(!r.success, "Order discount should be blocked after payment");
 
     // Cancel payment
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let pid = s.payments[0].payment_id.clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     // Now order discount should work again
-    let r = apply_discount(&manager, &order_id, 20.0);
+    let r = apply_discount(&manager, &order_id, 20.0).await;
     assert!(
         r.success,
         "Order discount should work after cancelling all payments"
@@ -689,17 +705,18 @@ fn test_combo_order_discount_blocked_after_payment() {
 
 // --- Test 13: 添加商品 → 部分支付 → void → 验证 loss ---
 
-#[test]
-fn test_combo_partial_pay_then_void_loss() {
+#[tokio::test]
+async fn test_combo_partial_pay_then_void_loss() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         289,
         vec![simple_item(1, "Coffee", 10.0, 5)], // 50
-    );
+    )
+    .await;
 
     // Pay 30
-    let r = pay(&manager, &order_id, 30.0, "CARD");
+    let r = pay(&manager, &order_id, 30.0, "CARD").await;
     assert!(r.success);
 
     // Void with loss settled (auto-calculate loss)
@@ -716,7 +733,7 @@ fn test_combo_partial_pay_then_void_loss() {
             authorizer_name: None,
         },
     );
-    let r = manager.execute_command(void_cmd);
+    let r = manager.execute_command(void_cmd).await;
     assert!(r.success);
 
     // Verify via snapshot: void sets status
@@ -731,24 +748,25 @@ fn test_combo_partial_pay_then_void_loss() {
 
 // --- Test 14: 超付保护 — 边界值 ---
 
-#[test]
-fn test_combo_overpayment_boundary() {
+#[tokio::test]
+async fn test_combo_overpayment_boundary() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         290,
         vec![simple_item(1, "Coffee", 10.0, 1)], // 10
-    );
+    )
+    .await;
 
     // Pay 10.00 exact — should succeed
-    let r = pay(&manager, &order_id, 10.0, "CARD");
+    let r = pay(&manager, &order_id, 10.0, "CARD").await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!((s.remaining_amount).abs() < 0.01);
 
     // Try to pay even 0.01 more — should fail
-    let r = pay(&manager, &order_id, 0.02, "CARD");
+    let r = pay(&manager, &order_id, 0.02, "CARD").await;
     assert!(!r.success, "Should reject payment when fully paid");
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -756,8 +774,8 @@ fn test_combo_overpayment_boundary() {
 
 // --- Test 15: 整单折扣 + 整单附加费 + 商品折扣 组合 ---
 
-#[test]
-fn test_combo_order_discount_surcharge_item_discount() {
+#[tokio::test]
+async fn test_combo_order_discount_surcharge_item_discount() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -766,7 +784,8 @@ fn test_combo_order_discount_surcharge_item_discount() {
             simple_item(1, "Coffee", 10.0, 2), // 20
             simple_item(2, "Tea", 8.0, 1),     // 8 → total=28
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let coffee_iid = s
@@ -778,11 +797,11 @@ fn test_combo_order_discount_surcharge_item_discount() {
         .clone();
 
     // 1. 50% item discount on coffee → coffee=10, total=18
-    let r = modify_item(&manager, &order_id, &coffee_iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &coffee_iid, discount_changes(50.0)).await;
     assert!(r.success);
 
     // 2. 10% order discount → total = 18 - 1.8 = 16.2
-    let r = apply_discount(&manager, &order_id, 10.0);
+    let r = apply_discount(&manager, &order_id, 10.0).await;
     assert!(r.success);
 
     // 3. 5% order surcharge → total = 18 - 1.8 + 0.9 = 17.1
@@ -797,7 +816,7 @@ fn test_combo_order_discount_surcharge_item_discount() {
             authorizer_name: None,
         },
     );
-    let r = manager.execute_command(cmd);
+    let r = manager.execute_command(cmd).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -805,10 +824,10 @@ fn test_combo_order_discount_surcharge_item_discount() {
     assert!(s.total < 28.0, "Total must be less than original");
 
     // 4. Pay and complete
-    let r = pay(&manager, &order_id, s.total, "CARD");
+    let r = pay(&manager, &order_id, s.total, "CARD").await;
     assert!(r.success);
 
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -816,21 +835,22 @@ fn test_combo_order_discount_surcharge_item_discount() {
 
 // --- Test 16: 3次部分支付 → 取消中间那笔 → 验证 remaining ---
 
-#[test]
-fn test_combo_three_payments_cancel_middle() {
+#[tokio::test]
+async fn test_combo_three_payments_cancel_middle() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         292,
         vec![simple_item(1, "Steak", 30.0, 3)], // 90
-    );
+    )
+    .await;
 
     // 3 payments: 25, 35, 20
-    let r = pay(&manager, &order_id, 25.0, "CARD");
+    let r = pay(&manager, &order_id, 25.0, "CARD").await;
     assert!(r.success);
-    let r = pay(&manager, &order_id, 35.0, "CASH");
+    let r = pay(&manager, &order_id, 35.0, "CASH").await;
     assert!(r.success);
-    let r = pay(&manager, &order_id, 20.0, "CARD");
+    let r = pay(&manager, &order_id, 20.0, "CARD").await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -845,7 +865,7 @@ fn test_combo_three_payments_cancel_middle() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &mid_pid);
+    let r = cancel_payment(&manager, &order_id, &mid_pid).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -862,9 +882,9 @@ fn test_combo_three_payments_cancel_middle() {
     );
 
     // Pay remaining and complete
-    let r = pay(&manager, &order_id, s.remaining_amount, "CARD");
+    let r = pay(&manager, &order_id, s.remaining_amount, "CARD").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -872,8 +892,8 @@ fn test_combo_three_payments_cancel_middle() {
 
 // --- Test 17: 部分支付 → 整单折扣被阻 → 取消支付 → 整单折扣 + 附加费 → 支付 ---
 
-#[test]
-fn test_combo_cancel_payment_then_order_discount_and_surcharge() {
+#[tokio::test]
+async fn test_combo_cancel_payment_then_order_discount_and_surcharge() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -882,18 +902,19 @@ fn test_combo_cancel_payment_then_order_discount_and_surcharge() {
             simple_item(1, "Coffee", 10.0, 4), // 40
             simple_item(2, "Tea", 5.0, 2),     // 10 → total=50
         ],
-    );
+    )
+    .await;
 
     // Pay 20
-    let r = pay(&manager, &order_id, 20.0, "CARD");
+    let r = pay(&manager, &order_id, 20.0, "CARD").await;
     assert!(r.success);
 
     // Try discount → blocked
-    let r = apply_discount(&manager, &order_id, 20.0);
+    let r = apply_discount(&manager, &order_id, 20.0).await;
     assert!(!r.success, "Discount should be blocked after payment");
 
     // Try surcharge → also blocked
-    let r = apply_surcharge(&manager, &order_id, 10.0);
+    let r = apply_surcharge(&manager, &order_id, 10.0).await;
     assert!(!r.success, "Surcharge should be blocked after payment");
 
     // Cancel payment
@@ -905,16 +926,16 @@ fn test_combo_cancel_payment_then_order_discount_and_surcharge() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     // Now discount (20%) → total = 50 * 0.8 = 40
-    let r = apply_discount(&manager, &order_id, 20.0);
+    let r = apply_discount(&manager, &order_id, 20.0).await;
     assert!(r.success);
 
     // Surcharge (10%) → total = 50 - 10 + 5 = 45
     // (discount on subtotal 50 = 10, surcharge on subtotal 50 = 5)
-    let r = apply_surcharge(&manager, &order_id, 10.0);
+    let r = apply_surcharge(&manager, &order_id, 10.0).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -927,9 +948,9 @@ fn test_combo_cancel_payment_then_order_discount_and_surcharge() {
     assert_remaining_consistent(&s);
 
     // Pay and complete
-    let r = pay(&manager, &order_id, s.total, "CASH");
+    let r = pay(&manager, &order_id, s.total, "CASH").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -937,8 +958,8 @@ fn test_combo_cancel_payment_then_order_discount_and_surcharge() {
 
 // --- Test 18: 商品折扣 + 整单折扣 + 整单附加费 + comp → 多层叠加 ---
 
-#[test]
-fn test_combo_multi_layer_discounts_surcharges_comp() {
+#[tokio::test]
+async fn test_combo_multi_layer_discounts_surcharges_comp() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -948,7 +969,8 @@ fn test_combo_multi_layer_discounts_surcharges_comp() {
             simple_item(2, "Wine", 15.0, 2),  // 30
             simple_item(3, "Bread", 3.0, 1),  // 3  → total=73
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let bread_iid = s
@@ -974,19 +996,19 @@ fn test_combo_multi_layer_discounts_surcharges_comp() {
         .clone();
 
     // 1. Comp bread (free) → subtotal = 40 + 30 = 70
-    let r = comp_item(&manager, &order_id, &bread_iid);
+    let r = comp_item(&manager, &order_id, &bread_iid).await;
     assert!(r.success);
 
     // 2. 50% item discount on wine → wine = 15, subtotal = 40 + 15 = 55
-    let r = modify_item(&manager, &order_id, &wine_iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &wine_iid, discount_changes(50.0)).await;
     assert!(r.success);
 
     // 3. 10% order discount → discount = 55 * 0.1 = 5.5
-    let r = apply_discount(&manager, &order_id, 10.0);
+    let r = apply_discount(&manager, &order_id, 10.0).await;
     assert!(r.success);
 
     // 4. 5% order surcharge → surcharge = 55 * 0.05 = 2.75
-    let r = apply_surcharge(&manager, &order_id, 5.0);
+    let r = apply_surcharge(&manager, &order_id, 5.0).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1009,7 +1031,7 @@ fn test_combo_multi_layer_discounts_surcharges_comp() {
         .map(|i| i.instance_id.clone())
         .collect();
     if let Some(comped_bread) = bread_iids.first() {
-        let r = uncomp_item(&manager, &order_id, comped_bread);
+        let r = uncomp_item(&manager, &order_id, comped_bread).await;
         if r.success {
             let s = manager.get_snapshot(&order_id).unwrap().unwrap();
             // New subtotal = 40 + 15 + 3 = 58
@@ -1022,9 +1044,9 @@ fn test_combo_multi_layer_discounts_surcharges_comp() {
 
     // 6. Pay and complete
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let r = pay(&manager, &order_id, s.total, "CARD");
+    let r = pay(&manager, &order_id, s.total, "CARD").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1032,14 +1054,15 @@ fn test_combo_multi_layer_discounts_surcharges_comp() {
 
 // --- Test 19: 分单支付 → 改价(触发 split) → 取消分单 → 再改价 ---
 
-#[test]
-fn test_combo_split_pay_modify_cancel_modify_again() {
+#[tokio::test]
+async fn test_combo_split_pay_modify_cancel_modify_again() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         295,
         vec![simple_item(1, "Coffee", 10.0, 6)], // 60
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let iid = s.items[0].instance_id.clone();
@@ -1055,7 +1078,8 @@ fn test_combo_split_pay_modify_cancel_modify_again() {
             unit_price: 10.0,
         }],
         "CARD",
-    );
+    )
+    .await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1077,7 +1101,7 @@ fn test_combo_split_pay_modify_cancel_modify_again() {
     );
     assert_eq!(unpaid_item.unpaid_quantity, 3, "Unpaid should be 3");
 
-    let r = modify_item(&manager, &order_id, &unpaid_iid, price_changes(8.0));
+    let r = modify_item(&manager, &order_id, &unpaid_iid, price_changes(8.0)).await;
     assert!(r.success, "Modify price failed: {:?}", r.error);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1106,7 +1130,7 @@ fn test_combo_split_pay_modify_cancel_modify_again() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1127,7 +1151,7 @@ fn test_combo_split_pay_modify_cancel_modify_again() {
     // 4. Modify all items back to 10 (normalize price)
     for item in &s.items {
         if (item.price - 10.0).abs() > 0.01 {
-            let r = modify_item(&manager, &order_id, &item.instance_id, price_changes(10.0));
+            let r = modify_item(&manager, &order_id, &item.instance_id, price_changes(10.0)).await;
             assert!(r.success);
         }
     }
@@ -1143,9 +1167,9 @@ fn test_combo_split_pay_modify_cancel_modify_again() {
     assert_remaining_consistent(&s);
 
     // 5. Pay and complete
-    let r = pay(&manager, &order_id, s.total, "CASH");
+    let r = pay(&manager, &order_id, s.total, "CASH").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1153,8 +1177,8 @@ fn test_combo_split_pay_modify_cancel_modify_again() {
 
 // --- Test 20: comp → uncomp → discount → remove → add → 完整循环 ---
 
-#[test]
-fn test_combo_comp_uncomp_discount_remove_add_cycle() {
+#[tokio::test]
+async fn test_combo_comp_uncomp_discount_remove_add_cycle() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -1163,7 +1187,8 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
             simple_item(1, "Steak", 25.0, 2), // 50
             simple_item(2, "Wine", 12.0, 3),  // 36 → total=86
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let wine_iid = s
@@ -1175,7 +1200,7 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
         .clone();
 
     // 1. Comp wine
-    let r = comp_item(&manager, &order_id, &wine_iid);
+    let r = comp_item(&manager, &order_id, &wine_iid).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1191,7 +1216,7 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
         .unwrap()
         .instance_id
         .clone();
-    let r = uncomp_item(&manager, &order_id, &comped_iid);
+    let r = uncomp_item(&manager, &order_id, &comped_iid).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1207,7 +1232,7 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
         .unwrap()
         .instance_id
         .clone();
-    let r = modify_item(&manager, &order_id, &wine_iid, discount_changes(30.0));
+    let r = modify_item(&manager, &order_id, &wine_iid, discount_changes(30.0)).await;
     assert!(r.success);
 
     // 4. Remove 1 steak
@@ -1218,7 +1243,7 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
         .unwrap()
         .instance_id
         .clone();
-    let r = remove_item(&manager, &order_id, &steak_iid, Some(1));
+    let r = remove_item(&manager, &order_id, &steak_iid, Some(1)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1227,7 +1252,7 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
     assert_remaining_consistent(&s);
 
     // 5. Add 2 more wines (same product, no discount → different instance_id)
-    let r = add_items(&manager, &order_id, vec![simple_item(2, "Wine", 12.0, 2)]);
+    let r = add_items(&manager, &order_id, vec![simple_item(2, "Wine", 12.0, 2)]).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1244,9 +1269,9 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
     assert_remaining_consistent(&s);
 
     // 6. Pay and complete
-    let r = pay(&manager, &order_id, s.total, "CARD");
+    let r = pay(&manager, &order_id, s.total, "CARD").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1254,23 +1279,24 @@ fn test_combo_comp_uncomp_discount_remove_add_cycle() {
 
 // --- Test 21: 整单折扣+附加费 → 改为固定折扣 → 改为固定附加费 → 反复切换 ---
 
-#[test]
-fn test_combo_order_adjustment_switching() {
+#[tokio::test]
+async fn test_combo_order_adjustment_switching() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         297,
         vec![simple_item(1, "Coffee", 10.0, 5)], // 50
-    );
+    )
+    .await;
 
     // 1. 20% order discount → total = 50 - 10 = 40
-    let r = apply_discount(&manager, &order_id, 20.0);
+    let r = apply_discount(&manager, &order_id, 20.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!((s.total - 40.0).abs() < 0.01);
 
     // 2. Switch to fixed discount of 15 → total = 50 - 15 = 35
-    let r = apply_discount_fixed(&manager, &order_id, 15.0);
+    let r = apply_discount_fixed(&manager, &order_id, 15.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1280,7 +1306,7 @@ fn test_combo_order_adjustment_switching() {
     );
 
     // 3. Add 10% surcharge → total = 50 - 15 + 5 = 40
-    let r = apply_surcharge(&manager, &order_id, 10.0);
+    let r = apply_surcharge(&manager, &order_id, 10.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1290,7 +1316,7 @@ fn test_combo_order_adjustment_switching() {
     );
 
     // 4. Switch surcharge to fixed 8 → total = 50 - 15 + 8 = 43
-    let r = apply_surcharge_fixed(&manager, &order_id, 8.0);
+    let r = apply_surcharge_fixed(&manager, &order_id, 8.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1300,7 +1326,7 @@ fn test_combo_order_adjustment_switching() {
     );
 
     // 5. Remove discount entirely → total = 50 + 8 = 58
-    let r = apply_discount(&manager, &order_id, 0.0);
+    let r = apply_discount(&manager, &order_id, 0.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1322,7 +1348,7 @@ fn test_combo_order_adjustment_switching() {
             authorizer_name: None,
         },
     );
-    let r = manager.execute_command(clear_surcharge_cmd);
+    let r = manager.execute_command(clear_surcharge_cmd).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1337,17 +1363,18 @@ fn test_combo_order_adjustment_switching() {
 
 // --- Test 22: 整单折扣 > subtotal → total clamp 0 + 附加费 → total 仍为正 ---
 
-#[test]
-fn test_combo_extreme_discount_with_surcharge() {
+#[tokio::test]
+async fn test_combo_extreme_discount_with_surcharge() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         298,
         vec![simple_item(1, "Coffee", 5.0, 2)], // 10
-    );
+    )
+    .await;
 
     // 固定折扣 30 on total 10 → clamp to 0
-    let r = apply_discount_fixed(&manager, &order_id, 30.0);
+    let r = apply_discount_fixed(&manager, &order_id, 30.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(s.total >= 0.0, "Total must not be negative");
@@ -1360,7 +1387,7 @@ fn test_combo_extreme_discount_with_surcharge() {
     // Add surcharge 5 → total = max(10 - 30, 0) + 5 → depends on clamp logic
     // Actually: total = (subtotal - discount + surcharge).max(0)
     //         = (10 - 30 + 5).max(0) = max(-15, 0) = 0
-    let r = apply_surcharge_fixed(&manager, &order_id, 5.0);
+    let r = apply_surcharge_fixed(&manager, &order_id, 5.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1369,16 +1396,16 @@ fn test_combo_extreme_discount_with_surcharge() {
     );
 
     // Reduce discount to 8 → total = (10 - 8 + 5).max(0) = 7
-    let r = apply_discount_fixed(&manager, &order_id, 8.0);
+    let r = apply_discount_fixed(&manager, &order_id, 8.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!((s.total - 7.0).abs() < 0.01, "Expected 7, got {}", s.total);
     assert_remaining_consistent(&s);
 
     // Pay and complete
-    let r = pay(&manager, &order_id, s.total, "CARD");
+    let r = pay(&manager, &order_id, s.total, "CARD").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1386,8 +1413,8 @@ fn test_combo_extreme_discount_with_surcharge() {
 
 // --- Test 23: 部分支付多次 → 取消全部 → 重新支付 → 完成 ---
 
-#[test]
-fn test_combo_pay_multiple_cancel_all_repay() {
+#[tokio::test]
+async fn test_combo_pay_multiple_cancel_all_repay() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -1396,11 +1423,12 @@ fn test_combo_pay_multiple_cancel_all_repay() {
             simple_item(1, "Coffee", 10.0, 2), // 20
             simple_item(2, "Tea", 5.0, 4),     // 20 → total=40
         ],
-    );
+    )
+    .await;
 
     // 4 partial payments
     for amount in &[8.0, 12.0, 10.0, 5.0] {
-        let r = pay(&manager, &order_id, *amount, "CARD");
+        let r = pay(&manager, &order_id, *amount, "CARD").await;
         assert!(r.success);
     }
 
@@ -1416,7 +1444,7 @@ fn test_combo_pay_multiple_cancel_all_repay() {
         .map(|p| p.payment_id.clone())
         .collect();
     for pid in &payment_ids {
-        let r = cancel_payment(&manager, &order_id, pid);
+        let r = cancel_payment(&manager, &order_id, pid).await;
         assert!(r.success);
     }
 
@@ -1432,9 +1460,9 @@ fn test_combo_pay_multiple_cancel_all_repay() {
     assert_remaining_consistent(&s);
 
     // Pay full amount at once
-    let r = pay(&manager, &order_id, 40.0, "CASH");
+    let r = pay(&manager, &order_id, 40.0, "CASH").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1442,14 +1470,15 @@ fn test_combo_pay_multiple_cancel_all_repay() {
 
 // --- Test 24: 分单支付+商品折扣循环+取消 → 验证 remaining 始终一致 ---
 
-#[test]
-fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
+#[tokio::test]
+async fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         300,
         vec![simple_item(1, "Coffee", 10.0, 6)], // 60
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let iid = s.items[0].instance_id.clone();
@@ -1465,7 +1494,8 @@ fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
             unit_price: 10.0,
         }],
         "CARD",
-    );
+    )
+    .await;
     assert!(r.success);
 
     // 2. 30% discount on unpaid coffees
@@ -1478,7 +1508,7 @@ fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
         .unwrap()
         .instance_id
         .clone();
-    let r = modify_item(&manager, &order_id, &unpaid_iid, discount_changes(30.0));
+    let r = modify_item(&manager, &order_id, &unpaid_iid, discount_changes(30.0)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1492,7 +1522,7 @@ fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
         .unwrap()
         .instance_id
         .clone();
-    let r = modify_item(&manager, &order_id, &unpaid_iid, discount_changes(50.0));
+    let r = modify_item(&manager, &order_id, &unpaid_iid, discount_changes(50.0)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1506,7 +1536,7 @@ fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1521,7 +1551,7 @@ fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
         .map(|i| i.instance_id.clone())
         .collect();
     for iid in &discounted {
-        modify_item(&manager, &order_id, iid, discount_changes(0.0));
+        modify_item(&manager, &order_id, iid, discount_changes(0.0)).await;
     }
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1534,8 +1564,8 @@ fn test_combo_split_discount_cycle_cancel_remaining_consistency() {
 
 // --- Test 25: 整单折扣 + 整单附加费 + 商品折扣 + comp → 支付后 void ---
 
-#[test]
-fn test_combo_everything_then_partial_pay_void() {
+#[tokio::test]
+async fn test_combo_everything_then_partial_pay_void() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -1545,7 +1575,8 @@ fn test_combo_everything_then_partial_pay_void() {
             simple_item(2, "Wine", 10.0, 3),  // 30
             simple_item(3, "Bread", 2.0, 2),  // 4  → total=74
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let bread_iid = s
@@ -1564,19 +1595,19 @@ fn test_combo_everything_then_partial_pay_void() {
         .clone();
 
     // 1. Comp bread → subtotal = 40 + 30 = 70
-    let r = comp_item(&manager, &order_id, &bread_iid);
+    let r = comp_item(&manager, &order_id, &bread_iid).await;
     assert!(r.success);
 
     // 2. 25% discount on wine → wine=22.5, subtotal = 40 + 22.5 = 62.5
-    let r = modify_item(&manager, &order_id, &wine_iid, discount_changes(25.0));
+    let r = modify_item(&manager, &order_id, &wine_iid, discount_changes(25.0)).await;
     assert!(r.success);
 
     // 3. 10% order discount → -6.25
-    let r = apply_discount(&manager, &order_id, 10.0);
+    let r = apply_discount(&manager, &order_id, 10.0).await;
     assert!(r.success);
 
     // 4. 5% order surcharge → +3.125
-    let r = apply_surcharge(&manager, &order_id, 5.0);
+    let r = apply_surcharge(&manager, &order_id, 5.0).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1590,7 +1621,7 @@ fn test_combo_everything_then_partial_pay_void() {
     assert_remaining_consistent(&s);
 
     // 5. Pay 30 (partial)
-    let r = pay(&manager, &order_id, 30.0, "CARD");
+    let r = pay(&manager, &order_id, 30.0, "CARD").await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1612,7 +1643,7 @@ fn test_combo_everything_then_partial_pay_void() {
             authorizer_name: None,
         },
     );
-    let r = manager.execute_command(void_cmd);
+    let r = manager.execute_command(void_cmd).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1623,17 +1654,18 @@ fn test_combo_everything_then_partial_pay_void() {
 
 // --- Test 26: 连续 add → remove → add → 验证总量和总价 ---
 
-#[test]
-fn test_combo_add_remove_add_items_total_tracking() {
+#[tokio::test]
+async fn test_combo_add_remove_add_items_total_tracking() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         302,
         vec![simple_item(1, "Coffee", 10.0, 2)], // 20
-    );
+    )
+    .await;
 
     // Add 3 more coffees → 5 total, 50
-    let r = add_items(&manager, &order_id, vec![simple_item(1, "Coffee", 10.0, 3)]);
+    let r = add_items(&manager, &order_id, vec![simple_item(1, "Coffee", 10.0, 3)]).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1643,7 +1675,7 @@ fn test_combo_add_remove_add_items_total_tracking() {
 
     // Remove 2 coffees → 3 left, 30
     let iid = s.items[0].instance_id.clone();
-    let r = remove_item(&manager, &order_id, &iid, Some(2));
+    let r = remove_item(&manager, &order_id, &iid, Some(2)).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1652,7 +1684,7 @@ fn test_combo_add_remove_add_items_total_tracking() {
     assert!((s.total - 30.0).abs() < 0.01);
 
     // Add tea
-    let r = add_items(&manager, &order_id, vec![simple_item(2, "Tea", 5.0, 4)]);
+    let r = add_items(&manager, &order_id, vec![simple_item(2, "Tea", 5.0, 4)]).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1661,9 +1693,9 @@ fn test_combo_add_remove_add_items_total_tracking() {
     assert_remaining_consistent(&s);
 
     // Pay and complete
-    let r = pay(&manager, &order_id, 50.0, "CASH");
+    let r = pay(&manager, &order_id, 50.0, "CASH").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1671,8 +1703,8 @@ fn test_combo_add_remove_add_items_total_tracking() {
 
 // --- Test 27: 部分支付 → 商品折扣(触发 split) → 取消支付 → 删除高价商品 → 支付 ---
 
-#[test]
-fn test_combo_partial_pay_discount_split_cancel_remove() {
+#[tokio::test]
+async fn test_combo_partial_pay_discount_split_cancel_remove() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -1681,7 +1713,8 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
             simple_item(1, "Steak", 30.0, 2), // 60
             simple_item(2, "Salad", 8.0, 1),  // 8  → total=68
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let steak_iid = s
@@ -1703,7 +1736,8 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
             unit_price: 30.0,
         }],
         "CARD",
-    );
+    )
+    .await;
     assert!(r.success);
 
     // 2. Apply 50% discount on unpaid steak (should split: paid@30 + unpaid@15)
@@ -1718,7 +1752,8 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
         &order_id,
         &unpaid_steak.instance_id,
         discount_changes(50.0),
-    );
+    )
+    .await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1732,7 +1767,7 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
         .unwrap()
         .payment_id
         .clone();
-    let r = cancel_payment(&manager, &order_id, &pid);
+    let r = cancel_payment(&manager, &order_id, &pid).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1747,7 +1782,7 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
         .unwrap()
         .instance_id
         .clone();
-    let r = remove_item(&manager, &order_id, &salad_iid, None);
+    let r = remove_item(&manager, &order_id, &salad_iid, None).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1759,9 +1794,9 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
     assert_remaining_consistent(&s);
 
     // 5. Pay remaining and complete
-    let r = pay(&manager, &order_id, s.total, "CASH");
+    let r = pay(&manager, &order_id, s.total, "CASH").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1769,23 +1804,24 @@ fn test_combo_partial_pay_discount_split_cancel_remove() {
 
 // --- Test 28: 整单折扣+附加费 叠加后取消折扣 → 附加费基数变化 ---
 
-#[test]
-fn test_combo_order_discount_surcharge_interaction() {
+#[tokio::test]
+async fn test_combo_order_discount_surcharge_interaction() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         304,
         vec![simple_item(1, "Coffee", 10.0, 10)], // 100
-    );
+    )
+    .await;
 
     // 20% discount → discount = 20, total = 80
-    let r = apply_discount(&manager, &order_id, 20.0);
+    let r = apply_discount(&manager, &order_id, 20.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!((s.total - 80.0).abs() < 0.01);
 
     // 10% surcharge → surcharge on subtotal(100) = 10, total = 100 - 20 + 10 = 90
-    let r = apply_surcharge(&manager, &order_id, 10.0);
+    let r = apply_surcharge(&manager, &order_id, 10.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1795,7 +1831,7 @@ fn test_combo_order_discount_surcharge_interaction() {
     );
 
     // Remove discount → total = 100 + 10 = 110
-    let r = apply_discount(&manager, &order_id, 0.0);
+    let r = apply_discount(&manager, &order_id, 0.0).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1817,7 +1853,7 @@ fn test_combo_order_discount_surcharge_interaction() {
             authorizer_name: None,
         },
     );
-    let r = manager.execute_command(clear_surcharge_cmd);
+    let r = manager.execute_command(clear_surcharge_cmd).await;
     assert!(r.success);
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(
@@ -1832,20 +1868,21 @@ fn test_combo_order_discount_surcharge_interaction() {
 
 // --- Test 29: 部分支付 → 每笔支付后检查 remaining 一致性 ---
 
-#[test]
-fn test_combo_remaining_consistent_after_every_payment() {
+#[tokio::test]
+async fn test_combo_remaining_consistent_after_every_payment() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         305,
         vec![simple_item(1, "Coffee", 7.5, 8)], // 60
-    );
+    )
+    .await;
 
     let payments = vec![5.0, 10.5, 3.0, 15.0, 7.5, 9.0];
     let mut total_paid = 0.0;
 
     for amount in &payments {
-        let r = pay(&manager, &order_id, *amount, "CARD");
+        let r = pay(&manager, &order_id, *amount, "CARD").await;
         assert!(r.success, "Payment of {} failed", amount);
         total_paid += amount;
 
@@ -1864,10 +1901,10 @@ fn test_combo_remaining_consistent_after_every_payment() {
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let remaining = s.remaining_amount;
     assert!(remaining > 0.0, "Should still have remaining");
-    let r = pay(&manager, &order_id, remaining, "CASH");
+    let r = pay(&manager, &order_id, remaining, "CASH").await;
     assert!(r.success);
 
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);
@@ -1875,8 +1912,8 @@ fn test_combo_remaining_consistent_after_every_payment() {
 
 // --- Test 30: 固定折扣 + 百分比附加费 + 商品折扣 → 多维叠加计算验证 ---
 
-#[test]
-fn test_combo_fixed_discount_percent_surcharge_item_discount() {
+#[tokio::test]
+async fn test_combo_fixed_discount_percent_surcharge_item_discount() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
@@ -1885,7 +1922,8 @@ fn test_combo_fixed_discount_percent_surcharge_item_discount() {
             simple_item(1, "A", 20.0, 3), // 60
             simple_item(2, "B", 15.0, 2), // 30 → subtotal=90
         ],
-    );
+    )
+    .await;
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
     let a_iid = s
@@ -1897,15 +1935,15 @@ fn test_combo_fixed_discount_percent_surcharge_item_discount() {
         .clone();
 
     // 1. 40% item discount on A → A_line = 20*0.6*3 = 36, subtotal = 36+30 = 66
-    let r = modify_item(&manager, &order_id, &a_iid, discount_changes(40.0));
+    let r = modify_item(&manager, &order_id, &a_iid, discount_changes(40.0)).await;
     assert!(r.success);
 
     // 2. Fixed order discount of 10 → total = 66 - 10 = 56
-    let r = apply_discount_fixed(&manager, &order_id, 10.0);
+    let r = apply_discount_fixed(&manager, &order_id, 10.0).await;
     assert!(r.success);
 
     // 3. 15% order surcharge → surcharge = 66 * 0.15 = 9.9, total = 66 - 10 + 9.9 = 65.9
-    let r = apply_surcharge(&manager, &order_id, 15.0);
+    let r = apply_surcharge(&manager, &order_id, 15.0).await;
     assert!(r.success);
 
     let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1917,9 +1955,9 @@ fn test_combo_fixed_discount_percent_surcharge_item_discount() {
     assert_remaining_consistent(&s);
 
     // 4. Pay and complete
-    let r = pay(&manager, &order_id, s.total, "CARD");
+    let r = pay(&manager, &order_id, s.total, "CARD").await;
     assert!(r.success);
-    let r = complete_order(&manager, &order_id);
+    let r = complete_order(&manager, &order_id).await;
     assert!(r.success);
 
     assert_snapshot_consistent(&manager, &order_id);

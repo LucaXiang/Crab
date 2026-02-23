@@ -4,10 +4,11 @@ use super::*;
 // 18. 完成订单后不能添加商品
 // ========================================================================
 
-#[test]
-fn test_cannot_add_items_to_completed_order() {
+#[tokio::test]
+async fn test_cannot_add_items_to_completed_order() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 213, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 213, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -22,7 +23,7 @@ fn test_cannot_add_items_to_completed_order() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -32,7 +33,7 @@ fn test_cannot_add_items_to_completed_order() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    manager.execute_command(complete_cmd);
+    manager.execute_command(complete_cmd).await;
 
     let add_cmd = OrderCommand::new(
         1,
@@ -42,7 +43,7 @@ fn test_cannot_add_items_to_completed_order() {
             items: vec![simple_item(2, "Tea", 5.0, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(
         !resp.success,
         "Should not allow adding items to completed order"
@@ -59,11 +60,11 @@ fn test_cannot_add_items_to_completed_order() {
 // 19. 零价格商品可以正常添加和完成
 // ========================================================================
 
-#[test]
-fn test_add_items_with_zero_price() {
+#[tokio::test]
+async fn test_add_items_with_zero_price() {
     let manager = create_test_manager();
     let order_id =
-        open_table_with_items(&manager, 214, vec![simple_item(1, "Free Sample", 0.0, 1)]);
+        open_table_with_items(&manager, 214, vec![simple_item(1, "Free Sample", 0.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.items.len(), 1);
@@ -80,7 +81,7 @@ fn test_add_items_with_zero_price() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success, "Zero-price order should complete");
 }
 
@@ -88,8 +89,8 @@ fn test_add_items_with_zero_price() {
 // 20. NaN 价格 — 静默变成 0 (当前行为记录)
 // ========================================================================
 
-#[test]
-fn test_add_items_with_nan_price_rejected() {
+#[tokio::test]
+async fn test_add_items_with_nan_price_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -104,7 +105,7 @@ fn test_add_items_with_nan_price_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -115,7 +116,7 @@ fn test_add_items_with_nan_price_rejected() {
             items: vec![simple_item(1, "NaN Item", f64::NAN, 2)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "NaN price should be rejected by validation");
 }
 
@@ -123,8 +124,8 @@ fn test_add_items_with_nan_price_rejected() {
 // 21. Infinity 价格 — 静默变成 0
 // ========================================================================
 
-#[test]
-fn test_add_items_with_infinity_price_rejected() {
+#[tokio::test]
+async fn test_add_items_with_infinity_price_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -139,7 +140,7 @@ fn test_add_items_with_infinity_price_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -150,7 +151,7 @@ fn test_add_items_with_infinity_price_rejected() {
             items: vec![simple_item(1, "Infinity Item", f64::INFINITY, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(
         !resp.success,
         "Infinity price should be rejected by validation"
@@ -161,8 +162,8 @@ fn test_add_items_with_infinity_price_rejected() {
 // 22. 负价格 — 当前被 clamp 到 0
 // ========================================================================
 
-#[test]
-fn test_add_items_with_negative_price_rejected() {
+#[tokio::test]
+async fn test_add_items_with_negative_price_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -177,7 +178,7 @@ fn test_add_items_with_negative_price_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -188,7 +189,7 @@ fn test_add_items_with_negative_price_rejected() {
             items: vec![simple_item(1, "Negative Item", -10.0, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(
         !resp.success,
         "Negative price should be rejected by validation"
@@ -199,14 +200,15 @@ fn test_add_items_with_negative_price_rejected() {
 // 23. 极大价格 × 数量仍正确计算
 // ========================================================================
 
-#[test]
-fn test_add_items_large_price_and_quantity() {
+#[tokio::test]
+async fn test_add_items_large_price_and_quantity() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         215,
         vec![simple_item(1, "Expensive Item", 99999.99, 100)],
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     // 99999.99 * 100 = 9_999_999.0
@@ -218,8 +220,8 @@ fn test_add_items_large_price_and_quantity() {
 // 24. f64::MAX 价格 — 转为 0 (Decimal 转换失败)
 // ========================================================================
 
-#[test]
-fn test_add_items_with_f64_max_price_rejected() {
+#[tokio::test]
+async fn test_add_items_with_f64_max_price_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -234,7 +236,7 @@ fn test_add_items_with_f64_max_price_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -245,7 +247,7 @@ fn test_add_items_with_f64_max_price_rejected() {
             items: vec![simple_item(1, "Max Item", f64::MAX, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(
         !resp.success,
         "f64::MAX price should be rejected (exceeds max)"
@@ -256,8 +258,8 @@ fn test_add_items_with_f64_max_price_rejected() {
 // 25. 数量为 0 — 当前被接受（应添加商品但金额为 0）
 // ========================================================================
 
-#[test]
-fn test_add_items_with_zero_quantity_rejected() {
+#[tokio::test]
+async fn test_add_items_with_zero_quantity_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -272,7 +274,7 @@ fn test_add_items_with_zero_quantity_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -283,7 +285,7 @@ fn test_add_items_with_zero_quantity_rejected() {
             items: vec![simple_item(1, "Zero Qty", 10.0, 0)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "Zero quantity should be rejected");
 }
 
@@ -291,8 +293,8 @@ fn test_add_items_with_zero_quantity_rejected() {
 // 26. 负数量 — 当前被接受 (导致负总额)
 // ========================================================================
 
-#[test]
-fn test_add_items_with_negative_quantity_rejected() {
+#[tokio::test]
+async fn test_add_items_with_negative_quantity_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -307,7 +309,7 @@ fn test_add_items_with_negative_quantity_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -318,7 +320,7 @@ fn test_add_items_with_negative_quantity_rejected() {
             items: vec![simple_item(1, "Negative Qty", 10.0, -3)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "Negative quantity should be rejected");
 }
 
@@ -326,8 +328,8 @@ fn test_add_items_with_negative_quantity_rejected() {
 // 27. i32::MAX 数量 — Decimal 可以处理
 // ========================================================================
 
-#[test]
-fn test_add_items_with_i32_max_quantity_rejected() {
+#[tokio::test]
+async fn test_add_items_with_i32_max_quantity_rejected() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -342,7 +344,7 @@ fn test_add_items_with_i32_max_quantity_rejected() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -353,21 +355,22 @@ fn test_add_items_with_i32_max_quantity_rejected() {
             items: vec![simple_item(1, "Max Qty", 0.01, i32::MAX)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(
         !resp.success,
         "i32::MAX quantity exceeds max (9999), should be rejected"
     );
 }
 
-#[test]
-fn test_add_items_with_max_allowed_quantity() {
+#[tokio::test]
+async fn test_add_items_with_max_allowed_quantity() {
     let manager = create_test_manager();
     let order_id = open_table_with_items(
         &manager,
         216,
         vec![simple_item(1, "Max Allowed", 0.01, 9999)],
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.items[0].quantity, 9999);
@@ -379,8 +382,8 @@ fn test_add_items_with_max_allowed_quantity() {
 // 28. 折扣超过 100% — unit_price clamp 到 0
 // ========================================================================
 
-#[test]
-fn test_add_items_with_discount_over_100_percent() {
+#[tokio::test]
+async fn test_add_items_with_discount_over_100_percent() {
     let manager = create_test_manager();
 
     // Open table
@@ -396,7 +399,7 @@ fn test_add_items_with_discount_over_100_percent() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     // Add item with 200% discount
@@ -420,7 +423,7 @@ fn test_add_items_with_discount_over_100_percent() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "200% discount should be rejected (max 100%)");
 }
 
@@ -428,8 +431,8 @@ fn test_add_items_with_discount_over_100_percent() {
 // 29. 负折扣 — 当前被接受 (相当于加价)
 // ========================================================================
 
-#[test]
-fn test_add_items_with_negative_discount_acts_as_markup() {
+#[tokio::test]
+async fn test_add_items_with_negative_discount_acts_as_markup() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -444,7 +447,7 @@ fn test_add_items_with_negative_discount_acts_as_markup() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -467,7 +470,7 @@ fn test_add_items_with_negative_discount_acts_as_markup() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(
         !resp.success,
         "Negative discount should be rejected (min 0%)"
@@ -478,10 +481,11 @@ fn test_add_items_with_negative_discount_acts_as_markup() {
 // 30. 支付 NaN 金额 — 当前被 <= 0.0 检查通过 (NaN 比较特殊)
 // ========================================================================
 
-#[test]
-fn test_add_payment_with_nan_amount_rejected() {
+#[tokio::test]
+async fn test_add_payment_with_nan_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 217, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 217, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -496,7 +500,7 @@ fn test_add_payment_with_nan_amount_rejected() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "NaN payment amount should be rejected");
 }
 
@@ -504,10 +508,11 @@ fn test_add_payment_with_nan_amount_rejected() {
 // 31. 支付 Infinity 金额 — 同样绕过 <= 0.0 检查
 // ========================================================================
 
-#[test]
-fn test_add_payment_with_infinity_amount_rejected() {
+#[tokio::test]
+async fn test_add_payment_with_infinity_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 218, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 218, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -522,7 +527,7 @@ fn test_add_payment_with_infinity_amount_rejected() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "Infinity payment amount should be rejected");
 }
 
@@ -530,10 +535,11 @@ fn test_add_payment_with_infinity_amount_rejected() {
 // 32. 支付 f64::MAX — 绕过检查，但 Decimal 转换为 0
 // ========================================================================
 
-#[test]
-fn test_add_payment_with_f64_max_amount_rejected() {
+#[tokio::test]
+async fn test_add_payment_with_f64_max_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 219, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 219, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -548,7 +554,7 @@ fn test_add_payment_with_f64_max_amount_rejected() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(
         !resp.success,
         "f64::MAX payment should be rejected (exceeds max)"
@@ -559,8 +565,8 @@ fn test_add_payment_with_f64_max_amount_rejected() {
 // 33. 多个极端商品叠加后完成订单
 // ========================================================================
 
-#[test]
-fn test_multiple_edge_items_then_complete() {
+#[tokio::test]
+async fn test_multiple_edge_items_then_complete() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -575,7 +581,7 @@ fn test_multiple_edge_items_then_complete() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     // 正常商品 + 零价格商品
@@ -591,7 +597,7 @@ fn test_multiple_edge_items_then_complete() {
             ],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -612,7 +618,7 @@ fn test_multiple_edge_items_then_complete() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -622,7 +628,7 @@ fn test_multiple_edge_items_then_complete() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -634,8 +640,8 @@ fn test_multiple_edge_items_then_complete() {
 // 34. 带选项价格修改器的边界测试
 // ========================================================================
 
-#[test]
-fn test_add_items_with_option_price_modifiers() {
+#[tokio::test]
+async fn test_add_items_with_option_price_modifiers() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -650,7 +656,7 @@ fn test_add_items_with_option_price_modifiers() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -690,7 +696,7 @@ fn test_add_items_with_option_price_modifiers() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -704,8 +710,8 @@ fn test_add_items_with_option_price_modifiers() {
 // 35. 选项修改器为负值 — 当前被接受
 // ========================================================================
 
-#[test]
-fn test_add_items_with_negative_option_modifier() {
+#[tokio::test]
+async fn test_add_items_with_negative_option_modifier() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -720,7 +726,7 @@ fn test_add_items_with_negative_option_modifier() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -750,7 +756,7 @@ fn test_add_items_with_negative_option_modifier() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     // 负的 price_modifier 是被允许的 (比如更小的规格减价)
     // 但不能超过 MAX_PRICE 的绝对值
     assert!(
@@ -771,10 +777,11 @@ fn test_add_items_with_negative_option_modifier() {
 // 37. 现金支付 tendered < amount 应被拒绝
 // ========================================================================
 
-#[test]
-fn test_add_cash_payment_tendered_less_than_amount_fails() {
+#[tokio::test]
+async fn test_add_cash_payment_tendered_less_than_amount_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 220, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 220, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -789,7 +796,7 @@ fn test_add_cash_payment_tendered_less_than_amount_fails() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(
         !resp.success,
         "Tendered less than amount should be rejected"
@@ -800,8 +807,8 @@ fn test_add_cash_payment_tendered_less_than_amount_fails() {
 // 38. 折扣 + 附加费 + 选项叠加后精度测试
 // ========================================================================
 
-#[test]
-fn test_discount_surcharge_options_combined_precision() {
+#[tokio::test]
+async fn test_discount_surcharge_options_combined_precision() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -816,7 +823,7 @@ fn test_discount_surcharge_options_combined_precision() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -846,7 +853,7 @@ fn test_discount_surcharge_options_combined_precision() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -862,10 +869,11 @@ fn test_discount_surcharge_options_combined_precision() {
 // 39. 支付 NaN 后尝试完成订单 — 应该失败
 // ========================================================================
 
-#[test]
-fn test_nan_payment_then_complete_fails() {
+#[tokio::test]
+async fn test_nan_payment_then_complete_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 221, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 221, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // NaN payment — 被输入验证拒绝
     let pay_cmd = OrderCommand::new(
@@ -881,7 +889,7 @@ fn test_nan_payment_then_complete_fails() {
             },
         },
     );
-    let pay_resp = manager.execute_command(pay_cmd);
+    let pay_resp = manager.execute_command(pay_cmd).await;
     assert!(
         !pay_resp.success,
         "NaN payment should be rejected by validation"
@@ -896,7 +904,7 @@ fn test_nan_payment_then_complete_fails() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(!resp.success, "Should fail: no payment was recorded");
 }
 
@@ -904,8 +912,8 @@ fn test_nan_payment_then_complete_fails() {
 // 40. 快照重建一致性 — 带边界值
 // ========================================================================
 
-#[test]
-fn test_rebuild_snapshot_with_edge_values() {
+#[tokio::test]
+async fn test_rebuild_snapshot_with_edge_values() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -920,7 +928,7 @@ fn test_rebuild_snapshot_with_edge_values() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     // 添加零价格商品
@@ -935,7 +943,7 @@ fn test_rebuild_snapshot_with_edge_values() {
             ],
         },
     );
-    manager.execute_command(add_cmd);
+    manager.execute_command(add_cmd).await;
 
     let stored = manager.get_snapshot(&order_id).unwrap().unwrap();
     let rebuilt = manager.rebuild_snapshot(&order_id).unwrap();
@@ -951,8 +959,8 @@ fn test_rebuild_snapshot_with_edge_values() {
 // 41. 批量小金额累加精度
 // ========================================================================
 
-#[test]
-fn test_many_small_amounts_precision() {
+#[tokio::test]
+async fn test_many_small_amounts_precision() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -967,7 +975,7 @@ fn test_many_small_amounts_precision() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     // 添加 10 次，每次 1 个 0.1 的商品
@@ -992,7 +1000,7 @@ fn test_many_small_amounts_precision() {
                 }],
             },
         );
-        manager.execute_command(add_cmd);
+        manager.execute_command(add_cmd).await;
     }
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1005,10 +1013,11 @@ fn test_many_small_amounts_precision() {
 // 42. NaN tendered — 对应 amount 为正值
 // ========================================================================
 
-#[test]
-fn test_add_cash_payment_nan_tendered() {
+#[tokio::test]
+async fn test_add_cash_payment_nan_tendered() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 222, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 222, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -1023,7 +1032,7 @@ fn test_add_cash_payment_nan_tendered() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     // to_decimal(NaN) = 0, to_decimal(10.0) - 0.01 = 9.99
     // 0 < 9.99 → tendered 不足被拒绝
     assert!(!resp.success, "NaN tendered should fail: Decimal(0) < 9.99");
@@ -1033,10 +1042,11 @@ fn test_add_cash_payment_nan_tendered() {
 // 43. 移桌后仍可正常支付
 // ========================================================================
 
-#[test]
-fn test_add_payment_after_move_order() {
+#[tokio::test]
+async fn test_add_payment_after_move_order() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 223, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 223, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // Move order
     let move_cmd = OrderCommand::new(
@@ -1052,7 +1062,7 @@ fn test_add_payment_after_move_order() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(move_cmd);
+    manager.execute_command(move_cmd).await;
 
     // MoveOrder 只移动桌台，订单保持 Active，仍可支付
     let pay_cmd = OrderCommand::new(
@@ -1068,7 +1078,7 @@ fn test_add_payment_after_move_order() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(
         resp.success,
         "Order should accept payments after MoveOrder (status stays Active)"
@@ -1079,10 +1089,11 @@ fn test_add_payment_after_move_order() {
 // 44. 极小金额差异 — 支付容差边界
 // ========================================================================
 
-#[test]
-fn test_payment_tolerance_boundary() {
+#[tokio::test]
+async fn test_payment_tolerance_boundary() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 224, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 224, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // 支付 9.99 — 差 0.01，在容差内
     let pay_cmd = OrderCommand::new(
@@ -1098,7 +1109,7 @@ fn test_payment_tolerance_boundary() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -1108,17 +1119,18 @@ fn test_payment_tolerance_boundary() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(
         resp.success,
         "9.99 should be sufficient for 10.0 (within 0.01 tolerance)"
     );
 }
 
-#[test]
-fn test_payment_below_tolerance_rejected() {
+#[tokio::test]
+async fn test_payment_below_tolerance_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 225, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 225, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // 支付 9.98 — 差 0.02，超出容差
     let pay_cmd = OrderCommand::new(
@@ -1134,7 +1146,7 @@ fn test_payment_below_tolerance_rejected() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -1144,7 +1156,7 @@ fn test_payment_below_tolerance_rejected() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(
         !resp.success,
         "9.98 should be insufficient for 10.0 (outside 0.01 tolerance)"
@@ -1155,8 +1167,8 @@ fn test_payment_below_tolerance_rejected() {
 // 41. 多选项 + 手动折扣 + 规则字段: 端到端精度验证 (无双重计算)
 // ========================================================================
 
-#[test]
-fn test_options_discount_rule_fields_no_double_counting() {
+#[tokio::test]
+async fn test_options_discount_rule_fields_no_double_counting() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -1171,7 +1183,7 @@ fn test_options_discount_rule_fields_no_double_counting() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     // Item: price=20.0, options=+3.0+2.0=5.0, discount=10%
@@ -1214,7 +1226,7 @@ fn test_options_discount_rule_fields_no_double_counting() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1238,8 +1250,8 @@ fn test_options_discount_rule_fields_no_double_counting() {
 // 42. ModifyItem 后 unit_price 一致性
 // ========================================================================
 
-#[test]
-fn test_modify_item_unit_price_consistency() {
+#[tokio::test]
+async fn test_modify_item_unit_price_consistency() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -1254,7 +1266,7 @@ fn test_modify_item_unit_price_consistency() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     // Add item: price=15.0, options=+2.5, no discount, qty=3
@@ -1285,7 +1297,7 @@ fn test_modify_item_unit_price_consistency() {
             }],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
     let snapshot_before = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1314,7 +1326,7 @@ fn test_modify_item_unit_price_consistency() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(resp.success, "ModifyItem should succeed");
 
     let snapshot_after = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1344,10 +1356,11 @@ fn test_modify_item_unit_price_consistency() {
 // 状态守卫: Voided 订单不可操作
 // ========================================================================
 
-#[test]
-fn test_add_items_to_voided_order_fails() {
+#[tokio::test]
+async fn test_add_items_to_voided_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 226, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 226, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // Void
     let void_cmd = OrderCommand::new(
@@ -1363,7 +1376,7 @@ fn test_add_items_to_voided_order_fails() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(void_cmd);
+    manager.execute_command(void_cmd).await;
 
     // Try to add items
     let add_cmd = OrderCommand::new(
@@ -1374,14 +1387,15 @@ fn test_add_items_to_voided_order_fails() {
             items: vec![simple_item(2, "Tea", 5.0, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "Should not add items to voided order");
 }
 
-#[test]
-fn test_add_payment_to_voided_order_fails() {
+#[tokio::test]
+async fn test_add_payment_to_voided_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 227, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 227, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let void_cmd = OrderCommand::new(
         1,
@@ -1396,7 +1410,7 @@ fn test_add_payment_to_voided_order_fails() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(void_cmd);
+    manager.execute_command(void_cmd).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -1411,14 +1425,14 @@ fn test_add_payment_to_voided_order_fails() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "Should not add payment to voided order");
 }
 
-#[test]
-fn test_complete_voided_order_fails() {
+#[tokio::test]
+async fn test_complete_voided_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 102, vec![]);
+    let order_id = open_table_with_items(&manager, 102, vec![]).await;
 
     let void_cmd = OrderCommand::new(
         1,
@@ -1433,7 +1447,7 @@ fn test_complete_voided_order_fails() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(void_cmd);
+    manager.execute_command(void_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -1443,7 +1457,7 @@ fn test_complete_voided_order_fails() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(!resp.success, "Should not complete a voided order");
 }
 
@@ -1451,10 +1465,11 @@ fn test_complete_voided_order_fails() {
 // 状态守卫: Completed 订单不可 void
 // ========================================================================
 
-#[test]
-fn test_void_completed_order_fails() {
+#[tokio::test]
+async fn test_void_completed_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 228, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 228, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // Pay + complete
     let pay_cmd = OrderCommand::new(
@@ -1470,7 +1485,7 @@ fn test_void_completed_order_fails() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -1480,7 +1495,7 @@ fn test_void_completed_order_fails() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    manager.execute_command(complete_cmd);
+    manager.execute_command(complete_cmd).await;
 
     // Try to void
     let void_cmd = OrderCommand::new(
@@ -1496,14 +1511,15 @@ fn test_void_completed_order_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(void_cmd);
+    let resp = manager.execute_command(void_cmd).await;
     assert!(!resp.success, "Should not void a completed order");
 }
 
-#[test]
-fn test_double_complete_fails() {
+#[tokio::test]
+async fn test_double_complete_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 229, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 229, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -1518,7 +1534,7 @@ fn test_double_complete_fails() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let complete_cmd = OrderCommand::new(
         1,
@@ -1528,7 +1544,7 @@ fn test_double_complete_fails() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp1 = manager.execute_command(complete_cmd);
+    let resp1 = manager.execute_command(complete_cmd).await;
     assert!(resp1.success);
 
     let complete_cmd2 = OrderCommand::new(
@@ -1539,7 +1555,7 @@ fn test_double_complete_fails() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp2 = manager.execute_command(complete_cmd2);
+    let resp2 = manager.execute_command(complete_cmd2).await;
     assert!(!resp2.success, "Double complete should fail");
 }
 
@@ -1547,10 +1563,11 @@ fn test_double_complete_fails() {
 // 恶意 ModifyItem 数据
 // ========================================================================
 
-#[test]
-fn test_modify_item_nan_price_rejected() {
+#[tokio::test]
+async fn test_modify_item_nan_price_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 230, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 230, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1574,17 +1591,18 @@ fn test_modify_item_nan_price_rejected() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(
         !resp.success,
         "ModifyItem with NaN price should be rejected"
     );
 }
 
-#[test]
-fn test_modify_item_negative_price_rejected() {
+#[tokio::test]
+async fn test_modify_item_negative_price_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 231, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 231, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1608,17 +1626,18 @@ fn test_modify_item_negative_price_rejected() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(
         !resp.success,
         "ModifyItem with negative price should be rejected"
     );
 }
 
-#[test]
-fn test_modify_item_nan_discount_rejected() {
+#[tokio::test]
+async fn test_modify_item_nan_discount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 232, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 232, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1642,17 +1661,18 @@ fn test_modify_item_nan_discount_rejected() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(
         !resp.success,
         "ModifyItem with NaN discount should be rejected"
     );
 }
 
-#[test]
-fn test_modify_item_discount_over_100_rejected() {
+#[tokio::test]
+async fn test_modify_item_discount_over_100_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 233, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 233, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1676,17 +1696,18 @@ fn test_modify_item_discount_over_100_rejected() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(
         !resp.success,
         "ModifyItem with 150% discount should be rejected"
     );
 }
 
-#[test]
-fn test_modify_item_zero_quantity_rejected() {
+#[tokio::test]
+async fn test_modify_item_zero_quantity_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 234, vec![simple_item(1, "Coffee", 10.0, 2)]);
+    let order_id =
+        open_table_with_items(&manager, 234, vec![simple_item(1, "Coffee", 10.0, 2)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1710,7 +1731,7 @@ fn test_modify_item_zero_quantity_rejected() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(
         !resp.success,
         "ModifyItem with quantity=0 should be rejected"
@@ -1721,10 +1742,10 @@ fn test_modify_item_zero_quantity_rejected() {
 // 空 items 数组攻击
 // ========================================================================
 
-#[test]
-fn test_add_empty_items_array() {
+#[tokio::test]
+async fn test_add_empty_items_array() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 103, vec![]);
+    let order_id = open_table_with_items(&manager, 103, vec![]).await;
 
     let add_cmd = OrderCommand::new(
         1,
@@ -1734,7 +1755,7 @@ fn test_add_empty_items_array() {
             items: vec![], // Empty array
         },
     );
-    let _resp = manager.execute_command(add_cmd);
+    let _resp = manager.execute_command(add_cmd).await;
     // 即使 AddItems 允许空数组（当前行为），订单不应进入不一致状态
     // 记录当前行为，不管成功与否，订单仍可继续操作
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1754,7 +1775,7 @@ fn test_add_empty_items_array() {
             items: vec![simple_item(1, "Coffee", 10.0, 1)],
         },
     );
-    let resp2 = manager.execute_command(add_cmd2);
+    let resp2 = manager.execute_command(add_cmd2).await;
     assert!(
         resp2.success,
         "Should be able to add items after empty array"
@@ -1765,11 +1786,11 @@ fn test_add_empty_items_array() {
 // 合并操作: 无效目标
 // ========================================================================
 
-#[test]
-fn test_merge_voided_source_fails() {
+#[tokio::test]
+async fn test_merge_voided_source_fails() {
     let manager = create_test_manager();
-    let source_id = open_table_with_items(&manager, 104, vec![]);
-    let target_id = open_table_with_items(&manager, 105, vec![]);
+    let source_id = open_table_with_items(&manager, 104, vec![]).await;
+    let target_id = open_table_with_items(&manager, 105, vec![]).await;
 
     // Void source
     let void_cmd = OrderCommand::new(
@@ -1785,7 +1806,7 @@ fn test_merge_voided_source_fails() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(void_cmd);
+    manager.execute_command(void_cmd).await;
 
     let merge_cmd = OrderCommand::new(
         1,
@@ -1797,15 +1818,15 @@ fn test_merge_voided_source_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(merge_cmd);
+    let resp = manager.execute_command(merge_cmd).await;
     assert!(!resp.success, "Should not merge a voided source order");
 }
 
-#[test]
-fn test_merge_into_voided_target_fails() {
+#[tokio::test]
+async fn test_merge_into_voided_target_fails() {
     let manager = create_test_manager();
-    let source_id = open_table_with_items(&manager, 106, vec![]);
-    let target_id = open_table_with_items(&manager, 107, vec![]);
+    let source_id = open_table_with_items(&manager, 106, vec![]).await;
+    let target_id = open_table_with_items(&manager, 107, vec![]).await;
 
     // Void target
     let void_cmd = OrderCommand::new(
@@ -1821,7 +1842,7 @@ fn test_merge_into_voided_target_fails() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(void_cmd);
+    manager.execute_command(void_cmd).await;
 
     let merge_cmd = OrderCommand::new(
         1,
@@ -1833,14 +1854,14 @@ fn test_merge_into_voided_target_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(merge_cmd);
+    let resp = manager.execute_command(merge_cmd).await;
     assert!(!resp.success, "Should not merge into a voided target order");
 }
 
-#[test]
-fn test_merge_self_fails() {
+#[tokio::test]
+async fn test_merge_self_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 108, vec![]);
+    let order_id = open_table_with_items(&manager, 108, vec![]).await;
 
     let merge_cmd = OrderCommand::new(
         1,
@@ -1852,7 +1873,7 @@ fn test_merge_self_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(merge_cmd);
+    let resp = manager.execute_command(merge_cmd).await;
     assert!(!resp.success, "Should not merge order with itself");
 }
 
@@ -1860,10 +1881,11 @@ fn test_merge_self_fails() {
 // AA Split 恶意数据
 // ========================================================================
 
-#[test]
-fn test_aa_split_zero_total_shares_fails() {
+#[tokio::test]
+async fn test_aa_split_zero_total_shares_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 235, vec![simple_item(1, "Coffee", 30.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 235, vec![simple_item(1, "Coffee", 30.0, 1)]).await;
 
     let cmd = OrderCommand::new(
         1,
@@ -1876,14 +1898,15 @@ fn test_aa_split_zero_total_shares_fails() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(cmd);
+    let resp = manager.execute_command(cmd).await;
     assert!(!resp.success, "AA split with 0 total shares should fail");
 }
 
-#[test]
-fn test_aa_split_one_share_fails() {
+#[tokio::test]
+async fn test_aa_split_one_share_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 236, vec![simple_item(1, "Coffee", 30.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 236, vec![simple_item(1, "Coffee", 30.0, 1)]).await;
 
     let cmd = OrderCommand::new(
         1,
@@ -1896,17 +1919,18 @@ fn test_aa_split_one_share_fails() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(cmd);
+    let resp = manager.execute_command(cmd).await;
     assert!(
         !resp.success,
         "AA split with 1 total share should fail (need >= 2)"
     );
 }
 
-#[test]
-fn test_aa_split_shares_exceed_total_fails() {
+#[tokio::test]
+async fn test_aa_split_shares_exceed_total_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 237, vec![simple_item(1, "Coffee", 30.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 237, vec![simple_item(1, "Coffee", 30.0, 1)]).await;
 
     let cmd = OrderCommand::new(
         1,
@@ -1919,14 +1943,15 @@ fn test_aa_split_shares_exceed_total_fails() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(cmd);
+    let resp = manager.execute_command(cmd).await;
     assert!(!resp.success, "AA split shares > total_shares should fail");
 }
 
-#[test]
-fn test_pay_aa_split_exceed_remaining_fails() {
+#[tokio::test]
+async fn test_pay_aa_split_exceed_remaining_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 238, vec![simple_item(1, "Coffee", 30.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 238, vec![simple_item(1, "Coffee", 30.0, 1)]).await;
 
     // Start AA: 3 shares, pay 2
     let start_cmd = OrderCommand::new(
@@ -1940,7 +1965,7 @@ fn test_pay_aa_split_exceed_remaining_fails() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(start_cmd);
+    let resp = manager.execute_command(start_cmd).await;
     assert!(resp.success);
 
     // Try to pay 3 more shares (only 1 remaining)
@@ -1954,7 +1979,7 @@ fn test_pay_aa_split_exceed_remaining_fails() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(
         !resp.success,
         "Pay AA split with shares > remaining should fail"
@@ -1965,10 +1990,11 @@ fn test_pay_aa_split_exceed_remaining_fails() {
 // 取消已取消的支付
 // ========================================================================
 
-#[test]
-fn test_cancel_already_cancelled_payment_fails() {
+#[tokio::test]
+async fn test_cancel_already_cancelled_payment_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 239, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 239, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     // Pay
     let pay_cmd = OrderCommand::new(
@@ -1984,7 +2010,7 @@ fn test_cancel_already_cancelled_payment_fails() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let payment_id = snapshot.payments[0].payment_id.clone();
@@ -2001,7 +2027,7 @@ fn test_cancel_already_cancelled_payment_fails() {
             authorizer_name: None,
         },
     );
-    let resp1 = manager.execute_command(cancel1);
+    let resp1 = manager.execute_command(cancel1).await;
     assert!(resp1.success);
 
     // Cancel again (should fail)
@@ -2016,7 +2042,7 @@ fn test_cancel_already_cancelled_payment_fails() {
             authorizer_name: None,
         },
     );
-    let resp2 = manager.execute_command(cancel2);
+    let resp2 = manager.execute_command(cancel2).await;
     assert!(
         !resp2.success,
         "Should not cancel an already-cancelled payment"
@@ -2027,11 +2053,12 @@ fn test_cancel_already_cancelled_payment_fails() {
 // 移桌到已占用桌台
 // ========================================================================
 
-#[test]
-fn test_move_to_occupied_table_fails() {
+#[tokio::test]
+async fn test_move_to_occupied_table_fails() {
     let manager = create_test_manager();
-    let _order1 = open_table_with_items(&manager, 240, vec![simple_item(1, "Coffee", 10.0, 1)]);
-    let order2 = open_table_with_items(&manager, 241, vec![simple_item(2, "Tea", 5.0, 1)]);
+    let _order1 =
+        open_table_with_items(&manager, 240, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
+    let order2 = open_table_with_items(&manager, 241, vec![simple_item(2, "Tea", 5.0, 1)]).await;
 
     // Move order2 to T-occ-1 (occupied)
     let move_cmd = OrderCommand::new(
@@ -2047,7 +2074,7 @@ fn test_move_to_occupied_table_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(move_cmd);
+    let resp = manager.execute_command(move_cmd).await;
     assert!(!resp.success, "Should not move to an occupied table");
 }
 
@@ -2055,10 +2082,11 @@ fn test_move_to_occupied_table_fails() {
 // ModifyItem 对已完成/已取消订单
 // ========================================================================
 
-#[test]
-fn test_modify_item_on_completed_order_fails() {
+#[tokio::test]
+async fn test_modify_item_on_completed_order_fails() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 242, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 242, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -2077,7 +2105,7 @@ fn test_modify_item_on_completed_order_fails() {
             },
         },
     );
-    manager.execute_command(pay_cmd);
+    manager.execute_command(pay_cmd).await;
     let complete_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -2086,7 +2114,7 @@ fn test_modify_item_on_completed_order_fails() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    manager.execute_command(complete_cmd);
+    manager.execute_command(complete_cmd).await;
 
     // Try to modify
     let modify_cmd = OrderCommand::new(
@@ -2108,7 +2136,7 @@ fn test_modify_item_on_completed_order_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(!resp.success, "Should not modify items on completed order");
 }
 
@@ -2116,10 +2144,11 @@ fn test_modify_item_on_completed_order_fails() {
 // 支付负金额
 // ========================================================================
 
-#[test]
-fn test_add_payment_negative_amount_rejected() {
+#[tokio::test]
+async fn test_add_payment_negative_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 243, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 243, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -2134,14 +2163,15 @@ fn test_add_payment_negative_amount_rejected() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "Negative payment amount should be rejected");
 }
 
-#[test]
-fn test_add_payment_zero_amount_rejected() {
+#[tokio::test]
+async fn test_add_payment_zero_amount_rejected() {
     let manager = create_test_manager();
-    let order_id = open_table_with_items(&manager, 244, vec![simple_item(1, "Coffee", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 244, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
     let pay_cmd = OrderCommand::new(
         1,
@@ -2156,6 +2186,6 @@ fn test_add_payment_zero_amount_rejected() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "Zero payment amount should be rejected");
 }

@@ -5,7 +5,6 @@
 //! - OrderMergedOut for the source order
 //! - OrderMerged for the target order
 
-use async_trait::async_trait;
 use rust_decimal::Decimal;
 
 use crate::order_money::to_decimal;
@@ -23,9 +22,8 @@ pub struct MergeOrdersAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for MergeOrdersAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -231,8 +229,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_success() {
+    #[test]
+    fn test_merge_orders_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -253,7 +251,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 2);
 
@@ -294,8 +292,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_with_items() {
+    #[test]
+    fn test_merge_orders_with_items() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -318,7 +316,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Check items and payment state are included in OrderMerged event
         if let EventPayload::OrderMerged {
@@ -340,8 +338,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_source_not_found() {
+    #[test]
+    fn test_merge_orders_source_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -359,13 +357,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_target_not_found() {
+    #[test]
+    fn test_merge_orders_target_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -383,13 +381,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_source_completed_fails() {
+    #[test]
+    fn test_merge_orders_source_completed_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -410,13 +408,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_source_voided_fails() {
+    #[test]
+    fn test_merge_orders_source_voided_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -437,13 +435,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_source_already_merged_fails() {
+    #[test]
+    fn test_merge_orders_source_already_merged_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -464,13 +462,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_target_completed_fails() {
+    #[test]
+    fn test_merge_orders_target_completed_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -491,13 +489,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_target_voided_fails() {
+    #[test]
+    fn test_merge_orders_target_voided_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -518,13 +516,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_into_self_fails() {
+    #[test]
+    fn test_merge_orders_into_self_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -542,13 +540,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_sequence_allocation() {
+    #[test]
+    fn test_merge_orders_sequence_allocation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -568,15 +566,15 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Events should have consecutive sequence numbers
         assert_eq!(events[0].sequence, current_seq + 1);
         assert_eq!(events[1].sequence, current_seq + 2);
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_metadata_propagation() {
+    #[test]
+    fn test_merge_orders_metadata_propagation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -602,7 +600,7 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Both events should have same metadata
         for event in &events {
@@ -612,8 +610,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_without_table_info() {
+    #[test]
+    fn test_merge_orders_without_table_info() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -639,7 +637,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Should use empty strings for missing table info
         if let EventPayload::OrderMergedOut {
@@ -671,8 +669,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_source_has_payment_fails() {
+    #[test]
+    fn test_merge_orders_source_has_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -693,13 +691,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_merge_orders_target_has_payment_fails() {
+    #[test]
+    fn test_merge_orders_target_has_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -720,13 +718,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_merge_rejects_source_with_aa_split() {
+    #[test]
+    fn test_merge_rejects_source_with_aa_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -746,15 +744,15 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("AA split"));
         }
     }
 
-    #[tokio::test]
-    async fn test_merge_rejects_target_with_aa_split() {
+    #[test]
+    fn test_merge_rejects_target_with_aa_split() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -774,7 +772,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        let result = action.execute(&mut ctx, &create_test_metadata());
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(msg.contains("AA split"));

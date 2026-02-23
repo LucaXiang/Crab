@@ -271,8 +271,8 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_sync_empty() {
+    #[tokio::test]
+    async fn test_sync_empty() {
         let manager = create_test_manager();
         let sync_service = SyncService::new(manager);
 
@@ -284,17 +284,17 @@ mod tests {
         assert_eq!(response.server_sequence, 0);
     }
 
-    #[test]
-    fn test_sync_incremental() {
+    #[tokio::test]
+    async fn test_sync_incremental() {
         let manager = create_test_manager();
         let sync_service = SyncService::new(manager.clone());
 
         // Create some orders
         let cmd1 = create_open_table_cmd(1, 1);
-        manager.execute_command(cmd1);
+        manager.execute_command(cmd1).await;
 
         let cmd2 = create_open_table_cmd(1, 2);
-        manager.execute_command(cmd2);
+        manager.execute_command(cmd2).await;
 
         // Sync from beginning
         let request = SyncRequest { since_sequence: 0 };
@@ -312,14 +312,14 @@ mod tests {
         assert_eq!(response.events.len(), 1);
     }
 
-    #[test]
-    fn test_sync_up_to_date() {
+    #[tokio::test]
+    async fn test_sync_up_to_date() {
         let manager = create_test_manager();
         let sync_service = SyncService::new(manager.clone());
 
         // Create an order
         let cmd = create_open_table_cmd(1, 1);
-        manager.execute_command(cmd);
+        manager.execute_command(cmd).await;
 
         // Sync with current sequence
         let request = SyncRequest { since_sequence: 1 };
@@ -330,14 +330,14 @@ mod tests {
         assert_eq!(response.server_sequence, 1);
     }
 
-    #[test]
-    fn test_verify_snapshot() {
+    #[tokio::test]
+    async fn test_verify_snapshot() {
         let manager = create_test_manager();
         let sync_service = SyncService::new(manager.clone());
 
         // Create an order
         let cmd = create_open_table_cmd(1, 1);
-        let response = manager.execute_command(cmd);
+        let response = manager.execute_command(cmd).await;
         let order_id = response.order_id.unwrap();
 
         // Verify snapshot
@@ -345,8 +345,8 @@ mod tests {
         assert!(is_valid);
     }
 
-    #[test]
-    fn test_client_sync_state() {
+    #[tokio::test]
+    async fn test_client_sync_state() {
         let mut state = ClientSyncState::new();
 
         assert_eq!(state.last_sequence, 0);

@@ -4,8 +4,8 @@ use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
 use crab_cert::{CaProfile, CertificateAuthority};
 use dashmap::DashMap;
+use shared::cloud::CloudMessage;
 use shared::cloud::ws::CloudRpcResult;
-use shared::cloud::{CloudCommandResult, CloudMessage};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, mpsc, oneshot};
@@ -58,9 +58,7 @@ pub struct AppState {
     pub stripe_pro_yearly_price_id: String,
     /// Connected edge-servers (edge_server_id → message sender)
     pub connected_edges: Arc<DashMap<i64, mpsc::Sender<CloudMessage>>>,
-    /// Pending legacy command requests (command_id → (created_at_ms, response sender))
-    pub pending_requests: Arc<DashMap<String, (i64, oneshot::Sender<CloudCommandResult>)>>,
-    /// Pending typed RPC requests (rpc_id → (created_at_ms, response sender))
+    /// Pending RPC requests (rpc_id → (created_at_ms, response sender))
     pub pending_rpcs: Arc<DashMap<String, (i64, oneshot::Sender<CloudRpcResult>)>>,
     /// 活跃订单实时分发 hub (edge → console fan-out)
     pub live_orders: LiveOrderHub,
@@ -170,7 +168,6 @@ impl AppState {
             stripe_basic_yearly_price_id: config.stripe_basic_yearly_price_id.clone(),
             stripe_pro_yearly_price_id: config.stripe_pro_yearly_price_id.clone(),
             connected_edges: Arc::new(DashMap::new()),
-            pending_requests: Arc::new(DashMap::new()),
             pending_rpcs: Arc::new(DashMap::new()),
             live_orders: LiveOrderHub::new(),
         })

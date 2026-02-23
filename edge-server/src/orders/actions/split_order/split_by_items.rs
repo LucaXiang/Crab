@@ -1,7 +1,5 @@
 //! SplitByItems (菜品分单) — pays for specific items
 
-use async_trait::async_trait;
-
 use crate::order_money::{MONEY_TOLERANCE, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::types::CommandErrorCode;
@@ -20,9 +18,8 @@ pub struct SplitByItemsAction {
     pub tendered: Option<f64>,
 }
 
-#[async_trait]
 impl CommandHandler for SplitByItemsAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,

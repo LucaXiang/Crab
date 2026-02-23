@@ -13,6 +13,7 @@ pub mod catalog_service;
 pub mod cert;
 pub mod https;
 pub mod image_cleanup;
+pub mod image_download;
 pub mod message_bus;
 pub mod tenant_binding;
 

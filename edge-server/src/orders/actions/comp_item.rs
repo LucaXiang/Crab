@@ -10,8 +10,6 @@
 //!
 //! Derived instance_id format for partial comp: {source_id}::comp::{uuid}
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_text};
 use shared::order::types::CommandErrorCode;
@@ -28,9 +26,8 @@ pub struct CompItemAction {
     pub authorizer_name: String,
 }
 
-#[async_trait]
 impl CommandHandler for CompItemAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -200,8 +197,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_comp_item_full() {
+    #[test]
+    fn test_comp_item_full() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -222,7 +219,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -254,8 +251,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_item_full_with_original_price() {
+    #[test]
+    fn test_comp_item_full_with_original_price() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -277,7 +274,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemComped { original_price, .. } = &events[0].payload {
             // Should capture original_price (12.0), not price (8.0)
@@ -287,8 +284,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_item_partial() {
+    #[test]
+    fn test_comp_item_partial() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -309,7 +306,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemComped {
@@ -332,8 +329,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_item_not_found() {
+    #[test]
+    fn test_comp_item_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -354,12 +351,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::ItemNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_comp_item_completed_order_fails() {
+    #[test]
+    fn test_comp_item_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -382,12 +379,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_comp_item_voided_order_fails() {
+    #[test]
+    fn test_comp_item_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -410,12 +407,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_comp_item_zero_quantity_fails() {
+    #[test]
+    fn test_comp_item_zero_quantity_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -436,12 +433,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_comp_item_empty_reason_fails() {
+    #[test]
+    fn test_comp_item_empty_reason_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -462,12 +459,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_comp_item_empty_authorizer_fails() {
+    #[test]
+    fn test_comp_item_empty_authorizer_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -488,14 +485,14 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         // With i64 authorizer_id, "empty" validation no longer applies
         // This test may need revisiting for semantic correctness
         assert!(result.is_ok() || matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_comp_item_insufficient_quantity() {
+    #[test]
+    fn test_comp_item_insufficient_quantity() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -516,12 +513,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
     }
 
-    #[tokio::test]
-    async fn test_comp_already_comped_item_fails() {
+    #[test]
+    fn test_comp_already_comped_item_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -543,14 +540,14 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     /// Test: comp all unpaid items on a partially paid item → full comp (not split).
     /// Item total=5, paid=2, unpaid=3. Comp 3 → is_full_comp=true.
-    #[tokio::test]
-    async fn test_comp_all_unpaid_is_full_comp() {
+    #[test]
+    fn test_comp_all_unpaid_is_full_comp() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -572,7 +569,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemComped {
             instance_id,
@@ -588,8 +585,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_comp_item_partially_paid_fails() {
+    #[test]
+    fn test_comp_item_partially_paid_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -611,7 +608,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
     }
 }

@@ -3,8 +3,6 @@
 //! Updates order metadata such as guest count, table name, receipt number, etc.
 //! Only applicable to orders in Active status.
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, validate_order_optional_text};
 use shared::order::types::CommandErrorCode;
@@ -20,9 +18,8 @@ pub struct UpdateOrderInfoAction {
     pub is_pre_payment: Option<bool>,
 }
 
-#[async_trait]
 impl CommandHandler for UpdateOrderInfoAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -113,8 +110,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_guest_count() {
+    #[test]
+    fn test_update_order_info_guest_count() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -132,7 +129,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -153,8 +150,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_multiple_fields() {
+    #[test]
+    fn test_update_order_info_multiple_fields() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -172,7 +169,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderInfoUpdated {
@@ -189,8 +186,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_no_fields_fails() {
+    #[test]
+    fn test_update_order_info_no_fields_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -208,13 +205,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_invalid_guest_count_fails() {
+    #[test]
+    fn test_update_order_info_invalid_guest_count_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -232,13 +229,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_negative_guest_count_fails() {
+    #[test]
+    fn test_update_order_info_negative_guest_count_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -256,13 +253,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_completed_order_fails() {
+    #[test]
+    fn test_update_order_info_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -281,13 +278,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_voided_order_fails() {
+    #[test]
+    fn test_update_order_info_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -306,13 +303,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_order_not_found_fails() {
+    #[test]
+    fn test_update_order_info_order_not_found_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -327,13 +324,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_table_name_only() {
+    #[test]
+    fn test_update_order_info_table_name_only() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -351,7 +348,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderInfoUpdated {
@@ -368,8 +365,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_is_pre_payment_only() {
+    #[test]
+    fn test_update_order_info_is_pre_payment_only() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -387,7 +384,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderInfoUpdated { is_pre_payment, .. } = &events[0].payload {
@@ -397,8 +394,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_sequence_allocation() {
+    #[test]
+    fn test_update_order_info_sequence_allocation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -416,13 +413,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events[0].sequence, current_seq + 1);
     }
 
-    #[tokio::test]
-    async fn test_update_order_info_metadata_propagation() {
+    #[test]
+    fn test_update_order_info_metadata_propagation() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -446,7 +443,7 @@ mod tests {
             timestamp: 9999999999,
         };
 
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events[0].command_id, "test-cmd-123");
         assert_eq!(events[0].operator_id, 456);

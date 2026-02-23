@@ -2,8 +2,6 @@
 //!
 //! Cancels an existing payment on an order.
 
-use async_trait::async_trait;
-
 use shared::order::types::CommandErrorCode;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
@@ -20,9 +18,8 @@ pub struct CancelPaymentAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for CancelPaymentAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -158,8 +155,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_cancel_payment_generates_event() {
+    #[test]
+    fn test_cancel_payment_generates_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -186,7 +183,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -213,8 +210,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_cancel_payment_without_reason() {
+    #[test]
+    fn test_cancel_payment_without_reason() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -240,7 +237,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::PaymentCancelled {
@@ -258,8 +255,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_cancel_payment_nonexistent_fails() {
+    #[test]
+    fn test_cancel_payment_nonexistent_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -285,13 +282,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::PaymentNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_cancel_already_cancelled_payment_fails() {
+    #[test]
+    fn test_cancel_already_cancelled_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -318,14 +315,14 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         // Should fail because payment is already cancelled
         assert!(matches!(result, Err(OrderError::PaymentNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_cancel_payment_on_completed_order_fails() {
+    #[test]
+    fn test_cancel_payment_on_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -351,13 +348,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_cancel_payment_on_voided_order_fails() {
+    #[test]
+    fn test_cancel_payment_on_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -381,13 +378,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_cancel_payment_on_nonexistent_order_fails() {
+    #[test]
+    fn test_cancel_payment_on_nonexistent_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -403,13 +400,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_cancel_specific_payment_from_multiple() {
+    #[test]
+    fn test_cancel_specific_payment_from_multiple() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         let txn = storage.begin_write().unwrap();
@@ -439,7 +436,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::PaymentCancelled {
@@ -499,8 +496,8 @@ mod tests {
     }
 
     /// 2 AA payments, cancel 1 → still 1 active → NO AaSplitCancelled event
-    #[tokio::test]
-    async fn test_cancel_one_of_two_aa_payments_stays_active() {
+    #[test]
+    fn test_cancel_one_of_two_aa_payments_stays_active() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -530,7 +527,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // Only PaymentCancelled, NO AaSplitCancelled (still 1 active AA payment)
         assert_eq!(events.len(), 1);
@@ -538,8 +535,8 @@ mod tests {
     }
 
     /// 2 AA payments, cancel both → zero-out → produces AaSplitCancelled
-    #[tokio::test]
-    async fn test_cancel_all_aa_payments_produces_aa_cancelled() {
+    #[test]
+    fn test_cancel_all_aa_payments_produces_aa_cancelled() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -571,7 +568,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         // PaymentCancelled + AaSplitCancelled (all AA shares gone)
         assert_eq!(events.len(), 2);
@@ -587,8 +584,8 @@ mod tests {
 
     /// Cancel amount split payment: has_amount_split flag relies on applier;
     /// Action just produces PaymentCancelled event.
-    #[tokio::test]
-    async fn test_cancel_amount_split_payment_produces_event() {
+    #[test]
+    fn test_cancel_amount_split_payment_produces_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -618,7 +615,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::PaymentCancelled);

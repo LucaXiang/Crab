@@ -134,12 +134,12 @@ pub struct ServerState {
 
 ### 订单事件溯源
 
-**CommandHandler** (async trait):
+**CommandHandler** (sync trait):
 ```rust
-async fn execute(&self, ctx: &mut CommandContext, metadata: &CommandMetadata)
+fn execute(&self, ctx: &mut CommandContext, metadata: &CommandMetadata)
     -> Result<Vec<OrderEvent>, OrderError>;
 ```
-- 可做 I/O（数据库查询、外部调用）
+- **纯同步**: 无 I/O、无 `.await`，所有外部数据通过 prefetch 注入
 - 只在处理新命令时调用
 
 **EventApplier** (纯函数 trait):
@@ -149,18 +149,23 @@ fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent);
 - **纯函数**: 无 I/O、无副作用
 - 用于命令执行和事件回放
 
-**命令流程**:
+**命令三阶段流程** (async prefetch → sync transaction → async post-actions):
 ```
-execute_command(cmd)
-  ├─ 幂等性检查 (command_id)
-  ├─ 开启 redb 写事务
-  ├─ CommandAction::from(&cmd).execute()
-  ├─ EventApplier.apply() (更新 snapshot)
-  ├─ 持久化 events + snapshots
-  ├─ 提交事务
-  ├─ EventRouter 广播
-  └─ 返回 CommandResponse
+execute_command(cmd)                    // async
+  ├─ Phase A: prefetch_data(cmd)        // async — SQLite 读取 (MG rules, member, stamps)
+  ├─ Phase B: process_command(cmd, prefetched)  // sync — redb 写事务
+  │   ├─ 幂等性检查 (command_id)
+  │   ├─ 开启 redb 写事务
+  │   ├─ CommandAction::from(&cmd).execute()
+  │   ├─ EventApplier.apply() (更新 snapshot)
+  │   ├─ 持久化 events + snapshots
+  │   ├─ 提交事务
+  │   └─ EventRouter 广播
+  └─ Phase C: post_actions(cmd, events) // async — stamp tracking SQLite 写
 ```
+
+**设计动机**: redb WriteTransaction 是 `!Send`，不能持有跨 `.await`。
+将所有 SQLite I/O 分离到事务前后，避免 `block_on` 嵌套 panic。
 
 **Commands (22)**:
 OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, AddPayment, CancelPayment, CompleteOrder, VoidOrder, MergeOrders, MoveOrder, SplitByItems, SplitByAmount, StartAaSplit, PayAaSplit, UpdateOrderInfo, AddOrderNote, ToggleRuleSkip, ApplyOrderDiscount, ApplyOrderSurcharge

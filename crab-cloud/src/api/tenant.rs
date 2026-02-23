@@ -373,20 +373,20 @@ pub async fn get_order_detail(
     };
 
     let now = shared::util::now_millis();
-    let command_id = uuid::Uuid::new_v4().to_string();
+    let rpc_id = uuid::Uuid::new_v4().to_string();
 
     let (tx, rx) = tokio::sync::oneshot::channel();
-    state.pending_requests.insert(command_id.clone(), (now, tx));
+    state.pending_rpcs.insert(rpc_id.clone(), (now, tx));
 
-    let cloud_cmd = shared::cloud::CloudCommand {
-        id: command_id.clone(),
-        command_type: "get_order_detail".to_string(),
-        payload: serde_json::json!({ "order_key": order_key }),
-        created_at: now,
+    let rpc_msg = shared::cloud::CloudMessage::Rpc {
+        id: rpc_id.clone(),
+        payload: Box::new(shared::cloud::ws::CloudRpc::GetOrderDetail {
+            order_key: order_key.clone(),
+        }),
     };
 
-    if sender.try_send(cloud_cmd).is_err() {
-        state.pending_requests.remove(&command_id);
+    if sender.try_send(rpc_msg).is_err() {
+        state.pending_rpcs.remove(&rpc_id);
         return Err(AppError::with_message(
             ErrorCode::NotFound,
             "Edge server command queue full",
@@ -396,14 +396,14 @@ pub async fn get_order_detail(
     let result = match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
         Ok(Ok(r)) => r,
         Ok(Err(_)) => {
-            state.pending_requests.remove(&command_id);
+            state.pending_rpcs.remove(&rpc_id);
             return Err(AppError::with_message(
                 ErrorCode::NotFound,
                 "Edge server disconnected during fetch",
             ));
         }
         Err(_) => {
-            state.pending_requests.remove(&command_id);
+            state.pending_rpcs.remove(&rpc_id);
             return Err(AppError::with_message(
                 ErrorCode::NotFound,
                 "Order detail fetch timed out",
@@ -411,16 +411,28 @@ pub async fn get_order_detail(
         }
     };
 
-    if !result.success {
+    let (success, data, error) = match result {
+        shared::cloud::ws::CloudRpcResult::Json {
+            success,
+            data,
+            error,
+        } => (success, data, error),
+        _ => {
+            return Err(AppError::with_message(
+                ErrorCode::InternalError,
+                "Unexpected RPC result type",
+            ));
+        }
+    };
+
+    if !success {
         return Err(AppError::with_message(
             ErrorCode::NotFound,
-            result
-                .error
-                .unwrap_or_else(|| "Edge could not find order detail".to_string()),
+            error.unwrap_or_else(|| "Edge could not find order detail".to_string()),
         ));
     }
 
-    let Some(data) = result.data else {
+    let Some(data) = data else {
         return Err(AppError::with_message(
             ErrorCode::NotFound,
             "Edge returned empty order detail",
@@ -509,7 +521,7 @@ pub async fn get_store_red_flags(
     Ok(Json(red_flags))
 }
 
-/// POST /api/tenant/stores/:id/commands
+/// POST /api/tenant/stores/:id/commands — send typed RPC to edge
 #[derive(Deserialize)]
 pub struct CreateCommandRequest {
     pub command_type: String,
@@ -525,7 +537,38 @@ pub async fn create_command(
 ) -> ApiResult<serde_json::Value> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
+    // Map command_type string → CloudRpc
+    let rpc = match req.command_type.as_str() {
+        "get_status" => shared::cloud::ws::CloudRpc::GetStatus,
+        "refresh_subscription" => shared::cloud::ws::CloudRpc::RefreshSubscription,
+        "get_order_detail" => {
+            let order_key = req
+                .payload
+                .get("order_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            shared::cloud::ws::CloudRpc::GetOrderDetail { order_key }
+        }
+        other => {
+            return Err(AppError::with_message(
+                ErrorCode::ValidationFailed,
+                format!("Unknown command type: {other}"),
+            ));
+        }
+    };
+
+    let Some(sender) = state.connected_edges.get(&store_id).map(|s| s.clone()) else {
+        return Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Edge server is offline",
+        ));
+    };
+
     let now = shared::util::now_millis();
+    let rpc_id = uuid::Uuid::new_v4().to_string();
+
+    // Record in DB for audit history
     let command_id = commands::create_command(
         &state.pool,
         store_id,
@@ -540,32 +583,70 @@ pub async fn create_command(
         AppError::new(ErrorCode::InternalError)
     })?;
 
-    // Try real-time push via WebSocket if edge is connected.
-    // If try_send succeeds, mark as 'delivered' immediately to prevent
-    // get_pending on reconnect from picking it up again (double-delivery).
-    let mut ws_pushed = false;
-    if let Some(sender) = state.connected_edges.get(&store_id) {
-        let cloud_cmd = shared::cloud::CloudCommand {
-            id: command_id.to_string(),
-            command_type: req.command_type.clone(),
-            payload: req.payload.clone(),
-            created_at: now,
-        };
-        if sender.try_send(cloud_cmd).is_ok() {
-            ws_pushed = true;
-            let _ = commands::mark_delivered(&state.pool, &[command_id]).await;
-        }
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    state.pending_rpcs.insert(rpc_id.clone(), (now, tx));
+
+    let rpc_msg = shared::cloud::CloudMessage::Rpc {
+        id: rpc_id.clone(),
+        payload: Box::new(rpc),
+    };
+
+    if sender.try_send(rpc_msg).is_err() {
+        state.pending_rpcs.remove(&rpc_id);
+        return Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Edge server command queue full",
+        ));
     }
+
+    let _ = commands::mark_delivered(&state.pool, &[command_id]).await;
+
+    // Wait for RPC result (10s timeout)
+    let rpc_result = match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(_)) => {
+            state.pending_rpcs.remove(&rpc_id);
+            return Err(AppError::with_message(
+                ErrorCode::NotFound,
+                "Edge server disconnected",
+            ));
+        }
+        Err(_) => {
+            state.pending_rpcs.remove(&rpc_id);
+            return Err(AppError::with_message(
+                ErrorCode::NotFound,
+                "Command timed out",
+            ));
+        }
+    };
+
+    // Extract result and update DB record
+    let (success, data, error) = match &rpc_result {
+        shared::cloud::ws::CloudRpcResult::Json {
+            success,
+            data,
+            error,
+        } => (*success, data.clone(), error.clone()),
+        shared::cloud::ws::CloudRpcResult::CatalogOp(r) => {
+            (r.success, serde_json::to_value(r).ok(), r.error.clone())
+        }
+    };
+
+    let result_json = serde_json::json!({ "success": success, "data": data, "error": error });
+    let _ = commands::complete_command(&state.pool, command_id, success, &result_json, now).await;
 
     let detail = serde_json::json!({
         "command_type": req.command_type,
         "command_id": command_id,
-        "ws_pushed": ws_pushed,
     });
     let _ = crate::db::audit::log(
         &state.pool,
         &identity.tenant_id,
-        "command_created",
+        if success {
+            "command_completed"
+        } else {
+            "command_failed"
+        },
         Some(&detail),
         None,
         now,
@@ -574,8 +655,9 @@ pub async fn create_command(
 
     Ok(Json(serde_json::json!({
         "command_id": command_id,
-        "status": "pending",
-        "ws_queued": ws_pushed,
+        "success": success,
+        "data": data,
+        "error": error,
     })))
 }
 

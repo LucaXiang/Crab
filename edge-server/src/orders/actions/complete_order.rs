@@ -2,7 +2,6 @@
 //!
 //! Completes an order, validating payment sufficiency and generating receipt.
 
-use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use std::collections::HashMap;
 
@@ -19,9 +18,8 @@ pub struct CompleteOrderAction {
     pub service_type: Option<ServiceType>,
 }
 
-#[async_trait]
 impl CommandHandler for CompleteOrderAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -146,8 +144,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_complete_order_success() {
+    #[test]
+    fn test_complete_order_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -165,7 +163,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -190,8 +188,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_with_multiple_payments() {
+    #[test]
+    fn test_complete_order_with_multiple_payments() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -211,7 +209,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderCompleted {
             payment_summary, ..
@@ -235,8 +233,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_excludes_cancelled_payments() {
+    #[test]
+    fn test_complete_order_excludes_cancelled_payments() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -257,7 +255,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::OrderCompleted {
             payment_summary, ..
@@ -271,8 +269,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_insufficient_payment() {
+    #[test]
+    fn test_complete_order_insufficient_payment() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -290,7 +288,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
@@ -298,8 +296,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_allows_small_rounding_difference() {
+    #[test]
+    fn test_complete_order_allows_small_rounding_difference() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -319,12 +317,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_complete_already_completed_order() {
+    #[test]
+    fn test_complete_already_completed_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -342,12 +340,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_complete_voided_order() {
+    #[test]
+    fn test_complete_voided_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -365,12 +363,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_complete_nonexistent_order() {
+    #[test]
+    fn test_complete_nonexistent_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -383,12 +381,12 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_complete_order_with_overpayment() {
+    #[test]
+    fn test_complete_order_with_overpayment() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -406,7 +404,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderCompleted {
@@ -422,8 +420,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_with_zero_total() {
+    #[test]
+    fn test_complete_order_with_zero_total() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -440,7 +438,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderCompleted {
@@ -453,8 +451,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_with_dine_in_service_type() {
+    #[test]
+    fn test_complete_order_with_dine_in_service_type() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -472,7 +470,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderCompleted { service_type, .. } = &events[0].payload {
@@ -482,8 +480,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_complete_order_with_takeout_service_type() {
+    #[test]
+    fn test_complete_order_with_takeout_service_type() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -501,7 +499,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderCompleted { service_type, .. } = &events[0].payload {

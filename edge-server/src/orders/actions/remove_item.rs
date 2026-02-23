@@ -6,8 +6,6 @@
 //! Note: Items are NOT physically deleted - they are marked as voided
 //! for audit trail purposes.
 
-use async_trait::async_trait;
-
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::utils::validation::{MAX_NAME_LEN, MAX_NOTE_LEN, validate_order_optional_text};
 use shared::order::types::CommandErrorCode;
@@ -24,9 +22,8 @@ pub struct RemoveItemAction {
     pub authorizer_name: Option<String>,
 }
 
-#[async_trait]
 impl CommandHandler for RemoveItemAction {
-    async fn execute(
+    fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
@@ -197,8 +194,8 @@ mod tests {
         snapshot
     }
 
-    #[tokio::test]
-    async fn test_remove_item_full() {
+    #[test]
+    fn test_remove_item_full() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -220,7 +217,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -244,8 +241,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_remove_item_partial() {
+    #[test]
+    fn test_remove_item_partial() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -267,7 +264,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemRemoved {
@@ -287,8 +284,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_remove_item_not_found() {
+    #[test]
+    fn test_remove_item_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -309,13 +306,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::ItemNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_insufficient_quantity() {
+    #[test]
+    fn test_remove_item_insufficient_quantity() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -336,13 +333,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_zero_quantity_fails() {
+    #[test]
+    fn test_remove_item_zero_quantity_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -363,13 +360,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_negative_quantity_fails() {
+    #[test]
+    fn test_remove_item_negative_quantity_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -390,13 +387,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_completed_order_fails() {
+    #[test]
+    fn test_remove_item_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -419,13 +416,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_voided_order_fails() {
+    #[test]
+    fn test_remove_item_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -448,13 +445,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_order_not_found() {
+    #[test]
+    fn test_remove_item_order_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -471,13 +468,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_remove_item_with_all_fields() {
+    #[test]
+    fn test_remove_item_with_all_fields() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -498,7 +495,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemRemoved {
             instance_id,
@@ -522,8 +519,8 @@ mod tests {
 
     // ---- Comped item protection tests ----
 
-    #[tokio::test]
-    async fn test_remove_comped_item_rejected() {
+    #[test]
+    fn test_remove_comped_item_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -545,7 +542,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
         if let Err(OrderError::InvalidOperation(_, msg)) = result {
             assert!(
@@ -558,8 +555,8 @@ mod tests {
     // ---- Paid item protection tests (server authority) ----
 
     /// quantity=None on partially paid item → clamp to unpaid portion only
-    #[tokio::test]
-    async fn test_remove_partially_paid_item_clamps_to_unpaid() {
+    #[test]
+    fn test_remove_partially_paid_item_clamps_to_unpaid() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -583,7 +580,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
 
         if let EventPayload::ItemRemoved { quantity, .. } = &events[0].payload {
             // Should clamp to unpaid portion (4), NOT None
@@ -594,8 +591,8 @@ mod tests {
     }
 
     /// quantity=None on fully paid item → rejected
-    #[tokio::test]
-    async fn test_remove_fully_paid_item_rejected() {
+    #[test]
+    fn test_remove_fully_paid_item_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -619,13 +616,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InvalidOperation(..))));
     }
 
     /// quantity=Some(qty) where qty > unpaid → rejected
-    #[tokio::test]
-    async fn test_remove_more_than_unpaid_rejected() {
+    #[test]
+    fn test_remove_more_than_unpaid_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -649,13 +646,13 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
+        let result = action.execute(&mut ctx, &metadata);
         assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
     }
 
     /// quantity=Some(qty) where qty <= unpaid → succeeds
-    #[tokio::test]
-    async fn test_remove_within_unpaid_succeeds() {
+    #[test]
+    fn test_remove_within_unpaid_succeeds() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -679,7 +676,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         if let EventPayload::ItemRemoved { quantity, .. } = &events[0].payload {
             assert_eq!(*quantity, Some(2));
         } else {
@@ -688,8 +685,8 @@ mod tests {
     }
 
     /// No paid qty → quantity=None stays as None (remove all, existing behavior)
-    #[tokio::test]
-    async fn test_remove_unpaid_item_full_stays_none() {
+    #[test]
+    fn test_remove_unpaid_item_full_stays_none() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -711,7 +708,7 @@ mod tests {
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let events = action.execute(&mut ctx, &metadata).unwrap();
         if let EventPayload::ItemRemoved { quantity, .. } = &events[0].payload {
             assert_eq!(*quantity, None); // Full removal, no clamping
         } else {

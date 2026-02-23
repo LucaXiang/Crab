@@ -35,7 +35,8 @@ impl ClientBridge {
 
                 let (response, events) = server_state
                     .orders_manager()
-                    .execute_command_with_events(command);
+                    .execute_command_with_events(command)
+                    .await;
 
                 if response.success {
                     // OpenTable 成功后加载并缓存价格规则

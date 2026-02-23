@@ -10,8 +10,8 @@ use super::*;
 // P0.1: 完整堂食订单生命周期
 // OpenTable → AddItems(3种) → ModifyItem → AddPayment → CompleteOrder
 // ------------------------------------------------------------------------
-#[test]
-fn test_complete_dine_in_flow() {
+#[tokio::test]
+async fn test_complete_dine_in_flow() {
     let manager = create_test_manager();
 
     // 1. 开台
@@ -27,7 +27,7 @@ fn test_complete_dine_in_flow() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     assert!(resp.success, "OpenTable should succeed");
     let order_id = resp.order_id.unwrap();
 
@@ -50,7 +50,7 @@ fn test_complete_dine_in_flow() {
             ],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success, "AddItems should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -81,7 +81,7 @@ fn test_complete_dine_in_flow() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(resp.success, "ModifyItem should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -90,14 +90,14 @@ fn test_complete_dine_in_flow() {
     assert_eq!(snapshot.total, 28.5);
 
     // 4. 全额支付
-    let pay_resp = pay(&manager, &order_id, 28.5, "CARD");
+    let pay_resp = pay(&manager, &order_id, 28.5, "CARD").await;
     assert!(pay_resp.success, "Payment should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 28.5);
 
     // 5. 完成订单
-    let complete_resp = complete_order(&manager, &order_id);
+    let complete_resp = complete_order(&manager, &order_id).await;
     assert!(complete_resp.success, "CompleteOrder should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -108,12 +108,12 @@ fn test_complete_dine_in_flow() {
 // ------------------------------------------------------------------------
 // P0.2: 完整零售订单流程 (带 queue_number)
 // ------------------------------------------------------------------------
-#[test]
-fn test_complete_retail_flow_with_queue_number() {
+#[tokio::test]
+async fn test_complete_retail_flow_with_queue_number() {
     let manager = create_test_manager();
 
     // 1. 开零售订单
-    let order_id = open_retail_order(&manager);
+    let order_id = open_retail_order(&manager).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(snapshot.is_retail);
@@ -135,10 +135,10 @@ fn test_complete_retail_flow_with_queue_number() {
             items: vec![simple_item(1, "Item", 15.0, 2)],
         },
     );
-    manager.execute_command(add_cmd);
+    manager.execute_command(add_cmd).await;
 
     // 3. 支付
-    pay(&manager, &order_id, 30.0, "CASH");
+    pay(&manager, &order_id, 30.0, "CASH").await;
 
     // 4. 完成 (指定服务类型为外带)
     let complete_cmd = OrderCommand::new(
@@ -149,7 +149,7 @@ fn test_complete_retail_flow_with_queue_number() {
             service_type: Some(ServiceType::Takeout),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -160,8 +160,8 @@ fn test_complete_retail_flow_with_queue_number() {
 // ------------------------------------------------------------------------
 // P0.3: VoidOrder 损失结算
 // ------------------------------------------------------------------------
-#[test]
-fn test_void_order_loss_settlement() {
+#[tokio::test]
+async fn test_void_order_loss_settlement() {
     let manager = create_test_manager();
 
     // 开台 + 添加商品
@@ -169,7 +169,8 @@ fn test_void_order_loss_settlement() {
         &manager,
         248,
         vec![simple_item(1, "Expensive Item", 100.0, 1)],
-    );
+    )
+    .await;
 
     // 损失结算作废
     let void_cmd = OrderCommand::new(
@@ -185,7 +186,7 @@ fn test_void_order_loss_settlement() {
             authorizer_name: Some("Manager".to_string()),
         },
     );
-    let resp = manager.execute_command(void_cmd);
+    let resp = manager.execute_command(void_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -201,8 +202,8 @@ fn test_void_order_loss_settlement() {
 // ------------------------------------------------------------------------
 // P0.4: 多次菜品分单后完成
 // ------------------------------------------------------------------------
-#[test]
-fn test_split_by_items_multiple_then_complete() {
+#[tokio::test]
+async fn test_split_by_items_multiple_then_complete() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
@@ -213,7 +214,8 @@ fn test_split_by_items_multiple_then_complete() {
             simple_item(2, "Item B", 15.0, 2), // 30
             simple_item(3, "Item C", 10.0, 1), // 10
         ],
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 80.0);
@@ -248,7 +250,7 @@ fn test_split_by_items_multiple_then_complete() {
             tendered: Some(20.0),
         },
     );
-    let resp = manager.execute_command(split_cmd1);
+    let resp = manager.execute_command(split_cmd1).await;
     assert!(resp.success, "First split should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -271,20 +273,20 @@ fn test_split_by_items_multiple_then_complete() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(split_cmd2);
+    let resp = manager.execute_command(split_cmd2).await;
     assert!(resp.success, "Second split should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 50.0);
 
     // 支付剩余 (Item A 的 1 个 + Item C): 20 + 10 = 30
-    pay(&manager, &order_id, 30.0, "CASH");
+    pay(&manager, &order_id, 30.0, "CASH").await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 80.0);
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id);
+    let complete_resp = complete_order(&manager, &order_id).await;
     assert!(complete_resp.success);
     assert_order_status(&manager, &order_id, OrderStatus::Completed);
 }
@@ -292,12 +294,12 @@ fn test_split_by_items_multiple_then_complete() {
 // ------------------------------------------------------------------------
 // P0.5: 多次金额分单后完成
 // ------------------------------------------------------------------------
-#[test]
-fn test_split_by_amount_multiple_then_complete() {
+#[tokio::test]
+async fn test_split_by_amount_multiple_then_complete() {
     let manager = create_test_manager();
 
     let order_id =
-        open_table_with_items(&manager, 250, vec![simple_item(1, "Total Item", 100.0, 1)]);
+        open_table_with_items(&manager, 250, vec![simple_item(1, "Total Item", 100.0, 1)]).await;
 
     // 第一次金额分单: 30%
     let split_cmd1 = OrderCommand::new(
@@ -310,7 +312,7 @@ fn test_split_by_amount_multiple_then_complete() {
             tendered: Some(30.0),
         },
     );
-    let resp = manager.execute_command(split_cmd1);
+    let resp = manager.execute_command(split_cmd1).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -328,17 +330,17 @@ fn test_split_by_amount_multiple_then_complete() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(split_cmd2);
+    let resp = manager.execute_command(split_cmd2).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 60.0);
 
     // 支付剩余 40%
-    pay(&manager, &order_id, 40.0, "CASH");
+    pay(&manager, &order_id, 40.0, "CASH").await;
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id);
+    let complete_resp = complete_order(&manager, &order_id).await;
     assert!(complete_resp.success);
     assert_order_status(&manager, &order_id, OrderStatus::Completed);
 }
@@ -346,13 +348,13 @@ fn test_split_by_amount_multiple_then_complete() {
 // ------------------------------------------------------------------------
 // P0.6: AA 分单 3 人不能整除场景 (精度测试)
 // ------------------------------------------------------------------------
-#[test]
-fn test_aa_split_three_payers_indivisible() {
+#[tokio::test]
+async fn test_aa_split_three_payers_indivisible() {
     let manager = create_test_manager();
 
     // 100 元订单，3 人 AA
     let order_id =
-        open_table_with_items(&manager, 251, vec![simple_item(1, "Shared Meal", 100.0, 1)]);
+        open_table_with_items(&manager, 251, vec![simple_item(1, "Shared Meal", 100.0, 1)]).await;
 
     // StartAaSplit: 3 人，先付 1 份
     let start_aa = OrderCommand::new(
@@ -366,7 +368,7 @@ fn test_aa_split_three_payers_indivisible() {
             tendered: Some(34.0), // 给 34 块
         },
     );
-    let resp = manager.execute_command(start_aa);
+    let resp = manager.execute_command(start_aa).await;
     assert!(resp.success, "StartAaSplit should succeed");
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -390,7 +392,7 @@ fn test_aa_split_three_payers_indivisible() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(pay_aa_2);
+    let resp = manager.execute_command(pay_aa_2).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -407,7 +409,7 @@ fn test_aa_split_three_payers_indivisible() {
             tendered: Some(34.0),
         },
     );
-    let resp = manager.execute_command(pay_aa_3);
+    let resp = manager.execute_command(pay_aa_3).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -421,15 +423,15 @@ fn test_aa_split_three_payers_indivisible() {
     );
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id);
+    let complete_resp = complete_order(&manager, &order_id).await;
     assert!(complete_resp.success);
 }
 
 // ------------------------------------------------------------------------
 // P0.7: 合并订单后修改并完成
 // ------------------------------------------------------------------------
-#[test]
-fn test_merge_orders_then_modify_then_complete() {
+#[tokio::test]
+async fn test_merge_orders_then_modify_then_complete() {
     let manager = create_test_manager();
 
     // 源订单
@@ -437,14 +439,16 @@ fn test_merge_orders_then_modify_then_complete() {
         &manager,
         252,
         vec![simple_item(1, "Coffee", 5.0, 2)], // 10
-    );
+    )
+    .await;
 
     // 目标订单
     let target_id = open_table_with_items(
         &manager,
         253,
         vec![simple_item(2, "Tea", 4.0, 1)], // 4
-    );
+    )
+    .await;
 
     // 合并
     let merge_cmd = OrderCommand::new(
@@ -457,7 +461,7 @@ fn test_merge_orders_then_modify_then_complete() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(merge_cmd);
+    let resp = manager.execute_command(merge_cmd).await;
     assert!(resp.success, "Merge should succeed");
 
     // 验证源订单状态
@@ -481,7 +485,7 @@ fn test_merge_orders_then_modify_then_complete() {
             items: vec![simple_item(3, "Cake", 6.0, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success, "AddItems to merged target should succeed");
 
     let target = manager.get_snapshot(&target_id).unwrap().unwrap();
@@ -489,20 +493,21 @@ fn test_merge_orders_then_modify_then_complete() {
     assert_eq!(target.total, 20.0);
 
     // 支付并完成
-    pay(&manager, &target_id, 20.0, "CARD");
-    let complete_resp = complete_order(&manager, &target_id);
+    pay(&manager, &target_id, 20.0, "CARD").await;
+    let complete_resp = complete_order(&manager, &target_id).await;
     assert!(complete_resp.success);
 }
 
 // ------------------------------------------------------------------------
 // P0.8: 移桌后合并再完成
 // ------------------------------------------------------------------------
-#[test]
-fn test_move_then_merge_then_complete() {
+#[tokio::test]
+async fn test_move_then_merge_then_complete() {
     let manager = create_test_manager();
 
     // 订单 1: T1
-    let order1 = open_table_with_items(&manager, 401, vec![simple_item(1, "Item 1", 10.0, 1)]);
+    let order1 =
+        open_table_with_items(&manager, 401, vec![simple_item(1, "Item 1", 10.0, 1)]).await;
 
     // 移桌: T1 → T2
     let move_cmd = OrderCommand::new(
@@ -518,7 +523,7 @@ fn test_move_then_merge_then_complete() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(move_cmd);
+    let resp = manager.execute_command(move_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order1).unwrap().unwrap();
@@ -526,7 +531,8 @@ fn test_move_then_merge_then_complete() {
     assert_eq!(snapshot.zone_id, Some(2));
 
     // 订单 2: T3
-    let order2 = open_table_with_items(&manager, 403, vec![simple_item(2, "Item 2", 20.0, 1)]);
+    let order2 =
+        open_table_with_items(&manager, 403, vec![simple_item(2, "Item 2", 20.0, 1)]).await;
 
     // 合并: T2 (order1) → T3 (order2)
     let merge_cmd = OrderCommand::new(
@@ -539,7 +545,7 @@ fn test_move_then_merge_then_complete() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(merge_cmd);
+    let resp = manager.execute_command(merge_cmd).await;
     assert!(resp.success);
 
     // order1 应该是 Merged 状态
@@ -551,23 +557,24 @@ fn test_move_then_merge_then_complete() {
     assert_eq!(target.total, 30.0);
 
     // 完成
-    pay(&manager, &order2, 30.0, "CASH");
-    let complete_resp = complete_order(&manager, &order2);
+    pay(&manager, &order2, 30.0, "CASH").await;
+    let complete_resp = complete_order(&manager, &order2).await;
     assert!(complete_resp.success);
 }
 
 // ------------------------------------------------------------------------
 // P0.9: 商品添加→修改→移除链条 (金额重算验证)
 // ------------------------------------------------------------------------
-#[test]
-fn test_items_add_modify_remove_chain() {
+#[tokio::test]
+async fn test_items_add_modify_remove_chain() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
         &manager,
         254,
         vec![simple_item(1, "Test Item", 10.0, 5)], // 50
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -589,7 +596,7 @@ fn test_items_add_modify_remove_chain() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(modify_cmd);
+    let resp = manager.execute_command(modify_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -609,7 +616,7 @@ fn test_items_add_modify_remove_chain() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(remove_cmd);
+    let resp = manager.execute_command(remove_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -629,7 +636,7 @@ fn test_items_add_modify_remove_chain() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(remove_cmd2);
+    let resp = manager.execute_command(remove_cmd2).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -646,15 +653,16 @@ fn test_items_add_modify_remove_chain() {
 // ------------------------------------------------------------------------
 // P1.1: 部分移除后金额重算
 // ------------------------------------------------------------------------
-#[test]
-fn test_remove_item_partial_recalculates() {
+#[tokio::test]
+async fn test_remove_item_partial_recalculates() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
         &manager,
         255,
         vec![simple_item(1, "Item", 10.0, 5)], // 50
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -672,7 +680,7 @@ fn test_remove_item_partial_recalculates() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(remove_cmd);
+    let resp = manager.execute_command(remove_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -684,11 +692,12 @@ fn test_remove_item_partial_recalculates() {
 // ------------------------------------------------------------------------
 // P1.2: 折扣 + 附加费叠加
 // ------------------------------------------------------------------------
-#[test]
-fn test_discount_plus_surcharge_calculation() {
+#[tokio::test]
+async fn test_discount_plus_surcharge_calculation() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 256, vec![simple_item(1, "Item", 100.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 256, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
     // 应用 10% 折扣
     let discount_cmd = OrderCommand::new(
@@ -702,7 +711,7 @@ fn test_discount_plus_surcharge_calculation() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(discount_cmd);
+    let resp = manager.execute_command(discount_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -721,7 +730,7 @@ fn test_discount_plus_surcharge_calculation() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(surcharge_cmd);
+    let resp = manager.execute_command(surcharge_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -733,8 +742,8 @@ fn test_discount_plus_surcharge_calculation() {
 // ------------------------------------------------------------------------
 // P1.3: 商品级折扣 + 订单级折扣叠加
 // ------------------------------------------------------------------------
-#[test]
-fn test_item_level_plus_order_level_discount() {
+#[tokio::test]
+async fn test_item_level_plus_order_level_discount() {
     let manager = create_test_manager();
 
     // 添加带 10% 手动折扣的商品
@@ -750,7 +759,7 @@ fn test_item_level_plus_order_level_discount() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -761,7 +770,7 @@ fn test_item_level_plus_order_level_discount() {
             items: vec![item_with_discount(1, "Item", 100.0, 1, 10.0)], // 90 after item discount
         },
     );
-    manager.execute_command(add_cmd);
+    manager.execute_command(add_cmd).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     // 商品级折扣后 subtotal = 90
@@ -779,7 +788,7 @@ fn test_item_level_plus_order_level_discount() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(discount_cmd);
+    let resp = manager.execute_command(discount_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -790,15 +799,16 @@ fn test_item_level_plus_order_level_discount() {
 // ------------------------------------------------------------------------
 // P1.4: Comp 后 Uncomp 恢复价格
 // ------------------------------------------------------------------------
-#[test]
-fn test_comp_then_uncomp_restores_price() {
+#[tokio::test]
+async fn test_comp_then_uncomp_restores_price() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
         &manager,
         257,
         vec![simple_item(1, "Item", 25.0, 2)], // 50
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -817,7 +827,7 @@ fn test_comp_then_uncomp_restores_price() {
             authorizer_name: "Manager".to_string(),
         },
     );
-    let resp = manager.execute_command(comp_cmd);
+    let resp = manager.execute_command(comp_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -838,7 +848,7 @@ fn test_comp_then_uncomp_restores_price() {
             authorizer_name: "Manager".to_string(),
         },
     );
-    let resp = manager.execute_command(uncomp_cmd);
+    let resp = manager.execute_command(uncomp_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -850,15 +860,16 @@ fn test_comp_then_uncomp_restores_price() {
 // ------------------------------------------------------------------------
 // P1.5: 部分 Comp 创建拆分商品
 // ------------------------------------------------------------------------
-#[test]
-fn test_comp_partial_creates_split_item() {
+#[tokio::test]
+async fn test_comp_partial_creates_split_item() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
         &manager,
         258,
         vec![simple_item(1, "Item", 10.0, 5)], // 50
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -876,7 +887,7 @@ fn test_comp_partial_creates_split_item() {
             authorizer_name: "Manager".to_string(),
         },
     );
-    let resp = manager.execute_command(comp_cmd);
+    let resp = manager.execute_command(comp_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -898,15 +909,16 @@ fn test_comp_partial_creates_split_item() {
 // ------------------------------------------------------------------------
 // P1.6: 大金额精度测试
 // ------------------------------------------------------------------------
-#[test]
-fn test_large_order_precision() {
+#[tokio::test]
+async fn test_large_order_precision() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
         &manager,
         259,
         vec![simple_item(1, "Expensive", 99999.99, 100)],
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     // 99999.99 * 100 = 9999999.0
@@ -927,8 +939,8 @@ fn test_large_order_precision() {
 // ------------------------------------------------------------------------
 // P1.7: 选项价格修改器累加
 // ------------------------------------------------------------------------
-#[test]
-fn test_option_price_modifiers_accumulate() {
+#[tokio::test]
+async fn test_option_price_modifiers_accumulate() {
     let manager = create_test_manager();
 
     let open_cmd = OrderCommand::new(
@@ -943,7 +955,7 @@ fn test_option_price_modifiers_accumulate() {
             is_retail: false,
         },
     );
-    let resp = manager.execute_command(open_cmd);
+    let resp = manager.execute_command(open_cmd).await;
     let order_id = resp.order_id.unwrap();
 
     let add_cmd = OrderCommand::new(
@@ -977,7 +989,7 @@ fn test_option_price_modifiers_accumulate() {
             )],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -994,15 +1006,16 @@ fn test_option_price_modifiers_accumulate() {
 // ------------------------------------------------------------------------
 // P2.1: 已完成订单拒绝所有修改命令
 // ------------------------------------------------------------------------
-#[test]
-fn test_all_commands_reject_completed_order() {
+#[tokio::test]
+async fn test_all_commands_reject_completed_order() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 260, vec![simple_item(1, "Item", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 260, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
     // 支付并完成
-    pay(&manager, &order_id, 10.0, "CASH");
-    complete_order(&manager, &order_id);
+    pay(&manager, &order_id, 10.0, "CASH").await;
+    complete_order(&manager, &order_id).await;
     assert_order_status(&manager, &order_id, OrderStatus::Completed);
 
     // 测试 AddItems
@@ -1014,7 +1027,7 @@ fn test_all_commands_reject_completed_order() {
             items: vec![simple_item(2, "New Item", 5.0, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "AddItems should fail on completed order");
 
     // 测试 AddPayment
@@ -1031,7 +1044,7 @@ fn test_all_commands_reject_completed_order() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "AddPayment should fail on completed order");
 
     // 测试 VoidOrder
@@ -1048,7 +1061,7 @@ fn test_all_commands_reject_completed_order() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(void_cmd);
+    let resp = manager.execute_command(void_cmd).await;
     assert!(!resp.success, "VoidOrder should fail on completed order");
 
     // 测试 MoveOrder
@@ -1065,21 +1078,22 @@ fn test_all_commands_reject_completed_order() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(move_cmd);
+    let resp = manager.execute_command(move_cmd).await;
     assert!(!resp.success, "MoveOrder should fail on completed order");
 }
 
 // ------------------------------------------------------------------------
 // P2.2: 已作废订单拒绝所有修改命令
 // ------------------------------------------------------------------------
-#[test]
-fn test_all_commands_reject_voided_order() {
+#[tokio::test]
+async fn test_all_commands_reject_voided_order() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 261, vec![simple_item(1, "Item", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 261, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
     // 作废订单
-    void_order_helper(&manager, &order_id, VoidType::Cancelled);
+    void_order_helper(&manager, &order_id, VoidType::Cancelled).await;
     assert_order_status(&manager, &order_id, OrderStatus::Void);
 
     // 测试 AddItems
@@ -1091,7 +1105,7 @@ fn test_all_commands_reject_voided_order() {
             items: vec![simple_item(2, "New Item", 5.0, 1)],
         },
     );
-    let resp = manager.execute_command(add_cmd);
+    let resp = manager.execute_command(add_cmd).await;
     assert!(!resp.success, "AddItems should fail on voided order");
 
     // 测试 AddPayment
@@ -1108,7 +1122,7 @@ fn test_all_commands_reject_voided_order() {
             },
         },
     );
-    let resp = manager.execute_command(pay_cmd);
+    let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "AddPayment should fail on voided order");
 
     // 测试 CompleteOrder
@@ -1120,7 +1134,7 @@ fn test_all_commands_reject_voided_order() {
             service_type: Some(ServiceType::DineIn),
         },
     );
-    let resp = manager.execute_command(complete_cmd);
+    let resp = manager.execute_command(complete_cmd).await;
     assert!(!resp.success, "CompleteOrder should fail on voided order");
 }
 
@@ -1128,12 +1142,14 @@ fn test_all_commands_reject_voided_order() {
 // P2.3: 已合并订单 - 验证合并后源订单状态
 // 注意: 当前实现对 Merged 状态订单不检查 AddItems，但订单已不在活跃列表
 // ------------------------------------------------------------------------
-#[test]
-fn test_merged_order_not_in_active_list() {
+#[tokio::test]
+async fn test_merged_order_not_in_active_list() {
     let manager = create_test_manager();
 
-    let source_id = open_table_with_items(&manager, 262, vec![simple_item(1, "Item", 10.0, 1)]);
-    let target_id = open_table_with_items(&manager, 263, vec![simple_item(2, "Item 2", 10.0, 1)]);
+    let source_id =
+        open_table_with_items(&manager, 262, vec![simple_item(1, "Item", 10.0, 1)]).await;
+    let target_id =
+        open_table_with_items(&manager, 263, vec![simple_item(2, "Item 2", 10.0, 1)]).await;
 
     // 合并前两个订单都在活跃列表
     let active = manager.get_active_orders().unwrap();
@@ -1150,7 +1166,7 @@ fn test_merged_order_not_in_active_list() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(merge_cmd);
+    manager.execute_command(merge_cmd).await;
     assert_order_status(&manager, &source_id, OrderStatus::Merged);
 
     // 合并后源订单不在活跃列表
@@ -1169,11 +1185,12 @@ fn test_merged_order_not_in_active_list() {
 // ------------------------------------------------------------------------
 // P2.4: UpdateOrderInfo 不影响金额
 // ------------------------------------------------------------------------
-#[test]
-fn test_update_guest_count_does_not_affect_totals() {
+#[tokio::test]
+async fn test_update_guest_count_does_not_affect_totals() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 264, vec![simple_item(1, "Item", 100.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 264, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.guest_count, 2); // 默认值
@@ -1190,7 +1207,7 @@ fn test_update_guest_count_does_not_affect_totals() {
             is_pre_payment: None,
         },
     );
-    let resp = manager.execute_command(update_cmd);
+    let resp = manager.execute_command(update_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1204,11 +1221,11 @@ fn test_update_guest_count_does_not_affect_totals() {
 // ------------------------------------------------------------------------
 // P2.5: AddOrderNote 覆盖之前的备注
 // ------------------------------------------------------------------------
-#[test]
-fn test_add_note_overwrites_previous() {
+#[tokio::test]
+async fn test_add_note_overwrites_previous() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 109, vec![]);
+    let order_id = open_table_with_items(&manager, 109, vec![]).await;
 
     // 添加第一个备注
     let note_cmd1 = OrderCommand::new(
@@ -1219,7 +1236,7 @@ fn test_add_note_overwrites_previous() {
             note: "First note".to_string(),
         },
     );
-    manager.execute_command(note_cmd1);
+    manager.execute_command(note_cmd1).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.note, Some("First note".to_string()));
@@ -1233,7 +1250,7 @@ fn test_add_note_overwrites_previous() {
             note: "Second note".to_string(),
         },
     );
-    manager.execute_command(note_cmd2);
+    manager.execute_command(note_cmd2).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.note, Some("Second note".to_string()));
@@ -1242,11 +1259,11 @@ fn test_add_note_overwrites_previous() {
 // ------------------------------------------------------------------------
 // P2.6: 空字符串清除备注
 // ------------------------------------------------------------------------
-#[test]
-fn test_clear_note_with_empty_string() {
+#[tokio::test]
+async fn test_clear_note_with_empty_string() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 110, vec![]);
+    let order_id = open_table_with_items(&manager, 110, vec![]).await;
 
     // 添加备注
     let note_cmd = OrderCommand::new(
@@ -1257,7 +1274,7 @@ fn test_clear_note_with_empty_string() {
             note: "Some note".to_string(),
         },
     );
-    manager.execute_command(note_cmd);
+    manager.execute_command(note_cmd).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.note, Some("Some note".to_string()));
@@ -1271,7 +1288,7 @@ fn test_clear_note_with_empty_string() {
             note: String::new(),
         },
     );
-    manager.execute_command(clear_cmd);
+    manager.execute_command(clear_cmd).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert!(snapshot.note.is_none() || snapshot.note.as_deref() == Some(""));
@@ -1286,14 +1303,15 @@ fn test_clear_note_with_empty_string() {
 // ------------------------------------------------------------------------
 // P3.1: 支付→取消→支付循环
 // ------------------------------------------------------------------------
-#[test]
-fn test_add_cancel_add_payment_cycle() {
+#[tokio::test]
+async fn test_add_cancel_add_payment_cycle() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 265, vec![simple_item(1, "Item", 30.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 265, vec![simple_item(1, "Item", 30.0, 1)]).await;
 
     // 第一次支付
-    pay(&manager, &order_id, 30.0, "CARD");
+    pay(&manager, &order_id, 30.0, "CARD").await;
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let payment1_id = snapshot.payments[0].payment_id.clone();
     assert_eq!(snapshot.paid_amount, 30.0);
@@ -1310,14 +1328,14 @@ fn test_add_cancel_add_payment_cycle() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(cancel_cmd1);
+    let resp = manager.execute_command(cancel_cmd1).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 0.0);
 
     // 第二次支付
-    pay(&manager, &order_id, 30.0, "CASH");
+    pay(&manager, &order_id, 30.0, "CASH").await;
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let payment2_id = snapshot
         .payments
@@ -1340,11 +1358,11 @@ fn test_add_cancel_add_payment_cycle() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(cancel_cmd2);
+    let resp = manager.execute_command(cancel_cmd2).await;
     assert!(resp.success);
 
     // 第三次支付
-    pay(&manager, &order_id, 30.0, "CARD");
+    pay(&manager, &order_id, 30.0, "CARD").await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.payments.len(), 3);
@@ -1356,18 +1374,19 @@ fn test_add_cancel_add_payment_cycle() {
     assert_eq!(snapshot.paid_amount, 30.0);
 
     // 完成订单
-    let complete_resp = complete_order(&manager, &order_id);
+    let complete_resp = complete_order(&manager, &order_id).await;
     assert!(complete_resp.success);
 }
 
 // ------------------------------------------------------------------------
 // P3.2: AA 分单不能与菜品分单混用
 // ------------------------------------------------------------------------
-#[test]
-fn test_aa_split_cannot_mix_with_item_split() {
+#[tokio::test]
+async fn test_aa_split_cannot_mix_with_item_split() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 266, vec![simple_item(1, "Item", 100.0, 2)]);
+    let order_id =
+        open_table_with_items(&manager, 266, vec![simple_item(1, "Item", 100.0, 2)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1384,7 +1403,7 @@ fn test_aa_split_cannot_mix_with_item_split() {
             tendered: Some(100.0),
         },
     );
-    let resp = manager.execute_command(start_aa);
+    let resp = manager.execute_command(start_aa).await;
     assert!(resp.success);
 
     // 尝试菜品分单应该失败
@@ -1403,7 +1422,7 @@ fn test_aa_split_cannot_mix_with_item_split() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(item_split_cmd);
+    let resp = manager.execute_command(item_split_cmd).await;
     assert!(
         !resp.success,
         "Item split should fail when AA split is active"
@@ -1413,8 +1432,8 @@ fn test_aa_split_cannot_mix_with_item_split() {
 // ------------------------------------------------------------------------
 // P3.3: Comp 后支付再完成
 // ------------------------------------------------------------------------
-#[test]
-fn test_comp_then_pay_then_complete() {
+#[tokio::test]
+async fn test_comp_then_pay_then_complete() {
     let manager = create_test_manager();
 
     let order_id = open_table_with_items(
@@ -1424,7 +1443,8 @@ fn test_comp_then_pay_then_complete() {
             simple_item(1, "Item A", 10.0, 1),
             simple_item(2, "Item B", 10.0, 1),
         ],
-    );
+    )
+    .await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let item_a_id = snapshot
@@ -1449,7 +1469,7 @@ fn test_comp_then_pay_then_complete() {
             authorizer_name: "Manager".to_string(),
         },
     );
-    let resp = manager.execute_command(comp_cmd);
+    let resp = manager.execute_command(comp_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1457,10 +1477,10 @@ fn test_comp_then_pay_then_complete() {
     assert_eq!(snapshot.total, 10.0);
 
     // 支付 10.0
-    pay(&manager, &order_id, 10.0, "CASH");
+    pay(&manager, &order_id, 10.0, "CASH").await;
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id);
+    let complete_resp = complete_order(&manager, &order_id).await;
     assert!(complete_resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1470,11 +1490,12 @@ fn test_comp_then_pay_then_complete() {
 // ------------------------------------------------------------------------
 // P3.4: 金额分单后菜品分单被禁用
 // ------------------------------------------------------------------------
-#[test]
-fn test_amount_split_blocks_item_split() {
+#[tokio::test]
+async fn test_amount_split_blocks_item_split() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 268, vec![simple_item(1, "Item", 100.0, 2)]);
+    let order_id =
+        open_table_with_items(&manager, 268, vec![simple_item(1, "Item", 100.0, 2)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1490,7 +1511,7 @@ fn test_amount_split_blocks_item_split() {
             tendered: Some(50.0),
         },
     );
-    let resp = manager.execute_command(amount_split);
+    let resp = manager.execute_command(amount_split).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1512,7 +1533,7 @@ fn test_amount_split_blocks_item_split() {
             tendered: None,
         },
     );
-    let resp = manager.execute_command(item_split);
+    let resp = manager.execute_command(item_split).await;
     assert!(
         !resp.success,
         "Item split should be blocked when amount split is active"
@@ -1522,11 +1543,12 @@ fn test_amount_split_blocks_item_split() {
 // ------------------------------------------------------------------------
 // P3.6: 取消不存在的支付应失败
 // ------------------------------------------------------------------------
-#[test]
-fn test_cancel_nonexistent_payment_fails() {
+#[tokio::test]
+async fn test_cancel_nonexistent_payment_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 269, vec![simple_item(1, "Item", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 269, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
     let cancel_cmd = OrderCommand::new(
         1,
@@ -1539,7 +1561,7 @@ fn test_cancel_nonexistent_payment_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(cancel_cmd);
+    let resp = manager.execute_command(cancel_cmd).await;
     assert!(
         !resp.success,
         "CancelPayment should fail for nonexistent payment"
@@ -1549,11 +1571,12 @@ fn test_cancel_nonexistent_payment_fails() {
 // ------------------------------------------------------------------------
 // P3.7: 超额菜品分单应失败
 // ------------------------------------------------------------------------
-#[test]
-fn test_split_by_items_overpay_fails() {
+#[tokio::test]
+async fn test_split_by_items_overpay_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 270, vec![simple_item(1, "Item", 10.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 270, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1574,18 +1597,19 @@ fn test_split_by_items_overpay_fails() {
             tendered: Some(50.0),
         },
     );
-    let resp = manager.execute_command(split_cmd);
+    let resp = manager.execute_command(split_cmd).await;
     assert!(!resp.success, "Split with excessive quantity should fail");
 }
 
 // ------------------------------------------------------------------------
 // P3.8: 移除超过现有数量应失败
 // ------------------------------------------------------------------------
-#[test]
-fn test_remove_item_excessive_quantity_fails() {
+#[tokio::test]
+async fn test_remove_item_excessive_quantity_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 271, vec![simple_item(1, "Item", 10.0, 2)]);
+    let order_id =
+        open_table_with_items(&manager, 271, vec![simple_item(1, "Item", 10.0, 2)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1603,18 +1627,19 @@ fn test_remove_item_excessive_quantity_fails() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(remove_cmd);
+    let resp = manager.execute_command(remove_cmd).await;
     assert!(!resp.success, "Remove with excessive quantity should fail");
 }
 
 // ------------------------------------------------------------------------
 // P3.9: Comp 超过现有数量应失败
 // ------------------------------------------------------------------------
-#[test]
-fn test_comp_item_excessive_quantity_fails() {
+#[tokio::test]
+async fn test_comp_item_excessive_quantity_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 272, vec![simple_item(1, "Item", 10.0, 2)]);
+    let order_id =
+        open_table_with_items(&manager, 272, vec![simple_item(1, "Item", 10.0, 2)]).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
@@ -1632,18 +1657,19 @@ fn test_comp_item_excessive_quantity_fails() {
             authorizer_name: "Manager".to_string(),
         },
     );
-    let resp = manager.execute_command(comp_cmd);
+    let resp = manager.execute_command(comp_cmd).await;
     assert!(!resp.success, "Comp with excessive quantity should fail");
 }
 
 // ------------------------------------------------------------------------
 // P3.10: 清除整单折扣
 // ------------------------------------------------------------------------
-#[test]
-fn test_clear_order_discount() {
+#[tokio::test]
+async fn test_clear_order_discount() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 273, vec![simple_item(1, "Item", 100.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 273, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
     // 应用折扣
     let discount_cmd = OrderCommand::new(
@@ -1657,7 +1683,7 @@ fn test_clear_order_discount() {
             authorizer_name: None,
         },
     );
-    manager.execute_command(discount_cmd);
+    manager.execute_command(discount_cmd).await;
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 80.0);
@@ -1674,7 +1700,7 @@ fn test_clear_order_discount() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(clear_cmd);
+    let resp = manager.execute_command(clear_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1686,11 +1712,12 @@ fn test_clear_order_discount() {
 // P3.11: ToggleRuleSkip - 规则不存在时应失败
 // 注意: ToggleRuleSkip 需要订单中有 applied_rules，否则会失败
 // ------------------------------------------------------------------------
-#[test]
-fn test_toggle_rule_skip_nonexistent_rule_fails() {
+#[tokio::test]
+async fn test_toggle_rule_skip_nonexistent_rule_fails() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 274, vec![simple_item(1, "Item", 100.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 274, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
     // 尝试 toggle 不存在的规则应失败
     let toggle_cmd = OrderCommand::new(
@@ -1702,7 +1729,7 @@ fn test_toggle_rule_skip_nonexistent_rule_fails() {
             skipped: true,
         },
     );
-    let resp = manager.execute_command(toggle_cmd);
+    let resp = manager.execute_command(toggle_cmd).await;
     assert!(
         !resp.success,
         "ToggleRuleSkip should fail when rule not found"
@@ -1712,11 +1739,12 @@ fn test_toggle_rule_skip_nonexistent_rule_fails() {
 // ------------------------------------------------------------------------
 // P3.12: 固定金额折扣
 // ------------------------------------------------------------------------
-#[test]
-fn test_fixed_amount_discount() {
+#[tokio::test]
+async fn test_fixed_amount_discount() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 275, vec![simple_item(1, "Item", 100.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 275, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
     // 应用 25 元固定折扣
     let discount_cmd = OrderCommand::new(
@@ -1730,7 +1758,7 @@ fn test_fixed_amount_discount() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(discount_cmd);
+    let resp = manager.execute_command(discount_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1741,11 +1769,12 @@ fn test_fixed_amount_discount() {
 // ------------------------------------------------------------------------
 // P3.13: 百分比附加费
 // ------------------------------------------------------------------------
-#[test]
-fn test_percentage_surcharge() {
+#[tokio::test]
+async fn test_percentage_surcharge() {
     let manager = create_test_manager();
 
-    let order_id = open_table_with_items(&manager, 276, vec![simple_item(1, "Item", 100.0, 1)]);
+    let order_id =
+        open_table_with_items(&manager, 276, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
     // 应用 10% 附加费
     let surcharge_cmd = OrderCommand::new(
@@ -1759,7 +1788,7 @@ fn test_percentage_surcharge() {
             authorizer_name: None,
         },
     );
-    let resp = manager.execute_command(surcharge_cmd);
+    let resp = manager.execute_command(surcharge_cmd).await;
     assert!(resp.success);
 
     let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
