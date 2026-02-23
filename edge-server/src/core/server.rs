@@ -162,6 +162,11 @@ impl Server {
         // Phase 7: Graceful shutdown
         // ═══════════════════════════════════════════════════════════════════
 
+        // 先删除 LOCK 文件（同步 FS 操作，无 .await 取消点，不可被 abort 打断）
+        // 必须在任何 async 操作之前执行，因为 bridge 给 server task 只有 3s
+        // 超时后会 abort，后续的审计日志写入和 cleanup 可能来不及执行
+        state.audit_service.on_shutdown();
+
         // 记录系统关闭审计日志（同步写入，确保持久化）
         if let Err(e) = state
             .audit_service
@@ -182,6 +187,8 @@ impl Server {
 
     /// 统一清理：停止后台任务 + 关闭数据库 + drain audit worker
     async fn cleanup(state: ServerState, background_tasks: BackgroundTasks) {
+        // 删除 LOCK 文件（幂等操作，Phase 7 正常退出时已提前调用过，
+        // 此处确保 activation/subscription/P12 等早期 shutdown 路径也能清理）
         state.audit_service.on_shutdown();
         background_tasks.shutdown().await;
         // 取出 audit worker handle，drop state 关闭 audit mpsc sender → worker drain 残留消息

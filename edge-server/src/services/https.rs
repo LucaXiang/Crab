@@ -147,7 +147,7 @@ impl HttpsService {
         let handle_clone = handle.clone();
         tokio::spawn(async move {
             shutdown_signal.await;
-            handle_clone.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
+            handle_clone.graceful_shutdown(Some(std::time::Duration::from_secs(2)));
         });
 
         axum_server::bind_rustls(addr, tls_config)
