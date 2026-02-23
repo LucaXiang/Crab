@@ -26,8 +26,8 @@ use crate::db::repository::order;
 const DEBOUNCE_MS: u64 = 500;
 /// Max retry attempts for HTTP fallback
 const MAX_RETRIES: u32 = 3;
-/// Initial retry delay
-const INITIAL_RETRY_DELAY_SECS: u64 = 5;
+/// Initial retry delay (1s for fast first reconnect, then exponential backoff)
+const INITIAL_RETRY_DELAY_SECS: u64 = 1;
 /// Max reconnect delay
 const MAX_RECONNECT_DELAY_SECS: u64 = 120;
 /// Archived order sync batch size

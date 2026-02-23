@@ -80,7 +80,7 @@ export function buildReceiptData(
             price_modifier: opt.price_modifier ?? 0,
           }))
         : null,
-      spec_name: item.selected_specification?.name ?? null,
+      spec_name: item.selected_specification?.name || null,
     }));
 
   return {

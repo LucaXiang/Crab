@@ -209,7 +209,11 @@ impl KitchenPrintService {
             })
             .unwrap_or_default();
 
-        let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
+        let spec_name = item
+            .selected_specification
+            .as_ref()
+            .map(|s| s.name.clone())
+            .filter(|n| !n.is_empty());
 
         PrintItemContext {
             category_id,

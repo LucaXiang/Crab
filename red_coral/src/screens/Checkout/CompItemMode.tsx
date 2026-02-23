@@ -3,6 +3,7 @@ import { HeldOrder, Permission } from '@/core/domain/types';
 import { Gift, ArrowLeft, Minus, Plus, Undo2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
+import { getSpecName } from '@/utils/pricing';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { compItem, uncompItem } from '@/core/stores/order/commands';
 import { toast } from '@/presentation/components/Toast';
@@ -281,8 +282,8 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                             <div className="font-bold text-sm text-gray-800 leading-snug line-clamp-2" title={item.name}>
                               {item.name}
                             </div>
-                            {item.selected_specification?.is_multi_spec && (
-                              <div className="text-xs text-gray-400 mt-0.5 truncate">{item.selected_specification.name}</div>
+                            {getSpecName(item.selected_specification) && (
+                              <div className="text-xs text-gray-400 mt-0.5 truncate">{item.selected_specification!.name}</div>
                             )}
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-sm font-medium text-gray-500">{formatCurrency(unitPrice)}</span>
@@ -380,8 +381,8 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                   {/* Selected Item Info */}
                   <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                     <div className="font-bold text-gray-800 text-lg">{selectedItem.name}</div>
-                    {selectedItem.selected_specification?.is_multi_spec && (
-                      <div className="text-sm text-gray-500 mt-1">{t('pos.cart.spec')}: {selectedItem.selected_specification.name}</div>
+                    {getSpecName(selectedItem.selected_specification) && (
+                      <div className="text-sm text-gray-500 mt-1">{t('pos.cart.spec')}: {selectedItem.selected_specification!.name}</div>
                     )}
                     <div className="text-sm text-gray-500 mt-1">
                       {formatCurrency(selectedItem.unit_price)} x {maxCompQty}

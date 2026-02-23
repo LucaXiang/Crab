@@ -148,9 +148,11 @@ impl<'a> ReceiptRenderer<'a> {
                 "{} {} {} {}",
                 qty_str, name_str, price_str, total_str
             ));
-            // Print specification name (if multi-spec product)
+            // Print specification name (if multi-spec product, skip empty names)
             if let Some(ref spec_name) = item.spec_name {
-                b.write_line(&format!("   > {}", spec_name));
+                if !spec_name.is_empty() {
+                    b.write_line(&format!("   > {}", spec_name));
+                }
             }
             // Print selected options (if any)
             if let Some(options) = &item.selected_options {

@@ -142,8 +142,10 @@ impl KitchenTicketRenderer {
         // Kitchen name
         line.push_str(&item.kitchen_name);
 
-        // Spec name
-        if let Some(ref spec) = item.spec_name {
+        // Spec name (skip empty names)
+        if let Some(ref spec) = item.spec_name
+            && !spec.is_empty()
+        {
             line.push_str(&format!(" ({})", spec));
         }
 

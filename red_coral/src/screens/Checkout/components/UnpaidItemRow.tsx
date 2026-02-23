@@ -2,7 +2,7 @@ import React from 'react';
 import { CartItem } from '@/core/domain/types';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
-import { calculateOptionsModifier } from '@/utils/pricing';
+import { calculateOptionsModifier, getSpecName } from '@/utils/pricing';
 import { t } from '@/infrastructure/i18n';
 import { GroupedOptionsList } from '@/shared/components';
 import { Gift, Stamp } from 'lucide-react';
@@ -35,7 +35,7 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
 
   const isComped = !!item.is_comped;
   const isStampReward = item.instance_id.startsWith('stamp_reward::');
-  const hasMultiSpec = item.selected_specification?.is_multi_spec;
+  const specName = getSpecName(item.selected_specification);
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
   const totalRuleDiscount = item.rule_discount_amount;
@@ -114,9 +114,9 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
       </div>
 
       {/* Row 2: Spec + Options + Note — full width */}
-      {hasMultiSpec && (
+      {specName && (
         <div className="text-sm text-gray-600 mt-1">
-          {t('pos.cart.spec')}: {item.selected_specification!.name}
+          {t('pos.cart.spec')}: {specName}
         </div>
       )}
       {hasOptions && <GroupedOptionsList options={item.selected_options!} />}

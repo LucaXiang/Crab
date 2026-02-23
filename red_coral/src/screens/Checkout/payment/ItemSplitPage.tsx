@@ -6,6 +6,7 @@ import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { useRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
 import { formatCurrency, Currency } from '@/utils/currency';
+import { getSpecName } from '@/utils/pricing';
 import { openCashDrawer } from '@/core/services/order/paymentService';
 import { completeOrder, splitByItems } from '@/core/stores/order/commands';
 import { CashPaymentModal } from './CashPaymentModal';
@@ -368,8 +369,8 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
                                                   <div className="font-bold text-sm text-gray-800 leading-snug line-clamp-2" title={item.name}>
                                                       {item.name}
                                                   </div>
-                                                  {item.selected_specification?.is_multi_spec && (
-                                                    <div className="text-xs text-gray-400 mt-0.5 truncate">{item.selected_specification.name}</div>
+                                                  {getSpecName(item.selected_specification) && (
+                                                    <div className="text-xs text-gray-400 mt-0.5 truncate">{item.selected_specification!.name}</div>
                                                   )}
                                                   <div className="flex items-center justify-between mt-2">
                                                       <span className="text-sm font-medium text-gray-500">{formatCurrency(unitPrice)}</span>
@@ -434,8 +435,8 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
                                           </div>
                                           <div className="flex-1 min-w-0">
                                               <div className="text-sm font-bold text-gray-800 truncate">{item.name}</div>
-                                              {item.selected_specification?.is_multi_spec && (
-                                                <div className="text-xs text-gray-400">{t('pos.cart.spec')}: {item.selected_specification.name}</div>
+                                              {getSpecName(item.selected_specification) && (
+                                                <div className="text-xs text-gray-400">{t('pos.cart.spec')}: {item.selected_specification!.name}</div>
                                               )}
                                               <div className="text-xs text-gray-500">{formatCurrency(unitPrice)}</div>
                                           </div>

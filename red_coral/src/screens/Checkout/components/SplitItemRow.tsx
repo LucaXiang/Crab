@@ -3,6 +3,7 @@ import { CartItemSnapshot } from '@/core/domain/types';
 import { useProductById } from '@/features/product';
 import { useImageUrl } from '@/core/hooks';
 import { formatCurrency } from '@/utils/currency';
+import { getSpecName } from '@/utils/pricing';
 import { t } from '@/infrastructure/i18n';
 import DefaultImage from '@/assets/reshot.svg';
 import { GroupedOptionsList } from '@/shared/components';
@@ -37,8 +38,8 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="font-medium text-gray-700 truncate">{item.name}</div>
-        {item.selected_specification?.is_multi_spec && (
-          <div className="text-xs text-gray-500">{t('pos.cart.spec')}: {item.selected_specification.name}</div>
+        {getSpecName(item.selected_specification) && (
+          <div className="text-xs text-gray-500">{t('pos.cart.spec')}: {item.selected_specification!.name}</div>
         )}
         {item.selected_options && item.selected_options.length > 0 && (
           <GroupedOptionsList options={item.selected_options} className="flex flex-col gap-0.5 mt-0.5" itemClassName="text-xs text-gray-500" />

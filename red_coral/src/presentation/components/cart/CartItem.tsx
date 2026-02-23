@@ -4,7 +4,7 @@ import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useProductStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { calculateOptionsModifier } from '@/utils/pricing';
+import { calculateOptionsModifier, getSpecName } from '@/utils/pricing';
 import { useLongPress } from '@/hooks/useLongPress';
 import { t } from '@/infrastructure/i18n';
 import { GroupedOptionsList } from '@/shared/components';
@@ -51,7 +51,7 @@ export const CartItem = React.memo<CartItemProps>(({
     { delay: 500, isPreventDefault: false }
   );
 
-  const hasMultiSpec = item.selected_specification?.is_multi_spec;
+  const specName = getSpecName(item.selected_specification);
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
   
@@ -73,10 +73,10 @@ export const CartItem = React.memo<CartItemProps>(({
             {item.name}
           </div>
 
-          {/* Line 2: Specification (if multi-spec) */}
-          {hasMultiSpec && (
+          {/* Line 2: Specification (if multi-spec and name is non-empty) */}
+          {specName && (
             <div className="text-sm text-gray-600 mt-0.5">
-              {t('pos.cart.spec')}: {item.selected_specification!.name}
+              {t('pos.cart.spec')}: {specName}
             </div>
           )}
 

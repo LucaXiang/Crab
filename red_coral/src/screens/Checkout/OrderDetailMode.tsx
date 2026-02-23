@@ -11,6 +11,7 @@ import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency, computePriceBreakdown } from '@/utils/currency';
+import { getSpecName } from '@/utils/pricing';
 import { CATEGORY_ACCENT, buildCategoryColorMap } from '@/utils/categoryColors';
 import {
   ArrowLeft, Receipt, CreditCard, Coins,
@@ -277,8 +278,8 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                 #{item.instance_id.slice(-5)}
               </span>
               <span>{item.name}</span>
-              {item.selected_specification?.name && (
-                <span className="text-xs text-gray-500">({item.selected_specification.name})</span>
+              {getSpecName(item.selected_specification) && (
+                <span className="text-xs text-gray-500">({item.selected_specification!.name})</span>
               )}
               {item.is_comped && (
                 item.instance_id.startsWith('stamp_reward::') ? (

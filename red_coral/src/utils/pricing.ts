@@ -1,5 +1,14 @@
-import type { ItemOption } from '@/core/domain/types';
+import type { ItemOption, SpecificationInfo } from '@/core/domain/types';
 import { Currency } from '@/utils/currency';
+
+/**
+ * 获取应该显示的规格名称
+ * 仅在 multi_spec 且 name 非空时返回名称，否则返回 null
+ */
+export function getSpecName(spec: SpecificationInfo | null | undefined): string | null {
+  if (!spec?.is_multi_spec || !spec.name) return null;
+  return spec.name;
+}
 
 /**
  * 计算选项加价总额（考虑选项数量）

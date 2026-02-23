@@ -19,85 +19,12 @@ export * from './archivedOrder';
 // Print and label types
 export * from './print';
 
-// Order Event Sourcing types (new server-side state architecture)
-// Import with namespace to avoid conflicts: import { OrderEvent } from '@/core/domain/types/orderEvent'
-// Or use: import type { OrderEvent as ServerOrderEvent } from '@/core/domain/types/orderEvent'
+// Order Event Sourcing types - import directly from '@/core/domain/types/orderEvent' for full access
 export type {
-  // Event types
-  OrderEventType,
-  OrderEvent,
-  EventPayload,
-  TableOpenedPayload,
-  OrderCompletedPayload,
-  OrderVoidedPayload,
-  ItemsAddedPayload,
-  ItemModifiedPayload,
-  ItemModificationResult,
-  ItemRemovedPayload,
-  PaymentAddedPayload,
-  PaymentCancelledPayload,
-  ItemSplitPayload,
-  AmountSplitPayload,
-  AaSplitStartedPayload,
-  AaSplitPaidPayload,
-  AaSplitCancelledPayload,
-  OrderMovedPayload,
-  OrderMovedOutPayload,
-  OrderMergedPayload,
-  OrderMergedOutPayload,
-  TableReassignedPayload,
-  OrderInfoUpdatedPayload,
-  RuleSkipToggledPayload,
-  MemberLinkedPayload,
-  MemberUnlinkedPayload,
-  StampRedeemedPayload,
-  // Command types
-  OrderCommand,
-  OrderCommandPayload,
-  OpenTableCommand,
-  CompleteOrderCommand,
-  VoidOrderCommand,
-  AddItemsCommand,
-  ModifyItemCommand,
-  RemoveItemCommand,
-  AddPaymentCommand,
-  CancelPaymentCommand,
-  SplitByItemsCommand,
-  SplitByAmountCommand,
-  StartAaSplitCommand,
-  PayAaSplitCommand,
-  SplitType,
-  MoveOrderCommand,
-  MergeOrdersCommand,
-  UpdateOrderInfoCommand,
-  ToggleRuleSkipCommand,
-  LinkMemberCommand,
-  UnlinkMemberCommand,
-  RedeemStampCommand,
-  // Response types
-  CommandResponse,
-  CommandError,
-  CommandErrorCode,
-  // Sync types
-  SyncRequest,
-  SyncResponse,
-  // Snapshot types
-  OrderSnapshot,
-  // Shared types (snake_case for Rust compatibility)
   CartItemSnapshot,
-  CartItemInput,
   ItemOption,
-  SpecificationInfo,
-  ItemChanges as ServerItemChanges,
-  SplitItem,
-  PaymentSummaryItem,
-  PaymentRecord as ServerPaymentRecord,
-  PaymentMethod,
-  OrderConnectionState,
   AppliedRule,
-  OrderStatus,  // Event sourcing status: ACTIVE | COMPLETED | VOID | MERGED
-  VoidType,
-  LossReason,
+  SpecificationInfo,
 } from './orderEvent';
 
 // ============================================================================
