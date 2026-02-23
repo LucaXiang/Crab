@@ -3,6 +3,7 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Hero from '$lib/components/Hero.svelte';
 	import Features from '$lib/components/Features.svelte';
+	import Showcase from '$lib/components/Showcase.svelte';
 	import Pricing from '$lib/components/Pricing.svelte';
 	import SignupForm from '$lib/components/SignupForm.svelte';
 	import Faq from '$lib/components/Faq.svelte';
@@ -11,15 +12,15 @@
 </script>
 
 <svelte:head>
-	<title>RedCoral — POS para restaurantes que funciona sin internet</title>
+	<title>RedCoral — TPV para hostelería con Verifactu incluido</title>
 	<meta
 		name="description"
-		content="RedCoral es un sistema POS para restaurantes que funciona sin internet. Seguro, rápido y fácil de usar. Gestiona pedidos, cobros e impresión desde cualquier dispositivo."
+		content="RedCoral es un TPV moderno para hostelería que funciona sin internet, cumple con Verifactu y registra cada operación con trazabilidad total. Desde 31 €/mes."
 	/>
-	<meta property="og:title" content="RedCoral — POS para restaurantes que funciona sin internet" />
+	<meta property="og:title" content="RedCoral — TPV para hostelería con Verifactu incluido" />
 	<meta
 		property="og:description"
-		content="Sistema POS para restaurantes que funciona sin internet. Seguro, rápido y fácil de usar."
+		content="TPV moderno para hostelería: funciona sin internet, Verifactu incluido, registro antifraude. Desde 31 €/mes."
 	/>
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://redcoral.app" />
@@ -27,10 +28,10 @@
 	<meta property="og:locale" content="es_ES" />
 	<link rel="canonical" href="https://redcoral.app" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="RedCoral — POS para restaurantes que funciona sin internet" />
+	<meta name="twitter:title" content="RedCoral — TPV para hostelería con Verifactu incluido" />
 	<meta
 		name="twitter:description"
-		content="Sistema POS para restaurantes que funciona sin internet. Seguro, rápido y fácil de usar."
+		content="TPV moderno para hostelería: funciona sin internet, Verifactu incluido, registro antifraude. Desde 31 €/mes."
 	/>
 	{@html `<script type="application/ld+json">${JSON.stringify({
 		'@context': 'https://schema.org',
@@ -53,6 +54,7 @@
 <Navbar />
 <Hero />
 <Features />
+<Showcase />
 <Pricing />
 <SignupForm />
 <Faq />

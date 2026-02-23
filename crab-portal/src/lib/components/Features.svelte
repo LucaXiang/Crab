@@ -1,24 +1,24 @@
 <script lang="ts">
 	import {
 		WifiOff,
-		ShieldCheck,
+		FileCheck,
 		Zap,
+		ShieldCheck,
 		MonitorSmartphone,
-		Printer,
 		Cloud
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 
 	const features = [
 		{ icon: WifiOff, titleKey: 'features.offline.title', descKey: 'features.offline.desc' },
-		{ icon: ShieldCheck, titleKey: 'features.security.title', descKey: 'features.security.desc' },
+		{ icon: FileCheck, titleKey: 'features.verifactu.title', descKey: 'features.verifactu.desc' },
 		{ icon: Zap, titleKey: 'features.speed.title', descKey: 'features.speed.desc' },
 		{
-			icon: MonitorSmartphone,
-			titleKey: 'features.multidevice.title',
-			descKey: 'features.multidevice.desc'
+			icon: ShieldCheck,
+			titleKey: 'features.audit.title',
+			descKey: 'features.audit.desc'
 		},
-		{ icon: Printer, titleKey: 'features.printer.title', descKey: 'features.printer.desc' },
+		{ icon: MonitorSmartphone, titleKey: 'features.multidevice.title', descKey: 'features.multidevice.desc' },
 		{ icon: Cloud, titleKey: 'features.cloud.title', descKey: 'features.cloud.desc' }
 	];
 </script>

@@ -118,11 +118,22 @@
 				<div class="absolute -bottom-6 -left-8 bg-slate-900/90 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-2xl shadow-black/50 animate-bounce duration-4000">
 					<div class="flex items-center gap-4">
 						<div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-							<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+							<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
 						</div>
 						<div>
-							<div class="text-xs text-slate-400 font-medium uppercase tracking-wider mb-0.5">Total Revenue</div>
-							<div class="text-xl font-bold text-white tracking-tight">$12,450.00</div>
+							<div class="text-xs text-slate-400 font-medium uppercase tracking-wider mb-0.5">Ventas Perdidas</div>
+							<div class="text-xl font-bold text-emerald-400 tracking-tight">0</div>
+						</div>
+					</div>
+				</div>
+				<div class="absolute -bottom-4 -right-6 bg-slate-900/90 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-2xl shadow-black/50 animate-bounce duration-5000" style="animation-delay: 1s;">
+					<div class="flex items-center gap-4">
+						<div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
+							<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+						</div>
+						<div>
+							<div class="text-xs text-slate-400 font-medium uppercase tracking-wider mb-0.5">Cada operacion registrada</div>
+							<div class="text-xl font-bold text-amber-400 tracking-tight">100%</div>
 						</div>
 					</div>
 				</div>
