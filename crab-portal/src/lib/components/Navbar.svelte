@@ -90,7 +90,7 @@
 			</div>
 			<div class="hidden md:flex items-center gap-4">
 				<a
-					href="/login"
+					href="https://console.redcoral.app/login"
 					class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
 				>
 					{$t('nav.login')}
@@ -160,7 +160,7 @@
 				<div class="h-px bg-slate-100 my-2"></div>
 				
 				<a
-					href="/login"
+					href="https://console.redcoral.app/login"
 					class="p-4 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-colors font-medium flex items-center gap-3"
 					onclick={() => (mobileMenuOpen = false)}
 				>

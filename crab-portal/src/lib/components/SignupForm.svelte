@@ -61,7 +61,7 @@
 
 					<p class="mt-5 text-xs text-slate-500">
 						{$t('signup.has_account')}
-						<a href="/login" class="text-coral-400 hover:text-coral-300 font-medium"
+						<a href="https://console.redcoral.app/login" class="text-coral-400 hover:text-coral-300 font-medium"
 							>{$t('signup.login_link')}</a
 						>
 					</p>

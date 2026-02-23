@@ -26,7 +26,7 @@
 				<span>{$t('reg_cancel.back_home')}</span>
 			</a>
 			<a
-				href="/login"
+				href="https://console.redcoral.app/login"
 				class="inline-flex items-center gap-1.5 bg-coral-500 hover:bg-coral-600 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors duration-150 cursor-pointer"
 			>
 				<span>{$t('reg_cancel.try_login')}</span>

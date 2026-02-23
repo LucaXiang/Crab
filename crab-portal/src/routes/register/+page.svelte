@@ -37,8 +37,7 @@
 		try {
 			const res = await register({ email, password, plan: selectedPlan });
 			if (res.status === 'verified') {
-				// Already verified — redirect to login
-				goto('/login?email=' + encodeURIComponent(email) + '&verified=1');
+				window.location.href = 'https://console.redcoral.app/login?email=' + encodeURIComponent(email) + '&verified=1';
 			} else {
 				sessionStorage.setItem('redcoral-verify-email', email);
 				goto('/verify');
@@ -173,7 +172,7 @@
 
 		<p class="text-center text-xs text-slate-400">
 			{$t('register.has_account')}
-			<a href="/login" class="text-coral-500 hover:text-coral-600 font-medium">{$t('auth.login_link')}</a>
+			<a href="https://console.redcoral.app/login" class="text-coral-500 hover:text-coral-600 font-medium">{$t('auth.login_link')}</a>
 		</p>
 	</form>
 </AuthLayout>

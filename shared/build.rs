@@ -10,13 +10,19 @@ fn main() {
     println!("cargo:rerun-if-changed=../.git/refs/heads/");
 
     // Embed git hash at compile time
-    let git_hash = std::process::Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
+    // Prefer GIT_HASH env var (set by Docker build-arg), fallback to git command
+    let git_hash = env::var("GIT_HASH")
         .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
+        .filter(|s| !s.is_empty() && s != "dev")
+        .unwrap_or_else(|| {
+            std::process::Command::new("git")
+                .args(["rev-parse", "--short", "HEAD"])
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|s| s.trim().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        });
     println!("cargo:rustc-env=GIT_HASH={git_hash}");
 
     // Only generate when env var is set
