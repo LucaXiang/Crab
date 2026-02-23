@@ -27,6 +27,10 @@ export const es: Record<string, string> = {
 	'hero.stat_uptime': 'Disponibilidad offline',
 	'hero.stat_security_value': 'Verifactu',
 	'hero.stat_security': 'Cumplimiento fiscal incluido',
+	'hero.stat_price_value': '31 €/mes',
+	'hero.stat_price': 'Todo incluido',
+	'hero.stat_devices_value': 'Multi-TPV',
+	'hero.stat_devices': 'Conecta varios terminales',
 
 	'features.title': '¿Por qué elegir RedCoral?',
 	'features.subtitle':

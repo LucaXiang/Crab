@@ -27,6 +27,10 @@ export const zh: Record<string, string> = {
 	'hero.stat_uptime': '离线可用性',
 	'hero.stat_security_value': 'Verifactu',
 	'hero.stat_security': '内置税务合规',
+	'hero.stat_price_value': '31€/月',
+	'hero.stat_price': '全包价',
+	'hero.stat_devices_value': '多终端',
+	'hero.stat_devices': '连接多台收银机',
 
 	'features.title': '为什么选择 RedCoral',
 	'features.subtitle': '专为餐饮实际运营打造 — 稳定、快速、Verifactu 合规',

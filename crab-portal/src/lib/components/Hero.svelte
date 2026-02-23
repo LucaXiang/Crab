@@ -27,24 +27,24 @@
 					{$t('hero.subtitle')}
 				</p>
 
-				<div class="flex flex-col sm:flex-row items-start gap-3">
+				<div class="flex flex-wrap items-center gap-3">
 					<a
 						href="/register"
-						class="inline-flex items-center gap-2 bg-coral-500 hover:bg-coral-600 text-white font-semibold px-7 py-3.5 rounded-xl transition-colors duration-150 cursor-pointer shadow-lg shadow-coral-500/20"
+						class="inline-flex items-center gap-2 bg-coral-500 hover:bg-coral-600 text-white font-semibold px-7 py-3.5 rounded-xl transition-colors duration-150 cursor-pointer shadow-lg shadow-coral-500/20 whitespace-nowrap"
 					>
 						<span>{$t('hero.cta_primary')}</span>
 						<ArrowRight class="w-4 h-4" />
 					</a>
 					<a
 						href="https://cloud.redcoral.app/api/download/latest"
-						class="inline-flex items-center gap-2 bg-white/8 hover:bg-white/14 text-white font-semibold px-7 py-3.5 rounded-xl border border-white/10 transition-colors duration-150 cursor-pointer"
+						class="inline-flex items-center gap-2 bg-white/8 hover:bg-white/14 text-white font-semibold px-7 py-3.5 rounded-xl border border-white/10 transition-colors duration-150 cursor-pointer whitespace-nowrap"
 					>
 						<Download class="w-4 h-4" />
 						<span>{$t('hero.cta_download')}</span>
 					</a>
 					<a
 						href="#features"
-						class="inline-flex items-center gap-2 text-slate-400 hover:text-white font-medium px-4 py-3.5 transition-colors duration-150 cursor-pointer"
+						class="inline-flex items-center gap-2 text-slate-400 hover:text-white font-medium px-4 py-3.5 transition-colors duration-150 cursor-pointer whitespace-nowrap"
 					>
 						<span>{$t('hero.cta_secondary')}</span>
 						<ChevronDown class="w-4 h-4" />
@@ -189,6 +189,16 @@
 			<div>
 				<div class="text-3xl md:text-4xl font-heading font-bold text-white tracking-tight">{$t('hero.stat_security_value')}</div>
 				<div class="text-sm text-slate-500 mt-1 font-medium">{$t('hero.stat_security')}</div>
+			</div>
+			<div class="w-px h-10 bg-white/6 hidden md:block"></div>
+			<div>
+				<div class="text-3xl md:text-4xl font-heading font-bold text-white tracking-tight">{$t('hero.stat_price_value')}</div>
+				<div class="text-sm text-slate-500 mt-1 font-medium">{$t('hero.stat_price')}</div>
+			</div>
+			<div class="w-px h-10 bg-white/6 hidden md:block"></div>
+			<div>
+				<div class="text-3xl md:text-4xl font-heading font-bold text-white tracking-tight">{$t('hero.stat_devices_value')}</div>
+				<div class="text-sm text-slate-500 mt-1 font-medium">{$t('hero.stat_devices')}</div>
 			</div>
 		</div>
 	</div>

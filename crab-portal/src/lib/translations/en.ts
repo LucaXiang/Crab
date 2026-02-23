@@ -27,6 +27,10 @@ export const en: Record<string, string> = {
 	'hero.stat_uptime': 'Offline availability',
 	'hero.stat_security_value': 'Verifactu',
 	'hero.stat_security': 'Tax compliance included',
+	'hero.stat_price_value': '€31/mo',
+	'hero.stat_price': 'All-inclusive',
+	'hero.stat_devices_value': 'Multi-POS',
+	'hero.stat_devices': 'Connect multiple terminals',
 
 	'features.title': 'Why choose RedCoral?',
 	'features.subtitle':
