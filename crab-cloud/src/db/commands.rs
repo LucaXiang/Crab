@@ -31,20 +31,6 @@ pub async fn create_command(
     Ok(row.0)
 }
 
-/// Mark commands as delivered (sent to edge-server)
-pub async fn mark_delivered(pool: &PgPool, ids: &[i64]) -> Result<(), BoxError> {
-    if ids.is_empty() {
-        return Ok(());
-    }
-
-    sqlx::query("UPDATE cloud_commands SET status = 'delivered' WHERE id = ANY($1)")
-        .bind(ids)
-        .execute(pool)
-        .await?;
-
-    Ok(())
-}
-
 /// Complete a single command with its RPC result
 pub async fn complete_command(
     pool: &PgPool,

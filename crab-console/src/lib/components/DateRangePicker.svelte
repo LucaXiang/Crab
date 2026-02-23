@@ -16,13 +16,17 @@
 	let customFrom = $state('');
 	let customTo = $state('');
 
+	function endOfDay(date: Date): number {
+		return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999).getTime();
+	}
+
 	function presetRange(preset: Preset): DateRange {
 		const now = new Date();
 		const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
 		switch (preset) {
 			case 'today':
-				return { from: todayStart.getTime(), to: now.getTime() + 60000 };
+				return { from: todayStart.getTime(), to: endOfDay(now) };
 			case 'yesterday': {
 				const yStart = new Date(todayStart);
 				yStart.setDate(yStart.getDate() - 1);
@@ -33,11 +37,11 @@
 				const mondayOffset = day === 0 ? -6 : 1 - day;
 				const weekStart = new Date(todayStart);
 				weekStart.setDate(weekStart.getDate() + mondayOffset);
-				return { from: weekStart.getTime(), to: now.getTime() + 60000 };
+				return { from: weekStart.getTime(), to: endOfDay(now) };
 			}
 			case 'this_month': {
 				const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-				return { from: monthStart.getTime(), to: now.getTime() + 60000 };
+				return { from: monthStart.getTime(), to: endOfDay(now) };
 			}
 		}
 	}

@@ -197,7 +197,7 @@ pub async fn upsert_category_from_sync(
 
     for dest_id in &cat.kitchen_print_destinations {
         sqlx::query(
-            "INSERT INTO catalog_category_print_dest (category_id, dest_source_id) VALUES ($1, $2)",
+            "INSERT INTO catalog_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'kitchen')",
         )
         .bind(pg_id)
         .bind(dest_id)
@@ -206,7 +206,7 @@ pub async fn upsert_category_from_sync(
     }
     for dest_id in &cat.label_print_destinations {
         sqlx::query(
-            "INSERT INTO catalog_category_print_dest (category_id, dest_source_id) VALUES ($1, $2)",
+            "INSERT INTO catalog_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'label')",
         )
         .bind(pg_id)
         .bind(dest_id)
@@ -434,7 +434,7 @@ struct PriceRuleRow {
     is_exclusive: bool,
     valid_from: Option<i64>,
     valid_until: Option<i64>,
-    active_days: Option<serde_json::Value>,
+    active_days: Option<i32>,
     active_start_time: Option<String>,
     active_end_time: Option<String>,
     is_active: bool,
@@ -452,24 +452,37 @@ impl PriceRuleRow {
             display_name: self.display_name,
             receipt_name: self.receipt_name,
             description: self.description,
-            rule_type: serde_json::from_value(serde_json::Value::String(self.rule_type))
-                .unwrap_or(RuleType::Discount),
-            product_scope: serde_json::from_value(serde_json::Value::String(self.product_scope))
-                .unwrap_or(ProductScope::Global),
+            rule_type: serde_json::from_value::<RuleType>(serde_json::Value::String(
+                self.rule_type.clone(),
+            ))
+            .unwrap_or_else(|e| {
+                tracing::warn!(rule_type = %self.rule_type, error = %e, "Invalid rule_type, defaulting to Discount");
+                RuleType::Discount
+            }),
+            product_scope: serde_json::from_value::<ProductScope>(serde_json::Value::String(
+                self.product_scope.clone(),
+            ))
+            .unwrap_or_else(|e| {
+                tracing::warn!(product_scope = %self.product_scope, error = %e, "Invalid product_scope, defaulting to Global");
+                ProductScope::Global
+            }),
             target_id: self.target_id,
             zone_scope: self.zone_scope,
-            adjustment_type: serde_json::from_value(serde_json::Value::String(
-                self.adjustment_type,
-            ))
-            .unwrap_or(AdjustmentType::Percentage),
+            adjustment_type: serde_json::from_value::<AdjustmentType>(
+                serde_json::Value::String(self.adjustment_type.clone()),
+            )
+            .unwrap_or_else(|e| {
+                tracing::warn!(adjustment_type = %self.adjustment_type, error = %e, "Invalid adjustment_type, defaulting to Percentage");
+                AdjustmentType::Percentage
+            }),
             adjustment_value: self.adjustment_value,
             is_stackable: self.is_stackable,
             is_exclusive: self.is_exclusive,
             valid_from: self.valid_from,
             valid_until: self.valid_until,
-            active_days: self
-                .active_days
-                .and_then(|v| serde_json::from_value(v).ok()),
+            active_days: self.active_days.map(|mask| {
+                (0..7).filter(|bit| mask & (1 << bit) != 0).collect()
+            }),
             active_start_time: self.active_start_time,
             active_end_time: self.active_end_time,
             is_active: self.is_active,
@@ -610,9 +623,9 @@ pub async fn list_categories(
         return Ok(vec![]);
     }
 
-    // Print destinations
-    let dest_rows: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT category_id, dest_source_id FROM catalog_category_print_dest WHERE category_id = ANY($1)",
+    // Print destinations (with purpose)
+    let dest_rows: Vec<(i64, i64, String)> = sqlx::query_as(
+        "SELECT category_id, dest_source_id, purpose FROM catalog_category_print_dest WHERE category_id = ANY($1)",
     )
     .bind(&pg_ids)
     .fetch_all(pool)
@@ -626,9 +639,16 @@ pub async fn list_categories(
     .fetch_all(pool)
     .await?;
 
-    let mut dest_map: std::collections::HashMap<i64, Vec<i64>> = std::collections::HashMap::new();
-    for (cat_id, dest_id) in dest_rows {
-        dest_map.entry(cat_id).or_default().push(dest_id);
+    let mut kitchen_dest_map: std::collections::HashMap<i64, Vec<i64>> =
+        std::collections::HashMap::new();
+    let mut label_dest_map: std::collections::HashMap<i64, Vec<i64>> =
+        std::collections::HashMap::new();
+    for (cat_id, dest_id, purpose) in dest_rows {
+        match purpose.as_str() {
+            "kitchen" => kitchen_dest_map.entry(cat_id).or_default().push(dest_id),
+            "label" => label_dest_map.entry(cat_id).or_default().push(dest_id),
+            _ => {} // ignore unknown purpose
+        }
     }
 
     let mut tag_map: std::collections::HashMap<i64, Vec<i64>> = std::collections::HashMap::new();
@@ -638,23 +658,19 @@ pub async fn list_categories(
 
     Ok(rows
         .into_iter()
-        .map(|r| {
-            // TODO: separate kitchen vs label destinations once we track purpose
-            let dests = dest_map.remove(&r.id).unwrap_or_default();
-            CatalogCategory {
-                source_id: r.source_id,
-                name: r.name,
-                sort_order: r.sort_order,
-                is_kitchen_print_enabled: r.is_kitchen_print_enabled,
-                is_label_print_enabled: r.is_label_print_enabled,
-                is_active: r.is_active,
-                is_virtual: r.is_virtual,
-                match_mode: r.match_mode,
-                is_display: r.is_display,
-                kitchen_print_destinations: dests.clone(),
-                label_print_destinations: dests,
-                tag_ids: tag_map.remove(&r.id).unwrap_or_default(),
-            }
+        .map(|r| CatalogCategory {
+            source_id: r.source_id,
+            name: r.name,
+            sort_order: r.sort_order,
+            is_kitchen_print_enabled: r.is_kitchen_print_enabled,
+            is_label_print_enabled: r.is_label_print_enabled,
+            is_active: r.is_active,
+            is_virtual: r.is_virtual,
+            match_mode: r.match_mode,
+            is_display: r.is_display,
+            kitchen_print_destinations: kitchen_dest_map.remove(&r.id).unwrap_or_default(),
+            label_print_destinations: label_dest_map.remove(&r.id).unwrap_or_default(),
+            tag_ids: tag_map.remove(&r.id).unwrap_or_default(),
         })
         .collect())
 }
@@ -961,11 +977,10 @@ pub async fn upsert_price_rule_from_sync(
     now: i64,
 ) -> Result<(), BoxError> {
     let rule: shared::models::PriceRule = serde_json::from_value(data.clone())?;
-    let active_days_json = rule
+    let active_days_mask: Option<i32> = rule
         .active_days
         .as_ref()
-        .map(serde_json::to_value)
-        .transpose()?;
+        .map(|days| days.iter().fold(0i32, |mask, &day| mask | (1 << day)));
 
     sqlx::query(
         r#"
@@ -1007,7 +1022,7 @@ pub async fn upsert_price_rule_from_sync(
     .bind(rule.is_exclusive)
     .bind(rule.valid_from)
     .bind(rule.valid_until)
-    .bind(&active_days_json)
+    .bind(active_days_mask)
     .bind(&rule.active_start_time)
     .bind(&rule.active_end_time)
     .bind(rule.is_active)

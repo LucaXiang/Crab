@@ -41,11 +41,12 @@ CREATE TABLE catalog_categories (
 );
 CREATE INDEX idx_catalog_categories_edge ON catalog_categories (edge_server_id);
 
--- Category → print_destination junction
+-- Category → print_destination junction (with purpose: 'kitchen' or 'label')
 CREATE TABLE catalog_category_print_dest (
     id             BIGSERIAL PRIMARY KEY,
-    category_id    BIGINT  NOT NULL REFERENCES catalog_categories(id) ON DELETE CASCADE,
-    dest_source_id BIGINT  NOT NULL  -- edge 本地 print_destination ID
+    category_id    BIGINT       NOT NULL REFERENCES catalog_categories(id) ON DELETE CASCADE,
+    dest_source_id BIGINT       NOT NULL,  -- edge 本地 print_destination ID
+    purpose        VARCHAR(10)  NOT NULL   -- 'kitchen' or 'label'
 );
 CREATE INDEX idx_cat_print_dest_category ON catalog_category_print_dest (category_id);
 
@@ -84,7 +85,7 @@ CREATE TABLE catalog_product_specs (
     product_id    BIGINT  NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
     source_id     BIGINT  NOT NULL,  -- edge 本地 spec ID
     name          TEXT    NOT NULL,
-    price         DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    price         REAL NOT NULL DEFAULT 0.0,
     display_order INTEGER NOT NULL DEFAULT 0,
     is_default    BOOLEAN NOT NULL DEFAULT FALSE,
     is_active     BOOLEAN NOT NULL DEFAULT TRUE,
@@ -127,7 +128,7 @@ CREATE TABLE catalog_attribute_options (
     attribute_id       BIGINT  NOT NULL REFERENCES catalog_attributes(id) ON DELETE CASCADE,
     source_id          BIGINT  NOT NULL,  -- edge 本地 option ID
     name               TEXT    NOT NULL,
-    price_modifier     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    price_modifier     REAL NOT NULL DEFAULT 0.0,
     display_order      INTEGER NOT NULL DEFAULT 0,
     is_active          BOOLEAN NOT NULL DEFAULT TRUE,
     receipt_name       TEXT,
@@ -168,12 +169,12 @@ CREATE TABLE catalog_price_rules (
     target_id        BIGINT,
     zone_scope       TEXT NOT NULL DEFAULT 'all',
     adjustment_type  TEXT NOT NULL,
-    adjustment_value DOUBLE PRECISION NOT NULL,
+    adjustment_value REAL NOT NULL,
     is_stackable     BOOLEAN NOT NULL DEFAULT TRUE,
     is_exclusive     BOOLEAN NOT NULL DEFAULT FALSE,
     valid_from       BIGINT,
     valid_until      BIGINT,
-    active_days      JSONB,
+    active_days      INTEGER,  -- bitmask: bit 0=Mon, bit 1=Tue, ..., bit 6=Sun; NULL=all days
     active_start_time TEXT,
     active_end_time  TEXT,
     is_active        BOOLEAN NOT NULL DEFAULT TRUE,

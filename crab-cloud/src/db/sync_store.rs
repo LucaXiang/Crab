@@ -1,8 +1,8 @@
 //! Sync data storage operations
 //!
 //! Upsert operations for each resource type synced from edge-servers.
-//! All data is stored as JSONB mirrors — crab-cloud is a data mirror,
-//! not a business engine.
+//! Catalog resources (product, category, tag, attribute, price_rule) are stored
+//! in normalized tables. Other resources use JSONB mirror tables.
 
 use std::collections::HashMap;
 
@@ -115,15 +115,25 @@ pub async fn upsert_resource(
 
     match item.resource.as_str() {
         "product" => {
-            upsert_generic(pool, "cloud_products", edge_server_id, tenant_id, item, now).await
+            let source_id: i64 = item.resource_id.parse()?;
+            super::catalog::upsert_product_from_sync(
+                pool,
+                edge_server_id,
+                source_id,
+                &item.data,
+                version_to_i64(item.version),
+                now,
+            )
+            .await
         }
         "category" => {
-            upsert_generic(
+            let source_id: i64 = item.resource_id.parse()?;
+            super::catalog::upsert_category_from_sync(
                 pool,
-                "cloud_categories",
                 edge_server_id,
-                tenant_id,
-                item,
+                source_id,
+                &item.data,
+                version_to_i64(item.version),
                 now,
             )
             .await
@@ -153,11 +163,49 @@ pub async fn upsert_resource(
             )
             .await
         }
+        "tag" => {
+            let source_id: i64 = item.resource_id.parse()?;
+            super::catalog::upsert_tag_from_sync(pool, edge_server_id, source_id, &item.data, now)
+                .await
+        }
+        "attribute" => {
+            let source_id: i64 = item.resource_id.parse()?;
+            super::catalog::upsert_attribute_from_sync(
+                pool,
+                edge_server_id,
+                source_id,
+                &item.data,
+                now,
+            )
+            .await
+        }
+        "attribute_binding" => {
+            let source_id: i64 = item.resource_id.parse()?;
+            super::catalog::upsert_binding_from_sync(
+                pool,
+                edge_server_id,
+                source_id,
+                &item.data,
+                now,
+            )
+            .await
+        }
+        "price_rule" => {
+            let source_id: i64 = item.resource_id.parse()?;
+            super::catalog::upsert_price_rule_from_sync(
+                pool,
+                edge_server_id,
+                source_id,
+                &item.data,
+                now,
+            )
+            .await
+        }
         other => Err(format!("Unknown resource type: {other}").into()),
     }
 }
 
-/// Generic upsert for simple mirror tables (product, category, daily_report)
+/// Generic upsert for simple mirror tables (daily_report, shift, employee)
 ///
 /// `table` must be a `&'static str` from the match in `upsert_resource` — never user input.
 async fn upsert_generic(
@@ -391,13 +439,20 @@ async fn delete_resource(
     resource: &str,
     resource_id: &str,
 ) -> Result<(), BoxError> {
-    let query = match resource {
+    let source_id_i64: i64 = resource_id.parse().unwrap_or(0);
+
+    // Catalog resources use dedicated functions (CASCADE deletes children)
+    match resource {
         "product" => {
-            sqlx::query("DELETE FROM cloud_products WHERE edge_server_id = $1 AND source_id = $2")
+            return super::catalog::delete_product(pool, edge_server_id, source_id_i64).await;
         }
         "category" => {
-            sqlx::query("DELETE FROM cloud_categories WHERE edge_server_id = $1 AND source_id = $2")
+            return super::catalog::delete_category(pool, edge_server_id, source_id_i64).await;
         }
+        _ => {}
+    }
+
+    let query = match resource {
         "daily_report" => sqlx::query(
             "DELETE FROM cloud_daily_reports WHERE edge_server_id = $1 AND source_id = $2",
         ),
@@ -407,6 +462,18 @@ async fn delete_resource(
         "employee" => {
             sqlx::query("DELETE FROM cloud_employees WHERE edge_server_id = $1 AND source_id = $2")
         }
+        "tag" => {
+            sqlx::query("DELETE FROM catalog_tags WHERE edge_server_id = $1 AND source_id = $2")
+        }
+        "attribute" => sqlx::query(
+            "DELETE FROM catalog_attributes WHERE edge_server_id = $1 AND source_id = $2",
+        ),
+        "attribute_binding" => sqlx::query(
+            "DELETE FROM catalog_attribute_bindings WHERE edge_server_id = $1 AND source_id = $2",
+        ),
+        "price_rule" => sqlx::query(
+            "DELETE FROM catalog_price_rules WHERE edge_server_id = $1 AND source_id = $2",
+        ),
         other => return Err(format!("Cannot delete resource type: {other}").into()),
     };
 

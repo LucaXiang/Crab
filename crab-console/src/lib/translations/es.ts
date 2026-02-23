@@ -37,7 +37,7 @@ export const es: Record<string, string> = {
 	'nav.overview': 'Resumen',
 	'nav.daily_report': 'Informe diario',
 	'nav.products': 'Productos',
-	'nav.commands': 'Comandos',
+	'nav.commands': 'RPC',
 	'nav.live_orders': 'Pedidos en vivo',
 	'nav.red_flags': 'Alertas',
 
@@ -84,6 +84,16 @@ export const es: Record<string, string> = {
 	'store.device_id': 'ID de dispositivo',
 	'store.registered': 'Registrado',
 	'store.back': 'Volver',
+	'store.name': 'Nombre',
+	'store.address': 'Dirección',
+	'store.phone': 'Teléfono',
+	'store.nif': 'NIF',
+	'store.email': 'Correo electrónico',
+	'store.website': 'Sitio web',
+	'store.business_day_cutoff': 'Cierre del día comercial',
+	'store.save': 'Guardar cambios',
+	'store.saving': 'Guardando...',
+	'store.saved': 'Guardado',
 
 	// Orders
 	'orders.title': 'Pedidos',
@@ -185,17 +195,16 @@ export const es: Record<string, string> = {
 	'products.no_category': 'Sin categoría',
 	'products.search': 'Buscar productos...',
 
-	// Commands
-	'commands.title': 'Comandos remotos',
+	// RPC
+	'commands.title': 'RPC remoto',
 	'commands.empty': 'No hay comandos.',
 	'commands.type': 'Tipo',
 	'commands.status': 'Estado',
 	'commands.created': 'Creado',
 	'commands.executed': 'Ejecutado',
 	'commands.result': 'Resultado',
-	'commands.send': 'Enviar comando',
+	'commands.send': 'Enviar RPC',
 	'commands.pending': 'Pendiente',
-	'commands.delivered': 'Entregado',
 	'commands.cmd_completed': 'Completado',
 	'commands.failed': 'Fallido',
 	'commands.load_more': 'Cargar más',

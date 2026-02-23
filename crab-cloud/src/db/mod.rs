@@ -2,7 +2,6 @@
 
 pub mod activations;
 pub mod audit;
-#[allow(dead_code)]
 pub mod catalog;
 pub mod catalog_templates;
 pub mod client_connections;

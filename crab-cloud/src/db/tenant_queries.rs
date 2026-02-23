@@ -237,43 +237,6 @@ pub async fn list_daily_reports(
     Ok(rows)
 }
 
-/// Product list for a store
-#[derive(serde::Serialize, sqlx::FromRow)]
-pub struct ProductEntry {
-    pub id: i64,
-    pub source_id: String,
-    pub data: serde_json::Value,
-    pub synced_at: i64,
-}
-
-pub async fn list_products(
-    pool: &PgPool,
-    edge_server_id: i64,
-    tenant_id: &str,
-) -> Result<Vec<ProductEntry>, BoxError> {
-    let rows: Vec<ProductEntry> = sqlx::query_as(
-        r#"
-        SELECT p.id, p.source_id,
-            CASE WHEN c.data IS NOT NULL
-                THEN jsonb_set(p.data, '{category_name}', to_jsonb(c.data->>'name'))
-                ELSE p.data
-            END AS data,
-            p.synced_at
-        FROM cloud_products p
-        LEFT JOIN cloud_categories c
-            ON c.edge_server_id = p.edge_server_id
-            AND c.source_id = (p.data->>'category_id')
-        WHERE p.edge_server_id = $1 AND p.tenant_id = $2
-        ORDER BY c.data->>'sort_order', p.data->>'sort_order', p.source_id
-        "#,
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows)
-}
-
 /// Get cached order detail (from cloud_order_details, 30-day cache)
 pub async fn get_order_detail(
     pool: &PgPool,

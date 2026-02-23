@@ -307,10 +307,10 @@ pub async fn list_products(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
-) -> ApiResult<Vec<tenant_queries::ProductEntry>> {
+) -> ApiResult<Vec<db::catalog::CatalogProduct>> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    let products = tenant_queries::list_products(&state.pool, store_id, &identity.tenant_id)
+    let products = db::catalog::list_products(&state.pool, store_id)
         .await
         .map_err(|e| {
             tracing::error!("Products query error: {e}");
@@ -598,8 +598,6 @@ pub async fn create_command(
             "Edge server command queue full",
         ));
     }
-
-    let _ = commands::mark_delivered(&state.pool, &[command_id]).await;
 
     // Wait for RPC result (10s timeout)
     let rpc_result = match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {

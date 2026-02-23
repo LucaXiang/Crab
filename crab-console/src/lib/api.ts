@@ -375,14 +375,36 @@ export function getStoreRedFlags(
 
 // === Products ===
 
-export interface ProductEntry {
-	id: number;
-	source_id: string;
-	data: Record<string, unknown>;
-	synced_at: number;
+export interface ProductSpec {
+	source_id: number;
+	name: string;
+	price: number;
+	display_order: number;
+	is_default: boolean;
+	is_active: boolean;
+	receipt_name: string | null;
+	is_root: boolean;
 }
 
-export function getProducts(token: string, storeId: number): Promise<ProductEntry[]> {
+export interface CatalogProduct {
+	source_id: number;
+	name: string;
+	image: string;
+	category_source_id: number;
+	category_name: string | null;
+	sort_order: number;
+	tax_rate: number;
+	receipt_name: string | null;
+	kitchen_print_name: string | null;
+	is_kitchen_print_enabled: number;
+	is_label_print_enabled: number;
+	is_active: boolean;
+	external_id: number | null;
+	specs: ProductSpec[];
+	tag_ids: number[];
+}
+
+export function getProducts(token: string, storeId: number): Promise<CatalogProduct[]> {
 	return request('GET', `/api/tenant/stores/${storeId}/products`, undefined, token);
 }
 

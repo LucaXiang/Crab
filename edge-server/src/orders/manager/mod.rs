@@ -726,7 +726,7 @@ impl OrdersManager {
 
                 // Get product metadata for existing items' MG scope matching
                 let product_metadata = if let Some(catalog) = &self.catalog_service {
-                    if let Ok(Some(snapshot)) = self.storage.get_snapshot(order_id) {
+                    if let Ok(snapshot) = ctx.load_snapshot(order_id) {
                         let product_ids: Vec<i64> = snapshot.items.iter().map(|i| i.id).collect();
                         catalog.get_product_meta_batch(&product_ids)
                     } else {

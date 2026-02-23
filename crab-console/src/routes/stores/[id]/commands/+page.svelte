@@ -18,7 +18,7 @@
 	let hasMore = $state(true);
 	let loadingMore = $state(false);
 	let sendLoading = $state(false);
-	let sendType = $state('sync');
+	let sendType = $state('get_status');
 	let sendResult = $state('');
 
 	let token = '';
@@ -56,7 +56,9 @@
 		sendResult = '';
 		try {
 			const res = await createCommand(token, storeId, sendType);
-			sendResult = `Command #${res.command_id} created (ws_queued: ${res.ws_queued})`;
+			sendResult = res.success
+				? `RPC #${res.command_id} ${$t('commands.cmd_completed')}${res.data ? ': ' + JSON.stringify(res.data) : ''}`
+				: `RPC #${res.command_id} ${$t('commands.failed')}: ${res.error ?? 'unknown'}`;
 			await loadCommands(true);
 		} catch (err) {
 			sendResult = err instanceof ApiError ? err.message : $t('auth.error_generic');
@@ -68,7 +70,6 @@
 	function statusBadge(status: string): string {
 		switch (status) {
 			case 'completed': return 'bg-green-50 text-green-600';
-			case 'delivered': return 'bg-blue-50 text-blue-600';
 			case 'failed': return 'bg-red-50 text-red-600';
 			default: return 'bg-amber-50 text-amber-600';
 		}
@@ -77,7 +78,6 @@
 	function statusLabel(status: string): string {
 		switch (status) {
 			case 'pending': return $t('commands.pending');
-			case 'delivered': return $t('commands.delivered');
 			case 'completed': return $t('commands.cmd_completed');
 			case 'failed': return $t('commands.failed');
 			default: return status;
@@ -106,9 +106,8 @@
 					bind:value={sendType}
 					class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-coral-500/20 focus:border-coral-500"
 				>
-					<option value="sync">sync</option>
-					<option value="restart">restart</option>
 					<option value="get_status">get_status</option>
+					<option value="refresh_subscription">refresh_subscription</option>
 				</select>
 				<button
 					onclick={handleSend}
