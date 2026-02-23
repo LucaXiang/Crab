@@ -102,7 +102,7 @@ pub async fn create(
 ) -> AppResult<Json<Attribute>> {
     validate_create(&payload)?;
 
-    let attr = attribute::create(&state.pool, payload).await?;
+    let attr = attribute::create(&state.pool, None, payload).await?;
 
     let id = attr.id.to_string();
 

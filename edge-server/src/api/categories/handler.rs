@@ -61,7 +61,7 @@ pub async fn create(
 ) -> AppResult<Json<Category>> {
     validate_create(&payload)?;
 
-    let category = state.catalog_service.create_category(payload).await?;
+    let category = state.catalog_service.create_category(None, payload).await?;
 
     let id = category.id.to_string();
 

@@ -400,7 +400,11 @@ impl CatalogService {
     // =========================================================================
 
     /// Create a new product
-    pub async fn create_product(&self, data: ProductCreate) -> RepoResult<ProductFull> {
+    pub async fn create_product(
+        &self,
+        assigned_id: Option<i64>,
+        data: ProductCreate,
+    ) -> RepoResult<ProductFull> {
         // Validate specs
         if data.specs.is_empty() {
             return Err(RepoError::Validation("specs cannot be empty".into()));
@@ -431,21 +435,40 @@ impl CatalogService {
         let tax_rate = data.tax_rate.unwrap_or(0);
         let is_kitchen_print_enabled = data.is_kitchen_print_enabled.unwrap_or(-1);
         let is_label_print_enabled = data.is_label_print_enabled.unwrap_or(-1);
-        let product_id = sqlx::query_scalar!(
-            r#"INSERT INTO product (name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10) RETURNING id as "id!""#,
-            data.name,
-            image,
-            data.category_id,
-            sort_order,
-            tax_rate,
-            data.receipt_name,
-            data.kitchen_print_name,
-            is_kitchen_print_enabled,
-            is_label_print_enabled,
-            data.external_id,
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let product_id: i64 = if let Some(aid) = assigned_id {
+            sqlx::query_scalar(
+                r#"INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11) RETURNING id"#,
+            )
+            .bind(aid)
+            .bind(&data.name)
+            .bind(image)
+            .bind(data.category_id)
+            .bind(sort_order)
+            .bind(tax_rate)
+            .bind(&data.receipt_name)
+            .bind(&data.kitchen_print_name)
+            .bind(is_kitchen_print_enabled)
+            .bind(is_label_print_enabled)
+            .bind(data.external_id)
+            .fetch_one(&self.pool)
+            .await?
+        } else {
+            sqlx::query_scalar!(
+                r#"INSERT INTO product (name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10) RETURNING id as "id!""#,
+                data.name,
+                image,
+                data.category_id,
+                sort_order,
+                tax_rate,
+                data.receipt_name,
+                data.kitchen_print_name,
+                is_kitchen_print_enabled,
+                is_label_print_enabled,
+                data.external_id,
+            )
+            .fetch_one(&self.pool)
+            .await?
+        };
 
         // Insert specs
         for spec in &data.specs {
@@ -836,7 +859,11 @@ impl CatalogService {
     // =========================================================================
 
     /// Create a new category
-    pub async fn create_category(&self, data: CategoryCreate) -> RepoResult<Category> {
+    pub async fn create_category(
+        &self,
+        assigned_id: Option<i64>,
+        data: CategoryCreate,
+    ) -> RepoResult<Category> {
         // Check duplicate name
         {
             let categories = self.categories.read();
@@ -854,18 +881,34 @@ impl CatalogService {
         let is_virtual = data.is_virtual.unwrap_or(false);
         let match_mode = data.match_mode.as_deref().unwrap_or("any");
         let is_display = data.is_display.unwrap_or(true);
-        let category_id = sqlx::query_scalar!(
-            r#"INSERT INTO category (name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7) RETURNING id as "id!""#,
-            data.name,
-            sort_order,
-            is_kitchen_print_enabled,
-            is_label_print_enabled,
-            is_virtual,
-            match_mode,
-            is_display,
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let category_id: i64 = if let Some(aid) = assigned_id {
+            sqlx::query_scalar(
+                r#"INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8) RETURNING id"#,
+            )
+            .bind(aid)
+            .bind(&data.name)
+            .bind(sort_order)
+            .bind(is_kitchen_print_enabled)
+            .bind(is_label_print_enabled)
+            .bind(is_virtual)
+            .bind(match_mode)
+            .bind(is_display)
+            .fetch_one(&self.pool)
+            .await?
+        } else {
+            sqlx::query_scalar!(
+                r#"INSERT INTO category (name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7) RETURNING id as "id!""#,
+                data.name,
+                sort_order,
+                is_kitchen_print_enabled,
+                is_label_print_enabled,
+                is_virtual,
+                match_mode,
+                is_display,
+            )
+            .fetch_one(&self.pool)
+            .await?
+        };
 
         // Insert print destinations (unified junction table)
         for dest_id in data

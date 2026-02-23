@@ -153,7 +153,7 @@ pub async fn create(
         );
     }
 
-    let product = state.catalog_service.create_product(payload).await?;
+    let product = state.catalog_service.create_product(None, payload).await?;
 
     let id_str = product.id.to_string();
 

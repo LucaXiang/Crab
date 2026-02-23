@@ -75,7 +75,7 @@ pub async fn create(
 ) -> AppResult<Json<Employee>> {
     validate_create(&payload)?;
 
-    let emp = employee::create(&state.pool, payload).await?;
+    let emp = employee::create(&state.pool, None, payload).await?;
 
     let id = emp.id.to_string();
 

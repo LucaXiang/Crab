@@ -58,7 +58,7 @@ pub async fn create(
 ) -> AppResult<Json<Zone>> {
     validate_create(&payload)?;
 
-    let z = zone::create(&state.pool, payload).await?;
+    let z = zone::create(&state.pool, None, payload).await?;
 
     let id = z.id.to_string();
 

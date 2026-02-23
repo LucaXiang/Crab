@@ -37,7 +37,11 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Attribu
     Ok(attr)
 }
 
-pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attribute> {
+pub async fn create(
+    pool: &SqlitePool,
+    assigned_id: Option<i64>,
+    data: AttributeCreate,
+) -> RepoResult<Attribute> {
     let default_option_ids_json = data
         .default_option_ids
         .as_ref()
@@ -49,20 +53,38 @@ pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attr
     let display_order = data.display_order.unwrap_or(0);
     let show_on_receipt = data.show_on_receipt.unwrap_or(false);
     let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(false);
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO attribute (name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id as "id!""#,
-        data.name,
-        is_multi_select,
-        data.max_selections,
-        default_option_ids_json,
-        display_order,
-        show_on_receipt,
-        data.receipt_name,
-        show_on_kitchen_print,
-        data.kitchen_print_name,
-    )
-    .fetch_one(&mut *tx)
-    .await?;
+    let id: i64 = if let Some(aid) = assigned_id {
+        sqlx::query_scalar(
+            r#"INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10) RETURNING id"#,
+        )
+        .bind(aid)
+        .bind(&data.name)
+        .bind(is_multi_select)
+        .bind(data.max_selections)
+        .bind(&default_option_ids_json)
+        .bind(display_order)
+        .bind(show_on_receipt)
+        .bind(&data.receipt_name)
+        .bind(show_on_kitchen_print)
+        .bind(&data.kitchen_print_name)
+        .fetch_one(&mut *tx)
+        .await?
+    } else {
+        sqlx::query_scalar!(
+            r#"INSERT INTO attribute (name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id as "id!""#,
+            data.name,
+            is_multi_select,
+            data.max_selections,
+            default_option_ids_json,
+            display_order,
+            show_on_receipt,
+            data.receipt_name,
+            show_on_kitchen_print,
+            data.kitchen_print_name,
+        )
+        .fetch_one(&mut *tx)
+        .await?
+    };
 
     // Create options
     if let Some(options) = data.options {

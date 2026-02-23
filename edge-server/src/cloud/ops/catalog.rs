@@ -10,8 +10,16 @@ use crate::core::state::ServerState;
 
 // ── Product ──
 
-pub async fn create_product(state: &ServerState, data: ProductCreate) -> CatalogOpResult {
-    match state.catalog_service.create_product(data).await {
+pub async fn create_product(
+    state: &ServerState,
+    assigned_id: Option<i64>,
+    data: ProductCreate,
+) -> CatalogOpResult {
+    match state
+        .catalog_service
+        .create_product(assigned_id, data)
+        .await
+    {
         Ok(p) => {
             state
                 .broadcast_sync("product", "created", &p.id.to_string(), Some(&p))
@@ -48,8 +56,16 @@ pub async fn delete_product(state: &ServerState, id: i64) -> CatalogOpResult {
 
 // ── Category ──
 
-pub async fn create_category(state: &ServerState, data: CategoryCreate) -> CatalogOpResult {
-    match state.catalog_service.create_category(data).await {
+pub async fn create_category(
+    state: &ServerState,
+    assigned_id: Option<i64>,
+    data: CategoryCreate,
+) -> CatalogOpResult {
+    match state
+        .catalog_service
+        .create_category(assigned_id, data)
+        .await
+    {
         Ok(c) => {
             state
                 .broadcast_sync("category", "created", &c.id.to_string(), Some(&c))

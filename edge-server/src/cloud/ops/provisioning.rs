@@ -52,7 +52,7 @@ async fn do_full_sync(
 
     // 1. Tags first (products/categories may reference them)
     for tag_data in &snapshot.tags {
-        let r = attribute::create_tag(state, tag_data).await;
+        let r = attribute::create_tag(state, None, tag_data).await;
         if r.success {
             result.tags_created += 1;
         } else if let Some(e) = r.error {
@@ -63,7 +63,7 @@ async fn do_full_sync(
     // 2. Attributes (bindings reference them)
     let mut attr_id_map: Vec<i64> = Vec::new();
     for attr_item in &snapshot.attributes {
-        let r = attribute::create(state, attr_item.data.clone()).await;
+        let r = attribute::create(state, None, attr_item.data.clone()).await;
         if r.success {
             attr_id_map.push(r.created_id.unwrap_or(-1));
             result.attributes_created += 1;
@@ -82,7 +82,7 @@ async fn do_full_sync(
     for cat_item in &snapshot.categories {
         match state
             .catalog_service
-            .create_category(cat_item.data.clone())
+            .create_category(None, cat_item.data.clone())
             .await
         {
             Ok(c) => {
@@ -141,7 +141,7 @@ async fn do_full_sync(
         let mut data = prod_item.data.clone();
         data.category_id = cat_id;
 
-        match state.catalog_service.create_product(data).await {
+        match state.catalog_service.create_product(None, data).await {
             Ok(p) => {
                 state
                     .broadcast_sync("product", "created", &p.id.to_string(), Some(&p))

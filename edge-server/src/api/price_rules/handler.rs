@@ -159,7 +159,7 @@ pub async fn create(
 ) -> AppResult<Json<PriceRule>> {
     validate_create(&payload)?;
     validate_adjustment_value(&payload.adjustment_type, payload.adjustment_value)?;
-    let rule = price_rule::create(&state.pool, payload).await?;
+    let rule = price_rule::create(&state.pool, None, payload).await?;
 
     let id = rule.id.to_string();
 

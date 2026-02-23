@@ -8,11 +8,12 @@ use crate::core::state::ServerState;
 
 pub async fn create_employee(
     state: &ServerState,
+    assigned_id: Option<i64>,
     data: shared::models::EmployeeCreate,
 ) -> CatalogOpResult {
     use crate::db::repository::employee;
 
-    match employee::create(&state.pool, data).await {
+    match employee::create(&state.pool, assigned_id, data).await {
         Ok(emp) => {
             state
                 .broadcast_sync("employee", "created", &emp.id.to_string(), Some(&emp))
@@ -57,10 +58,14 @@ pub async fn delete_employee(state: &ServerState, id: i64) -> CatalogOpResult {
 
 // ── Zone ──
 
-pub async fn create_zone(state: &ServerState, data: shared::models::ZoneCreate) -> CatalogOpResult {
+pub async fn create_zone(
+    state: &ServerState,
+    assigned_id: Option<i64>,
+    data: shared::models::ZoneCreate,
+) -> CatalogOpResult {
     use crate::db::repository::zone;
 
-    match zone::create(&state.pool, data).await {
+    match zone::create(&state.pool, assigned_id, data).await {
         Ok(z) => {
             state
                 .broadcast_sync("zone", "created", &z.id.to_string(), Some(&z))
@@ -107,11 +112,12 @@ pub async fn delete_zone(state: &ServerState, id: i64) -> CatalogOpResult {
 
 pub async fn create_table(
     state: &ServerState,
+    assigned_id: Option<i64>,
     data: shared::models::DiningTableCreate,
 ) -> CatalogOpResult {
     use crate::db::repository::dining_table;
 
-    match dining_table::create(&state.pool, data).await {
+    match dining_table::create(&state.pool, assigned_id, data).await {
         Ok(t) => {
             state
                 .broadcast_sync("dining_table", "created", &t.id.to_string(), Some(&t))
@@ -158,11 +164,12 @@ pub async fn delete_table(state: &ServerState, id: i64) -> CatalogOpResult {
 
 pub async fn create_price_rule(
     state: &ServerState,
+    assigned_id: Option<i64>,
     data: shared::models::PriceRuleCreate,
 ) -> CatalogOpResult {
     use crate::db::repository::price_rule;
 
-    match price_rule::create(&state.pool, data).await {
+    match price_rule::create(&state.pool, assigned_id, data).await {
         Ok(rule) => {
             state
                 .broadcast_sync("price_rule", "created", &rule.id.to_string(), Some(&rule))

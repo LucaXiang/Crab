@@ -42,17 +42,33 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Ta
     Ok(tag)
 }
 
-pub async fn create(pool: &SqlitePool, data: TagCreate) -> RepoResult<Tag> {
+pub async fn create(
+    pool: &SqlitePool,
+    assigned_id: Option<i64>,
+    data: TagCreate,
+) -> RepoResult<Tag> {
     let color = data.color.unwrap_or_else(|| "#3B82F6".to_string());
     let display_order = data.display_order.unwrap_or(0);
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO tag (name, color, display_order) VALUES (?, ?, ?) RETURNING id as "id!""#,
-        data.name,
-        color,
-        display_order
-    )
-    .fetch_one(pool)
-    .await?;
+    let id: i64 = if let Some(aid) = assigned_id {
+        sqlx::query_scalar(
+            r#"INSERT INTO tag (id, name, color, display_order) VALUES (?, ?, ?, ?) RETURNING id"#,
+        )
+        .bind(aid)
+        .bind(&data.name)
+        .bind(&color)
+        .bind(display_order)
+        .fetch_one(pool)
+        .await?
+    } else {
+        sqlx::query_scalar!(
+            r#"INSERT INTO tag (name, color, display_order) VALUES (?, ?, ?) RETURNING id as "id!""#,
+            data.name,
+            color,
+            display_order
+        )
+        .fetch_one(pool)
+        .await?
+    };
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create tag".into()))

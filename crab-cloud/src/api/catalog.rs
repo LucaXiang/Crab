@@ -1,10 +1,10 @@
-//! Catalog REST API — Console CRUD forwarded to edge via typed RPC
+//! Catalog REST API — Cloud PG authoritative CRUD
 //!
 //! Each write operation:
 //! 1. Verify store ownership
-//! 2. Construct CatalogOp
-//! 3. Send CloudMessage::Rpc to edge via connected_edges channel
-//! 4. Await RpcResult via pending_rpcs oneshot (10s timeout)
+//! 2. Write directly to PG (authoritative source)
+//! 3. Increment catalog version
+//! 4. Fire-and-forget push CatalogOp to edge (if online)
 //! 5. Return CatalogOpResult to console
 //!
 //! Read operations query the normalized PG tables directly (no edge round-trip).
@@ -14,7 +14,7 @@ use axum::{
     extract::{Path, State},
 };
 use shared::cloud::catalog::{CatalogOp, CatalogOpResult};
-use shared::cloud::ws::{CloudMessage, CloudRpc, CloudRpcResult};
+use shared::cloud::ws::{CloudMessage, CloudRpc};
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::tenant_auth::TenantIdentity;
@@ -77,7 +77,7 @@ pub async fn list_attributes(
     Ok(Json(attributes))
 }
 
-// ── Write endpoints (RPC forwarded to edge) ──
+// ── Product write endpoints ──
 
 /// POST /api/tenant/stores/:id/catalog/products
 pub async fn create_product(
@@ -88,7 +88,24 @@ pub async fn create_product(
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
     fire_ensure_image(&state, store_id, &identity.tenant_id, data.image.as_deref()).await;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateProduct { data }).await
+
+    let (source_id, op_data) = catalog::create_product_direct(&state.pool, store_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateProduct {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/products/:pid
@@ -100,15 +117,24 @@ pub async fn update_product(
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
     fire_ensure_image(&state, store_id, &identity.tenant_id, data.image.as_deref()).await;
-    send_catalog_rpc(
+
+    catalog::update_product_direct(&state.pool, store_id, product_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdateProduct {
             id: product_id,
             data,
         },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/products/:pid
@@ -118,13 +144,24 @@ pub async fn delete_product(
     Path((store_id, product_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::delete_product(&state.pool, store_id, product_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::DeleteProduct { id: product_id },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
+
+// ── Category write endpoints ──
 
 /// POST /api/tenant/stores/:id/catalog/categories
 pub async fn create_category(
@@ -134,7 +171,24 @@ pub async fn create_category(
     Json(data): Json<shared::models::category::CategoryCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateCategory { data }).await
+
+    let (source_id, op_data) = catalog::create_category_direct(&state.pool, store_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateCategory {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/categories/:cid
@@ -145,15 +199,24 @@ pub async fn update_category(
     Json(data): Json<shared::models::category::CategoryUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::update_category_direct(&state.pool, store_id, category_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdateCategory {
             id: category_id,
             data,
         },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/categories/:cid
@@ -163,13 +226,24 @@ pub async fn delete_category(
     Path((store_id, category_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::delete_category(&state.pool, store_id, category_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::DeleteCategory { id: category_id },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
+
+// ── Tag write endpoints ──
 
 /// POST /api/tenant/stores/:id/catalog/tags
 pub async fn create_tag(
@@ -179,7 +253,24 @@ pub async fn create_tag(
     Json(data): Json<shared::models::tag::TagCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateTag { data }).await
+
+    let (source_id, op_data) = catalog::create_tag_direct(&state.pool, store_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateTag {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/tags/:tid
@@ -190,7 +281,17 @@ pub async fn update_tag(
     Json(data): Json<shared::models::tag::TagUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::UpdateTag { id: tag_id, data }).await
+
+    catalog::update_tag_direct(&state.pool, store_id, tag_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, CatalogOp::UpdateTag { id: tag_id, data });
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/tags/:tid
@@ -200,8 +301,20 @@ pub async fn delete_tag(
     Path((store_id, tag_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::DeleteTag { id: tag_id }).await
+
+    catalog::delete_tag_direct(&state.pool, store_id, tag_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, CatalogOp::DeleteTag { id: tag_id });
+
+    Ok(Json(CatalogOpResult::ok()))
 }
+
+// ── Attribute write endpoints ──
 
 /// POST /api/tenant/stores/:id/catalog/attributes
 pub async fn create_attribute(
@@ -211,7 +324,24 @@ pub async fn create_attribute(
     Json(data): Json<shared::models::attribute::AttributeCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateAttribute { data }).await
+
+    let (source_id,) = catalog::create_attribute_direct(&state.pool, store_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateAttribute {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/attributes/:aid
@@ -222,12 +352,21 @@ pub async fn update_attribute(
     Json(data): Json<shared::models::attribute::AttributeUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::update_attribute_direct(&state.pool, store_id, attr_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdateAttribute { id: attr_id, data },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/attributes/:aid
@@ -237,7 +376,17 @@ pub async fn delete_attribute(
     Path((store_id, attr_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::DeleteAttribute { id: attr_id }).await
+
+    catalog::delete_attribute_direct(&state.pool, store_id, attr_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, CatalogOp::DeleteAttribute { id: attr_id });
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 /// POST /api/tenant/stores/:id/catalog/attributes/bind
@@ -248,7 +397,26 @@ pub async fn bind_attribute(
     Json(req): Json<BindAttributeRequest>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    let binding_id = catalog::bind_attribute_direct(
+        &state.pool,
+        store_id,
+        catalog::BindAttributeParams {
+            owner_type: req.owner.owner_type(),
+            owner_id: req.owner.owner_id(),
+            attribute_id: req.attribute_id,
+            is_required: req.is_required,
+            display_order: req.display_order,
+            default_option_ids: req.default_option_ids.clone(),
+        },
+    )
+    .await
+    .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::BindAttribute {
@@ -258,8 +426,9 @@ pub async fn bind_attribute(
             display_order: req.display_order,
             default_option_ids: req.default_option_ids,
         },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::created(binding_id)))
 }
 
 /// POST /api/tenant/stores/:id/catalog/attributes/unbind
@@ -270,14 +439,23 @@ pub async fn unbind_attribute(
     Json(req): Json<UnbindAttributeRequest>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::unbind_attribute_direct(&state.pool, store_id, req.binding_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UnbindAttribute {
             binding_id: req.binding_id,
         },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 // ── Price Rule endpoints ──
@@ -303,7 +481,24 @@ pub async fn create_price_rule(
     Json(data): Json<shared::models::price_rule::PriceRuleCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreatePriceRule { data }).await
+
+    let (source_id, op_data) = catalog::create_price_rule_direct(&state.pool, store_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreatePriceRule {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/price-rules/:rid
@@ -314,12 +509,21 @@ pub async fn update_price_rule(
     Json(data): Json<shared::models::price_rule::PriceRuleUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::update_price_rule_direct(&state.pool, store_id, rule_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdatePriceRule { id: rule_id, data },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/price-rules/:rid
@@ -329,7 +533,17 @@ pub async fn delete_price_rule(
     Path((store_id, rule_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::DeletePriceRule { id: rule_id }).await
+
+    catalog::delete_price_rule_direct(&state.pool, store_id, rule_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, CatalogOp::DeletePriceRule { id: rule_id });
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 // ── Employee endpoints ──
@@ -355,7 +569,25 @@ pub async fn create_employee(
     Json(data): Json<shared::models::employee::EmployeeCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateEmployee { data }).await
+
+    let (source_id, op_data) =
+        catalog::create_employee_direct(&state.pool, store_id, &identity.tenant_id, &data)
+            .await
+            .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateEmployee {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/employees/:eid
@@ -366,15 +598,24 @@ pub async fn update_employee(
     Json(data): Json<shared::models::employee::EmployeeUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    let op_data = catalog::update_employee_direct(&state.pool, store_id, employee_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdateEmployee {
             id: employee_id,
             data,
         },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok().with_data(op_data)))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/employees/:eid
@@ -384,12 +625,21 @@ pub async fn delete_employee(
     Path((store_id, employee_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    catalog::delete_employee_direct(&state.pool, store_id, employee_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::DeleteEmployee { id: employee_id },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 // ── Zone endpoints ──
@@ -415,7 +665,25 @@ pub async fn create_zone(
     Json(data): Json<shared::models::zone::ZoneCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateZone { data }).await
+
+    let (source_id, op_data) =
+        catalog::create_zone_direct(&state.pool, store_id, &identity.tenant_id, &data)
+            .await
+            .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateZone {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/zones/:zid
@@ -426,12 +694,21 @@ pub async fn update_zone(
     Json(data): Json<shared::models::zone::ZoneUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    let op_data = catalog::update_zone_direct(&state.pool, store_id, zone_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdateZone { id: zone_id, data },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok().with_data(op_data)))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/zones/:zid
@@ -441,7 +718,17 @@ pub async fn delete_zone(
     Path((store_id, zone_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::DeleteZone { id: zone_id }).await
+
+    catalog::delete_zone_direct(&state.pool, store_id, zone_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, CatalogOp::DeleteZone { id: zone_id });
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 // ── DiningTable endpoints ──
@@ -467,7 +754,25 @@ pub async fn create_table(
     Json(data): Json<shared::models::dining_table::DiningTableCreate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::CreateTable { data }).await
+
+    let (source_id, op_data) =
+        catalog::create_table_direct(&state.pool, store_id, &identity.tenant_id, &data)
+            .await
+            .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        CatalogOp::CreateTable {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(CatalogOpResult::created(source_id).with_data(op_data)))
 }
 
 /// PUT /api/tenant/stores/:id/catalog/tables/:tid
@@ -478,12 +783,21 @@ pub async fn update_table(
     Json(data): Json<shared::models::dining_table::DiningTableUpdate>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(
+
+    let op_data = catalog::update_table_direct(&state.pool, store_id, table_id, &data)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
         &state,
         store_id,
         CatalogOp::UpdateTable { id: table_id, data },
-    )
-    .await
+    );
+
+    Ok(Json(CatalogOpResult::ok().with_data(op_data)))
 }
 
 /// DELETE /api/tenant/stores/:id/catalog/tables/:tid
@@ -493,7 +807,17 @@ pub async fn delete_table(
     Path((store_id, table_id)): Path<(i64, i64)>,
 ) -> ApiResult<CatalogOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
-    send_catalog_rpc(&state, store_id, CatalogOp::DeleteTable { id: table_id }).await
+
+    catalog::delete_table_direct(&state.pool, store_id, table_id)
+        .await
+        .map_err(internal)?;
+    catalog::increment_catalog_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, CatalogOp::DeleteTable { id: table_id });
+
+    Ok(Json(CatalogOpResult::ok()))
 }
 
 // ── Request types ──
@@ -514,28 +838,6 @@ pub struct UnbindAttributeRequest {
     pub binding_id: i64,
 }
 
-// ── RPC helper ──
-
-/// Send a CatalogOp to edge via typed RPC and await the result.
-///
-/// Returns error if edge is offline or doesn't respond within 10 seconds.
-async fn send_catalog_rpc(
-    state: &AppState,
-    store_id: i64,
-    op: CatalogOp,
-) -> ApiResult<CatalogOpResult> {
-    let rpc = CloudRpc::CatalogOp(Box::new(op));
-    let result = crate::services::rpc::call_edge_rpc(&state.edges, store_id, rpc).await?;
-
-    match result {
-        CloudRpcResult::CatalogOp(r) => Ok(Json(*r)),
-        CloudRpcResult::Json { error, .. } => Err(AppError::with_message(
-            ErrorCode::InternalError,
-            error.unwrap_or_else(|| "Unexpected RPC result type".to_string()),
-        )),
-    }
-}
-
 // ── Helpers ──
 
 use super::tenant::verify_store;
@@ -543,6 +845,24 @@ use super::tenant::verify_store;
 fn internal(e: impl std::fmt::Display) -> AppError {
     tracing::error!("Catalog query error: {e}");
     AppError::new(ErrorCode::InternalError)
+}
+
+/// Fire-and-forget push CatalogOp to edge if it's currently connected.
+///
+/// Does NOT block on response. Edge will process the op and update its local SQLite.
+/// If edge is offline, the op is simply dropped — edge will catch up via FullSync on reconnect.
+fn push_to_edge_if_online(state: &AppState, store_id: i64, op: CatalogOp) {
+    let sender = match state.edges.connected.get(&store_id) {
+        Some(s) => s.clone(),
+        None => return,
+    };
+
+    let msg = CloudMessage::Rpc {
+        id: format!("push-{}", uuid::Uuid::new_v4()),
+        payload: Box::new(CloudRpc::CatalogOp(Box::new(op))),
+    };
+
+    let _ = sender.try_send(msg);
 }
 
 /// Fire-and-forget: send EnsureImage RPC to edge so it downloads the image from S3.

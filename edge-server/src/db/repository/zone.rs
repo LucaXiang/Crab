@@ -33,14 +33,29 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Zo
     Ok(zone)
 }
 
-pub async fn create(pool: &SqlitePool, data: ZoneCreate) -> RepoResult<Zone> {
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO zone (name, description) VALUES (?, ?) RETURNING id as "id!""#,
-        data.name,
-        data.description
-    )
-    .fetch_one(pool)
-    .await?;
+pub async fn create(
+    pool: &SqlitePool,
+    assigned_id: Option<i64>,
+    data: ZoneCreate,
+) -> RepoResult<Zone> {
+    let id: i64 = if let Some(aid) = assigned_id {
+        sqlx::query_scalar(
+            r#"INSERT INTO zone (id, name, description) VALUES (?, ?, ?) RETURNING id"#,
+        )
+        .bind(aid)
+        .bind(&data.name)
+        .bind(&data.description)
+        .fetch_one(pool)
+        .await?
+    } else {
+        sqlx::query_scalar!(
+            r#"INSERT INTO zone (name, description) VALUES (?, ?) RETURNING id as "id!""#,
+            data.name,
+            data.description
+        )
+        .fetch_one(pool)
+        .await?
+    };
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create zone".into()))

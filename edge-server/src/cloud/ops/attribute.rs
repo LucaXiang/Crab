@@ -7,10 +7,14 @@ use crate::core::state::ServerState;
 
 // ── Attribute ──
 
-pub async fn create(state: &ServerState, data: AttributeCreate) -> CatalogOpResult {
+pub async fn create(
+    state: &ServerState,
+    assigned_id: Option<i64>,
+    data: AttributeCreate,
+) -> CatalogOpResult {
     use crate::db::repository::attribute;
 
-    match attribute::create(&state.pool, data).await {
+    match attribute::create(&state.pool, assigned_id, data).await {
         Ok(attr) => {
             state
                 .broadcast_sync("attribute", "created", &attr.id.to_string(), Some(&attr))
@@ -147,11 +151,12 @@ pub async fn unbind(state: &ServerState, binding_id: i64) -> CatalogOpResult {
 
 pub async fn create_tag(
     state: &ServerState,
+    assigned_id: Option<i64>,
     data: &shared::models::tag::TagCreate,
 ) -> CatalogOpResult {
     use crate::db::repository::tag;
 
-    match tag::create(&state.pool, data.clone()).await {
+    match tag::create(&state.pool, assigned_id, data.clone()).await {
         Ok(t) => {
             state
                 .broadcast_sync("tag", "created", &t.id.to_string(), Some(&t))

@@ -175,6 +175,7 @@ mod tests {
             id: "rpc-001".into(),
             payload: Box::new(CloudRpc::CatalogOp(Box::new(
                 super::super::catalog::CatalogOp::CreateProduct {
+                    id: None,
                     data: crate::models::product::ProductCreate {
                         name: "Test".into(),
                         image: None,
@@ -214,7 +215,7 @@ mod tests {
         let CloudRpc::CatalogOp(op) = *payload else {
             panic!("Expected CatalogOp");
         };
-        let super::super::catalog::CatalogOp::CreateProduct { data } = *op else {
+        let super::super::catalog::CatalogOp::CreateProduct { data, .. } = *op else {
             panic!("Expected CreateProduct");
         };
         assert_eq!(data.name, "Test");

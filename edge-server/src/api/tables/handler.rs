@@ -56,7 +56,7 @@ pub async fn create(
 ) -> AppResult<Json<DiningTable>> {
     validate_create(&payload)?;
 
-    let table = dining_table::create(&state.pool, payload).await?;
+    let table = dining_table::create(&state.pool, None, payload).await?;
 
     let id = table.id.to_string();
 

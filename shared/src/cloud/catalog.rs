@@ -23,6 +23,8 @@ use crate::models::{
 pub enum CatalogOp {
     // ── Product ──
     CreateProduct {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: ProductCreate,
     },
     UpdateProduct {
@@ -35,6 +37,8 @@ pub enum CatalogOp {
 
     // ── Category ──
     CreateCategory {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: CategoryCreate,
     },
     UpdateCategory {
@@ -47,6 +51,8 @@ pub enum CatalogOp {
 
     // ── Attribute ──
     CreateAttribute {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: AttributeCreate,
     },
     UpdateAttribute {
@@ -72,6 +78,8 @@ pub enum CatalogOp {
 
     // ── Tag ──
     CreateTag {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: TagCreate,
     },
     UpdateTag {
@@ -84,6 +92,8 @@ pub enum CatalogOp {
 
     // ── Price Rule ──
     CreatePriceRule {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: PriceRuleCreate,
     },
     UpdatePriceRule {
@@ -96,6 +106,8 @@ pub enum CatalogOp {
 
     // ── Employee ──
     CreateEmployee {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: EmployeeCreate,
     },
     UpdateEmployee {
@@ -108,6 +120,8 @@ pub enum CatalogOp {
 
     // ── Zone ──
     CreateZone {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: ZoneCreate,
     },
     UpdateZone {
@@ -120,6 +134,8 @@ pub enum CatalogOp {
 
     // ── DiningTable ──
     CreateTable {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
         data: DiningTableCreate,
     },
     UpdateTable {

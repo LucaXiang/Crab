@@ -58,7 +58,7 @@ pub async fn create(
 ) -> AppResult<Json<Tag>> {
     validate_create(&payload)?;
 
-    let t = tag::create(&state.pool, payload).await?;
+    let t = tag::create(&state.pool, None, payload).await?;
 
     let id = t.id.to_string();
 

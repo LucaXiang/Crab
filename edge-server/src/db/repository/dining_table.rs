@@ -48,16 +48,32 @@ pub async fn find_by_name_in_zone(
     Ok(table)
 }
 
-pub async fn create(pool: &SqlitePool, data: DiningTableCreate) -> RepoResult<DiningTable> {
+pub async fn create(
+    pool: &SqlitePool,
+    assigned_id: Option<i64>,
+    data: DiningTableCreate,
+) -> RepoResult<DiningTable> {
     let capacity = data.capacity.unwrap_or(4);
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO dining_table (name, zone_id, capacity) VALUES (?, ?, ?) RETURNING id as "id!""#,
-        data.name,
-        data.zone_id,
-        capacity
-    )
-    .fetch_one(pool)
-    .await?;
+    let id: i64 = if let Some(aid) = assigned_id {
+        sqlx::query_scalar(
+            r#"INSERT INTO dining_table (id, name, zone_id, capacity) VALUES (?, ?, ?, ?) RETURNING id"#,
+        )
+        .bind(aid)
+        .bind(&data.name)
+        .bind(data.zone_id)
+        .bind(capacity)
+        .fetch_one(pool)
+        .await?
+    } else {
+        sqlx::query_scalar!(
+            r#"INSERT INTO dining_table (name, zone_id, capacity) VALUES (?, ?, ?) RETURNING id as "id!""#,
+            data.name,
+            data.zone_id,
+            capacity
+        )
+        .fetch_one(pool)
+        .await?
+    };
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create dining table".into()))
