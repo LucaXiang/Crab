@@ -9,6 +9,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+#[cfg(windows)]
+use tracing::debug;
 use tracing::{info, instrument, warn};
 
 /// Trait for printer adapters
@@ -373,9 +375,13 @@ impl WindowsPrinter {
             s.encode_utf16().chain(std::iter::once(0)).collect()
         }
 
+        debug!(printer = %self.name, bytes = data.len(), "write_raw: sending data");
+
         unsafe {
             // Check if printer is online first
-            if !Self::check_online(&self.name).unwrap_or(true) {
+            let offline = !Self::check_online(&self.name).unwrap_or(true);
+            debug!(printer = %self.name, online = !offline, "write_raw: online check");
+            if offline {
                 return Err(PrintError::Offline(self.name.clone()));
             }
 
@@ -384,6 +390,7 @@ impl WindowsPrinter {
 
             OpenPrinterW(PCWSTR::from_raw(name_w.as_ptr()), &mut handle, None)
                 .map_err(|_| PrintError::WindowsPrinter("OpenPrinterW failed".to_string()))?;
+            debug!(printer = %self.name, "write_raw: printer opened");
 
             let doc_name_w = to_wide("Raw Document");
             let datatype_w = to_wide("RAW");
@@ -415,6 +422,8 @@ impl WindowsPrinter {
                 data.len() as u32,
                 &mut written,
             );
+
+            debug!(printer = %self.name, written, total = data.len(), "write_raw: data written");
 
             let _ = EndPagePrinter(handle);
             let _ = EndDocPrinter(handle);

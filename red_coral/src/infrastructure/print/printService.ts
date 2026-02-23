@@ -71,6 +71,7 @@ export interface ReceiptData {
   surcharge: ReceiptSurchargeInfo | null;
   items: ReceiptItem[];
   total_amount: number;
+  queue_number: number | null;
   qr_data: string | null;
 }
 

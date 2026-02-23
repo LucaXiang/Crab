@@ -59,6 +59,10 @@ impl PrintExecutor {
     ) -> PrintExecutorResult<()> {
         // Group items by destination
         let grouped = self.group_by_destination(order);
+        tracing::debug!(
+            destination_count = grouped.len(),
+            "print_kitchen_order: items grouped"
+        );
 
         if grouped.is_empty() {
             info!("No items to print");
@@ -155,6 +159,13 @@ impl PrintExecutor {
 
     /// Send data to a specific printer
     async fn send_to_printer(&self, printer: &Printer, data: &[u8]) -> PrintExecutorResult<()> {
+        tracing::debug!(
+            connection = %printer.connection,
+            driver = ?printer.driver_name,
+            ip = ?printer.ip,
+            bytes = data.len(),
+            "send_to_printer: attempting"
+        );
         match printer.connection.as_str() {
             "driver" => self.send_to_driver_printer(printer, data).await,
             "network" => self.send_to_network_printer(printer, data).await,
@@ -222,6 +233,221 @@ impl PrintExecutor {
             .print(data)
             .await
             .map_err(|e| PrintExecutorError::PrintFailed(e.to_string()))
+    }
+
+    /// Print label records (Windows: GDI+ rendering via crab-printer)
+    #[cfg(windows)]
+    #[instrument(skip(self, records, destinations, template), fields(record_count = records.len()))]
+    pub async fn print_label_records(
+        &self,
+        records: &[super::types::LabelPrintRecord],
+        destinations: &HashMap<String, PrintDestination>,
+        template: &crab_printer::label::LabelTemplate,
+        table_name: Option<&str>,
+        queue_number: Option<u32>,
+    ) -> PrintExecutorResult<()> {
+        for record in records {
+            tracing::debug!(
+                record_id = %record.id,
+                product = %record.context.product_name,
+                label_dests = record.context.label_destinations.len(),
+                "print_label_records: processing record"
+            );
+            for dest_id in &record.context.label_destinations {
+                let dest = match destinations.get(dest_id) {
+                    Some(d) => d,
+                    None => {
+                        warn!(dest_id = %dest_id, "Label destination not found, skipping");
+                        continue;
+                    }
+                };
+
+                // 找活跃的驱动打印机（优先级排序）
+                let printer = dest
+                    .printers
+                    .iter()
+                    .filter(|p| p.is_active && p.connection == "driver")
+                    .min_by_key(|p| p.priority);
+
+                let Some(printer) = printer else {
+                    warn!(dest = %dest.name, "No active driver printer for labels");
+                    continue;
+                };
+
+                let driver_name = match &printer.driver_name {
+                    Some(name) => name.clone(),
+                    None => {
+                        warn!("Label printer has no driver_name");
+                        continue;
+                    }
+                };
+
+                let data = build_label_data(&record.context, table_name, queue_number);
+
+                let options = crab_printer::label::PrintOptions {
+                    printer_name: Some(driver_name),
+                    doc_name: "label".to_string(),
+                    label_width_mm: template.width_mm,
+                    label_height_mm: template.height_mm,
+                    copies: 1,
+                    fit: crab_printer::label::FitMode::Contain,
+                    rotate: crab_printer::label::Rotation::R0,
+                    override_dpi: None,
+                };
+
+                let template_clone = template.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    crab_printer::label::render_and_print_label(
+                        &data,
+                        Some(&template_clone),
+                        &options,
+                    )
+                })
+                .await;
+
+                match result {
+                    Ok(Ok(())) => {
+                        info!(
+                            record_id = %record.id,
+                            product = %record.context.product_name,
+                            index = ?record.context.index,
+                            "Label printed"
+                        );
+                        break; // 成功打印，不再尝试其他目的地
+                    }
+                    Ok(Err(e)) => {
+                        error!(
+                            record_id = %record.id,
+                            dest = %dest.name,
+                            error = %e,
+                            "Label print failed"
+                        );
+                    }
+                    Err(e) => {
+                        error!(record_id = %record.id, error = %e, "Label print task panicked");
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Print label records (non-Windows: not supported)
+    #[cfg(not(windows))]
+    pub async fn print_label_records(
+        &self,
+        _records: &[super::types::LabelPrintRecord],
+        _destinations: &HashMap<String, PrintDestination>,
+        _table_name: Option<&str>,
+        _queue_number: Option<u32>,
+    ) -> PrintExecutorResult<()> {
+        warn!("Label printing requires Windows (GDI+)");
+        Ok(())
+    }
+}
+
+/// Build label data JSON from PrintItemContext
+#[cfg(windows)]
+fn build_label_data(
+    ctx: &super::types::PrintItemContext,
+    table_name: Option<&str>,
+    queue_number: Option<u32>,
+) -> serde_json::Value {
+    let time = chrono::Local::now().format("%H:%M").to_string();
+    serde_json::json!({
+        "product_name": ctx.product_name,
+        "kitchen_name": ctx.kitchen_name,
+        "item_name": ctx.kitchen_name,
+        "category_name": ctx.category_name,
+        "spec_name": ctx.spec_name.as_deref().unwrap_or(""),
+        "specs": ctx.spec_name.as_deref().unwrap_or(""),
+        "options": ctx.options.join(", "),
+        "quantity": ctx.quantity,
+        "index": ctx.index.as_deref().unwrap_or(""),
+        "note": ctx.note.as_deref().unwrap_or(""),
+        "external_id": ctx.external_id.unwrap_or(0),
+        "table_name": table_name.unwrap_or(""),
+        "queue_number": queue_number.map(|n| format!("#{:03}", n)).unwrap_or_default(),
+        "time": time,
+    })
+}
+
+/// Convert DB LabelTemplate to crab-printer LabelTemplate
+#[cfg(windows)]
+pub fn convert_label_template(
+    db_template: &shared::models::LabelTemplate,
+) -> crab_printer::label::LabelTemplate {
+    let fields = db_template
+        .fields
+        .iter()
+        .filter(|f| f.visible)
+        .filter_map(convert_label_field)
+        .collect();
+
+    crab_printer::label::LabelTemplate {
+        width_mm: db_template.width_mm.unwrap_or(db_template.width),
+        height_mm: db_template.height_mm.unwrap_or(db_template.height),
+        padding_mm_x: db_template.padding_mm_x.unwrap_or(0.0),
+        padding_mm_y: db_template.padding_mm_y.unwrap_or(0.0),
+        fields,
+    }
+}
+
+#[cfg(windows)]
+fn convert_label_field(
+    f: &shared::models::LabelField,
+) -> Option<crab_printer::label::TemplateField> {
+    use shared::models::LabelFieldType;
+    match f.field_type {
+        LabelFieldType::Text
+        | LabelFieldType::Datetime
+        | LabelFieldType::Price
+        | LabelFieldType::Counter => Some(crab_printer::label::TemplateField::Text(
+            crab_printer::label::TextField {
+                x: f.x,
+                y: f.y,
+                width: f.width,
+                height: f.height,
+                font_size: f.font_size as f32,
+                font_family: f.font_family.clone(),
+                style: if f.font_weight.as_deref() == Some("bold") {
+                    crab_printer::label::TextStyle::Bold
+                } else {
+                    crab_printer::label::TextStyle::Regular
+                },
+                align: match f.alignment {
+                    Some(shared::models::LabelFieldAlignment::Center) => {
+                        crab_printer::label::TextAlign::Center
+                    }
+                    Some(shared::models::LabelFieldAlignment::Right) => {
+                        crab_printer::label::TextAlign::Right
+                    }
+                    _ => crab_printer::label::TextAlign::Left,
+                },
+                template: f
+                    .template
+                    .clone()
+                    .or_else(|| f.data_key.as_ref().map(|k| format!("{{{}}}", k)))
+                    .unwrap_or_default(),
+            },
+        )),
+        LabelFieldType::Image | LabelFieldType::Barcode | LabelFieldType::Qrcode => Some(
+            crab_printer::label::TemplateField::Image(crab_printer::label::ImageField {
+                x: f.x,
+                y: f.y,
+                width: f.width,
+                height: f.height,
+                maintain_aspect_ratio: f.maintain_aspect_ratio.unwrap_or(true),
+                data_key: f.data_key.clone().unwrap_or_else(|| f.name.clone()),
+            }),
+        ),
+        LabelFieldType::Separator => Some(crab_printer::label::TemplateField::Separator(
+            crab_printer::label::SeparatorField {
+                y: f.y,
+                x_start: Some(f.x),
+                x_end: Some(f.x + f.width),
+            },
+        )),
     }
 }
 

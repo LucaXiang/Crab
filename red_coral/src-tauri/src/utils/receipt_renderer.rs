@@ -80,9 +80,14 @@ impl<'a> ReceiptRenderer<'a> {
         // MESA: [Name]           OP: [Admin/User] (If we had op name)
         // Since we only have table_name, let's just make it clear.
 
-        let zone_str = self.receipt.zone_name.as_deref().unwrap_or("");
-        let table_full = format!("{} MESA: {}", zone_str, self.receipt.table_name);
-        b.line_lr(table_full.trim(), "Terminal: 01");
+        if let Some(qn) = self.receipt.queue_number {
+            let pedido_str = format!("PEDIDO: #{:03}", qn);
+            b.line_lr(&pedido_str, "Terminal: 01");
+        } else {
+            let zone_str = self.receipt.zone_name.as_deref().unwrap_or("");
+            let table_full = format!("{} MESA: {}", zone_str, self.receipt.table_name);
+            b.line_lr(table_full.trim(), "Terminal: 01");
+        }
 
         let guest_str = format!("Pers: {}", self.receipt.guest_count.unwrap_or(0));
         let opened_str = format!(
@@ -384,33 +389,6 @@ impl<'a> ReceiptRenderer<'a> {
         b.bold_off();
         b.eq_sep();
 
-        let qr_payload = self
-            .receipt
-            .qr_data
-            .as_deref()
-            .unwrap_or("https://verifactu.example/qr?ref=TEST-001");
-        b.align_center();
-        b.write("\x1D\x28\x6B\x04\x00\x31\x41\x31\x00");
-        b.write("\x1D\x28\x6B\x03\x00\x31\x43\x06");
-        b.write("\x1D\x28\x6B\x03\x00\x31\x45\x31");
-        let data_bytes = qr_payload.as_bytes();
-        // GS ( k: pL pH = (data_len + 3) as u16 little-endian
-        let total_len = (data_bytes.len() + 3) as u16;
-        let p_l = (total_len & 0xFF) as u8;
-        let p_h = (total_len >> 8) as u8;
-        let mut store_cmd = String::new();
-        store_cmd.push('\x1D');
-        store_cmd.push('(');
-        store_cmd.push('k');
-        store_cmd.push(char::from(p_l));
-        store_cmd.push(char::from(p_h));
-        store_cmd.push('\x31');
-        store_cmd.push('\x50');
-        store_cmd.push('\x30');
-        b.write(&store_cmd);
-        b.write(qr_payload);
-        b.write("\x1D\x28\x6B\x03\x00\x31\x51\x30");
-        b.write("\n\n");
         b.write("\n\n\n");
         b.write("\x1D\x56\x00");
         b.finalize()

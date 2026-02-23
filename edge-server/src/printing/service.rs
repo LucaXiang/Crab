@@ -87,6 +87,13 @@ impl KitchenPrintService {
             return Ok(None);
         }
 
+        tracing::debug!(
+            kitchen_enabled,
+            label_enabled,
+            items_count = items.len(),
+            "process_items_added: processing items"
+        );
+
         // Build print contexts for each item
         let mut kitchen_items = Vec::new();
         let mut label_records = Vec::new();
@@ -142,6 +149,11 @@ impl KitchenPrintService {
         for record in &label_records {
             self.storage.store_label_record(&txn, record)?;
         }
+        tracing::debug!(
+            kitchen_items = kitchen_order.items.len(),
+            label_records = label_records.len(),
+            "process_items_added: records created"
+        );
         txn.commit().map_err(PrintStorageError::from)?;
 
         Ok(Some(kitchen_order.id))

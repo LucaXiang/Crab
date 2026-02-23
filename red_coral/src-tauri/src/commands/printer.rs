@@ -50,6 +50,12 @@ pub fn print_receipt(
     printer_name: Option<String>,
     receipt: ReceiptData,
 ) -> Result<ApiResponse<()>, String> {
+    tracing::debug!(
+        printer = ?printer_name,
+        order_id = %receipt.order_id,
+        items = receipt.items.len(),
+        "print_receipt: entry"
+    );
     match printing::print_receipt(printer_name, receipt) {
         Ok(()) => Ok(ApiResponse::success(())),
         Err(e) => {
@@ -79,6 +85,13 @@ pub struct LabelPrintRequest {
 /// 打印标签
 #[tauri::command]
 pub fn print_label(request: LabelPrintRequest) -> Result<ApiResponse<()>, String> {
+    tracing::debug!(
+        printer = ?request.printer_name,
+        has_template = request.template.is_some(),
+        label_w = ?request.label_width_mm,
+        label_h = ?request.label_height_mm,
+        "print_label: entry"
+    );
     match printing::print_label(request) {
         Ok(()) => Ok(ApiResponse::success(())),
         Err(e) => {

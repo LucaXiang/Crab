@@ -49,6 +49,14 @@ mod platform {
     ) -> Result<(), String> {
         let name = resolve_printer(printer_name)?;
         info!(printer = name, "printing receipt");
+        tracing::debug!(
+            has_logo = receipt
+                .store_info
+                .as_ref()
+                .and_then(|i| i.logo_url.as_ref())
+                .is_some(),
+            "print_receipt: starting render"
+        );
 
         // Initialize printer (ESC @)
         let mut data: Vec<u8> = vec![0x1B, 0x40];
@@ -70,6 +78,12 @@ mod platform {
         // Render receipt content
         let output = ReceiptRenderer::new(&receipt, 48).render();
         let text_bytes = convert_mixed_utf8_to_gbk(output.as_bytes());
+        tracing::debug!(
+            rendered_bytes = output.len(),
+            gbk_bytes = text_bytes.len(),
+            total_bytes = data.len() + text_bytes.len(),
+            "print_receipt: rendered and encoded"
+        );
         data.extend_from_slice(&text_bytes);
 
         // Print using crab-printer (sync — no async overhead needed)
@@ -94,6 +108,10 @@ mod platform {
         };
 
         info!(?options, "printing label");
+        tracing::debug!(
+            has_template = template.is_some(),
+            "print_label: calling render_and_print_label"
+        );
         crate::utils::label_printer::render_and_print_label(
             &request.data,
             template.as_ref(),

@@ -67,6 +67,7 @@ pub struct ReceiptData {
     pub surcharge: Option<SurchargeInfo>,
     pub items: Vec<ReceiptItem>,
     pub total_amount: f64,
+    pub queue_number: Option<u32>,
     pub qr_data: Option<String>,
 }
 

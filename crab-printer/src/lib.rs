@@ -52,3 +52,6 @@ pub use escpos::process_logo;
 
 #[cfg(windows)]
 pub use printer::WindowsPrinter;
+
+#[cfg(windows)]
+pub mod label;
