@@ -19,8 +19,8 @@ pub mod util;
 /// Git commit hash (short), embedded at compile time by build.rs
 pub const GIT_HASH: &str = env!("GIT_HASH");
 
-/// Default auth server URL (production, public HTTPS via Caddy)
-pub const DEFAULT_AUTH_SERVER_URL: &str = "https://auth.redcoral.app";
+/// Default cloud server URL (production, public HTTPS via Caddy)
+pub const DEFAULT_AUTH_SERVER_URL: &str = "https://cloud.redcoral.app";
 
 /// Default cloud sync URL (production, mTLS direct connection on port 8443)
 pub const DEFAULT_CLOUD_SYNC_URL: &str = "https://sync.redcoral.app:8443";

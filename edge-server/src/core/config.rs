@@ -173,7 +173,7 @@ impl Config {
     /// | HTTP_PORT | 3000 | HTTP 端口 |
     /// | MESSAGE_TCP_PORT | 8081 | TCP 消息端口 |
     /// | ENVIRONMENT | development | 运行环境 |
-    /// | AUTH_SERVER_URL | https://auth.redcoral.app | 认证服务器 |
+    /// | AUTH_SERVER_URL | https://cloud.redcoral.app | 认证服务器 |
     pub fn from_env() -> Self {
         Self::builder()
             .work_dir(std::env::var("WORK_DIR").unwrap_or_else(|_| "/var/lib/crab/edge".into()))
