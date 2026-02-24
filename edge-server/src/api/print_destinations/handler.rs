@@ -9,7 +9,7 @@ use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::repository::print_destination;
+use crate::db::repository::{print_config, print_destination};
 use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, MAX_SHORT_TEXT_LEN, validate_optional_text, validate_required_text,
 };
@@ -84,6 +84,9 @@ pub async fn create(
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&item))
         .await;
+
+    // Auto-set as global default if none exists for this purpose
+    auto_set_default_if_missing(&state, &item).await;
 
     Ok(Json(item))
 }
@@ -175,7 +178,134 @@ pub async fn delete(
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
             .await;
+
+        // Clean up global default if it referenced the deleted destination
+        clear_default_if_deleted(&state, id).await;
     }
 
     Ok(Json(result))
+}
+
+// =============================================================================
+// Print Config Auto-Sync Helpers
+// =============================================================================
+
+/// After creating a PrintDestination, auto-set it as the global default
+/// if no default exists for this purpose.
+async fn auto_set_default_if_missing(state: &ServerState, dest: &PrintDestination) {
+    let defaults = state.catalog_service.get_print_defaults();
+    let id_str = dest.id.to_string();
+
+    let (kitchen, label) = match dest.purpose.as_str() {
+        "kitchen" if defaults.kitchen_destination.is_none() => {
+            (Some(id_str), defaults.label_destination)
+        }
+        "label" if defaults.label_destination.is_none() => {
+            (defaults.kitchen_destination, Some(id_str))
+        }
+        _ => return,
+    };
+
+    if let Err(e) = print_config::update(
+        &state.pool,
+        kitchen.as_deref(),
+        label.as_deref(),
+    )
+    .await
+    {
+        tracing::error!(error = ?e, "Failed to auto-set print_config default");
+        return;
+    }
+
+    state
+        .catalog_service
+        .set_print_defaults(kitchen.clone(), label.clone());
+
+    tracing::info!(
+        kitchen = ?kitchen,
+        label = ?label,
+        "Auto-set print_config default for new destination"
+    );
+
+    broadcast_print_config(state, kitchen, label).await;
+}
+
+/// After deleting a PrintDestination, clear or fall back the global default
+/// if it referenced the deleted ID.
+async fn clear_default_if_deleted(state: &ServerState, deleted_id: i64) {
+    let defaults = state.catalog_service.get_print_defaults();
+    let deleted_str = deleted_id.to_string();
+
+    let mut kitchen = defaults.kitchen_destination;
+    let mut label = defaults.label_destination;
+    let mut changed = false;
+
+    if kitchen.as_deref() == Some(&deleted_str) {
+        kitchen = find_next_active_destination(&state.pool, "kitchen", deleted_id).await;
+        changed = true;
+    }
+    if label.as_deref() == Some(&deleted_str) {
+        label = find_next_active_destination(&state.pool, "label", deleted_id).await;
+        changed = true;
+    }
+
+    if !changed {
+        return;
+    }
+
+    if let Err(e) = print_config::update(
+        &state.pool,
+        kitchen.as_deref(),
+        label.as_deref(),
+    )
+    .await
+    {
+        tracing::error!(error = ?e, "Failed to update print_config after deletion");
+        return;
+    }
+
+    state
+        .catalog_service
+        .set_print_defaults(kitchen.clone(), label.clone());
+
+    tracing::info!(
+        kitchen = ?kitchen,
+        label = ?label,
+        "Updated print_config default after destination deletion"
+    );
+
+    broadcast_print_config(state, kitchen, label).await;
+}
+
+/// Find the next active PrintDestination with the given purpose, excluding `excluded_id`.
+async fn find_next_active_destination(
+    pool: &sqlx::SqlitePool,
+    purpose: &str,
+    excluded_id: i64,
+) -> Option<String> {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM print_destination WHERE purpose = ? AND is_active = 1 AND id != ? LIMIT 1",
+    )
+    .bind(purpose)
+    .bind(excluded_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .map(|id| id.to_string())
+}
+
+/// Broadcast a print_config update to connected clients.
+async fn broadcast_print_config(
+    state: &ServerState,
+    kitchen: Option<String>,
+    label: Option<String>,
+) {
+    let config = serde_json::json!({
+        "default_kitchen_printer": kitchen,
+        "default_label_printer": label,
+    });
+    state
+        .broadcast_sync("print_config", "updated", "default", Some(&config))
+        .await;
 }

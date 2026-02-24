@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Server, Printer, Trash2, Edit2, Plus, Wifi, Monitor, ChefHat, Tag } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Server, Printer, Trash2, Edit2, Plus, Wifi, Monitor, ChefHat, Tag, Settings2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
+import { createTauriClient } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
 import { PrinterEditModal } from './PrinterEditModal';
-import type { PrintDestination, PrintPurpose, Printer as PrinterModel } from '@/core/domain/types/api';
+import type { PrintDestination, PrintPurpose, PrintConfig, Printer as PrinterModel } from '@/core/domain/types/api';
+
+const getApi = () => createTauriClient();
 
 interface PrintStationsTabProps {
   systemPrinters: string[];
@@ -68,9 +71,36 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
     port?: number;
   } | null>(null);
 
+  // Print Config state
+  const [printConfig, setPrintConfig] = useState<PrintConfig>({ default_kitchen_printer: null, default_label_printer: null });
+  const [configSaving, setConfigSaving] = useState(false);
+
+  // Filter destinations by purpose
+  const kitchenDestinations = useMemo(() => items.filter((d) => d.purpose === 'kitchen' && d.is_active), [items]);
+  const labelDestinations = useMemo(() => items.filter((d) => d.purpose === 'label' && d.is_active), [items]);
+
   useEffect(() => {
     fetchAll();
+    getApi().getPrintConfig().then(setPrintConfig).catch((e) => {
+      logger.error('Failed to load print config', e);
+    });
   }, []);
+
+  const handleConfigChange = async (field: keyof PrintConfig, value: string | null) => {
+    const newConfig = { ...printConfig, [field]: value };
+    setPrintConfig(newConfig);
+    setConfigSaving(true);
+    try {
+      const saved = await getApi().updatePrintConfig(newConfig);
+      setPrintConfig(saved);
+    } catch (e) {
+      logger.error('Failed to update print config', e);
+      // Revert on failure
+      setPrintConfig(printConfig);
+    } finally {
+      setConfigSaving(false);
+    }
+  };
 
   const handleSave = async (data: {
     name: string;
@@ -146,6 +176,62 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* 全局默认打印站 */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
+            <Settings2 size={20} className="text-violet-600" />
+          </div>
+          <div>
+            <h4 className="font-bold text-gray-900">{t('settings.printer.defaults.title')}</h4>
+            <p className="text-xs text-gray-500 mt-0.5">{t('settings.printer.defaults.description')}</p>
+          </div>
+          {configSaving && (
+            <div className="ml-auto w-4 h-4 border-2 border-gray-200 border-t-violet-600 rounded-full animate-spin" />
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* 默认厨房打印站 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <span className="inline-flex items-center gap-1.5">
+                <ChefHat size={14} className="text-orange-600" />
+                {t('settings.printer.defaults.kitchen')}
+              </span>
+            </label>
+            <select
+              value={printConfig.default_kitchen_printer ?? ''}
+              onChange={(e) => handleConfigChange('default_kitchen_printer', e.target.value || null)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+            >
+              <option value="">{t('settings.printer.defaults.none')}</option>
+              {kitchenDestinations.map((d) => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+          {/* 默认标签打印站 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <span className="inline-flex items-center gap-1.5">
+                <Tag size={14} className="text-amber-600" />
+                {t('settings.printer.defaults.label')}
+              </span>
+            </label>
+            <select
+              value={printConfig.default_label_printer ?? ''}
+              onChange={(e) => handleConfigChange('default_label_printer', e.target.value || null)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+            >
+              <option value="">{t('settings.printer.defaults.none')}</option>
+              {labelDestinations.map((d) => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* 说明卡片 */}
       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-start gap-3">
         <Server size={20} className="text-indigo-600 mt-0.5 shrink-0" />

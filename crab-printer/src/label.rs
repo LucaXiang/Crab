@@ -1,10 +1,8 @@
-#![cfg(windows)]
-
 use std::alloc::{Layout, alloc_zeroed, dealloc};
 use std::mem::{align_of, size_of};
 use std::ptr::NonNull;
 
-use tracing::debug;
+use tracing::{debug, info};
 use windows::Win32::Foundation::{E_FAIL, E_INVALIDARG, GetLastError};
 use windows::Win32::Graphics::Gdi::{
     BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DEVMODEW, DIB_RGB_COLORS, DM_DEFAULTSOURCE,
@@ -30,7 +28,7 @@ use windows::core::{Error, HRESULT, PCWSTR, PWSTR, Result as WinResult, w};
 use serde::{Deserialize, Serialize};
 
 #[link(name = "gdi32")]
-extern "system" {
+unsafe extern "system" {
     fn AbortDoc(hdc: HDC) -> i32;
     fn EndDoc(hdc: HDC) -> i32;
     fn EndPage(hdc: HDC) -> i32;
@@ -820,11 +818,32 @@ pub fn render_label_gdiplus(
         let _black_brush_guard = BrushGuard(black_brush as *mut _);
 
         // Render all fields dynamically based on template
+        let data_keys: Vec<&str> = if let Some(obj) = data.as_object() {
+            obj.keys().map(|k| k.as_str()).collect()
+        } else {
+            vec![]
+        };
+        info!(
+            fields_count = template.fields.len(),
+            ?data_keys,
+            "render_label_gdiplus: rendering fields"
+        );
+
         for field in &template.fields {
             match field {
                 TemplateField::Text(text_field) => {
                     // Render template with data
                     let rendered_text = render_template(&text_field.template, data);
+                    debug!(
+                        template = %text_field.template,
+                        rendered = %rendered_text,
+                        x = text_field.x,
+                        y = text_field.y,
+                        w = text_field.width,
+                        h = text_field.height,
+                        font_size = text_field.font_size,
+                        "render field"
+                    );
 
                     // Create a temporary field with adjusted coordinates
                     let mut adj_field = text_field.clone();
@@ -903,14 +922,16 @@ unsafe fn draw_image(
     }
 
     let stride = (img_width * 4) as i32;
-    let status = GdipCreateBitmapFromScan0(
-        img_width as i32,
-        img_height as i32,
-        stride,
-        PIXEL_FORMAT_32BPP_ARGB,
-        Some(argb_data.as_ptr()),
-        &mut img_bitmap,
-    );
+    let status = unsafe {
+        GdipCreateBitmapFromScan0(
+            img_width as i32,
+            img_height as i32,
+            stride,
+            PIXEL_FORMAT_32BPP_ARGB,
+            Some(argb_data.as_ptr()),
+            &mut img_bitmap,
+        )
+    };
 
     if status.0 != 0 || img_bitmap.is_null() {
         return Err(Error::new(E_FAIL, "Failed to create image bitmap"));
@@ -944,14 +965,16 @@ unsafe fn draw_image(
 
     // Draw the image
     use windows::Win32::Graphics::GdiPlus::GdipDrawImageRect;
-    let status = GdipDrawImageRect(
-        graphics,
-        img_bitmap as *mut _,
-        dest_x,
-        dest_y,
-        dest_width,
-        dest_height,
-    );
+    let status = unsafe {
+        GdipDrawImageRect(
+            graphics,
+            img_bitmap as *mut _,
+            dest_x,
+            dest_y,
+            dest_width,
+            dest_height,
+        )
+    };
 
     if status.0 != 0 {
         return Err(Error::new(E_FAIL, "Failed to draw image"));
@@ -968,110 +991,111 @@ unsafe fn draw_rect_string(
     field: &TextField,
     brush: *mut GpBrush,
 ) {
-    use windows::Win32::Graphics::GdiPlus::{
-        GdipCreateStringFormat, GdipDeleteStringFormat, GdipSetStringFormatAlign,
-        GdipSetStringFormatLineAlign, StringAlignmentCenter, StringAlignmentFar,
-        StringAlignmentNear,
-    };
+    unsafe {
+        use windows::Win32::Graphics::GdiPlus::{
+            GdipCreateStringFormat, GdipDeleteStringFormat, GdipSetStringFormatAlign,
+            GdipSetStringFormatLineAlign, StringAlignmentCenter, StringAlignmentFar,
+            StringAlignmentNear,
+        };
 
-    // Create font with specified style
-    let font_style = match field.style {
-        TextStyle::Regular => FontStyleRegular.0,
-        TextStyle::Bold => FontStyleBold.0,
-    };
+        // Create font with specified style
+        let font_style = match field.style {
+            TextStyle::Regular => FontStyleRegular.0,
+            TextStyle::Bold => FontStyleBold.0,
+        };
 
-    // Create font family
-    // Use field-specific font family if provided, otherwise use default passed in font_family arg
-    let mut field_font_family: *mut GpFontFamily = std::ptr::null_mut();
-    let family_name = field.font_family.as_deref().unwrap_or("Microsoft YaHei");
-    let wide_family_name = to_wide(family_name);
+        // Create font family
+        let mut field_font_family: *mut GpFontFamily = std::ptr::null_mut();
+        let family_name = field.font_family.as_deref().unwrap_or("Microsoft YaHei");
+        let wide_family_name = to_wide(family_name);
 
-    GdipCreateFontFamilyFromName(
-        PCWSTR::from_raw(wide_family_name.as_ptr()),
-        std::ptr::null_mut(),
-        &mut field_font_family,
-    );
-
-    // If custom font fails, try fallback or use the default one passed in
-    if field_font_family.is_null() {
-        let fallback_name = to_wide("Arial");
         GdipCreateFontFamilyFromName(
-            PCWSTR::from_raw(fallback_name.as_ptr()),
+            PCWSTR::from_raw(wide_family_name.as_ptr()),
             std::ptr::null_mut(),
             &mut field_font_family,
         );
-    }
 
-    let target_font_family = if let Some(_name) = &field.font_family {
-        if !field_font_family.is_null() {
-            field_font_family
-        } else {
-            font_family // Fallback to default
+        // If custom font fails, try fallback or use the default one passed in
+        if field_font_family.is_null() {
+            let fallback_name = to_wide("Arial");
+            GdipCreateFontFamilyFromName(
+                PCWSTR::from_raw(fallback_name.as_ptr()),
+                std::ptr::null_mut(),
+                &mut field_font_family,
+            );
         }
-    } else {
-        font_family // Use default
-    };
 
-    let mut font: *mut GpFont = std::ptr::null_mut();
-    GdipCreateFont(
-        target_font_family,
-        field.font_size,
-        font_style,
-        UnitPixel,
-        &mut font,
-    );
-
-    // Clean up if we created a local font family
-    if field.font_family.is_some() && !field_font_family.is_null() {
-        GdipDeleteFontFamily(field_font_family);
-    }
-
-    if font.is_null() {
-        return;
-    }
-
-    // Create string format for alignment
-    let mut string_format: *mut GpStringFormat = std::ptr::null_mut();
-    GdipCreateStringFormat(0, 0, &mut string_format);
-
-    if !string_format.is_null() {
-        let h_align = match field.align {
-            TextAlign::Left => StringAlignmentNear,
-            TextAlign::Center => StringAlignmentCenter,
-            TextAlign::Right => StringAlignmentFar,
+        let target_font_family = if let Some(_name) = &field.font_family {
+            if !field_font_family.is_null() {
+                field_font_family
+            } else {
+                font_family // Fallback to default
+            }
+        } else {
+            font_family // Use default
         };
 
-        GdipSetStringFormatAlign(string_format, h_align);
-        GdipSetStringFormatLineAlign(string_format, StringAlignmentNear); // Top-aligned vertically
+        let mut font: *mut GpFont = std::ptr::null_mut();
+        GdipCreateFont(
+            target_font_family,
+            field.font_size,
+            font_style,
+            UnitPixel,
+            &mut font,
+        );
+
+        // Clean up if we created a local font family
+        if field.font_family.is_some() && !field_font_family.is_null() {
+            GdipDeleteFontFamily(field_font_family);
+        }
+
+        if font.is_null() {
+            return;
+        }
+
+        // Create string format for alignment
+        let mut string_format: *mut GpStringFormat = std::ptr::null_mut();
+        GdipCreateStringFormat(0, 0, &mut string_format);
+
+        if !string_format.is_null() {
+            let h_align = match field.align {
+                TextAlign::Left => StringAlignmentNear,
+                TextAlign::Center => StringAlignmentCenter,
+                TextAlign::Right => StringAlignmentFar,
+            };
+
+            GdipSetStringFormatAlign(string_format, h_align);
+            GdipSetStringFormatLineAlign(string_format, StringAlignmentNear);
+        }
+
+        // Convert text to wide string
+        let wide_text = to_wide(text);
+
+        // Define rectangle
+        let rectf = windows::Win32::Graphics::GdiPlus::RectF {
+            X: field.x,
+            Y: field.y,
+            Width: field.width,
+            Height: field.height,
+        };
+
+        // Draw string
+        GdipDrawString(
+            graphics,
+            PCWSTR::from_raw(wide_text.as_ptr()),
+            wide_text.len() as i32 - 1,
+            font,
+            &rectf,
+            string_format,
+            brush,
+        );
+
+        // Cleanup
+        if !string_format.is_null() {
+            GdipDeleteStringFormat(string_format);
+        }
+        GdipDeleteFont(font);
     }
-
-    // Convert text to wide string
-    let wide_text = to_wide(text);
-
-    // Define rectangle
-    let rectf = windows::Win32::Graphics::GdiPlus::RectF {
-        X: field.x,
-        Y: field.y,
-        Width: field.width,
-        Height: field.height,
-    };
-
-    // Draw string
-    GdipDrawString(
-        graphics,
-        PCWSTR::from_raw(wide_text.as_ptr()),
-        wide_text.len() as i32 - 1, // exclude null terminator
-        font,
-        &rectf,
-        string_format,
-        brush,
-    );
-
-    // Cleanup
-    if !string_format.is_null() {
-        GdipDeleteStringFormat(string_format);
-    }
-    GdipDeleteFont(font);
 }
 
 // Extract ARGB pixel data from GDI+ bitmap
@@ -1080,72 +1104,78 @@ unsafe fn extract_bitmap_data(
     width: u32,
     height: u32,
 ) -> WinResult<(Vec<u8>, u32, u32)> {
-    use windows::Win32::Graphics::GdiPlus::{
-        BitmapData, GdipBitmapLockBits, GdipBitmapUnlockBits, ImageLockModeRead,
-    };
+    unsafe {
+        use windows::Win32::Graphics::GdiPlus::{
+            BitmapData, GdipBitmapLockBits, GdipBitmapUnlockBits, ImageLockModeRead,
+        };
 
-    const PIXEL_FORMAT_32BPP_ARGB: i32 = 0x0026200A;
+        const PIXEL_FORMAT_32BPP_ARGB: i32 = 0x0026200A;
 
-    let mut bmp_data = BitmapData {
-        Width: width,
-        Height: height,
-        Stride: 0,
-        PixelFormat: PIXEL_FORMAT_32BPP_ARGB,
-        Scan0: std::ptr::null_mut(),
-        Reserved: 0,
-    };
+        let mut bmp_data = BitmapData {
+            Width: width,
+            Height: height,
+            Stride: 0,
+            PixelFormat: PIXEL_FORMAT_32BPP_ARGB,
+            Scan0: std::ptr::null_mut(),
+            Reserved: 0,
+        };
 
-    let rectf = windows::Win32::Graphics::GdiPlus::Rect {
-        X: 0,
-        Y: 0,
-        Width: width as i32,
-        Height: height as i32,
-    };
+        let rectf = windows::Win32::Graphics::GdiPlus::Rect {
+            X: 0,
+            Y: 0,
+            Width: width as i32,
+            Height: height as i32,
+        };
 
-    let status = GdipBitmapLockBits(
-        bitmap as *mut _,
-        &rectf as *const _,
-        ImageLockModeRead.0 as u32,
-        PIXEL_FORMAT_32BPP_ARGB,
-        &mut bmp_data,
-    );
+        let status = GdipBitmapLockBits(
+            bitmap as *mut _,
+            &rectf as *const _,
+            ImageLockModeRead.0 as u32,
+            PIXEL_FORMAT_32BPP_ARGB,
+            &mut bmp_data,
+        );
 
-    if status.0 != 0 {
-        return Err(Error::new(E_FAIL, "GdipBitmapLockBits failed"));
-    }
-
-    // Copy pixel data (ARGB format)
-    let stride = usize::try_from(bmp_data.Stride.unsigned_abs())
-        .map_err(|_| Error::new(E_FAIL, "BMP stride overflow -- corrupted image data"))?;
-    let data_size = stride * height as usize;
-    let mut pixels = vec![0u8; data_size];
-
-    std::ptr::copy_nonoverlapping(bmp_data.Scan0 as *const u8, pixels.as_mut_ptr(), data_size);
-
-    GdipBitmapUnlockBits(bitmap as *mut _, &mut bmp_data);
-
-    // Convert ARGB to RGBA premultiplied
-    let mut rgba = vec![0u8; (width * height * 4) as usize];
-    for y in 0..height as usize {
-        for x in 0..width as usize {
-            let src_idx = y * stride + x * 4;
-            let dst_idx = (y * width as usize + x) * 4;
-
-            let b = pixels[src_idx];
-            let g = pixels[src_idx + 1];
-            let r = pixels[src_idx + 2];
-            let a = pixels[src_idx + 3];
-
-            // Premultiply alpha
-            let alpha = a as f32 / 255.0;
-            rgba[dst_idx] = (r as f32 * alpha) as u8;
-            rgba[dst_idx + 1] = (g as f32 * alpha) as u8;
-            rgba[dst_idx + 2] = (b as f32 * alpha) as u8;
-            rgba[dst_idx + 3] = a;
+        if status.0 != 0 {
+            return Err(Error::new(E_FAIL, "GdipBitmapLockBits failed"));
         }
-    }
 
-    Ok((rgba, width, height))
+        // Copy pixel data (ARGB format)
+        let stride = usize::try_from(bmp_data.Stride.unsigned_abs())
+            .map_err(|_| Error::new(E_FAIL, "BMP stride overflow -- corrupted image data"))?;
+        let data_size = stride * height as usize;
+        let mut pixels = vec![0u8; data_size];
+
+        std::ptr::copy_nonoverlapping(
+            bmp_data.Scan0 as *const u8,
+            pixels.as_mut_ptr(),
+            data_size,
+        );
+
+        GdipBitmapUnlockBits(bitmap as *mut _, &mut bmp_data);
+
+        // Convert ARGB to RGBA premultiplied
+        let mut rgba = vec![0u8; (width * height * 4) as usize];
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                let src_idx = y * stride + x * 4;
+                let dst_idx = (y * width as usize + x) * 4;
+
+                let b = pixels[src_idx];
+                let g = pixels[src_idx + 1];
+                let r = pixels[src_idx + 2];
+                let a = pixels[src_idx + 3];
+
+                // Premultiply alpha
+                let alpha = a as f32 / 255.0;
+                rgba[dst_idx] = (r as f32 * alpha) as u8;
+                rgba[dst_idx + 1] = (g as f32 * alpha) as u8;
+                rgba[dst_idx + 2] = (b as f32 * alpha) as u8;
+                rgba[dst_idx + 3] = a;
+            }
+        }
+
+        Ok((rgba, width, height))
+    }
 }
 
 // RAII guards for GDI+ resources

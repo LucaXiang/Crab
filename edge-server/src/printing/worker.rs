@@ -129,7 +129,10 @@ impl KitchenPrintWorker {
                 .await;
             }
             Ok(None) => {
-                // Printing not enabled or no items to print
+                tracing::debug!(
+                    order_id = %event.order_id,
+                    "handle_items_added: no print records created (printing disabled or no matching destinations)"
+                );
             }
             Err(e) => {
                 tracing::error!(
@@ -210,8 +213,20 @@ impl KitchenPrintWorker {
         };
 
         if records.is_empty() {
+            tracing::debug!(
+                order_id = %order_id,
+                kitchen_order_id = %kitchen_order_id,
+                "execute_label_print: no label records for this kitchen order"
+            );
             return;
         }
+
+        tracing::debug!(
+            order_id = %order_id,
+            kitchen_order_id = %kitchen_order_id,
+            label_records_count = records.len(),
+            "execute_label_print: printing labels"
+        );
 
         // 加载默认标签模板
         let template = match label_template::get_default(&self.pool).await {

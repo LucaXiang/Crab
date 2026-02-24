@@ -31,6 +31,7 @@ import type {
   PrintDestination,
   PrintDestinationCreate,
   PrintDestinationUpdate,
+  PrintConfig,
   Attribute,
   AttributeCreate,
   AttributeUpdate,
@@ -363,6 +364,16 @@ export class TauriApiClient {
 
   async deletePrintDestination(id: number): Promise<void> {
     await invokeApi<void>('delete_print_destination', { id });
+  }
+
+  // ============ Print Config ============
+
+  async getPrintConfig(): Promise<PrintConfig> {
+    return invokeApi<PrintConfig>('api_get', { path: '/api/print-config' });
+  }
+
+  async updatePrintConfig(config: PrintConfig): Promise<PrintConfig> {
+    return invokeApi<PrintConfig>('api_put', { path: '/api/print-config', body: config });
   }
 
   // ============ Employees ============

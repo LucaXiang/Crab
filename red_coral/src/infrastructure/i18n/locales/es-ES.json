@@ -1580,6 +1580,13 @@
         "kitchen": "Cocina",
         "label": "Etiqueta"
       },
+      "defaults": {
+        "title": "Predeterminados",
+        "description": "Seleccione la estación predeterminada para cada tipo. Sin selección = desactivado",
+        "kitchen": "Estación cocina predeterminada",
+        "label": "Estación etiquetas predeterminada",
+        "none": "Ninguna (desactivado)"
+      },
       "kitchen_station": {
         "title": "Estaciones cocina",
         "no_data": "Cree su primera estación",

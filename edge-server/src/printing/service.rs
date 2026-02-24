@@ -74,6 +74,10 @@ impl KitchenPrintService {
         let label_enabled = catalog.is_label_print_enabled();
 
         if !kitchen_enabled && !label_enabled {
+            tracing::debug!(
+                order_id = %event.order_id,
+                "process_items_added: both kitchen and label printing disabled at system level"
+            );
             return Ok(None);
         }
 
@@ -100,6 +104,14 @@ impl KitchenPrintService {
 
         for item in items {
             let context = self.build_print_context(item, catalog);
+
+            tracing::debug!(
+                product_id = item.id,
+                product_name = %item.name,
+                kitchen_destinations = ?context.kitchen_destinations,
+                label_destinations = ?context.label_destinations,
+                "process_items_added: item print context"
+            );
 
             // Check if this item should be printed to kitchen
             if kitchen_enabled && !context.kitchen_destinations.is_empty() {
@@ -130,6 +142,12 @@ impl KitchenPrintService {
         }
 
         if kitchen_items.is_empty() && label_records.is_empty() {
+            tracing::debug!(
+                order_id = %event.order_id,
+                kitchen_enabled,
+                label_enabled,
+                "process_items_added: no items matched any print destination"
+            );
             return Ok(None);
         }
 
@@ -182,6 +200,13 @@ impl KitchenPrintService {
         // Get print config from catalog (with fallback chain)
         let kitchen_config = catalog.get_kitchen_print_config(item.id);
         let label_config = catalog.get_label_print_config(item.id);
+
+        tracing::debug!(
+            product_id = item.id,
+            kitchen_config = ?kitchen_config,
+            label_config = ?label_config,
+            "build_print_context: resolved print configs"
+        );
 
         let kitchen_destinations = kitchen_config
             .as_ref()

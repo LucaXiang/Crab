@@ -351,6 +351,13 @@ export interface PrintDestinationUpdate {
   is_active?: boolean;
 }
 
+// ============ Print Config ============
+
+export interface PrintConfig {
+  default_kitchen_printer: string | null;
+  default_label_printer: string | null;
+}
+
 // ============ Zone ============
 
 export interface Zone {

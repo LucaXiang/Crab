@@ -61,7 +61,7 @@ pub async fn run() {
             let env_filter = if let Ok(from_env) = EnvFilter::try_from_default_env() {
                 from_env
             } else if cfg!(debug_assertions) {
-                EnvFilter::new("info,tao=error,http_access=warn,red_coral=debug,edge_server::orders=debug,edge_server::pricing=debug")
+                EnvFilter::new("info,tao=error,http_access=warn,red_coral=debug,edge_server::orders=debug,edge_server::pricing=debug,crab_printer=debug")
             } else {
                 EnvFilter::new("info,tao=error,http_access=warn")
             };

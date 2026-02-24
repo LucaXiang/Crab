@@ -1581,6 +1581,13 @@
         "kitchen": "厨房打印",
         "label": "标签打印"
       },
+      "defaults": {
+        "title": "全局默认",
+        "description": "选择各类型的默认打印站，未选择则该类型打印关闭",
+        "kitchen": "默认厨房打印站",
+        "label": "默认标签打印站",
+        "none": "无（关闭）"
+      },
       "kitchen_station": {
         "title": "厨房工位",
         "no_data": "创建您的第一个厨房工位",

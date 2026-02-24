@@ -285,13 +285,59 @@ impl CatalogService {
         let products_count = self.products.read().len();
         tracing::debug!(count = products_count, "CatalogService loaded products");
 
-        // 6. Load persisted print defaults
+        // 6. Load persisted print defaults + auto-fix if destinations exist but defaults are NULL
         match crate::db::repository::print_config::get(&self.pool).await {
             Ok(row) => {
+                let mut kitchen = row.default_kitchen_printer;
+                let mut label = row.default_label_printer;
+                let mut changed = false;
+
+                // Auto-fix: if defaults are NULL but active destinations exist, auto-set them
+                if kitchen.is_none() {
+                    if let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
+                        "SELECT id FROM print_destination WHERE purpose = 'kitchen' AND is_active = 1 LIMIT 1",
+                    )
+                    .fetch_optional(&self.pool)
+                    .await
+                    {
+                        kitchen = Some(id.to_string());
+                        changed = true;
+                    }
+                }
+                if label.is_none() {
+                    if let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
+                        "SELECT id FROM print_destination WHERE purpose = 'label' AND is_active = 1 LIMIT 1",
+                    )
+                    .fetch_optional(&self.pool)
+                    .await
+                    {
+                        label = Some(id.to_string());
+                        changed = true;
+                    }
+                }
+
+                if changed {
+                    if let Err(e) = crate::db::repository::print_config::update(
+                        &self.pool,
+                        kitchen.as_deref(),
+                        label.as_deref(),
+                    )
+                    .await
+                    {
+                        tracing::warn!(error = ?e, "Failed to auto-fix print_config defaults");
+                    } else {
+                        tracing::info!(
+                            kitchen = ?kitchen,
+                            label = ?label,
+                            "Auto-fixed print_config defaults from existing destinations"
+                        );
+                    }
+                }
+
                 let mut defaults = self.print_defaults.write();
-                defaults.kitchen_destination = row.default_kitchen_printer;
-                defaults.label_destination = row.default_label_printer;
-                tracing::debug!(
+                defaults.kitchen_destination = kitchen;
+                defaults.label_destination = label;
+                tracing::info!(
                     kitchen = ?defaults.kitchen_destination,
                     label = ?defaults.label_destination,
                     "CatalogService loaded print defaults"
