@@ -25,6 +25,7 @@ pub async fn upsert_tag_from_sync(
         DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color,
                       display_order = EXCLUDED.display_order, is_active = EXCLUDED.is_active,
                       is_system = EXCLUDED.is_system, updated_at = EXCLUDED.updated_at
+        WHERE store_tags.updated_at <= EXCLUDED.updated_at
         "#,
     )
     .bind(edge_server_id)

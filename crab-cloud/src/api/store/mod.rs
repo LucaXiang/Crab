@@ -38,19 +38,24 @@ fn internal(e: impl std::fmt::Display) -> AppError {
     AppError::new(ErrorCode::InternalError)
 }
 
-/// Fire-and-forget push StoreOp to edge if it's currently connected.
-fn push_to_edge_if_online(state: &AppState, store_id: i64, op: StoreOp) {
-    let sender = match state.edges.connected.get(&store_id) {
-        Some(s) => s.clone(),
-        None => return,
-    };
+/// Push StoreOp to edge: direct send if online, queue to pending_ops if offline.
+async fn push_to_edge(state: &AppState, edge_server_id: i64, op: StoreOp) {
+    let now = shared::util::now_millis();
 
-    let msg = CloudMessage::Rpc {
-        id: format!("push-{}", uuid::Uuid::new_v4()),
-        payload: Box::new(CloudRpc::StoreOp(Box::new(op))),
-    };
-
-    let _ = sender.try_send(msg);
+    if let Some(sender) = state.edges.connected.get(&edge_server_id) {
+        let msg = CloudMessage::Rpc {
+            id: format!("push-{}", uuid::Uuid::new_v4()),
+            payload: Box::new(CloudRpc::StoreOp {
+                op: Box::new(op),
+                changed_at: Some(now),
+            }),
+        };
+        let _ = sender.try_send(msg);
+    } else if let Err(e) =
+        crate::db::store::pending_ops::insert(&state.pool, edge_server_id, &op, now).await
+    {
+        tracing::error!(edge_server_id, "Failed to queue pending op: {e}");
+    }
 }
 
 /// Fire-and-forget: send EnsureImage RPC to edge so it downloads the image from S3.
@@ -80,10 +85,13 @@ async fn fire_ensure_image(
 
     let msg = CloudMessage::Rpc {
         id: format!("img-{hash}"),
-        payload: Box::new(CloudRpc::StoreOp(Box::new(StoreOp::EnsureImage {
-            presigned_url,
-            hash: hash.to_string(),
-        }))),
+        payload: Box::new(CloudRpc::StoreOp {
+            op: Box::new(StoreOp::EnsureImage {
+                presigned_url,
+                hash: hash.to_string(),
+            }),
+            changed_at: None,
+        }),
     };
 
     let _ = sender.try_send(msg);

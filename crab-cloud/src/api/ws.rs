@@ -109,6 +109,54 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         }
     }
 
+    // Replay pending ops (Console edits queued while edge was offline)
+    // Fetch ordered, send one-by-one, delete after each successful send.
+    // On send failure: unsent ops remain in DB for next reconnect.
+    match crate::db::store::pending_ops::fetch_ordered(&state.pool, edge_server_id).await {
+        Ok(ops) if !ops.is_empty() => {
+            let total = ops.len();
+            let mut sent = 0usize;
+            for (row_id, op, changed_at) in ops {
+                let msg = CloudMessage::Rpc {
+                    id: format!("catchup-{}", uuid::Uuid::new_v4()),
+                    payload: Box::new(shared::cloud::CloudRpc::StoreOp {
+                        op: Box::new(op),
+                        changed_at: Some(changed_at),
+                    }),
+                };
+                let json = match serde_json::to_string(&msg) {
+                    Ok(j) => j,
+                    Err(e) => {
+                        tracing::warn!(
+                            edge_server_id,
+                            row_id,
+                            "Failed to serialize pending op: {e}"
+                        );
+                        continue;
+                    }
+                };
+                if ws_sink.send(Message::Text(json.into())).await.is_err() {
+                    tracing::warn!(
+                        edge_server_id,
+                        sent,
+                        remaining = total - sent,
+                        "Failed to send pending op, disconnecting (unsent ops preserved)"
+                    );
+                    state.edges.connected.remove(&edge_server_id);
+                    return;
+                }
+                // Successfully sent — delete from queue
+                let _ = crate::db::store::pending_ops::delete_one(&state.pool, row_id).await;
+                sent += 1;
+            }
+            tracing::info!(edge_server_id, count = sent, "Pending ops replayed to edge");
+        }
+        Ok(_) => {} // no pending ops
+        Err(e) => {
+            tracing::error!(edge_server_id, "Failed to fetch pending ops: {e}");
+        }
+    }
+
     // 所有初始化发送完成后，标记 edge 上线（通知正在观看的 console）
     state
         .live_orders

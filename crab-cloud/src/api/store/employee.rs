@@ -9,7 +9,7 @@ use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::store;
 use crate::state::AppState;
 
-use super::{internal, push_to_edge_if_online, verify_store};
+use super::{internal, push_to_edge, verify_store};
 
 type ApiResult<T> = Result<Json<T>, AppError>;
 
@@ -41,14 +41,15 @@ pub async fn create_employee(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::CreateEmployee {
             id: Some(source_id),
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::created(source_id).with_data(op_data)))
 }
@@ -68,14 +69,15 @@ pub async fn update_employee(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::UpdateEmployee {
             id: employee_id,
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok().with_data(op_data)))
 }
@@ -94,11 +96,12 @@ pub async fn delete_employee(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::DeleteEmployee { id: employee_id },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

@@ -44,6 +44,7 @@ pub async fn upsert_product_from_sync(
             is_label_print_enabled = EXCLUDED.is_label_print_enabled,
             is_active = EXCLUDED.is_active, external_id = EXCLUDED.external_id,
             updated_at = EXCLUDED.updated_at
+        WHERE store_products.updated_at <= EXCLUDED.updated_at
         RETURNING id
         "#,
     )

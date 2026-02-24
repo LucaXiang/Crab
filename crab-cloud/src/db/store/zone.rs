@@ -26,6 +26,7 @@ pub async fn upsert_zone_from_sync(
         DO UPDATE SET
             name = EXCLUDED.name, description = EXCLUDED.description,
             is_active = EXCLUDED.is_active, updated_at = EXCLUDED.updated_at
+        WHERE store_zones.updated_at <= EXCLUDED.updated_at
         "#,
     )
     .bind(edge_server_id)

@@ -37,6 +37,7 @@ pub async fn upsert_category_from_sync(
             is_active = EXCLUDED.is_active, is_virtual = EXCLUDED.is_virtual,
             match_mode = EXCLUDED.match_mode, is_display = EXCLUDED.is_display,
             updated_at = EXCLUDED.updated_at
+        WHERE store_categories.updated_at <= EXCLUDED.updated_at
         RETURNING id
         "#,
     )

@@ -25,7 +25,7 @@ pub async fn upsert_attribute_from_sync(
 
     let mut tx = pool.begin().await?;
 
-    let row: (i64,) = sqlx::query_as(
+    let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_attributes (
             edge_server_id, source_id, name, is_multi_select, max_selections,
@@ -43,6 +43,7 @@ pub async fn upsert_attribute_from_sync(
             show_on_kitchen_print = EXCLUDED.show_on_kitchen_print,
             kitchen_print_name = EXCLUDED.kitchen_print_name,
             updated_at = EXCLUDED.updated_at
+        WHERE store_attributes.updated_at <= EXCLUDED.updated_at
         RETURNING id
         "#,
     )
@@ -59,12 +60,17 @@ pub async fn upsert_attribute_from_sync(
     .bind(attr.show_on_kitchen_print)
     .bind(&attr.kitchen_print_name)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
+
+    let Some((pg_id,)) = row else {
+        tx.commit().await?;
+        return Ok(());
+    };
 
     // Replace options
     sqlx::query("DELETE FROM store_attribute_options WHERE attribute_id = $1")
-        .bind(row.0)
+        .bind(pg_id)
         .execute(&mut *tx)
         .await?;
 
@@ -78,7 +84,7 @@ pub async fn upsert_attribute_from_sync(
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
         )
-        .bind(row.0)
+        .bind(pg_id)
         .bind(opt.id)
         .bind(&opt.name)
         .bind(opt.price_modifier)

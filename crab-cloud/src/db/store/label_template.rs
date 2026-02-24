@@ -23,7 +23,7 @@ pub async fn upsert_label_template_from_sync(
 
     let mut tx = pool.begin().await?;
 
-    let (pg_id,): (i64,) = sqlx::query_as(
+    let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_label_templates (
             edge_server_id, source_id, tenant_id, name, description,
@@ -42,6 +42,7 @@ pub async fn upsert_label_template_from_sync(
             padding_mm_x = EXCLUDED.padding_mm_x, padding_mm_y = EXCLUDED.padding_mm_y,
             render_dpi = EXCLUDED.render_dpi, test_data = EXCLUDED.test_data,
             updated_at = EXCLUDED.updated_at
+        WHERE store_label_templates.updated_at <= EXCLUDED.updated_at
         RETURNING id
         "#,
     )
@@ -62,8 +63,13 @@ pub async fn upsert_label_template_from_sync(
     .bind(tmpl.render_dpi)
     .bind(&tmpl.test_data)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
+
+    let Some((pg_id,)) = row else {
+        tx.commit().await?;
+        return Ok(());
+    };
 
     // Replace fields
     sqlx::query("DELETE FROM store_label_fields WHERE template_id = $1")

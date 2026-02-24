@@ -9,7 +9,7 @@ use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::store;
 use crate::state::AppState;
 
-use super::{internal, push_to_edge_if_online, verify_store};
+use super::{internal, push_to_edge, verify_store};
 
 type ApiResult<T> = Result<Json<T>, AppError>;
 
@@ -40,14 +40,15 @@ pub async fn create_price_rule(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::CreatePriceRule {
             id: Some(source_id),
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::created(source_id).with_data(op_data)))
 }
@@ -67,11 +68,12 @@ pub async fn update_price_rule(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::UpdatePriceRule { id: rule_id, data },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }
@@ -90,7 +92,7 @@ pub async fn delete_price_rule(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(&state, store_id, StoreOp::DeletePriceRule { id: rule_id });
+    push_to_edge(&state, store_id, StoreOp::DeletePriceRule { id: rule_id }).await;
 
     Ok(Json(StoreOpResult::ok()))
 }

@@ -67,8 +67,13 @@ pub enum CloudRpc {
     GetOrderDetail { order_key: String },
     /// 刷新订阅信息
     RefreshSubscription,
-    /// Store 操作 (CRUD + FullSync)
-    StoreOp(Box<StoreOp>),
+    /// Store 操作 (CRUD + FullSync) + LWW 时间戳
+    StoreOp {
+        op: Box<StoreOp>,
+        /// Console 编辑时间 (用于 edge 侧 LWW guard)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        changed_at: Option<i64>,
+    },
     // ── Edge → Cloud (预留) ──
 }
 
@@ -174,8 +179,8 @@ mod tests {
 
         let msg = CloudMessage::Rpc {
             id: "rpc-001".into(),
-            payload: Box::new(CloudRpc::StoreOp(Box::new(
-                super::super::store_op::StoreOp::CreateProduct {
+            payload: Box::new(CloudRpc::StoreOp {
+                op: Box::new(super::super::store_op::StoreOp::CreateProduct {
                     id: None,
                     data: crate::models::product::ProductCreate {
                         name: "Test".into(),
@@ -199,8 +204,9 @@ mod tests {
                             is_root: true,
                         }],
                     },
-                },
-            ))),
+                }),
+                changed_at: None,
+            }),
         };
 
         let json = serde_json::to_string(&msg).unwrap();
@@ -213,7 +219,7 @@ mod tests {
             panic!("Expected Rpc");
         };
         assert_eq!(id, "rpc-001");
-        let CloudRpc::StoreOp(op) = *payload else {
+        let CloudRpc::StoreOp { op, .. } = *payload else {
             panic!("Expected StoreOp");
         };
         let super::super::store_op::StoreOp::CreateProduct { data, .. } = *op else {

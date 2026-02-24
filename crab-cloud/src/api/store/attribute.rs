@@ -9,7 +9,7 @@ use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::store;
 use crate::state::AppState;
 
-use super::{internal, push_to_edge_if_online, verify_store};
+use super::{internal, push_to_edge, verify_store};
 
 type ApiResult<T> = Result<Json<T>, AppError>;
 
@@ -40,14 +40,15 @@ pub async fn create_attribute(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::CreateAttribute {
             id: Some(source_id),
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::created(source_id).with_data(op_data)))
 }
@@ -67,11 +68,12 @@ pub async fn update_attribute(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::UpdateAttribute { id: attr_id, data },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }
@@ -90,7 +92,7 @@ pub async fn delete_attribute(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(&state, store_id, StoreOp::DeleteAttribute { id: attr_id });
+    push_to_edge(&state, store_id, StoreOp::DeleteAttribute { id: attr_id }).await;
 
     Ok(Json(StoreOpResult::ok()))
 }
@@ -139,7 +141,7 @@ pub async fn bind_attribute(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::BindAttribute {
@@ -149,7 +151,8 @@ pub async fn bind_attribute(
             display_order: req.display_order,
             default_option_ids: req.default_option_ids,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::created(binding_id)))
 }
@@ -169,13 +172,14 @@ pub async fn unbind_attribute(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::UnbindAttribute {
             binding_id: req.binding_id,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

@@ -27,6 +27,7 @@ pub async fn upsert_dining_table_from_sync(
             name = EXCLUDED.name, zone_source_id = EXCLUDED.zone_source_id,
             capacity = EXCLUDED.capacity, is_active = EXCLUDED.is_active,
             updated_at = EXCLUDED.updated_at
+        WHERE store_dining_tables.updated_at <= EXCLUDED.updated_at
         "#,
     )
     .bind(edge_server_id)

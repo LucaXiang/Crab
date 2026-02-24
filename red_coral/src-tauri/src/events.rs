@@ -204,12 +204,13 @@ mod tests {
         let sync_payload = SyncPayload {
             resource: shared::cloud::SyncResource::OrderSync,
             version: order_event.sequence,
-            action: order_event.event_type.to_string(),
+            action: shared::message::SyncChangeType::Created,
             id: order_event.order_id.clone(),
             data: Some(serde_json::json!({
                 "event": order_event,
                 "snapshot": order_snapshot
             })),
+            cloud_origin: false,
         };
         let bus_msg = BusMessage::sync(&sync_payload);
 
@@ -236,9 +237,10 @@ mod tests {
         let sync_payload = SyncPayload {
             resource: shared::cloud::SyncResource::Product,
             version: 1,
-            action: "updated".to_string(),
+            action: shared::message::SyncChangeType::Updated,
             id: "prod-1".to_string(),
             data: Some(serde_json::json!({"name": "Coffee"})),
+            cloud_origin: false,
         };
         let bus_msg = BusMessage::sync(&sync_payload);
 

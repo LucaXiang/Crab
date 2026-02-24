@@ -10,7 +10,7 @@ use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::store;
 use crate::state::AppState;
 
-use super::{internal, push_to_edge_if_online, verify_store};
+use super::{internal, push_to_edge, verify_store};
 
 type ApiResult<T> = Result<Json<T>, AppError>;
 
@@ -42,14 +42,15 @@ pub async fn create_label_template(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::CreateLabelTemplate {
             id: Some(pg_id),
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::created(pg_id).with_data(op_data)))
 }
@@ -69,14 +70,15 @@ pub async fn update_label_template(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::UpdateLabelTemplate {
             id: template_id,
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok().with_data(op_data)))
 }
@@ -95,11 +97,12 @@ pub async fn delete_label_template(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::DeleteLabelTemplate { id: template_id },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

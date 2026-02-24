@@ -29,6 +29,7 @@ pub async fn upsert_store_info_from_sync(
             email = EXCLUDED.email, website = EXCLUDED.website,
             business_day_cutoff = EXCLUDED.business_day_cutoff,
             updated_at = EXCLUDED.updated_at
+        WHERE store_info.updated_at <= EXCLUDED.updated_at
         "#,
     )
     .bind(edge_server_id)

@@ -400,9 +400,13 @@ impl CloudWorker {
                     error: None,
                 }
             }
-            shared::cloud::CloudRpc::StoreOp(op) => {
-                let result =
-                    crate::cloud::rpc_executor::execute_catalog_op(&self.state, op.as_ref()).await;
+            shared::cloud::CloudRpc::StoreOp { op, changed_at } => {
+                let result = crate::cloud::rpc_executor::execute_catalog_op(
+                    &self.state,
+                    op.as_ref(),
+                    *changed_at,
+                )
+                .await;
                 CloudRpcResult::StoreOp(Box::new(result))
             }
         }

@@ -9,7 +9,7 @@ use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::store;
 use crate::state::AppState;
 
-use super::{internal, push_to_edge_if_online, verify_store};
+use super::{internal, push_to_edge, verify_store};
 
 type ApiResult<T> = Result<Json<T>, AppError>;
 
@@ -40,14 +40,15 @@ pub async fn create_tag(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(
+    push_to_edge(
         &state,
         store_id,
         StoreOp::CreateTag {
             id: Some(source_id),
             data,
         },
-    );
+    )
+    .await;
 
     Ok(Json(StoreOpResult::created(source_id).with_data(op_data)))
 }
@@ -67,7 +68,7 @@ pub async fn update_tag(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(&state, store_id, StoreOp::UpdateTag { id: tag_id, data });
+    push_to_edge(&state, store_id, StoreOp::UpdateTag { id: tag_id, data }).await;
 
     Ok(Json(StoreOpResult::ok()))
 }
@@ -86,7 +87,7 @@ pub async fn delete_tag(
         .await
         .map_err(internal)?;
 
-    push_to_edge_if_online(&state, store_id, StoreOp::DeleteTag { id: tag_id });
+    push_to_edge(&state, store_id, StoreOp::DeleteTag { id: tag_id }).await;
 
     Ok(Json(StoreOpResult::ok()))
 }

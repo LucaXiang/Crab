@@ -43,6 +43,7 @@ pub async fn upsert_price_rule_from_sync(
             active_days = EXCLUDED.active_days, active_start_time = EXCLUDED.active_start_time,
             active_end_time = EXCLUDED.active_end_time, is_active = EXCLUDED.is_active,
             updated_at = EXCLUDED.updated_at
+        WHERE store_price_rules.updated_at <= EXCLUDED.updated_at
         "#,
     )
     .bind(edge_server_id)

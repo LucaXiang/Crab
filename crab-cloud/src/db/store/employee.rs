@@ -29,6 +29,7 @@ pub async fn upsert_employee_from_sync(
             display_name = EXCLUDED.display_name, role_id = EXCLUDED.role_id,
             is_system = EXCLUDED.is_system, is_active = EXCLUDED.is_active,
             updated_at = EXCLUDED.updated_at
+        WHERE store_employees.updated_at <= EXCLUDED.updated_at
         "#,
     )
     .bind(edge_server_id)

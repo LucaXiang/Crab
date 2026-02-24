@@ -4,6 +4,7 @@
 
 use shared::cloud::store_op::{StoreOp, StoreOpResult};
 use shared::cloud::{CloudRpc, CloudRpcResult};
+use sqlx::SqlitePool;
 
 use crate::core::state::ServerState;
 use crate::db::repository::order;
@@ -80,15 +81,36 @@ pub async fn execute_rpc(state: &ServerState, rpc: &CloudRpc) -> CloudRpcResult 
                 error: None,
             }
         }
-        CloudRpc::StoreOp(op) => {
-            let result = execute_catalog_op(state, op).await;
+        CloudRpc::StoreOp { op, changed_at } => {
+            let result = execute_catalog_op(state, op, *changed_at).await;
             CloudRpcResult::StoreOp(Box::new(result))
         }
     }
 }
 
-/// Execute a single StoreOp and broadcast changes to POS
-pub async fn execute_catalog_op(state: &ServerState, op: &StoreOp) -> StoreOpResult {
+/// Execute a single StoreOp with optional LWW guard.
+///
+/// For Update/Delete operations, if `changed_at` is provided, compare with local
+/// `updated_at`. If local is newer, skip the operation (LWW: last write wins).
+pub async fn execute_catalog_op(
+    state: &ServerState,
+    op: &StoreOp,
+    changed_at: Option<i64>,
+) -> StoreOpResult {
+    // LWW guard for Update/Delete operations
+    if let Some(ts) = changed_at
+        && let Some((table, id)) = lww_target(op)
+        && !lww_check(&state.pool, table, id, ts).await
+    {
+        tracing::info!(
+            table,
+            id,
+            changed_at = ts,
+            "LWW guard: local is newer, skipping cloud op"
+        );
+        return StoreOpResult::ok();
+    }
+
     match op {
         // ── Product ──
         StoreOp::CreateProduct { id, data } => {
@@ -183,5 +205,56 @@ pub async fn execute_catalog_op(state: &ServerState, op: &StoreOp) -> StoreOpRes
 
         // ── Full Sync (initial provisioning) ──
         StoreOp::FullSync { snapshot } => provisioning::apply_full_sync(state, snapshot).await,
+    }
+}
+
+/// Extract the SQLite table name and resource id for LWW guard.
+///
+/// Returns None for Create, FullSync, EnsureImage, Bind/Unbind (no LWW needed).
+fn lww_target(op: &StoreOp) -> Option<(&'static str, i64)> {
+    match op {
+        StoreOp::UpdateProduct { id, .. } | StoreOp::DeleteProduct { id } => Some(("product", *id)),
+        StoreOp::UpdateCategory { id, .. } | StoreOp::DeleteCategory { id } => {
+            Some(("category", *id))
+        }
+        StoreOp::UpdateTag { id, .. } | StoreOp::DeleteTag { id } => Some(("tag", *id)),
+        StoreOp::UpdateAttribute { id, .. } | StoreOp::DeleteAttribute { id } => {
+            Some(("attribute", *id))
+        }
+        StoreOp::UpdateEmployee { id, .. } | StoreOp::DeleteEmployee { id } => {
+            Some(("employee", *id))
+        }
+        StoreOp::UpdateZone { id, .. } | StoreOp::DeleteZone { id } => Some(("zone", *id)),
+        StoreOp::UpdateTable { id, .. } | StoreOp::DeleteTable { id } => {
+            Some(("dining_table", *id))
+        }
+        StoreOp::UpdatePriceRule { id, .. } | StoreOp::DeletePriceRule { id } => {
+            Some(("price_rule", *id))
+        }
+        StoreOp::UpdateLabelTemplate { id, .. } | StoreOp::DeleteLabelTemplate { id } => {
+            Some(("label_template", *id))
+        }
+        _ => None, // Create, FullSync, EnsureImage, Bind/Unbind
+    }
+}
+
+/// Check if a cloud operation should proceed based on LWW timestamp.
+///
+/// Returns true if cloud's `changed_at` >= local `updated_at` (cloud wins).
+/// Returns true if resource not found (proceed with operation, it may fail later).
+async fn lww_check(pool: &SqlitePool, table: &str, id: i64, changed_at: i64) -> bool {
+    // Safe: table names are hardcoded from lww_target(), not user input
+    let query = format!("SELECT updated_at FROM \"{table}\" WHERE id = ?");
+    match sqlx::query_scalar::<_, i64>(&query)
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    {
+        Ok(Some(local_updated_at)) => changed_at >= local_updated_at,
+        Ok(None) => true, // not found → proceed (delete will no-op, update will fail)
+        Err(e) => {
+            tracing::warn!(table, id, "LWW check query failed: {e}");
+            true // proceed on error
+        }
     }
 }
