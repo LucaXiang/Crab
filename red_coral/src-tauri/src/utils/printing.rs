@@ -133,12 +133,12 @@ mod platform {
             .fields
             .iter()
             .filter(|f| f.visible)
-            .filter_map(|f| match f.field_type {
+            .map(|f| match f.field_type {
                 LabelFieldType::Text
                 | LabelFieldType::Datetime
                 | LabelFieldType::Price
-                | LabelFieldType::Counter => Some(crab_printer::label::TemplateField::Text(
-                    crab_printer::label::TextField {
+                | LabelFieldType::Counter => {
+                    crab_printer::label::TemplateField::Text(crab_printer::label::TextField {
                         x: f.x,
                         y: f.y,
                         width: f.width,
@@ -164,9 +164,9 @@ mod platform {
                             .clone()
                             .or_else(|| f.data_key.as_ref().map(|k| format!("{{{}}}", k)))
                             .unwrap_or_default(),
-                    },
-                )),
-                LabelFieldType::Image | LabelFieldType::Barcode | LabelFieldType::Qrcode => Some(
+                    })
+                }
+                LabelFieldType::Image | LabelFieldType::Barcode | LabelFieldType::Qrcode => {
                     crab_printer::label::TemplateField::Image(crab_printer::label::ImageField {
                         x: f.x,
                         y: f.y,
@@ -174,15 +174,15 @@ mod platform {
                         height: f.height,
                         maintain_aspect_ratio: f.maintain_aspect_ratio.unwrap_or(true),
                         data_key: f.data_key.clone().unwrap_or_else(|| f.name.clone()),
-                    }),
-                ),
-                LabelFieldType::Separator => Some(crab_printer::label::TemplateField::Separator(
+                    })
+                }
+                LabelFieldType::Separator => crab_printer::label::TemplateField::Separator(
                     crab_printer::label::SeparatorField {
                         y: f.y,
                         x_start: Some(f.x),
                         x_end: Some(f.x + f.width),
                     },
-                )),
+                ),
             })
             .collect();
 
