@@ -53,7 +53,16 @@ fn validate_update(payload: &ProductUpdate) -> AppResult<()> {
 /// Validate product spec prices and text fields
 fn validate_specs(specs: &[shared::models::ProductSpecInput]) -> AppResult<()> {
     for spec in specs {
-        validate_required_text(&spec.name, "spec name", MAX_NAME_LEN)?;
+        // Root spec name can be empty (won't display on receipts when empty)
+        if spec.is_root {
+            if spec.name.len() > MAX_NAME_LEN {
+                return Err(AppError::validation(format!(
+                    "spec name exceeds max length {MAX_NAME_LEN}"
+                )));
+            }
+        } else {
+            validate_required_text(&spec.name, "spec name", MAX_NAME_LEN)?;
+        }
         validate_optional_text(
             &spec.receipt_name,
             "spec receipt_name",

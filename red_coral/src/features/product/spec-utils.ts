@@ -13,7 +13,8 @@ export function validateSpecData(
   isRoot: boolean,
   t: (key: string) => string
 ): string | null {
-  if (!spec.name?.trim()) {
+  // Root spec name can be empty (won't display on receipts when empty)
+  if (!isRoot && !spec.name?.trim()) {
     return t('settings.specification.form.name_required');
   }
 

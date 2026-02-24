@@ -63,7 +63,7 @@ export async function createProduct(
     external_id: formData.externalId ?? null,
     tags: formData.tags ?? [],
     specs: [{
-      name: formData.name.trim(),
+      name: '',
       price: Math.max(0.01, price),
       display_order: 0,
       is_default: true,
@@ -141,7 +141,7 @@ export async function updateProduct(
   const updatedSpecs = existingSpecs.length > 0
     ? existingSpecs.map(toSpecInput)
     : [{
-        name: formData.name.trim(),
+        name: '',
         price: Math.max(0.01, price),
         display_order: 0,
         is_default: true,

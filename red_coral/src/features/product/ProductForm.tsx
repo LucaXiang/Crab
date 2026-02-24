@@ -80,7 +80,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         const currentSpecs = formData.specs || [];
         if (currentSpecs.length === 0) {
           onFieldChange('specs', [{
-            name: formData.name,
+            name: '',
             price: value,
             display_order: 0,
             is_default: true,

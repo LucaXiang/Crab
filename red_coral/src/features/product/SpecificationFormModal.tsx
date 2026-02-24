@@ -121,7 +121,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
   if (!isOpen) return null;
 
   const canSubmit =
-    formData.name.trim() &&
+    (isRootSpec || formData.name.trim()) &&
     !isSubmitting;
 
   return (
@@ -158,7 +158,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
         {/* Content */}
         <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
           <FormSection title={t('settings.attribute.section.basic')} icon={Type}>
-            <FormField label={t('settings.specification.form.name')} required>
+            <FormField label={t('settings.specification.form.name')} required={!isRootSpec}>
               <input
                 value={formData.name}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
