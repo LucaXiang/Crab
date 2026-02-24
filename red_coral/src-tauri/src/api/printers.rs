@@ -16,7 +16,7 @@ pub struct StoreInfo {
     pub logo_url: Option<String>,
 }
 
-/// 附加费信息
+/// 附加费信息 (整单手动)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SurchargeInfo {
     pub name: String,
@@ -26,12 +26,22 @@ pub struct SurchargeInfo {
     pub amount: f64,
 }
 
-/// 折扣信息
+/// 折扣信息 (整单手动)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscountInfo {
     pub name: String,
     #[serde(rename = "type")]
     pub type_: String,
+    pub value: f64,
+    pub amount: f64,
+}
+
+/// 价格规则调整 (整单级，含规则名)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleAdjustment {
+    pub name: String,
+    pub rule_type: String,
+    pub adjustment_type: String,
     pub value: f64,
     pub amount: f64,
 }
@@ -75,8 +85,10 @@ pub struct ReceiptData {
     #[serde(default)]
     pub pre_payment: bool,
     pub store_info: Option<StoreInfo>,
-    pub surcharge: Option<SurchargeInfo>,
     pub discount: Option<DiscountInfo>,
+    pub surcharge: Option<SurchargeInfo>,
+    #[serde(default)]
+    pub rule_adjustments: Vec<RuleAdjustment>,
     pub items: Vec<ReceiptItem>,
     pub total_amount: f64,
     pub queue_number: Option<u32>,

@@ -44,6 +44,14 @@ export interface ReceiptDiscountInfo {
   amount: number;
 }
 
+export interface ReceiptRuleAdjustment {
+  name: string;
+  rule_type: string;
+  adjustment_type: string;
+  value: number;
+  amount: number;
+}
+
 export interface ReceiptSelectedOption {
   attribute_name: string;
   option_name: string;
@@ -78,6 +86,7 @@ export interface ReceiptData {
   store_info: ReceiptStoreInfo | null;
   surcharge: ReceiptSurchargeInfo | null;
   discount: ReceiptDiscountInfo | null;
+  rule_adjustments: ReceiptRuleAdjustment[];
   items: ReceiptItem[];
   total_amount: number;
   queue_number: number | null;

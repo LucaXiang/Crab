@@ -4,10 +4,10 @@
  * 纯数据转换，无 I/O。将 HeldOrder + StoreInfo 转为 Rust ReceiptData 格式。
  */
 
-import type { HeldOrder } from '@/core/domain/types';
+import type { HeldOrder, AppliedRule } from '@/core/domain/types';
 import type { ArchivedOrderDetail } from '@/core/domain/types/archivedOrder';
 import type { StoreInfo } from '@/core/domain/types/api';
-import type { ReceiptData, ReceiptItem, ReceiptStoreInfo, ReceiptSurchargeInfo, ReceiptDiscountInfo } from '@/infrastructure/print/printService';
+import type { ReceiptData, ReceiptItem, ReceiptStoreInfo, ReceiptSurchargeInfo, ReceiptDiscountInfo, ReceiptRuleAdjustment } from '@/infrastructure/print/printService';
 
 function formatTimestamp(ms: number): string {
   return new Date(ms).toLocaleString('es-ES', {
@@ -33,6 +33,55 @@ function buildStoreInfo(storeInfo: StoreInfo | null): ReceiptStoreInfo | null {
   };
 }
 
+/**
+ * 聚合所有应用的价格规则（item-level + order-level）到整单级别
+ * 按 rule_id 分组，合并 calculated_amount
+ */
+function aggregateRuleAdjustments(order: HeldOrder): ReceiptRuleAdjustment[] {
+  const ruleMap = new Map<number, { rule: AppliedRule; totalAmount: number }>();
+
+  // 收集所有 item-level 规则
+  for (const item of order.items) {
+    if (item._removed || item.is_comped) continue;
+    for (const rule of item.applied_rules) {
+      if (rule.skipped) continue;
+      const existing = ruleMap.get(rule.rule_id);
+      if (existing) {
+        existing.totalAmount += rule.calculated_amount * item.quantity;
+      } else {
+        ruleMap.set(rule.rule_id, {
+          rule,
+          totalAmount: rule.calculated_amount * item.quantity,
+        });
+      }
+    }
+  }
+
+  // 收集 order-level 规则
+  for (const rule of order.order_applied_rules) {
+    if (rule.skipped) continue;
+    const existing = ruleMap.get(rule.rule_id);
+    if (existing) {
+      existing.totalAmount += rule.calculated_amount;
+    } else {
+      ruleMap.set(rule.rule_id, {
+        rule,
+        totalAmount: rule.calculated_amount,
+      });
+    }
+  }
+
+  return Array.from(ruleMap.values())
+    .filter((entry) => Math.abs(entry.totalAmount) > 0.005)
+    .map((entry) => ({
+      name: entry.rule.receipt_name || entry.rule.display_name || entry.rule.name,
+      rule_type: entry.rule.rule_type,
+      adjustment_type: entry.rule.adjustment_type,
+      value: entry.rule.adjustment_value,
+      amount: Math.abs(entry.totalAmount),
+    }));
+}
+
 export function buildReceiptData(
   order: HeldOrder,
   storeInfo: StoreInfo | null,
@@ -42,7 +91,7 @@ export function buildReceiptData(
 
   const store_info = buildStoreInfo(storeInfo);
 
-  // 整单附加费
+  // 整单手动附加费
   let surcharge: ReceiptSurchargeInfo | null = null;
   if (order.order_manual_surcharge_amount > 0) {
     if (order.order_manual_surcharge_percent != null && order.order_manual_surcharge_percent > 0) {
@@ -62,7 +111,7 @@ export function buildReceiptData(
     }
   }
 
-  // 整单折扣
+  // 整单手动折扣
   let discount: ReceiptDiscountInfo | null = null;
   if (order.order_manual_discount_amount > 0) {
     if (order.order_manual_discount_percent != null && order.order_manual_discount_percent > 0) {
@@ -82,16 +131,21 @@ export function buildReceiptData(
     }
   }
 
+  // 价格规则（整单聚合）
+  const rule_adjustments = aggregateRuleAdjustments(order);
+
+  // PVP = original_price（菜单原价），IMPORTE = line_total（最终行合计）
   const items: ReceiptItem[] = order.items
     .filter((item) => !item._removed && !item.is_comped)
     .map((item) => ({
       name: item.name,
       quantity: item.quantity,
-      price: item.unit_price,
+      price: item.original_price > 0 ? item.original_price : item.price,
       total: item.line_total,
       tax_rate: item.tax_rate / 100, // 21 -> 0.21
       discount_percent: item.manual_discount_percent ?? null,
-      original_price: item.original_price !== item.price ? item.original_price : null,
+      original_price: item.original_price > 0 && item.original_price !== item.price
+        ? item.original_price : null,
       selected_options: item.selected_options
         ? item.selected_options
             .filter((opt) => opt.show_on_receipt)
@@ -122,6 +176,7 @@ export function buildReceiptData(
     store_info,
     surcharge,
     discount,
+    rule_adjustments,
     items,
     total_amount: order.total,
     queue_number: order.queue_number ?? null,
@@ -138,7 +193,7 @@ export function buildArchivedReceiptData(
 ): ReceiptData {
   const store_info = buildStoreInfo(storeInfo);
 
-  // 整单附加费
+  // 整单手动附加费
   let surcharge: ReceiptSurchargeInfo | null = null;
   if (order.order_manual_surcharge_amount > 0) {
     surcharge = {
@@ -149,7 +204,7 @@ export function buildArchivedReceiptData(
     };
   }
 
-  // 整单折扣 (归档订单只有 amount，没有 percent/fixed 细分)
+  // 整单手动折扣
   let discount: ReceiptDiscountInfo | null = null;
   if (order.order_manual_discount_amount > 0) {
     discount = {
@@ -160,12 +215,42 @@ export function buildArchivedReceiptData(
     };
   }
 
+  // 归档订单的规则调整：从 items 的 applied_rules 聚合
+  const ruleMap = new Map<number, { name: string; rule_type: string; adjustment_type: string; value: number; totalAmount: number }>();
+  for (const item of order.items) {
+    if (item.is_comped) continue;
+    for (const rule of item.applied_rules ?? []) {
+      const existing = ruleMap.get(rule.rule_id);
+      if (existing) {
+        existing.totalAmount += rule.calculated_amount * item.quantity;
+      } else {
+        ruleMap.set(rule.rule_id, {
+          name: rule.receipt_name || rule.display_name || rule.name,
+          rule_type: rule.rule_type,
+          adjustment_type: rule.adjustment_type,
+          value: rule.adjustment_value,
+          totalAmount: rule.calculated_amount * item.quantity,
+        });
+      }
+    }
+  }
+  const rule_adjustments: ReceiptRuleAdjustment[] = Array.from(ruleMap.values())
+    .filter((entry) => Math.abs(entry.totalAmount) > 0.005)
+    .map((entry) => ({
+      name: entry.name,
+      rule_type: entry.rule_type,
+      adjustment_type: entry.adjustment_type,
+      value: entry.value,
+      amount: Math.abs(entry.totalAmount),
+    }));
+
+  // PVP = 原价
   const items: ReceiptItem[] = order.items
     .filter((item) => !item.is_comped)
     .map((item) => ({
       name: item.name,
       quantity: item.quantity,
-      price: item.unit_price,
+      price: item.price,
       total: item.line_total,
       tax_rate: item.tax_rate / 100,
       discount_percent: null,
@@ -200,6 +285,7 @@ export function buildArchivedReceiptData(
     store_info,
     surcharge,
     discount,
+    rule_adjustments,
     items,
     total_amount: order.total,
     queue_number: order.queue_number ?? null,

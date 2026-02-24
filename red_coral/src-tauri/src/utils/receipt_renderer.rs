@@ -57,28 +57,16 @@ impl<'a> ReceiptRenderer<'a> {
             b.write("\n");
         }
 
-        // Header Information Optimization
+        // Header
         b.align_left();
-
-        // Line 1: FACTURA SIMPLIFICADA (Centered or Left) - Let's keep it bold
         b.bold_on();
         b.write_line("FACTURA SIMPLIFICADA");
         b.bold_off();
 
-        // Line 2: Order ID + Date (Right aligned date)
         b.line_lr(
             &format!("Num: {}", self.receipt.order_id),
             &self.receipt.timestamp,
         );
-
-        // Line 3: Mesa / Camarero / Comensales (if available)
-        // We assume 'table_name' might contain guest info or we can just format it nicely
-        // If we had guest count in receipt data, we would show it.
-        // For now, let's show Table on left, and maybe "T: [Table]" if short.
-
-        // Let's try to fit more info:
-        // MESA: [Name]           OP: [Admin/User] (If we had op name)
-        // Since we only have table_name, let's just make it clear.
 
         if let Some(qn) = self.receipt.queue_number {
             let pedido_str = format!("PEDIDO: #{:03}", qn);
@@ -106,52 +94,7 @@ impl<'a> ReceiptRenderer<'a> {
 
         b.write("\n");
 
-        if let Some(discount) = &self.receipt.discount {
-            b.dash_sep();
-            b.align_center();
-            b.bold_on();
-            b.write_line(&format!("*** {} ***", discount.name.to_uppercase()));
-            b.bold_off();
-            b.align_left();
-            let desc = if discount.type_ == "percentage" {
-                format!("Descuento (-{}%)", discount.value)
-            } else {
-                format!("Descuento (-{:.2} €)", discount.value).replace('.', ",")
-            };
-            b.write_line(&format!(
-                "{:<28}{:>10}",
-                desc,
-                format!("-{:.2} €", discount.amount).replace('.', ",")
-            ));
-            b.dash_sep();
-        }
-
-        if let Some(surcharge) = &self.receipt.surcharge {
-            b.dash_sep();
-            b.align_center();
-            b.bold_on();
-            b.write_line(&format!("*** {} ***", surcharge.name.to_uppercase()));
-            b.bold_off();
-            b.align_left();
-            let desc = if surcharge.type_ == "percentage" {
-                format!("Suplemento ({}%)", surcharge.value)
-            } else {
-                format!("Suplemento ({:.2} €/ud)", surcharge.value).replace('.', ",")
-            };
-            if surcharge.amount.abs() < 0.001 {
-                b.write(&desc);
-                b.write(" ");
-                b.bold_on();
-                b.write("(EXENTO)");
-                b.bold_off();
-                b.write("\n");
-            } else {
-                b.write(&desc);
-                b.write("\n");
-            }
-            b.dash_sep();
-        }
-
+        // ── Items ──
         b.align_left();
         let h_uds = "UDS";
         let h_desc_padded = format!("{:<24}", "DESCRIPCION");
@@ -162,6 +105,7 @@ impl<'a> ReceiptRenderer<'a> {
             h_uds, h_desc_padded, h_pvp, h_importe
         ));
         b.eq_sep();
+
         for item in &self.receipt.items {
             let qty_str = pad_to_gbk_width(&item.quantity.to_string(), 3, true);
             let name_str = pad_to_gbk_width(&item.name, 24, false);
@@ -173,13 +117,15 @@ impl<'a> ReceiptRenderer<'a> {
                 "{} {} {} {}",
                 qty_str, name_str, price_str, total_str
             ));
-            // Print specification name (if multi-spec product, skip empty names)
+
+            // Specification name
             if let Some(ref spec_name) = item.spec_name {
                 if !spec_name.is_empty() {
                     b.write_line(&format!("   > {}", spec_name));
                 }
             }
-            // Print selected options (if any)
+
+            // Selected options
             if let Some(options) = &item.selected_options {
                 if !options.is_empty() {
                     let mut groups: Vec<(String, Vec<String>, f64)> = Vec::new();
@@ -219,20 +165,14 @@ impl<'a> ReceiptRenderer<'a> {
                 }
             }
 
+            // Manual discount sub-line
             if let Some(dp) = item.discount_percent {
                 if dp > 0.0 {
                     b.bold_on();
                     let before = item.original_price.unwrap_or(item.price);
                     let before_str = format!("{:.2} €", before).replace('.', ",");
-                    // Layout: Indent(3) + Desc(20) + Space(6) + PVP(8) + Space(1) + Total(10)
-                    // We want "ANTES 10,00 €" to align with PVP column (width 8)
-                    // The "ANTES " part can spill left into the space/desc area if needed
 
                     let discount_text = format!("> DESC -{}%", dp.round() as i32);
-
-                    // Layout: Indent(3) + Discount Text + Spacing + "ANTES" + Price
-                    // We want the Price to align with the PVP column.
-                    // PVP column: Start index 29, Width 8. Ends at index 36 (length 37).
 
                     let pvp_col_end_len = 37;
                     let before_width = get_gbk_width(&before_str);
@@ -240,15 +180,11 @@ impl<'a> ReceiptRenderer<'a> {
                     let antes_width = get_gbk_width(antes_str);
 
                     let mut line = String::new();
-                    line.push_str("   "); // Indent 3
+                    line.push_str("   ");
                     line.push_str(&discount_text);
 
                     let current_len = get_gbk_width(&line);
                     let total_right_width = before_width + antes_width;
-
-                    // Calculate required padding
-                    // We want: current_len + padding + total_right_width = pvp_col_end_len
-                    // padding = pvp_col_end_len - total_right_width - current_len
 
                     if pvp_col_end_len > total_right_width + current_len {
                         let padding = pvp_col_end_len - total_right_width - current_len;
@@ -256,7 +192,6 @@ impl<'a> ReceiptRenderer<'a> {
                         line.push_str(antes_str);
                         line.push_str(&before_str);
                     } else {
-                        // Fallback: just append with single space
                         line.push_str(antes_str);
                         line.push_str(&before_str);
                     }
@@ -268,31 +203,95 @@ impl<'a> ReceiptRenderer<'a> {
         }
 
         b.eq_sep();
-        // Group items by tax rate
+
+        // ── Subtotal (items sum, before order-level adjustments) ──
+        let items_subtotal: f64 = self.receipt.items.iter().map(|i| i.total).sum();
+
+        // Check if there are any order-level adjustments
+        let has_rule_adjustments = !self.receipt.rule_adjustments.is_empty();
+        let has_manual_discount = self.receipt.discount.is_some();
+        let has_manual_surcharge = self.receipt.surcharge.is_some();
+        let has_adjustments = has_rule_adjustments || has_manual_discount || has_manual_surcharge;
+
+        if has_adjustments {
+            // Show subtotal line
+            let subtotal_str = format!("{:.2} €", items_subtotal).replace('.', ",");
+            b.line_lr("SUBTOTAL", &subtotal_str);
+            b.dash_sep();
+        }
+
+        // ── Rule adjustments (整单级价格规则) ──
+        for rule in &self.receipt.rule_adjustments {
+            let (sign, prefix) = if rule.rule_type == "DISCOUNT" {
+                ("-", "")
+            } else {
+                ("+", "+")
+            };
+
+            let desc = if rule.adjustment_type == "PERCENTAGE" {
+                format!("{} ({}{}%)", rule.name, prefix, rule.value)
+            } else {
+                format!("{} ({}{:.2} €)", rule.name, prefix, rule.value).replace('.', ",")
+            };
+
+            let amount_str = format!("{}{:.2} €", sign, rule.amount).replace('.', ",");
+            b.write_line(&format!(
+                "{:<36}{:>10}",
+                pad_to_gbk_width(&desc, 36, false),
+                amount_str
+            ));
+        }
+
+        // ── Manual order discount (整单手动折扣) ──
+        if let Some(discount) = &self.receipt.discount {
+            let desc = if discount.type_ == "percentage" {
+                format!("{} (-{}%)", discount.name, discount.value)
+            } else {
+                format!("{} (-{:.2} €)", discount.name, discount.value).replace('.', ",")
+            };
+            let amount_str = format!("-{:.2} €", discount.amount).replace('.', ",");
+            b.write_line(&format!(
+                "{:<36}{:>10}",
+                pad_to_gbk_width(&desc, 36, false),
+                amount_str
+            ));
+        }
+
+        // ── Manual order surcharge (整单手动附加费) ──
+        if let Some(surcharge) = &self.receipt.surcharge {
+            let desc = if surcharge.type_ == "percentage" {
+                format!("{} (+{}%)", surcharge.name, surcharge.value)
+            } else {
+                format!("{} (+{:.2} €)", surcharge.name, surcharge.value).replace('.', ",")
+            };
+            let amount_str = format!("+{:.2} €", surcharge.amount).replace('.', ",");
+            b.write_line(&format!(
+                "{:<36}{:>10}",
+                pad_to_gbk_width(&desc, 36, false),
+                amount_str
+            ));
+        }
+
+        if has_adjustments {
+            b.dash_sep();
+        }
+
+        // ── Tax breakdown ──
         let mut tax_groups: std::collections::HashMap<i32, (f64, f64)> =
             std::collections::HashMap::new();
-
-        // If items have tax_rate, use it. Otherwise use default 0.10
         let default_tax = 0.10;
 
         for item in &self.receipt.items {
             let rate = item.tax_rate.unwrap_or(default_tax);
             let rate_key = (rate * 100.0).round() as i32;
-
             let entry = tax_groups.entry(rate_key).or_insert((0.0, 0.0));
-            // Calculate base for this item
-            // item.total is tax inclusive
             let item_base = item.total / (1.0 + rate);
             let item_tax = item.total - item_base;
-
             entry.0 += item_base;
             entry.1 += item_tax;
         }
 
         b.align_left();
-        // Layout: Margin(7) + Base(14) + Rate(6) + Tax(14) = 41 chars (centered in 48)
-        // Layout: Left(20) + IVA(8) + Space(1) + Base(8) + Space(1) + Cuota(10) = 48 chars
-        // Base aligns with PVP (cols 29-36), Cuota aligns with Importe (cols 38-47)
         let total_qty: f64 = self
             .receipt
             .items
@@ -305,13 +304,9 @@ impl<'a> ReceiptRenderer<'a> {
             format!("{:.2}", total_qty)
         };
         let left_text = format!("Total Uds: {}", qty_display);
-
-        // Layout: Label(23) + Space(1) + IVA(4) + Space(1) + Base(8) + Space(1) + Cuota(10) = 48
-        // Base aligns with PVP (cols 29-36), Cuota aligns with Importe (cols 38-47)
-
         let left_header = pad_to_gbk_width(&left_text, 23, false);
 
-        // Calculate total savings
+        // Calculate total savings (manual discounts + rule discounts)
         let mut total_savings = 0.0;
         for item in &self.receipt.items {
             if let Some(dp) = item.discount_percent {
@@ -323,15 +318,22 @@ impl<'a> ReceiptRenderer<'a> {
                 }
             }
         }
+        // Add rule discount savings
+        for rule in &self.receipt.rule_adjustments {
+            if rule.rule_type == "DISCOUNT" {
+                total_savings += rule.amount;
+            }
+        }
+        // Add manual order discount
+        if let Some(discount) = &self.receipt.discount {
+            total_savings += discount.amount;
+        }
 
         let h_iva = pad_to_gbk_width("IVA", 4, true);
         let h_base = pad_to_gbk_width("BASE IMP", 8, true);
         let h_cuota = pad_to_gbk_width("CUOTA", 10, true);
-
-        // Actually, let's be precise with spaces
         b.write_line(&format!("{} {} {} {}", left_header, h_iva, h_base, h_cuota));
 
-        // Sort by tax rate for consistent output
         let mut sorted_rates: Vec<_> = tax_groups.keys().cloned().collect();
         sorted_rates.sort();
 
@@ -354,7 +356,6 @@ impl<'a> ReceiptRenderer<'a> {
             let col2 = pad_to_gbk_width(&base_str, 8, true);
             let col3 = pad_to_gbk_width(&tax_str, 10, true);
 
-            // Show savings in the first row if any
             let left_content = if i == 0 && total_savings > 0.005 {
                 format!("AHORRO: -{:.2} €", total_savings).replace('.', ",")
             } else {
@@ -365,16 +366,13 @@ impl<'a> ReceiptRenderer<'a> {
             b.write_line(&format!("{} {} {} {}", left_col, col1, col2, col3));
         }
 
-        // Render Subtotals
-        // Padding is 23 + 1 + 4 + 1 = 29 spaces
-        // Separator width: 8 + 1 + 10 = 19
+        // Subtotals
         let sub_padding = " ".repeat(29);
         let sub_sep = format!("{}{}", sub_padding, "-".repeat(19));
         b.write_line(&sub_sep);
 
         let total_base_str = format!("{:.2} €", total_base).replace('.', ",");
         let total_tax_str = format!("{:.2} €", total_tax).replace('.', ",");
-        // No rate column in subtotal
         let col_t2 = pad_to_gbk_width(&total_base_str, 8, true);
         let col_t3 = pad_to_gbk_width(&total_tax_str, 10, true);
         b.write_line(&format!("{}{} {}", sub_padding, col_t2, col_t3));
@@ -383,6 +381,7 @@ impl<'a> ReceiptRenderer<'a> {
         b.underscore_sep();
         b.write("\n");
 
+        // ── TOTAL ──
         b.size_double();
         b.bold_on();
         let total_val = format!("{:.2} €", self.receipt.total_amount).replace('.', ",");
