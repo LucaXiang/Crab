@@ -551,6 +551,28 @@ pub async fn update_product_direct(
     Ok(())
 }
 
+pub async fn batch_update_sort_order_products(
+    pool: &PgPool,
+    edge_server_id: i64,
+    items: &[shared::cloud::store_op::SortOrderItem],
+) -> Result<(), BoxError> {
+    let now = shared::util::now_millis();
+    let mut tx = pool.begin().await?;
+    for item in items {
+        sqlx::query(
+            "UPDATE store_products SET sort_order = $1, updated_at = $2 WHERE edge_server_id = $3 AND source_id = $4",
+        )
+        .bind(item.sort_order)
+        .bind(now)
+        .bind(edge_server_id)
+        .bind(item.id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn delete_product_direct(
     pool: &PgPool,
     edge_server_id: i64,

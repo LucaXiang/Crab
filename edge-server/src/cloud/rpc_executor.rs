@@ -120,6 +120,9 @@ pub async fn execute_catalog_op(
             catalog::update_product(state, *id, data.clone()).await
         }
         StoreOp::DeleteProduct { id } => catalog::delete_product(state, *id).await,
+        StoreOp::BatchUpdateProductSortOrder { items } => {
+            catalog::batch_update_product_sort_order(state, items.clone()).await
+        }
 
         // ── Category ──
         StoreOp::CreateCategory { id, data } => {

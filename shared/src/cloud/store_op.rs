@@ -36,6 +36,9 @@ pub enum StoreOp {
     DeleteProduct {
         id: i64,
     },
+    BatchUpdateProductSortOrder {
+        items: Vec<SortOrderItem>,
+    },
 
     // ── Category ──
     CreateCategory {
@@ -249,6 +252,12 @@ pub struct SnapshotBinding {
     #[serde(default)]
     pub display_order: i32,
     pub default_option_ids: Option<Vec<i32>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SortOrderItem {
+    pub id: i64,
+    pub sort_order: i32,
 }
 
 /// Store 操作结果

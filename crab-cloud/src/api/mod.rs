@@ -97,6 +97,10 @@ pub fn public_router(state: AppState) -> Router {
             get(store::list_products).post(store::create_product),
         )
         .route(
+            "/api/tenant/stores/{id}/products/sort-order",
+            patch(store::batch_update_product_sort_order),
+        )
+        .route(
             "/api/tenant/stores/{id}/products/{pid}",
             put(store::update_product).delete(store::delete_product),
         )
