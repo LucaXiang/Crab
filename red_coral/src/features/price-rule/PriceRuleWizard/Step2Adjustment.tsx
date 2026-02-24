@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Percent, DollarSign } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { Currency } from '@/utils/currency';
 import type { WizardState } from './index';
 import { FormSection, FormField, inputClass } from '@/shared/components/FormField';
 
@@ -41,7 +42,7 @@ export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateS
       // Format: percentage as integer, fixed as 2 decimal places
       const formatted = isPercentage
         ? Math.round(parsed)
-        : Math.round(parsed * 100) / 100;
+        : Currency.round2(parsed).toNumber();
       updateState({ adjustment_value: formatted });
       setInputValue(String(formatted));
     } else {

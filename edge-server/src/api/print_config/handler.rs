@@ -70,7 +70,12 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync("print_config", "updated", "default", Some(&config))
+        .broadcast_sync(
+            shared::cloud::SyncResource::PrintConfig,
+            "updated",
+            "default",
+            Some(&config),
+        )
         .await;
 
     Ok(Json(config))

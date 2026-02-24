@@ -56,7 +56,11 @@ pub async fn get_default(pool: &SqlitePool) -> RepoResult<Option<LabelTemplate>>
     Ok(template)
 }
 
-pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<LabelTemplate> {
+pub async fn create(
+    pool: &SqlitePool,
+    assigned_id: Option<i64>,
+    data: LabelTemplateCreate,
+) -> RepoResult<LabelTemplate> {
     // If this is set as default, unset other defaults first
     if data.is_default {
         sqlx::query!("UPDATE label_template SET is_default = 0 WHERE is_default = 1")
@@ -67,26 +71,50 @@ pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
 
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO label_template (name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id as "id!""#,
-        data.name,
-        data.description,
-        data.width,
-        data.height,
-        data.padding,
-        data.is_default,
-        data.is_active,
-        data.width_mm,
-        data.height_mm,
-        data.padding_mm_x,
-        data.padding_mm_y,
-        data.render_dpi,
-        data.test_data,
-        now,
-        now,
-    )
-    .fetch_one(&mut *tx)
-    .await?;
+    let id: i64 = if let Some(aid) = assigned_id {
+        sqlx::query_scalar!(
+            r#"INSERT INTO label_template (id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id as "id!""#,
+            aid,
+            data.name,
+            data.description,
+            data.width,
+            data.height,
+            data.padding,
+            data.is_default,
+            data.is_active,
+            data.width_mm,
+            data.height_mm,
+            data.padding_mm_x,
+            data.padding_mm_y,
+            data.render_dpi,
+            data.test_data,
+            now,
+            now,
+        )
+        .fetch_one(&mut *tx)
+        .await?
+    } else {
+        sqlx::query_scalar!(
+            r#"INSERT INTO label_template (name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id as "id!""#,
+            data.name,
+            data.description,
+            data.width,
+            data.height,
+            data.padding,
+            data.is_default,
+            data.is_active,
+            data.width_mm,
+            data.height_mm,
+            data.padding_mm_x,
+            data.padding_mm_y,
+            data.render_dpi,
+            data.test_data,
+            now,
+            now,
+        )
+        .fetch_one(&mut *tx)
+        .await?
+    };
 
     // Create fields
     for field in &data.fields {

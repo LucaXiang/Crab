@@ -1,5 +1,4 @@
 export {
-  usePrinterStore,
   useReceiptPrinter,
   useKitchenPrinter,
   useLabelPrinter,
@@ -13,6 +12,4 @@ export {
   useLabelTemplateStore,
   useLabelTemplates,
   useLabelTemplatesLoading,
-  useLabelTemplateById,
-  useLabelTemplateActions,
 } from './useLabelTemplateStore';

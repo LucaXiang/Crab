@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
-const RESOURCE: &str = "category";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Category;
 
 fn validate_create(payload: &CategoryCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
@@ -291,7 +292,7 @@ pub async fn bind_category_attribute(
     // 广播同步通知
     state
         .broadcast_sync(
-            "category_attribute",
+            SyncResource::AttributeBinding,
             "created",
             &format!("{}:{}", category_id, attr_id),
             Some(&binding),
@@ -338,7 +339,7 @@ pub async fn unbind_category_attribute(
         // 广播同步通知
         state
             .broadcast_sync::<()>(
-                "category_attribute",
+                SyncResource::AttributeBinding,
                 "deleted",
                 &format!("{}:{}", category_id, attr_id),
                 None,

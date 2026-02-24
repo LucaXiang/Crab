@@ -1,8 +1,8 @@
 //! Cloud RPC executor — dispatches CloudRpc to domain-specific handlers
 //!
-//! Handles all RPC types: GetStatus, GetOrderDetail, RefreshSubscription, CatalogOp.
+//! Handles all RPC types: GetStatus, GetOrderDetail, RefreshSubscription, StoreOp.
 
-use shared::cloud::catalog::{CatalogOp, CatalogOpResult};
+use shared::cloud::store_op::{StoreOp, StoreOpResult};
 use shared::cloud::{CloudRpc, CloudRpcResult};
 
 use crate::core::state::ServerState;
@@ -80,45 +80,41 @@ pub async fn execute_rpc(state: &ServerState, rpc: &CloudRpc) -> CloudRpcResult 
                 error: None,
             }
         }
-        CloudRpc::CatalogOp(op) => {
+        CloudRpc::StoreOp(op) => {
             let result = execute_catalog_op(state, op).await;
-            CloudRpcResult::CatalogOp(Box::new(result))
+            CloudRpcResult::StoreOp(Box::new(result))
         }
     }
 }
 
-/// Execute a single CatalogOp and broadcast changes to POS
-pub async fn execute_catalog_op(state: &ServerState, op: &CatalogOp) -> CatalogOpResult {
+/// Execute a single StoreOp and broadcast changes to POS
+pub async fn execute_catalog_op(state: &ServerState, op: &StoreOp) -> StoreOpResult {
     match op {
         // ── Product ──
-        CatalogOp::CreateProduct { id, data } => {
+        StoreOp::CreateProduct { id, data } => {
             catalog::create_product(state, *id, data.clone()).await
         }
-        CatalogOp::UpdateProduct { id, data } => {
+        StoreOp::UpdateProduct { id, data } => {
             catalog::update_product(state, *id, data.clone()).await
         }
-        CatalogOp::DeleteProduct { id } => catalog::delete_product(state, *id).await,
+        StoreOp::DeleteProduct { id } => catalog::delete_product(state, *id).await,
 
         // ── Category ──
-        CatalogOp::CreateCategory { id, data } => {
+        StoreOp::CreateCategory { id, data } => {
             catalog::create_category(state, *id, data.clone()).await
         }
-        CatalogOp::UpdateCategory { id, data } => {
+        StoreOp::UpdateCategory { id, data } => {
             catalog::update_category(state, *id, data.clone()).await
         }
-        CatalogOp::DeleteCategory { id } => catalog::delete_category(state, *id).await,
+        StoreOp::DeleteCategory { id } => catalog::delete_category(state, *id).await,
 
         // ── Attribute ──
-        CatalogOp::CreateAttribute { id, data } => {
-            attribute::create(state, *id, data.clone()).await
-        }
-        CatalogOp::UpdateAttribute { id, data } => {
-            attribute::update(state, *id, data.clone()).await
-        }
-        CatalogOp::DeleteAttribute { id } => attribute::delete(state, *id).await,
+        StoreOp::CreateAttribute { id, data } => attribute::create(state, *id, data.clone()).await,
+        StoreOp::UpdateAttribute { id, data } => attribute::update(state, *id, data.clone()).await,
+        StoreOp::DeleteAttribute { id } => attribute::delete(state, *id).await,
 
         // ── Attribute Binding ──
-        CatalogOp::BindAttribute {
+        StoreOp::BindAttribute {
             owner,
             attribute_id,
             is_required,
@@ -135,52 +131,57 @@ pub async fn execute_catalog_op(state: &ServerState, op: &CatalogOp) -> CatalogO
             )
             .await
         }
-        CatalogOp::UnbindAttribute { binding_id } => attribute::unbind(state, *binding_id).await,
+        StoreOp::UnbindAttribute { binding_id } => attribute::unbind(state, *binding_id).await,
 
         // ── Tag ──
-        CatalogOp::CreateTag { id, data } => attribute::create_tag(state, *id, data).await,
-        CatalogOp::UpdateTag { id, data } => attribute::update_tag(state, *id, data).await,
-        CatalogOp::DeleteTag { id } => attribute::delete_tag(state, *id).await,
+        StoreOp::CreateTag { id, data } => attribute::create_tag(state, *id, data).await,
+        StoreOp::UpdateTag { id, data } => attribute::update_tag(state, *id, data).await,
+        StoreOp::DeleteTag { id } => attribute::delete_tag(state, *id).await,
 
         // ── Price Rule ──
-        CatalogOp::CreatePriceRule { id, data } => {
+        StoreOp::CreatePriceRule { id, data } => {
             resource::create_price_rule(state, *id, data.clone()).await
         }
-        CatalogOp::UpdatePriceRule { id, data } => {
+        StoreOp::UpdatePriceRule { id, data } => {
             resource::update_price_rule(state, *id, data.clone()).await
         }
-        CatalogOp::DeletePriceRule { id } => resource::delete_price_rule(state, *id).await,
+        StoreOp::DeletePriceRule { id } => resource::delete_price_rule(state, *id).await,
 
         // ── Employee ──
-        CatalogOp::CreateEmployee { id, data } => {
+        StoreOp::CreateEmployee { id, data } => {
             resource::create_employee(state, *id, data.clone()).await
         }
-        CatalogOp::UpdateEmployee { id, data } => {
+        StoreOp::UpdateEmployee { id, data } => {
             resource::update_employee(state, *id, data.clone()).await
         }
-        CatalogOp::DeleteEmployee { id } => resource::delete_employee(state, *id).await,
+        StoreOp::DeleteEmployee { id } => resource::delete_employee(state, *id).await,
 
         // ── Zone ──
-        CatalogOp::CreateZone { id, data } => resource::create_zone(state, *id, data.clone()).await,
-        CatalogOp::UpdateZone { id, data } => resource::update_zone(state, *id, data.clone()).await,
-        CatalogOp::DeleteZone { id } => resource::delete_zone(state, *id).await,
+        StoreOp::CreateZone { id, data } => resource::create_zone(state, *id, data.clone()).await,
+        StoreOp::UpdateZone { id, data } => resource::update_zone(state, *id, data.clone()).await,
+        StoreOp::DeleteZone { id } => resource::delete_zone(state, *id).await,
 
         // ── DiningTable ──
-        CatalogOp::CreateTable { id, data } => {
-            resource::create_table(state, *id, data.clone()).await
+        StoreOp::CreateTable { id, data } => resource::create_table(state, *id, data.clone()).await,
+        StoreOp::UpdateTable { id, data } => resource::update_table(state, *id, data.clone()).await,
+        StoreOp::DeleteTable { id } => resource::delete_table(state, *id).await,
+
+        // ── LabelTemplate ──
+        StoreOp::CreateLabelTemplate { id, data } => {
+            resource::create_label_template(state, *id, data.clone()).await
         }
-        CatalogOp::UpdateTable { id, data } => {
-            resource::update_table(state, *id, data.clone()).await
+        StoreOp::UpdateLabelTemplate { id, data } => {
+            resource::update_label_template(state, *id, data.clone()).await
         }
-        CatalogOp::DeleteTable { id } => resource::delete_table(state, *id).await,
+        StoreOp::DeleteLabelTemplate { id } => resource::delete_label_template(state, *id).await,
 
         // ── Image ──
-        CatalogOp::EnsureImage {
+        StoreOp::EnsureImage {
             presigned_url,
             hash,
         } => provisioning::ensure_image(state, presigned_url, hash),
 
         // ── Full Sync (initial provisioning) ──
-        CatalogOp::FullSync { snapshot } => provisioning::apply_full_sync(state, snapshot).await,
+        StoreOp::FullSync { snapshot } => provisioning::apply_full_sync(state, snapshot).await,
     }
 }

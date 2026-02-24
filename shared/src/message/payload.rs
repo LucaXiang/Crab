@@ -167,8 +167,8 @@ pub struct RequestCommandPayload {
 /// - `id`: "order_123"
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SyncPayload {
-    /// 资源类型 (例如: "order", "menu", "table")
-    pub resource: String,
+    /// 资源类型
+    pub resource: crate::cloud::SyncResource,
     /// 版本号 (用于前端判断是否需要全量刷新，差距 > 5 时触发)
     pub version: u64,
     /// 变更类型 (例如: "created", "updated", "deleted")

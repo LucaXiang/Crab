@@ -76,7 +76,7 @@ pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSumm
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
         SELECT id, entity_id, name, address, phone, nif, email, website, business_day_cutoff, device_id, last_sync_at, registered_at
-        FROM cloud_edge_servers
+        FROM edge_servers
         WHERE tenant_id = $1
         ORDER BY registered_at DESC
         "#,
@@ -103,7 +103,7 @@ pub async fn update_store(
 ) -> Result<(), BoxError> {
     sqlx::query(
         r#"
-        UPDATE cloud_edge_servers 
+        UPDATE edge_servers 
         SET 
             name = COALESCE($1, name),
             address = COALESCE($2, address),
@@ -127,22 +127,6 @@ pub async fn update_store(
     .execute(pool)
     .await?;
     Ok(())
-}
-
-/// Get store info data for a specific edge-server
-pub async fn get_store_info(
-    pool: &PgPool,
-    edge_server_id: i64,
-    tenant_id: &str,
-) -> Result<Option<serde_json::Value>, BoxError> {
-    let row: Option<(serde_json::Value,)> = sqlx::query_as(
-        "SELECT data FROM cloud_store_info WHERE edge_server_id = $1 AND tenant_id = $2",
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .fetch_optional(pool)
-    .await?;
-    Ok(row.map(|r| r.0))
 }
 
 /// Archived order summary
@@ -169,7 +153,7 @@ pub async fn list_orders(
         sqlx::query_as(
             r#"
             SELECT id, source_id, receipt_number, status, end_time, total, synced_at
-            FROM cloud_archived_orders
+            FROM store_archived_orders
             WHERE edge_server_id = $1 AND tenant_id = $2 AND status = $3
             ORDER BY end_time DESC NULLS LAST
             LIMIT $4 OFFSET $5
@@ -186,7 +170,7 @@ pub async fn list_orders(
         sqlx::query_as(
             r#"
             SELECT id, source_id, receipt_number, status, end_time, total, synced_at
-            FROM cloud_archived_orders
+            FROM store_archived_orders
             WHERE edge_server_id = $1 AND tenant_id = $2
             ORDER BY end_time DESC NULLS LAST
             LIMIT $3 OFFSET $4
@@ -202,34 +186,43 @@ pub async fn list_orders(
     Ok(rows)
 }
 
-/// Daily report stats with date range
+/// Daily report entry for Console stats
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct DailyReportEntry {
     pub id: i64,
-    pub source_id: String,
-    pub data: serde_json::Value,
-    pub synced_at: i64,
+    pub business_date: String,
+    pub total_orders: i32,
+    pub completed_orders: i32,
+    pub void_orders: i32,
+    pub total_sales: f64,
+    pub total_paid: f64,
+    pub total_unpaid: f64,
+    pub void_amount: f64,
+    pub total_tax: f64,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+    pub updated_at: i64,
 }
 
 pub async fn list_daily_reports(
     pool: &PgPool,
     edge_server_id: i64,
-    tenant_id: &str,
-    from: Option<i64>,
-    to: Option<i64>,
+    from: Option<&str>,
+    to: Option<&str>,
 ) -> Result<Vec<DailyReportEntry>, BoxError> {
     let rows: Vec<DailyReportEntry> = sqlx::query_as(
         r#"
-        SELECT id, source_id, data, synced_at
-        FROM cloud_daily_reports
-        WHERE edge_server_id = $1 AND tenant_id = $2
-            AND ($3::BIGINT IS NULL OR synced_at >= $3)
-            AND ($4::BIGINT IS NULL OR synced_at <= $4)
-        ORDER BY synced_at DESC
+        SELECT id, business_date, total_orders, completed_orders, void_orders,
+               total_sales, total_paid, total_unpaid, void_amount,
+               total_tax, total_discount, total_surcharge, updated_at
+        FROM store_daily_reports
+        WHERE edge_server_id = $1
+            AND ($2::TEXT IS NULL OR business_date >= $2)
+            AND ($3::TEXT IS NULL OR business_date <= $3)
+        ORDER BY business_date DESC
         "#,
     )
     .bind(edge_server_id)
-    .bind(tenant_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)
@@ -237,7 +230,7 @@ pub async fn list_daily_reports(
     Ok(rows)
 }
 
-/// Get cached order detail (from cloud_order_details, 30-day cache)
+/// Get cached order detail (from store_order_details, 30-day cache)
 pub async fn get_order_detail(
     pool: &PgPool,
     edge_server_id: i64,
@@ -247,8 +240,8 @@ pub async fn get_order_detail(
     let row: Option<(serde_json::Value,)> = sqlx::query_as(
         r#"
         SELECT d.detail
-        FROM cloud_order_details d
-        JOIN cloud_archived_orders o ON o.id = d.archived_order_id
+        FROM store_order_details d
+        JOIN store_archived_orders o ON o.id = d.archived_order_id
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2 AND o.order_key = $3
         "#,
     )
@@ -260,7 +253,7 @@ pub async fn get_order_detail(
     Ok(row.map(|r| r.0))
 }
 
-/// Get order desglose from cloud_archived_orders.desglose JSONB column
+/// Get order desglose from store_archived_orders.desglose JSONB column
 pub async fn get_order_desglose(
     pool: &PgPool,
     edge_server_id: i64,
@@ -270,7 +263,7 @@ pub async fn get_order_desglose(
     let row: Option<(serde_json::Value,)> = sqlx::query_as(
         r#"
         SELECT desglose
-        FROM cloud_archived_orders
+        FROM store_archived_orders
         WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3
         "#,
     )
@@ -286,7 +279,7 @@ pub async fn get_order_desglose(
     }
 }
 
-// ── Store overview statistics (computed from cloud_archived_orders) ──
+// ── Store overview statistics (computed from store_archived_orders) ──
 
 /// Overview statistics for a time range
 #[derive(Debug, serde::Serialize)]
@@ -361,7 +354,7 @@ pub async fn get_store_overview(
     from: i64,
     to: i64,
 ) -> Result<StoreOverview, BoxError> {
-    // 1. Basic aggregation from cloud_archived_orders
+    // 1. Basic aggregation from store_archived_orders
     #[allow(clippy::type_complexity)]
     let overview: (f64, i64, i64, f64, f64, i64, f64, f64, i64, f64, f64) = sqlx::query_as(
         r#"
@@ -378,7 +371,7 @@ pub async fn get_store_overview(
             COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LOSS_SETTLED'),
             COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
-        FROM cloud_archived_orders
+        FROM store_archived_orders
         WHERE edge_server_id = $1 AND tenant_id = $2
             AND end_time >= $3 AND end_time < $4
         "#,
@@ -421,7 +414,7 @@ pub async fn get_store_overview(
             EXTRACT(HOUR FROM TO_TIMESTAMP(end_time / 1000.0))::INTEGER AS hour,
             COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
             COUNT(*) AS orders
-        FROM cloud_archived_orders
+        FROM store_archived_orders
         WHERE edge_server_id = $1 AND tenant_id = $2
             AND end_time >= $3 AND end_time < $4
             AND status = 'COMPLETED'
@@ -436,14 +429,14 @@ pub async fn get_store_overview(
     .fetch_all(pool)
     .await?;
 
-    // 3. Tax breakdown from cloud_order_items (permanent, computed from line_total + tax_rate)
+    // 3. Tax breakdown from store_order_items (permanent, computed from line_total + tax_rate)
     let tax_rows: Vec<(i32, f64)> = sqlx::query_as(
         r#"
         SELECT
             i.tax_rate,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS base_amount
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
@@ -470,15 +463,15 @@ pub async fn get_store_overview(
         })
         .collect();
 
-    // 4. Payment breakdown from cloud_order_payments (permanent)
+    // 4. Payment breakdown from store_order_payments (permanent)
     let payment_rows: Vec<(String, f64, i64)> = sqlx::query_as(
         r#"
         SELECT
             p.method,
             COALESCE(SUM(p.amount), 0)::DOUBLE PRECISION AS amount,
             COUNT(*) AS count
-        FROM cloud_order_payments p
-        JOIN cloud_archived_orders o ON o.id = p.archived_order_id
+        FROM store_order_payments p
+        JOIN store_archived_orders o ON o.id = p.archived_order_id
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
@@ -503,15 +496,15 @@ pub async fn get_store_overview(
         })
         .collect();
 
-    // 5. Top products from cloud_order_items (permanent)
+    // 5. Top products from store_order_items (permanent)
     let product_rows: Vec<(String, i64, f64)> = sqlx::query_as(
         r#"
         SELECT
             i.name,
             COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
@@ -537,14 +530,14 @@ pub async fn get_store_overview(
         })
         .collect();
 
-    // 6. Category sales from cloud_order_items (permanent)
+    // 6. Category sales from store_order_items (permanent)
     let category_rows: Vec<(String, f64)> = sqlx::query_as(
         r#"
         SELECT
             COALESCE(i.category_name, 'Sin categoría') AS name,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
@@ -566,7 +559,7 @@ pub async fn get_store_overview(
         .map(|(name, revenue)| CategorySaleEntry { name, revenue })
         .collect();
 
-    // 7. Tag sales — JOIN order_items → catalog_product_tag → catalog_tags
+    // 7. Tag sales — JOIN order_items → store_product_tag → store_tags
     let tag_sales: Vec<TagSaleEntry> = sqlx::query_as(
         r#"
         SELECT
@@ -574,11 +567,11 @@ pub async fn get_store_overview(
             t.color,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
             COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
-        JOIN catalog_product_tag pt ON pt.product_source_id = i.product_source_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
+        JOIN store_product_tag pt ON pt.product_source_id = i.product_source_id
             AND pt.store_id = $1
-        JOIN catalog_tags t ON t.source_id = pt.tag_source_id
+        JOIN store_tags t ON t.source_id = pt.tag_source_id
             AND t.store_id = $1
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
@@ -642,7 +635,7 @@ pub async fn get_tenant_overview(
             COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LOSS_SETTLED'),
             COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
-        FROM cloud_archived_orders
+        FROM store_archived_orders
         WHERE tenant_id = $1
             AND end_time >= $2 AND end_time < $3
         "#,
@@ -683,7 +676,7 @@ pub async fn get_tenant_overview(
             EXTRACT(HOUR FROM TO_TIMESTAMP(end_time / 1000.0))::INTEGER AS hour,
             COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
             COUNT(*) AS orders
-        FROM cloud_archived_orders
+        FROM store_archived_orders
         WHERE tenant_id = $1
             AND end_time >= $2 AND end_time < $3
             AND status = 'COMPLETED'
@@ -702,8 +695,8 @@ pub async fn get_tenant_overview(
         SELECT
             i.tax_rate,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS base_amount
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
         WHERE o.tenant_id = $1
             AND o.end_time >= $2 AND o.end_time < $3
             AND o.status = 'COMPLETED'
@@ -735,8 +728,8 @@ pub async fn get_tenant_overview(
             p.method,
             COALESCE(SUM(p.amount), 0)::DOUBLE PRECISION AS amount,
             COUNT(*) AS count
-        FROM cloud_order_payments p
-        JOIN cloud_archived_orders o ON o.id = p.archived_order_id
+        FROM store_order_payments p
+        JOIN store_archived_orders o ON o.id = p.archived_order_id
         WHERE o.tenant_id = $1
             AND o.end_time >= $2 AND o.end_time < $3
             AND o.status = 'COMPLETED'
@@ -766,8 +759,8 @@ pub async fn get_tenant_overview(
             i.name,
             COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
         WHERE o.tenant_id = $1
             AND o.end_time >= $2 AND o.end_time < $3
             AND o.status = 'COMPLETED'
@@ -797,8 +790,8 @@ pub async fn get_tenant_overview(
         SELECT
             COALESCE(i.category_name, 'Sin categoría') AS name,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
         WHERE o.tenant_id = $1
             AND o.end_time >= $2 AND o.end_time < $3
             AND o.status = 'COMPLETED'
@@ -827,11 +820,11 @@ pub async fn get_tenant_overview(
             t.color,
             COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
             COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
-        FROM cloud_order_items i
-        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
-        JOIN catalog_product_tag pt ON pt.product_source_id = i.product_source_id
+        FROM store_order_items i
+        JOIN store_archived_orders o ON o.id = i.archived_order_id
+        JOIN store_product_tag pt ON pt.product_source_id = i.product_source_id
             AND pt.store_id = o.edge_server_id
-        JOIN catalog_tags t ON t.source_id = pt.tag_source_id
+        JOIN store_tags t ON t.source_id = pt.tag_source_id
             AND t.store_id = o.edge_server_id
         WHERE o.tenant_id = $1
             AND o.end_time >= $2 AND o.end_time < $3
@@ -928,8 +921,8 @@ pub async fn get_red_flags(
             COUNT(*) FILTER (WHERE e.event_type = 'ORDER_VOIDED') AS order_voids,
             COUNT(*) FILTER (WHERE e.event_type = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
             COUNT(*) FILTER (WHERE e.event_type = 'ITEM_MODIFIED') AS price_modifications
-        FROM cloud_order_events e
-        JOIN cloud_archived_orders o ON o.id = e.archived_order_id
+        FROM store_order_events e
+        JOIN store_archived_orders o ON o.id = e.archived_order_id
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
             AND e.timestamp >= $3 AND e.timestamp < $4
             AND e.event_type IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
@@ -990,7 +983,7 @@ pub async fn verify_store_ownership(
     tenant_id: &str,
 ) -> Result<Option<i64>, BoxError> {
     let row: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM cloud_edge_servers WHERE id = $1 AND tenant_id = $2")
+        sqlx::query_as("SELECT id FROM edge_servers WHERE id = $1 AND tenant_id = $2")
             .bind(store_id)
             .bind(tenant_id)
             .fetch_optional(pool)

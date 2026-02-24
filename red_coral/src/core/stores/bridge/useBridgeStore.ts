@@ -486,21 +486,4 @@ export const useBridgeStore = create<BridgeStore>()(
 // ==================== Selectors ====================
 
 export const useAppState = () => useBridgeStore((state) => state.appState);
-export const useIsFirstRun = () => useBridgeStore((state) => state.isFirstRun);
-export const useModeInfo = () => useBridgeStore((state) => state.modeInfo);
-export const useCurrentSession = () => useBridgeStore((state) => state.currentSession);
-export const useBridgeLoading = () => useBridgeStore((state) => state.isLoading);
-export const useBridgeError = () => useBridgeStore((state) => state.error);
-
-/**
- * 检查是否可以访问 POS
- */
-export const useCanAccessPOS = () =>
-  useBridgeStore((state) => AppStateHelpers.canAccessPOS(state.appState));
-
-/**
- * 获取推荐路由
- */
-export const useRecommendedRoute = () =>
-  useBridgeStore((state) => AppStateHelpers.getRouteForState(state.appState));
 

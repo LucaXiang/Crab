@@ -16,7 +16,8 @@ use crate::core::ServerState;
 use crate::db::repository::{shift, store_info};
 use crate::utils::time;
 
-const RESOURCE: &str = "shift";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Shift;
 
 /// 班次过期检测调度器
 ///

@@ -3,14 +3,14 @@ import { Plus, SlidersHorizontal, X, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { listAttributes, createAttribute, updateAttribute, deleteAttribute } from '@/infrastructure/api/catalog';
+import { listAttributes, createAttribute, updateAttribute, deleteAttribute } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import { FormField, inputClass } from '@/shared/components/FormField/FormField';
 import { CheckboxField } from '@/shared/components/FormField/FormField';
-import type { CatalogAttribute, AttributeCreate, AttributeUpdate, AttributeOptionInput } from '@/core/types/catalog';
+import type { StoreAttribute, AttributeCreate, AttributeUpdate, AttributeOptionInput } from '@/core/types/store';
 import { formatCurrency } from '@/utils/format';
 
 interface FormOption {
@@ -23,14 +23,14 @@ export const AttributeManagement: React.FC = () => {
   const storeId = useStoreId();
   const token = useAuthStore(s => s.token);
 
-  const [attributes, setAttributes] = useState<CatalogAttribute[]>([]);
+  const [attributes, setAttributes] = useState<StoreAttribute[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<CatalogAttribute | null>(null);
+  const [editing, setEditing] = useState<StoreAttribute | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -41,7 +41,7 @@ export const AttributeManagement: React.FC = () => {
   const [formOptions, setFormOptions] = useState<FormOption[]>([]);
 
   // Delete confirmation
-  const [deleteTarget, setDeleteTarget] = useState<CatalogAttribute | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StoreAttribute | null>(null);
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -75,7 +75,7 @@ export const AttributeManagement: React.FC = () => {
     setModalOpen(true);
   };
 
-  const openEdit = (attr: CatalogAttribute) => {
+  const openEdit = (attr: StoreAttribute) => {
     setEditing(attr);
     setFormName(attr.name);
     setFormIsMultiSelect(attr.is_multi_select);
@@ -154,7 +154,7 @@ export const AttributeManagement: React.FC = () => {
     }
   };
 
-  const columns: Column<CatalogAttribute>[] = [
+  const columns: Column<StoreAttribute>[] = [
     {
       key: 'name',
       header: t('settings.common.name'),

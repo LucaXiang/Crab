@@ -9,10 +9,10 @@ import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, inputClass } from '@/shared/components/FormField';
-import { listTags, createTag, updateTag, deleteTag } from '@/infrastructure/api/catalog';
-import type { CatalogTag, TagCreate, TagUpdate } from '@/core/types/catalog';
+import { listTags, createTag, updateTag, deleteTag } from '@/infrastructure/api/store';
+import type { StoreTag, TagCreate, TagUpdate } from '@/core/types/store';
 
-type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: CatalogTag } | { type: 'delete'; item: CatalogTag };
+type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: StoreTag } | { type: 'delete'; item: StoreTag };
 
 export const TagManagement: React.FC = () => {
   const { t } = useI18n();
@@ -21,7 +21,7 @@ export const TagManagement: React.FC = () => {
   const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
-  const [items, setItems] = useState<CatalogTag[]>([]);
+  const [items, setItems] = useState<StoreTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<ModalState>({ type: 'closed' });
@@ -58,7 +58,7 @@ export const TagManagement: React.FC = () => {
     setModal({ type: 'create' });
   };
 
-  const openEdit = (item: CatalogTag) => {
+  const openEdit = (item: StoreTag) => {
     setFormName(item.name); setFormColor(item.color || '#6366f1'); setFormDisplayOrder(item.display_order);
     setModal({ type: 'edit', item });
   };
@@ -91,7 +91,7 @@ export const TagManagement: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  const columns: Column<CatalogTag>[] = useMemo(() => [
+  const columns: Column<StoreTag>[] = useMemo(() => [
     {
       key: 'name', header: t('catalog.name'),
       render: (tag) => (

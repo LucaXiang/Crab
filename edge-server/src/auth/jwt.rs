@@ -195,7 +195,7 @@ pub fn load_or_create_persistent_secret(data_dir: &std::path::Path) -> String {
         tracing::error!("Failed to create data dir for JWT secret: {}", e);
         return secret;
     }
-    if let Err(e) = std::fs::write(&secret_path, &secret) {
+    if let Err(e) = crab_cert::write_secret_file(&secret_path, &secret) {
         tracing::error!("Failed to persist JWT secret: {}", e);
     } else {
         tracing::info!("JWT secret generated and persisted");

@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{Attribute, AttributeCreate, AttributeOptionInput, AttributeUpdate};
 
-const RESOURCE: &str = "attribute";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Attribute;
 
 fn validate_create(payload: &AttributeCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;

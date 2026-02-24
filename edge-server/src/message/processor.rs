@@ -144,7 +144,12 @@ impl MessageProcessor for ServerCommandProcessor {
                     Ok(issue) => {
                         let id_str = issue.id.to_string();
                         self.state
-                            .broadcast_sync("system_issue", "created", &id_str, Some(&issue))
+                            .broadcast_sync(
+                                shared::cloud::SyncResource::SystemIssue,
+                                "created",
+                                &id_str,
+                                Some(&issue),
+                            )
                             .await;
                     }
                     Err(e) => {

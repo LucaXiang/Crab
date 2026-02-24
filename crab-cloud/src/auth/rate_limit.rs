@@ -106,14 +106,14 @@ fn too_many_requests() -> Response {
     AppError::new(ErrorCode::TooManyAttempts).into_response()
 }
 
-/// Rate limit middleware for login: 5 requests/minute per IP
+/// Rate limit middleware for login: 10 requests/minute per IP
 pub async fn login_rate_limit(
     State(state): State<crate::state::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("login", &ip, 5, 60).await {
+    if !state.rate_limiter.check("login", &ip, 10, 60).await {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)
@@ -145,27 +145,31 @@ pub async fn password_reset_rate_limit(
     Ok(next.run(request).await)
 }
 
-/// Rate limit middleware for P12 upload: 3 requests/minute per IP
+/// Rate limit middleware for P12 upload: 5 requests/minute per IP
 pub async fn p12_upload_rate_limit(
     State(state): State<crate::state::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("p12_upload", &ip, 3, 60).await {
+    if !state.rate_limiter.check("p12_upload", &ip, 5, 60).await {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)
 }
 
-/// Global rate limit middleware: 30 requests/minute per IP
+/// Global rate limit middleware: 200 requests/minute per IP
+///
+/// Authenticated tenant API can burst many calls per page load (stores, orders,
+/// stats, overview, products…), so the global cap must be generous.
+/// Sensitive endpoints (login, register, password_reset) have their own stricter limits.
 pub async fn global_rate_limit(
     State(state): State<crate::state::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("global", &ip, 30, 60).await {
+    if !state.rate_limiter.check("global", &ip, 200, 60).await {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)

@@ -15,7 +15,7 @@ pub async fn create_command(
 ) -> Result<i64, BoxError> {
     let row: (i64,) = sqlx::query_as(
         r#"
-        INSERT INTO cloud_commands (edge_server_id, tenant_id, command_type, payload, status, created_at)
+        INSERT INTO store_commands (edge_server_id, tenant_id, command_type, payload, status, created_at)
         VALUES ($1, $2, $3, $4, 'pending', $5)
         RETURNING id
         "#,
@@ -43,7 +43,7 @@ pub async fn complete_command(
 
     sqlx::query(
         r#"
-        UPDATE cloud_commands
+        UPDATE store_commands
         SET status = $1, result = $2, executed_at = $3
         WHERE id = $4
         "#,
@@ -80,7 +80,7 @@ pub async fn get_command_history(
     let rows: Vec<CommandRecord> = sqlx::query_as(
         r#"
         SELECT id, command_type, payload, status, created_at, executed_at, result
-        FROM cloud_commands
+        FROM store_commands
         WHERE edge_server_id = $1 AND tenant_id = $2
         ORDER BY created_at DESC
         LIMIT $3 OFFSET $4

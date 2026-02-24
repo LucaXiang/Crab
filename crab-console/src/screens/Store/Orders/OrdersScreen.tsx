@@ -640,7 +640,7 @@ const TaxCard: React.FC<{ desglose: OrderDetailResponse['desglose']; t: (key: st
       {desglose.map((row, i) => (
         <div key={i} className="px-4 py-3 flex justify-between items-center text-sm">
           <span className="text-slate-700 font-medium">{row.tax_rate}%</span>
-          <div className="flex gap-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
             <div className="text-right">
               <p className="text-[10px] text-slate-400 uppercase">{t('orders.tax_base')}</p>
               <p className="text-slate-600">{formatCurrency(row.base_amount)}</p>
@@ -709,7 +709,7 @@ const ItemRow: React.FC<{ item: OrderItem; accentColor: string; t: (k: string) =
         <div className="font-bold text-slate-800 pl-4 shrink-0">{formatCurrency(item.line_total)}</div>
       </div>
       {expanded && hasOptions && (
-        <div className="px-16 pb-4 pt-0">
+        <div className="px-4 sm:px-16 pb-4 pt-0">
           <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1 shadow-sm">
             {item.options.map((opt, j) => (
               <div key={j} className="text-sm">

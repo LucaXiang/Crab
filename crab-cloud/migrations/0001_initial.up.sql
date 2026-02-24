@@ -250,31 +250,72 @@ CREATE TABLE IF NOT EXISTS cloud_order_details (
 
 CREATE INDEX idx_cloud_order_details_synced_at ON cloud_order_details (synced_at);
 
--- ── Daily Reports ──
+-- ── Daily Reports (normalized, mirrors edge-server SQLite schema) ──
 
 CREATE TABLE IF NOT EXISTS cloud_daily_reports (
-    id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
-    tenant_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    data JSONB NOT NULL,
-    version BIGINT NOT NULL DEFAULT 0,
-    synced_at BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    id               BIGSERIAL PRIMARY KEY,
+    edge_server_id   BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
+    source_id        BIGINT NOT NULL,
+    business_date    TEXT NOT NULL,
+    total_orders     INTEGER NOT NULL DEFAULT 0,
+    completed_orders INTEGER NOT NULL DEFAULT 0,
+    void_orders      INTEGER NOT NULL DEFAULT 0,
+    total_sales      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_paid       DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_unpaid     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    void_amount      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_tax        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_discount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_surcharge  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    generated_at     BIGINT,
+    generated_by_id  BIGINT,
+    generated_by_name TEXT,
+    note             TEXT,
+    updated_at       BIGINT NOT NULL,
+    UNIQUE (edge_server_id, source_id),
+    UNIQUE (edge_server_id, business_date)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cloud_daily_reports_tenant ON cloud_daily_reports (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cloud_daily_reports_edge ON cloud_daily_reports(edge_server_id);
 
--- ── Store Info ──
+CREATE TABLE IF NOT EXISTS cloud_daily_report_tax_breakdown (
+    id           BIGSERIAL PRIMARY KEY,
+    report_id    BIGINT NOT NULL REFERENCES cloud_daily_reports(id) ON DELETE CASCADE,
+    tax_rate     INTEGER NOT NULL,
+    net_amount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    tax_amount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    gross_amount DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    order_count  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_cloud_dr_tax_report ON cloud_daily_report_tax_breakdown(report_id);
+
+CREATE TABLE IF NOT EXISTS cloud_daily_report_payment_breakdown (
+    id        BIGSERIAL PRIMARY KEY,
+    report_id BIGINT NOT NULL REFERENCES cloud_daily_reports(id) ON DELETE CASCADE,
+    method    TEXT NOT NULL,
+    amount    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    count     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_cloud_dr_payment_report ON cloud_daily_report_payment_breakdown(report_id);
+
+-- ── Store Info (normalized, mirrors edge-server SQLite schema) ──
 
 CREATE TABLE IF NOT EXISTS cloud_store_info (
-    id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
-    tenant_id TEXT NOT NULL,
-    data JSONB NOT NULL,
-    version BIGINT NOT NULL DEFAULT 0,
-    synced_at BIGINT NOT NULL,
-    UNIQUE (edge_server_id, tenant_id)
+    id                   BIGSERIAL PRIMARY KEY,
+    edge_server_id       BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
+    name                 TEXT NOT NULL DEFAULT '',
+    address              TEXT NOT NULL DEFAULT '',
+    nif                  TEXT NOT NULL DEFAULT '',
+    logo_url             TEXT,
+    phone                TEXT,
+    email                TEXT,
+    website              TEXT,
+    business_day_cutoff  TEXT NOT NULL DEFAULT '00:00',
+    created_at           BIGINT,
+    updated_at           BIGINT NOT NULL,
+    UNIQUE (edge_server_id)
 );
 
 -- ── Commands ──
@@ -309,28 +350,44 @@ CREATE TABLE IF NOT EXISTS cloud_order_events (
 CREATE INDEX IF NOT EXISTS idx_coe_order ON cloud_order_events(archived_order_id);
 CREATE INDEX IF NOT EXISTS idx_coe_red_flags ON cloud_order_events(event_type, timestamp, operator_id);
 
--- 班次（JSONB 镜像）
+-- Shifts (normalized, mirrors edge-server SQLite schema + cloud isolation)
 CREATE TABLE IF NOT EXISTS cloud_shifts (
     id              BIGSERIAL PRIMARY KEY,
     edge_server_id  BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
-    tenant_id       TEXT NOT NULL,
-    source_id       TEXT NOT NULL,
-    data            JSONB NOT NULL,
-    version         BIGINT NOT NULL DEFAULT 0,
-    synced_at       BIGINT NOT NULL,
+    source_id       BIGINT NOT NULL,
+    operator_id     BIGINT NOT NULL,
+    operator_name   TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'OPEN',
+    start_time      BIGINT NOT NULL,
+    end_time        BIGINT,
+    starting_cash   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    expected_cash   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    actual_cash     DOUBLE PRECISION,
+    cash_variance   DOUBLE PRECISION,
+    abnormal_close  BOOLEAN NOT NULL DEFAULT FALSE,
+    last_active_at  BIGINT,
+    note            TEXT,
+    created_at      BIGINT,
+    updated_at      BIGINT NOT NULL,
     UNIQUE (edge_server_id, source_id)
 );
-CREATE INDEX IF NOT EXISTS idx_cloud_shifts_tenant ON cloud_shifts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cloud_shifts_edge ON cloud_shifts(edge_server_id);
+CREATE INDEX IF NOT EXISTS idx_cloud_shifts_status ON cloud_shifts(edge_server_id, status);
 
--- 员工（JSONB 镜像）
+-- Employees (normalized, mirrors edge-server SQLite schema + cloud isolation)
 CREATE TABLE IF NOT EXISTS cloud_employees (
     id              BIGSERIAL PRIMARY KEY,
     edge_server_id  BIGINT NOT NULL REFERENCES cloud_edge_servers(id),
-    tenant_id       TEXT NOT NULL,
-    source_id       TEXT NOT NULL,
-    data            JSONB NOT NULL,
-    version         BIGINT NOT NULL DEFAULT 0,
-    synced_at       BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    source_id       BIGINT NOT NULL,
+    username        TEXT NOT NULL,
+    hash_pass       TEXT NOT NULL,
+    display_name    TEXT NOT NULL DEFAULT '',
+    role_id         INTEGER NOT NULL,
+    is_system       BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      BIGINT NOT NULL DEFAULT 0,
+    updated_at      BIGINT NOT NULL,
+    UNIQUE (edge_server_id, source_id),
+    UNIQUE (edge_server_id, username)
 );
-CREATE INDEX IF NOT EXISTS idx_cloud_employees_tenant ON cloud_employees(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cloud_employees_edge ON cloud_employees(edge_server_id);

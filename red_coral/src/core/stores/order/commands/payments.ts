@@ -2,33 +2,8 @@
  * Payment-related order commands: partial settle, cancel, split, AA split.
  */
 
-import { PaymentRecord } from '@/core/domain/types';
 import { createCommand } from '../commandUtils';
 import { sendCommand, ensureSuccess } from './sendCommand';
-
-/**
- * Partial settle (add payments without completing).
- * Fire & forget — UI updates via WebSocket event.
- */
-export const partialSettle = async (
-  orderId: string,
-  newPayments: PaymentRecord[],
-): Promise<void> => {
-  for (const payment of newPayments) {
-    const command = createCommand({
-      type: 'ADD_PAYMENT',
-      order_id: orderId,
-      payment: {
-        method: payment.method,
-        amount: payment.amount,
-        tendered: payment.tendered ?? null,
-        note: payment.note ?? null,
-      },
-    });
-    const response = await sendCommand(command);
-    ensureSuccess(response, 'Add payment');
-  }
-};
 
 /**
  * Cancel a payment.

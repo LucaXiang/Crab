@@ -14,7 +14,7 @@ pub async fn log(
     now: i64,
 ) -> Result<(), BoxError> {
     sqlx::query(
-        "INSERT INTO cloud_audit_log (tenant_id, action, detail, ip_address, created_at) VALUES ($1, $2, $3, $4, $5)"
+        "INSERT INTO audit_logs (tenant_id, action, detail, ip_address, created_at) VALUES ($1, $2, $3, $4, $5)"
     )
     .bind(tenant_id)
     .bind(action)
@@ -43,7 +43,7 @@ pub async fn query(
     offset: i32,
 ) -> Result<Vec<AuditEntry>, BoxError> {
     let rows: Vec<AuditEntry> = sqlx::query_as(
-        "SELECT id, action, detail, ip_address, created_at FROM cloud_audit_log WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+        "SELECT id, action, detail, ip_address, created_at FROM audit_logs WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
     )
     .bind(tenant_id)
     .bind(limit)

@@ -9,10 +9,10 @@ import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, inputClass, SelectField } from '@/shared/components/FormField';
-import { listCategories, createCategory, updateCategory, deleteCategory } from '@/infrastructure/api/catalog';
-import type { CatalogCategory, CategoryCreate, CategoryUpdate } from '@/core/types/catalog';
+import { listCategories, createCategory, updateCategory, deleteCategory } from '@/infrastructure/api/store';
+import type { StoreCategory, CategoryCreate, CategoryUpdate } from '@/core/types/store';
 
-type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: CatalogCategory } | { type: 'delete'; item: CatalogCategory };
+type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: StoreCategory } | { type: 'delete'; item: StoreCategory };
 
 export const CategoryManagement: React.FC = () => {
   const { t } = useI18n();
@@ -21,7 +21,7 @@ export const CategoryManagement: React.FC = () => {
   const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
-  const [items, setItems] = useState<CatalogCategory[]>([]);
+  const [items, setItems] = useState<StoreCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<ModalState>({ type: 'closed' });
@@ -59,7 +59,7 @@ export const CategoryManagement: React.FC = () => {
     setModal({ type: 'create' });
   };
 
-  const openEdit = (item: CatalogCategory) => {
+  const openEdit = (item: StoreCategory) => {
     setFormName(item.name); setFormSortOrder(item.sort_order);
     setFormIsVirtual(item.is_virtual); setFormIsDisplay(item.is_display);
     setModal({ type: 'edit', item });
@@ -93,7 +93,7 @@ export const CategoryManagement: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  const columns: Column<CatalogCategory>[] = useMemo(() => [
+  const columns: Column<StoreCategory>[] = useMemo(() => [
     {
       key: 'name', header: t('catalog.name'),
       render: (c) => (

@@ -41,7 +41,7 @@ pub use account::{
     change_email, change_password, confirm_email_change, get_profile, update_profile,
 };
 
-pub use store::{list_products, list_stores, update_store};
+pub use store::{list_stores, update_store};
 
 pub use analytics::{get_stats, get_store_overview, get_store_red_flags, get_tenant_overview};
 

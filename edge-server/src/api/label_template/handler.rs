@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 
-const RESOURCE: &str = "label_template";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::LabelTemplate;
 
 fn validate_create(payload: &LabelTemplateCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
@@ -76,7 +77,7 @@ pub async fn create(
 ) -> AppResult<Json<LabelTemplate>> {
     validate_create(&payload)?;
 
-    let template = label_template::create(&state.pool, payload).await?;
+    let template = label_template::create(&state.pool, None, payload).await?;
 
     let id = template.id.to_string();
 

@@ -81,7 +81,14 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     // Create message channel for real-time push (carries CloudMessage directly)
     let (msg_tx, mut msg_rx) = mpsc::channel::<CloudMessage>(32);
 
-    // Register in connected_edges
+    // Register in connected_edges (replaces old connection if any — old sender drops → old loop exits)
+    if let Some((_, old_tx)) = state.edges.connected.remove(&edge_server_id) {
+        tracing::warn!(
+            edge_server_id,
+            "Replacing existing WS connection for this edge"
+        );
+        drop(old_tx); // old msg_rx.recv() returns None → old loop breaks
+    }
     state.edges.connected.insert(edge_server_id, msg_tx.clone());
 
     // Send Welcome with sync cursors
@@ -99,35 +106,6 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         Err(e) => {
             tracing::error!(edge_server_id, "Failed to get cursors for Welcome: {e}");
             // Non-fatal: edge will do full sync if no Welcome received
-        }
-    }
-
-    // Check if edge needs initial catalog provisioning
-    // (no products synced yet = first-time activation)
-    match needs_catalog_provisioning(&state, edge_server_id).await {
-        Ok(true) => {
-            tracing::info!(
-                edge_server_id,
-                "Edge needs catalog provisioning, sending FullSync"
-            );
-            let snapshot = crate::db::catalog_templates::default_snapshot();
-            let rpc_msg = CloudMessage::Rpc {
-                id: format!("provision-{edge_server_id}"),
-                payload: Box::new(shared::cloud::ws::CloudRpc::CatalogOp(Box::new(
-                    shared::cloud::catalog::CatalogOp::FullSync { snapshot },
-                ))),
-            };
-            if let Ok(json) = serde_json::to_string(&rpc_msg)
-                && ws_sink.send(Message::Text(json.into())).await.is_err()
-            {
-                tracing::warn!(edge_server_id, "Failed to send FullSync, disconnecting");
-                state.edges.connected.remove(&edge_server_id);
-                return;
-            }
-        }
-        Ok(false) => {} // already provisioned
-        Err(e) => {
-            tracing::warn!(edge_server_id, "Failed to check provisioning status: {e}");
         }
     }
 
@@ -246,6 +224,16 @@ async fn handle_edge_message<S>(
 
     match cloud_msg {
         CloudMessage::SyncBatch { items, .. } => {
+            // Reject oversized batches
+            if items.len() > shared::cloud::MAX_SYNC_BATCH_ITEMS {
+                tracing::warn!(
+                    edge_id = %identity.entity_id,
+                    count = items.len(),
+                    "WS sync batch too large, ignoring"
+                );
+                return;
+            }
+
             // Update last_sync_at
             if let Err(e) = sync_store::update_last_sync(&state.pool, edge_server_id, now).await {
                 tracing::warn!(edge_server_id, "Failed to update last_sync_at: {e}");
@@ -270,7 +258,7 @@ async fn handle_edge_message<S>(
                         if let Err(e) = sync_store::update_cursor(
                             &state.pool,
                             edge_server_id,
-                            &item.resource,
+                            item.resource,
                             i64::try_from(item.version).unwrap_or(i64::MAX),
                             now,
                         )
@@ -340,19 +328,4 @@ async fn handle_edge_message<S>(
             tracing::debug!("Ignoring unexpected CloudMessage from edge");
         }
     }
-}
-
-/// Check if an edge server needs initial catalog provisioning.
-///
-/// Returns true if no products have been synced for this edge yet.
-async fn needs_catalog_provisioning(
-    state: &AppState,
-    edge_server_id: i64,
-) -> Result<bool, sqlx::Error> {
-    let count: (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM catalog_products WHERE edge_server_id = $1")
-            .bind(edge_server_id)
-            .fetch_one(&state.pool)
-            .await?;
-    Ok(count.0 == 0)
 }

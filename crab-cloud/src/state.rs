@@ -8,6 +8,7 @@ use shared::cloud::CloudMessage;
 use shared::cloud::ws::CloudRpcResult;
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use tokio::sync::{OnceCell, mpsc, oneshot};
 
 use crate::auth::QuotaCache;
@@ -68,6 +69,8 @@ pub struct AppState {
     pub s3: S3Config,
     pub edges: EdgeConnections,
     pub live_orders: LiveOrderHub,
+    /// Console WS connections per tenant (tenant_id → count)
+    pub console_connections: Arc<DashMap<String, AtomicUsize>>,
 }
 
 impl AppState {
@@ -179,6 +182,7 @@ impl AppState {
             },
             edges: EdgeConnections::new(),
             live_orders: LiveOrderHub::new(),
+            console_connections: Arc::new(DashMap::new()),
         })
     }
 }

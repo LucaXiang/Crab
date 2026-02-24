@@ -13,11 +13,11 @@ use crate::state::AppState;
 
 use super::{ApiResult, verify_store};
 
-/// GET /api/tenant/stores/:id/stats
+/// GET /api/tenant/stores/:id/stats?from=YYYY-MM-DD&to=YYYY-MM-DD
 #[derive(Deserialize)]
 pub struct StatsQuery {
-    pub from: Option<i64>,
-    pub to: Option<i64>,
+    pub from: Option<String>,
+    pub to: Option<String>,
 }
 
 pub async fn get_stats(
@@ -31,9 +31,8 @@ pub async fn get_stats(
     let reports = tenant_queries::list_daily_reports(
         &state.pool,
         store_id,
-        &identity.tenant_id,
-        query.from,
-        query.to,
+        query.from.as_deref(),
+        query.to.as_deref(),
     )
     .await
     .map_err(|e| {

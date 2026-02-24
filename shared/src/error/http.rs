@@ -74,6 +74,7 @@ impl ErrorCode {
             | Self::LicenseExpired
             | Self::DeviceLimitReached
             | Self::ClientLimitReached
+            | Self::ResourceLimitExceeded
             | Self::TenantNoSubscription
             | Self::SubscriptionBlocked
             | Self::FeatureNotAvailable

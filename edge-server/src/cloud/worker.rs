@@ -8,7 +8,7 @@
 //! 6. Reconnect with exponential backoff on disconnect
 
 use futures::{SinkExt, StreamExt};
-use shared::cloud::{CloudMessage, CloudSyncBatch, CloudSyncItem};
+use shared::cloud::{CloudMessage, CloudSyncBatch, CloudSyncItem, SyncResource};
 use shared::message::{BusMessage, EventType, SyncPayload};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -155,7 +155,7 @@ impl CloudWorker {
             tokio::time::interval(Duration::from_secs(ARCHIVED_ORDER_SYNC_INTERVAL_SECS));
         archived_order_sync_interval.tick().await; // skip immediate tick (already did catch-up above)
 
-        let mut pending: HashMap<String, HashMap<String, CloudSyncItem>> = HashMap::new();
+        let mut pending: HashMap<SyncResource, HashMap<String, CloudSyncItem>> = HashMap::new();
         let mut debounce_deadline: Option<Instant> = None;
 
         loop {
@@ -217,7 +217,7 @@ impl CloudWorker {
                             }
 
                             if let Some(item) = Self::extract_sync_item(&msg) {
-                                let resource = item.resource.clone();
+                                let resource = item.resource;
                                 let resource_id = item.resource_id.clone();
                                 pending
                                     .entry(resource)
@@ -400,10 +400,10 @@ impl CloudWorker {
                     error: None,
                 }
             }
-            shared::cloud::CloudRpc::CatalogOp(op) => {
+            shared::cloud::CloudRpc::StoreOp(op) => {
                 let result =
                     crate::cloud::rpc_executor::execute_catalog_op(&self.state, op.as_ref()).await;
-                CloudRpcResult::CatalogOp(Box::new(result))
+                CloudRpcResult::StoreOp(Box::new(result))
             }
         }
     }
@@ -453,65 +453,7 @@ impl CloudWorker {
     where
         S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
     {
-        let mut items = Vec::new();
-
-        // Check each resource: skip if cloud cursor matches local version
-        for resource in &["product", "category"] {
-            let local_version = self.state.resource_versions.get(resource);
-            let cloud_cursor = cursors.get(*resource).copied().unwrap_or(0);
-
-            if local_version == cloud_cursor && local_version > 0 {
-                tracing::debug!(
-                    resource,
-                    version = local_version,
-                    "Skipping sync: cloud already up-to-date"
-                );
-                continue;
-            }
-
-            // Version mismatch or cloud has nothing → send full resource
-            match *resource {
-                "product" => {
-                    let products = self.state.catalog_service.list_products();
-                    for product in &products {
-                        let data = match serde_json::to_value(product) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                tracing::warn!(product_id = %product.id, "Failed to serialize product: {e}");
-                                continue;
-                            }
-                        };
-                        items.push(CloudSyncItem {
-                            resource: "product".to_string(),
-                            version: local_version,
-                            action: "upsert".to_string(),
-                            resource_id: product.id.to_string(),
-                            data,
-                        });
-                    }
-                }
-                "category" => {
-                    let categories = self.state.catalog_service.list_categories();
-                    for category in &categories {
-                        let data = match serde_json::to_value(category) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                tracing::warn!(category_id = %category.id, "Failed to serialize category: {e}");
-                                continue;
-                            }
-                        };
-                        items.push(CloudSyncItem {
-                            resource: "category".to_string(),
-                            version: local_version,
-                            action: "upsert".to_string(),
-                            resource_id: category.id.to_string(),
-                            data,
-                        });
-                    }
-                }
-                _ => {}
-            }
-        }
+        let items = self.collect_sync_items_incremental(cursors).await;
 
         if items.is_empty() {
             tracing::info!("Initial sync: all resources up-to-date, zero transfer");
@@ -578,9 +520,9 @@ impl CloudWorker {
                             }
                         };
                         items.push(CloudSyncItem {
-                            resource: "archived_order".to_string(),
+                            resource: SyncResource::ArchivedOrder,
                             version: id as u64,
-                            action: "upsert".to_string(),
+                            action: shared::cloud::SyncAction::Upsert,
                             resource_id: detail_sync.order_key,
                             data,
                         });
@@ -660,7 +602,7 @@ impl CloudWorker {
     async fn flush_pending_ws<S>(
         &mut self,
         ws_sink: &mut S,
-        pending: &mut HashMap<String, HashMap<String, CloudSyncItem>>,
+        pending: &mut HashMap<SyncResource, HashMap<String, CloudSyncItem>>,
     ) -> Result<(), crate::utils::AppError>
     where
         S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
@@ -691,43 +633,149 @@ impl CloudWorker {
         Ok(())
     }
 
-    /// Collect all sync items (products + categories) — used by HTTP fallback
-    fn collect_all_sync_items(&self) -> Vec<CloudSyncItem> {
+    /// Collect sync items with cursor-based skip (used by send_initial_sync)
+    async fn collect_sync_items_incremental(
+        &self,
+        cursors: &HashMap<String, u64>,
+    ) -> Vec<CloudSyncItem> {
         let mut items = Vec::new();
 
-        let product_version = self.state.resource_versions.get("product");
-        for product in &self.state.catalog_service.list_products() {
-            if let Ok(data) = serde_json::to_value(product) {
-                items.push(CloudSyncItem {
-                    resource: "product".to_string(),
-                    version: product_version,
-                    action: "upsert".to_string(),
-                    resource_id: product.id.to_string(),
-                    data,
-                });
-            }
-        }
+        for &resource in SyncResource::INITIAL_SYNC {
+            let local_version = self.state.resource_versions.get(resource);
+            let cloud_cursor = cursors.get(resource.as_str()).copied().unwrap_or(0);
 
-        let category_version = self.state.resource_versions.get("category");
-        for category in &self.state.catalog_service.list_categories() {
-            if let Ok(data) = serde_json::to_value(category) {
-                items.push(CloudSyncItem {
-                    resource: "category".to_string(),
-                    version: category_version,
-                    action: "upsert".to_string(),
-                    resource_id: category.id.to_string(),
-                    data,
-                });
+            if local_version == cloud_cursor && local_version > 0 {
+                tracing::debug!(resource = %resource, version = local_version, "Skipping sync: up-to-date");
+                continue;
             }
+
+            self.collect_resource_items(resource, local_version, &mut items)
+                .await;
         }
 
         items
     }
 
+    /// Collect all sync items (all resources) — used by HTTP fallback
+    async fn collect_all_sync_items(&self) -> Vec<CloudSyncItem> {
+        let mut items = Vec::new();
+        for &resource in SyncResource::INITIAL_SYNC {
+            let version = self.state.resource_versions.get(resource);
+            self.collect_resource_items(resource, version, &mut items)
+                .await;
+        }
+        items
+    }
+
+    /// Collect items for a single resource type from local DB
+    async fn collect_resource_items(
+        &self,
+        resource: SyncResource,
+        version: u64,
+        items: &mut Vec<CloudSyncItem>,
+    ) {
+        use crate::db::repository::{
+            attribute, dining_table, employee, label_template, price_rule, store_info, tag, zone,
+        };
+
+        /// Push serializable records with an `id` field into sync items
+        fn push_many<T: serde::Serialize>(
+            records: &[T],
+            resource: SyncResource,
+            version: u64,
+            id_fn: impl Fn(&T) -> i64,
+            items: &mut Vec<CloudSyncItem>,
+        ) {
+            for record in records {
+                if let Ok(data) = serde_json::to_value(record) {
+                    items.push(CloudSyncItem {
+                        resource,
+                        version,
+                        action: shared::cloud::SyncAction::Upsert,
+                        resource_id: id_fn(record).to_string(),
+                        data,
+                    });
+                }
+            }
+        }
+
+        match resource {
+            SyncResource::Product => {
+                let products = self.state.catalog_service.list_products();
+                push_many(&products, resource, version, |p| p.id, items);
+            }
+            SyncResource::Category => {
+                let categories = self.state.catalog_service.list_categories();
+                push_many(&categories, resource, version, |c| c.id, items);
+            }
+            SyncResource::Tag => {
+                if let Ok(v) = tag::find_all(&self.state.pool).await {
+                    push_many(&v, resource, version, |t| t.id, items);
+                }
+            }
+            SyncResource::Attribute => {
+                if let Ok(v) = attribute::find_all(&self.state.pool).await {
+                    push_many(&v, resource, version, |a| a.id, items);
+                }
+            }
+            SyncResource::AttributeBinding => {
+                if let Ok(v) = sqlx::query_as::<_, shared::models::attribute::AttributeBinding>(
+                    "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, \
+                     COALESCE(default_option_ids, 'null') as default_option_ids \
+                     FROM attribute_binding ORDER BY display_order",
+                )
+                .fetch_all(&self.state.pool)
+                .await
+                {
+                    push_many(&v, resource, version, |b| b.id, items);
+                }
+            }
+            SyncResource::Zone => {
+                if let Ok(v) = zone::find_all(&self.state.pool).await {
+                    push_many(&v, resource, version, |z| z.id, items);
+                }
+            }
+            SyncResource::DiningTable => {
+                if let Ok(v) = dining_table::find_all(&self.state.pool).await {
+                    push_many(&v, resource, version, |t| t.id, items);
+                }
+            }
+            SyncResource::Employee => {
+                if let Ok(v) = employee::find_all_with_inactive(&self.state.pool).await {
+                    push_many(&v, resource, version, |e| e.id, items);
+                }
+            }
+            SyncResource::PriceRule => {
+                if let Ok(v) = price_rule::find_all(&self.state.pool).await {
+                    push_many(&v, resource, version, |r| r.id, items);
+                }
+            }
+            SyncResource::LabelTemplate => {
+                if let Ok(v) = label_template::list_all(&self.state.pool).await {
+                    push_many(&v, resource, version, |t| t.id, items);
+                }
+            }
+            SyncResource::StoreInfo => {
+                if let Ok(Some(info)) = store_info::get(&self.state.pool).await
+                    && let Ok(data) = serde_json::to_value(&info)
+                {
+                    items.push(CloudSyncItem {
+                        resource,
+                        version,
+                        action: shared::cloud::SyncAction::Upsert,
+                        resource_id: "1".into(),
+                        data,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Full sync via HTTP POST (fallback when WS unavailable)
     async fn full_sync_http(&mut self) -> Result<(), crate::utils::AppError> {
         tracing::info!("Starting full cloud sync via HTTP fallback");
-        let items = self.collect_all_sync_items();
+        let items = self.collect_all_sync_items().await;
 
         if items.is_empty() {
             return Ok(());
@@ -833,7 +881,7 @@ impl CloudWorker {
         }
 
         let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
-        if payload.resource != "order_sync" {
+        if payload.resource != SyncResource::OrderSync {
             return None;
         }
 
@@ -886,18 +934,21 @@ impl CloudWorker {
 
         let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
 
-        // Whitelist: only forward resources that crab-cloud knows how to store.
-        match payload.resource.as_str() {
-            "product" | "category" | "daily_report" | "store_info" | "shift" | "employee"
-            | "tag" | "attribute" | "attribute_binding" | "price_rule" | "zone"
-            | "dining_table" => {}
-            _ => return None,
+        // Only forward resources that crab-cloud knows how to store
+        if !payload.resource.is_cloud_synced() {
+            return None;
         }
+
+        let action = if payload.action == "deleted" {
+            shared::cloud::SyncAction::Delete
+        } else {
+            shared::cloud::SyncAction::Upsert
+        };
 
         Some(CloudSyncItem {
             resource: payload.resource,
             version: payload.version,
-            action: payload.action,
+            action,
             resource_id: payload.id,
             data: payload.data.unwrap_or(serde_json::Value::Null),
         })

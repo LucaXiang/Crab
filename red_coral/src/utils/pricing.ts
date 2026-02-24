@@ -16,10 +16,12 @@ export function getSpecName(spec: SpecificationInfo | null | undefined): string 
  */
 export function calculateOptionsModifier(options: ItemOption[] | undefined | null): number {
   if (!options || options.length === 0) return 0;
-  return options.reduce(
-    (sum, opt) => sum + (opt.price_modifier ?? 0) * (opt.quantity ?? 1),
-    0
-  );
+  return options
+    .reduce(
+      (sum, opt) => Currency.add(sum, Currency.mul(opt.price_modifier ?? 0, opt.quantity ?? 1)),
+      Currency.toDecimal(0)
+    )
+    .toNumber();
 }
 
 /**
@@ -39,9 +41,9 @@ export function computeDraftItemPrices(item: {
   manual_discount_percent?: number | null;
   selected_options?: ItemOption[] | null;
 }): { unit_price: number; line_total: number } {
-  const basePrice = item.original_price || item.price;
+  const basePrice = item.original_price ?? item.price;
   const optionsModifier = calculateOptionsModifier(item.selected_options);
-  const baseWithOptions = basePrice + optionsModifier;
+  const baseWithOptions = Currency.add(basePrice, optionsModifier).toNumber();
 
   const discountPercent = item.manual_discount_percent || 0;
   let unitPrice: number;

@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{Employee, EmployeeCreate, EmployeeUpdate};
 
-const RESOURCE: &str = "employee";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Employee;
 
 fn validate_create(payload: &EmployeeCreate) -> AppResult<()> {
     validate_required_text(&payload.username, "username", MAX_NAME_LEN)?;

@@ -74,7 +74,7 @@ impl MessageRoute {
         if msg.event_type == EventType::Sync {
             // Try to parse as SyncPayload and check resource
             if let Ok(sync_payload) = msg.parse_payload::<shared::message::SyncPayload>() {
-                if sync_payload.resource == "order_sync" {
+                if sync_payload.resource == shared::cloud::SyncResource::OrderSync {
                     // Try to extract OrderSyncPayload (event + snapshot) from data field
                     if let Some(data) = sync_payload.data {
                         if let Ok(order_sync) = serde_json::from_value::<OrderSyncPayload>(data) {
@@ -200,9 +200,9 @@ mod tests {
             stamp_redemptions: vec![],
         };
 
-        // Create a Sync message with resource="order_sync" (like edge-server does)
+        // Create a Sync message with resource=OrderSync (like edge-server does)
         let sync_payload = SyncPayload {
-            resource: "order_sync".to_string(),
+            resource: shared::cloud::SyncResource::OrderSync,
             version: order_event.sequence,
             action: order_event.event_type.to_string(),
             id: order_event.order_id.clone(),
@@ -234,7 +234,7 @@ mod tests {
     fn test_message_route_other_sync() {
         // Create a Sync message with different resource (not order_sync)
         let sync_payload = SyncPayload {
-            resource: "product".to_string(),
+            resource: shared::cloud::SyncResource::Product,
             version: 1,
             action: "updated".to_string(),
             id: "prod-1".to_string(),

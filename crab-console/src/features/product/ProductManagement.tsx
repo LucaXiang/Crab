@@ -3,7 +3,7 @@ import { Plus, Package, X, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { listProducts, createProduct, updateProduct, deleteProduct, listCategories } from '@/infrastructure/api/catalog';
+import { listProducts, createProduct, updateProduct, deleteProduct, listCategories } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
@@ -12,9 +12,9 @@ import { FormField, inputClass, CheckboxField } from '@/shared/components/FormFi
 import { SelectField } from '@/shared/components/FormField/SelectField';
 import { formatCurrency } from '@/utils/format';
 import type {
-  CatalogProduct, ProductCreate, ProductUpdate, ProductSpecInput,
-  CatalogCategory,
-} from '@/core/types/catalog';
+  StoreProduct, ProductCreate, ProductUpdate, ProductSpecInput,
+  StoreCategory,
+} from '@/core/types/store';
 
 interface FormSpec {
   name: string;
@@ -39,15 +39,15 @@ export const ProductManagement: React.FC = () => {
   const storeId = useStoreId();
   const token = useAuthStore(s => s.token);
 
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<CatalogProduct | null>(null);
+  const [editing, setEditing] = useState<StoreProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -59,7 +59,7 @@ export const ProductManagement: React.FC = () => {
   const [formSpecs, setFormSpecs] = useState<FormSpec[]>([]);
 
   // Delete confirmation
-  const [deleteTarget, setDeleteTarget] = useState<CatalogProduct | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StoreProduct | null>(null);
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -108,7 +108,7 @@ export const ProductManagement: React.FC = () => {
     setModalOpen(true);
   };
 
-  const openEdit = (prod: CatalogProduct) => {
+  const openEdit = (prod: StoreProduct) => {
     setEditing(prod);
     setFormName(prod.name);
     setFormCategoryId(prod.category_source_id);
@@ -204,7 +204,7 @@ export const ProductManagement: React.FC = () => {
     }
   };
 
-  const columns: Column<CatalogProduct>[] = [
+  const columns: Column<StoreProduct>[] = [
     {
       key: 'name',
       header: t('settings.common.name'),

@@ -17,7 +17,8 @@ use crate::utils::validation::{
 };
 use shared::models::{StoreInfo, StoreInfoUpdate};
 
-const RESOURCE: &str = "store_info";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::StoreInfo;
 
 fn validate_update(payload: &StoreInfoUpdate) -> AppResult<()> {
     validate_optional_text(&payload.name, "name", MAX_NAME_LEN)?;

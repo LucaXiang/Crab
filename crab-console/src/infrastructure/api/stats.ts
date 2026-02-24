@@ -21,8 +21,8 @@ export function getStoreOverview(
 export function getStats(
   token: string,
   storeId: number,
-  from?: number,
-  to?: number,
+  from?: string,
+  to?: string,
 ): Promise<DailyReportEntry[]> {
   let path = `/api/tenant/stores/${storeId}/stats?`;
   if (from) path += `from=${from}&`;

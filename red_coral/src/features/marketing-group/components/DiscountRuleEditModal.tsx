@@ -4,6 +4,7 @@ import {
   Target, LayoutGrid, Tag, Package, Search, FileText,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { Currency } from '@/utils/currency';
 import { useCategoryStore, useTagStore, useProductStore } from '@/core/stores/resources';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -141,7 +142,7 @@ export const DiscountRuleEditModal: React.FC<DiscountRuleEditModalProps> = ({
   const handleBlur = () => {
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed) && parsed > 0) {
-      const formatted = isPercentage ? Math.round(parsed) : Math.round(parsed * 100) / 100;
+      const formatted = isPercentage ? Math.round(parsed) : Currency.round2(parsed).toNumber();
       setAdjustmentValue(formatted);
       setInputValue(String(formatted));
     } else {

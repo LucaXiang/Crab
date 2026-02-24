@@ -5,6 +5,144 @@
 
 use serde::{Deserialize, Serialize};
 
+/// All syncable resource types across the system.
+///
+/// Serializes to snake_case strings (e.g. `DiningTable` → `"dining_table"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncResource {
+    Product,
+    Category,
+    Tag,
+    Attribute,
+    AttributeBinding,
+    Zone,
+    DiningTable,
+    Employee,
+    PriceRule,
+    StoreInfo,
+    Shift,
+    DailyReport,
+    SystemState,
+    SystemIssue,
+    PrintConfig,
+    PrintDestination,
+    LabelTemplate,
+    Member,
+    MarketingGroup,
+    /// Archived orders (edge → cloud only, not in initial sync)
+    ArchivedOrder,
+    /// Order sync events (edge-internal, for live order push to cloud)
+    OrderSync,
+    /// Role resource (client-visible for sync status)
+    Role,
+}
+
+impl SyncResource {
+    /// Resources that should be synced to cloud on initial connect
+    pub const INITIAL_SYNC: &'static [SyncResource] = &[
+        Self::Product,
+        Self::Category,
+        Self::Tag,
+        Self::Attribute,
+        Self::AttributeBinding,
+        Self::Zone,
+        Self::DiningTable,
+        Self::Employee,
+        Self::PriceRule,
+        Self::StoreInfo,
+        Self::LabelTemplate,
+    ];
+
+    /// Resources that cloud accepts via live sync (extract_sync_item whitelist)
+    pub const CLOUD_SYNCED: &'static [SyncResource] = &[
+        Self::Product,
+        Self::Category,
+        Self::Tag,
+        Self::Attribute,
+        Self::AttributeBinding,
+        Self::Zone,
+        Self::DiningTable,
+        Self::Employee,
+        Self::PriceRule,
+        Self::StoreInfo,
+        Self::Shift,
+        Self::DailyReport,
+        Self::LabelTemplate,
+    ];
+
+    /// Resources exposed in the client sync/status endpoint
+    pub const CLIENT_VISIBLE: &'static [SyncResource] = &[
+        Self::Product,
+        Self::Category,
+        Self::Tag,
+        Self::Attribute,
+        Self::Zone,
+        Self::DiningTable,
+        Self::Employee,
+        Self::Role,
+        Self::PriceRule,
+        Self::PrintDestination,
+        Self::LabelTemplate,
+    ];
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Product => "product",
+            Self::Category => "category",
+            Self::Tag => "tag",
+            Self::Attribute => "attribute",
+            Self::AttributeBinding => "attribute_binding",
+            Self::Zone => "zone",
+            Self::DiningTable => "dining_table",
+            Self::Employee => "employee",
+            Self::PriceRule => "price_rule",
+            Self::StoreInfo => "store_info",
+            Self::Shift => "shift",
+            Self::DailyReport => "daily_report",
+            Self::SystemState => "system_state",
+            Self::SystemIssue => "system_issue",
+            Self::PrintConfig => "print_config",
+            Self::PrintDestination => "print_destination",
+            Self::LabelTemplate => "label_template",
+            Self::Member => "member",
+            Self::MarketingGroup => "marketing_group",
+            Self::ArchivedOrder => "archived_order",
+            Self::OrderSync => "order_sync",
+            Self::Role => "role",
+        }
+    }
+
+    pub fn is_cloud_synced(&self) -> bool {
+        Self::CLOUD_SYNCED.contains(self)
+    }
+
+    /// Per-store resource upper bound. Returns `None` for resources without a limit.
+    pub const fn max_per_store(&self) -> Option<i64> {
+        match self {
+            Self::Product => Some(2000),
+            Self::Category => Some(200),
+            Self::Tag => Some(200),
+            Self::Attribute => Some(100),
+            Self::PriceRule => Some(100),
+            Self::Employee => Some(100),
+            Self::Zone => Some(50),
+            Self::DiningTable => Some(500),
+            Self::LabelTemplate => Some(50),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for SyncResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Maximum items per sync batch (HTTP or WS).
+pub const MAX_SYNC_BATCH_ITEMS: usize = 500;
+
 /// A batch of sync items from an edge-server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudSyncBatch {
@@ -16,16 +154,32 @@ pub struct CloudSyncBatch {
     pub sent_at: i64,
 }
 
+/// Cloud sync action (edge → cloud)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncAction {
+    Upsert,
+    Delete,
+}
+
+impl std::fmt::Display for SyncAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Upsert => f.write_str("upsert"),
+            Self::Delete => f.write_str("delete"),
+        }
+    }
+}
+
 /// A single resource change to sync to the cloud
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudSyncItem {
-    /// Resource type: "product", "category", "archived_order",
-    /// "daily_report", "store_info"
-    pub resource: String,
+    /// Resource type
+    pub resource: SyncResource,
     /// Monotonically increasing version for this resource on this edge
     pub version: u64,
-    /// Action: "upsert" or "delete"
-    pub action: String,
+    /// Action
+    pub action: SyncAction,
     /// Resource ID (source ID on the edge-server)
     pub resource_id: String,
     /// Full resource data as JSON
@@ -215,9 +369,9 @@ mod tests {
         let batch = CloudSyncBatch {
             edge_id: "edge-001".to_string(),
             items: vec![CloudSyncItem {
-                resource: "product".to_string(),
+                resource: SyncResource::Product,
                 version: 1,
-                action: "upsert".to_string(),
+                action: SyncAction::Upsert,
                 resource_id: "42".to_string(),
                 data: serde_json::json!({"name": "Test Product", "price": 9.99}),
             }],
@@ -228,7 +382,7 @@ mod tests {
         let deserialized: CloudSyncBatch = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.edge_id, "edge-001");
         assert_eq!(deserialized.items.len(), 1);
-        assert_eq!(deserialized.items[0].resource, "product");
+        assert_eq!(deserialized.items[0].resource, SyncResource::Product);
         assert_eq!(deserialized.items[0].version, 1);
     }
 

@@ -10,7 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "redcoral-pos",
@@ -22,10 +22,10 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' asset: http://asset.localhost data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' tauri: ws: asset: http://ipc.localhost http://localhost:9625 http://127.0.0.1:9625",
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' asset: http://asset.localhost data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' tauri: ws://localhost:9625 ws://127.0.0.1:9625 asset: http://ipc.localhost http://localhost:9625 http://127.0.0.1:9625",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": ["$APPDATA/**", "$RESOURCE/**"]
       }
     }
   },

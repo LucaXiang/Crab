@@ -10,29 +10,6 @@ import { formatCurrency } from '@/utils/format';
 import { Spinner } from '@/presentation/components/ui/Spinner';
 import type { DailyReportEntry } from '@/core/types/stats';
 
-interface DailyReport {
-  business_date: string;
-  total_orders: number;
-  completed_orders: number;
-  void_orders: number;
-  total_sales: number;
-  total_paid: number;
-  total_discount: number;
-}
-
-function parseReport(entry: DailyReportEntry): DailyReport {
-  const d = entry.data as Record<string, unknown>;
-  return {
-    business_date: (d.business_date as string) ?? '',
-    total_orders: (d.total_orders as number) ?? 0,
-    completed_orders: (d.completed_orders as number) ?? 0,
-    void_orders: (d.void_orders as number) ?? 0,
-    total_sales: (d.total_sales as number) ?? 0,
-    total_paid: (d.total_paid as number) ?? 0,
-    total_discount: (d.total_discount as number) ?? 0,
-  };
-}
-
 export const StatsScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -66,7 +43,9 @@ export const StatsScreen: React.FC = () => {
       <h1 className="text-xl font-bold text-slate-900">{t('stats.daily_report')}</h1>
 
       {reports.length > 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-200 p-6">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -80,27 +59,52 @@ export const StatsScreen: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {reports.map(entry => {
-                  const r = parseReport(entry);
-                  return (
+                {reports.map(entry => (
                     <tr key={entry.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
                       <td className="py-2 text-slate-700">
-                        <Link to={`/stores/${storeId}/stats/${r.business_date}`} className="text-primary-500 hover:text-primary-600 font-medium hover:underline">
-                          {r.business_date}
+                        <Link to={`/stores/${storeId}/stats/${entry.business_date}`} className="text-primary-500 hover:text-primary-600 font-medium hover:underline">
+                          {entry.business_date}
                         </Link>
                       </td>
-                      <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(r.total_sales)}</td>
-                      <td className="py-2 text-right text-slate-700">{r.completed_orders}</td>
-                      <td className="py-2 text-right text-slate-700">{r.void_orders}</td>
-                      <td className="py-2 text-right text-slate-700">{formatCurrency(r.total_paid)}</td>
-                      <td className="py-2 text-right text-orange-500">{formatCurrency(r.total_discount)}</td>
+                      <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(entry.total_sales)}</td>
+                      <td className="py-2 text-right text-slate-700">{entry.completed_orders}</td>
+                      <td className="py-2 text-right text-slate-700">{entry.void_orders}</td>
+                      <td className="py-2 text-right text-slate-700">{formatCurrency(entry.total_paid)}</td>
+                      <td className="py-2 text-right text-orange-500">{formatCurrency(entry.total_discount)}</td>
                     </tr>
-                  );
-                })}
+                  ))}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {reports.map(entry => (
+              <Link key={entry.id} to={`/stores/${storeId}/stats/${entry.business_date}`} className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors">
+                <div className="text-primary-500 font-medium mb-2">{entry.business_date}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div>
+                    <p className="text-xs text-slate-400">{t('stats.total_sales')}</p>
+                    <p className="font-semibold text-slate-900">{formatCurrency(entry.total_sales)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">{t('stats.completed_orders')}</p>
+                    <p className="font-semibold text-slate-900">{entry.completed_orders}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">{t('stats.total_paid')}</p>
+                    <p className="text-slate-700">{formatCurrency(entry.total_paid)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">{t('stats.total_discount')}</p>
+                    <p className="text-orange-500">{formatCurrency(entry.total_discount)}</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+        </div>
+        </>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
           <ScrollText className="w-10 h-10 text-slate-300 mx-auto mb-3" />

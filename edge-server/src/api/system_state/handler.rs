@@ -7,7 +7,8 @@ use crate::db::repository::system_state;
 use crate::utils::AppResult;
 use shared::models::{SystemState, SystemStateUpdate};
 
-const RESOURCE: &str = "system_state";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::SystemState;
 
 /// Get current system state
 pub async fn get(State(state): State<ServerState>) -> AppResult<Json<SystemState>> {

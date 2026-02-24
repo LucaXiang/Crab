@@ -569,9 +569,11 @@ impl ArchiveWorker {
 
             // Broadcast shift update so frontend stores stay current
             if let Ok(Some(updated_shift)) = shift::find_any_open(&self.pool).await {
-                let version = self.resource_versions.increment("shift");
+                let version = self
+                    .resource_versions
+                    .increment(shared::cloud::SyncResource::Shift);
                 let payload = SyncPayload {
-                    resource: "shift".to_string(),
+                    resource: shared::cloud::SyncResource::Shift,
                     version,
                     action: "updated".to_string(),
                     id: updated_shift.id.to_string(),

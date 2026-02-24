@@ -1145,11 +1145,7 @@ unsafe fn extract_bitmap_data(
         let data_size = stride * height as usize;
         let mut pixels = vec![0u8; data_size];
 
-        std::ptr::copy_nonoverlapping(
-            bmp_data.Scan0 as *const u8,
-            pixels.as_mut_ptr(),
-            data_size,
-        );
+        std::ptr::copy_nonoverlapping(bmp_data.Scan0 as *const u8, pixels.as_mut_ptr(), data_size);
 
         GdipBitmapUnlockBits(bitmap as *mut _, &mut bmp_data);
 

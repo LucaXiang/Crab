@@ -10,7 +10,7 @@ import { FilterBar } from '@/shared/components/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, inputClass, SelectField } from '@/shared/components/FormField';
 import { listZones, listTables, createTable, updateTable, deleteTable } from '@/infrastructure/api/management';
-import type { Zone, DiningTable, DiningTableCreate, DiningTableUpdate } from '@/core/types/catalog';
+import type { Zone, DiningTable, DiningTableCreate, DiningTableUpdate } from '@/core/types/store';
 
 type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: DiningTable } | { type: 'delete'; item: DiningTable };
 

@@ -68,10 +68,6 @@ const useRetailServiceTypeStore = create<{
   set: (type) => set({ serviceType: type }),
 }));
 
-export function getRetailServiceType(): RetailServiceType {
-  return useRetailServiceTypeStore.getState().serviceType;
-}
-
 export function setRetailServiceType(type: RetailServiceType): void {
   useRetailServiceTypeStore.getState().set(type);
 }

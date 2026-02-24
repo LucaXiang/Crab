@@ -22,6 +22,9 @@ use crate::auth::tenant_auth;
 use crate::live::LiveHubEvent;
 use crate::state::AppState;
 
+/// Maximum concurrent console WS connections per tenant
+const MAX_CONSOLE_WS_PER_TENANT: usize = 10;
+
 #[derive(Deserialize)]
 pub struct WsAuthQuery {
     token: String,
@@ -41,6 +44,19 @@ pub async fn handle_console_ws(
 
     let tenant_id = claims.sub;
 
+    // Check concurrent connection limit
+    let count = state
+        .console_connections
+        .entry(tenant_id.clone())
+        .or_insert_with(|| std::sync::atomic::AtomicUsize::new(0))
+        .load(std::sync::atomic::Ordering::Relaxed);
+    if count >= MAX_CONSOLE_WS_PER_TENANT {
+        return Err(AppError::with_message(
+            ErrorCode::ResourceLimitExceeded,
+            format!("Too many console connections ({count}/{MAX_CONSOLE_WS_PER_TENANT})"),
+        ));
+    }
+
     Ok(ws.on_upgrade(move |socket| console_ws_session(socket, state, tenant_id)))
 }
 
@@ -48,6 +64,13 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
     let (mut sink, mut stream) = socket.split();
 
     tracing::info!(tenant_id = %tenant_id, "Console WS connected");
+
+    // Track connection count
+    state
+        .console_connections
+        .entry(tenant_id.clone())
+        .or_insert_with(|| std::sync::atomic::AtomicUsize::new(0))
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     // 订阅 LiveOrderHub
     let mut hub_rx = state.live_orders.subscribe(&tenant_id);
@@ -145,6 +168,11 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
                 }
             }
         }
+    }
+
+    // Decrement connection count
+    if let Some(counter) = state.console_connections.get(&tenant_id) {
+        counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     tracing::info!(tenant_id = %tenant_id, "Console WS disconnected");

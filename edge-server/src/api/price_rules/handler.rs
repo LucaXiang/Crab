@@ -19,7 +19,8 @@ use shared::error::ErrorCode;
 use shared::models::price_rule::AdjustmentType;
 use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 
-const RESOURCE: &str = "price_rule";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::PriceRule;
 
 fn validate_create(payload: &PriceRuleCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;

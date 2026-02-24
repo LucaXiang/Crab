@@ -78,7 +78,7 @@ pub async fn create_command(
             data,
             error,
         } => (*success, data.clone(), error.clone()),
-        shared::cloud::ws::CloudRpcResult::CatalogOp(r) => {
+        shared::cloud::ws::CloudRpcResult::StoreOp(r) => {
             (r.success, serde_json::to_value(r).ok(), r.error.clone())
         }
     };

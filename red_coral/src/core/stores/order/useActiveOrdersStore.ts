@@ -353,112 +353,11 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 // ============================================================================
 
 /**
- * Select all active orders
- * Re-renders only when active orders array shallow-equals previous
- * Uses useShallow to prevent unnecessary re-renders when array contents haven't changed
- */
-export const useActiveOrders = () =>
-  useActiveOrdersStore(
-    useShallow((state) =>
-      Array.from(state.orders.values()).filter((o) => o.status === 'ACTIVE')
-    )
-  );
-
-/**
- * Select a specific order by ID
- */
-export const useOrder = (orderId: string | null | undefined) =>
-  useActiveOrdersStore((state) =>
-    orderId ? state.orders.get(orderId) : undefined
-  );
-
-/**
- * Select order by table ID
- */
-export const useOrderByTable = (tableId: number | null | undefined) =>
-  useActiveOrdersStore((state) => {
-    if (!tableId) return undefined;
-    return Array.from(state.orders.values()).find(
-      (order) => order.table_id === tableId && order.status === 'ACTIVE'
-    );
-  });
-
-/**
  * Select timeline for a specific order
  */
 export const useOrderTimeline = (orderId: string | null | undefined) =>
   useActiveOrdersStore((state) =>
     orderId ? state.timelines.get(orderId) || [] : []
-  );
-
-/**
- * Select active order count
- */
-export const useActiveOrderCount = () =>
-  useActiveOrdersStore((state) =>
-    Array.from(state.orders.values()).filter((o) => o.status === 'ACTIVE').length
-  );
-
-/**
- * Select connection state
- */
-export const useOrderConnectionState = () =>
-  useActiveOrdersStore((state) => state.connectionState);
-
-/**
- * Select whether store is initialized
- */
-export const useOrdersInitialized = () =>
-  useActiveOrdersStore((state) => state.isInitialized);
-
-/**
- * Select orders needing timeline sync
- * Uses useShallow to prevent unnecessary re-renders when array contents haven't changed
- */
-export const useOrdersNeedingTimelineSync = () =>
-  useActiveOrdersStore(
-    useShallow((state) => Array.from(state.ordersNeedingTimelineSync))
-  );
-
-/**
- * Select last sequence number
- */
-export const useLastSequence = () =>
-  useActiveOrdersStore((state) => state.lastSequence);
-
-/**
- * Check if connected to order service
- */
-export const useIsOrderConnected = () =>
-  useActiveOrdersStore((state) => state.connectionState === 'connected');
-
-/**
- * Select query methods for imperative use
- */
-export const useOrderQueries = () =>
-  useActiveOrdersStore(
-    useShallow((state) => ({
-      getOrder: state.getOrder,
-      getActiveOrders: state.getActiveOrders,
-      getOrderByTable: state.getOrderByTable,
-      getAllOrders: state.getAllOrders,
-      hasActiveOrderOnTable: state.hasActiveOrderOnTable,
-    }))
-  );
-
-/**
- * Select internal methods (for event listeners only)
- * Use with caution - these should not be called from UI components
- */
-export const useOrderStoreInternal = () =>
-  useActiveOrdersStore(
-    useShallow((state) => ({
-      _applyOrderSync: state._applyOrderSync,
-      _fullSync: state._fullSync,
-      _setConnectionState: state._setConnectionState,
-      _setInitialized: state._setInitialized,
-      _reset: state._reset,
-    }))
   );
 
 // ============================================================================

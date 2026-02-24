@@ -1,0 +1,101 @@
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+};
+use shared::cloud::store_op::{StoreOp, StoreOpResult};
+use shared::error::AppError;
+
+use crate::auth::tenant_auth::TenantIdentity;
+use crate::db::store;
+use crate::state::AppState;
+
+use super::{fire_ensure_image, internal, push_to_edge_if_online, verify_store};
+
+type ApiResult<T> = Result<Json<T>, AppError>;
+
+pub async fn list_products(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<Vec<store::StoreProduct>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+    let products = store::list_products(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    Ok(Json(products))
+}
+
+pub async fn create_product(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Json(data): Json<shared::models::product::ProductCreate>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+    fire_ensure_image(&state, store_id, &identity.tenant_id, data.image.as_deref()).await;
+
+    let (source_id, op_data) = store::create_product_direct(&state.pool, store_id, &data)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        StoreOp::CreateProduct {
+            id: Some(source_id),
+            data,
+        },
+    );
+
+    Ok(Json(StoreOpResult::created(source_id).with_data(op_data)))
+}
+
+pub async fn update_product(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, product_id)): Path<(i64, i64)>,
+    Json(data): Json<shared::models::product::ProductUpdate>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+    fire_ensure_image(&state, store_id, &identity.tenant_id, data.image.as_deref()).await;
+
+    store::update_product_direct(&state.pool, store_id, product_id, &data)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(
+        &state,
+        store_id,
+        StoreOp::UpdateProduct {
+            id: product_id,
+            data,
+        },
+    );
+
+    Ok(Json(StoreOpResult::ok()))
+}
+
+pub async fn delete_product(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, product_id)): Path<(i64, i64)>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    store::delete_product_direct(&state.pool, store_id, product_id)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge_if_online(&state, store_id, StoreOp::DeleteProduct { id: product_id });
+
+    Ok(Json(StoreOpResult::ok()))
+}

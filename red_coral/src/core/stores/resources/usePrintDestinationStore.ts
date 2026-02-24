@@ -192,12 +192,6 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 
 }));
 
-// Convenience hooks
-export const usePrintDestinations = () => usePrintDestinationStore((state) => state.items);
-export const usePrintDestinationsLoading = () => usePrintDestinationStore((state) => state.isLoading);
-export const usePrintDestinationById = (id: number) =>
-  usePrintDestinationStore((state) => state.items.find((p) => p.id === id));
-
 // CRUD action hooks
 export const usePrintDestinationActions = () => ({
   create: usePrintDestinationStore.getState().create,

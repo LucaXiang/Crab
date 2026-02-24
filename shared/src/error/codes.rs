@@ -115,6 +115,8 @@ pub enum ErrorCode {
     DeviceIdMismatch = 3020,
     /// Certificate missing device_id extension
     CertificateMissingDeviceId = 3021,
+    /// Resource limit exceeded (e.g. max products per store)
+    ResourceLimitExceeded = 3022,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -352,6 +354,7 @@ impl ErrorCode {
             ErrorCode::P12Required => "P12 certificate must be uploaded before payment",
             ErrorCode::DeviceIdMismatch => "Hardware ID mismatch with certificate",
             ErrorCode::CertificateMissingDeviceId => "Certificate missing device_id extension",
+            ErrorCode::ResourceLimitExceeded => "Resource limit exceeded",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -522,6 +525,7 @@ impl TryFrom<u16> for ErrorCode {
             3019 => Ok(ErrorCode::P12Required),
             3020 => Ok(ErrorCode::DeviceIdMismatch),
             3021 => Ok(ErrorCode::CertificateMissingDeviceId),
+            3022 => Ok(ErrorCode::ResourceLimitExceeded),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
@@ -917,7 +921,7 @@ mod tests {
             1001, 1002, 1003, 1004, 1005, 1006, 1007, // 1xxx Auth (7)
             2001, 2002, 2003, 2004, 2005, // 2xxx Permission (5)
             3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, // 3xxx Tenant
-            3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, // (21)
+            3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, // (22)
             4001, 4002, 4003, 4004, 4005, 4006, 4007, // 4xxx Order (7)
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
@@ -943,7 +947,7 @@ mod tests {
             9401, 9402, 9403, 9404, // 94xx Storage (15)
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 117;
+        const EXPECTED_VARIANT_COUNT: usize = 118;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

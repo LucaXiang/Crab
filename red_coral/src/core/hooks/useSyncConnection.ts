@@ -20,20 +20,6 @@ interface SyncStatus {
 // 缓存的服务器 epoch
 let cachedEpoch: string | null = null;
 
-/**
- * 获取缓存的 epoch (用于测试)
- */
-export function getCachedEpoch(): string | null {
-  return cachedEpoch;
-}
-
-/**
- * 设置缓存的 epoch (用于初始化和测试)
- */
-export function setCachedEpoch(epoch: string | null): void {
-  cachedEpoch = epoch;
-}
-
 export function useSyncConnection() {
   const isReconnecting = useRef(false);
 

@@ -138,7 +138,7 @@ pub async fn get_order_detail(
     // 3. Write fetched detail back to cache (best-effort)
     let now = shared::util::now_millis();
     let archived_order_id: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM cloud_archived_orders WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3",
+        "SELECT id FROM store_archived_orders WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3",
     )
     .bind(store_id)
     .bind(&identity.tenant_id)
@@ -152,7 +152,7 @@ pub async fn get_order_detail(
     {
         let _ = sqlx::query(
             r#"
-                INSERT INTO cloud_order_details (archived_order_id, detail, synced_at)
+                INSERT INTO store_order_details (archived_order_id, detail, synced_at)
                 VALUES ($1, $2, $3)
                 ON CONFLICT (archived_order_id)
                 DO UPDATE SET detail = EXCLUDED.detail, synced_at = EXCLUDED.synced_at

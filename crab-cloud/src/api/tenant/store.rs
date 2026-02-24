@@ -1,4 +1,4 @@
-//! Store management endpoints: list, update, products
+//! Store management endpoints: list, update
 
 use axum::{
     Extension, Json,
@@ -8,7 +8,7 @@ use serde::Deserialize;
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::tenant_auth::TenantIdentity;
-use crate::db::{self, tenant_queries};
+use crate::db::tenant_queries;
 use crate::state::AppState;
 
 use super::{ApiResult, verify_store};
@@ -27,12 +27,13 @@ pub async fn list_stores(
 
     let mut result = Vec::new();
     for store in stores {
-        let store_info = tenant_queries::get_store_info(&state.pool, store.id, &identity.tenant_id)
+        let store_info = crate::db::store::get_store_info(&state.pool, store.id)
             .await
             .map_err(|e| {
                 tracing::error!(store_id = store.id, "Failed to get store_info: {e}");
                 AppError::new(ErrorCode::InternalError)
-            })?;
+            })?
+            .and_then(|info| serde_json::to_value(info).ok());
 
         result.push(shared::cloud::StoreDetailResponse {
             id: store.id,
@@ -94,22 +95,4 @@ pub async fn update_store(
     })?;
 
     Ok(Json(()))
-}
-
-/// GET /api/tenant/stores/:id/products
-pub async fn list_products(
-    State(state): State<AppState>,
-    Extension(identity): Extension<TenantIdentity>,
-    Path(store_id): Path<i64>,
-) -> ApiResult<Vec<db::catalog::CatalogProduct>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
-
-    let products = db::catalog::list_products(&state.pool, store_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Products query error: {e}");
-            AppError::new(ErrorCode::InternalError)
-        })?;
-
-    Ok(Json(products))
 }

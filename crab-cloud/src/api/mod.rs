@@ -4,12 +4,12 @@
 //! - `public_router`: HTTP port (health, register, webhook, update, tenant API)
 //! - `edge_router`: mTLS port (edge sync with SignedBinding + quota validation)
 
-pub mod catalog;
 pub mod console_ws;
 pub mod health;
 pub mod image;
 pub mod pki;
 pub mod register;
+pub mod store;
 pub mod stripe_webhook;
 pub mod sync;
 pub mod tenant;
@@ -81,10 +81,6 @@ pub fn public_router(state: AppState) -> Router {
             get(tenant::get_store_overview),
         )
         .route(
-            "/api/tenant/stores/{id}/products",
-            get(tenant::list_products),
-        )
-        .route(
             "/api/tenant/stores/{id}/red-flags",
             get(tenant::get_store_red_flags),
         )
@@ -95,81 +91,90 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/commands",
             post(tenant::create_command).get(tenant::list_commands),
         )
-        // ── Catalog CRUD ──
+        // ── Store Resource CRUD ──
         .route(
-            "/api/tenant/stores/{id}/catalog/products",
-            get(catalog::list_products).post(catalog::create_product),
+            "/api/tenant/stores/{id}/products",
+            get(store::list_products).post(store::create_product),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/products/{pid}",
-            put(catalog::update_product).delete(catalog::delete_product),
+            "/api/tenant/stores/{id}/products/{pid}",
+            put(store::update_product).delete(store::delete_product),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/categories",
-            get(catalog::list_categories).post(catalog::create_category),
+            "/api/tenant/stores/{id}/categories",
+            get(store::list_categories).post(store::create_category),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/categories/{cid}",
-            put(catalog::update_category).delete(catalog::delete_category),
+            "/api/tenant/stores/{id}/categories/{cid}",
+            put(store::update_category).delete(store::delete_category),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/tags",
-            get(catalog::list_tags).post(catalog::create_tag),
+            "/api/tenant/stores/{id}/tags",
+            get(store::list_tags).post(store::create_tag),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/tags/{tid}",
-            put(catalog::update_tag).delete(catalog::delete_tag),
+            "/api/tenant/stores/{id}/tags/{tid}",
+            put(store::update_tag).delete(store::delete_tag),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/attributes",
-            get(catalog::list_attributes).post(catalog::create_attribute),
+            "/api/tenant/stores/{id}/attributes",
+            get(store::list_attributes).post(store::create_attribute),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/attributes/{aid}",
-            put(catalog::update_attribute).delete(catalog::delete_attribute),
+            "/api/tenant/stores/{id}/attributes/{aid}",
+            put(store::update_attribute).delete(store::delete_attribute),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/attributes/bind",
-            post(catalog::bind_attribute),
+            "/api/tenant/stores/{id}/attributes/bind",
+            post(store::bind_attribute),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/attributes/unbind",
-            post(catalog::unbind_attribute),
+            "/api/tenant/stores/{id}/attributes/unbind",
+            post(store::unbind_attribute),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/price-rules",
-            get(catalog::list_price_rules).post(catalog::create_price_rule),
+            "/api/tenant/stores/{id}/price-rules",
+            get(store::list_price_rules).post(store::create_price_rule),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/price-rules/{rid}",
-            put(catalog::update_price_rule).delete(catalog::delete_price_rule),
+            "/api/tenant/stores/{id}/price-rules/{rid}",
+            put(store::update_price_rule).delete(store::delete_price_rule),
         )
         // ── Employee CRUD ──
         .route(
-            "/api/tenant/stores/{id}/catalog/employees",
-            get(catalog::list_employees).post(catalog::create_employee),
+            "/api/tenant/stores/{id}/employees",
+            get(store::list_employees).post(store::create_employee),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/employees/{eid}",
-            put(catalog::update_employee).delete(catalog::delete_employee),
+            "/api/tenant/stores/{id}/employees/{eid}",
+            put(store::update_employee).delete(store::delete_employee),
         )
         // ── Zone CRUD ──
         .route(
-            "/api/tenant/stores/{id}/catalog/zones",
-            get(catalog::list_zones).post(catalog::create_zone),
+            "/api/tenant/stores/{id}/zones",
+            get(store::list_zones).post(store::create_zone),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/zones/{zid}",
-            put(catalog::update_zone).delete(catalog::delete_zone),
+            "/api/tenant/stores/{id}/zones/{zid}",
+            put(store::update_zone).delete(store::delete_zone),
         )
         // ── DiningTable CRUD ──
         .route(
-            "/api/tenant/stores/{id}/catalog/tables",
-            get(catalog::list_tables).post(catalog::create_table),
+            "/api/tenant/stores/{id}/tables",
+            get(store::list_tables).post(store::create_table),
         )
         .route(
-            "/api/tenant/stores/{id}/catalog/tables/{tid}",
-            put(catalog::update_table).delete(catalog::delete_table),
+            "/api/tenant/stores/{id}/tables/{tid}",
+            put(store::update_table).delete(store::delete_table),
+        )
+        // ── LabelTemplate CRUD ──
+        .route(
+            "/api/tenant/stores/{id}/label-templates",
+            get(store::list_label_templates).post(store::create_label_template),
+        )
+        .route(
+            "/api/tenant/stores/{id}/label-templates/{tid}",
+            put(store::update_label_template).delete(store::delete_label_template),
         )
         .layer(middleware::from_fn_with_state(
             state.clone(),

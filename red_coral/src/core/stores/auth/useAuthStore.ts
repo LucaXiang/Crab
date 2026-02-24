@@ -219,11 +219,6 @@ export const useAuthStore = create<AuthStore>()(
 // ==================== Selectors ====================
 
 /**
- * Hook to check if user is authenticated
- */
-export const useIsAuthenticated = () => useAuthStore((state) => state.isAuthenticated);
-
-/**
  * Hook to get current user
  */
 export const useCurrentUser = () => useAuthStore((state) => state.user);

@@ -19,7 +19,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{DailyReport, DailyReportGenerate};
 
-const RESOURCE: &str = "daily_report";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::DailyReport;
 
 /// Query params for listing reports
 #[derive(Debug, Deserialize)]

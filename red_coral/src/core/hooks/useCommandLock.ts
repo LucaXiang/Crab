@@ -38,7 +38,7 @@ import { t } from '@/infrastructure/i18n';
 /**
  * Command lock error thrown when trying to execute during sync
  */
-export class CommandLockError extends Error {
+class CommandLockError extends Error {
   constructor(
     message: string = 'System is syncing, please wait...',
     public readonly connectionState: string
@@ -51,7 +51,7 @@ export class CommandLockError extends Error {
 /**
  * Hook to check and enforce command locking during sync
  */
-export function useCommandLock() {
+function useCommandLock() {
   const connectionState = useActiveOrdersStore((s) => s.connectionState);
   const isInitialized = useActiveOrdersStore((s) => s.isInitialized);
 

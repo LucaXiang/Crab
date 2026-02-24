@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   BarChart3, DollarSign, ShoppingBag, Users, TrendingUp,
-  CreditCard, Clock, XCircle, AlertTriangle, Tag, Award, Receipt,
+  CreditCard, Banknote, Clock, XCircle, AlertTriangle, Tag, Award, Receipt,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -52,9 +52,12 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
 
       {/* KPI Row 2 — Secondary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {overview.payment_breakdown.slice(0, 2).map(pb => (
-          <KpiCard key={pb.method} icon={CreditCard} bg="bg-indigo-100" color="text-indigo-600" value={formatCurrency(pb.amount)} label={`${pb.method} (${pb.count})`} />
-        ))}
+        {overview.payment_breakdown.slice(0, 2).map(pb => {
+          const isCash = pb.method.toUpperCase() === 'CASH';
+          return (
+            <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${pb.method} (${pb.count})`} />
+          );
+        })}
         <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} />
         <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('stats.avg_dining_time')} />
       </div>
@@ -107,7 +110,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
               <CreditCard className="w-5 h-5 text-slate-400" />
               <h3 className="font-bold text-slate-900">{t('stats.payment_breakdown')}</h3>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
               <div className="w-36 h-36 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>

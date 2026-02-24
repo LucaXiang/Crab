@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
 
-const RESOURCE: &str = "print_destination";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::PrintDestination;
 
 fn validate_create(payload: &PrintDestinationCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
@@ -206,13 +207,7 @@ async fn auto_set_default_if_missing(state: &ServerState, dest: &PrintDestinatio
         _ => return,
     };
 
-    if let Err(e) = print_config::update(
-        &state.pool,
-        kitchen.as_deref(),
-        label.as_deref(),
-    )
-    .await
-    {
+    if let Err(e) = print_config::update(&state.pool, kitchen.as_deref(), label.as_deref()).await {
         tracing::error!(error = ?e, "Failed to auto-set print_config default");
         return;
     }
@@ -253,13 +248,7 @@ async fn clear_default_if_deleted(state: &ServerState, deleted_id: i64) {
         return;
     }
 
-    if let Err(e) = print_config::update(
-        &state.pool,
-        kitchen.as_deref(),
-        label.as_deref(),
-    )
-    .await
-    {
+    if let Err(e) = print_config::update(&state.pool, kitchen.as_deref(), label.as_deref()).await {
         tracing::error!(error = ?e, "Failed to update print_config after deletion");
         return;
     }
@@ -306,6 +295,11 @@ async fn broadcast_print_config(
         "default_label_printer": label,
     });
     state
-        .broadcast_sync("print_config", "updated", "default", Some(&config))
+        .broadcast_sync(
+            SyncResource::PrintConfig,
+            "updated",
+            "default",
+            Some(&config),
+        )
         .await;
 }

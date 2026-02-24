@@ -1,28 +1,28 @@
-//! FullSync (initial catalog provisioning) + EnsureImage
+//! FullSync (initial store provisioning) + EnsureImage
 
-use shared::cloud::catalog::{BindingOwner, CatalogOpResult, CatalogSnapshot, FullSyncResult};
+use shared::cloud::store_op::{BindingOwner, FullSyncResult, StoreOpResult, StoreSnapshot};
 
 use crate::core::state::ServerState;
 
 use super::attribute;
 
 /// Fire-and-forget image download
-pub fn ensure_image(state: &ServerState, presigned_url: &str, hash: &str) -> CatalogOpResult {
+pub fn ensure_image(state: &ServerState, presigned_url: &str, hash: &str) -> StoreOpResult {
     let images_dir = state.work_dir().join("images");
     let url = presigned_url.to_string();
     let h = hash.to_string();
     tokio::spawn(async move {
         crate::services::image_download::download_and_save(&url, &h, &images_dir).await;
     });
-    CatalogOpResult::ok()
+    StoreOpResult::ok()
 }
 
-/// Apply a full catalog snapshot (initial provisioning)
-pub async fn apply_full_sync(state: &ServerState, snapshot: &CatalogSnapshot) -> CatalogOpResult {
+/// Apply a full store snapshot (initial provisioning)
+pub async fn apply_full_sync(state: &ServerState, snapshot: &StoreSnapshot) -> StoreOpResult {
     match do_full_sync(state, snapshot).await {
         Ok(result) => {
             let success = result.errors.is_empty();
-            CatalogOpResult {
+            StoreOpResult {
                 success,
                 created_id: None,
                 data: None,
@@ -33,13 +33,13 @@ pub async fn apply_full_sync(state: &ServerState, snapshot: &CatalogSnapshot) ->
                 },
             }
         }
-        Err(e) => CatalogOpResult::err(e),
+        Err(e) => StoreOpResult::err(e),
     }
 }
 
 async fn do_full_sync(
     state: &ServerState,
-    snapshot: &CatalogSnapshot,
+    snapshot: &StoreSnapshot,
 ) -> Result<FullSyncResult, String> {
     let mut result = FullSyncResult {
         tags_created: 0,
@@ -87,7 +87,12 @@ async fn do_full_sync(
         {
             Ok(c) => {
                 state
-                    .broadcast_sync("category", "created", &c.id.to_string(), Some(&c))
+                    .broadcast_sync(
+                        shared::cloud::SyncResource::Category,
+                        "created",
+                        &c.id.to_string(),
+                        Some(&c),
+                    )
                     .await;
                 let cat_id = c.id;
                 cat_id_map.push(cat_id);
@@ -144,7 +149,12 @@ async fn do_full_sync(
         match state.catalog_service.create_product(None, data).await {
             Ok(p) => {
                 state
-                    .broadcast_sync("product", "created", &p.id.to_string(), Some(&p))
+                    .broadcast_sync(
+                        shared::cloud::SyncResource::Product,
+                        "created",
+                        &p.id.to_string(),
+                        Some(&p),
+                    )
                     .await;
                 let prod_id = p.id;
                 result.products_created += 1;

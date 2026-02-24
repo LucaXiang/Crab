@@ -10,7 +10,7 @@ import type { OrderCommand, OrderCommandPayload } from '@/core/domain/types/orde
 /**
  * Generate a UUID v4 for command idempotency
  */
-export function generateCommandId(): string {
+function generateCommandId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }

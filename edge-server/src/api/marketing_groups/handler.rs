@@ -21,7 +21,8 @@ use shared::models::{
     MarketingGroup, MgDiscountRule, MgDiscountRuleCreate, MgDiscountRuleUpdate, StampActivityDetail,
 };
 
-const RESOURCE: &str = "marketing_group";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::MarketingGroup;
 
 fn validate_group_create(payload: &shared::models::MarketingGroupCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;

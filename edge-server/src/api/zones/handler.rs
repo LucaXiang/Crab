@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{DiningTable, Zone, ZoneCreate, ZoneUpdate};
 
-const RESOURCE: &str = "zone";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Zone;
 
 fn validate_create(payload: &ZoneCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;

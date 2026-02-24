@@ -18,6 +18,9 @@ use crate::state::AppState;
 /// Maximum file size (20MB)
 const MAX_FILE_SIZE: usize = 20 * 1024 * 1024;
 
+/// Maximum images per tenant (across all stores)
+const MAX_IMAGES_PER_TENANT: i32 = 5000;
+
 /// JPEG quality (matches edge-server)
 const JPEG_QUALITY: u8 = 85;
 
@@ -101,6 +104,27 @@ pub async fn upload_image(
             ErrorCode::InvalidRequest,
             format!("Unsupported format: {ext}. Supported: png, jpg, jpeg, webp"),
         ));
+    }
+
+    // Check tenant image count limit
+    let prefix = format!("images/{}/", identity.tenant_id);
+    let list_result = state
+        .s3
+        .client
+        .list_objects_v2()
+        .bucket(&state.s3.bucket)
+        .prefix(&prefix)
+        .max_keys(MAX_IMAGES_PER_TENANT)
+        .send()
+        .await;
+    if let Ok(output) = list_result {
+        let count = output.key_count().unwrap_or(0);
+        if count >= MAX_IMAGES_PER_TENANT {
+            return Err(AppError::with_message(
+                ErrorCode::ResourceLimitExceeded,
+                format!("Image limit reached ({count}/{MAX_IMAGES_PER_TENANT})"),
+            ));
+        }
     }
 
     // Load and validate image content

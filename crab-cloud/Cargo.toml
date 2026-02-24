@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 # Workspace crates
-shared.workspace = true
+shared = { workspace = true, features = ["db"] }
 crab-cert = { workspace = true, features = ["p12-openssl"] }
 
 # Web framework

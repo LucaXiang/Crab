@@ -57,9 +57,18 @@ export interface StoreOverview {
 
 export interface DailyReportEntry {
   id: number;
-  source_id: string;
-  data: Record<string, unknown>;
-  synced_at: number;
+  business_date: string;
+  total_orders: number;
+  completed_orders: number;
+  void_orders: number;
+  total_sales: number;
+  total_paid: number;
+  total_unpaid: number;
+  void_amount: number;
+  total_tax: number;
+  total_discount: number;
+  total_surcharge: number;
+  updated_at: number;
 }
 
 export interface RedFlagsSummary {

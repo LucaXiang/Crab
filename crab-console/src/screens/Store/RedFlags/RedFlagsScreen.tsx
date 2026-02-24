@@ -112,10 +112,12 @@ const OperatorTable: React.FC<{
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100">
+      <div className="px-4 md:px-6 py-4 border-b border-slate-100">
         <h2 className="font-semibold text-slate-900">{t('red_flags.operator')}</h2>
       </div>
-      <div className="overflow-x-auto">
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-slate-500">
@@ -145,6 +147,28 @@ const OperatorTable: React.FC<{
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden divide-y divide-slate-100">
+        {breakdown.map((op, i) => {
+          const isHigh = op.total_flags > avgPerOperator * 2;
+          return (
+            <div key={i} className={`px-4 py-3 ${isHigh ? 'bg-red-50' : ''}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium text-slate-900">{op.operator_name ?? t('red_flags.unknown_operator')}</span>
+                <span className={`text-lg font-bold tabular-nums ${isHigh ? 'text-red-600' : 'text-slate-900'}`}>{op.total_flags}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {op.item_removals > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 tabular-nums">{t('red_flags.item_removals')} {op.item_removals}</span>}
+                {op.item_comps > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 tabular-nums">{t('red_flags.item_comps')} {op.item_comps}</span>}
+                {op.order_voids > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 tabular-nums">{t('red_flags.order_voids')} {op.order_voids}</span>}
+                {op.order_discounts > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700 tabular-nums">{t('red_flags.order_discounts')} {op.order_discounts}</span>}
+                {op.price_modifications > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 tabular-nums">{t('red_flags.price_modifications')} {op.price_modifications}</span>}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

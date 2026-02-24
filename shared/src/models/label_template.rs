@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "db", derive(sqlx::Type))]
-#[cfg_attr(feature = "db", sqlx(rename_all = "lowercase"))]
+#[cfg_attr(
+    feature = "db",
+    sqlx(type_name = "label_field_type", rename_all = "lowercase")
+)]
 pub enum LabelFieldType {
     #[default]
     Text,
@@ -23,7 +26,10 @@ pub enum LabelFieldType {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "db", derive(sqlx::Type))]
-#[cfg_attr(feature = "db", sqlx(rename_all = "lowercase"))]
+#[cfg_attr(
+    feature = "db",
+    sqlx(type_name = "label_field_alignment", rename_all = "lowercase")
+)]
 pub enum LabelFieldAlignment {
     #[default]
     Left,

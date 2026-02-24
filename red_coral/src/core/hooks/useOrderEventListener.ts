@@ -123,43 +123,6 @@ export function useOrderEventListener() {
   }, [appState?.type]);
 }
 
-/**
- * Hook to get order sync utilities (Server Authority Model)
- *
- * Provides methods for manual sync operations (reconnection, refresh, etc.)
- * Always uses full sync - client never computes snapshots locally.
- */
-export function useOrderSyncActions() {
-  // Server Authority: always perform full sync (since_sequence = 0)
-  const syncOrders = useCallback(async () => {
-    const store = useActiveOrdersStore.getState();
-    store._setConnectionState('syncing');
-
-    try {
-      const response = await invokeApi<SyncResponse>('order_sync_since', {
-        sinceSequence: 0, // Always full sync (Server Authority Model)
-      });
-
-      store._fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
-
-      return true;
-    } catch (error) {
-      logger.error('Sync failed', error, { component: 'OrderSync' });
-      store._setConnectionState('disconnected');
-      return false;
-    }
-  }, []);
-
-  const refreshOrders = useCallback(async () => {
-    return syncOrders();
-  }, [syncOrders]);
-
-  return {
-    syncOrders,
-    refreshOrders,
-  };
-}
-
 /** Response type for order events API */
 interface OrderEventsResponse {
   events: OrderEvent[];

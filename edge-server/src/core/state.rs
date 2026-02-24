@@ -1,4 +1,5 @@
 use dashmap::DashMap;
+use shared::cloud::SyncResource;
 use shared::message::{BusMessage, SyncPayload};
 use sqlx::SqlitePool;
 use std::path::PathBuf;
@@ -30,7 +31,7 @@ use crate::services::{
 /// 确保客户端可以通过版本号判断数据新旧。
 #[derive(Debug)]
 pub struct ResourceVersions {
-    versions: DashMap<String, u64>,
+    versions: DashMap<SyncResource, u64>,
 }
 
 impl ResourceVersions {
@@ -44,8 +45,8 @@ impl ResourceVersions {
     /// 递增指定资源的版本号并返回新值
     ///
     /// 如果资源不存在，从 0 开始递增（返回 1）
-    pub fn increment(&self, resource: &str) -> u64 {
-        let mut entry = self.versions.entry(resource.to_string()).or_insert(0);
+    pub fn increment(&self, resource: SyncResource) -> u64 {
+        let mut entry = self.versions.entry(resource).or_insert(0);
         *entry += 1;
         *entry
     }
@@ -53,8 +54,8 @@ impl ResourceVersions {
     /// 获取指定资源的当前版本号
     ///
     /// 如果资源不存在，返回 0
-    pub fn get(&self, resource: &str) -> u64 {
-        self.versions.get(resource).map(|v| *v).unwrap_or(0)
+    pub fn get(&self, resource: SyncResource) -> u64 {
+        self.versions.get(&resource).map(|v| *v).unwrap_or(0)
     }
 }
 
@@ -605,7 +606,7 @@ impl ServerState {
                         match orders_manager.get_snapshot(&order_id) {
                             Ok(Some(snapshot)) => {
                                 let payload = SyncPayload {
-                                    resource: "order_sync".to_string(),
+                                    resource: SyncResource::OrderSync,
                                     version: sequence,
                                     action,
                                     id: order_id,
@@ -780,14 +781,14 @@ impl ServerState {
     /// - `data`: 资源数据 (deleted 时为 None)
     pub async fn broadcast_sync<T: serde::Serialize>(
         &self,
-        resource: &str,
+        resource: SyncResource,
         action: &str,
         id: &str,
         data: Option<&T>,
     ) {
         let version = self.resource_versions.increment(resource);
         let payload = SyncPayload {
-            resource: resource.to_string(),
+            resource,
             version,
             action: action.to_string(),
             id: id.to_string(),

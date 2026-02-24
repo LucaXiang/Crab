@@ -10,7 +10,7 @@ import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import { FormField, inputClass } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
-import type { Employee, EmployeeCreate, EmployeeUpdate } from '@/core/types/catalog';
+import type { Employee, EmployeeCreate, EmployeeUpdate } from '@/core/types/store';
 
 function useRoleOptions(t: (key: string) => string) {
   return [

@@ -19,7 +19,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 
-const RESOURCE: &str = "shift";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Shift;
 
 /// Validate a cash amount is finite and non-negative
 fn validate_cash(value: f64, field: &str) -> AppResult<()> {

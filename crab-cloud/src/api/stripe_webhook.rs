@@ -236,10 +236,16 @@ async fn handle_subscription_updated(state: &AppState, event: &serde_json::Value
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
         let tenant_status = match status {
-            "active" => TenantStatus::Active,
-            "past_due" => TenantStatus::Suspended,
-            "canceled" | "unpaid" => TenantStatus::Canceled,
-            _ => TenantStatus::Active,
+            "active" | "trialing" => TenantStatus::Active,
+            "past_due" | "incomplete" | "paused" => TenantStatus::Suspended,
+            "canceled" | "unpaid" | "incomplete_expired" => TenantStatus::Canceled,
+            other => {
+                tracing::warn!(
+                    status = other,
+                    "Unknown Stripe subscription status, defaulting to Suspended"
+                );
+                TenantStatus::Suspended
+            }
         };
         let _ = db::tenants::update_status(&state.pool, &tenant_id, tenant_status.as_db()).await;
         tracing::info!(

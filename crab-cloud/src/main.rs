@@ -20,6 +20,7 @@ pub mod util;
 
 use config::Config;
 use state::AppState;
+use tokio::signal;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -56,9 +57,18 @@ async fn main() -> Result<(), BoxError> {
     let http_listener = tokio::net::TcpListener::bind(&http_addr).await?;
     tracing::info!("crab-cloud HTTP listening on {http_addr}");
 
-    let http_handle = tokio::spawn(async move {
-        if let Err(e) = axum::serve(http_listener, public_app).await {
-            tracing::error!("HTTP server error: {e}");
+    // mTLS server handle for graceful shutdown
+    let mtls_server_handle = axum_server::Handle::new();
+
+    let http_handle = tokio::spawn({
+        let shutdown = shutdown_signal();
+        async move {
+            if let Err(e) = axum::serve(http_listener, public_app)
+                .with_graceful_shutdown(shutdown)
+                .await
+            {
+                tracing::error!("HTTP server error: {e}");
+            }
         }
     });
 
@@ -67,8 +77,10 @@ async fn main() -> Result<(), BoxError> {
     let mtls_handle = match build_mtls_config(&config) {
         Ok(tls_config) => {
             tracing::info!("crab-cloud mTLS listening on {mtls_addr}");
+            let handle = mtls_server_handle.clone();
             Some(tokio::spawn(async move {
                 if let Err(e) = axum_server::bind_rustls(mtls_addr, tls_config)
+                    .handle(handle)
                     .serve(edge_app.into_make_service())
                     .await
                 {
@@ -102,7 +114,7 @@ async fn main() -> Result<(), BoxError> {
         loop {
             interval.tick().await;
             let cutoff = shared::util::now_millis() - 30 * 24 * 3600 * 1000;
-            match sqlx::query("DELETE FROM cloud_order_details WHERE synced_at < $1")
+            match sqlx::query("DELETE FROM store_order_details WHERE synced_at < $1")
                 .bind(cutoff)
                 .execute(&cleanup_pool)
                 .await
@@ -146,13 +158,39 @@ async fn main() -> Result<(), BoxError> {
         }
     });
 
-    // Wait for servers
+    // Wait for HTTP server (it shuts down on SIGTERM via graceful_shutdown)
     http_handle.await?;
+
+    // Gracefully shut down mTLS server
+    mtls_server_handle.graceful_shutdown(Some(std::time::Duration::from_secs(30)));
     if let Some(h) = mtls_handle {
         h.await?;
     }
 
+    tracing::info!("crab-cloud shut down gracefully");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c().await.expect("failed to listen for ctrl+c");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to listen for SIGTERM")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => tracing::info!("Received Ctrl+C, shutting down..."),
+        _ = terminate => tracing::info!("Received SIGTERM, shutting down..."),
+    }
 }
 
 /// Load PEM bytes from env var content (preferred) or file path (fallback).

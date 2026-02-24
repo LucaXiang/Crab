@@ -56,23 +56,6 @@ export const applyOrderSurcharge = async (
 };
 
 /**
- * Add or clear order-level note.
- */
-export const addOrderNote = async (
-  orderId: string,
-  note: string,
-): Promise<void> => {
-  const command = createCommand({
-    type: 'ADD_ORDER_NOTE',
-    order_id: orderId,
-    note,
-  });
-
-  const response = await sendCommand(command);
-  ensureSuccess(response, 'Add order note');
-};
-
-/**
  * Toggle rule skip status for an order.
  */
 export const toggleRuleSkip = async (

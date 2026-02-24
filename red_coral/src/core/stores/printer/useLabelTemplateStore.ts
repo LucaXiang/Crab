@@ -14,6 +14,9 @@ import { DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 // Lazy-load API client to avoid initialization issues
 const getApi = () => createTauriClient();
 
+// Shared fetch promise — prevents StrictMode race condition in ensureDefaultTemplate
+let activeFetchPromise: Promise<void> | null = null;
+
 /** 补全 API 响应中可能缺失的默认值 */
 function normalizeTemplate(t: LabelTemplate): LabelTemplate {
   return {
@@ -115,19 +118,29 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
   // Actions
   fetchAll: async (force = false) => {
     const state = get();
-    if (state.isLoading) return;
     if (state.isLoaded && !force) return;
 
-    set({ isLoading: true, error: null });
-    try {
-      const rawTemplates = await getApi().listLabelTemplates();
-      const templates = rawTemplates.map(normalizeTemplate);
-      set({ templates, isLoading: false, isLoaded: true });
-    } catch (e: unknown) {
-      const errorMsg = e instanceof Error ? e.message : 'Failed to fetch label templates';
-      set({ error: errorMsg, isLoading: false });
-      logger.error('Label template fetch failed', undefined, { component: 'LabelTemplateStore', detail: errorMsg });
+    // If a fetch is already in progress, await it instead of returning early
+    if (activeFetchPromise) {
+      await activeFetchPromise;
+      return;
     }
+
+    set({ isLoading: true, error: null });
+    activeFetchPromise = (async () => {
+      try {
+        const rawTemplates = await getApi().listLabelTemplates();
+        const templates = rawTemplates.map(normalizeTemplate);
+        set({ templates, isLoading: false, isLoaded: true });
+      } catch (e: unknown) {
+        const errorMsg = e instanceof Error ? e.message : 'Failed to fetch label templates';
+        set({ error: errorMsg, isLoading: false });
+        logger.error('Label template fetch failed', undefined, { component: 'LabelTemplateStore', detail: errorMsg });
+      } finally {
+        activeFetchPromise = null;
+      }
+    })();
+    await activeFetchPromise;
   },
 
   createTemplate: async (templateData) => {
@@ -269,15 +282,3 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
 // Convenience hooks
 export const useLabelTemplates = () => useLabelTemplateStore((state) => state.templates);
 export const useLabelTemplatesLoading = () => useLabelTemplateStore((state) => state.isLoading);
-export const useLabelTemplateById = (id: number) =>
-  useLabelTemplateStore((state) => state.templates.find((t) => t.id === id));
-
-// Action hooks
-export const useLabelTemplateActions = () => ({
-  fetch: useLabelTemplateStore.getState().fetchAll,
-  create: useLabelTemplateStore.getState().createTemplate,
-  update: useLabelTemplateStore.getState().updateTemplate,
-  delete: useLabelTemplateStore.getState().deleteTemplate,
-  duplicate: useLabelTemplateStore.getState().duplicateTemplate,
-  ensureDefault: useLabelTemplateStore.getState().ensureDefaultTemplate,
-});

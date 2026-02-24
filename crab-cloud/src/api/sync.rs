@@ -1,7 +1,7 @@
 //! POST /api/edge/sync — receive data batches from edge-servers
 
 use axum::{Extension, Json, extract::State};
-use shared::cloud::{CloudSyncBatch, CloudSyncError, CloudSyncResponse};
+use shared::cloud::{CloudSyncBatch, CloudSyncError, CloudSyncResponse, MAX_SYNC_BATCH_ITEMS};
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::EdgeIdentity;
@@ -29,6 +29,17 @@ pub async fn handle_sync(
         return Err(AppError::with_message(
             ErrorCode::PermissionDenied,
             "Only server entities can sync to cloud",
+        ));
+    }
+
+    // Reject oversized batches
+    if batch.items.len() > MAX_SYNC_BATCH_ITEMS {
+        return Err(AppError::with_message(
+            ErrorCode::ValidationFailed,
+            format!(
+                "Batch too large: {} items (max {MAX_SYNC_BATCH_ITEMS})",
+                batch.items.len()
+            ),
         ));
     }
 
@@ -78,7 +89,7 @@ pub async fn handle_sync(
                 if let Err(e) = sync_store::update_cursor(
                     &state.pool,
                     edge_server_id,
-                    &item.resource,
+                    item.resource,
                     i64::try_from(item.version).unwrap_or(i64::MAX),
                     now,
                 )

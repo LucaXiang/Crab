@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::order::{OrderEvent, OrderSnapshot};
 
-use super::catalog::{CatalogOp, CatalogOpResult};
+use super::store_op::{StoreOp, StoreOpResult};
 use super::{CloudSyncError, CloudSyncItem};
 
 /// Duplex message protocol over WebSocket
@@ -67,8 +67,8 @@ pub enum CloudRpc {
     GetOrderDetail { order_key: String },
     /// 刷新订阅信息
     RefreshSubscription,
-    /// Catalog 操作 (CRUD + FullSync)
-    CatalogOp(Box<CatalogOp>),
+    /// Store 操作 (CRUD + FullSync)
+    StoreOp(Box<StoreOp>),
     // ── Edge → Cloud (预留) ──
 }
 
@@ -84,21 +84,22 @@ pub enum CloudRpcResult {
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
     },
-    /// Catalog 操作结果
-    CatalogOp(Box<CatalogOpResult>),
+    /// Store 操作结果
+    StoreOp(Box<StoreOpResult>),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cloud::{SyncAction, SyncResource};
 
     #[test]
     fn test_cloud_message_sync_batch_roundtrip() {
         let msg = CloudMessage::SyncBatch {
             items: vec![CloudSyncItem {
-                resource: "product".into(),
+                resource: SyncResource::Product,
                 version: 1,
-                action: "upsert".into(),
+                action: SyncAction::Upsert,
                 resource_id: "42".into(),
                 data: serde_json::json!({"name": "Test"}),
             }],
@@ -173,8 +174,8 @@ mod tests {
 
         let msg = CloudMessage::Rpc {
             id: "rpc-001".into(),
-            payload: Box::new(CloudRpc::CatalogOp(Box::new(
-                super::super::catalog::CatalogOp::CreateProduct {
+            payload: Box::new(CloudRpc::StoreOp(Box::new(
+                super::super::store_op::StoreOp::CreateProduct {
                     id: None,
                     data: crate::models::product::ProductCreate {
                         name: "Test".into(),
@@ -204,7 +205,7 @@ mod tests {
 
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"Rpc"#));
-        assert!(json.contains(r#""kind":"CatalogOp"#));
+        assert!(json.contains(r#""kind":"StoreOp"#));
         assert!(json.contains(r#""op":"CreateProduct"#));
 
         let deserialized: CloudMessage = serde_json::from_str(&json).unwrap();
@@ -212,10 +213,10 @@ mod tests {
             panic!("Expected Rpc");
         };
         assert_eq!(id, "rpc-001");
-        let CloudRpc::CatalogOp(op) = *payload else {
-            panic!("Expected CatalogOp");
+        let CloudRpc::StoreOp(op) = *payload else {
+            panic!("Expected StoreOp");
         };
-        let super::super::catalog::CatalogOp::CreateProduct { data, .. } = *op else {
+        let super::super::store_op::StoreOp::CreateProduct { data, .. } = *op else {
             panic!("Expected CreateProduct");
         };
         assert_eq!(data.name, "Test");
@@ -223,27 +224,27 @@ mod tests {
 
     #[test]
     fn test_rpc_result_catalog_roundtrip() {
-        use super::super::catalog::CatalogOpResult;
+        use super::super::store_op::StoreOpResult;
 
         let msg = CloudMessage::RpcResult {
             id: "rpc-001".into(),
-            result: CloudRpcResult::CatalogOp(Box::new(CatalogOpResult::created(42))),
+            result: CloudRpcResult::StoreOp(Box::new(StoreOpResult::created(42))),
         };
 
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"RpcResult"#));
-        assert!(json.contains(r#""kind":"CatalogOp"#));
+        assert!(json.contains(r#""kind":"StoreOp"#));
 
         let deserialized: CloudMessage = serde_json::from_str(&json).unwrap();
         match deserialized {
             CloudMessage::RpcResult { id, result } => {
                 assert_eq!(id, "rpc-001");
                 match result {
-                    CloudRpcResult::CatalogOp(r) => {
+                    CloudRpcResult::StoreOp(r) => {
                         assert!(r.success);
                         assert_eq!(r.created_id, Some(42));
                     }
-                    _ => panic!("Expected CatalogOp result"),
+                    _ => panic!("Expected StoreOp result"),
                 }
             }
             _ => panic!("Expected RpcResult"),

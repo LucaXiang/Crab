@@ -3,7 +3,7 @@ import { Plus, Percent, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { listPriceRules, createPriceRule, updatePriceRule, deletePriceRule } from '@/infrastructure/api/catalog';
+import { listPriceRules, createPriceRule, updatePriceRule, deletePriceRule } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
@@ -14,7 +14,7 @@ import { formatCurrency } from '@/utils/format';
 import type {
   PriceRule, PriceRuleCreate, PriceRuleUpdate,
   RuleType, ProductScope, AdjustmentType,
-} from '@/core/types/catalog';
+} from '@/core/types/store';
 
 function useRuleTypeOptions(t: (key: string) => string) {
   return [

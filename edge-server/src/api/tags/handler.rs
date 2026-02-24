@@ -17,7 +17,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::{Tag, TagCreate, TagUpdate};
 
-const RESOURCE: &str = "tag";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Tag;
 
 fn validate_create(payload: &TagCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;

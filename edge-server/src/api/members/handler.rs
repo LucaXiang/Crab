@@ -18,7 +18,8 @@ use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
 use shared::models::MemberWithGroup;
 
-const RESOURCE: &str = "member";
+use shared::cloud::SyncResource;
+const RESOURCE: SyncResource = SyncResource::Member;
 
 fn validate_create(payload: &shared::models::MemberCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;

@@ -83,11 +83,3 @@ export async function refreshAllLoadedStores(): Promise<void> {
   );
 }
 
-/**
- * 清空所有 Store
- */
-export function clearAllStores(): void {
-  Object.entries(storeRegistry).forEach(([name, store]) => {
-    store.getState().clear();
-  });
-}

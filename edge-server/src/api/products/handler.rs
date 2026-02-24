@@ -16,7 +16,8 @@ use axum::{
 };
 use shared::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 
-const RESOURCE_PRODUCT: &str = "product";
+use shared::cloud::SyncResource;
+const RESOURCE_PRODUCT: SyncResource = SyncResource::Product;
 
 fn validate_create(payload: &ProductCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
