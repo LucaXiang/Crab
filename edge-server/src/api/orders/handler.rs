@@ -292,7 +292,7 @@ pub async fn fetch_order_list(
             .as_deref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .map(|d| time::day_end_millis(d, tz))
-            .unwrap_or(0)
+            .unwrap_or_else(|| shared::util::now_millis() + 86_400_000) // default: now + 1 day
     });
     let limit = params.limit.unwrap_or(100);
     let offset = params.offset.unwrap_or(0);
