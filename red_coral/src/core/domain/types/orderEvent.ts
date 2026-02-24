@@ -1002,9 +1002,8 @@ export interface OrderSnapshot {
   /** Last applied event sequence number */
   last_sequence: number;
   /**
-   * State checksum for drift detection (16-char hex string)
-   * Computed from: items.len, total(cents), paid_amount(cents), last_sequence, status
-   * If local checksum != server checksum, trigger full snapshot sync
+   * State checksum for drift detection (FNV-1a, 16-char hex string).
+   * If local checksum != server checksum, trigger full snapshot sync.
    */
   state_checksum?: string;
 }

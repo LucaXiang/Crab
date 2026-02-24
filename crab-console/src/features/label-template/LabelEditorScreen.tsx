@@ -20,7 +20,6 @@ import { SUPPORTED_LABEL_FIELDS } from './constants';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { uploadImage } from '@/infrastructure/api/store';
-import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import {
   DndContext,
   closestCenter,
@@ -127,13 +126,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   const [showOffsetBorder, setShowOffsetBorder] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const pendingFilesRef = useRef(new Map<string, File>());
-  const [dialogConfig, setDialogConfig] = useState<{
-    isOpen: boolean;
-    title: string;
-    description: string;
-    variant: 'info' | 'warning' | 'danger';
-  }>({ isOpen: false, title: '', description: '', variant: 'info' });
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -231,9 +225,11 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   const saveAndExit = async () => {
     if (!token) return;
     setIsSaving(true);
+    setSaveError('');
     try {
       // Upload any pending images first
       let updatedFields = [...template.fields];
+      const failedUploads: string[] = [];
 
       for (const field of updatedFields) {
         if (field.source_type === 'image' && field._pending_blob_url) {
@@ -246,8 +242,15 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             );
           } catch (e) {
             console.error('Failed to upload image for field', field.field_id, e);
+            failedUploads.push(field.name || field.field_id);
           }
         }
+      }
+
+      if (failedUploads.length > 0) {
+        setSaveError(`Image upload failed: ${failedUploads.join(', ')}`);
+        setIsSaving(false);
+        return;
       }
 
       // Clean up _pending_blob_url from all fields before saving
@@ -353,6 +356,13 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           </button>
         </div>
       </div>
+
+      {saveError && (
+        <div className="bg-red-50 border-b border-red-200 text-red-700 px-4 py-2 text-sm flex items-center justify-between">
+          <span>{saveError}</span>
+          <button onClick={() => setSaveError('')} className="text-red-500 hover:text-red-700 font-bold ml-4">&times;</button>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 relative overflow-hidden">
@@ -590,17 +600,6 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           </div>
         </div>
       </div>
-
-      <ConfirmDialog
-        isOpen={dialogConfig.isOpen}
-        title={dialogConfig.title}
-        description={dialogConfig.description}
-        variant={dialogConfig.variant}
-        showCancel={false}
-        confirmText={t('common.dialog.ok')}
-        onConfirm={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
-        onCancel={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
-      />
 
       <FieldHelperDialog isOpen={showHelper} onClose={() => setShowHelper(false)} />
     </div>

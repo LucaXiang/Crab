@@ -1,4 +1,4 @@
-const API_BASE = 'https://cloud.redcoral.app';
+export const API_BASE = 'https://cloud.redcoral.app';
 
 export class ApiError extends Error {
   status: number;

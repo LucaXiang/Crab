@@ -10,7 +10,6 @@ use super::types::{
     VoidType,
 };
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 
 /// Order status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -290,41 +289,23 @@ impl OrderSnapshot {
         self.paid_amount >= self.total
     }
 
-    /// Compute state checksum for drift detection
-    ///
-    /// The checksum is computed from key state fields that should match
-    /// between server and client after applying the same events.
-    /// Returns a 16-character hex string.
-    ///
-    /// Fields included:
-    /// - items.len() - number of items
-    /// - total (cents) - order total in cents to avoid float precision issues
-    /// - paid_amount (cents) - paid amount in cents
-    /// - last_sequence - last applied event sequence
-    /// - status - order status discriminant
+    /// Compute state checksum for drift detection (FNV-1a, 16-char hex).
     pub fn compute_checksum(&self) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::Hasher as _;
+        // FNV-1a: deterministic across Rust versions and platforms
+        // (DefaultHasher uses randomly-seeded SipHash — NOT stable)
+        let mut h: u64 = 0xcbf29ce484222325; // FNV offset basis
+        let mut mix = |val: u64| {
+            h ^= val;
+            h = h.wrapping_mul(0x100000001b3); // FNV prime
+        };
 
-        let mut hasher = DefaultHasher::new();
+        mix(self.items.len() as u64);
+        mix(self.total.to_bits());
+        mix(self.paid_amount.to_bits());
+        mix(self.last_sequence);
+        mix(self.status as u8 as u64);
 
-        // Hash item count
-        self.items.len().hash(&mut hasher);
-
-        // Hash total in cents (avoid float precision issues)
-        ((self.total * 100.0).round() as i64).hash(&mut hasher);
-
-        // Hash paid_amount in cents
-        ((self.paid_amount * 100.0).round() as i64).hash(&mut hasher);
-
-        // Hash last sequence
-        self.last_sequence.hash(&mut hasher);
-
-        // Hash status discriminant
-        (self.status as u8).hash(&mut hasher);
-
-        // Return as hex string
-        format!("{:016x}", hasher.finish())
+        format!("{:016x}", h)
     }
 
     /// Update the state_checksum field based on current state

@@ -118,7 +118,12 @@ impl AppState {
 
     /// Create a new AppState
     pub async fn new(config: &Config) -> Result<Self, BoxError> {
-        let pool = PgPool::connect(&config.database_url).await?;
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(20)
+            .min_connections(2)
+            .acquire_timeout(std::time::Duration::from_secs(5))
+            .connect(&config.database_url)
+            .await?;
 
         sqlx::migrate!("./migrations").run(&pool).await?;
 

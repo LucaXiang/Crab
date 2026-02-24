@@ -1,4 +1,4 @@
-import { request, ApiError } from './client';
+import { request, ApiError, API_BASE } from './client';
 import type {
   StoreProduct, ProductCreate, ProductUpdate,
   StoreCategory, CategoryCreate, CategoryUpdate,
@@ -91,7 +91,6 @@ export const deleteLabelTemplate = (token: string, storeId: number, id: number) 
   request<StoreOpResult>('DELETE', `${storePath(storeId, 'label-templates')}/${id}`, undefined, token);
 
 // ── Image Upload ──
-const API_BASE = 'https://cloud.redcoral.app';
 
 export async function uploadImage(token: string, file: File): Promise<string> {
   const form = new FormData();

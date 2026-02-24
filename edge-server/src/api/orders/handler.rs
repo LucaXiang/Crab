@@ -5,8 +5,8 @@
 
 use crate::core::ServerState;
 use crate::db::repository::order;
-use crate::utils::AppResult;
 use crate::utils::time;
+use crate::utils::{AppError, AppResult};
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -306,7 +306,7 @@ pub async fn fetch_order_list(
         )
         .fetch_one(&state.pool)
         .await
-        .unwrap_or(0);
+        .map_err(|e| AppError::database(e.to_string()))?;
 
         let rows = sqlx::query_as::<_, OrderSummary>(
             "SELECT id AS order_id, receipt_number, table_name, UPPER(status) AS status, is_retail, total_amount AS total, guest_count, start_time, end_time, void_type, loss_reason, loss_amount FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND LOWER(receipt_number) LIKE ?3 ORDER BY end_time DESC, start_time DESC LIMIT ?4 OFFSET ?5",
@@ -318,7 +318,7 @@ pub async fn fetch_order_list(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .unwrap_or_default();
+        .map_err(|e| AppError::database(e.to_string()))?;
 
         (rows, total)
     } else {
@@ -329,7 +329,7 @@ pub async fn fetch_order_list(
         )
         .fetch_one(&state.pool)
         .await
-        .unwrap_or(0);
+        .map_err(|e| AppError::database(e.to_string()))?;
 
         let rows = sqlx::query_as::<_, OrderSummary>(
             "SELECT id AS order_id, receipt_number, table_name, UPPER(status) AS status, is_retail, total_amount AS total, guest_count, start_time, end_time, void_type, loss_reason, loss_amount FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 ORDER BY end_time DESC, start_time DESC LIMIT ?3 OFFSET ?4",
@@ -340,7 +340,7 @@ pub async fn fetch_order_list(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .unwrap_or_default();
+        .map_err(|e| AppError::database(e.to_string()))?;
 
         (rows, total)
     };
@@ -389,7 +389,7 @@ pub async fn fetch_member_history(
     )
     .fetch_one(&state.pool)
     .await
-    .unwrap_or(0);
+    .map_err(|e| AppError::database(e.to_string()))?;
 
     let rows = sqlx::query_as::<_, OrderSummary>(
         "SELECT id AS order_id, receipt_number, table_name, UPPER(status) AS status, is_retail, total_amount AS total, guest_count, start_time, end_time, void_type, loss_reason, loss_amount FROM archived_order WHERE member_id = ?1 AND UPPER(status) = 'COMPLETED' ORDER BY end_time DESC LIMIT ?2 OFFSET ?3",
@@ -399,7 +399,7 @@ pub async fn fetch_member_history(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .unwrap_or_default();
+    .map_err(|e| AppError::database(e.to_string()))?;
 
     Ok(Json(MemberSpendingResponse {
         orders: rows,

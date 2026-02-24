@@ -43,6 +43,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [fieldImages, setFieldImages] = useState<Record<string, HTMLImageElement>>({});
+  const cloudBlobUrlsRef = useRef<string[]>([]);
   const [needsRedraw, setNeedsRedraw] = useState(true);
   const isDraggingRef = useRef(false);
 
@@ -58,6 +59,10 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   useEffect(() => {
     let isMounted = true;
     const loadImages = async () => {
+      // Revoke previous cloud blob URLs to prevent memory leaks
+      cloudBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      cloudBlobUrlsRef.current = [];
+
       const newImages: Record<string, HTMLImageElement> = {};
       const imageFields = template.fields.filter(
         f => f.field_type === 'image' || f.field_type === 'barcode' || f.field_type === 'qrcode',
@@ -97,6 +102,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
                 if (!content.startsWith('http') && !content.startsWith('data:') && content.length < 3) return;
                 if (token && !content.startsWith('http') && !content.startsWith('data:')) {
                   src = await getImageBlobUrl(token, content);
+                  cloudBlobUrlsRef.current.push(src);
                 } else {
                   src = content;
                 }
@@ -128,6 +134,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     return () => {
       isMounted = false;
       clearTimeout(debounceTimer);
+      cloudBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      cloudBlobUrlsRef.current = [];
     };
   }, [template.fields, test_dataObj, token]);
 
@@ -323,7 +331,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       ctx.rect(field.x, field.y, field.width, field.height);
       ctx.clip();
 
-      if (field.field_type === 'text') {
+      if (field.field_type === 'text' || field.field_type === 'price' || field.field_type === 'datetime' || field.field_type === 'counter') {
         const fontSize = field.font_size;
         const fontStyle = field.font_weight === 'bold' ? 'bold' : 'normal';
         const fontFamily = field.font_family || 'Arial';

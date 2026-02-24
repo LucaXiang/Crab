@@ -137,16 +137,22 @@ async fn handle_client_connection(
     clients: Arc<DashMap<String, Arc<dyn Transport>>>,
     credential_cache: Arc<RwLock<Option<TenantBinding>>>,
 ) -> Result<(), AppError> {
-    // TLS handshake if configured
+    // TLS handshake if configured (with 10s timeout to prevent slow-loris)
     let transport: Arc<dyn Transport> = if let Some(acceptor) = tls_acceptor {
-        match acceptor.accept(stream).await {
-            Ok(tls_stream) => {
+        match tokio::time::timeout(std::time::Duration::from_secs(10), acceptor.accept(stream))
+            .await
+        {
+            Ok(Ok(tls_stream)) => {
                 tracing::debug!("Client {} TLS handshake successful", addr);
                 Arc::new(TlsTransport::new(tls_stream))
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 tracing::error!("Client {} TLS handshake failed: {}", addr, e);
                 return Err(AppError::internal(format!("TLS handshake failed: {}", e)));
+            }
+            Err(_) => {
+                tracing::warn!("Client {} TLS handshake timed out", addr);
+                return Err(AppError::internal("TLS handshake timed out"));
             }
         }
     } else {
