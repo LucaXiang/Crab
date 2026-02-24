@@ -135,6 +135,7 @@ pub struct OrderItemSync {
     pub name: String,
     pub spec_name: Option<String>,
     pub category_name: Option<String>,
+    pub product_source_id: Option<i64>,
     pub price: f64,
     pub quantity: i32,
     pub unit_price: f64,

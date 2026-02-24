@@ -133,6 +133,7 @@ export interface ArchivedOrderDetail {
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
   operator_name: string | null;
+  queue_number: number | null;
   // === Void Metadata ===
   void_type: ArchivedVoidType | null;
   loss_reason: ArchivedLossReason | null;

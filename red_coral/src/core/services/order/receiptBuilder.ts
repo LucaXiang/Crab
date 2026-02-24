@@ -163,7 +163,7 @@ export function buildArchivedReceiptData(
     surcharge,
     items,
     total_amount: order.total,
-    queue_number: null,
+    queue_number: order.queue_number ?? null,
     qr_data: null,
   };
 }

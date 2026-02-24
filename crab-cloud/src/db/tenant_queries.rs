@@ -308,6 +308,7 @@ pub struct StoreOverview {
     pub payment_breakdown: Vec<PaymentBreakdownEntry>,
     pub top_products: Vec<TopProductEntry>,
     pub category_sales: Vec<CategorySaleEntry>,
+    pub tag_sales: Vec<TagSaleEntry>,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -342,6 +343,14 @@ pub struct TopProductEntry {
 pub struct CategorySaleEntry {
     pub name: String,
     pub revenue: f64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct TagSaleEntry {
+    pub name: String,
+    pub color: Option<String>,
+    pub revenue: f64,
+    pub quantity: i64,
 }
 
 /// Compute store overview statistics for a time range (from..to as unix millis)
@@ -557,6 +566,37 @@ pub async fn get_store_overview(
         .map(|(name, revenue)| CategorySaleEntry { name, revenue })
         .collect();
 
+    // 7. Tag sales — JOIN order_items → catalog_product_tag → catalog_tags
+    let tag_sales: Vec<TagSaleEntry> = sqlx::query_as(
+        r#"
+        SELECT
+            t.name,
+            t.color,
+            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
+            COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
+        FROM cloud_order_items i
+        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        JOIN catalog_product_tag pt ON pt.product_source_id = i.product_source_id
+            AND pt.store_id = $1
+        JOIN catalog_tags t ON t.source_id = pt.tag_source_id
+            AND t.store_id = $1
+        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
+            AND o.end_time >= $3 AND o.end_time < $4
+            AND o.status = 'COMPLETED'
+            AND i.product_source_id IS NOT NULL
+        GROUP BY t.name, t.color
+        ORDER BY revenue DESC
+        LIMIT 10
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(tenant_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
     Ok(StoreOverview {
         revenue,
         orders,
@@ -575,6 +615,7 @@ pub async fn get_store_overview(
         payment_breakdown,
         top_products,
         category_sales,
+        tag_sales,
     })
 }
 
@@ -778,6 +819,36 @@ pub async fn get_tenant_overview(
         .map(|(name, revenue)| CategorySaleEntry { name, revenue })
         .collect();
 
+    // Tenant-wide tag sales (across all stores)
+    let tag_sales: Vec<TagSaleEntry> = sqlx::query_as(
+        r#"
+        SELECT
+            t.name,
+            t.color,
+            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
+            COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
+        FROM cloud_order_items i
+        JOIN cloud_archived_orders o ON o.id = i.archived_order_id
+        JOIN catalog_product_tag pt ON pt.product_source_id = i.product_source_id
+            AND pt.store_id = o.edge_server_id
+        JOIN catalog_tags t ON t.source_id = pt.tag_source_id
+            AND t.store_id = o.edge_server_id
+        WHERE o.tenant_id = $1
+            AND o.end_time >= $2 AND o.end_time < $3
+            AND o.status = 'COMPLETED'
+            AND i.product_source_id IS NOT NULL
+        GROUP BY t.name, t.color
+        ORDER BY revenue DESC
+        LIMIT 10
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
     Ok(StoreOverview {
         revenue,
         orders,
@@ -796,6 +867,7 @@ pub async fn get_tenant_overview(
         payment_breakdown,
         top_products,
         category_sales,
+        tag_sales,
     })
 }
 

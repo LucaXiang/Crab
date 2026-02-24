@@ -113,6 +113,7 @@ pub struct OrderDetail {
     pub loss_reason: Option<String>,
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
+    pub queue_number: Option<i32>,
     pub items: Vec<OrderItemDetail>,
     pub payments: Vec<OrderPaymentDetail>,
     pub timeline: Vec<OrderEventDetail>,
@@ -150,6 +151,7 @@ pub async fn get_by_id(
         loss_reason: detail.loss_reason,
         loss_amount: detail.loss_amount,
         void_note: detail.void_note,
+        queue_number: detail.queue_number,
         items: detail
             .items
             .into_iter()

@@ -338,8 +338,8 @@ async fn upsert_archived_order(
     for item_sync in &detail_sync.detail.items {
         sqlx::query(
             r#"
-            INSERT INTO cloud_order_items (archived_order_id, name, category_name, quantity, line_total, tax_rate)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO cloud_order_items (archived_order_id, name, category_name, quantity, line_total, tax_rate, product_source_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
         )
         .bind(order_row_id)
@@ -348,6 +348,7 @@ async fn upsert_archived_order(
         .bind(item_sync.quantity)
         .bind(item_sync.line_total)
         .bind(item_sync.tax_rate)
+        .bind(item_sync.product_source_id)
         .execute(&mut *tx)
         .await?;
     }

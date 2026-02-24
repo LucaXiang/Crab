@@ -33,6 +33,7 @@ pub struct OrderDetail {
     pub loss_reason: Option<String>,
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
+    pub queue_number: Option<i32>,
     pub items: Vec<OrderDetailItem>,
     pub payments: Vec<OrderDetailPayment>,
     pub timeline: Vec<OrderDetailEvent>,
@@ -123,6 +124,7 @@ struct OrderRow {
     loss_reason: Option<String>,
     loss_amount: Option<f64>,
     void_note: Option<String>,
+    queue_number: Option<i32>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -179,7 +181,7 @@ struct ItemRow {
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
     let order: OrderRow = sqlx::query_as::<_, OrderRow>(
-        "SELECT id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note FROM archived_order WHERE id = ?",
+        "SELECT id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -317,6 +319,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         loss_reason: order.loss_reason,
         loss_amount: order.loss_amount,
         void_note: order.void_note,
+        queue_number: order.queue_number,
         items,
         payments,
         timeline,
@@ -413,6 +416,7 @@ pub async fn build_order_detail_sync(
     #[derive(sqlx::FromRow)]
     struct SyncItemRow {
         id: i64,
+        spec: String,
         name: String,
         spec_name: Option<String>,
         category_name: Option<String>,
@@ -429,7 +433,7 @@ pub async fn build_order_detail_sync(
     }
 
     let item_rows: Vec<SyncItemRow> = sqlx::query_as::<_, SyncItemRow>(
-        "SELECT id, name, spec_name, category_name, price, quantity, unit_price, \
+        "SELECT id, spec, name, spec_name, category_name, price, quantity, unit_price, \
          line_total, discount_amount, surcharge_amount, tax, tax_rate, is_comped, note \
          FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
@@ -468,10 +472,17 @@ pub async fn build_order_detail_sync(
         .into_iter()
         .map(|row| {
             let options = options_map.remove(&row.id).unwrap_or_default();
+            // spec format: "product_id:spec_id"
+            let product_source_id = row
+                .spec
+                .split(':')
+                .next()
+                .and_then(|s| s.parse::<i64>().ok());
             OrderItemSync {
                 name: row.name,
                 spec_name: row.spec_name,
                 category_name: row.category_name,
+                product_source_id,
                 price: row.price,
                 quantity: row.quantity,
                 unit_price: row.unit_price,
