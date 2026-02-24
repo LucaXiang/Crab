@@ -88,7 +88,7 @@ Tauri identifier: `com.craboss.redcoral`
 
 **架构**: EC2 (Amazon Linux 2023) + Docker Compose + Caddy (自动 HTTPS) + PostgreSQL 16
 
-**域名**: `cloud.redcoral.app` → Caddy → crab-cloud:8080 (`auth.redcoral.app` 已废弃，301 到 cloud)
+**域名**: `cloud.redcoral.app` → Caddy → crab-cloud:8080
 **mTLS**: 端口 8443 直接暴露 (edge-server 双向 TLS 连接用)
 
 ### 完整部署流程

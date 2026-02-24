@@ -89,8 +89,3 @@ updates.redcoral.app {
 	}
 	header Cache-Control "public, max-age=300"
 }
-
-auth.redcoral.app {
-	# 已废弃 — 统一到 cloud.redcoral.app
-	redir https://cloud.redcoral.app{uri} permanent
-}

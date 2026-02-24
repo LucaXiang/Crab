@@ -15,14 +15,12 @@ Internet
 
 域名:
 - `cloud.redcoral.app` → crab-cloud (HTTP API)
-- `auth.redcoral.app` → crab-cloud (HTTP API, 同一服务)
 
 ## 你需要准备的
 
 ### 1. 域名 + DNS (Cloudflare)
 
 - [ ] `cloud.redcoral.app` → A 记录 → EC2 Elastic IP
-- [ ] `auth.redcoral.app` → A 记录 → EC2 Elastic IP (同一 IP)
 - [ ] Cloudflare Proxy 关闭 (DNS Only)，由 Caddy 管理 TLS
 
 ### 2. AWS 资源
