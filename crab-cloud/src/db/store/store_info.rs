@@ -111,7 +111,7 @@ pub async fn get_store_info(
 ) -> Result<Option<StoreInfo>, BoxError> {
     let row: Option<StoreInfo> = sqlx::query_as(
         r#"
-        SELECT 1 AS id, name, address, nif, logo_url, phone, email, website,
+        SELECT 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website,
                business_day_cutoff, created_at, updated_at
         FROM store_info
         WHERE edge_server_id = $1
