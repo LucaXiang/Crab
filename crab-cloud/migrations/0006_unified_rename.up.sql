@@ -30,8 +30,15 @@ ALTER TABLE cloud_order_items RENAME TO store_order_items;
 ALTER TABLE cloud_order_payments RENAME TO store_order_payments;
 ALTER TABLE cloud_order_details RENAME TO store_order_details;
 ALTER TABLE cloud_order_events RENAME TO store_order_events;
-ALTER TABLE cloud_label_templates RENAME TO store_label_templates;
-ALTER TABLE cloud_label_fields RENAME TO store_label_fields;
+-- Label templates: skip if already created as store_* by migration 0005
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cloud_label_templates' AND table_schema = 'public') THEN
+    ALTER TABLE cloud_label_templates RENAME TO store_label_templates;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cloud_label_fields' AND table_schema = 'public') THEN
+    ALTER TABLE cloud_label_fields RENAME TO store_label_fields;
+  END IF;
+END $$;
 
 -- ════════════════════════════════════════════════════════════════
 -- 3. Rename catalog_* tables → store_*
@@ -128,12 +135,15 @@ ALTER TABLE store_dining_tables ADD CONSTRAINT store_dining_tables_edge_server_i
     FOREIGN KEY (edge_server_id) REFERENCES edge_servers(id) ON DELETE CASCADE;
 
 -- store_label_templates → edge_servers (already has CASCADE, update constraint name)
+-- Drop both possible names (cloud_* if renamed from old table, store_* if created fresh by 0005)
 ALTER TABLE store_label_templates DROP CONSTRAINT IF EXISTS cloud_label_templates_edge_server_id_fkey;
+ALTER TABLE store_label_templates DROP CONSTRAINT IF EXISTS store_label_templates_edge_server_id_fkey;
 ALTER TABLE store_label_templates ADD CONSTRAINT store_label_templates_edge_server_id_fkey
     FOREIGN KEY (edge_server_id) REFERENCES edge_servers(id) ON DELETE CASCADE;
 
 -- store_label_fields → store_label_templates (already has CASCADE, update constraint name)
 ALTER TABLE store_label_fields DROP CONSTRAINT IF EXISTS cloud_label_fields_template_id_fkey;
+ALTER TABLE store_label_fields DROP CONSTRAINT IF EXISTS store_label_fields_template_id_fkey;
 ALTER TABLE store_label_fields ADD CONSTRAINT store_label_fields_template_id_fkey
     FOREIGN KEY (template_id) REFERENCES store_label_templates(id) ON DELETE CASCADE;
 
