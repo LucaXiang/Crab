@@ -48,7 +48,8 @@
     "price_rules": "Price Rules",
     "employees": "Employees",
     "zones": "Zones",
-    "tables": "Tables"
+    "tables": "Tables",
+    "label_templates": "Label Templates"
   },
   "dash": {
     "title": "Dashboard",
@@ -385,7 +386,79 @@
       "confirm": {
         "delete": "This category will be permanently removed. Products in it will become uncategorized. Continue?"
       }
-    }
+    },
+    "label": {
+      "templates": "Label Templates",
+      "templates_desc": "Manage label printing templates.",
+      "new_template": "New Template",
+      "no_templates": "No label templates",
+      "no_templates_desc": "Create from a preset or start with a blank template.",
+      "create_blank": "Blank Template",
+      "delete_confirm": "Delete template \"{name}\"?",
+      "field_properties": "Field Properties",
+      "select_field_hint": "Select a field on the canvas to edit its properties.",
+      "display_label": "Display Name",
+      "placeholder": "Enter name",
+      "x_position": "X Position",
+      "y_position": "Y Position",
+      "width": "Width",
+      "height": "Height",
+      "content_template": "Content Template",
+      "text_template_hint": "Use {variable} to insert dynamic content.",
+      "image_template_hint": "Use {variable} to insert dynamic content.",
+      "font_size": "Font Size",
+      "font_family": "Font Family",
+      "font_style": "Font Weight",
+      "style_regular": "Regular",
+      "style_bold": "Bold",
+      "text_align": "Horizontal Align",
+      "vertical_align": "Vertical Align",
+      "source_type": "Source Type",
+      "source_type_image": "Static Image",
+      "source_type_product_image": "Product Image",
+      "source_type_qrcode": "QR Code",
+      "source_type_barcode": "Barcode",
+      "static_image": "Static Image",
+      "static_image_hint": "Upload a fixed image to display.",
+      "select_image": "Select Image",
+      "pending_upload": "Pending upload",
+      "maintain_aspect_ratio": "Maintain Aspect Ratio",
+      "separator_hint": "Separator fills the label width. Only Y position is adjustable.",
+      "template_name": "Template Name",
+      "width_mm": "Width (mm)",
+      "height_mm": "Height (mm)",
+      "padding_x": "Horizontal Padding (mm)",
+      "padding_y": "Vertical Padding (mm)",
+      "show_offset_border": "Show Physical Paper Border",
+      "render_dpi": "Render DPI",
+      "render_dpi_hint": "Common values for label printers: 203 or 300.",
+      "select_element_hint": "Select an element on the canvas to edit its properties.",
+      "test_data_json": "Test Data (JSON)",
+      "fill_sample": "Fill Sample",
+      "test_data_hint": "Variables will be replaced with test data values.",
+      "layers": "Layers",
+      "no_layers": "No layers. Add one from the left panel.",
+      "horizontal_line": "Horizontal Separator",
+      "toggle_layers": "Toggle Layers Panel",
+      "toggle_properties": "Toggle Properties Panel",
+      "zoom_in": "Zoom In",
+      "zoom_out": "Zoom Out",
+      "fit_to_screen": "Fit to Screen",
+      "field_helper_hint": "Use {variable} syntax in template fields to insert dynamic data.",
+      "field": {
+        "text": "Text",
+        "image": "Image",
+        "line": "Separator",
+        "new_text": "New Text",
+        "new_image": "New Image",
+        "default_text": "Sample Text",
+        "default_separator": "Separator"
+      }
+    },
+    "printer": {
+      "templates": "Template Settings"
+    },
+    "supported_fields": "Supported Fields"
   },
   "live": {
     "title": "Live Orders",
@@ -478,7 +551,9 @@
       "edit": "Edit",
       "delete": "Delete",
       "confirm": "Confirm",
-      "filter": "Filter"
+      "filter": "Filter",
+      "create": "Create",
+      "duplicate": "Duplicate"
     },
     "dialog": {
       "confirm_delete": "Confirm deletion"

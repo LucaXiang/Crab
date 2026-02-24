@@ -201,6 +201,7 @@ pub fn public_router(state: AppState) -> Router {
     // Image upload (JWT authenticated, 20MB body limit)
     let image_upload = Router::new()
         .route("/api/tenant/images", post(image::upload_image))
+        .route("/api/tenant/images/{hash}", get(image::get_image_url))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             tenant_auth_middleware,

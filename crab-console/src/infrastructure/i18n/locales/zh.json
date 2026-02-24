@@ -48,7 +48,8 @@
     "price_rules": "价格规则",
     "employees": "员工",
     "zones": "区域",
-    "tables": "餐桌"
+    "tables": "餐桌",
+    "label_templates": "标签模板"
   },
   "dash": {
     "title": "概览",
@@ -385,7 +386,79 @@
       "confirm": {
         "delete": "此分类将被永久删除，其下产品将变为未分类。确定继续？"
       }
-    }
+    },
+    "label": {
+      "templates": "标签模板",
+      "templates_desc": "管理标签打印模板。",
+      "new_template": "新建模板",
+      "no_templates": "暂无标签模板",
+      "no_templates_desc": "从预设创建或新建空白模板。",
+      "create_blank": "空白模板",
+      "delete_confirm": "确定删除模板 \"{name}\" 吗？",
+      "field_properties": "字段属性",
+      "select_field_hint": "在画布上选择一个字段以编辑属性。",
+      "display_label": "显示名称",
+      "placeholder": "输入名称",
+      "x_position": "X 位置",
+      "y_position": "Y 位置",
+      "width": "宽度",
+      "height": "高度",
+      "content_template": "内容模板",
+      "text_template_hint": "使用 {变量名} 插入动态内容。",
+      "image_template_hint": "使用 {变量名} 插入动态内容。",
+      "font_size": "字号",
+      "font_family": "字体",
+      "font_style": "字重",
+      "style_regular": "常规",
+      "style_bold": "粗体",
+      "text_align": "水平对齐",
+      "vertical_align": "垂直对齐",
+      "source_type": "来源类型",
+      "source_type_image": "静态图片",
+      "source_type_product_image": "产品图片",
+      "source_type_qrcode": "二维码",
+      "source_type_barcode": "条形码",
+      "static_image": "静态图片",
+      "static_image_hint": "上传一张固定显示的图片。",
+      "select_image": "选择图片",
+      "pending_upload": "待上传",
+      "maintain_aspect_ratio": "保持宽高比",
+      "separator_hint": "分隔线自动占满标签宽度，仅可调整 Y 位置。",
+      "template_name": "模板名称",
+      "width_mm": "宽度 (mm)",
+      "height_mm": "高度 (mm)",
+      "padding_x": "水平边距 (mm)",
+      "padding_y": "垂直边距 (mm)",
+      "show_offset_border": "显示物理纸张边界",
+      "render_dpi": "渲染 DPI",
+      "render_dpi_hint": "标签打印机常见 203 或 300。",
+      "select_element_hint": "选择画布上的元素以编辑属性。",
+      "test_data_json": "测试数据 (JSON)",
+      "fill_sample": "填充示例",
+      "test_data_hint": "变量会替换为测试数据中的值。",
+      "layers": "图层",
+      "no_layers": "暂无图层，从左侧添加。",
+      "horizontal_line": "水平分隔线",
+      "toggle_layers": "切换图层面板",
+      "toggle_properties": "切换属性面板",
+      "zoom_in": "放大",
+      "zoom_out": "缩小",
+      "fit_to_screen": "适应屏幕",
+      "field_helper_hint": "在模板字段中使用 {变量名} 语法插入动态数据。",
+      "field": {
+        "text": "文本",
+        "image": "图片",
+        "line": "分隔线",
+        "new_text": "新文本",
+        "new_image": "新图片",
+        "default_text": "示例文本",
+        "default_separator": "分隔线"
+      }
+    },
+    "printer": {
+      "templates": "模板设置"
+    },
+    "supported_fields": "支持的字段"
   },
   "live": {
     "title": "实时订单",
@@ -478,7 +551,9 @@
       "edit": "编辑",
       "delete": "删除",
       "confirm": "确认",
-      "filter": "筛选"
+      "filter": "筛选",
+      "create": "创建",
+      "duplicate": "复制"
     },
     "dialog": {
       "confirm_delete": "确认删除"

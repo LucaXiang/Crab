@@ -1,10 +1,11 @@
-import { request } from './client';
+import { request, ApiError } from './client';
 import type {
   StoreProduct, ProductCreate, ProductUpdate,
   StoreCategory, CategoryCreate, CategoryUpdate,
   StoreTag, TagCreate, TagUpdate,
   StoreAttribute, AttributeCreate, AttributeUpdate,
   PriceRule, PriceRuleCreate, PriceRuleUpdate,
+  LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate,
   StoreOpResult,
 } from '@/core/types/store';
 
@@ -75,3 +76,46 @@ export const updatePriceRule = (token: string, storeId: number, id: number, data
 
 export const deletePriceRule = (token: string, storeId: number, id: number) =>
   request<StoreOpResult>('DELETE', `${storePath(storeId, 'price-rules')}/${id}`, undefined, token);
+
+// ── Label Templates ──
+export const listLabelTemplates = (token: string, storeId: number) =>
+  request<LabelTemplate[]>('GET', storePath(storeId, 'label-templates'), undefined, token);
+
+export const createLabelTemplate = (token: string, storeId: number, data: LabelTemplateCreate) =>
+  request<StoreOpResult>('POST', storePath(storeId, 'label-templates'), data, token);
+
+export const updateLabelTemplate = (token: string, storeId: number, id: number, data: LabelTemplateUpdate) =>
+  request<StoreOpResult>('PUT', `${storePath(storeId, 'label-templates')}/${id}`, data, token);
+
+export const deleteLabelTemplate = (token: string, storeId: number, id: number) =>
+  request<StoreOpResult>('DELETE', `${storePath(storeId, 'label-templates')}/${id}`, undefined, token);
+
+// ── Image Upload ──
+const API_BASE = 'https://cloud.redcoral.app';
+
+export async function uploadImage(token: string, file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/tenant/images`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, data?.message ?? 'Upload failed', data?.code ?? null);
+  return data.hash as string;
+}
+
+/** Get a presigned S3 URL for an image hash, then create a blob URL for use in <img> / Canvas */
+export async function getImageBlobUrl(token: string, hash: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/tenant/images/${hash}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, data?.message ?? 'Image not found', data?.code ?? null);
+  // Fetch from presigned S3 URL and create blob URL
+  const imgRes = await fetch(data.url);
+  if (!imgRes.ok) throw new ApiError(imgRes.status, 'Failed to load image', null);
+  const blob = await imgRes.blob();
+  return URL.createObjectURL(blob);
+}

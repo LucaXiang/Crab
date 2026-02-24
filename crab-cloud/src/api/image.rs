@@ -178,6 +178,22 @@ pub async fn upload_image(
     Ok(Json(ImageUploadResponse { hash }))
 }
 
+/// GET /api/tenant/images/:hash — get presigned S3 URL for an image
+pub async fn get_image_url(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    axum::extract::Path(hash): axum::extract::Path<String>,
+) -> Result<Json<ImageUrlResponse>, AppError> {
+    let url = presigned_get_url(&state, &identity.tenant_id, &hash).await?;
+    Ok(Json(ImageUrlResponse { url }))
+}
+
+/// Get image URL response
+#[derive(serde::Serialize)]
+pub struct ImageUrlResponse {
+    pub url: String,
+}
+
 /// Generate a presigned GET URL for an image in S3
 pub async fn presigned_get_url(
     state: &AppState,

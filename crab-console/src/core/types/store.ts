@@ -328,6 +328,132 @@ export interface DiningTableUpdate {
   is_active?: boolean;
 }
 
+// ── Label Template ──
+
+export type LabelFieldType =
+  | 'text'
+  | 'barcode'
+  | 'qrcode'
+  | 'image'
+  | 'separator'
+  | 'datetime'
+  | 'price'
+  | 'counter';
+
+export type LabelFieldAlignment = 'left' | 'center' | 'right';
+export type LabelVerticalAlign = 'top' | 'middle' | 'bottom';
+
+export interface LabelField {
+  field_id: string;
+  name: string;
+  field_type: LabelFieldType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  font_size: number;
+  font_weight?: string;
+  font_family?: string;
+  color?: string;
+  rotate?: number;
+  alignment?: LabelFieldAlignment;
+  data_source: string;
+  format?: string;
+  visible: boolean;
+  label?: string;
+  template?: string;
+  data_key?: string;
+  source_type?: 'productImage' | 'qrCode' | 'barcode' | 'image';
+  maintain_aspect_ratio?: boolean;
+  /** Temporary blob URL for pending image upload (editor only, not persisted) */
+  _pending_blob_url?: string;
+  style?: string;
+  align?: LabelFieldAlignment;
+  vertical_align?: LabelVerticalAlign;
+  line_style?: 'solid' | 'dashed' | 'dotted';
+}
+
+export interface LabelTemplate {
+  id: number;
+  name: string;
+  description?: string;
+  width: number;
+  height: number;
+  padding: number;
+  fields: LabelField[];
+  is_default: boolean;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
+}
+
+export interface LabelFieldInput {
+  field_id: string;
+  name: string;
+  field_type: LabelFieldType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  font_size?: number;
+  font_weight?: string;
+  font_family?: string;
+  color?: string;
+  rotate?: number;
+  alignment?: LabelFieldAlignment;
+  data_source?: string;
+  format?: string;
+  visible?: boolean;
+  template?: string;
+  data_key?: string;
+  source_type?: string;
+  maintain_aspect_ratio?: boolean;
+  style?: string;
+  align?: LabelFieldAlignment;
+  vertical_align?: LabelVerticalAlign;
+  line_style?: string;
+}
+
+export interface LabelTemplateCreate {
+  name: string;
+  description?: string;
+  width: number;
+  height: number;
+  padding?: number;
+  fields?: LabelFieldInput[];
+  is_default?: boolean;
+  is_active?: boolean;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
+}
+
+export interface LabelTemplateUpdate {
+  name?: string;
+  description?: string;
+  width?: number;
+  height?: number;
+  padding?: number;
+  fields?: LabelFieldInput[];
+  is_default?: boolean;
+  is_active?: boolean;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
+}
+
 // ── StoreOpResult ──
 
 export interface StoreOpResult {

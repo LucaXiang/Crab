@@ -48,7 +48,8 @@
     "price_rules": "Reglas de precio",
     "employees": "Empleados",
     "zones": "Zonas",
-    "tables": "Mesas"
+    "tables": "Mesas",
+    "label_templates": "Plantillas de etiqueta"
   },
   "dash": {
     "title": "Resumen",
@@ -385,7 +386,79 @@
       "confirm": {
         "delete": "Esta categoría se eliminará permanentemente. Los productos quedarán sin categoría. ¿Continuar?"
       }
-    }
+    },
+    "label": {
+      "templates": "Plantillas de etiqueta",
+      "templates_desc": "Gestiona las plantillas de impresión de etiquetas.",
+      "new_template": "Nueva plantilla",
+      "no_templates": "Sin plantillas de etiqueta",
+      "no_templates_desc": "Crea desde un preset o empieza con una plantilla en blanco.",
+      "create_blank": "Plantilla en blanco",
+      "delete_confirm": "¿Eliminar la plantilla \"{name}\"?",
+      "field_properties": "Propiedades del campo",
+      "select_field_hint": "Selecciona un campo en el lienzo para editar sus propiedades.",
+      "display_label": "Nombre visible",
+      "placeholder": "Introduce un nombre",
+      "x_position": "Posición X",
+      "y_position": "Posición Y",
+      "width": "Ancho",
+      "height": "Alto",
+      "content_template": "Plantilla de contenido",
+      "text_template_hint": "Usa {variable} para insertar contenido dinámico.",
+      "image_template_hint": "Usa {variable} para insertar contenido dinámico.",
+      "font_size": "Tamaño de fuente",
+      "font_family": "Familia tipográfica",
+      "font_style": "Peso de fuente",
+      "style_regular": "Normal",
+      "style_bold": "Negrita",
+      "text_align": "Alineación horizontal",
+      "vertical_align": "Alineación vertical",
+      "source_type": "Tipo de fuente",
+      "source_type_image": "Imagen estática",
+      "source_type_product_image": "Imagen de producto",
+      "source_type_qrcode": "Código QR",
+      "source_type_barcode": "Código de barras",
+      "static_image": "Imagen estática",
+      "static_image_hint": "Sube una imagen fija para mostrar.",
+      "select_image": "Seleccionar imagen",
+      "pending_upload": "Pendiente de subir",
+      "maintain_aspect_ratio": "Mantener proporción",
+      "separator_hint": "El separador ocupa todo el ancho de la etiqueta. Solo se puede ajustar la posición Y.",
+      "template_name": "Nombre de plantilla",
+      "width_mm": "Ancho (mm)",
+      "height_mm": "Alto (mm)",
+      "padding_x": "Margen horizontal (mm)",
+      "padding_y": "Margen vertical (mm)",
+      "show_offset_border": "Mostrar borde del papel físico",
+      "render_dpi": "DPI de renderizado",
+      "render_dpi_hint": "Valores comunes para impresoras de etiquetas: 203 o 300.",
+      "select_element_hint": "Selecciona un elemento en el lienzo para editar sus propiedades.",
+      "test_data_json": "Datos de prueba (JSON)",
+      "fill_sample": "Rellenar ejemplo",
+      "test_data_hint": "Las variables se reemplazarán con los valores de los datos de prueba.",
+      "layers": "Capas",
+      "no_layers": "Sin capas. Añade una desde el panel izquierdo.",
+      "horizontal_line": "Separador horizontal",
+      "toggle_layers": "Alternar panel de capas",
+      "toggle_properties": "Alternar panel de propiedades",
+      "zoom_in": "Acercar",
+      "zoom_out": "Alejar",
+      "fit_to_screen": "Ajustar a pantalla",
+      "field_helper_hint": "Usa la sintaxis {variable} en los campos de plantilla para insertar datos dinámicos.",
+      "field": {
+        "text": "Texto",
+        "image": "Imagen",
+        "line": "Separador",
+        "new_text": "Nuevo texto",
+        "new_image": "Nueva imagen",
+        "default_text": "Texto de ejemplo",
+        "default_separator": "Separador"
+      }
+    },
+    "printer": {
+      "templates": "Configuración de plantillas"
+    },
+    "supported_fields": "Campos disponibles"
   },
   "live": {
     "title": "Pedidos en vivo",
@@ -478,7 +551,9 @@
       "edit": "Editar",
       "delete": "Eliminar",
       "confirm": "Confirmar",
-      "filter": "Filtrar"
+      "filter": "Filtrar",
+      "create": "Crear",
+      "duplicate": "Duplicar"
     },
     "dialog": {
       "confirm_delete": "Confirmar eliminación"
