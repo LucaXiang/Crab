@@ -132,7 +132,29 @@ impl OrderStorage {
     /// This is critical for edge devices that may experience unexpected shutdowns
     /// (e.g., power outages, forced restarts).
     pub fn open(path: impl AsRef<Path>) -> StorageResult<Self> {
-        let db = Database::create(path)?;
+        // Retry with backoff: previous ServerState may still be releasing the file lock
+        // (e.g. after abort during mode switch, Axum handler tasks may hold Arc<Database>)
+        let path = path.as_ref();
+        let mut db = None;
+        for attempt in 0..5 {
+            match Database::create(path) {
+                Ok(d) => {
+                    db = Some(d);
+                    break;
+                }
+                Err(redb::DatabaseError::DatabaseAlreadyOpen) if attempt < 4 => {
+                    let wait = std::time::Duration::from_millis(200 * (attempt as u64 + 1));
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        wait_ms = wait.as_millis() as u64,
+                        "redb file locked, retrying..."
+                    );
+                    std::thread::sleep(wait);
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+        let db = db.expect("loop guarantees db is set on break");
 
         // Initialize tables
         let write_txn = db.begin_write()?;

@@ -58,7 +58,27 @@ pub struct PrintStorage {
 impl PrintStorage {
     /// Open or create database
     pub fn open(path: impl AsRef<Path>) -> PrintStorageResult<Self> {
-        let db = Database::create(path)?;
+        let path = path.as_ref();
+        let mut db = None;
+        for attempt in 0..5 {
+            match Database::create(path) {
+                Ok(d) => {
+                    db = Some(d);
+                    break;
+                }
+                Err(redb::DatabaseError::DatabaseAlreadyOpen) if attempt < 4 => {
+                    let wait = std::time::Duration::from_millis(200 * (attempt as u64 + 1));
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        wait_ms = wait.as_millis() as u64,
+                        "print.redb file locked, retrying..."
+                    );
+                    std::thread::sleep(wait);
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+        let db = db.expect("loop guarantees db is set on break");
 
         // Initialize tables
         let write_txn = db.begin_write()?;
