@@ -101,12 +101,20 @@ pub fn public_router(state: AppState) -> Router {
             patch(store::batch_update_product_sort_order),
         )
         .route(
+            "/api/tenant/stores/{id}/products/bulk-delete",
+            post(store::bulk_delete_products),
+        )
+        .route(
             "/api/tenant/stores/{id}/products/{pid}",
             put(store::update_product).delete(store::delete_product),
         )
         .route(
             "/api/tenant/stores/{id}/categories",
             get(store::list_categories).post(store::create_category),
+        )
+        .route(
+            "/api/tenant/stores/{id}/categories/sort-order",
+            patch(store::batch_update_category_sort_order),
         )
         .route(
             "/api/tenant/stores/{id}/categories/{cid}",
@@ -135,6 +143,18 @@ pub fn public_router(state: AppState) -> Router {
         .route(
             "/api/tenant/stores/{id}/attributes/unbind",
             post(store::unbind_attribute),
+        )
+        .route(
+            "/api/tenant/stores/{id}/attributes/{aid}/options",
+            post(store::create_attribute_option),
+        )
+        .route(
+            "/api/tenant/stores/{id}/attributes/{aid}/options/sort-order",
+            patch(store::batch_update_option_sort_order),
+        )
+        .route(
+            "/api/tenant/stores/{id}/attributes/{aid}/options/{oid}",
+            put(store::update_attribute_option).delete(store::delete_attribute_option),
         )
         .route(
             "/api/tenant/stores/{id}/price-rules",

@@ -53,6 +53,9 @@ pub enum StoreOp {
     DeleteCategory {
         id: i64,
     },
+    BatchUpdateCategorySortOrder {
+        items: Vec<SortOrderItem>,
+    },
 
     // ── Attribute ──
     CreateAttribute {
@@ -66,6 +69,25 @@ pub enum StoreOp {
     },
     DeleteAttribute {
         id: i64,
+    },
+
+    // ── Attribute Option ──
+    CreateAttributeOption {
+        attribute_id: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<i64>,
+        data: crate::models::attribute::AttributeOptionCreate,
+    },
+    UpdateAttributeOption {
+        id: i64,
+        data: crate::models::attribute::AttributeOptionUpdate,
+    },
+    DeleteAttributeOption {
+        id: i64,
+    },
+    BatchUpdateOptionSortOrder {
+        attribute_id: i64,
+        items: Vec<SortOrderItem>,
     },
 
     // ── Attribute Binding ──

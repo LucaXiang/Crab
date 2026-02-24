@@ -481,53 +481,38 @@ impl CatalogService {
         let tax_rate = data.tax_rate.unwrap_or(0);
         let is_kitchen_print_enabled = data.is_kitchen_print_enabled.unwrap_or(-1);
         let is_label_print_enabled = data.is_label_print_enabled.unwrap_or(-1);
-        let product_id: i64 = if let Some(aid) = assigned_id {
-            sqlx::query_scalar(
-                r#"INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11) RETURNING id"#,
-            )
-            .bind(aid)
-            .bind(&data.name)
-            .bind(image)
-            .bind(data.category_id)
-            .bind(sort_order)
-            .bind(tax_rate)
-            .bind(&data.receipt_name)
-            .bind(&data.kitchen_print_name)
-            .bind(is_kitchen_print_enabled)
-            .bind(is_label_print_enabled)
-            .bind(data.external_id)
-            .fetch_one(&self.pool)
-            .await?
-        } else {
-            sqlx::query_scalar!(
-                r#"INSERT INTO product (name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10) RETURNING id as "id!""#,
-                data.name,
-                image,
-                data.category_id,
-                sort_order,
-                tax_rate,
-                data.receipt_name,
-                data.kitchen_print_name,
-                is_kitchen_print_enabled,
-                is_label_print_enabled,
-                data.external_id,
-            )
-            .fetch_one(&self.pool)
-            .await?
-        };
+        let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+        let product_id: i64 = sqlx::query_scalar(
+            r#"INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11) RETURNING id"#,
+        )
+        .bind(id)
+        .bind(&data.name)
+        .bind(image)
+        .bind(data.category_id)
+        .bind(sort_order)
+        .bind(tax_rate)
+        .bind(&data.receipt_name)
+        .bind(&data.kitchen_print_name)
+        .bind(is_kitchen_print_enabled)
+        .bind(is_label_print_enabled)
+        .bind(data.external_id)
+        .fetch_one(&self.pool)
+        .await?;
 
-        // Insert specs
+        // Insert specs (each spec gets a snowflake ID)
         for spec in &data.specs {
-            sqlx::query!(
-                "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)",
-                product_id,
-                spec.name,
-                spec.price,
-                spec.display_order,
-                spec.is_default,
-                spec.receipt_name,
-                spec.is_root,
+            let spec_id = shared::util::snowflake_id();
+            sqlx::query(
+                "INSERT INTO product_spec (id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8)",
             )
+            .bind(spec_id)
+            .bind(product_id)
+            .bind(&spec.name)
+            .bind(spec.price)
+            .bind(spec.display_order)
+            .bind(spec.is_default)
+            .bind(&spec.receipt_name)
+            .bind(spec.is_root)
             .execute(&self.pool)
             .await?;
         }
@@ -644,17 +629,19 @@ impl CatalogService {
                 .execute(&self.pool)
                 .await?;
             for spec in specs {
-                sqlx::query!(
-                    "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    id,
-                    spec.name,
-                    spec.price,
-                    spec.display_order,
-                    spec.is_default,
-                    spec.is_active,
-                    spec.receipt_name,
-                    spec.is_root,
+                let spec_id = shared::util::snowflake_id();
+                sqlx::query(
+                    "INSERT INTO product_spec (id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 )
+                .bind(spec_id)
+                .bind(id)
+                .bind(&spec.name)
+                .bind(spec.price)
+                .bind(spec.display_order)
+                .bind(spec.is_default)
+                .bind(spec.is_active)
+                .bind(&spec.receipt_name)
+                .bind(spec.is_root)
                 .execute(&self.pool)
                 .await?;
             }
@@ -953,34 +940,20 @@ impl CatalogService {
         let is_virtual = data.is_virtual.unwrap_or(false);
         let match_mode = data.match_mode.as_deref().unwrap_or("any");
         let is_display = data.is_display.unwrap_or(true);
-        let category_id: i64 = if let Some(aid) = assigned_id {
-            sqlx::query_scalar(
-                r#"INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8) RETURNING id"#,
-            )
-            .bind(aid)
-            .bind(&data.name)
-            .bind(sort_order)
-            .bind(is_kitchen_print_enabled)
-            .bind(is_label_print_enabled)
-            .bind(is_virtual)
-            .bind(match_mode)
-            .bind(is_display)
-            .fetch_one(&self.pool)
-            .await?
-        } else {
-            sqlx::query_scalar!(
-                r#"INSERT INTO category (name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7) RETURNING id as "id!""#,
-                data.name,
-                sort_order,
-                is_kitchen_print_enabled,
-                is_label_print_enabled,
-                is_virtual,
-                match_mode,
-                is_display,
-            )
-            .fetch_one(&self.pool)
-            .await?
-        };
+        let cid = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+        let category_id: i64 = sqlx::query_scalar(
+            r#"INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8) RETURNING id"#,
+        )
+        .bind(cid)
+        .bind(&data.name)
+        .bind(sort_order)
+        .bind(is_kitchen_print_enabled)
+        .bind(is_label_print_enabled)
+        .bind(is_virtual)
+        .bind(match_mode)
+        .bind(is_display)
+        .fetch_one(&self.pool)
+        .await?;
 
         // Insert print destinations (unified junction table)
         for dest_id in data
@@ -1104,6 +1077,32 @@ impl CatalogService {
         }
 
         Ok(updated)
+    }
+
+    /// Batch update category sort orders
+    pub async fn batch_update_category_sort_order(
+        &self,
+        items: &[shared::cloud::store_op::SortOrderItem],
+    ) -> RepoResult<()> {
+        for item in items {
+            sqlx::query!(
+                "UPDATE category SET sort_order = ?1 WHERE id = ?2",
+                item.sort_order,
+                item.id
+            )
+            .execute(&self.pool)
+            .await?;
+        }
+        // Update cache
+        {
+            let mut cache = self.categories.write();
+            for item in items {
+                if let Some(c) = cache.get_mut(&item.id) {
+                    c.sort_order = item.sort_order;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Delete a category

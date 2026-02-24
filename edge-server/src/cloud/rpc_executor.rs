@@ -132,11 +132,29 @@ pub async fn execute_catalog_op(
             catalog::update_category(state, *id, data.clone()).await
         }
         StoreOp::DeleteCategory { id } => catalog::delete_category(state, *id).await,
+        StoreOp::BatchUpdateCategorySortOrder { items } => {
+            catalog::batch_update_category_sort_order(state, items.clone()).await
+        }
 
         // ── Attribute ──
         StoreOp::CreateAttribute { id, data } => attribute::create(state, *id, data.clone()).await,
         StoreOp::UpdateAttribute { id, data } => attribute::update(state, *id, data.clone()).await,
         StoreOp::DeleteAttribute { id } => attribute::delete(state, *id).await,
+
+        // ── Attribute Option ──
+        StoreOp::CreateAttributeOption {
+            attribute_id,
+            id,
+            data,
+        } => attribute::create_option(state, *attribute_id, *id, data.clone()).await,
+        StoreOp::UpdateAttributeOption { id, data } => {
+            attribute::update_option(state, *id, data.clone()).await
+        }
+        StoreOp::DeleteAttributeOption { id } => attribute::delete_option(state, *id).await,
+        StoreOp::BatchUpdateOptionSortOrder {
+            attribute_id,
+            items,
+        } => attribute::batch_update_option_sort_order(state, *attribute_id, items.clone()).await,
 
         // ── Attribute Binding ──
         StoreOp::BindAttribute {

@@ -81,6 +81,36 @@ pub async fn update_category(
     Ok(Json(StoreOpResult::ok()))
 }
 
+#[derive(serde::Deserialize)]
+pub struct BatchSortOrderRequest {
+    pub items: Vec<shared::cloud::store_op::SortOrderItem>,
+}
+
+pub async fn batch_update_category_sort_order(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Json(req): Json<BatchSortOrderRequest>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    store::batch_update_sort_order_categories(&state.pool, store_id, &req.items)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge(
+        &state,
+        store_id,
+        StoreOp::BatchUpdateCategorySortOrder { items: req.items },
+    )
+    .await;
+
+    Ok(Json(StoreOpResult::ok()))
+}
+
 pub async fn delete_category(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,

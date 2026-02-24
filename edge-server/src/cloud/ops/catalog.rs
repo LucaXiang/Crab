@@ -99,6 +99,31 @@ pub async fn batch_update_product_sort_order(
     }
 }
 
+pub async fn batch_update_category_sort_order(
+    state: &ServerState,
+    items: Vec<shared::cloud::store_op::SortOrderItem>,
+) -> StoreOpResult {
+    match state
+        .catalog_service
+        .batch_update_category_sort_order(&items)
+        .await
+    {
+        Ok(()) => {
+            state
+                .broadcast_sync::<()>(
+                    SyncResource::Category,
+                    SyncChangeType::Updated,
+                    "batch-sort",
+                    None,
+                    true,
+                )
+                .await;
+            StoreOpResult::ok()
+        }
+        Err(e) => StoreOpResult::err(e.to_string()),
+    }
+}
+
 // ── Category ──
 
 pub async fn create_category(
