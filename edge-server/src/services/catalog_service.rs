@@ -691,6 +691,32 @@ impl CatalogService {
         Ok(full)
     }
 
+    /// Batch update product sort orders
+    pub async fn batch_update_product_sort_order(
+        &self,
+        items: &[shared::cloud::store_op::SortOrderItem],
+    ) -> RepoResult<()> {
+        for item in items {
+            sqlx::query!(
+                "UPDATE product SET sort_order = ?1 WHERE id = ?2",
+                item.sort_order,
+                item.id
+            )
+            .execute(&self.pool)
+            .await?;
+        }
+        // Update cache
+        {
+            let mut cache = self.products.write();
+            for item in items {
+                if let Some(p) = cache.get_mut(&item.id) {
+                    p.sort_order = item.sort_order;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Delete a product
     pub async fn delete_product(&self, id: i64) -> RepoResult<()> {
         // Get image references before deleting
