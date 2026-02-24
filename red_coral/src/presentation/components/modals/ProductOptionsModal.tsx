@@ -155,7 +155,11 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
           option_id: optionId,
           option_name: option.name,
           price_modifier: option.price_modifier ?? null,
-          quantity: qty, // Include quantity in ItemOption
+          quantity: qty,
+          receipt_name: option.receipt_name ?? null,
+          kitchen_print_name: option.kitchen_print_name ?? null,
+          show_on_receipt: attr.show_on_receipt,
+          show_on_kitchen_print: attr.show_on_kitchen_print,
         });
       });
     });

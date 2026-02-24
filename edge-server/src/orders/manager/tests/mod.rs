@@ -725,6 +725,10 @@ fn make_option(
         option_name: opt_name.to_string(),
         price_modifier: Some(modifier),
         quantity: 1,
+        receipt_name: None,
+        kitchen_print_name: None,
+        show_on_receipt: true,
+        show_on_kitchen_print: true,
     }
 }
 

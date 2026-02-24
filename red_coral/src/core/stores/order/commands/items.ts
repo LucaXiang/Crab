@@ -22,6 +22,10 @@ export function toCartItemInput(item: CartItem): CartItemInput {
     option_name: opt.option_name,
     price_modifier: opt.price_modifier ?? null,
     quantity: opt.quantity ?? 1,
+    receipt_name: opt.receipt_name ?? null,
+    kitchen_print_name: opt.kitchen_print_name ?? null,
+    show_on_receipt: opt.show_on_receipt,
+    show_on_kitchen_print: opt.show_on_kitchen_print,
   })) ?? null;
 
   return {

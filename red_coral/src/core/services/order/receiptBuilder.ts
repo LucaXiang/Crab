@@ -73,14 +73,19 @@ export function buildReceiptData(
       discount_percent: item.manual_discount_percent ?? null,
       original_price: item.original_price !== item.price ? item.original_price : null,
       selected_options: item.selected_options
-        ? item.selected_options.map((opt) => ({
-            attribute_name: opt.attribute_name,
-            option_name: opt.option_name,
-            receipt_name: null,
-            price_modifier: opt.price_modifier ?? 0,
-          }))
+        ? item.selected_options
+            .filter((opt) => opt.show_on_receipt)
+            .map((opt) => ({
+              attribute_name: opt.attribute_name,
+              option_name: opt.option_name,
+              receipt_name: opt.receipt_name ?? null,
+              price_modifier: opt.price_modifier ?? 0,
+              show_on_receipt: opt.show_on_receipt,
+            }))
         : null,
-      spec_name: item.selected_specification?.name || null,
+      spec_name: item.selected_specification?.receipt_name
+        || item.selected_specification?.name
+        || null,
     }));
 
   return {
@@ -139,6 +144,7 @@ export function buildArchivedReceiptData(
             option_name: opt.option_name,
             receipt_name: null,
             price_modifier: opt.price_modifier ?? 0,
+            show_on_receipt: true,
           }))
         : null,
       spec_name: item.spec_name,

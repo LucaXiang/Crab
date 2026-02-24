@@ -838,6 +838,10 @@ mod tests {
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }];
 
         let action = ModifyItemAction {
@@ -1027,6 +1031,10 @@ mod tests {
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }];
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
@@ -1136,6 +1144,10 @@ mod tests {
                     option_name: "Large".to_string(),
                     price_modifier: None,
                     quantity: 1,
+                    receipt_name: None,
+                    kitchen_print_name: None,
+                    show_on_receipt: true,
+                    show_on_kitchen_print: true,
                 }]),
                 ..Default::default()
             }

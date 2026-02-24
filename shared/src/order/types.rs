@@ -183,6 +183,16 @@ pub struct ItemOption {
         skip_serializing_if = "is_default_quantity"
     )]
     pub quantity: i32,
+    /// Receipt display name (falls back to option_name if None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
+    /// Kitchen ticket display name (falls back to option_name if None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kitchen_print_name: Option<String>,
+    /// Whether to show this option on customer receipt
+    pub show_on_receipt: bool,
+    /// Whether to show this option on kitchen ticket
+    pub show_on_kitchen_print: bool,
 }
 
 fn default_option_quantity() -> i32 {

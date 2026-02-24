@@ -229,17 +229,41 @@ impl KitchenPrintService {
         // Get product external_id (now at product level)
         let external_id = product.as_ref().and_then(|p| p.external_id);
 
-        // Build options list (with quantity if > 1)
+        // Build options list (with quantity if > 1), respecting show_on_kitchen_print
         let options: Vec<String> = item
             .selected_options
             .as_ref()
             .map(|opts| {
                 opts.iter()
+                    .filter(|opt| opt.show_on_kitchen_print)
                     .map(|opt| {
+                        let name = opt
+                            .kitchen_print_name
+                            .as_deref()
+                            .unwrap_or(&opt.option_name);
                         if opt.quantity > 1 {
-                            format!("{}×{}", opt.option_name, opt.quantity)
+                            format!("{}×{}", name, opt.quantity)
                         } else {
-                            opt.option_name.clone()
+                            name.to_string()
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Build label options list (using receipt_name, respecting show_on_receipt)
+        let label_options: Vec<String> = item
+            .selected_options
+            .as_ref()
+            .map(|opts| {
+                opts.iter()
+                    .filter(|opt| opt.show_on_receipt)
+                    .map(|opt| {
+                        let name = opt.receipt_name.as_deref().unwrap_or(&opt.option_name);
+                        if opt.quantity > 1 {
+                            format!("{}×{}", name, opt.quantity)
+                        } else {
+                            name.to_string()
                         }
                     })
                     .collect()
@@ -263,6 +287,7 @@ impl KitchenPrintService {
             quantity: item.quantity,
             index: None,
             options,
+            label_options,
             note: item.note.clone(),
             kitchen_destinations,
             label_destinations,

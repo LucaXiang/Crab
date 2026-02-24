@@ -33,6 +33,7 @@ pub struct SelectedOption {
     pub option_name: String,
     pub receipt_name: Option<String>,
     pub price_modifier: f64,
+    pub show_on_receipt: bool,
 }
 
 /// 订单项

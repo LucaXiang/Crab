@@ -164,6 +164,9 @@ impl<'a> ReceiptRenderer<'a> {
                 if !options.is_empty() {
                     let mut groups: Vec<(String, Vec<String>, f64)> = Vec::new();
                     for option in options {
+                        if !option.show_on_receipt {
+                            continue;
+                        }
                         let attr_name = &option.attribute_name;
                         let display_name = option
                             .receipt_name

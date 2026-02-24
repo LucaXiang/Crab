@@ -71,7 +71,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
       await Promise.all(
         imageFields.map(async field => {
-          const source_type = (field.source_type || 'image').toLowerCase();
+          const source_type = field.source_type || 'image';
           let src = '';
 
           try {
@@ -86,7 +86,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
               if (!content) return;
 
-              if (source_type === 'qrcode') {
+              if (source_type === 'qrCode') {
                 src = await QRCode.toDataURL(content, { margin: 1, errorCorrectionLevel: 'M' });
               } else if (source_type === 'barcode') {
                 const canvas = document.createElement('canvas');
@@ -420,7 +420,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     // Resize handles
     const selectedField = template.fields.find(f => f.field_id === selectedFieldId);
-    if (selectedField && !draggingField && selectedField.field_type !== 'separator') {
+    if (selectedField && !draggingField && selectedField.field_type !== LabelFieldType.Separator) {
       const handleSize = 6 / viewState.scale;
       ctx.fillStyle = '#ef4444';
       const handles = [

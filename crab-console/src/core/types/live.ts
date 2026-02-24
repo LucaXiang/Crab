@@ -5,6 +5,10 @@ export interface ItemOption {
   option_name: string;
   price_modifier?: number;
   quantity?: number;
+  receipt_name?: string | null;
+  kitchen_print_name?: string | null;
+  show_on_receipt: boolean;
+  show_on_kitchen_print: boolean;
 }
 
 export interface SpecificationInfo {

@@ -480,6 +480,7 @@ mod tests {
                     quantity: 2,
                     index: None,
                     options: vec![],
+                    label_options: vec![],
                     note: None,
                     kitchen_destinations: vec!["dest-1".to_string()],
                     label_destinations: vec![],

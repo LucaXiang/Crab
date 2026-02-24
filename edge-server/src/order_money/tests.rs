@@ -864,6 +864,10 @@ fn test_unit_price_with_original_price_and_options_no_double_counting() {
                 option_name: "Large".to_string(),
                 price_modifier: Some(3.0),
                 quantity: 1,
+                receipt_name: None,
+                kitchen_print_name: None,
+                show_on_receipt: true,
+                show_on_kitchen_print: true,
             },
             shared::order::ItemOption {
                 attribute_id: 2,
@@ -872,6 +876,10 @@ fn test_unit_price_with_original_price_and_options_no_double_counting() {
                 option_name: "Extra Cheese".to_string(),
                 price_modifier: Some(1.50),
                 quantity: 1,
+                receipt_name: None,
+                kitchen_print_name: None,
+                show_on_receipt: true,
+                show_on_kitchen_print: true,
             },
         ]),
         selected_specification: None,
@@ -920,6 +928,10 @@ fn test_rule_discount_plus_options_plus_manual_discount() {
             option_name: "Cheese".to_string(),
             price_modifier: Some(5.0),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
         manual_discount_percent: Some(10.0), // 10% off
@@ -973,6 +985,10 @@ fn test_option_quantity_multiplies_price_modifier() {
             option_name: "鸡蛋".to_string(),
             price_modifier: Some(2.0), // +2 per egg
             quantity: 3,               // 3 eggs!
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
         manual_discount_percent: None,
@@ -1024,6 +1040,10 @@ fn test_multiple_options_with_different_quantities() {
                 option_name: "Cheddar".to_string(),
                 price_modifier: Some(1.5), // +1.5 per slice
                 quantity: 2,               // 2 slices
+                receipt_name: None,
+                kitchen_print_name: None,
+                show_on_receipt: true,
+                show_on_kitchen_print: true,
             },
             shared::order::ItemOption {
                 attribute_id: 2,
@@ -1032,6 +1052,10 @@ fn test_multiple_options_with_different_quantities() {
                 option_name: "Crispy".to_string(),
                 price_modifier: Some(2.0), // +2 per strip
                 quantity: 2,               // 2 strips
+                receipt_name: None,
+                kitchen_print_name: None,
+                show_on_receipt: true,
+                show_on_kitchen_print: true,
             },
         ]),
         selected_specification: None,
@@ -1309,6 +1333,10 @@ fn test_validate_item_changes_option_nan_modifier() {
             option_name: "Large".to_string(),
             price_modifier: Some(f64::NAN),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
     };
@@ -1332,6 +1360,10 @@ fn test_validate_item_changes_option_exceeds_max_modifier() {
             option_name: "Large".to_string(),
             price_modifier: Some(MAX_PRICE + 1.0),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
     };
@@ -1920,6 +1952,10 @@ fn test_unit_price_with_options_and_skipped_rule() {
         option_name: "Large".to_string(),
         price_modifier: Some(3.0),
         quantity: 1,
+        receipt_name: None,
+        kitchen_print_name: None,
+        show_on_receipt: true,
+        show_on_kitchen_print: true,
     }]);
 
     let up = calculate_unit_price(&item);
@@ -2245,6 +2281,10 @@ fn test_recalculate_totals_with_option_quantity() {
             option_name: "鸡蛋".to_string(),
             price_modifier: Some(2.0), // +2 per egg
             quantity: 3,               // 3 eggs per bowl
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
         manual_discount_percent: None,
@@ -2323,6 +2363,10 @@ fn make_option(name: &str, price_modifier: f64, quantity: i32) -> shared::order:
         option_name: name.to_string(),
         price_modifier: Some(price_modifier),
         quantity,
+        receipt_name: None,
+        kitchen_print_name: None,
+        show_on_receipt: true,
+        show_on_kitchen_print: true,
     }
 }
 
@@ -2511,6 +2555,10 @@ fn test_validate_cart_item_option_quantity_must_be_positive() {
             option_name: "Opt".to_string(),
             price_modifier: Some(1.0),
             quantity: 0, // Invalid!
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
         manual_discount_percent: None,
@@ -2540,6 +2588,10 @@ fn test_validate_cart_item_option_quantity_negative() {
             option_name: "Opt".to_string(),
             price_modifier: Some(1.0),
             quantity: -1, // Invalid!
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
         manual_discount_percent: None,
@@ -2569,6 +2621,10 @@ fn test_validate_cart_item_option_exceeds_max_quantity() {
             option_name: "Opt".to_string(),
             price_modifier: Some(1.0),
             quantity: MAX_OPTION_QUANTITY + 1, // Exceeds max
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]),
         selected_specification: None,
         manual_discount_percent: None,

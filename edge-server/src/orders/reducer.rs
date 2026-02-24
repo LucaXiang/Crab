@@ -250,6 +250,10 @@ mod tests {
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }]);
 
         let id1 = generate_instance_id_from_parts(1, 10.0, None, &None, &None);
@@ -418,6 +422,10 @@ mod tests {
                     option_name: "Large".to_string(),
                     price_modifier: Some(5.0),
                     quantity: 1,
+                    receipt_name: None,
+                    kitchen_print_name: None,
+                    show_on_receipt: true,
+                    show_on_kitchen_print: true,
                 },
                 ItemOption {
                     attribute_id: 2,
@@ -426,6 +434,10 @@ mod tests {
                     option_name: "Cheese".to_string(),
                     price_modifier: Some(2.0),
                     quantity: 1,
+                    receipt_name: None,
+                    kitchen_print_name: None,
+                    show_on_receipt: true,
+                    show_on_kitchen_print: true,
                 },
             ]),
             selected_specification: None,

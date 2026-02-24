@@ -42,6 +42,7 @@ export interface ReceiptSelectedOption {
   option_name: string;
   receipt_name: string | null;
   price_modifier: number;
+  show_on_receipt: boolean;
 }
 
 export interface ReceiptItem {

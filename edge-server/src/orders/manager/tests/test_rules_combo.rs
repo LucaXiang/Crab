@@ -594,6 +594,10 @@ async fn test_combo_option_quantity_with_rule() {
                 option_name: "Extra Egg".to_string(),
                 price_modifier: Some(2.0),
                 quantity: 3,
+                receipt_name: None,
+                kitchen_print_name: None,
+                show_on_receipt: true,
+                show_on_kitchen_print: true,
             }],
         )],
     )

@@ -67,6 +67,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !field) return;
+    // Revoke previous blob URL to prevent memory leak on re-selection
+    if (field._pending_blob_url) URL.revokeObjectURL(field._pending_blob_url);
     const blobUrl = URL.createObjectURL(file);
     onFileSelect(field.field_id, file);
     handleUpdate({ _pending_blob_url: blobUrl, template: '' });

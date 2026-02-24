@@ -181,6 +181,10 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                         option_name: opt.name,
                         price_modifier: opt.price_modifier ?? null,
                         quantity: qty,
+                        receipt_name: opt.receipt_name ?? null,
+                        kitchen_print_name: opt.kitchen_print_name ?? null,
+                        show_on_receipt: attr.show_on_receipt,
+                        show_on_kitchen_print: attr.show_on_kitchen_print,
                     });
                 }
             });

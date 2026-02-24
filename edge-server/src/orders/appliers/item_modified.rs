@@ -743,6 +743,10 @@ mod tests {
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }];
 
         let changes = ItemChanges {
@@ -801,6 +805,10 @@ mod tests {
             option_name: "Extra Hot".to_string(),
             price_modifier: None,
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }];
 
         let changes = ItemChanges {
@@ -842,6 +850,10 @@ mod tests {
             option_name: "Mild".to_string(),
             price_modifier: None,
             quantity: 1,
+            receipt_name: None,
+            kitchen_print_name: None,
+            show_on_receipt: true,
+            show_on_kitchen_print: true,
         }];
 
         let changes = ItemChanges {

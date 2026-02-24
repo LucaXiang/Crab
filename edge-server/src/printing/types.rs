@@ -22,8 +22,9 @@ pub struct PrintItemContext {
     pub quantity: i32,
     pub index: Option<String>, // 标签用："2/5"
 
-    // 属性/做法
+    // 属性/做法 (厨房单用 kitchen_print_name，标签用 receipt_name)
     pub options: Vec<String>,
+    pub label_options: Vec<String>,
 
     // 备注
     pub note: Option<String>,

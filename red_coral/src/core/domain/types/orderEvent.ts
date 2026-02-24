@@ -1127,6 +1127,14 @@ export interface ItemOption {
   price_modifier?: number | null;
   /** Option quantity (default: 1) */
   quantity?: number;
+  /** Receipt display name (falls back to option_name if null) */
+  receipt_name?: string | null;
+  /** Kitchen ticket display name (falls back to option_name if null) */
+  kitchen_print_name?: string | null;
+  /** Whether to show this option on customer receipt */
+  show_on_receipt: boolean;
+  /** Whether to show this option on kitchen ticket */
+  show_on_kitchen_print: boolean;
 }
 
 export interface SpecificationInfo {
