@@ -191,9 +191,7 @@ const App: React.FC = () => {
       }
     };
 
-    if ('__TAURI__' in window) {
-      showWindow();
-    }
+    showWindow();
   }, []);
 
   useEffect(() => {

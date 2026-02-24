@@ -27,11 +27,6 @@ export const useHistoryOrderDetail = (order_id: number | null): UseHistoryOrderD
       return;
     }
 
-    if (!('__TAURI__' in window)) {
-      logger.warn('Order details only available in Tauri environment', { component: 'useHistoryOrderDetail', action: 'fetchOrderDetail' });
-      return;
-    }
-
     setLoading(true);
     setError(null);
 

@@ -17,18 +17,16 @@ initUIScale();
 
 const root = ReactDOM.createRoot(rootElement);
 
-if ('__TAURI__' in window) {
-  const win = getCurrentWindow();
+const win = getCurrentWindow();
+void win.setFullscreen(true);
+window.addEventListener('focus', () => {
   void win.setFullscreen(true);
-  window.addEventListener('focus', () => {
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
     void win.setFullscreen(true);
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      void win.setFullscreen(true);
-    }
-  });
-}
+  }
+});
 
 window.addEventListener('error', (ev) => {
   void reportError(

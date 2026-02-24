@@ -57,12 +57,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
 
   const fetchStatistics = async () => {
     try {
-      if (!('__TAURI__' in window)) {
-        logger.warn('Not running inside Tauri, skipping invoke', { component: 'Statistics' });
-        toast.error(t('statistics.error.load'));
-        return;
-      }
-
       const params: Record<string, unknown> = { timeRange };
       if (customStartDate) params.startDate = customStartDate;
       if (customEndDate) params.endDate = customEndDate;

@@ -43,10 +43,6 @@ export const useHistoryOrderList = (
 
   const fetchOrderList = useCallback(async () => {
     if (!enabled) return;
-    if (!('__TAURI__' in window)) {
-      logger.warn('History orders only available in Tauri environment', { component: 'useHistoryOrderList', action: 'fetchOrderList' });
-      return;
-    }
 
     setLoading(true);
     try {

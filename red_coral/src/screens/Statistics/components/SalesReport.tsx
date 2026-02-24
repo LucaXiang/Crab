@@ -60,12 +60,6 @@ export const SalesReport: React.FC<SalesReportProps> = ({
     setError(null);
 
     try {
-      if (!('__TAURI__' in window)) {
-         logger.warn('Not running inside Tauri, skipping invoke', { component: 'SalesReport' });
-         setLoading(false);
-         return;
-      }
-
       const params: Record<string, unknown> = { timeRange, page };
       if (customStartDate) params.startDate = customStartDate;
       if (customEndDate) params.endDate = customEndDate;

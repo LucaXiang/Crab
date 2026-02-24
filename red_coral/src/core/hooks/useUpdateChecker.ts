@@ -31,8 +31,7 @@ export function useUpdateChecker() {
   const updateRef = useRef<Update | null>(null);
 
   const checkForUpdate = useCallback(async () => {
-    // 开发模式跳过
-    if (!('__TAURI__' in window)) return;
+    if (!('__TAURI_INTERNALS__' in window)) return;
 
     try {
       setStatus('checking');

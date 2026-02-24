@@ -33,9 +33,7 @@ export const SystemSettings: React.FC = () => {
 
   const [appVersion, setAppVersion] = useState('');
   useEffect(() => {
-    if ('__TAURI__' in window) {
-      import('@tauri-apps/api/app').then(({ getVersion }) => getVersion()).then(setAppVersion);
-    }
+    import('@tauri-apps/api/app').then(({ getVersion }) => getVersion()).then(setAppVersion);
   }, []);
 
   const scalePercent = Math.round(uiScale * 100);

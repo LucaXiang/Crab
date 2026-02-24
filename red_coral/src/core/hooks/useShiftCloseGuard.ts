@@ -106,10 +106,7 @@ export function useShiftCloseGuard() {
       }
     };
 
-    // 只在 Tauri 环境中设置
-    if ('__TAURI__' in window) {
-      setupCloseHandler();
-    }
+    setupCloseHandler();
 
     return () => {
       isSubscribed = false;
