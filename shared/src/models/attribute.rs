@@ -92,6 +92,34 @@ pub struct AttributeUpdate {
     pub is_active: Option<bool>,
 }
 
+/// Create a single attribute option independently
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeOptionCreate {
+    pub name: String,
+    #[serde(default)]
+    pub price_modifier: f64,
+    #[serde(default)]
+    pub display_order: i32,
+    pub receipt_name: Option<String>,
+    pub kitchen_print_name: Option<String>,
+    #[serde(default)]
+    pub enable_quantity: bool,
+    pub max_quantity: Option<i32>,
+}
+
+/// Update a single attribute option independently
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeOptionUpdate {
+    pub name: Option<String>,
+    pub price_modifier: Option<f64>,
+    pub display_order: Option<i32>,
+    pub is_active: Option<bool>,
+    pub receipt_name: Option<String>,
+    pub kitchen_print_name: Option<String>,
+    pub enable_quantity: Option<bool>,
+    pub max_quantity: Option<i32>,
+}
+
 /// Attribute binding (owner_type + owner_id polymorphic FK)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "db", derive(sqlx::FromRow))]

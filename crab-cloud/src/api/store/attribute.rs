@@ -97,6 +97,122 @@ pub async fn delete_attribute(
     Ok(Json(StoreOpResult::ok()))
 }
 
+// ── Attribute Option Independent CRUD ──
+
+pub async fn create_attribute_option(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, attr_id)): Path<(i64, i64)>,
+    Json(data): Json<shared::models::attribute::AttributeOptionCreate>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let source_id = store::create_option_direct(&state.pool, store_id, attr_id, &data)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge(
+        &state,
+        store_id,
+        StoreOp::CreateAttributeOption {
+            attribute_id: attr_id,
+            id: Some(source_id),
+            data,
+        },
+    )
+    .await;
+
+    Ok(Json(StoreOpResult::created(source_id)))
+}
+
+pub async fn update_attribute_option(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, _attr_id, option_id)): Path<(i64, i64, i64)>,
+    Json(data): Json<shared::models::attribute::AttributeOptionUpdate>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    store::update_option_direct(&state.pool, store_id, option_id, &data)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge(
+        &state,
+        store_id,
+        StoreOp::UpdateAttributeOption {
+            id: option_id,
+            data,
+        },
+    )
+    .await;
+
+    Ok(Json(StoreOpResult::ok()))
+}
+
+pub async fn delete_attribute_option(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, _attr_id, option_id)): Path<(i64, i64, i64)>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    store::delete_option_direct(&state.pool, store_id, option_id)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge(
+        &state,
+        store_id,
+        StoreOp::DeleteAttributeOption { id: option_id },
+    )
+    .await;
+
+    Ok(Json(StoreOpResult::ok()))
+}
+
+#[derive(serde::Deserialize)]
+pub struct BatchOptionSortOrderRequest {
+    pub items: Vec<shared::cloud::store_op::SortOrderItem>,
+}
+
+pub async fn batch_update_option_sort_order(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, attr_id)): Path<(i64, i64)>,
+    Json(req): Json<BatchOptionSortOrderRequest>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    store::batch_update_option_sort_order(&state.pool, store_id, &req.items)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    push_to_edge(
+        &state,
+        store_id,
+        StoreOp::BatchUpdateOptionSortOrder {
+            attribute_id: attr_id,
+            items: req.items,
+        },
+    )
+    .await;
+
+    Ok(Json(StoreOpResult::ok()))
+}
+
 // ── Attribute Binding ──
 
 #[derive(serde::Deserialize)]

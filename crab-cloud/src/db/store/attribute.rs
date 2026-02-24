@@ -469,6 +469,130 @@ pub async fn delete_attribute_direct(
     Ok(())
 }
 
+// ── Option Independent CRUD ──
+
+pub async fn create_option_direct(
+    pool: &PgPool,
+    edge_server_id: i64,
+    attribute_source_id: i64,
+    data: &shared::models::attribute::AttributeOptionCreate,
+) -> Result<i64, BoxError> {
+    // Find PG attribute_id from source_id
+    let pg_attr_id: i64 = sqlx::query_scalar(
+        "SELECT id FROM store_attributes WHERE edge_server_id = $1 AND source_id = $2",
+    )
+    .bind(edge_server_id)
+    .bind(attribute_source_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or("Attribute not found")?;
+
+    let mut tx = pool.begin().await?;
+
+    let (pg_id,): (i64,) = sqlx::query_as(
+        r#"INSERT INTO store_attribute_options (attribute_id, source_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES ($1, 0, $2, $3, $4, TRUE, $5, $6, $7, $8) RETURNING id"#,
+    )
+    .bind(pg_attr_id)
+    .bind(&data.name)
+    .bind(data.price_modifier)
+    .bind(data.display_order)
+    .bind(&data.receipt_name)
+    .bind(&data.kitchen_print_name)
+    .bind(data.enable_quantity)
+    .bind(data.max_quantity)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let source_id = super::snowflake_id();
+    sqlx::query("UPDATE store_attribute_options SET source_id = $1 WHERE id = $2")
+        .bind(source_id)
+        .bind(pg_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(source_id)
+}
+
+pub async fn update_option_direct(
+    pool: &PgPool,
+    edge_server_id: i64,
+    option_source_id: i64,
+    data: &shared::models::attribute::AttributeOptionUpdate,
+) -> Result<(), BoxError> {
+    let rows = sqlx::query(
+        r#"UPDATE store_attribute_options SET
+            name = COALESCE($1, name),
+            price_modifier = COALESCE($2, price_modifier),
+            display_order = COALESCE($3, display_order),
+            is_active = COALESCE($4, is_active),
+            receipt_name = COALESCE($5, receipt_name),
+            kitchen_print_name = COALESCE($6, kitchen_print_name),
+            enable_quantity = COALESCE($7, enable_quantity),
+            max_quantity = COALESCE($8, max_quantity)
+        WHERE source_id = $9
+            AND attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $10)"#,
+    )
+    .bind(&data.name)
+    .bind(data.price_modifier)
+    .bind(data.display_order)
+    .bind(data.is_active)
+    .bind(&data.receipt_name)
+    .bind(&data.kitchen_print_name)
+    .bind(data.enable_quantity)
+    .bind(data.max_quantity)
+    .bind(option_source_id)
+    .bind(edge_server_id)
+    .execute(pool)
+    .await?;
+    if rows.rows_affected() == 0 {
+        return Err("Attribute option not found".into());
+    }
+    Ok(())
+}
+
+pub async fn delete_option_direct(
+    pool: &PgPool,
+    edge_server_id: i64,
+    option_source_id: i64,
+) -> Result<(), BoxError> {
+    let rows = sqlx::query(
+        r#"DELETE FROM store_attribute_options
+        WHERE source_id = $1
+            AND attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $2)"#,
+    )
+    .bind(option_source_id)
+    .bind(edge_server_id)
+    .execute(pool)
+    .await?;
+    if rows.rows_affected() == 0 {
+        return Err("Attribute option not found".into());
+    }
+    Ok(())
+}
+
+pub async fn batch_update_option_sort_order(
+    pool: &PgPool,
+    edge_server_id: i64,
+    items: &[shared::cloud::store_op::SortOrderItem],
+) -> Result<(), BoxError> {
+    let mut tx = pool.begin().await?;
+    for item in items {
+        sqlx::query(
+            r#"UPDATE store_attribute_options SET display_order = $1
+            WHERE source_id = $2
+                AND attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $3)"#,
+        )
+        .bind(item.sort_order)
+        .bind(item.id)
+        .bind(edge_server_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 // ── Binding CRUD ──
 
 pub struct BindAttributeParams<'a> {

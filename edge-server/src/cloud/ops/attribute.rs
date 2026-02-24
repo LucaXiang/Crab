@@ -74,6 +74,190 @@ pub async fn delete(state: &ServerState, id: i64) -> StoreOpResult {
     }
 }
 
+// ── Attribute Option ──
+
+pub async fn create_option(
+    state: &ServerState,
+    attribute_id: i64,
+    assigned_id: Option<i64>,
+    data: shared::models::attribute::AttributeOptionCreate,
+) -> StoreOpResult {
+    use crate::db::repository::attribute;
+
+    // Verify attribute exists
+    if attribute::find_by_id(&state.pool, attribute_id)
+        .await
+        .ok()
+        .flatten()
+        .is_none()
+    {
+        return StoreOpResult::err(format!("Attribute {attribute_id} not found"));
+    }
+
+    let id = if let Some(aid) = assigned_id {
+        match sqlx::query_scalar::<_, i64>(
+            "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id",
+        )
+        .bind(aid)
+        .bind(attribute_id)
+        .bind(&data.name)
+        .bind(data.price_modifier)
+        .bind(data.display_order)
+        .bind(&data.receipt_name)
+        .bind(&data.kitchen_print_name)
+        .bind(data.enable_quantity)
+        .bind(data.max_quantity)
+        .fetch_one(&state.pool)
+        .await
+        {
+            Ok(id) => id,
+            Err(e) => return StoreOpResult::err(e.to_string()),
+        }
+    } else {
+        match sqlx::query_scalar::<_, i64>(
+            "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8) RETURNING id",
+        )
+        .bind(attribute_id)
+        .bind(&data.name)
+        .bind(data.price_modifier)
+        .bind(data.display_order)
+        .bind(&data.receipt_name)
+        .bind(&data.kitchen_print_name)
+        .bind(data.enable_quantity)
+        .bind(data.max_quantity)
+        .fetch_one(&state.pool)
+        .await
+        {
+            Ok(id) => id,
+            Err(e) => return StoreOpResult::err(e.to_string()),
+        }
+    };
+
+    state
+        .broadcast_sync::<()>(
+            SyncResource::Attribute,
+            SyncChangeType::Updated,
+            &attribute_id.to_string(),
+            None,
+            true,
+        )
+        .await;
+    StoreOpResult::created(id)
+}
+
+pub async fn update_option(
+    state: &ServerState,
+    id: i64,
+    data: shared::models::attribute::AttributeOptionUpdate,
+) -> StoreOpResult {
+    match sqlx::query(
+        "UPDATE attribute_option SET name = COALESCE(?1, name), price_modifier = COALESCE(?2, price_modifier), display_order = COALESCE(?3, display_order), is_active = COALESCE(?4, is_active), receipt_name = COALESCE(?5, receipt_name), kitchen_print_name = COALESCE(?6, kitchen_print_name), enable_quantity = COALESCE(?7, enable_quantity), max_quantity = COALESCE(?8, max_quantity) WHERE id = ?9",
+    )
+    .bind(&data.name)
+    .bind(data.price_modifier)
+    .bind(data.display_order)
+    .bind(data.is_active)
+    .bind(&data.receipt_name)
+    .bind(&data.kitchen_print_name)
+    .bind(data.enable_quantity)
+    .bind(data.max_quantity)
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    {
+        Ok(r) if r.rows_affected() == 0 => {
+            return StoreOpResult::err(format!("Attribute option {id} not found"))
+        }
+        Err(e) => return StoreOpResult::err(e.to_string()),
+        _ => {}
+    }
+
+    // Get attribute_id for sync broadcast
+    if let Ok(Some(attr_id)) =
+        sqlx::query_scalar::<_, i64>("SELECT attribute_id FROM attribute_option WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await
+    {
+        state
+            .broadcast_sync::<()>(
+                SyncResource::Attribute,
+                SyncChangeType::Updated,
+                &attr_id.to_string(),
+                None,
+                true,
+            )
+            .await;
+    }
+
+    StoreOpResult::ok()
+}
+
+pub async fn delete_option(state: &ServerState, id: i64) -> StoreOpResult {
+    // Get attribute_id before delete for sync broadcast
+    let attr_id =
+        sqlx::query_scalar::<_, i64>("SELECT attribute_id FROM attribute_option WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten();
+
+    match sqlx::query("DELETE FROM attribute_option WHERE id = ?")
+        .bind(id)
+        .execute(&state.pool)
+        .await
+    {
+        Ok(r) if r.rows_affected() == 0 => {
+            return StoreOpResult::err(format!("Attribute option {id} not found"));
+        }
+        Err(e) => return StoreOpResult::err(e.to_string()),
+        _ => {}
+    }
+
+    if let Some(aid) = attr_id {
+        state
+            .broadcast_sync::<()>(
+                SyncResource::Attribute,
+                SyncChangeType::Updated,
+                &aid.to_string(),
+                None,
+                true,
+            )
+            .await;
+    }
+
+    StoreOpResult::ok()
+}
+
+pub async fn batch_update_option_sort_order(
+    state: &ServerState,
+    attribute_id: i64,
+    items: Vec<shared::cloud::store_op::SortOrderItem>,
+) -> StoreOpResult {
+    for item in &items {
+        if let Err(e) = sqlx::query("UPDATE attribute_option SET display_order = ?1 WHERE id = ?2")
+            .bind(item.sort_order)
+            .bind(item.id)
+            .execute(&state.pool)
+            .await
+        {
+            return StoreOpResult::err(e.to_string());
+        }
+    }
+
+    state
+        .broadcast_sync::<()>(
+            SyncResource::Attribute,
+            SyncChangeType::Updated,
+            &attribute_id.to_string(),
+            None,
+            true,
+        )
+        .await;
+    StoreOpResult::ok()
+}
+
 // ── Attribute Binding ──
 
 pub async fn bind(
