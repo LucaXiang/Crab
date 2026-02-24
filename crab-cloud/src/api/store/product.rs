@@ -113,6 +113,33 @@ pub async fn batch_update_product_sort_order(
     Ok(Json(StoreOpResult::ok()))
 }
 
+#[derive(serde::Deserialize)]
+pub struct BulkDeleteRequest {
+    pub ids: Vec<i64>,
+}
+
+pub async fn bulk_delete_products(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Json(req): Json<BulkDeleteRequest>,
+) -> ApiResult<StoreOpResult> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    store::bulk_delete_products(&state.pool, store_id, &req.ids)
+        .await
+        .map_err(internal)?;
+    store::increment_store_version(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+
+    for id in &req.ids {
+        push_to_edge(&state, store_id, StoreOp::DeleteProduct { id: *id }).await;
+    }
+
+    Ok(Json(StoreOpResult::ok()))
+}
+
 pub async fn delete_product(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,

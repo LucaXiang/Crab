@@ -407,7 +407,7 @@ pub async fn create_product_direct(
         .into_iter()
         .map(|r| ProductSpec {
             id: r.source_id,
-            product_id: pg_id,
+            product_id: source_id,
             name: r.name,
             price: r.price,
             display_order: r.display_order,
@@ -570,6 +570,34 @@ pub async fn batch_update_sort_order_products(
         .await?;
     }
     tx.commit().await?;
+    Ok(())
+}
+
+pub async fn bulk_delete_products(
+    pool: &PgPool,
+    edge_server_id: i64,
+    source_ids: &[i64],
+) -> Result<(), BoxError> {
+    if source_ids.is_empty() {
+        return Ok(());
+    }
+    // Build dynamic SQL: DELETE FROM store_products WHERE edge_server_id = $1 AND source_id IN ($2, $3, ...)
+    let mut sql =
+        String::from("DELETE FROM store_products WHERE edge_server_id = $1 AND source_id IN (");
+    for (i, _) in source_ids.iter().enumerate() {
+        if i > 0 {
+            sql.push_str(", ");
+        }
+        sql.push('$');
+        sql.push_str(&(i + 2).to_string());
+    }
+    sql.push(')');
+
+    let mut query = sqlx::query(&sql).bind(edge_server_id);
+    for id in source_ids {
+        query = query.bind(id);
+    }
+    query.execute(pool).await?;
     Ok(())
 }
 
