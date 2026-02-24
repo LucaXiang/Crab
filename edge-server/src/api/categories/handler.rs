@@ -289,17 +289,34 @@ pub async fn bind_category_attribute(
         details = serde_json::json!({"op": "bind_attribute", "attribute_id": attr_id})
     );
 
-    // Refresh product cache for this category (inherited attributes changed)
-    if let Err(e) = state
+    // Refresh product cache and broadcast product syncs (inherited attributes changed)
+    match state
         .catalog_service
         .refresh_products_in_category(category_id)
         .await
     {
-        tracing::warn!(
-            "Failed to refresh products in category {}: {}",
-            category_id,
-            e
-        );
+        Ok(product_ids) => {
+            for pid in product_ids {
+                let product = state.catalog_service.get_product(pid);
+                let pid_str = pid.to_string();
+                state
+                    .broadcast_sync(
+                        SyncResource::Product,
+                        SyncChangeType::Updated,
+                        &pid_str,
+                        product.as_ref(),
+                        false,
+                    )
+                    .await;
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to refresh products in category {}: {}",
+                category_id,
+                e
+            );
+        }
     }
 
     // 广播同步通知
@@ -337,17 +354,34 @@ pub async fn unbind_category_attribute(
             details = serde_json::json!({"op": "unbind_attribute", "attribute_id": attr_id})
         );
 
-        // Refresh product cache for this category (inherited attributes changed)
-        if let Err(e) = state
+        // Refresh product cache and broadcast product syncs (inherited attributes changed)
+        match state
             .catalog_service
             .refresh_products_in_category(category_id)
             .await
         {
-            tracing::warn!(
-                "Failed to refresh products in category {}: {}",
-                category_id,
-                e
-            );
+            Ok(product_ids) => {
+                for pid in product_ids {
+                    let product = state.catalog_service.get_product(pid);
+                    let pid_str = pid.to_string();
+                    state
+                        .broadcast_sync(
+                            SyncResource::Product,
+                            SyncChangeType::Updated,
+                            &pid_str,
+                            product.as_ref(),
+                            false,
+                        )
+                        .await;
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to refresh products in category {}: {}",
+                    category_id,
+                    e
+                );
+            }
         }
 
         // 广播同步通知

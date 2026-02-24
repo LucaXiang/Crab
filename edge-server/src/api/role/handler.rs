@@ -15,7 +15,9 @@ use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
 };
 use crate::utils::{AppError, AppResult};
+use shared::cloud::SyncResource;
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{Role, RoleCreate, RoleUpdate};
 
 fn validate_create(payload: &RoleCreate) -> AppResult<()> {
@@ -128,6 +130,16 @@ pub async fn create(
         details = create_snapshot(&r, "role")
     );
 
+    state
+        .broadcast_sync(
+            SyncResource::Role,
+            SyncChangeType::Created,
+            &id,
+            Some(&r),
+            false,
+        )
+        .await;
+
     Ok(Json(r))
 }
 
@@ -170,6 +182,16 @@ pub async fn update(
         details = create_diff(&old_role, &r, "role")
     );
 
+    state
+        .broadcast_sync(
+            SyncResource::Role,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&r),
+            false,
+        )
+        .await;
+
     Ok(Json(r))
 }
 
@@ -205,6 +227,16 @@ pub async fn delete(
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"role_name": name_for_audit})
         );
+
+        state
+            .broadcast_sync::<()>(
+                SyncResource::Role,
+                SyncChangeType::Deleted,
+                &id_str,
+                None,
+                false,
+            )
+            .await;
     }
 
     Ok(Json(result))
@@ -271,6 +303,16 @@ pub async fn update_role_permissions(
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_role, &r, "role")
     );
+
+    state
+        .broadcast_sync(
+            SyncResource::Role,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&r),
+            false,
+        )
+        .await;
 
     Ok(Json(r))
 }
