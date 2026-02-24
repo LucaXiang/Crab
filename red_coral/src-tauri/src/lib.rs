@@ -334,7 +334,7 @@ pub async fn run() {
                             .build()
                             .expect("shutdown runtime");
                         rt.block_on(async move {
-                            if let Err(e) = bridge.stop().await {
+                            if let Err(e) = bridge.stop(false).await {
                                 tracing::error!("Failed to stop bridge on exit: {}", e);
                             } else {
                                 tracing::info!("Bridge stopped gracefully on app exit");

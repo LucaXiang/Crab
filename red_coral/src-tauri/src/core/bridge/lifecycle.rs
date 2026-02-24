@@ -632,7 +632,10 @@ impl ClientBridge {
     ///
     /// Server 模式: cancel shutdown_token → await_mode_shutdown（3s 超时）
     /// Client 模式: cancel shutdown_token → await_mode_shutdown（5s 超时）
-    pub async fn stop(&self) -> Result<(), BridgeError> {
+    ///
+    /// `clear_mode = true`: 用户主动停止，清除 current_mode（下次启动进 Setup）
+    /// `clear_mode = false`: 应用退出，保留 current_mode（下次启动自动恢复）
+    pub async fn stop(&self, clear_mode: bool) -> Result<(), BridgeError> {
         let _lifecycle = self.lifecycle_lock.lock().await;
 
         // 1. 短暂写锁：发送 shutdown 信号 + 取出 mode
@@ -657,14 +660,15 @@ impl ClientBridge {
         // 2. 无锁等待 task 完成
         await_mode_shutdown(old_mode).await;
 
-        // 3. 更新配置
-        {
+        // 3. 按需清除配置
+        if clear_mode {
             let mut config = self.config.write().await;
             config.current_mode = None;
+            // save_config 在下面统一执行
         }
         self.save_config().await?;
 
-        tracing::info!("Mode stopped, now disconnected");
+        tracing::info!(clear_mode, "Mode stopped, now disconnected");
 
         Ok(())
     }

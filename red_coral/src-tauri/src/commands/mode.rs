@@ -104,7 +104,7 @@ pub async fn start_client_mode(
 /// 停止当前模式
 #[tauri::command]
 pub async fn stop_mode(bridge: State<'_, Arc<ClientBridge>>) -> Result<ApiResponse<()>, String> {
-    match bridge.stop().await {
+    match bridge.stop(true).await {
         Ok(_) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::InternalError,
@@ -160,7 +160,7 @@ pub async fn reconnect(bridge: State<'_, Arc<ClientBridge>>) -> Result<ApiRespon
     };
 
     // Stop current connection
-    if let Err(e) = bridge_arc.stop().await {
+    if let Err(e) = bridge_arc.stop(false).await {
         return Ok(ApiResponse::error_with_code(
             ErrorCode::BridgeConnectionFailed,
             e.to_string(),
