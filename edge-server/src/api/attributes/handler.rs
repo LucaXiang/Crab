@@ -21,6 +21,37 @@ use shared::models::{Attribute, AttributeCreate, AttributeOptionInput, Attribute
 use shared::cloud::SyncResource;
 const RESOURCE: SyncResource = SyncResource::Attribute;
 
+/// Refresh product cache for all products using this attribute and broadcast sync for each
+async fn refresh_and_broadcast_products(state: &ServerState, attribute_id: i64) {
+    match state
+        .catalog_service
+        .refresh_products_with_attribute(attribute_id)
+        .await
+    {
+        Ok(product_ids) => {
+            for pid in product_ids {
+                let product = state.catalog_service.get_product(pid);
+                let pid_str = pid.to_string();
+                state
+                    .broadcast_sync(
+                        SyncResource::Product,
+                        SyncChangeType::Updated,
+                        &pid_str,
+                        product.as_ref(),
+                        false,
+                    )
+                    .await;
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to refresh product cache after attribute {} update: {e}",
+                attribute_id
+            );
+        }
+    }
+}
+
 fn validate_create(payload: &AttributeCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
     validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
@@ -168,14 +199,8 @@ pub async fn update(
         )
         .await;
 
-    // 刷新引用此属性的产品缓存
-    if let Err(e) = state
-        .catalog_service
-        .refresh_products_with_attribute(id)
-        .await
-    {
-        tracing::warn!("Failed to refresh product cache after attribute update: {e}");
-    }
+    // 刷新引用此属性的产品缓存并广播 sync
+    refresh_and_broadcast_products(&state, id).await;
 
     Ok(Json(attr))
 }
@@ -231,13 +256,7 @@ pub async fn delete(
             .await;
 
         // 刷新引用此属性的产品缓存
-        if let Err(e) = state
-            .catalog_service
-            .refresh_products_with_attribute(id)
-            .await
-        {
-            tracing::warn!("Failed to refresh product cache after attribute delete: {e}");
-        }
+        refresh_and_broadcast_products(&state, id).await;
     }
 
     Ok(Json(result))
@@ -309,13 +328,7 @@ pub async fn add_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state
-        .catalog_service
-        .refresh_products_with_attribute(id)
-        .await
-    {
-        tracing::warn!("Failed to refresh product cache after option add: {e}");
-    }
+    refresh_and_broadcast_products(&state, id).await;
 
     Ok(Json(attr))
 }
@@ -395,13 +408,7 @@ pub async fn update_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state
-        .catalog_service
-        .refresh_products_with_attribute(id)
-        .await
-    {
-        tracing::warn!("Failed to refresh product cache after option update: {e}");
-    }
+    refresh_and_broadcast_products(&state, id).await;
 
     Ok(Json(attr))
 }
@@ -476,13 +483,7 @@ pub async fn remove_option(
         .await;
 
     // 刷新引用此属性的产品缓存
-    if let Err(e) = state
-        .catalog_service
-        .refresh_products_with_attribute(id)
-        .await
-    {
-        tracing::warn!("Failed to refresh product cache after option remove: {e}");
-    }
+    refresh_and_broadcast_products(&state, id).await;
 
     Ok(Json(attr))
 }

@@ -419,8 +419,9 @@ impl CatalogService {
         Ok(())
     }
 
-    /// Refresh cached products that reference a given attribute (direct or inherited)
-    pub async fn refresh_products_with_attribute(&self, attribute_id: i64) -> RepoResult<()> {
+    /// Refresh cached products that reference a given attribute (direct or inherited).
+    /// Returns the list of affected product IDs.
+    pub async fn refresh_products_with_attribute(&self, attribute_id: i64) -> RepoResult<Vec<i64>> {
         let product_ids: Vec<i64> = {
             let cache = self.products.read();
             cache
@@ -430,13 +431,13 @@ impl CatalogService {
                 .collect()
         };
 
-        for product_id in product_ids {
+        for &product_id in &product_ids {
             let full = self.fetch_product_full(product_id).await?;
             let mut cache = self.products.write();
             cache.insert(product_id, full);
         }
 
-        Ok(())
+        Ok(product_ids)
     }
 
     // =========================================================================

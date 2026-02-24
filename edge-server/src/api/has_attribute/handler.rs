@@ -12,7 +12,9 @@ use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use shared::cloud::SyncResource;
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{Attribute, AttributeBinding};
 
 /// 创建绑定的请求体
@@ -102,17 +104,32 @@ pub async fn create(
         })
     );
 
-    // Refresh product cache (attribute bindings changed)
-    if let Err(e) = state
+    // Refresh product cache and broadcast sync (attribute bindings changed)
+    let product_id_str = payload.product_id.to_string();
+    match state
         .catalog_service
         .refresh_product_cache(payload.product_id)
         .await
     {
-        tracing::warn!(
-            "Failed to refresh product cache for {}: {}",
-            payload.product_id,
-            e
-        );
+        Ok(()) => {
+            let product = state.catalog_service.get_product(payload.product_id);
+            state
+                .broadcast_sync(
+                    SyncResource::Product,
+                    SyncChangeType::Updated,
+                    &product_id_str,
+                    product.as_ref(),
+                    false,
+                )
+                .await;
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to refresh product cache for {}: {}",
+                payload.product_id,
+                e
+            );
+        }
     }
 
     Ok(Json(binding))
@@ -174,6 +191,25 @@ pub async fn update(
         })
     );
 
+    // Broadcast product sync if binding belongs to a product
+    if binding.owner_type == "product" {
+        let _ = state
+            .catalog_service
+            .refresh_product_cache(binding.owner_id)
+            .await;
+        let product = state.catalog_service.get_product(binding.owner_id);
+        let owner_id_str = binding.owner_id.to_string();
+        state
+            .broadcast_sync(
+                SyncResource::Product,
+                SyncChangeType::Updated,
+                &owner_id_str,
+                product.as_ref(),
+                false,
+            )
+            .await;
+    }
+
     Ok(Json(binding))
 }
 
@@ -218,12 +254,24 @@ pub async fn delete(
         })
     );
 
-    // Refresh product cache if the binding was for a product
-    if let (Some(oid), Some(otype)) = (owner_id, owner_type)
+    // Refresh product cache and broadcast sync if the binding was for a product
+    if let (Some(oid), Some(otype)) = (owner_id, &owner_type)
         && otype == "product"
-        && let Err(e) = state.catalog_service.refresh_product_cache(oid).await
     {
-        tracing::warn!("Failed to refresh product cache for {}: {}", oid, e);
+        if let Err(e) = state.catalog_service.refresh_product_cache(oid).await {
+            tracing::warn!("Failed to refresh product cache for {}: {}", oid, e);
+        }
+        let product = state.catalog_service.get_product(oid);
+        let oid_str = oid.to_string();
+        state
+            .broadcast_sync(
+                SyncResource::Product,
+                SyncChangeType::Updated,
+                &oid_str,
+                product.as_ref(),
+                false,
+            )
+            .await;
     }
 
     Ok(Json(true))
