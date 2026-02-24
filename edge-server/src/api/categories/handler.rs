@@ -15,6 +15,7 @@ use crate::utils::types::{BatchUpdateResponse, SortOrderUpdate};
 use crate::utils::validation::{MAX_NAME_LEN, validate_optional_text, validate_required_text};
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
 use shared::cloud::SyncResource;
@@ -77,7 +78,13 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&category))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            &id,
+            Some(&category),
+            false,
+        )
         .await;
 
     Ok(Json(category))
@@ -115,7 +122,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&category))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&category),
+            false,
+        )
         .await;
 
     Ok(Json(category))
@@ -148,7 +161,7 @@ pub async fn delete(
     );
 
     state
-        .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+        .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
         .await;
 
     Ok(Json(true))
@@ -216,7 +229,7 @@ pub async fn batch_update_sort_order(
 
     // 广播同步通知
     state
-        .broadcast_sync::<()>(RESOURCE, "updated", "batch", None)
+        .broadcast_sync::<()>(RESOURCE, SyncChangeType::Updated, "batch", None, false)
         .await;
 
     Ok(Json(BatchUpdateResponse {
@@ -293,9 +306,10 @@ pub async fn bind_category_attribute(
     state
         .broadcast_sync(
             SyncResource::AttributeBinding,
-            "created",
+            SyncChangeType::Created,
             &format!("{}:{}", category_id, attr_id),
             Some(&binding),
+            false,
         )
         .await;
 
@@ -340,9 +354,10 @@ pub async fn unbind_category_attribute(
         state
             .broadcast_sync::<()>(
                 SyncResource::AttributeBinding,
-                "deleted",
+                SyncChangeType::Deleted,
                 &format!("{}:{}", category_id, attr_id),
                 None,
+                false,
             )
             .await;
     }

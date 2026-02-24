@@ -2,6 +2,7 @@
 
 use shared::cloud::SyncResource;
 use shared::cloud::store_op::{BindingOwner, StoreOpResult};
+use shared::message::SyncChangeType;
 use shared::models::attribute::{AttributeCreate, AttributeUpdate};
 
 use crate::core::state::ServerState;
@@ -20,9 +21,10 @@ pub async fn create(
             state
                 .broadcast_sync(
                     SyncResource::Attribute,
-                    "created",
+                    SyncChangeType::Created,
                     &attr.id.to_string(),
                     Some(&attr),
+                    true,
                 )
                 .await;
             StoreOpResult::created(attr.id)
@@ -39,9 +41,10 @@ pub async fn update(state: &ServerState, id: i64, data: AttributeUpdate) -> Stor
             state
                 .broadcast_sync(
                     SyncResource::Attribute,
-                    "updated",
+                    SyncChangeType::Updated,
                     &attr.id.to_string(),
                     Some(&attr),
+                    true,
                 )
                 .await;
             StoreOpResult::ok()
@@ -57,7 +60,13 @@ pub async fn delete(state: &ServerState, id: i64) -> StoreOpResult {
     match attribute::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(SyncResource::Attribute, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::Attribute,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -105,9 +114,10 @@ pub async fn bind(
             state
                 .broadcast_sync(
                     SyncResource::AttributeBinding,
-                    "created",
+                    SyncChangeType::Created,
                     &binding.id.to_string(),
                     Some(&binding),
+                    true,
                 )
                 .await;
             StoreOpResult::created(binding.id)
@@ -150,9 +160,10 @@ pub async fn unbind(state: &ServerState, binding_id: i64) -> StoreOpResult {
     state
         .broadcast_sync::<()>(
             SyncResource::AttributeBinding,
-            "deleted",
+            SyncChangeType::Deleted,
             &binding_id.to_string(),
             None,
+            true,
         )
         .await;
     StoreOpResult::ok()
@@ -170,7 +181,13 @@ pub async fn create_tag(
     match tag::create(&state.pool, assigned_id, data.clone()).await {
         Ok(t) => {
             state
-                .broadcast_sync(SyncResource::Tag, "created", &t.id.to_string(), Some(&t))
+                .broadcast_sync(
+                    SyncResource::Tag,
+                    SyncChangeType::Created,
+                    &t.id.to_string(),
+                    Some(&t),
+                    true,
+                )
                 .await;
             StoreOpResult::created(t.id)
         }
@@ -188,7 +205,13 @@ pub async fn update_tag(
     match tag::update(&state.pool, id, data.clone()).await {
         Ok(t) => {
             state
-                .broadcast_sync(SyncResource::Tag, "updated", &t.id.to_string(), Some(&t))
+                .broadcast_sync(
+                    SyncResource::Tag,
+                    SyncChangeType::Updated,
+                    &t.id.to_string(),
+                    Some(&t),
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -203,7 +226,13 @@ pub async fn delete_tag(state: &ServerState, id: i64) -> StoreOpResult {
     match tag::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(SyncResource::Tag, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::Tag,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }

@@ -14,6 +14,7 @@ use axum::{
     Json,
     extract::{Extension, Path, State},
 };
+use shared::message::SyncChangeType;
 use shared::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 
 use shared::cloud::SyncResource;
@@ -169,7 +170,13 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "created", &id_str, Some(&product))
+        .broadcast_sync(
+            RESOURCE_PRODUCT,
+            SyncChangeType::Created,
+            &id_str,
+            Some(&product),
+            false,
+        )
         .await;
 
     Ok(Json(product))
@@ -229,7 +236,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id_str, Some(&product))
+        .broadcast_sync(
+            RESOURCE_PRODUCT,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&product),
+            false,
+        )
         .await;
 
     Ok(Json(product))
@@ -262,7 +275,13 @@ pub async fn delete(
     );
 
     state
-        .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id_str, None)
+        .broadcast_sync::<()>(
+            RESOURCE_PRODUCT,
+            SyncChangeType::Deleted,
+            &id_str,
+            None,
+            false,
+        )
         .await;
 
     Ok(Json(true))
@@ -321,7 +340,13 @@ pub async fn add_product_tag(
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id_str, Some(&product))
+        .broadcast_sync(
+            RESOURCE_PRODUCT,
+            SyncChangeType::Updated,
+            &product_id_str,
+            Some(&product),
+            false,
+        )
         .await;
 
     Ok(Json(product))
@@ -352,7 +377,13 @@ pub async fn remove_product_tag(
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id_str, Some(&product))
+        .broadcast_sync(
+            RESOURCE_PRODUCT,
+            SyncChangeType::Updated,
+            &product_id_str,
+            Some(&product),
+            false,
+        )
         .await;
 
     Ok(Json(product))
@@ -422,7 +453,13 @@ pub async fn batch_update_sort_order(
 
     // 广播同步通知
     state
-        .broadcast_sync::<()>(RESOURCE_PRODUCT, "updated", "batch", None)
+        .broadcast_sync::<()>(
+            RESOURCE_PRODUCT,
+            SyncChangeType::Updated,
+            "batch",
+            None,
+            false,
+        )
         .await;
 
     Ok(Json(BatchUpdateResponse {

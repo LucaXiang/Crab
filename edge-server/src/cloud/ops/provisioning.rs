@@ -1,6 +1,7 @@
 //! FullSync (initial store provisioning) + EnsureImage
 
 use shared::cloud::store_op::{BindingOwner, FullSyncResult, StoreOpResult, StoreSnapshot};
+use shared::message::SyncChangeType;
 
 use crate::core::state::ServerState;
 
@@ -89,9 +90,10 @@ async fn do_full_sync(
                 state
                     .broadcast_sync(
                         shared::cloud::SyncResource::Category,
-                        "created",
+                        SyncChangeType::Created,
                         &c.id.to_string(),
                         Some(&c),
+                        true,
                     )
                     .await;
                 let cat_id = c.id;
@@ -151,9 +153,10 @@ async fn do_full_sync(
                 state
                     .broadcast_sync(
                         shared::cloud::SyncResource::Product,
-                        "created",
+                        SyncChangeType::Created,
                         &p.id.to_string(),
                         Some(&p),
+                        true,
                     )
                     .await;
                 let prod_id = p.id;

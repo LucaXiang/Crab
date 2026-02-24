@@ -575,9 +575,10 @@ impl ArchiveWorker {
                 let payload = SyncPayload {
                     resource: shared::cloud::SyncResource::Shift,
                     version,
-                    action: "updated".to_string(),
+                    action: shared::message::SyncChangeType::Updated,
                     id: updated_shift.id.to_string(),
                     data: serde_json::to_value(&updated_shift).ok(),
+                    cloud_origin: false,
                 };
                 if let Err(e) = self.message_bus.publish(BusMessage::sync(&payload)).await {
                     tracing::error!("Shift sync broadcast failed: {}", e);

@@ -4,6 +4,7 @@ use crate::message::{BusMessage, EventType};
 use crate::orders::actions::open_table::load_matching_rules;
 use async_trait::async_trait;
 use shared::error::AppError;
+use shared::message::SyncChangeType;
 use shared::order::{OrderCommand, OrderCommandPayload};
 use std::sync::Arc;
 
@@ -146,9 +147,10 @@ impl MessageProcessor for ServerCommandProcessor {
                         self.state
                             .broadcast_sync(
                                 shared::cloud::SyncResource::SystemIssue,
-                                "created",
+                                SyncChangeType::Created,
                                 &id_str,
                                 Some(&issue),
+                                false,
                             )
                             .await;
                     }

@@ -13,6 +13,7 @@ use crate::db::repository::dining_table;
 use crate::utils::validation::{MAX_NAME_LEN, validate_required_text};
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 
 use shared::cloud::SyncResource;
@@ -72,7 +73,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&table))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&table), false)
         .await;
 
     Ok(Json(table))
@@ -109,7 +110,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&table))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&table),
+            false,
+        )
         .await;
 
     Ok(Json(table))
@@ -155,7 +162,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
             .await;
     }
 

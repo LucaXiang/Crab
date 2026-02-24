@@ -155,29 +155,36 @@ pub struct RequestCommandPayload {
     pub params: Option<serde_json::Value>,
 }
 
+/// 同步变更类型 (message bus 广播)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncChangeType {
+    Created,
+    Updated,
+    Deleted,
+    /// 班次需要结算
+    SettlementRequired,
+}
+
 /// 同步信号载荷 (边缘服务端 -> 所有客户端)
 ///
 /// 当某个资源发生变更时（由某个客户端请求触发，或服务端后台触发），
 /// 服务端广播此信号，通知所有感兴趣的客户端刷新数据。
-///
-/// # 示例
-/// - `resource`: "order"
-/// - `version`: 42
-/// - `action`: "updated"
-/// - `id`: "order_123"
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SyncPayload {
     /// 资源类型
     pub resource: crate::cloud::SyncResource,
     /// 版本号 (用于前端判断是否需要全量刷新，差距 > 5 时触发)
     pub version: u64,
-    /// 变更类型 (例如: "created", "updated", "deleted")
-    pub action: String,
+    /// 变更类型
+    pub action: SyncChangeType,
     /// 资源 ID (必填，每次 Sync 都应指定具体的实体 ID)
     pub id: String,
     /// 资源数据 (可选，deleted 时为 None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,
+    /// 标记此变更源自 cloud 推送 (防止 CloudWorker 回弹到 cloud)
+    pub cloud_origin: bool,
 }
 
 /// 通用响应载荷 (服务端 -> 客户端)

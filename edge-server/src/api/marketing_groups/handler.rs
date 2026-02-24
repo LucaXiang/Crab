@@ -16,6 +16,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::price_rule::AdjustmentType;
 use shared::models::{
     MarketingGroup, MgDiscountRule, MgDiscountRuleCreate, MgDiscountRuleUpdate, StampActivityDetail,
@@ -201,7 +202,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&group))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&group), false)
         .await;
 
     Ok(Json(group))
@@ -241,7 +242,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&group))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&group),
+            false,
+        )
         .await;
 
     Ok(Json(group))
@@ -276,7 +283,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
             .await;
     }
 
@@ -319,7 +326,13 @@ pub async fn create_rule(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &group_id.to_string(),
+            Some(&group),
+            false,
+        )
         .await;
 
     Ok(Json(rule))
@@ -367,7 +380,13 @@ pub async fn update_rule(
     // Broadcast parent group for store incremental sync
     if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
         state
-            .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+            .broadcast_sync(
+                RESOURCE,
+                SyncChangeType::Updated,
+                &group_id.to_string(),
+                Some(&group),
+                false,
+            )
             .await;
     }
 
@@ -397,7 +416,13 @@ pub async fn delete_rule(
 
         if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
             state
-                .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+                .broadcast_sync(
+                    RESOURCE,
+                    SyncChangeType::Updated,
+                    &group_id.to_string(),
+                    Some(&group),
+                    false,
+                )
                 .await;
         }
     }
@@ -440,7 +465,13 @@ pub async fn create_activity(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &group_id.to_string(),
+            Some(&group),
+            false,
+        )
         .await;
 
     Ok(Json(detail))
@@ -472,7 +503,13 @@ pub async fn update_activity(
     // Broadcast parent group for store incremental sync
     if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
         state
-            .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+            .broadcast_sync(
+                RESOURCE,
+                SyncChangeType::Updated,
+                &group_id.to_string(),
+                Some(&group),
+                false,
+            )
             .await;
     }
 
@@ -502,7 +539,13 @@ pub async fn delete_activity(
 
         if let Ok(Some(group)) = marketing_group::find_by_id(&state.pool, group_id).await {
             state
-                .broadcast_sync(RESOURCE, "updated", &group_id.to_string(), Some(&group))
+                .broadcast_sync(
+                    RESOURCE,
+                    SyncChangeType::Updated,
+                    &group_id.to_string(),
+                    Some(&group),
+                    false,
+                )
                 .await;
         }
     }

@@ -11,6 +11,7 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::utils::AppResult;
+use shared::message::SyncChangeType;
 
 /// System print configuration response/request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,9 +73,10 @@ pub async fn update(
     state
         .broadcast_sync(
             shared::cloud::SyncResource::PrintConfig,
-            "updated",
+            SyncChangeType::Updated,
             "default",
             Some(&config),
+            false,
         )
         .await;
 

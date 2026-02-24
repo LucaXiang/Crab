@@ -2,6 +2,7 @@
 
 use shared::cloud::SyncResource;
 use shared::cloud::store_op::{StoreOpData, StoreOpResult};
+use shared::message::SyncChangeType;
 
 use crate::core::state::ServerState;
 
@@ -19,9 +20,10 @@ pub async fn create_employee(
             state
                 .broadcast_sync(
                     SyncResource::Employee,
-                    "created",
+                    SyncChangeType::Created,
                     &emp.id.to_string(),
                     Some(&emp),
+                    true,
                 )
                 .await;
             StoreOpResult::created(emp.id).with_data(StoreOpData::Employee(emp))
@@ -42,9 +44,10 @@ pub async fn update_employee(
             state
                 .broadcast_sync(
                     SyncResource::Employee,
-                    "updated",
+                    SyncChangeType::Updated,
                     &emp.id.to_string(),
                     Some(&emp),
+                    true,
                 )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::Employee(emp))
@@ -59,7 +62,13 @@ pub async fn delete_employee(state: &ServerState, id: i64) -> StoreOpResult {
     match employee::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(SyncResource::Employee, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::Employee,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -79,7 +88,13 @@ pub async fn create_zone(
     match zone::create(&state.pool, assigned_id, data).await {
         Ok(z) => {
             state
-                .broadcast_sync(SyncResource::Zone, "created", &z.id.to_string(), Some(&z))
+                .broadcast_sync(
+                    SyncResource::Zone,
+                    SyncChangeType::Created,
+                    &z.id.to_string(),
+                    Some(&z),
+                    true,
+                )
                 .await;
             StoreOpResult::created(z.id).with_data(StoreOpData::Zone(z))
         }
@@ -97,7 +112,13 @@ pub async fn update_zone(
     match zone::update(&state.pool, id, data).await {
         Ok(z) => {
             state
-                .broadcast_sync(SyncResource::Zone, "updated", &z.id.to_string(), Some(&z))
+                .broadcast_sync(
+                    SyncResource::Zone,
+                    SyncChangeType::Updated,
+                    &z.id.to_string(),
+                    Some(&z),
+                    true,
+                )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::Zone(z))
         }
@@ -111,7 +132,13 @@ pub async fn delete_zone(state: &ServerState, id: i64) -> StoreOpResult {
     match zone::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(SyncResource::Zone, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::Zone,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -133,9 +160,10 @@ pub async fn create_table(
             state
                 .broadcast_sync(
                     SyncResource::DiningTable,
-                    "created",
+                    SyncChangeType::Created,
                     &t.id.to_string(),
                     Some(&t),
+                    true,
                 )
                 .await;
             StoreOpResult::created(t.id).with_data(StoreOpData::Table(t))
@@ -156,9 +184,10 @@ pub async fn update_table(
             state
                 .broadcast_sync(
                     SyncResource::DiningTable,
-                    "updated",
+                    SyncChangeType::Updated,
                     &t.id.to_string(),
                     Some(&t),
+                    true,
                 )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::Table(t))
@@ -173,7 +202,13 @@ pub async fn delete_table(state: &ServerState, id: i64) -> StoreOpResult {
     match dining_table::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(SyncResource::DiningTable, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::DiningTable,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -195,9 +230,10 @@ pub async fn create_price_rule(
             state
                 .broadcast_sync(
                     SyncResource::PriceRule,
-                    "created",
+                    SyncChangeType::Created,
                     &rule.id.to_string(),
                     Some(&rule),
+                    true,
                 )
                 .await;
             StoreOpResult::created(rule.id).with_data(StoreOpData::PriceRule(rule))
@@ -218,9 +254,10 @@ pub async fn update_price_rule(
             state
                 .broadcast_sync(
                     SyncResource::PriceRule,
-                    "updated",
+                    SyncChangeType::Updated,
                     &rule.id.to_string(),
                     Some(&rule),
+                    true,
                 )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::PriceRule(rule))
@@ -235,7 +272,13 @@ pub async fn delete_price_rule(state: &ServerState, id: i64) -> StoreOpResult {
     match price_rule::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(SyncResource::PriceRule, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::PriceRule,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -257,9 +300,10 @@ pub async fn create_label_template(
             state
                 .broadcast_sync(
                     SyncResource::LabelTemplate,
-                    "created",
+                    SyncChangeType::Created,
                     &tpl.id.to_string(),
                     Some(&tpl),
+                    true,
                 )
                 .await;
             StoreOpResult::created(tpl.id).with_data(StoreOpData::LabelTemplate(tpl))
@@ -280,9 +324,10 @@ pub async fn update_label_template(
             state
                 .broadcast_sync(
                     SyncResource::LabelTemplate,
-                    "updated",
+                    SyncChangeType::Updated,
                     &tpl.id.to_string(),
                     Some(&tpl),
+                    true,
                 )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::LabelTemplate(tpl))
@@ -299,9 +344,10 @@ pub async fn delete_label_template(state: &ServerState, id: i64) -> StoreOpResul
             state
                 .broadcast_sync::<()>(
                     SyncResource::LabelTemplate,
-                    "deleted",
+                    SyncChangeType::Deleted,
                     &id.to_string(),
                     None,
+                    true,
                 )
                 .await;
             StoreOpResult::ok()

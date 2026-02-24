@@ -9,7 +9,7 @@
 
 use futures::{SinkExt, StreamExt};
 use shared::cloud::{CloudMessage, CloudSyncBatch, CloudSyncItem, SyncResource};
-use shared::message::{BusMessage, EventType, SyncPayload};
+use shared::message::{BusMessage, EventType, SyncChangeType, SyncPayload};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -888,7 +888,7 @@ impl CloudWorker {
         let order_id = &payload.id;
 
         // deleted = 订单终结 (completed/voided/merged)
-        if payload.action == "deleted" {
+        if payload.action == SyncChangeType::Deleted {
             return Some(CloudMessage::ActiveOrderRemoved {
                 order_id: order_id.clone(),
             });
@@ -927,6 +927,8 @@ impl CloudWorker {
     }
 
     /// Extract a CloudSyncItem from a BusMessage if it's a Sync event
+    ///
+    /// Returns None for cloud-originated changes to prevent echo back to cloud.
     fn extract_sync_item(msg: &BusMessage) -> Option<CloudSyncItem> {
         if msg.event_type != EventType::Sync {
             return None;
@@ -934,12 +936,17 @@ impl CloudWorker {
 
         let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
 
+        // Skip cloud-originated changes to prevent echo/bounce
+        if payload.cloud_origin {
+            return None;
+        }
+
         // Only forward resources that crab-cloud knows how to store
         if !payload.resource.is_cloud_synced() {
             return None;
         }
 
-        let action = if payload.action == "deleted" {
+        let action = if payload.action == SyncChangeType::Deleted {
             shared::cloud::SyncAction::Delete
         } else {
             shared::cloud::SyncAction::Upsert

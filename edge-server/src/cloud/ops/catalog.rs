@@ -2,6 +2,7 @@
 
 use shared::cloud::SyncResource;
 use shared::cloud::store_op::{StoreOpData, StoreOpResult};
+use shared::message::SyncChangeType;
 use shared::models::{
     category::{CategoryCreate, CategoryUpdate},
     product::{ProductCreate, ProductUpdate},
@@ -25,9 +26,10 @@ pub async fn create_product(
             state
                 .broadcast_sync(
                     SyncResource::Product,
-                    "created",
+                    SyncChangeType::Created,
                     &p.id.to_string(),
                     Some(&p),
+                    true,
                 )
                 .await;
             StoreOpResult::created(p.id).with_data(StoreOpData::Product(p))
@@ -42,9 +44,10 @@ pub async fn update_product(state: &ServerState, id: i64, data: ProductUpdate) -
             state
                 .broadcast_sync(
                     SyncResource::Product,
-                    "updated",
+                    SyncChangeType::Updated,
                     &p.id.to_string(),
                     Some(&p),
+                    true,
                 )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::Product(p))
@@ -57,7 +60,13 @@ pub async fn delete_product(state: &ServerState, id: i64) -> StoreOpResult {
     match state.catalog_service.delete_product(id).await {
         Ok(()) => {
             state
-                .broadcast_sync::<()>(SyncResource::Product, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::Product,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }
@@ -81,9 +90,10 @@ pub async fn create_category(
             state
                 .broadcast_sync(
                     SyncResource::Category,
-                    "created",
+                    SyncChangeType::Created,
                     &c.id.to_string(),
                     Some(&c),
+                    true,
                 )
                 .await;
             StoreOpResult::created(c.id).with_data(StoreOpData::Category(c))
@@ -98,9 +108,10 @@ pub async fn update_category(state: &ServerState, id: i64, data: CategoryUpdate)
             state
                 .broadcast_sync(
                     SyncResource::Category,
-                    "updated",
+                    SyncChangeType::Updated,
                     &c.id.to_string(),
                     Some(&c),
+                    true,
                 )
                 .await;
             StoreOpResult::ok().with_data(StoreOpData::Category(c))
@@ -113,7 +124,13 @@ pub async fn delete_category(state: &ServerState, id: i64) -> StoreOpResult {
     match state.catalog_service.delete_category(id).await {
         Ok(()) => {
             state
-                .broadcast_sync::<()>(SyncResource::Category, "deleted", &id.to_string(), None)
+                .broadcast_sync::<()>(
+                    SyncResource::Category,
+                    SyncChangeType::Deleted,
+                    &id.to_string(),
+                    None,
+                    true,
+                )
                 .await;
             StoreOpResult::ok()
         }

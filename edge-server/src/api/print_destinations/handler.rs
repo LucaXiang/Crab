@@ -15,6 +15,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
 
 use shared::cloud::SyncResource;
@@ -83,7 +84,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&item))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&item), false)
         .await;
 
     // Auto-set as global default if none exists for this purpose
@@ -125,7 +126,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&item))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&item),
+            false,
+        )
         .await;
 
     Ok(Json(item))
@@ -177,7 +184,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
             .await;
 
         // Clean up global default if it referenced the deleted destination
@@ -297,9 +304,10 @@ async fn broadcast_print_config(
     state
         .broadcast_sync(
             SyncResource::PrintConfig,
-            "updated",
+            SyncChangeType::Updated,
             "default",
             Some(&config),
+            false,
         )
         .await;
 }

@@ -17,6 +17,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 
 use shared::cloud::SyncResource;
@@ -119,7 +120,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&s))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -156,7 +157,7 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&s))
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, &id_str, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -193,7 +194,7 @@ pub async fn close(
     );
 
     state
-        .broadcast_sync(RESOURCE, "closed", &id_str, Some(&s))
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, &id_str, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -228,7 +229,7 @@ pub async fn force_close(
     );
 
     state
-        .broadcast_sync(RESOURCE, "force_closed", &id_str, Some(&s))
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, &id_str, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -266,7 +267,13 @@ pub async fn recover_stale(State(state): State<ServerState>) -> AppResult<Json<V
         let id = s.id.to_string();
 
         state
-            .broadcast_sync(RESOURCE, "settlement_required", &id, Some(s))
+            .broadcast_sync(
+                RESOURCE,
+                SyncChangeType::SettlementRequired,
+                &id,
+                Some(s),
+                false,
+            )
             .await;
     }
 

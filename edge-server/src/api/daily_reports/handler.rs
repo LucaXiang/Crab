@@ -17,6 +17,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{DailyReport, DailyReportGenerate};
 
 use shared::cloud::SyncResource;
@@ -138,7 +139,7 @@ pub async fn generate(
     );
 
     state
-        .broadcast_sync(RESOURCE, "generated", &id, Some(&report))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&report), false)
         .await;
 
     Ok(Json(report))

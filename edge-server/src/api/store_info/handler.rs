@@ -15,6 +15,7 @@ use crate::utils::validation::{
     MAX_ADDRESS_LEN, MAX_EMAIL_LEN, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_URL_LEN,
     validate_optional_text,
 };
+use shared::message::SyncChangeType;
 use shared::models::{StoreInfo, StoreInfoUpdate};
 
 use shared::cloud::SyncResource;
@@ -64,7 +65,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", "main", Some(&store_info))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            "main",
+            Some(&store_info),
+            false,
+        )
         .await;
 
     // 通知依赖配置的调度器（如班次检测器）立即重检

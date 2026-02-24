@@ -1,6 +1,6 @@
 use dashmap::DashMap;
 use shared::cloud::SyncResource;
-use shared::message::{BusMessage, SyncPayload};
+use shared::message::{BusMessage, SyncChangeType, SyncPayload};
 use sqlx::SqlitePool;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -600,7 +600,7 @@ impl ServerState {
 
                         let order_id = event.order_id.clone();
                         let sequence = event.sequence;
-                        let action = event.event_type.to_string();
+                        let action = order_event_type_to_sync_change_type(&event.event_type);
 
                         // 获取快照，打包 event + snapshot 一起推送
                         match orders_manager.get_snapshot(&order_id) {
@@ -615,6 +615,7 @@ impl ServerState {
                                         "snapshot": snapshot
                                     })
                                     .into(),
+                                    cloud_origin: false,
                                 };
                                 if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
                                     tracing::warn!("Failed to forward order sync: {}", e);
@@ -776,25 +777,28 @@ impl ServerState {
     ///
     /// # 参数
     /// - `resource`: 资源类型 (如 "tag", "product", "category")
-    /// - `action`: 变更类型 ("created", "updated", "deleted")
+    /// - `action`: 变更类型
     /// - `id`: 资源 ID
     /// - `data`: 资源数据 (deleted 时为 None)
+    /// - `cloud_origin`: 是否源自 cloud 推送 (true = CloudWorker 不回弹)
     pub async fn broadcast_sync<T: serde::Serialize>(
         &self,
         resource: SyncResource,
-        action: &str,
+        action: SyncChangeType,
         id: &str,
         data: Option<&T>,
+        cloud_origin: bool,
     ) {
         let version = self.resource_versions.increment(resource);
         let payload = SyncPayload {
             resource,
             version,
-            action: action.to_string(),
+            action,
             id: id.to_string(),
             data: data.and_then(|d| serde_json::to_value(d).ok()),
+            cloud_origin,
         };
-        tracing::debug!(resource = %resource, action = %action, id = %id, "Broadcasting sync event");
+        tracing::debug!(resource = %resource, action = ?action, id = %id, cloud_origin, "Broadcasting sync event");
         match self.message_bus().publish(BusMessage::sync(&payload)).await {
             Ok(_) => {}
             Err(e) => tracing::error!("Sync broadcast failed: {}", e),
@@ -1021,5 +1025,27 @@ impl ServerState {
         } else {
             tracing::warn!("Server activated but credential not found in cache!");
         }
+    }
+}
+
+/// Map OrderEventType to SyncChangeType for synchronization
+fn order_event_type_to_sync_change_type(
+    event_type: &shared::order::OrderEventType,
+) -> shared::message::SyncChangeType {
+    use shared::message::SyncChangeType;
+    use shared::order::OrderEventType;
+
+    match event_type {
+        // Creation/Opening events
+        OrderEventType::TableOpened | OrderEventType::ItemsAdded => SyncChangeType::Created,
+        // Completion/Deletion events
+        OrderEventType::OrderCompleted
+        | OrderEventType::OrderVoided
+        | OrderEventType::ItemRemoved
+        | OrderEventType::PaymentCancelled
+        | OrderEventType::OrderMovedOut
+        | OrderEventType::OrderMerged => SyncChangeType::Deleted,
+        // All other modification events
+        _ => SyncChangeType::Updated,
     }
 }

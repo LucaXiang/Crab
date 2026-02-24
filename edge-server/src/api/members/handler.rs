@@ -16,6 +16,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::MemberWithGroup;
 
 use shared::cloud::SyncResource;
@@ -177,7 +178,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&member))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&member), false)
         .await;
 
     Ok(Json(member))
@@ -214,7 +215,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&member))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&member),
+            false,
+        )
         .await;
 
     Ok(Json(member))
@@ -249,7 +256,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
             .await;
     }
 

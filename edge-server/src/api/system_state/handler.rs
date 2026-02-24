@@ -5,6 +5,7 @@ use axum::{Json, extract::State};
 use crate::core::ServerState;
 use crate::db::repository::system_state;
 use crate::utils::AppResult;
+use shared::message::SyncChangeType;
 use shared::models::{SystemState, SystemStateUpdate};
 
 use shared::cloud::SyncResource;
@@ -24,7 +25,13 @@ pub async fn update(
     let system_state = system_state::update(&state.pool, payload).await?;
 
     state
-        .broadcast_sync(RESOURCE, "updated", "main", Some(&system_state))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            "main",
+            Some(&system_state),
+            false,
+        )
         .await;
 
     Ok(Json(system_state))
@@ -38,7 +45,13 @@ pub async fn init_genesis(
     let system_state = system_state::init_genesis(&state.pool, payload.genesis_hash).await?;
 
     state
-        .broadcast_sync(RESOURCE, "genesis_initialized", "main", Some(&system_state))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            "main",
+            Some(&system_state),
+            false,
+        )
         .await;
 
     Ok(Json(system_state))
@@ -60,7 +73,13 @@ pub async fn update_last_order(
         system_state::update_last_order(&state.pool, &payload.order_id, payload.order_hash).await?;
 
     state
-        .broadcast_sync(RESOURCE, "last_order_updated", "main", Some(&system_state))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            "main",
+            Some(&system_state),
+            false,
+        )
         .await;
 
     Ok(Json(system_state))
@@ -86,7 +105,13 @@ pub async fn update_sync_state(
     .await?;
 
     state
-        .broadcast_sync(RESOURCE, "sync_state_updated", "main", Some(&system_state))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            "main",
+            Some(&system_state),
+            false,
+        )
         .await;
 
     Ok(Json(system_state))

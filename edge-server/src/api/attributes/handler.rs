@@ -15,6 +15,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{Attribute, AttributeCreate, AttributeOptionInput, AttributeUpdate};
 
 use shared::cloud::SyncResource;
@@ -118,7 +119,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&attr))
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&attr), false)
         .await;
 
     Ok(Json(attr))
@@ -158,7 +159,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&attr))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&attr),
+            false,
+        )
         .await;
 
     // 刷新引用此属性的产品缓存
@@ -220,7 +227,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
             .await;
 
         // 刷新引用此属性的产品缓存
@@ -292,7 +299,13 @@ pub async fn add_option(
 
     // 广播同步通知
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&attr))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&attr),
+            false,
+        )
         .await;
 
     // 刷新引用此属性的产品缓存
@@ -372,7 +385,13 @@ pub async fn update_option(
 
     // 广播同步通知
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&attr))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&attr),
+            false,
+        )
         .await;
 
     // 刷新引用此属性的产品缓存
@@ -447,7 +466,13 @@ pub async fn remove_option(
 
     // 广播同步通知
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&attr))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&attr),
+            false,
+        )
         .await;
 
     // 刷新引用此属性的产品缓存

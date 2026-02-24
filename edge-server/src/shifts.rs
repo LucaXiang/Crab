@@ -15,6 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::core::ServerState;
 use crate::db::repository::{shift, store_info};
 use crate::utils::time;
+use shared::message::SyncChangeType;
 
 use shared::cloud::SyncResource;
 const RESOURCE: SyncResource = SyncResource::Shift;
@@ -96,7 +97,13 @@ impl ShiftAutoCloseScheduler {
                     let id = s.id.to_string();
 
                     self.state
-                        .broadcast_sync(RESOURCE, "settlement_required", &id, Some(s))
+                        .broadcast_sync(
+                            RESOURCE,
+                            SyncChangeType::SettlementRequired,
+                            &id,
+                            Some(s),
+                            false,
+                        )
                         .await;
                 }
             }

@@ -15,6 +15,7 @@ use crate::utils::validation::{
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
+use shared::message::SyncChangeType;
 use shared::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 
 use shared::cloud::SyncResource;
@@ -92,7 +93,13 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&template))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            &id,
+            Some(&template),
+            false,
+        )
         .await;
 
     Ok(Json(template))
@@ -129,7 +136,13 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&template))
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Updated,
+            &id_str,
+            Some(&template),
+            false,
+        )
         .await;
 
     Ok(Json(template))
@@ -163,7 +176,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
             .await;
     }
 
