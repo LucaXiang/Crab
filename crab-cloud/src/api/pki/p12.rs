@@ -3,6 +3,7 @@ use crate::db::{p12, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Multipart, State};
+use base64::Engine;
 use shared::error::ErrorCode;
 use zeroize::Zeroize;
 
@@ -101,40 +102,34 @@ pub async fn upload_p12(
         "P12 validated: issued by trusted Spanish CA"
     );
 
-    // Store P12 binary (base64) + password in Secrets Manager
-    let secret_name = match state
-        .store_p12_secret(&tenant.id, &p12_data, &p12_password)
-        .await
+    // Base64 编码 P12 数据，直接存入 PostgreSQL
+    let p12_base64 = base64::engine::general_purpose::STANDARD.encode(&p12_data);
+
+    if let Err(e) = p12::upsert(
+        &state.pool,
+        &tenant.id,
+        &p12_base64,
+        &p12_password,
+        &cert_info,
+    )
+    .await
     {
-        Ok(name) => name,
-        Err(e) => {
-            p12_password.zeroize();
-            tracing::error!(error = %e, tenant_id = %tenant.id, "Failed to store P12 in Secrets Manager");
-            return Json(serde_json::json!({
-                "success": false,
-                "error": "Failed to secure certificate",
-                "error_code": ErrorCode::InternalError
-            }));
-        }
-    };
-
-    // 密码已存入 Secrets Manager，立即清零内存
-    p12_password.zeroize();
-
-    // Save metadata to PostgreSQL (upsert — 重复上传覆盖)
-    if let Err(e) = p12::upsert(&state.pool, &tenant.id, &secret_name, &cert_info).await {
-        tracing::error!(error = %e, "Failed to save P12 metadata");
+        p12_password.zeroize();
+        tracing::error!(error = %e, "Failed to save P12 to database");
         return Json(serde_json::json!({
             "success": false,
-            "error": "Failed to save certificate metadata",
+            "error": "Failed to save certificate",
             "error_code": ErrorCode::InternalError
         }));
     }
 
+    // P12 已存入数据库，清零内存中的密码
+    p12_password.zeroize();
+
     tracing::info!(
         tenant_id = %tenant.id,
         fingerprint = %cert_info.fingerprint,
-        "P12 certificate uploaded and secured in Secrets Manager"
+        "P12 certificate uploaded and stored in database"
     );
 
     Json(serde_json::json!({

@@ -60,7 +60,6 @@ pub struct AppState {
     pub ca_store: CaStore,
     pub root_ca_pem: String,
     pub email: crate::email::EmailService,
-    pub sm: SmClient,
     pub console_base_url: String,
     pub jwt_secret: String,
     pub quota_cache: QuotaCache,
@@ -74,48 +73,6 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Store P12 binary (base64) + password in Secrets Manager (create or update)
-    pub async fn store_p12_secret(
-        &self,
-        tenant_id: &str,
-        p12_data: &[u8],
-        password: &str,
-    ) -> Result<String, BoxError> {
-        use base64::Engine;
-        let p12_base64 = base64::engine::general_purpose::STANDARD.encode(p12_data);
-        let secret_value = serde_json::json!({
-            "p12_base64": p12_base64,
-            "password": password,
-        })
-        .to_string();
-
-        let secret_name = format!("crab/p12/{tenant_id}");
-        match self
-            .sm
-            .put_secret_value()
-            .secret_id(&secret_name)
-            .secret_string(&secret_value)
-            .send()
-            .await
-        {
-            Ok(_) => Ok(secret_name),
-            Err(err)
-                if err
-                    .as_service_error()
-                    .is_some_and(|e| e.is_resource_not_found_exception()) =>
-            {
-                self.sm
-                    .create_secret()
-                    .name(&secret_name)
-                    .secret_string(&secret_value)
-                    .send()
-                    .await?;
-                Ok(secret_name)
-            }
-            Err(err) => Err(err.into()),
-        }
-    }
-
     /// Create a new AppState
     pub async fn new(config: &Config) -> Result<Self, BoxError> {
         let pool = sqlx::postgres::PgPoolOptions::new()
@@ -136,7 +93,7 @@ impl AppState {
             config.email_from.clone(),
         );
 
-        let ca_store = CaStore::new(sm_client.clone());
+        let ca_store = CaStore::new(sm_client, pool.clone());
 
         // Verify Root CA is accessible (warm cache)
         ca_store.get_or_create_root_ca().await?;
@@ -167,7 +124,6 @@ impl AppState {
             ca_store,
             root_ca_pem,
             email,
-            sm: sm_client,
             console_base_url: config.console_base_url.clone(),
             jwt_secret: config.jwt_secret.clone(),
             quota_cache: QuotaCache::new(),
@@ -192,13 +148,14 @@ impl AppState {
     }
 }
 
-/// Full Certificate Authority store (merged from crab-auth)
+/// Certificate Authority 存储
 ///
-/// Supports both read-only operations (mTLS verification) and
-/// PKI operations (Root CA / Tenant CA creation, cert signing).
+/// Root CA 从 Secrets Manager 读写，Tenant CA 从 PostgreSQL 读写。
+/// 内存缓存：Root CA 和 Tenant CA 创建后不变，缓存在进程内。
 #[derive(Clone)]
 pub struct CaStore {
     sm: SmClient,
+    pool: PgPool,
     /// Root CA in-process cache (cert + key, never changes after creation)
     root_ca_cache: std::sync::Arc<OnceCell<CaSecret>>,
     /// Tenant CA in-process cache (tenant_id → CaSecret, never changes after creation)
@@ -212,15 +169,16 @@ struct CaSecret {
 }
 
 impl CaStore {
-    pub fn new(sm: SmClient) -> Self {
+    pub fn new(sm: SmClient, pool: PgPool) -> Self {
         Self {
             sm,
+            pool,
             root_ca_cache: std::sync::Arc::new(OnceCell::new()),
             tenant_ca_cache: Arc::new(DashMap::new()),
         }
     }
 
-    /// Get or create Root CA (cached in-process)
+    /// Get or create Root CA (cached in-process, stored in Secrets Manager)
     pub async fn get_or_create_root_ca(&self) -> Result<CertificateAuthority, BoxError> {
         let secret = self
             .root_ca_cache
@@ -232,7 +190,7 @@ impl CaStore {
         )?)
     }
 
-    /// Get or create Tenant CA (cached in-process — CAs never change after creation)
+    /// Get or create Tenant CA (cached in-process, stored in PostgreSQL)
     pub async fn get_or_create_tenant_ca(
         &self,
         tenant_id: &str,
@@ -245,17 +203,29 @@ impl CaStore {
             )?);
         }
 
-        let secret_name = format!("crab/tenant/{tenant_id}");
-        let secret = match self.read_secret(&secret_name).await? {
-            Some(s) => s,
+        // 从 PostgreSQL 读取 tenant CA
+        let secret = match sqlx::query_as::<_, (String, String)>(
+            "SELECT ca_cert_pem, ca_key_pem FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
+        )
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?
+        {
+            Some((cert_pem, key_pem)) => CaSecret { cert_pem, key_pem },
             None => {
+                // 创建新 Tenant CA 并写入 PostgreSQL
                 let profile = CaProfile::intermediate(tenant_id, &format!("Tenant {tenant_id}"));
                 let ca = CertificateAuthority::new_intermediate(profile, root_ca)?;
                 let s = CaSecret {
                     cert_pem: ca.cert_pem().to_string(),
                     key_pem: ca.key_pem(),
                 };
-                self.create_secret(&secret_name, &s).await?;
+                sqlx::query("UPDATE tenants SET ca_cert_pem = $1, ca_key_pem = $2 WHERE id = $3")
+                    .bind(&s.cert_pem)
+                    .bind(&s.key_pem)
+                    .bind(tenant_id)
+                    .execute(&self.pool)
+                    .await?;
                 s
             }
         };
@@ -268,7 +238,7 @@ impl CaStore {
         )?)
     }
 
-    /// Load existing Tenant CA (cached, errors if not found)
+    /// Load existing Tenant CA (cached, errors if not found, reads from PostgreSQL)
     pub async fn load_tenant_ca(&self, tenant_id: &str) -> Result<CertificateAuthority, BoxError> {
         if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
             return Ok(CertificateAuthority::load(
@@ -277,12 +247,15 @@ impl CaStore {
             )?);
         }
 
-        let secret_name = format!("crab/tenant/{tenant_id}");
-        let secret = self
-            .read_secret(&secret_name)
-            .await?
-            .ok_or_else(|| format!("Tenant CA not found for {tenant_id}"))?;
+        let (cert_pem, key_pem) = sqlx::query_as::<_, (String, String)>(
+            "SELECT ca_cert_pem, ca_key_pem FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
+        )
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| format!("Tenant CA not found for {tenant_id}"))?;
 
+        let secret = CaSecret { cert_pem, key_pem };
         self.tenant_ca_cache
             .insert(tenant_id.to_string(), secret.clone());
         Ok(CertificateAuthority::load(
@@ -291,27 +264,27 @@ impl CaStore {
         )?)
     }
 
-    /// Load Tenant CA cert PEM only (cached, for mTLS verification in edge_auth)
+    /// Load Tenant CA cert PEM only (cached, for mTLS verification in edge_auth, reads from PostgreSQL)
     pub async fn load_tenant_ca_cert(&self, tenant_id: &str) -> Result<String, BoxError> {
         if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
             return Ok(cached.cert_pem.clone());
         }
 
-        let secret_name = format!("crab/tenant/{tenant_id}");
-        let output = self
-            .sm
-            .get_secret_value()
-            .secret_id(&secret_name)
-            .send()
-            .await?;
+        let (cert_pem, key_pem) = sqlx::query_as::<_, (String, String)>(
+            "SELECT ca_cert_pem, ca_key_pem FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
+        )
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| format!("Tenant CA cert not found for {tenant_id}"))?;
 
-        let json = output.secret_string().ok_or("Secret has no string value")?;
-        let secret: CaSecret = serde_json::from_str(json)?;
-        let pem = secret.cert_pem.clone();
-        self.tenant_ca_cache.insert(tenant_id.to_string(), secret);
+        let pem = cert_pem.clone();
+        self.tenant_ca_cache
+            .insert(tenant_id.to_string(), CaSecret { cert_pem, key_pem });
         Ok(pem)
     }
 
+    /// Root CA 初始化（从 Secrets Manager 读取或创建）
     async fn init_root_ca(&self) -> Result<CaSecret, BoxError> {
         match self.read_secret("crab/root-ca").await? {
             Some(s) => Ok(s),
@@ -327,6 +300,7 @@ impl CaStore {
         }
     }
 
+    /// 从 Secrets Manager 读取 secret（仅 Root CA 使用）
     async fn read_secret(&self, name: &str) -> Result<Option<CaSecret>, BoxError> {
         match self.sm.get_secret_value().secret_id(name).send().await {
             Ok(output) => {
@@ -346,6 +320,7 @@ impl CaStore {
         }
     }
 
+    /// 在 Secrets Manager 创建 secret（仅 Root CA 使用）
     async fn create_secret(&self, name: &str, secret: &CaSecret) -> Result<(), BoxError> {
         let json = serde_json::to_string(secret)?;
         self.sm

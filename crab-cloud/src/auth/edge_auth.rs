@@ -26,7 +26,7 @@ pub struct EdgeIdentity {
 /// Middleware that extracts and verifies SignedBinding from request headers
 ///
 /// Expects `X-Signed-Binding` header containing a JSON-serialized SignedBinding.
-/// Verifies the signature using the Tenant CA cert from Secrets Manager.
+/// Verifies the signature using the Tenant CA cert from PostgreSQL.
 /// On success, injects `EdgeIdentity` into request extensions.
 pub async fn edge_auth_middleware(
     State(state): State<AppState>,
