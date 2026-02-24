@@ -73,6 +73,7 @@ export const useHistoryOrderList = (
       });
       setTotal(Number(response.total));
     } catch (err) {
+      console.error('[useHistoryOrderList] Failed to fetch order list:', err);
       logger.error('Failed to fetch order list', err, { component: 'useHistoryOrderList', action: 'fetchOrderList', page, search: debouncedSearch });
       setOrders([]);
       setTotal(0);
