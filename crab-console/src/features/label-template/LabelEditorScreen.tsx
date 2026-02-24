@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { LabelTemplate, LabelField } from '@/core/types/store';
+import { LabelFieldType, LabelFieldAlignment } from '@/core/types/store';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
 import { FieldPropertiesPanel } from './FieldPropertiesPanel';
 import { FieldHelperDialog } from './FieldHelperDialog';
@@ -165,7 +166,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     if (type === 'text') {
       newField = {
         field_id: generateId(),
-        field_type: 'text',
+        field_type: LabelFieldType.Text,
         name: t('settings.label.field.new_text'),
         x: 10,
         y: 10,
@@ -173,7 +174,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         height: 20,
         font_size: 12,
         font_weight: 'normal',
-        alignment: 'left',
+        alignment: LabelFieldAlignment.Left,
         template: t('settings.label.field.default_text'),
         data_source: '',
         visible: true,
@@ -181,7 +182,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     } else if (type === 'image') {
       newField = {
         field_id: generateId(),
-        field_type: 'image',
+        field_type: LabelFieldType.Image,
         name: t('settings.label.field.new_image'),
         x: 10,
         y: 10,
@@ -197,7 +198,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     } else {
       newField = {
         field_id: generateId(),
-        field_type: 'separator',
+        field_type: LabelFieldType.Separator,
         name: t('settings.label.field.default_separator'),
         x: 8,
         y: 50,
@@ -268,11 +269,11 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
   const renderLayerIcon = (field: LabelField) => {
     switch (field.field_type) {
-      case 'text':
+      case LabelFieldType.Text:
         return <Type size={14} />;
-      case 'image':
+      case LabelFieldType.Image:
         return <ImageIcon size={14} />;
-      case 'separator':
+      case LabelFieldType.Separator:
         return <Minus size={14} />;
       default:
         return null;
@@ -281,13 +282,13 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
   const renderLayerInfo = (field: LabelField) => {
     switch (field.field_type) {
-      case 'text':
+      case LabelFieldType.Text:
         return field.template || field.name;
-      case 'image':
-      case 'barcode':
-      case 'qrcode':
+      case LabelFieldType.Image:
+      case LabelFieldType.Barcode:
+      case LabelFieldType.Qrcode:
         return field.data_key || field.name;
-      case 'separator':
+      case LabelFieldType.Separator:
         return t('settings.label.horizontal_line');
       default:
         return '';

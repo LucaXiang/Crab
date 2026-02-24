@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import type { LabelTemplate, LabelField } from '@/core/types/store';
+import { LabelFieldType, LabelFieldAlignment, LabelVerticalAlign } from '@/core/types/store';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getImageBlobUrl } from '@/infrastructure/api/store';
 import { useI18n } from '@/hooks/useI18n';
@@ -65,7 +66,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
       const newImages: Record<string, HTMLImageElement> = {};
       const imageFields = template.fields.filter(
-        f => f.field_type === 'image' || f.field_type === 'barcode' || f.field_type === 'qrcode',
+        f => f.field_type === LabelFieldType.Image || f.field_type === LabelFieldType.Barcode || f.field_type === LabelFieldType.Qrcode,
       );
 
       await Promise.all(
@@ -299,7 +300,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       const isSelected = field.field_id === selectedFieldId;
       const isDragging = field.field_id === draggingField;
 
-      if (field.field_type === 'separator') {
+      if (field.field_type === LabelFieldType.Separator) {
         ctx.strokeStyle = isSelected ? '#ef4444' : '#000000';
         ctx.lineWidth = (isSelected ? 2 : 1) / viewState.scale;
         if (isDragging) ctx.setLineDash([5 / viewState.scale, 3 / viewState.scale]);
@@ -320,7 +321,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       ctx.setLineDash([]);
 
       ctx.fillStyle = isSelected
-        ? field.field_type === 'text'
+        ? field.field_type === LabelFieldType.Text
           ? 'rgba(239, 68, 68, 0.05)'
           : 'rgba(59, 130, 246, 0.05)'
         : 'transparent';
@@ -331,7 +332,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       ctx.rect(field.x, field.y, field.width, field.height);
       ctx.clip();
 
-      if (field.field_type === 'text' || field.field_type === 'price' || field.field_type === 'datetime' || field.field_type === 'counter') {
+      if (field.field_type === LabelFieldType.Text || field.field_type === LabelFieldType.Price || field.field_type === LabelFieldType.Datetime || field.field_type === LabelFieldType.Counter) {
         const fontSize = field.font_size;
         const fontStyle = field.font_weight === 'bold' ? 'bold' : 'normal';
         const fontFamily = field.font_family || 'Arial';
@@ -365,29 +366,29 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
         const lineHeight = fontSize * 1.2;
         const totalTextHeight = lines.length * lineHeight;
-        const align = field.alignment || 'left';
-        const verticalAlign = field.vertical_align || 'top';
+        const align = field.alignment || LabelFieldAlignment.Left;
+        const verticalAlign = field.vertical_align || LabelVerticalAlign.Top;
 
         ctx.textAlign = align as CanvasTextAlign;
         const x =
-          align === 'center'
+          align === LabelFieldAlignment.Center
             ? field.x + field.width / 2
-            : align === 'right'
+            : align === LabelFieldAlignment.Right
               ? field.x + field.width - 4
               : field.x + 4;
 
         let y = field.y + 4;
-        if (verticalAlign === 'middle') {
+        if (verticalAlign === LabelVerticalAlign.Middle) {
           y = field.y + (field.height - totalTextHeight) / 2 + fontSize * 0.1;
-        } else if (verticalAlign === 'bottom') {
+        } else if (verticalAlign === LabelVerticalAlign.Bottom) {
           y = field.y + field.height - totalTextHeight - 4;
         }
 
         lines.forEach((ln, i) => ctx.fillText(ln, x, y + i * lineHeight));
       } else if (
-        field.field_type === 'image' ||
-        field.field_type === 'barcode' ||
-        field.field_type === 'qrcode'
+        field.field_type === LabelFieldType.Image ||
+        field.field_type === LabelFieldType.Barcode ||
+        field.field_type === LabelFieldType.Qrcode
       ) {
         const img = fieldImages[field.field_id];
         if (img?.complete && img.naturalWidth > 0) {
@@ -500,7 +501,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     (x: number, y: number): LabelField | null => {
       for (let i = template.fields.length - 1; i >= 0; i--) {
         const field = template.fields[i];
-        if (field.field_type === 'separator') {
+        if (field.field_type === LabelFieldType.Separator) {
           if (
             x >= 8 &&
             x <= (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE - 8 &&
@@ -519,7 +520,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
   const getResizeHandle = useCallback(
     (field: LabelField, x: number, y: number): 'se' | 'sw' | 'ne' | 'nw' | null => {
-      if (field.field_type === 'separator') return null;
+      if (field.field_type === LabelFieldType.Separator) return null;
       const threshold = 10 / viewState.scale;
       const handles = [
         { name: 'se' as const, x: field.x + field.width, y: field.y + field.height },
@@ -565,7 +566,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       } else {
         setDraggingField(field.field_id);
         setDragOffset({
-          x: worldPos.x - (field.field_type === 'separator' ? 0 : field.x),
+          x: worldPos.x - (field.field_type === LabelFieldType.Separator ? 0 : field.x),
           y: worldPos.y - field.y,
         });
       }
@@ -588,7 +589,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
       if (resizingField && resizeHandle) {
         const updatedFields = template.fields.map(field => {
-          if (field.field_id !== resizingField || field.field_type === 'separator') return field;
+          if (field.field_id !== resizingField || field.field_type === LabelFieldType.Separator) return field;
 
           let newX = field.x,
             newY = field.y,
@@ -626,7 +627,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         const updatedFields = template.fields.map(field => {
           if (field.field_id !== draggingField) return field;
           const newY = worldPos.y - dragOffset.y;
-          if (field.field_type === 'separator') return { ...field, y: newY };
+          if (field.field_type === LabelFieldType.Separator) return { ...field, y: newY };
           return { ...field, x: worldPos.x - dragOffset.x, y: newY };
         });
         onTemplateChange({ ...template, fields: updatedFields });
@@ -646,7 +647,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
             };
             canvas.style.cursor = cursors[handle];
           } else {
-            canvas.style.cursor = field.field_type === 'separator' ? 'ns-resize' : 'move';
+            canvas.style.cursor = field.field_type === LabelFieldType.Separator ? 'ns-resize' : 'move';
           }
         } else {
           canvas.style.cursor = 'grab';
@@ -749,7 +750,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       e.preventDefault();
       const updatedFields = template.fields.map(field => {
         if (field.field_id !== selectedFieldId) return field;
-        if (field.field_type === 'separator') return { ...field, y: field.y + dy };
+        if (field.field_type === LabelFieldType.Separator) return { ...field, y: field.y + dy };
         return { ...field, x: field.x + dx, y: field.y + dy };
       });
       onTemplateChange({ ...template, fields: updatedFields });

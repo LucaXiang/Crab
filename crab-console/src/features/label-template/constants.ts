@@ -1,9 +1,5 @@
-import type { LabelField, LabelTemplate, LabelFieldType } from '@/core/types/store';
-
-// ── Alignment types ──
-
-export type TextAlign = 'left' | 'center' | 'right';
-export type VerticalAlign = 'top' | 'middle' | 'bottom';
+import type { LabelField, LabelTemplate } from '@/core/types/store';
+import { LabelFieldType, LabelFieldAlignment } from '@/core/types/store';
 
 // ── Supported label fields ──
 
@@ -39,7 +35,7 @@ export const LabelFieldHelpers = {
     return {
       field_id: crypto.randomUUID(),
       name: '',
-      field_type: 'text' as LabelFieldType,
+      field_type: LabelFieldType.Text,
       x: 0,
       y: 0,
       width: 20,
@@ -49,7 +45,7 @@ export const LabelFieldHelpers = {
       font_family: 'Arial',
       color: '#000000',
       rotate: 0,
-      alignment: 'left',
+      alignment: LabelFieldAlignment.Left,
       data_source: '',
       format: '',
       visible: true,
@@ -75,7 +71,7 @@ export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 
       LabelFieldHelpers.createField({
         field_id: 'name',
         name: '商品名称',
-        field_type: 'text',
+        field_type: LabelFieldType.Text,
         x: 8, y: 16, width: 224, height: 32,
         font_size: 10, font_weight: 'bold',
         data_source: 'product.name',
@@ -83,7 +79,7 @@ export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 
       LabelFieldHelpers.createField({
         field_id: 'price',
         name: '价格',
-        field_type: 'price',
+        field_type: LabelFieldType.Price,
         x: 8, y: 64, width: 224, height: 32,
         font_size: 12, font_weight: 'bold',
         data_source: 'product.price',
@@ -92,7 +88,7 @@ export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 
       LabelFieldHelpers.createField({
         field_id: 'barcode',
         name: '条码',
-        field_type: 'barcode',
+        field_type: LabelFieldType.Barcode,
         x: 8, y: 112, width: 224, height: 40,
         font_size: 8,
         data_source: 'product.externalId',
@@ -114,7 +110,7 @@ export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 
       LabelFieldHelpers.createField({
         field_id: 'name',
         name: '商品名称',
-        field_type: 'text',
+        field_type: LabelFieldType.Text,
         x: 16, y: 16, width: 288, height: 48,
         font_size: 14, font_weight: 'bold',
         data_source: 'product.name',
@@ -122,17 +118,17 @@ export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 
       LabelFieldHelpers.createField({
         field_id: 'price',
         name: '价格',
-        field_type: 'price',
+        field_type: LabelFieldType.Price,
         x: 192, y: 80, width: 112, height: 32,
         font_size: 12, font_weight: 'bold',
         data_source: 'product.price',
         format: '€{value}',
-        alignment: 'right',
+        alignment: LabelFieldAlignment.Right,
       }),
       LabelFieldHelpers.createField({
         field_id: 'barcode',
         name: '条码',
-        field_type: 'barcode',
+        field_type: LabelFieldType.Barcode,
         x: 16, y: 128, width: 288, height: 80,
         font_size: 10,
         data_source: 'product.externalId',

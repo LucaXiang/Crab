@@ -330,18 +330,31 @@ export interface DiningTableUpdate {
 
 // ── Label Template ──
 
-export type LabelFieldType =
-  | 'text'
-  | 'barcode'
-  | 'qrcode'
-  | 'image'
-  | 'separator'
-  | 'datetime'
-  | 'price'
-  | 'counter';
+export enum LabelFieldType {
+  Text = 'text',
+  Barcode = 'barcode',
+  Qrcode = 'qrcode',
+  Image = 'image',
+  Separator = 'separator',
+  Datetime = 'datetime',
+  Price = 'price',
+  Counter = 'counter',
+}
 
-export type LabelFieldAlignment = 'left' | 'center' | 'right';
-export type LabelVerticalAlign = 'top' | 'middle' | 'bottom';
+export enum LabelFieldAlignment {
+  Left = 'left',
+  Center = 'center',
+  Right = 'right',
+}
+
+export enum LabelVerticalAlign {
+  Top = 'top',
+  Middle = 'middle',
+  Bottom = 'bottom',
+}
+
+export type LabelImageSourceType = 'productImage' | 'qrCode' | 'barcode' | 'image';
+export type LabelLineStyle = 'solid' | 'dashed' | 'dotted';
 
 export interface LabelField {
   field_id: string;
@@ -363,14 +376,14 @@ export interface LabelField {
   label?: string;
   template?: string;
   data_key?: string;
-  source_type?: 'productImage' | 'qrCode' | 'barcode' | 'image';
+  source_type?: LabelImageSourceType;
   maintain_aspect_ratio?: boolean;
   /** Temporary blob URL for pending image upload (editor only, not persisted) */
   _pending_blob_url?: string;
   style?: string;
   align?: LabelFieldAlignment;
   vertical_align?: LabelVerticalAlign;
-  line_style?: 'solid' | 'dashed' | 'dotted';
+  line_style?: LabelLineStyle;
 }
 
 export interface LabelTemplate {
@@ -412,12 +425,12 @@ export interface LabelFieldInput {
   visible?: boolean;
   template?: string;
   data_key?: string;
-  source_type?: string;
+  source_type?: LabelImageSourceType;
   maintain_aspect_ratio?: boolean;
   style?: string;
   align?: LabelFieldAlignment;
   vertical_align?: LabelVerticalAlign;
-  line_style?: string;
+  line_style?: LabelLineStyle;
 }
 
 export interface LabelTemplateCreate {

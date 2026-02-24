@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import type { LabelField } from '@/core/types/store';
-import type { TextAlign, VerticalAlign } from './constants';
+import { LabelFieldType, LabelFieldAlignment, LabelVerticalAlign } from '@/core/types/store';
 import {
   Type,
   Image as ImageIcon,
@@ -51,10 +51,10 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
     );
   }
 
-  const isTextField = field.field_type === 'text';
+  const isTextField = field.field_type === LabelFieldType.Text;
   const isImageField =
-    field.field_type === 'image' || field.field_type === 'barcode' || field.field_type === 'qrcode';
-  const isSeparatorField = field.field_type === 'separator';
+    field.field_type === LabelFieldType.Image || field.field_type === LabelFieldType.Barcode || field.field_type === LabelFieldType.Qrcode;
+  const isSeparatorField = field.field_type === LabelFieldType.Separator;
 
   const handleUpdate = (updates: Partial<LabelField>) => {
     onFieldUpdate({ ...field, ...updates } as LabelField);
@@ -79,24 +79,24 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
     handleUpdate({ template: '', _pending_blob_url: undefined });
   };
 
-  const renderAlignIcon = (align: TextAlign) => {
+  const renderAlignIcon = (align: LabelFieldAlignment) => {
     switch (align) {
-      case 'left':
+      case LabelFieldAlignment.Left:
         return <AlignLeft size={16} />;
-      case 'center':
+      case LabelFieldAlignment.Center:
         return <AlignCenter size={16} />;
-      case 'right':
+      case LabelFieldAlignment.Right:
         return <AlignRight size={16} />;
     }
   };
 
-  const renderVerticalAlignIcon = (align: VerticalAlign) => {
+  const renderVerticalAlignIcon = (align: LabelVerticalAlign) => {
     switch (align) {
-      case 'top':
+      case LabelVerticalAlign.Top:
         return <AlignStartVertical size={16} />;
-      case 'middle':
+      case LabelVerticalAlign.Middle:
         return <AlignCenterVertical size={16} />;
-      case 'bottom':
+      case LabelVerticalAlign.Bottom:
         return <AlignEndVertical size={16} />;
     }
   };
@@ -267,12 +267,12 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                   {t('settings.label.text_align')}
                 </label>
                 <div className="flex gap-1">
-                  {(['left', 'center', 'right'] as TextAlign[]).map(align => (
+                  {([LabelFieldAlignment.Left, LabelFieldAlignment.Center, LabelFieldAlignment.Right]).map(align => (
                     <button
                       key={align}
                       onClick={() => handleUpdate({ alignment: align })}
                       className={`flex-1 p-2 rounded-lg border transition-all flex items-center justify-center ${
-                        (field.alignment || 'left') === align
+                        (field.alignment || LabelFieldAlignment.Left) === align
                           ? 'border-blue-500 bg-blue-50 text-blue-600'
                           : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:bg-gray-50'
                       }`}
@@ -287,12 +287,12 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                   {t('settings.label.vertical_align')}
                 </label>
                 <div className="flex gap-1">
-                  {(['top', 'middle', 'bottom'] as VerticalAlign[]).map(align => (
+                  {([LabelVerticalAlign.Top, LabelVerticalAlign.Middle, LabelVerticalAlign.Bottom]).map(align => (
                     <button
                       key={align}
                       onClick={() => handleUpdate({ vertical_align: align })}
                       className={`flex-1 p-2 rounded-lg border transition-all flex items-center justify-center ${
-                        (field.vertical_align ?? 'top') === align
+                        (field.vertical_align ?? LabelVerticalAlign.Top) === align
                           ? 'border-blue-500 bg-blue-50 text-blue-600'
                           : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:bg-gray-50'
                       }`}

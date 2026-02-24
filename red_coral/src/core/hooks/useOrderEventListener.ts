@@ -47,28 +47,37 @@ export function useOrderEventListener() {
 
   const appState = useBridgeStore((state) => state.appState);
 
-  // Initialize order state from server
+  // Initialize order state from server (with retry for transient failures)
   const initializeOrders = useCallback(async () => {
     if (isInitializedRef.current) return;
 
     const store = useActiveOrdersStore.getState();
     store._setConnectionState('syncing');
 
-    try {
-      // Fetch all active orders from server
-      const response = await invokeApi<SyncResponse>('order_sync_since', {
-        sinceSequence: 0,
-      });
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
 
-      // Full sync with server state (including events for timeline and server_epoch)
-      store._fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
-      store._setInitialized(true);
-      isInitializedRef.current = true;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await invokeApi<SyncResponse>('order_sync_since', {
+          sinceSequence: 0,
+        });
 
-      logger.debug(`Initialized with ${response.active_orders.length} active orders, sequence: ${response.server_sequence}`, { component: 'OrderEventListener' });
-    } catch (error) {
-      logger.error('Failed to initialize orders', error, { component: 'OrderEventListener' });
-      store._setConnectionState('disconnected');
+        store._fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
+        store._setInitialized(true);
+        isInitializedRef.current = true;
+
+        logger.debug(`Initialized with ${response.active_orders.length} active orders, sequence: ${response.server_sequence}`, { component: 'OrderEventListener' });
+        return;
+      } catch (error) {
+        if (attempt < MAX_RETRIES) {
+          logger.warn(`Failed to initialize orders (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying...`, { component: 'OrderEventListener', error });
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+        } else {
+          logger.error('Failed to initialize orders after retries', error, { component: 'OrderEventListener' });
+          store._setConnectionState('disconnected');
+        }
+      }
     }
   }, []);
 
