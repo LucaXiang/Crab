@@ -7,7 +7,7 @@
 import type { HeldOrder } from '@/core/domain/types';
 import type { ArchivedOrderDetail } from '@/core/domain/types/archivedOrder';
 import type { StoreInfo } from '@/core/domain/types/api';
-import type { ReceiptData, ReceiptItem, ReceiptStoreInfo, ReceiptSurchargeInfo } from '@/infrastructure/print/printService';
+import type { ReceiptData, ReceiptItem, ReceiptStoreInfo, ReceiptSurchargeInfo, ReceiptDiscountInfo } from '@/infrastructure/print/printService';
 
 function formatTimestamp(ms: number): string {
   return new Date(ms).toLocaleString('es-ES', {
@@ -62,6 +62,26 @@ export function buildReceiptData(
     }
   }
 
+  // 整单折扣
+  let discount: ReceiptDiscountInfo | null = null;
+  if (order.order_manual_discount_amount > 0) {
+    if (order.order_manual_discount_percent != null && order.order_manual_discount_percent > 0) {
+      discount = {
+        name: 'Descuento',
+        type: 'percentage',
+        value: order.order_manual_discount_percent,
+        amount: order.order_manual_discount_amount,
+      };
+    } else if (order.order_manual_discount_fixed != null && order.order_manual_discount_fixed > 0) {
+      discount = {
+        name: 'Descuento',
+        type: 'fixed',
+        value: order.order_manual_discount_fixed,
+        amount: order.order_manual_discount_amount,
+      };
+    }
+  }
+
   const items: ReceiptItem[] = order.items
     .filter((item) => !item._removed && !item.is_comped)
     .map((item) => ({
@@ -101,6 +121,7 @@ export function buildReceiptData(
     pre_payment: opts?.prePayment ?? false,
     store_info,
     surcharge,
+    discount,
     items,
     total_amount: order.total,
     queue_number: order.queue_number ?? null,
@@ -125,6 +146,17 @@ export function buildArchivedReceiptData(
       type: 'fixed',
       value: order.order_manual_surcharge_amount,
       amount: order.order_manual_surcharge_amount,
+    };
+  }
+
+  // 整单折扣 (归档订单只有 amount，没有 percent/fixed 细分)
+  let discount: ReceiptDiscountInfo | null = null;
+  if (order.order_manual_discount_amount > 0) {
+    discount = {
+      name: 'Descuento',
+      type: 'fixed',
+      value: order.order_manual_discount_amount,
+      amount: order.order_manual_discount_amount,
     };
   }
 
@@ -167,6 +199,7 @@ export function buildArchivedReceiptData(
     pre_payment: false,
     store_info,
     surcharge,
+    discount,
     items,
     total_amount: order.total,
     queue_number: order.queue_number ?? null,

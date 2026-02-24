@@ -26,6 +26,16 @@ pub struct SurchargeInfo {
     pub amount: f64,
 }
 
+/// 折扣信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscountInfo {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub value: f64,
+    pub amount: f64,
+}
+
 /// 选项信息 (用于订单项)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectedOption {
@@ -66,6 +76,7 @@ pub struct ReceiptData {
     pub pre_payment: bool,
     pub store_info: Option<StoreInfo>,
     pub surcharge: Option<SurchargeInfo>,
+    pub discount: Option<DiscountInfo>,
     pub items: Vec<ReceiptItem>,
     pub total_amount: f64,
     pub queue_number: Option<u32>,

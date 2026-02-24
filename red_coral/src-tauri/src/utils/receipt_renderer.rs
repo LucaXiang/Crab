@@ -106,6 +106,26 @@ impl<'a> ReceiptRenderer<'a> {
 
         b.write("\n");
 
+        if let Some(discount) = &self.receipt.discount {
+            b.dash_sep();
+            b.align_center();
+            b.bold_on();
+            b.write_line(&format!("*** {} ***", discount.name.to_uppercase()));
+            b.bold_off();
+            b.align_left();
+            let desc = if discount.type_ == "percentage" {
+                format!("Descuento (-{}%)", discount.value)
+            } else {
+                format!("Descuento (-{:.2} €)", discount.value).replace('.', ",")
+            };
+            b.write_line(&format!(
+                "{:<28}{:>10}",
+                desc,
+                format!("-{:.2} €", discount.amount).replace('.', ",")
+            ));
+            b.dash_sep();
+        }
+
         if let Some(surcharge) = &self.receipt.surcharge {
             b.dash_sep();
             b.align_center();

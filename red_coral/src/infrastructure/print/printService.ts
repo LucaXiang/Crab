@@ -37,6 +37,13 @@ export interface ReceiptSurchargeInfo {
   amount: number;
 }
 
+export interface ReceiptDiscountInfo {
+  name: string;
+  type: string;
+  value: number;
+  amount: number;
+}
+
 export interface ReceiptSelectedOption {
   attribute_name: string;
   option_name: string;
@@ -70,6 +77,7 @@ export interface ReceiptData {
   pre_payment: boolean;
   store_info: ReceiptStoreInfo | null;
   surcharge: ReceiptSurchargeInfo | null;
+  discount: ReceiptDiscountInfo | null;
   items: ReceiptItem[];
   total_amount: number;
   queue_number: number | null;
