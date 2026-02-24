@@ -293,27 +293,25 @@ impl CatalogService {
                 let mut changed = false;
 
                 // Auto-fix: if defaults are NULL but active destinations exist, auto-set them
-                if kitchen.is_none() {
-                    if let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
+                if kitchen.is_none()
+                    && let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
                         "SELECT id FROM print_destination WHERE purpose = 'kitchen' AND is_active = 1 LIMIT 1",
                     )
                     .fetch_optional(&self.pool)
                     .await
-                    {
-                        kitchen = Some(id.to_string());
-                        changed = true;
-                    }
+                {
+                    kitchen = Some(id.to_string());
+                    changed = true;
                 }
-                if label.is_none() {
-                    if let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
+                if label.is_none()
+                    && let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
                         "SELECT id FROM print_destination WHERE purpose = 'label' AND is_active = 1 LIMIT 1",
                     )
                     .fetch_optional(&self.pool)
                     .await
-                    {
-                        label = Some(id.to_string());
-                        changed = true;
-                    }
+                {
+                    label = Some(id.to_string());
+                    changed = true;
                 }
 
                 if changed {

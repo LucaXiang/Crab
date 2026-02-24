@@ -364,8 +364,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           printer_name: labelPrinter,
           data: test_data,
           template: template,
-          label_width_mm: (template.width_mm ?? 0) + (template.padding_mm_x ?? 0), // Auto-expand paper width by offset
-          label_height_mm: (template.height_mm ?? 0) + (template.padding_mm_y ?? 0), // Auto-expand paper height by offset
+          label_width_mm: template.width_mm ?? template.width ?? 40,
+          label_height_mm: template.height_mm ?? template.height ?? 30,
           override_dpi: template.render_dpi
         };
 

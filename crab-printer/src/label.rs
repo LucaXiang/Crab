@@ -1255,19 +1255,23 @@ pub fn render_and_print_label(
     template: Option<&LabelTemplate>,
     options: &PrintOptions,
 ) -> WinResult<()> {
-    // Use provided template or create default based on label size
-    let mut tmpl = match template {
+    // Use provided template or create default based on label size.
+    // When a template is provided, its own width_mm/height_mm control the bitmap
+    // rendering dimensions. options.label_width_mm only affects physical paper size
+    // (used by print_rgba_premul → create_custom_printer_dc).
+    let tmpl = match template {
         Some(t) => t.clone(),
-        None => LabelTemplate::default(),
+        None => {
+            let mut default = LabelTemplate::default();
+            if options.label_width_mm > 0.0 {
+                default.width_mm = options.label_width_mm;
+            }
+            if options.label_height_mm > 0.0 {
+                default.height_mm = options.label_height_mm;
+            }
+            default
+        }
     };
-
-    // Override dimensions from options if provided (handles auto-expanded paper size)
-    if options.label_width_mm > 0.0 {
-        tmpl.width_mm = options.label_width_mm;
-    }
-    if options.label_height_mm > 0.0 {
-        tmpl.height_mm = options.label_height_mm;
-    }
 
     // Render at high DPI for better quality (300 DPI for thermal printers)
     // Update: User reports 300 DPI causes ratio issues on some printers.
