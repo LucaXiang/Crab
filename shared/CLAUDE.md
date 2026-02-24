@@ -47,6 +47,11 @@ src/
 ├── message/        # 消息总线协议
 │   ├── mod.rs          # Message<T>, EventType, BusMessage
 │   └── payload.rs      # Notification, ServerCommand, SyncPayload, Response
+├── cloud/          # Cloud 通信协议
+│   ├── mod.rs         # StoreDetailResponse, StoreOpResult, StoreOpData
+│   ├── store_op.rs    # StoreOp 枚举 (Cloud→Edge 双向 CRUD 操作)
+│   ├── sync.rs        # CloudSyncPayload, SyncResource 枚举
+│   └── ws.rs          # WebSocket 消息类型
 ├── activation.rs   # 激活协议 (ActivationResponse, SignedBinding, SubscriptionInfo)
 ├── app_state.rs    # 应用状态 (HealthStatus, ActivationProgress, SubscriptionBlocked)
 ├── client.rs       # 客户端类型

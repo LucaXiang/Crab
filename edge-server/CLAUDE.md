@@ -95,6 +95,16 @@ src/
 │   ├── storage.rs      # redb 审计存储
 │   ├── types.rs        # AuditAction, AuditEntry
 │   └── worker.rs       # AuditWorker (异步写入)
+├── cloud/          # Cloud 通信与双向操作
+│   ├── worker.rs          # CloudSyncWorker (定期同步到 cloud)
+│   ├── service.rs         # CloudService (HTTP 客户端)
+│   ├── rpc_executor.rs    # RPC executor (执行 cloud 推送的 StoreOp)
+│   └── ops/               # StoreOp 执行器 (按资源分文件)
+│       ├── mod.rs
+│       ├── catalog.rs         # Product/Category/Tag CRUD
+│       ├── attribute.rs       # Attribute/Binding CRUD
+│       ├── resource.rs        # Employee/Zone/Table/PriceRule CRUD
+│       └── provisioning.rs    # LabelTemplate CRUD
 ├── services/       # 业务服务
 │   ├── catalog_service.rs  # CatalogService (商品/分类内存缓存)
 │   ├── message_bus.rs      # MessageBusService
@@ -228,6 +238,15 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 - `get_product_meta()` → ProductMeta (category_id, tags, tax_rate)
 - `is_kitchen_print_enabled()` / `is_label_print_enabled()`
 - 在商品/分类更新时自动失效
+
+### Cloud 双向操作
+
+**Edge → Cloud**: `CloudSyncWorker` 定期将本地资源变更同步到 cloud（POST /api/edge/sync）
+
+**Cloud → Edge**: Cloud Console CRUD 操作通过 WebSocket 推送 `StoreOp` 到 edge
+- `rpc_executor.rs`: 接收 `StoreOp` 枚举，分发到对应的 `cloud/ops/` handler
+- `StoreOp` 支持: Create/Update/Delete 所有门店资源（Product, Category, Tag, Attribute, Employee, Zone, Table, PriceRule, LabelTemplate）
+- 执行后通过 MessageBus 广播 sync 消息到已连接的 POS 客户端
 
 ## 错误处理原则
 
