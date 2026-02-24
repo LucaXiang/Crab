@@ -176,6 +176,11 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/label-templates/{tid}",
             put(store::update_label_template).delete(store::delete_label_template),
         )
+        // ── StoreInfo ──
+        .route(
+            "/api/tenant/stores/{id}/store-info",
+            get(store::get_store_info).put(store::update_store_info),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             tenant_auth_middleware,

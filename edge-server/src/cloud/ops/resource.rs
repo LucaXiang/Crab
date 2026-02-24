@@ -286,6 +286,33 @@ pub async fn delete_price_rule(state: &ServerState, id: i64) -> StoreOpResult {
     }
 }
 
+// ── StoreInfo ──
+
+pub async fn update_store_info(
+    state: &ServerState,
+    data: shared::models::store_info::StoreInfoUpdate,
+) -> StoreOpResult {
+    use crate::db::repository::store_info;
+
+    match store_info::update(&state.pool, data).await {
+        Ok(info) => {
+            state
+                .broadcast_sync(
+                    SyncResource::StoreInfo,
+                    SyncChangeType::Updated,
+                    "main",
+                    Some(&info),
+                    true,
+                )
+                .await;
+            // Notify shift schedulers (business_day_cutoff may have changed)
+            state.config_notify.notify_waiters();
+            StoreOpResult::ok().with_data(StoreOpData::StoreInfo(info))
+        }
+        Err(e) => StoreOpResult::err(e.to_string()),
+    }
+}
+
 // ── LabelTemplate ──
 
 pub async fn create_label_template(

@@ -14,6 +14,7 @@ pub mod employee;
 pub mod label_template;
 pub mod price_rule;
 pub mod product;
+pub mod store_info;
 pub mod tag;
 pub mod zone;
 
@@ -24,6 +25,7 @@ pub use employee::*;
 pub use label_template::*;
 pub use price_rule::*;
 pub use product::*;
+pub use store_info::*;
 pub use tag::*;
 pub use zone::*;
 

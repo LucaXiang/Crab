@@ -14,6 +14,7 @@ use crate::models::{
     label_template::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate},
     price_rule::{PriceRule, PriceRuleCreate, PriceRuleUpdate},
     product::{ProductCreate, ProductFull, ProductUpdate},
+    store_info::{StoreInfo, StoreInfoUpdate},
     tag::{Tag, TagCreate, TagUpdate},
     zone::{Zone, ZoneCreate, ZoneUpdate},
 };
@@ -161,6 +162,11 @@ pub enum StoreOp {
         id: i64,
     },
 
+    // ── StoreInfo (singleton) ──
+    UpdateStoreInfo {
+        data: StoreInfoUpdate,
+    },
+
     // ── Batch (首次供给 / 全量推送) ──
     FullSync {
         snapshot: StoreSnapshot,
@@ -273,6 +279,7 @@ pub enum StoreOpData {
     Zone(Zone),
     Table(DiningTable),
     LabelTemplate(LabelTemplate),
+    StoreInfo(StoreInfo),
 }
 
 impl StoreOpResult {

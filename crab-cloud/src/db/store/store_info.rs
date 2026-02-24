@@ -48,6 +48,61 @@ pub async fn upsert_store_info_from_sync(
     Ok(())
 }
 
+// ── Console Write ──
+
+pub async fn update_store_info_direct(
+    pool: &PgPool,
+    edge_server_id: i64,
+    data: &shared::models::store_info::StoreInfoUpdate,
+) -> Result<StoreInfo, BoxError> {
+    let now = shared::util::now_millis();
+
+    // Ensure row exists (edge may not have synced yet)
+    sqlx::query(
+        r#"
+        INSERT INTO store_info (edge_server_id, name, address, nif, business_day_cutoff, created_at, updated_at)
+        VALUES ($1, '', '', '', '02:00', $2, $2)
+        ON CONFLICT (edge_server_id) DO NOTHING
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        UPDATE store_info SET
+            name = COALESCE($1, name),
+            address = COALESCE($2, address),
+            nif = COALESCE($3, nif),
+            logo_url = COALESCE($4, logo_url),
+            phone = COALESCE($5, phone),
+            email = COALESCE($6, email),
+            website = COALESCE($7, website),
+            business_day_cutoff = COALESCE($8, business_day_cutoff),
+            updated_at = $9
+        WHERE edge_server_id = $10
+        "#,
+    )
+    .bind(&data.name)
+    .bind(&data.address)
+    .bind(&data.nif)
+    .bind(&data.logo_url)
+    .bind(&data.phone)
+    .bind(&data.email)
+    .bind(&data.website)
+    .bind(&data.business_day_cutoff)
+    .bind(now)
+    .bind(edge_server_id)
+    .execute(pool)
+    .await?;
+
+    get_store_info(pool, edge_server_id)
+        .await?
+        .ok_or_else(|| "Store info not found after update".into())
+}
+
 // ── Console Read ──
 
 pub async fn get_store_info(

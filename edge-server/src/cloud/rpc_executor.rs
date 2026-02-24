@@ -197,6 +197,9 @@ pub async fn execute_catalog_op(
         }
         StoreOp::DeleteLabelTemplate { id } => resource::delete_label_template(state, *id).await,
 
+        // ── StoreInfo ──
+        StoreOp::UpdateStoreInfo { data } => resource::update_store_info(state, data.clone()).await,
+
         // ── Image ──
         StoreOp::EnsureImage {
             presigned_url,
@@ -234,6 +237,7 @@ fn lww_target(op: &StoreOp) -> Option<(&'static str, i64)> {
         StoreOp::UpdateLabelTemplate { id, .. } | StoreOp::DeleteLabelTemplate { id } => {
             Some(("label_template", *id))
         }
+        StoreOp::UpdateStoreInfo { .. } => Some(("store_info", 1)), // singleton, always id=1
         _ => None, // Create, FullSync, EnsureImage, Bind/Unbind
     }
 }
