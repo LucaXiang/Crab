@@ -294,7 +294,9 @@
       "status": "Estado",
       "active": "Activo",
       "inactive": "Inactivo",
-      "required_field": "Rellena todos los campos obligatorios."
+      "required_field": "Rellena todos los campos obligatorios.",
+      "sort_order": "Orden",
+      "search": "Buscar..."
     },
     "product": {
       "title": "Productos",

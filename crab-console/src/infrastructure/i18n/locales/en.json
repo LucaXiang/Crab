@@ -294,7 +294,9 @@
       "status": "Status",
       "active": "Active",
       "inactive": "Inactive",
-      "required_field": "Please fill in all required fields."
+      "required_field": "Please fill in all required fields.",
+      "sort_order": "Sort Order",
+      "search": "Search..."
     },
     "product": {
       "title": "Products",

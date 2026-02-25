@@ -67,7 +67,7 @@ export const useHistoryOrderList = (
         const newOrders = response.orders.filter(o => !existingIds.has(o.order_id));
         return [...prev, ...newOrders];
       });
-      setTotal(Number(response.total));
+      setTotal(response.total);
     } catch (err) {
       console.error('[useHistoryOrderList] Failed to fetch order list:', err);
       logger.error('Failed to fetch order list', err, { component: 'useHistoryOrderList', action: 'fetchOrderList', page, search: debouncedSearch });

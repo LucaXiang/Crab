@@ -193,10 +193,17 @@ pub async fn update(
 
     // Broadcast product sync if binding belongs to a product
     if binding.owner_type == "product" {
-        let _ = state
+        if let Err(e) = state
             .catalog_service
             .refresh_product_cache(binding.owner_id)
-            .await;
+            .await
+        {
+            tracing::warn!(
+                "Failed to refresh product cache for {}: {}",
+                binding.owner_id,
+                e
+            );
+        }
         let product = state.catalog_service.get_product(binding.owner_id);
         let owner_id_str = binding.owner_id.to_string();
         state

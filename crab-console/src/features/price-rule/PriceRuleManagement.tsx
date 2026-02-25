@@ -124,7 +124,7 @@ export const PriceRuleManagement: React.FC = () => {
   };
   const dateStrToTs = (s: string): number | undefined => {
     if (!s) return undefined;
-    return new Date(s + 'T00:00:00').getTime();
+    return new Date(s + 'T00:00:00Z').getTime();
   };
 
   const openCreate = () => {

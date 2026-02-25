@@ -294,7 +294,9 @@
       "status": "状态",
       "active": "启用",
       "inactive": "停用",
-      "required_field": "请填写所有必填项。"
+      "required_field": "请填写所有必填项。",
+      "sort_order": "排序",
+      "search": "搜索..."
     },
     "product": {
       "title": "产品",

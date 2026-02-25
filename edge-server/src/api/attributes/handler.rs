@@ -218,7 +218,7 @@ pub async fn delete(
     )
     .fetch_one(&state.pool)
     .await
-    .unwrap_or(0);
+    .map_err(|e| AppError::database(e.to_string()))?;
 
     if binding_count > 0 {
         return Err(AppError::with_message(
