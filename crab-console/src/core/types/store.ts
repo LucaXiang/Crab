@@ -238,10 +238,16 @@ export interface PriceRuleCreate {
   rule_type: RuleType;
   product_scope: ProductScope;
   target_id?: number;
+  zone_scope?: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
   is_stackable?: boolean;
   is_exclusive?: boolean;
+  valid_from?: number;
+  valid_until?: number;
+  active_days?: number[];
+  active_start_time?: string;
+  active_end_time?: string;
 }
 
 export interface PriceRuleUpdate {
@@ -252,10 +258,16 @@ export interface PriceRuleUpdate {
   rule_type?: RuleType;
   product_scope?: ProductScope;
   target_id?: number;
+  zone_scope?: string;
   adjustment_type?: AdjustmentType;
   adjustment_value?: number;
   is_stackable?: boolean;
   is_exclusive?: boolean;
+  valid_from?: number;
+  valid_until?: number;
+  active_days?: number[];
+  active_start_time?: string;
+  active_end_time?: string;
   is_active?: boolean;
 }
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Percent, X } from 'lucide-react';
+import { Plus, Percent, X, Tag, Settings2, Clock } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -8,7 +8,7 @@ import { ApiError } from '@/infrastructure/api/client';
 import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
-import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
+import { FormField, FormSection, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
 import { formatCurrency } from '@/utils/format';
 import type {
@@ -44,6 +44,8 @@ function formatAdjustment(type: AdjustmentType, value: number): string {
   return formatCurrency(value);
 }
 
+const DAY_INDICES = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun display order
+
 export const PriceRuleManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
@@ -64,16 +66,27 @@ export const PriceRuleManagement: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Form fields
+  // Form fields — basic
   const [formName, setFormName] = useState('');
   const [formDisplayName, setFormDisplayName] = useState('');
   const [formReceiptName, setFormReceiptName] = useState('');
+  const [formDescription, setFormDescription] = useState('');
   const [formRuleType, setFormRuleType] = useState<RuleType>('DISCOUNT');
   const [formProductScope, setFormProductScope] = useState<ProductScope>('GLOBAL');
+  const [formTargetId, setFormTargetId] = useState('');
+  const [formZoneScope, setFormZoneScope] = useState('all');
   const [formAdjustmentType, setFormAdjustmentType] = useState<AdjustmentType>('PERCENTAGE');
   const [formAdjustmentValue, setFormAdjustmentValue] = useState<number>(0);
   const [formIsStackable, setFormIsStackable] = useState(false);
   const [formIsExclusive, setFormIsExclusive] = useState(false);
+  const [formIsActive, setFormIsActive] = useState(true);
+
+  // Form fields — time
+  const [formActiveDays, setFormActiveDays] = useState<number[]>([]);
+  const [formActiveStartTime, setFormActiveStartTime] = useState('');
+  const [formActiveEndTime, setFormActiveEndTime] = useState('');
+  const [formValidFrom, setFormValidFrom] = useState('');
+  const [formValidUntil, setFormValidUntil] = useState('');
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<PriceRule | null>(null);
@@ -103,17 +116,36 @@ export const PriceRuleManagement: React.FC = () => {
     );
   }, [rules, searchQuery]);
 
+  // Helpers: timestamp <-> date string
+  const tsToDateStr = (ts: number | null): string => {
+    if (!ts) return '';
+    return new Date(ts).toISOString().slice(0, 10);
+  };
+  const dateStrToTs = (s: string): number | undefined => {
+    if (!s) return undefined;
+    return new Date(s + 'T00:00:00').getTime();
+  };
+
   const openCreate = () => {
     setEditing(null);
     setFormName('');
     setFormDisplayName('');
     setFormReceiptName('');
+    setFormDescription('');
     setFormRuleType('DISCOUNT');
     setFormProductScope('GLOBAL');
+    setFormTargetId('');
+    setFormZoneScope('all');
     setFormAdjustmentType('PERCENTAGE');
     setFormAdjustmentValue(0);
     setFormIsStackable(false);
     setFormIsExclusive(false);
+    setFormIsActive(true);
+    setFormActiveDays([]);
+    setFormActiveStartTime('');
+    setFormActiveEndTime('');
+    setFormValidFrom('');
+    setFormValidUntil('');
     setFormError('');
     setModalOpen(true);
   };
@@ -123,12 +155,21 @@ export const PriceRuleManagement: React.FC = () => {
     setFormName(rule.name);
     setFormDisplayName(rule.display_name);
     setFormReceiptName(rule.receipt_name);
+    setFormDescription(rule.description ?? '');
     setFormRuleType(rule.rule_type);
     setFormProductScope(rule.product_scope);
+    setFormTargetId(rule.target_id != null ? String(rule.target_id) : '');
+    setFormZoneScope(rule.zone_scope || 'all');
     setFormAdjustmentType(rule.adjustment_type);
     setFormAdjustmentValue(rule.adjustment_value);
     setFormIsStackable(rule.is_stackable);
     setFormIsExclusive(rule.is_exclusive);
+    setFormIsActive(rule.is_active);
+    setFormActiveDays(rule.active_days ?? []);
+    setFormActiveStartTime(rule.active_start_time ?? '');
+    setFormActiveEndTime(rule.active_end_time ?? '');
+    setFormValidFrom(tsToDateStr(rule.valid_from));
+    setFormValidUntil(tsToDateStr(rule.valid_until));
     setFormError('');
     setModalOpen(true);
   };
@@ -143,31 +184,34 @@ export const PriceRuleManagement: React.FC = () => {
     setSaving(true);
     setFormError('');
     try {
+      const common = {
+        name: formName.trim(),
+        display_name: formDisplayName.trim(),
+        receipt_name: formReceiptName.trim(),
+        description: formDescription.trim() || undefined,
+        rule_type: formRuleType,
+        product_scope: formProductScope,
+        target_id: formProductScope !== 'GLOBAL' && formTargetId ? Number(formTargetId) : undefined,
+        zone_scope: formZoneScope !== 'all' ? formZoneScope : undefined,
+        adjustment_type: formAdjustmentType,
+        adjustment_value: formAdjustmentValue,
+        is_stackable: formIsStackable,
+        is_exclusive: formIsExclusive,
+        active_days: formActiveDays.length > 0 ? formActiveDays : undefined,
+        active_start_time: formActiveStartTime || undefined,
+        active_end_time: formActiveEndTime || undefined,
+        valid_from: dateStrToTs(formValidFrom),
+        valid_until: dateStrToTs(formValidUntil),
+      };
+
       if (editing) {
         const payload: PriceRuleUpdate = {
-          name: formName.trim(),
-          display_name: formDisplayName.trim(),
-          receipt_name: formReceiptName.trim(),
-          rule_type: formRuleType,
-          product_scope: formProductScope,
-          adjustment_type: formAdjustmentType,
-          adjustment_value: formAdjustmentValue,
-          is_stackable: formIsStackable,
-          is_exclusive: formIsExclusive,
+          ...common,
+          is_active: formIsActive,
         };
         await updatePriceRule(token, storeId, editing.source_id, payload);
       } else {
-        const payload: PriceRuleCreate = {
-          name: formName.trim(),
-          display_name: formDisplayName.trim(),
-          receipt_name: formReceiptName.trim(),
-          rule_type: formRuleType,
-          product_scope: formProductScope,
-          adjustment_type: formAdjustmentType,
-          adjustment_value: formAdjustmentValue,
-          is_stackable: formIsStackable,
-          is_exclusive: formIsExclusive,
-        };
+        const payload: PriceRuleCreate = common;
         await createPriceRule(token, storeId, payload);
       }
       setModalOpen(false);
@@ -189,6 +233,22 @@ export const PriceRuleManagement: React.FC = () => {
       setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
       setDeleteTarget(null);
     }
+  };
+
+  const handleToggleActive = async (rule: PriceRule) => {
+    if (!token) return;
+    try {
+      await updatePriceRule(token, storeId, rule.source_id, { is_active: !rule.is_active });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
+    }
+  };
+
+  const toggleDay = (day: number) => {
+    setFormActiveDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
   };
 
   const columns: Column<PriceRule>[] = [
@@ -214,7 +274,7 @@ export const PriceRuleManagement: React.FC = () => {
             ? 'bg-orange-50 text-orange-700 border-orange-200'
             : 'bg-purple-50 text-purple-700 border-purple-200'
         }`}>
-          {r.rule_type}
+          {r.rule_type === 'DISCOUNT' ? t('settings.price_rule.type_discount') : t('settings.price_rule.type_surcharge')}
         </span>
       ),
     },
@@ -233,7 +293,9 @@ export const PriceRuleManagement: React.FC = () => {
       header: t('settings.price_rule.scope'),
       width: '100px',
       render: (r) => (
-        <span className="text-sm text-gray-600">{r.product_scope}</span>
+        <span className="text-sm text-gray-600">
+          {productScopeOptions.find(o => o.value === r.product_scope)?.label ?? r.product_scope}
+        </span>
       ),
     },
     {
@@ -241,11 +303,14 @@ export const PriceRuleManagement: React.FC = () => {
       header: t('settings.common.status'),
       width: '100px',
       render: (r) => (
-        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-          r.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-        }`}>
+        <button
+          onClick={(ev) => { ev.stopPropagation(); handleToggleActive(r); }}
+          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+            r.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+        >
           {r.is_active ? t('settings.common.active') : t('settings.common.inactive')}
-        </span>
+        </button>
       ),
     },
   ];
@@ -319,6 +384,7 @@ export const PriceRuleManagement: React.FC = () => {
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
               )}
 
+              {/* Basic info */}
               <FormField label={t('settings.price_rule.name')} required>
                 <input
                   type="text"
@@ -349,19 +415,22 @@ export const PriceRuleManagement: React.FC = () => {
                 />
               </FormField>
 
+              <FormField label={t('settings.price_rule.description')}>
+                <textarea
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className={`${inputClass} resize-none`}
+                  rows={2}
+                  placeholder={t('settings.price_rule.description_placeholder')}
+                />
+              </FormField>
+
+              {/* Rule type & adjustment */}
               <SelectField
                 label={t('settings.price_rule.type')}
                 value={formRuleType}
                 onChange={(v) => setFormRuleType(v as RuleType)}
                 options={ruleTypeOptions}
-                required
-              />
-
-              <SelectField
-                label={t('settings.price_rule.scope')}
-                value={formProductScope}
-                onChange={(v) => setFormProductScope(v as ProductScope)}
-                options={productScopeOptions}
                 required
               />
 
@@ -385,7 +454,101 @@ export const PriceRuleManagement: React.FC = () => {
                 />
               </FormField>
 
-              <div className="space-y-2">
+              {/* Scope section */}
+              <FormSection title={t('settings.price_rule.scope')} icon={Tag}>
+                <SelectField
+                  label={t('settings.price_rule.scope')}
+                  value={formProductScope}
+                  onChange={(v) => setFormProductScope(v as ProductScope)}
+                  options={productScopeOptions}
+                  required
+                />
+
+                {formProductScope !== 'GLOBAL' && (
+                  <FormField label={t('settings.price_rule.target_id')}>
+                    <input
+                      type="number"
+                      value={formTargetId}
+                      onChange={(e) => setFormTargetId(e.target.value)}
+                      className={inputClass}
+                      placeholder={t('settings.price_rule.target_id_placeholder')}
+                    />
+                  </FormField>
+                )}
+
+                <FormField label={t('settings.price_rule.zone_scope')}>
+                  <input
+                    type="text"
+                    value={formZoneScope}
+                    onChange={(e) => setFormZoneScope(e.target.value)}
+                    className={inputClass}
+                    placeholder={t('settings.price_rule.zone_all')}
+                  />
+                </FormField>
+              </FormSection>
+
+              {/* Time section */}
+              <FormSection title={t('settings.price_rule.section_time')} icon={Clock} defaultCollapsed>
+                <FormField label={t('settings.price_rule.active_days')}>
+                  <div className="flex flex-wrap gap-2">
+                    {DAY_INDICES.map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                          formActiveDays.includes(day)
+                            ? 'bg-orange-50 text-orange-700 border-orange-300'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {t(`settings.price_rule.day_${day}`)}
+                      </button>
+                    ))}
+                  </div>
+                </FormField>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label={t('settings.price_rule.active_start_time')}>
+                    <input
+                      type="time"
+                      value={formActiveStartTime}
+                      onChange={(e) => setFormActiveStartTime(e.target.value)}
+                      className={inputClass}
+                    />
+                  </FormField>
+                  <FormField label={t('settings.price_rule.active_end_time')}>
+                    <input
+                      type="time"
+                      value={formActiveEndTime}
+                      onChange={(e) => setFormActiveEndTime(e.target.value)}
+                      className={inputClass}
+                    />
+                  </FormField>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label={t('settings.price_rule.valid_from')}>
+                    <input
+                      type="date"
+                      value={formValidFrom}
+                      onChange={(e) => setFormValidFrom(e.target.value)}
+                      className={inputClass}
+                    />
+                  </FormField>
+                  <FormField label={t('settings.price_rule.valid_until')}>
+                    <input
+                      type="date"
+                      value={formValidUntil}
+                      onChange={(e) => setFormValidUntil(e.target.value)}
+                      className={inputClass}
+                    />
+                  </FormField>
+                </div>
+              </FormSection>
+
+              {/* Options section */}
+              <FormSection title={t('settings.price_rule.adjustment')} icon={Settings2}>
                 <CheckboxField
                   id="is_stackable"
                   label={t('settings.price_rule.is_stackable')}
@@ -400,7 +563,16 @@ export const PriceRuleManagement: React.FC = () => {
                   checked={formIsExclusive}
                   onChange={setFormIsExclusive}
                 />
-              </div>
+
+                {editing && (
+                  <CheckboxField
+                    id="is_active"
+                    label={t('settings.common.active')}
+                    checked={formIsActive}
+                    onChange={setFormIsActive}
+                  />
+                )}
+              </FormSection>
             </div>
 
             {/* Modal Footer */}
