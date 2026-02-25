@@ -385,6 +385,9 @@ impl ServerState {
         // PrintRecordCleanup: 清理过期打印记录
         self.register_print_record_cleanup(&mut tasks);
 
+        // ArchiveDetailCleanup: 清理已同步到云端的旧订单详情
+        self.register_archive_detail_cleanup(&mut tasks);
+
         // VerifyScheduler: 归档哈希链验证（启动补扫 + 每日触发）
         self.register_verify_scheduler(&mut tasks);
 
@@ -713,6 +716,71 @@ impl ServerState {
                 }
             }
         });
+    }
+
+    /// 清理已同步到云端且超过 90 天的订单详情子表
+    ///
+    /// 保留 archived_order 摘要行（小、hash chain、收据补打需要），
+    /// 仅删除 item/option/payment/event 行以释放 SQLite 空间。
+    fn register_archive_detail_cleanup(&self, tasks: &mut BackgroundTasks) {
+        const CLEANUP_INTERVAL_SECS: u64 = 24 * 3600; // daily
+        const RETENTION_DAYS: i64 = 90;
+
+        let pool = self.pool.clone();
+        let shutdown = tasks.shutdown_token();
+
+        tasks.spawn(
+            "archive_detail_cleanup",
+            TaskKind::Periodic,
+            async move {
+                let cutoff_ms = || {
+                    shared::util::now_millis() - RETENTION_DAYS * 24 * 3600 * 1000
+                };
+
+                // Cleanup on startup
+                match crate::db::repository::order::cleanup_synced_order_details(
+                    &pool,
+                    cutoff_ms(),
+                )
+                .await
+                {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(
+                            deleted = count,
+                            "Cleaned up old synced order details on startup (>{RETENTION_DAYS}d)"
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!("Archive detail cleanup failed on startup: {e}");
+                    }
+                }
+
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                    CLEANUP_INTERVAL_SECS,
+                ));
+                interval.tick().await;
+
+                loop {
+                    tokio::select! {
+                        _ = shutdown.cancelled() => break,
+                        _ = interval.tick() => {
+                            match crate::db::repository::order::cleanup_synced_order_details(
+                                &pool, cutoff_ms(),
+                            ).await {
+                                Ok(count) if count > 0 => {
+                                    tracing::info!(deleted = count, "Cleaned up old synced order details");
+                                }
+                                Ok(_) => {}
+                                Err(e) => {
+                                    tracing::warn!("Archive detail cleanup failed: {e}");
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        );
     }
 
     /// 注册归档验证调度器

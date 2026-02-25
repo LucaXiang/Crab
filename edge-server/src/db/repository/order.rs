@@ -615,3 +615,75 @@ pub async fn build_order_detail_sync(
         },
     })
 }
+
+/// Delete detail sub-table rows for orders that have been synced to cloud
+/// and are older than `cutoff_millis` (Unix ms).
+/// Keeps the archived_order summary row intact.
+/// Returns the total number of detail rows deleted.
+pub async fn cleanup_synced_order_details(
+    pool: &SqlitePool,
+    cutoff_millis: i64,
+) -> RepoResult<u64> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| RepoError::Database(e.to_string()))?;
+
+    let mut total: u64 = 0;
+
+    // 1. Delete item options (child of items)
+    let r = sqlx::query(
+        "DELETE FROM archived_order_item_option WHERE item_pk IN (\
+            SELECT i.id FROM archived_order_item i \
+            JOIN archived_order o ON i.order_pk = o.id \
+            WHERE o.cloud_synced = 1 AND o.end_time < ?1\
+        )",
+    )
+    .bind(cutoff_millis)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| RepoError::Database(e.to_string()))?;
+    total += r.rows_affected();
+
+    // 2. Delete items
+    let r = sqlx::query(
+        "DELETE FROM archived_order_item WHERE order_pk IN (\
+            SELECT id FROM archived_order WHERE cloud_synced = 1 AND end_time < ?1\
+        )",
+    )
+    .bind(cutoff_millis)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| RepoError::Database(e.to_string()))?;
+    total += r.rows_affected();
+
+    // 3. Delete payments
+    let r = sqlx::query(
+        "DELETE FROM archived_order_payment WHERE order_pk IN (\
+            SELECT id FROM archived_order WHERE cloud_synced = 1 AND end_time < ?1\
+        )",
+    )
+    .bind(cutoff_millis)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| RepoError::Database(e.to_string()))?;
+    total += r.rows_affected();
+
+    // 4. Delete events
+    let r = sqlx::query(
+        "DELETE FROM archived_order_event WHERE order_pk IN (\
+            SELECT id FROM archived_order WHERE cloud_synced = 1 AND end_time < ?1\
+        )",
+    )
+    .bind(cutoff_millis)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| RepoError::Database(e.to_string()))?;
+    total += r.rows_affected();
+
+    tx.commit()
+        .await
+        .map_err(|e| RepoError::Database(e.to_string()))?;
+
+    Ok(total)
+}
