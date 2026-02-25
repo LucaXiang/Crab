@@ -684,13 +684,11 @@ impl CatalogService {
         items: &[shared::cloud::store_op::SortOrderItem],
     ) -> RepoResult<()> {
         for item in items {
-            sqlx::query!(
-                "UPDATE product SET sort_order = ?1 WHERE id = ?2",
-                item.sort_order,
-                item.id
-            )
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("UPDATE product SET sort_order = ?1 WHERE id = ?2")
+                .bind(item.sort_order)
+                .bind(item.id)
+                .execute(&self.pool)
+                .await?;
         }
         // Update cache
         {
@@ -1085,13 +1083,11 @@ impl CatalogService {
         items: &[shared::cloud::store_op::SortOrderItem],
     ) -> RepoResult<()> {
         for item in items {
-            sqlx::query!(
-                "UPDATE category SET sort_order = ?1 WHERE id = ?2",
-                item.sort_order,
-                item.id
-            )
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("UPDATE category SET sort_order = ?1 WHERE id = ?2")
+                .bind(item.sort_order)
+                .bind(item.id)
+                .execute(&self.pool)
+                .await?;
         }
         // Update cache
         {
