@@ -31,6 +31,7 @@ pub async fn get_stats(
     let reports = tenant_queries::list_daily_reports(
         &state.pool,
         store_id,
+        &identity.tenant_id,
         query.from.as_deref(),
         query.to.as_deref(),
     )

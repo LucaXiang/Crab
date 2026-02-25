@@ -152,6 +152,16 @@ export async function getImageBlobUrl(token: string, hash: string): Promise<stri
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data?.message ?? 'Image not found', data?.code ?? null);
+  // Validate presigned URL is from expected S3 domain
+  try {
+    const parsed = new URL(data.url);
+    if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.amazonaws.com')) {
+      throw new ApiError(400, 'Invalid image URL', null);
+    }
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(400, 'Invalid image URL', null);
+  }
   // Fetch from presigned S3 URL and create blob URL
   const imgRes = await fetch(data.url);
   if (!imgRes.ok) throw new ApiError(imgRes.status, 'Failed to load image', null);

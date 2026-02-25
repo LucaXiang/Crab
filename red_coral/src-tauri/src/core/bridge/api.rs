@@ -111,6 +111,15 @@ impl ClientBridge {
         Ok(())
     }
 
+    /// 获取 Server 模式的 ServerState (用于同进程直接调用 edge-server 逻辑)
+    pub async fn get_server_state(&self) -> Option<Arc<edge_server::ServerState>> {
+        let mode = self.mode.read().await;
+        match &*mode {
+            ClientMode::Server { server_state, .. } => Some(server_state.clone()),
+            _ => None,
+        }
+    }
+
     /// 获取 Client 模式的 mTLS HTTP client 和相关信息
     ///
     /// 返回 (edge_url, http_client, token) 用于需要直接访问 EdgeServer 的场景 (如图片上传)

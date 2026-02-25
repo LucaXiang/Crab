@@ -1,125 +1,92 @@
-use std::fs::{self, File};
-use std::io::{Read, Write};
-use tauri::{AppHandle, Manager};
-use zip::write::FileOptions;
-use zip::{ZipArchive, ZipWriter};
+use std::sync::Arc;
+use tauri::State;
 
+use crate::core::bridge::ClientBridge;
 use crate::core::ApiResponse;
 
-fn zip_dir(
-    it: &mut std::fs::ReadDir,
-    prefix: &str,
-    writer: &mut ZipWriter<File>,
-    options: FileOptions<()>,
-) -> zip::result::ZipResult<()> {
-    for entry in it {
-        let entry = entry?;
-        let path = entry.path();
-        let name = path
-            .file_name()
-            .ok_or(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid file name",
-            ))?
-            .to_str()
-            .ok_or(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid UTF-8 name",
-            ))?;
-        let path_as_string = format!("{}{}", prefix, name);
-
-        if path.is_dir() {
-            writer.add_directory(&path_as_string, options)?;
-            let mut dir_it = fs::read_dir(&path)?;
-            zip_dir(
-                &mut dir_it,
-                &format!("{}/", path_as_string),
-                writer,
-                options,
-            )?;
-        } else {
-            writer.start_file(&path_as_string, options)?;
-            let mut f = File::open(&path)?;
-            let mut buffer = Vec::new();
-            f.read_to_end(&mut buffer)?;
-            writer.write_all(&buffer)?;
-        }
-    }
-    Ok(())
-}
-
 #[tauri::command]
-pub async fn export_data(app: AppHandle, path: String) -> Result<ApiResponse<()>, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-
-    let file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
-    let mut zip = ZipWriter::new(file);
-    let options: FileOptions<()> = FileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated)
-        .unix_permissions(0o755);
-
-    // Backup config.json
-    let config_file = app_dir.join("config.json");
-    if config_file.exists() {
-        zip.start_file("config.json", options)
+pub async fn export_data(
+    bridge: State<'_, Arc<ClientBridge>>,
+    path: String,
+) -> Result<ApiResponse<()>, String> {
+    // Server mode: call edge-server export directly (in-process, zero network)
+    if let Some(server_state) = bridge.get_server_state().await {
+        let zip_bytes = edge_server::api::data_transfer::export_zip(&server_state)
+            .await
             .map_err(|e| e.to_string())?;
-        let mut f = File::open(config_file).map_err(|e| e.to_string())?;
-        let mut buffer = Vec::new();
-        f.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
-        zip.write_all(&buffer).map_err(|e| e.to_string())?;
+        tokio::fs::write(&path, &zip_bytes)
+            .await
+            .map_err(|e| format!("Failed to write file: {e}"))?;
+        return Ok(ApiResponse::success(()));
     }
 
-    // Backup tenants directory
-    let tenants_dir = app_dir.join("tenants");
-    if tenants_dir.exists() {
-        if let Ok(mut it) = fs::read_dir(&tenants_dir) {
-            zip.add_directory("tenants/", options)
-                .map_err(|e| e.to_string())?;
-            zip_dir(&mut it, "tenants/", &mut zip, options).map_err(|e| e.to_string())?;
-        }
+    // Client mode: GET /api/data-transfer/export via mTLS
+    let (edge_url, http_client, token) = bridge
+        .get_edge_http_context()
+        .await
+        .ok_or_else(|| "Not connected to edge server".to_string())?;
+
+    let resp = http_client
+        .get(format!("{edge_url}/api/data-transfer/export"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| format!("Export request failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Export failed with status: {}", resp.status()));
     }
 
-    zip.finish()
-        .map_err(|e| format!("Failed to finish zip: {}", e))?;
+    let zip_bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response: {e}"))?;
+
+    tokio::fs::write(&path, &zip_bytes)
+        .await
+        .map_err(|e| format!("Failed to write file: {e}"))?;
 
     Ok(ApiResponse::success(()))
 }
 
 #[tauri::command]
-pub async fn import_data(app: AppHandle, path: String) -> Result<ApiResponse<()>, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+pub async fn import_data(
+    bridge: State<'_, Arc<ClientBridge>>,
+    path: String,
+) -> Result<ApiResponse<()>, String> {
+    let zip_bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|e| format!("Failed to read file: {e}"))?;
 
-    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let mut archive = ZipArchive::new(file).map_err(|e| format!("Failed to read zip: {}", e))?;
+    // Server mode: call edge-server import directly (in-process, zero network)
+    if let Some(server_state) = bridge.get_server_state().await {
+        edge_server::api::data_transfer::import_zip(&server_state, &zip_bytes)
+            .await
+            .map_err(|e| e.to_string())?;
+        return Ok(ApiResponse::success(()));
+    }
 
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => app_dir.join(path),
-            None => continue,
-        };
+    // Client mode: POST /api/data-transfer/import via mTLS
+    let (edge_url, http_client, token) = bridge
+        .get_edge_http_context()
+        .await
+        .ok_or_else(|| "Not connected to edge server".to_string())?;
 
-        if (*file.name()).ends_with('/') {
-            fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
-        } else {
-            if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(p).map_err(|e| e.to_string())?;
-                }
-            }
-            let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
-            std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
-        }
+    let resp = http_client
+        .post(format!("{edge_url}/api/data-transfer/import"))
+        .bearer_auth(&token)
+        .header("content-type", "application/zip")
+        .body(zip_bytes)
+        .send()
+        .await
+        .map_err(|e| format!("Import request failed: {e}"))?;
 
-        // Get and Set permissions
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if let Some(mode) = file.unix_mode() {
-                fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))
-                    .map_err(|e| e.to_string())?;
-            }
-        }
+    if !resp.status().is_success() {
+        let body = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "unknown error".to_string());
+        return Err(format!("Import failed: {body}"));
     }
 
     Ok(ApiResponse::success(()))

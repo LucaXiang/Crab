@@ -37,7 +37,8 @@
 		try {
 			const res = await register({ email, password, plan: selectedPlan });
 			if (res.status === 'verified') {
-				window.location.href = 'https://console.redcoral.app/login?email=' + encodeURIComponent(email) + '&verified=1';
+				sessionStorage.setItem('redcoral-login-email', email);
+				window.location.href = 'https://console.redcoral.app/login?verified=1';
 			} else {
 				sessionStorage.setItem('redcoral-verify-email', email);
 				goto('/verify');

@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
 };
 use shared::cloud::store_op::{StoreOp, StoreOpResult};
-use shared::error::AppError;
+use shared::error::{AppError, ErrorCode};
 
 use crate::auth::tenant_auth::TenantIdentity;
 use crate::db::store;
@@ -125,6 +125,13 @@ pub async fn bulk_delete_products(
     Json(req): Json<BulkDeleteRequest>,
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    if req.ids.len() > 200 {
+        return Err(AppError::with_message(
+            ErrorCode::ValidationFailed,
+            "Too many IDs (max 200)",
+        ));
+    }
 
     store::bulk_delete_products(&state.pool, store_id, &req.ids)
         .await

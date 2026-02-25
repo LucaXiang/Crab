@@ -110,6 +110,10 @@ export const SettingsScreen: React.FC = () => {
     if (!token) return;
     try {
       const res = await createBillingPortal(token);
+      try {
+        const parsed = new URL(res.url);
+        if (parsed.protocol !== 'https:' || (parsed.hostname !== 'billing.stripe.com' && parsed.hostname !== 'checkout.stripe.com')) return;
+      } catch { return; }
       window.open(res.url, '_blank');
     } catch { /* ignore */ }
   };

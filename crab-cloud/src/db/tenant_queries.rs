@@ -207,22 +207,26 @@ pub struct DailyReportEntry {
 pub async fn list_daily_reports(
     pool: &PgPool,
     edge_server_id: i64,
+    tenant_id: &str,
     from: Option<&str>,
     to: Option<&str>,
 ) -> Result<Vec<DailyReportEntry>, BoxError> {
     let rows: Vec<DailyReportEntry> = sqlx::query_as(
         r#"
-        SELECT id, business_date, total_orders, completed_orders, void_orders,
-               total_sales, total_paid, total_unpaid, void_amount,
-               total_tax, total_discount, total_surcharge, updated_at
-        FROM store_daily_reports
-        WHERE edge_server_id = $1
-            AND ($2::TEXT IS NULL OR business_date >= $2)
-            AND ($3::TEXT IS NULL OR business_date <= $3)
-        ORDER BY business_date DESC
+        SELECT dr.id, dr.business_date, dr.total_orders, dr.completed_orders, dr.void_orders,
+               dr.total_sales, dr.total_paid, dr.total_unpaid, dr.void_amount,
+               dr.total_tax, dr.total_discount, dr.total_surcharge, dr.updated_at
+        FROM store_daily_reports dr
+        JOIN edge_servers es ON es.id = dr.edge_server_id
+        WHERE dr.edge_server_id = $1
+            AND es.tenant_id = $2
+            AND ($3::TEXT IS NULL OR dr.business_date >= $3)
+            AND ($4::TEXT IS NULL OR dr.business_date <= $4)
+        ORDER BY dr.business_date DESC
         "#,
     )
     .bind(edge_server_id)
+    .bind(tenant_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)

@@ -40,9 +40,14 @@ export async function request<T>(
 export async function requestFormData<T>(
   path: string,
   formData: FormData,
+  token?: string,
 ): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
+    headers,
     body: formData,
   });
 

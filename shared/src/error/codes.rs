@@ -117,6 +117,18 @@ pub enum ErrorCode {
     CertificateMissingDeviceId = 3021,
     /// Resource limit exceeded (e.g. max products per store)
     ResourceLimitExceeded = 3022,
+    /// P12/PFX file format invalid (not a valid PKCS#12 DER file)
+    P12InvalidFormat = 3023,
+    /// P12 password incorrect
+    P12WrongPassword = 3024,
+    /// P12 file contains no private key (required for signing)
+    P12MissingPrivateKey = 3025,
+    /// P12 file contains no certificate
+    P12MissingCertificate = 3026,
+    /// P12 certificate chain signature verification failed
+    P12ChainVerifyFailed = 3027,
+    /// P12 root CA not recognized by AEAT (untrusted issuer)
+    P12UntrustedCa = 3028,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -355,6 +367,12 @@ impl ErrorCode {
             ErrorCode::DeviceIdMismatch => "Hardware ID mismatch with certificate",
             ErrorCode::CertificateMissingDeviceId => "Certificate missing device_id extension",
             ErrorCode::ResourceLimitExceeded => "Resource limit exceeded",
+            ErrorCode::P12InvalidFormat => "Invalid P12/PFX file format",
+            ErrorCode::P12WrongPassword => "Incorrect P12 password",
+            ErrorCode::P12MissingPrivateKey => "P12 file contains no private key",
+            ErrorCode::P12MissingCertificate => "P12 file contains no certificate",
+            ErrorCode::P12ChainVerifyFailed => "Certificate chain verification failed",
+            ErrorCode::P12UntrustedCa => "Certificate root CA not recognized by AEAT",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -526,6 +544,12 @@ impl TryFrom<u16> for ErrorCode {
             3020 => Ok(ErrorCode::DeviceIdMismatch),
             3021 => Ok(ErrorCode::CertificateMissingDeviceId),
             3022 => Ok(ErrorCode::ResourceLimitExceeded),
+            3023 => Ok(ErrorCode::P12InvalidFormat),
+            3024 => Ok(ErrorCode::P12WrongPassword),
+            3025 => Ok(ErrorCode::P12MissingPrivateKey),
+            3026 => Ok(ErrorCode::P12MissingCertificate),
+            3027 => Ok(ErrorCode::P12ChainVerifyFailed),
+            3028 => Ok(ErrorCode::P12UntrustedCa),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
@@ -921,7 +945,8 @@ mod tests {
             1001, 1002, 1003, 1004, 1005, 1006, 1007, // 1xxx Auth (7)
             2001, 2002, 2003, 2004, 2005, // 2xxx Permission (5)
             3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, // 3xxx Tenant
-            3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, // (22)
+            3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, 3023, 3024,
+            3025, 3026, 3027, 3028, // P12 errors (28)
             4001, 4002, 4003, 4004, 4005, 4006, 4007, // 4xxx Order (7)
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
@@ -947,7 +972,7 @@ mod tests {
             9401, 9402, 9403, 9404, // 94xx Storage (15)
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 118;
+        const EXPECTED_VARIANT_COUNT: usize = 124;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

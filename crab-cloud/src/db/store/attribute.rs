@@ -593,6 +593,38 @@ pub async fn batch_update_option_sort_order(
     Ok(())
 }
 
+// ── Binding Read ──
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct StoreBinding {
+    pub source_id: i64,
+    pub owner_type: String,
+    pub owner_source_id: i64,
+    pub attribute_source_id: i64,
+    pub is_required: bool,
+    pub display_order: i32,
+    pub default_option_ids: Option<serde_json::Value>,
+}
+
+pub async fn list_all_bindings(
+    pool: &PgPool,
+    edge_server_id: i64,
+) -> Result<Vec<StoreBinding>, BoxError> {
+    let rows: Vec<StoreBinding> = sqlx::query_as(
+        r#"
+        SELECT source_id, owner_type, owner_source_id, attribute_source_id,
+               is_required, display_order, default_option_ids
+        FROM store_attribute_bindings
+        WHERE edge_server_id = $1
+        ORDER BY owner_type, owner_source_id, display_order
+        "#,
+    )
+    .bind(edge_server_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 // ── Binding CRUD ──
 
 pub struct BindAttributeParams<'a> {

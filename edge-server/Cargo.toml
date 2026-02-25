@@ -72,6 +72,9 @@ rustls-pemfile.workspace = true
 # Image processing
 image.workspace = true
 
+# Archive
+zip.workspace = true
+
 # Other utilities
 dotenvy.workspace = true
 dashmap.workspace = true

@@ -44,18 +44,21 @@ pub async fn handle_console_ws(
 
     let tenant_id = claims.sub;
 
-    // Check concurrent connection limit
-    let count = state
-        .console_connections
-        .entry(tenant_id.clone())
-        .or_insert_with(|| std::sync::atomic::AtomicUsize::new(0))
-        .load(std::sync::atomic::Ordering::Relaxed);
-    if count >= MAX_CONSOLE_WS_PER_TENANT {
-        return Err(AppError::with_message(
-            ErrorCode::ResourceLimitExceeded,
-            format!("Too many console connections ({count}/{MAX_CONSOLE_WS_PER_TENANT})"),
-        ));
-    }
+    // Check concurrent connection limit (atomic increment to avoid TOCTOU race)
+    {
+        let counter = state
+            .console_connections
+            .entry(tenant_id.clone())
+            .or_insert_with(|| std::sync::atomic::AtomicUsize::new(0));
+        let prev = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if prev >= MAX_CONSOLE_WS_PER_TENANT {
+            counter.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            return Err(AppError::with_message(
+                ErrorCode::ResourceLimitExceeded,
+                format!("Too many console connections ({prev}/{MAX_CONSOLE_WS_PER_TENANT})"),
+            ));
+        }
+    } // drop RefMut before moving state into on_upgrade closure
 
     Ok(ws.on_upgrade(move |socket| console_ws_session(socket, state, tenant_id)))
 }
@@ -65,12 +68,7 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
 
     tracing::info!(tenant_id = %tenant_id, "Console WS connected");
 
-    // Track connection count
-    state
-        .console_connections
-        .entry(tenant_id.clone())
-        .or_insert_with(|| std::sync::atomic::AtomicUsize::new(0))
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // Connection count already incremented in handler (atomic TOCTOU fix)
 
     // 订阅 LiveOrderHub
     let mut hub_rx = state.live_orders.subscribe(&tenant_id);

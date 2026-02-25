@@ -17,6 +17,9 @@ const TRUSTED_ROOT_FINGERPRINTS: &[&str] = &[
     "2530cc8e98321502bad96f9b1fba1b099e2d299e0f4548bb914f363bc0d4531f",
     // Autoridad de Certificacion Firmaprofesional
     "04048028bf1f2864d48f9ad4d83294366a828856553f3b14303f90147f5d40ef",
+    // === DEV ONLY: Test Root CA (generated for local testing) ===
+    #[cfg(debug_assertions)]
+    "2c3919f6ff94c7da31d4a929461341974121a66111bc1addd8b75958cee9df7f",
 ];
 
 /// P12 证书解析结果 (西班牙电子签名证书)
@@ -94,48 +97,39 @@ impl P12CertInfo {
 pub fn parse_p12(data: &[u8], password: &str) -> Result<P12CertInfo> {
     // 用 OpenSSL 解析 P12 (能处理 BER 编码)
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(data)
-        .map_err(|e| CertError::ValidationFailed(format!("Invalid P12 file: {e}")))?;
+        .map_err(|e| CertError::P12InvalidFormat(e.to_string()))?;
 
-    let parsed = pkcs12.parse2(password).map_err(|e| {
-        CertError::ValidationFailed(format!("Wrong P12 password or corrupted: {e}"))
-    })?;
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| CertError::P12WrongPassword(e.to_string()))?;
 
     // 必须包含私钥 (签名用)
     if parsed.pkey.is_none() {
-        return Err(CertError::ValidationFailed(
-            "P12 contains no private key for signing".into(),
-        ));
+        return Err(CertError::P12MissingPrivateKey);
     }
 
     // 叶子证书
-    let leaf_cert = parsed
-        .cert
-        .ok_or_else(|| CertError::ValidationFailed("P12 contains no certificate".into()))?;
+    let leaf_cert = parsed.cert.ok_or(CertError::P12MissingCertificate)?;
 
-    // 收集完整证书链的 DER: [leaf, ...intermediates, root]
-    let leaf_der = leaf_cert
-        .to_der()
-        .map_err(|e| CertError::ValidationFailed(format!("Cert DER encode error: {e}")))?;
-
-    let mut cert_ders = vec![leaf_der];
-    if let Some(ref ca_certs) = parsed.ca {
+    // 收集完整证书链: [leaf, ...CA certs]
+    let mut certs = vec![leaf_cert.clone()];
+    if let Some(ca_certs) = parsed.ca {
         for ca in ca_certs {
-            let der = ca.to_der().map_err(|e| {
-                CertError::ValidationFailed(format!("CA cert DER encode error: {e}"))
-            })?;
-            cert_ders.push(der);
+            certs.push(ca);
         }
     }
 
-    // === 证书链验证 ===
-    let cert_der_refs: Vec<&[u8]> = cert_ders.iter().map(|d| d.as_slice()).collect();
-    verify_chain(&cert_der_refs)?;
+    // === 证书链验证 (使用 OpenSSL 签名验证) ===
+    verify_chain(&certs)?;
 
-    // SHA256 指纹 (叶子证书)
-    let fingerprint = hex::encode(Sha256::digest(&cert_ders[0]));
+    // SHA256 指纹 (叶子证书 DER)
+    let leaf_der = leaf_cert
+        .to_der()
+        .map_err(|e| CertError::ValidationFailed(format!("Cert DER encode error: {e}")))?;
+    let fingerprint = hex::encode(Sha256::digest(&leaf_der));
 
     // 用 x509-parser 解析叶子证书以提取 Subject DN
-    let (_, x509) = x509_parser::parse_x509_certificate(&cert_ders[0])
+    let (_, x509) = x509_parser::parse_x509_certificate(&leaf_der)
         .map_err(|e| CertError::ValidationFailed(format!("Failed to parse X.509: {e}")))?;
 
     // === 提取 Issuer ===
@@ -205,59 +199,54 @@ pub fn parse_p12(data: &[u8], password: &str) -> Result<P12CertInfo> {
     })
 }
 
-/// 验证 P12 内部证书链
+/// 验证 P12 内部证书链 (使用 OpenSSL 签名验证)
 ///
 /// 1. 验证链中每一级的签名 (cert[i] 由 cert[i+1] 签发)
 /// 2. 链的最顶层证书 (root/anchor) 的 SHA256 指纹必须在受信列表中
-fn verify_chain(cert_ders: &[&[u8]]) -> Result<()> {
+fn verify_chain(certs: &[openssl::x509::X509]) -> Result<()> {
     // 验证链中每一级签名
-    for i in 0..cert_ders.len().saturating_sub(1) {
-        let child = cert_ders[i];
-        let parent = cert_ders[i + 1];
+    for i in 0..certs.len().saturating_sub(1) {
+        let child = &certs[i];
+        let parent = &certs[i + 1];
 
-        let parent_pem = pem_from_der(parent);
-        let child_tbs = crate::trust::extract_tbs_from_der(child)?;
+        let parent_pubkey = parent
+            .public_key()
+            .map_err(|e| CertError::P12ChainVerifyFailed(format!("Extract public key: {e}")))?;
 
-        let (_, child_x509) = x509_parser::parse_x509_certificate(child)
-            .map_err(|e| CertError::ValidationFailed(format!("Chain cert parse error: {e}")))?;
-
-        crate::crypto::verify(&parent_pem, child_tbs, child_x509.signature_value.as_ref())
-            .map_err(|_| {
-                CertError::ValidationFailed(
-                    "Certificate chain signature verification failed".into(),
-                )
-            })?;
+        child.verify(&parent_pubkey).map_err(|_| {
+            let child_cn = child
+                .subject_name()
+                .entries_by_nid(openssl::nid::Nid::COMMONNAME)
+                .next()
+                .and_then(|e| e.data().as_utf8().ok())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            CertError::P12ChainVerifyFailed(format!("cert '{child_cn}' not signed by its parent"))
+        })?;
     }
 
     // 链的最顶层证书应该是受信任的根 CA
-    let anchor = cert_ders.last().unwrap();
-    let anchor_fingerprint = hex::encode(Sha256::digest(anchor));
+    let anchor = certs.last().unwrap();
+    let anchor_der = anchor
+        .to_der()
+        .map_err(|e| CertError::P12ChainVerifyFailed(format!("Anchor DER encode: {e}")))?;
+    let anchor_fingerprint = hex::encode(Sha256::digest(&anchor_der));
 
     if !TRUSTED_ROOT_FINGERPRINTS.contains(&anchor_fingerprint.as_str()) {
-        let (_, anchor_x509) = x509_parser::parse_x509_certificate(anchor)
-            .map_err(|e| CertError::ValidationFailed(format!("Anchor parse error: {e}")))?;
-
-        let issuer_org = anchor_x509
-            .issuer()
-            .iter_organization()
+        let issuer_org = anchor
+            .issuer_name()
+            .entries_by_nid(openssl::nid::Nid::ORGANIZATIONNAME)
             .next()
-            .and_then(|o| o.as_str().ok())
-            .unwrap_or("Unknown");
+            .and_then(|e| e.data().as_utf8().ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
 
-        return Err(CertError::ValidationFailed(format!(
-            "Certificate root CA not recognized by AEAT (fingerprint: {anchor_fingerprint}, issuer: {issuer_org}). \
-             Contact support to add your CA."
+        return Err(CertError::P12UntrustedCa(format!(
+            "issuer: {issuer_org}, fingerprint: {anchor_fingerprint}"
         )));
     }
 
     Ok(())
-}
-
-/// DER 转 PEM
-fn pem_from_der(der: &[u8]) -> String {
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(der);
-    format!("-----BEGIN CERTIFICATE-----\n{b64}\n-----END CERTIFICATE-----")
 }
 
 #[cfg(test)]
@@ -326,6 +315,69 @@ mod tests {
 
         // 打印全部信息供人工检查
         eprintln!("=== P12CertInfo ===");
+        eprintln!("fingerprint:     {}", info.fingerprint);
+        eprintln!("common_name:     {}", info.common_name);
+        eprintln!("serial_number:   {:?}", info.serial_number);
+        eprintln!("organization_id: {:?}", info.organization_id);
+        eprintln!("organization:    {:?}", info.organization);
+        eprintln!("given_name:      {:?}", info.given_name);
+        eprintln!("surname:         {:?}", info.surname);
+        eprintln!("country:         {:?}", info.country);
+        eprintln!("issuer:          {}", info.issuer);
+        eprintln!("tax_id():        {:?}", info.tax_id());
+        eprintln!("not_before:      {}", info.not_before);
+        eprintln!("expires_at:      {}", info.expires_at);
+    }
+
+    /// 用生成的测试证书验证完整 P12 解析流程
+    ///
+    /// 需要:
+    /// - /tmp/test-p12/test_cert.p12 (测试用生成证书)
+    /// 跳过条件: 文件不存在时自动 skip
+    #[test]
+    fn test_parse_generated_test_p12() {
+        let p12_path = "/tmp/test-p12/test_cert.p12";
+        let password = "1234";
+
+        let data = match std::fs::read(p12_path) {
+            Ok(d) => d,
+            Err(_) => {
+                eprintln!("SKIP: {p12_path} not found");
+                return;
+            }
+        };
+
+        let info = parse_p12(&data, password).expect("parse_p12 should succeed");
+
+        // 基础字段
+        assert!(!info.fingerprint.is_empty());
+        assert!(info.not_before < info.expires_at);
+
+        // Subject 字段
+        assert!(
+            info.common_name.contains("EMPRESA TEST"),
+            "got: {}",
+            info.common_name
+        );
+
+        // 税号
+        let sn = info
+            .serial_number
+            .as_deref()
+            .expect("serial_number should exist");
+        assert!(sn.contains("B12345678"), "got: {sn}");
+
+        let tax_id = info.tax_id().expect("tax_id() should return Some");
+        assert_eq!(tax_id, "B12345678");
+
+        // 国家
+        assert_eq!(info.country.as_deref(), Some("ES"));
+
+        // Issuer (intermediate CA)
+        assert!(info.issuer.contains("Test"), "got issuer: {}", info.issuer);
+
+        // 打印全部信息供人工检查
+        eprintln!("=== Test P12CertInfo ===");
         eprintln!("fingerprint:     {}", info.fingerprint);
         eprintln!("common_name:     {}", info.common_name);
         eprintln!("serial_number:   {:?}", info.serial_number);

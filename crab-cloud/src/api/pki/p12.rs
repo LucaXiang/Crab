@@ -3,23 +3,26 @@ use crate::db::{p12, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Multipart, State};
+use axum::http::HeaderMap;
 use base64::Engine;
 use shared::error::ErrorCode;
 use zeroize::Zeroize;
 
 pub async fn upload_p12(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Json<serde_json::Value> {
-    let mut token = None;
     let mut p12_password = None;
     let mut p12_data = None;
+    // Legacy: also accept token from form body for backwards compatibility
+    let mut form_token = None;
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = field.name().unwrap_or_default().to_string();
         match name.as_str() {
             "token" => {
-                token = field.text().await.ok();
+                form_token = field.text().await.ok();
             }
             "p12_password" => {
                 p12_password = field.text().await.ok();
@@ -31,16 +34,24 @@ pub async fn upload_p12(
         }
     }
 
+    // Prefer Authorization header, fallback to form body token
+    let token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(String::from)
+        .or(form_token);
+
     let (Some(token), Some(mut p12_password), Some(p12_data)) = (token, p12_password, p12_data)
     else {
         return Json(serde_json::json!({
             "success": false,
-            "error": "Missing required fields: token, p12_password, p12_file",
+            "error": "Missing required fields: p12_password, p12_file (and Authorization header)",
             "error_code": ErrorCode::RequiredField
         }));
     };
 
-    // JWT 认证（与其他 PKI 端点统一）
+    // JWT 认证
     let tenant_id = match tenant_auth::verify_token(&token, &state.jwt_secret) {
         Ok(claims) => claims.sub,
         Err(_) => {
@@ -79,15 +90,18 @@ pub async fn upload_p12(
         Ok(info) => info,
         Err(e) => {
             p12_password.zeroize();
+            let (error_code, detail) = map_p12_error(&e);
             tracing::warn!(
                 tenant_id = %tenant.id,
-                error = %e,
+                error_code = ?error_code,
+                detail = %detail,
                 "P12 validation failed"
             );
             return Json(serde_json::json!({
                 "success": false,
-                "error": "Invalid P12 file or password",
-                "error_code": ErrorCode::ValidationFailed
+                "error": error_code.message(),
+                "error_detail": detail,
+                "error_code": error_code
             }));
         }
     };
@@ -102,11 +116,12 @@ pub async fn upload_p12(
         "P12 validated: issued by trusted Spanish CA"
     );
 
-    // Base64 编码 P12 数据，直接存入 PostgreSQL
+    // Base64 编码 P12 数据，加密后存入 PostgreSQL
     let p12_base64 = base64::engine::general_purpose::STANDARD.encode(&p12_data);
 
     if let Err(e) = p12::upsert(
         &state.pool,
+        &state.master_key,
         &tenant.id,
         &p12_base64,
         &p12_password,
@@ -129,7 +144,7 @@ pub async fn upload_p12(
     tracing::info!(
         tenant_id = %tenant.id,
         fingerprint = %cert_info.fingerprint,
-        "P12 certificate uploaded and stored in database"
+        "P12 certificate uploaded and encrypted in database"
     );
 
     Json(serde_json::json!({
@@ -141,4 +156,21 @@ pub async fn upload_p12(
         "issuer": cert_info.issuer,
         "expires_at": cert_info.expires_at
     }))
+}
+
+/// Map crab_cert P12 errors to specific ErrorCode + detail string
+fn map_p12_error(e: &crab_cert::CertError) -> (ErrorCode, String) {
+    use crab_cert::CertError;
+    match e {
+        CertError::P12InvalidFormat(detail) => (ErrorCode::P12InvalidFormat, detail.clone()),
+        CertError::P12WrongPassword(detail) => (ErrorCode::P12WrongPassword, detail.clone()),
+        CertError::P12MissingPrivateKey => (ErrorCode::P12MissingPrivateKey, e.to_string()),
+        CertError::P12MissingCertificate => (ErrorCode::P12MissingCertificate, e.to_string()),
+        CertError::P12ChainVerifyFailed(detail) => {
+            (ErrorCode::P12ChainVerifyFailed, detail.clone())
+        }
+        CertError::P12UntrustedCa(detail) => (ErrorCode::P12UntrustedCa, detail.clone()),
+        // Fallback for any other cert error
+        other => (ErrorCode::ValidationFailed, other.to_string()),
+    }
 }

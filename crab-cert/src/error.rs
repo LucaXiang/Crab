@@ -16,6 +16,20 @@ pub enum CertError {
     ValidationFailed(String),
     #[error("TLS error: {0}")]
     Tls(String),
+
+    // ── P12 specific errors ──
+    #[error("Invalid P12/PFX file format: {0}")]
+    P12InvalidFormat(String),
+    #[error("Wrong P12 password or corrupted file: {0}")]
+    P12WrongPassword(String),
+    #[error("P12 contains no private key for signing")]
+    P12MissingPrivateKey,
+    #[error("P12 contains no certificate")]
+    P12MissingCertificate,
+    #[error("Certificate chain signature verification failed: {0}")]
+    P12ChainVerifyFailed(String),
+    #[error("Certificate root CA not recognized by AEAT: {0}")]
+    P12UntrustedCa(String),
 }
 
 pub type Result<T> = std::result::Result<T, CertError>;

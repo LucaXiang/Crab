@@ -41,8 +41,10 @@ pub async fn search(pool: &SqlitePool, query: &str) -> RepoResult<Vec<MemberWith
 
 pub async fn create(pool: &SqlitePool, data: MemberCreate) -> RepoResult<MemberWithGroup> {
     let now = shared::util::now_millis();
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO member (name, phone, card_number, marketing_group_id, birthday, email, notes, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?8) RETURNING id as "id!""#,
+    let id = shared::util::snowflake_id();
+    sqlx::query!(
+        "INSERT INTO member (id, name, phone, card_number, marketing_group_id, birthday, email, notes, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9)",
+        id,
         data.name,
         data.phone,
         data.card_number,
@@ -52,7 +54,7 @@ pub async fn create(pool: &SqlitePool, data: MemberCreate) -> RepoResult<MemberW
         data.notes,
         now
     )
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
     find_by_id(pool, id)
         .await?

@@ -26,6 +26,7 @@ import { EmployeeManagement } from '@/features/employee';
 import { ZoneManagement } from '@/features/zone';
 import { TableManagement } from '@/features/table';
 import { LabelTemplateManagement } from '@/features/label-template';
+import { DataTransferScreen } from '@/screens/Store/DataTransfer/DataTransferScreen';
 
 export const App: React.FC = () => (
   <Routes>
@@ -56,6 +57,7 @@ export const App: React.FC = () => (
       <Route path="zones" element={<ZoneManagement />} />
       <Route path="tables" element={<TableManagement />} />
       <Route path="label-templates" element={<LabelTemplateManagement />} />
+      <Route path="data-transfer" element={<DataTransferScreen />} />
       <Route path="red-flags" element={<RedFlagsScreen />} />
     </Route>
 

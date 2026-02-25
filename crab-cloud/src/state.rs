@@ -13,6 +13,7 @@ use tokio::sync::{OnceCell, mpsc, oneshot};
 
 use crate::auth::QuotaCache;
 use crate::config::Config;
+use crate::crypto::MasterKey;
 use crate::live::LiveOrderHub;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -66,6 +67,7 @@ pub struct AppState {
     pub rate_limiter: crate::auth::rate_limit::RateLimiter,
     pub stripe: StripeConfig,
     pub s3: S3Config,
+    pub master_key: Arc<MasterKey>,
     pub edges: EdgeConnections,
     pub live_orders: LiveOrderHub,
     /// Console WS connections per tenant (tenant_id → count)
@@ -93,7 +95,9 @@ impl AppState {
             config.email_from.clone(),
         );
 
-        let ca_store = CaStore::new(sm_client, pool.clone());
+        let master_key = Arc::new(MasterKey::from_secrets_manager(&sm_client).await?);
+
+        let ca_store = CaStore::new(sm_client, pool.clone(), master_key.clone());
 
         // Verify Root CA is accessible (warm cache)
         ca_store.get_or_create_root_ca().await?;
@@ -141,6 +145,7 @@ impl AppState {
                 bucket: config.update_s3_bucket.clone(),
                 download_base_url: config.update_download_base_url.clone(),
             },
+            master_key,
             edges: EdgeConnections::new(),
             live_orders: LiveOrderHub::new(),
             console_connections: Arc::new(DashMap::new()),
@@ -156,6 +161,7 @@ impl AppState {
 pub struct CaStore {
     sm: SmClient,
     pool: PgPool,
+    master_key: Arc<MasterKey>,
     /// Root CA in-process cache (cert + key, never changes after creation)
     root_ca_cache: std::sync::Arc<OnceCell<CaSecret>>,
     /// Tenant CA in-process cache (tenant_id → CaSecret, never changes after creation)
@@ -169,10 +175,11 @@ struct CaSecret {
 }
 
 impl CaStore {
-    pub fn new(sm: SmClient, pool: PgPool) -> Self {
+    pub fn new(sm: SmClient, pool: PgPool, master_key: Arc<MasterKey>) -> Self {
         Self {
             sm,
             pool,
+            master_key,
             root_ca_cache: std::sync::Arc::new(OnceCell::new()),
             tenant_ca_cache: Arc::new(DashMap::new()),
         }
@@ -203,26 +210,32 @@ impl CaStore {
             )?);
         }
 
-        // 从 PostgreSQL 读取 tenant CA
+        // 从 PostgreSQL 读取 tenant CA (key is encrypted)
         let secret = match sqlx::query_as::<_, (String, String)>(
-            "SELECT ca_cert_pem, ca_key_pem FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
+            "SELECT ca_cert_pem, ca_key_encrypted FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?
         {
-            Some((cert_pem, key_pem)) => CaSecret { cert_pem, key_pem },
+            Some((cert_pem, key_encrypted)) => {
+                let key_pem = self.master_key.decrypt_string(&key_encrypted)
+                    .map_err(|e| format!("Failed to decrypt tenant CA key: {e}"))?;
+                CaSecret { cert_pem, key_pem }
+            }
             None => {
-                // 创建新 Tenant CA 并写入 PostgreSQL
+                // 创建新 Tenant CA 并写入 PostgreSQL (key encrypted)
                 let profile = CaProfile::intermediate(tenant_id, &format!("Tenant {tenant_id}"));
                 let ca = CertificateAuthority::new_intermediate(profile, root_ca)?;
+                let key_encrypted = self.master_key.encrypt_string(&ca.key_pem())
+                    .map_err(|e| format!("Failed to encrypt tenant CA key: {e}"))?;
                 let s = CaSecret {
                     cert_pem: ca.cert_pem().to_string(),
                     key_pem: ca.key_pem(),
                 };
-                sqlx::query("UPDATE tenants SET ca_cert_pem = $1, ca_key_pem = $2 WHERE id = $3")
+                sqlx::query("UPDATE tenants SET ca_cert_pem = $1, ca_key_encrypted = $2 WHERE id = $3")
                     .bind(&s.cert_pem)
-                    .bind(&s.key_pem)
+                    .bind(&key_encrypted)
                     .bind(tenant_id)
                     .execute(&self.pool)
                     .await?;
@@ -247,13 +260,18 @@ impl CaStore {
             )?);
         }
 
-        let (cert_pem, key_pem) = sqlx::query_as::<_, (String, String)>(
-            "SELECT ca_cert_pem, ca_key_pem FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
+        let (cert_pem, key_encrypted) = sqlx::query_as::<_, (String, String)>(
+            "SELECT ca_cert_pem, ca_key_encrypted FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| format!("Tenant CA not found for {tenant_id}"))?;
+
+        let key_pem = self
+            .master_key
+            .decrypt_string(&key_encrypted)
+            .map_err(|e| format!("Failed to decrypt tenant CA key: {e}"))?;
 
         let secret = CaSecret { cert_pem, key_pem };
         self.tenant_ca_cache
@@ -270,13 +288,18 @@ impl CaStore {
             return Ok(cached.cert_pem.clone());
         }
 
-        let (cert_pem, key_pem) = sqlx::query_as::<_, (String, String)>(
-            "SELECT ca_cert_pem, ca_key_pem FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
+        let (cert_pem, key_encrypted) = sqlx::query_as::<_, (String, String)>(
+            "SELECT ca_cert_pem, ca_key_encrypted FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| format!("Tenant CA cert not found for {tenant_id}"))?;
+
+        let key_pem = self
+            .master_key
+            .decrypt_string(&key_encrypted)
+            .map_err(|e| format!("Failed to decrypt tenant CA key: {e}"))?;
 
         let pem = cert_pem.clone();
         self.tenant_ca_cache

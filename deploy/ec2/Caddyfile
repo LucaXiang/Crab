@@ -1,15 +1,26 @@
 (security_headers) {
 	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		X-XSS-Protection "1; mode=block"
 		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		-Server
 	}
 }
 
+(csp_portal) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+}
+
+(csp_console) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://cloud.redcoral.app wss://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+}
+
 redcoral.app {
 	import security_headers
+	import csp_portal
 	log {
 		output file /var/log/caddy/access.log {
 			roll_size 50MiB
@@ -33,6 +44,7 @@ redcoral.app {
 
 console.redcoral.app {
 	import security_headers
+	import csp_console
 	log {
 		output file /var/log/caddy/access.log {
 			roll_size 50MiB

@@ -49,7 +49,8 @@
     "employees": "Employees",
     "zones": "Zones",
     "tables": "Tables",
-    "label_templates": "Label Templates"
+    "label_templates": "Label Templates",
+    "data_transfer": "Data Transfer"
   },
   "dash": {
     "title": "Dashboard",
@@ -655,6 +656,20 @@
     "quantity": "Quantity",
     "loss_amount": "Loss"
   },
+  "data_transfer": {
+    "title": "Data Transfer",
+    "description": "Export or import your store's catalog data (products, categories, tags, attributes).",
+    "export_title": "Export Catalog",
+    "export_desc": "Download the full catalog as a ZIP file. Images are not included (stored in cloud).",
+    "export_btn": "Export ZIP",
+    "import_title": "Import Catalog",
+    "import_desc": "Upload a catalog ZIP file to replace all catalog data for this store.",
+    "import_btn": "Select ZIP file",
+    "import_success": "Catalog imported successfully. Changes will be synced to the terminal.",
+    "warning_title": "Important",
+    "warning1": "Importing will replace ALL existing catalog data for this store.",
+    "warning2": "The terminal will receive a full sync after import."
+  },
   "error": {
     "title": "Error",
     "not_found": "Page not found",
@@ -671,6 +686,12 @@
     "3011": "No active subscription.",
     "3017": "Payment setup failed. Please try again.",
     "3018": "Password must be at least 8 characters.",
-    "3019": "You must upload your electronic certificate (P12) before proceeding."
+    "3019": "You must upload your electronic certificate (P12) before proceeding.",
+    "3023": "Invalid P12/PFX file. Make sure you selected the correct file.",
+    "3024": "Incorrect P12 certificate password.",
+    "3025": "P12 file contains no private key. A signing key is required.",
+    "3026": "P12 file contains no certificate.",
+    "3027": "Certificate chain verification failed. The file may be corrupted.",
+    "3028": "Certificate root CA not recognized by AEAT. Only certificates from authorized Spanish CAs are accepted (FNMT, ACCV, Izenpe, Firmaprofesional)."
   }
 }

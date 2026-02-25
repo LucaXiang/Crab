@@ -54,7 +54,8 @@ jsonwebtoken.workspace = true
 # HTTP client (Stripe API)
 reqwest.workspace = true
 
-# Crypto (webhook signature)
+# Crypto (webhook signature + envelope encryption)
+aes-gcm.workspace = true
 hmac.workspace = true
 sha2.workspace = true
 hex.workspace = true
@@ -73,6 +74,7 @@ dotenvy.workspace = true
 dashmap.workspace = true
 futures.workspace = true
 image.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

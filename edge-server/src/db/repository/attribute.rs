@@ -391,6 +391,16 @@ pub async fn find_bindings_for_owner(
     Ok(result)
 }
 
+/// Find ALL attribute bindings (without attribute data, for export)
+pub async fn find_all_bindings(pool: &SqlitePool) -> RepoResult<Vec<AttributeBinding>> {
+    let bindings = sqlx::query_as::<_, AttributeBinding>(
+        "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, COALESCE(default_option_ids, 'null') as default_option_ids FROM attribute_binding ORDER BY display_order",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(bindings)
+}
+
 /// Find ALL attribute bindings with their full attribute data (for bulk warmup)
 pub async fn find_all_bindings_with_attributes(
     pool: &SqlitePool,

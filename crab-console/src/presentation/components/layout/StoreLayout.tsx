@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Settings, ChevronLeft, LogOut, Globe, ChevronDown,
   Radio, ShoppingBag, BarChart3, Package, FolderTree,
-  Tag, SlidersHorizontal, Percent, Users, Map, Grid3x3, ShieldAlert, ScrollText, Tags,
+  Tag, SlidersHorizontal, Percent, Users, Map, Grid3x3, ShieldAlert, ScrollText, Tags, ArrowLeftRight,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
@@ -66,6 +66,7 @@ export const StoreLayout: React.FC = () => {
         { key: 'nav.zones', href: `/stores/${storeId}/zones`, icon: Map },
         { key: 'nav.tables', href: `/stores/${storeId}/tables`, icon: Grid3x3 },
         { key: 'nav.label_templates', href: `/stores/${storeId}/label-templates`, icon: Tags },
+        { key: 'nav.data_transfer', href: `/stores/${storeId}/data-transfer`, icon: ArrowLeftRight },
       ],
     },
     {

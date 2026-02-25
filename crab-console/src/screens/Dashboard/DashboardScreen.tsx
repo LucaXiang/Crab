@@ -19,6 +19,14 @@ import { Spinner } from '@/presentation/components/ui/Spinner';
 import type { StoreDetail } from '@/core/types/store';
 import type { StoreOverview } from '@/core/types/stats';
 
+function isSafeStripeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' &&
+      (parsed.hostname === 'checkout.stripe.com' || parsed.hostname === 'billing.stripe.com');
+  } catch { return false; }
+}
+
 function getTodayRange(): { from: number; to: number } {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -94,6 +102,7 @@ export const DashboardScreen: React.FC = () => {
     setBillingLoading(true);
     try {
       const res = await createBillingPortal(token);
+      if (!isSafeStripeUrl(res.url)) { setError('Invalid billing URL'); return; }
       window.location.href = res.url;
     } catch (err) {
       setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
@@ -126,6 +135,7 @@ export const DashboardScreen: React.FC = () => {
     setError('');
     try {
       const res = await createCheckout(token, plan);
+      if (!isSafeStripeUrl(res.checkout_url)) { setError('Invalid checkout URL'); return; }
       window.location.href = res.checkout_url;
     } catch (err) {
       setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));

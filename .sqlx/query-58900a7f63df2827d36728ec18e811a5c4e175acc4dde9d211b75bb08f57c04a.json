@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO system_issue (id, source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "58900a7f63df2827d36728ec18e811a5c4e175acc4dde9d211b75bb08f57c04a"
+}

@@ -184,6 +184,13 @@ pub async fn get_image_url(
     Extension(identity): Extension<TenantIdentity>,
     axum::extract::Path(hash): axum::extract::Path<String>,
 ) -> Result<Json<ImageUrlResponse>, AppError> {
+    // Validate hash is exactly 64 hex characters (SHA256) to prevent path traversal
+    if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(AppError::with_message(
+            ErrorCode::InvalidRequest,
+            "Invalid image hash",
+        ));
+    }
     let url = presigned_get_url(&state, &identity.tenant_id, &hash).await?;
     Ok(Json(ImageUrlResponse { url }))
 }

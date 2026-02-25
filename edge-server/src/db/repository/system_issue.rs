@@ -9,8 +9,10 @@ pub async fn create(pool: &SqlitePool, data: SystemIssueCreate) -> RepoResult<Sy
     let params_json = serde_json::to_string(&data.params).unwrap_or_else(|_| "{}".to_string());
     let options_json = serde_json::to_string(&data.options).unwrap_or_else(|_| "[]".to_string());
 
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO system_issue (source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9) RETURNING id as "id!""#,
+    let id = shared::util::snowflake_id();
+    sqlx::query!(
+        "INSERT INTO system_issue (id, source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10)",
+        id,
         data.source,
         data.kind,
         data.blocking,
@@ -21,7 +23,7 @@ pub async fn create(pool: &SqlitePool, data: SystemIssueCreate) -> RepoResult<Sy
         options_json,
         now
     )
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
 
     find_by_id(pool, id)

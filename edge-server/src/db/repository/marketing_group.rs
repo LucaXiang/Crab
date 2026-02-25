@@ -32,8 +32,10 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Marketi
 pub async fn create(pool: &SqlitePool, data: MarketingGroupCreate) -> RepoResult<MarketingGroup> {
     let now = shared::util::now_millis();
     let sort_order = data.sort_order.unwrap_or(0);
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO marketing_group (name, display_name, description, sort_order, points_earn_rate, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6) RETURNING id as "id!""#,
+    let id = shared::util::snowflake_id();
+    sqlx::query!(
+        "INSERT INTO marketing_group (id, name, display_name, description, sort_order, points_earn_rate, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+        id,
         data.name,
         data.display_name,
         data.description,
@@ -41,7 +43,7 @@ pub async fn create(pool: &SqlitePool, data: MarketingGroupCreate) -> RepoResult
         data.points_earn_rate,
         now
     )
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
     find_by_id(pool, id)
         .await?
@@ -159,8 +161,10 @@ pub async fn create_rule(
     data: MgDiscountRuleCreate,
 ) -> RepoResult<MgDiscountRule> {
     let now = shared::util::now_millis();
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO mg_discount_rule (marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9) RETURNING id as "id!""#,
+    let id = shared::util::snowflake_id();
+    sqlx::query!(
+        "INSERT INTO mg_discount_rule (id, marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)",
+        id,
         group_id,
         data.name,
         data.display_name,
@@ -171,7 +175,7 @@ pub async fn create_rule(
         data.adjustment_value,
         now
     )
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
 
     let row = sqlx::query_as::<_, MgDiscountRule>(
@@ -272,8 +276,10 @@ pub async fn create_activity(
 
     let mut tx = pool.begin().await?;
 
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO stamp_activity (marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9) RETURNING id as "id!""#,
+    let id = shared::util::snowflake_id();
+    sqlx::query!(
+        "INSERT INTO stamp_activity (id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)",
+        id,
         group_id,
         data.name,
         data.display_name,
@@ -284,7 +290,7 @@ pub async fn create_activity(
         is_cyclic,
         now
     )
-    .fetch_one(&mut *tx)
+    .execute(&mut *tx)
     .await?;
 
     replace_stamp_targets(&mut tx, id, &data.stamp_targets).await?;

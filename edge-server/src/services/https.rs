@@ -67,6 +67,8 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::audit_log::router())
         // System Issues (系统问题)
         .merge(crate::api::system_issues::router())
+        // Data Transfer (catalog export/import)
+        .merge(crate::api::data_transfer::router())
         // Sync API
         .merge(crate::api::sync::router())
 }
@@ -106,6 +108,15 @@ impl HttpsService {
 
     pub fn router(&self) -> Option<Router> {
         self.router.read().clone()
+    }
+
+    /// Break circular reference: Router → ServerState → HttpsService → Router
+    ///
+    /// Must be called during shutdown BEFORE dropping ServerState,
+    /// otherwise Arc<Database> inside OrdersManager will leak due to
+    /// the reference cycle and redb file lock will never be released.
+    pub fn clear_router(&self) {
+        *self.router.write() = None;
     }
 
     pub async fn oneshot(&self, request: http::Request<axum::body::Body>) -> OneshotResult {

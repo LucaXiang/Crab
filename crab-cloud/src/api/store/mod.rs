@@ -9,6 +9,7 @@
 
 pub mod attribute;
 pub mod category;
+pub mod data_transfer;
 pub mod dining_table;
 pub mod employee;
 pub mod label_template;

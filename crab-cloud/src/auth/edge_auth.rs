@@ -67,6 +67,27 @@ pub async fn edge_auth_middleware(
         AppError::new(ErrorCode::NotAuthenticated).into_response()
     })?;
 
+    // Verify device is still active (revocation check)
+    let activation = crate::db::activations::find_by_entity(&state.pool, &binding.entity_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(entity_id = %binding.entity_id, "DB error checking activation: {e}");
+            AppError::new(ErrorCode::InternalError).into_response()
+        })?
+        .ok_or_else(|| {
+            tracing::warn!(entity_id = %binding.entity_id, "No activation record found");
+            AppError::new(ErrorCode::NotAuthenticated).into_response()
+        })?;
+
+    if activation.status != "active" {
+        tracing::warn!(
+            entity_id = %binding.entity_id,
+            status = %activation.status,
+            "Deactivated device attempted connection"
+        );
+        return Err(AppError::new(ErrorCode::NotAuthenticated).into_response());
+    }
+
     // Inject EdgeIdentity into request extensions
     let identity = EdgeIdentity {
         entity_id: binding.entity_id.clone(),

@@ -74,8 +74,7 @@ export async function uploadP12(
   p12Password: string,
 ): Promise<P12UploadResponse> {
   const form = new FormData();
-  form.append('token', token);
   form.append('p12_password', p12Password);
   form.append('p12_file', p12File);
-  return requestFormData('/api/p12/upload', form);
+  return requestFormData('/api/p12/upload', form, token);
 }

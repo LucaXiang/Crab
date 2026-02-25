@@ -128,7 +128,8 @@ pub fn verify_webhook_signature(
         return Err("Invalid Stripe-Signature header");
     }
 
-    let signed_payload = format!("{timestamp}.{}", std::str::from_utf8(payload).unwrap_or(""));
+    let payload_str = std::str::from_utf8(payload).map_err(|_| "Non-UTF8 webhook payload")?;
+    let signed_payload = format!("{timestamp}.{payload_str}");
     let mut mac =
         Hmac::<Sha256>::new_from_slice(secret.as_bytes()).map_err(|_| "HMAC key error")?;
     mac.update(signed_payload.as_bytes());

@@ -187,6 +187,11 @@ impl Server {
 
     /// 统一清理：停止后台任务 + 关闭数据库 + drain audit worker
     async fn cleanup(state: ServerState, background_tasks: BackgroundTasks) {
+        // 立即打破循环引用 (Router → ServerState → HttpsService → Router)，
+        // 确保即使后续 await 被 abort，Arc<Database> 也能正确释放 redb 文件锁。
+        // 必须在任何 .await 之前执行（同步操作，不可被 cancel）。
+        state.https.clear_router();
+
         // 删除 LOCK 文件（幂等操作，Phase 7 正常退出时已提前调用过，
         // 此处确保 activation/subscription/P12 等早期 shutdown 路径也能清理）
         state.audit_service.on_shutdown();

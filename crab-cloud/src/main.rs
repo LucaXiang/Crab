@@ -9,6 +9,7 @@
 mod api;
 mod auth;
 mod config;
+mod crypto;
 mod db;
 mod email;
 pub mod error;
@@ -252,9 +253,10 @@ fn build_mtls_config(config: &Config) -> Result<axum_server::tls_rustls::RustlsC
     let client_verifier =
         rustls::server::WebPkiClientVerifier::builder(std::sync::Arc::new(root_store)).build()?;
 
-    let mut tls_config = rustls::ServerConfig::builder()
-        .with_client_cert_verifier(client_verifier)
-        .with_single_cert(certs, key)?;
+    let mut tls_config =
+        rustls::ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+            .with_client_cert_verifier(client_verifier)
+            .with_single_cert(certs, key)?;
 
     tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
 

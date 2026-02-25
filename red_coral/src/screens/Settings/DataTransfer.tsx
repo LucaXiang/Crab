@@ -3,12 +3,10 @@ import { Upload, Download, FileArchive } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { toast } from '@/presentation/components/Toast';
-import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import { invokeApi } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
 import { getErrorMessage } from '@/utils/error';
-
-const getApi = () => createTauriClient();
-import { useProductStore, useCategoryStore, useZoneStore, useTableStore } from '@/core/stores/resources';
+import { useProductStore, useCategoryStore, useZoneStore, useTableStore, useTagStore, useAttributeStore } from '@/core/stores/resources';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 
 export const DataTransfer: React.FC = () => {
@@ -59,6 +57,8 @@ export const DataTransfer: React.FC = () => {
       // Clear all caches to force reload
       useProductStore.getState().fetchAll(true);
       useCategoryStore.getState().fetchAll(true);
+      useTagStore.getState().fetchAll(true);
+      useAttributeStore.getState().fetchAll(true);
       useZoneStore.getState().fetchAll(true);
       useTableStore.getState().fetchAll(true);
 

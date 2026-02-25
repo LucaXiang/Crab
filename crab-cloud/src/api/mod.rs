@@ -205,6 +205,15 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/store-info",
             get(store::get_store_info).put(store::update_store_info),
         )
+        // ── Data Transfer ──
+        .route(
+            "/api/tenant/stores/{id}/data-transfer/export",
+            get(store::data_transfer::export_catalog),
+        )
+        .route(
+            "/api/tenant/stores/{id}/data-transfer/import",
+            post(store::data_transfer::import_catalog),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             tenant_auth_middleware,

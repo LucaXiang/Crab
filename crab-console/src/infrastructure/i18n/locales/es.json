@@ -49,7 +49,8 @@
     "employees": "Empleados",
     "zones": "Zonas",
     "tables": "Mesas",
-    "label_templates": "Plantillas de etiqueta"
+    "label_templates": "Plantillas de etiqueta",
+    "data_transfer": "Transferencia de datos"
   },
   "dash": {
     "title": "Resumen",
@@ -655,6 +656,20 @@
     "quantity": "Cantidad",
     "loss_amount": "Pérdida"
   },
+  "data_transfer": {
+    "title": "Transferencia de datos",
+    "description": "Exporta o importa los datos del catálogo de tu local (productos, categorías, etiquetas, atributos).",
+    "export_title": "Exportar catálogo",
+    "export_desc": "Descarga el catálogo completo como archivo ZIP. Las imágenes no se incluyen (almacenadas en la nube).",
+    "export_btn": "Exportar ZIP",
+    "import_title": "Importar catálogo",
+    "import_desc": "Sube un archivo ZIP de catálogo para reemplazar todos los datos del catálogo de este local.",
+    "import_btn": "Seleccionar archivo ZIP",
+    "import_success": "Catálogo importado correctamente. Los cambios se sincronizarán con el terminal.",
+    "warning_title": "Importante",
+    "warning1": "La importación reemplazará TODOS los datos del catálogo existentes de este local.",
+    "warning2": "El terminal recibirá una sincronización completa después de la importación."
+  },
   "error": {
     "title": "Error",
     "not_found": "Página no encontrada",
@@ -671,6 +686,12 @@
     "3011": "No tienes una suscripción activa.",
     "3017": "Error al configurar el pago. Inténtalo de nuevo.",
     "3018": "La contraseña debe tener al menos 8 caracteres.",
-    "3019": "Debes subir tu certificado electrónico (P12) antes de continuar."
+    "3019": "Debes subir tu certificado electrónico (P12) antes de continuar.",
+    "3023": "El archivo no es un certificado P12/PFX válido. Comprueba que has seleccionado el archivo correcto.",
+    "3024": "La contraseña del certificado P12 es incorrecta.",
+    "3025": "El archivo P12 no contiene clave privada. Se requiere para la firma electrónica.",
+    "3026": "El archivo P12 no contiene certificado.",
+    "3027": "La cadena de certificados no se ha podido verificar. El archivo puede estar dañado.",
+    "3028": "El certificado raíz no está reconocido por la AEAT. Solo se aceptan certificados de CAs españolas autorizadas (FNMT, ACCV, Izenpe, Firmaprofesional)."
   }
 }

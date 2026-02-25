@@ -28,7 +28,8 @@ pub async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> ApiResult<LoginResponse> {
-    let tenant = db::tenants::find_by_email(&state.pool, &req.email)
+    let email = req.email.trim().to_lowercase();
+    let tenant = db::tenants::find_by_email(&state.pool, &email)
         .await
         .map_err(|e| {
             tracing::error!("DB error during login: {e}");

@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS tenants (
     name              TEXT,
     status            TEXT NOT NULL DEFAULT 'pending',
     stripe_customer_id TEXT UNIQUE,
+    ca_cert_pem       TEXT,
+    ca_key_encrypted  TEXT,
     created_at        BIGINT NOT NULL,
     verified_at       BIGINT
 );
@@ -96,7 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_client_connections_replaced_by ON client_connecti
 
 CREATE TABLE IF NOT EXISTS p12_certificates (
     tenant_id         TEXT PRIMARY KEY,
-    secret_name       TEXT NOT NULL,
+    p12_encrypted     TEXT,
     fingerprint       TEXT,
     common_name       TEXT,
     serial_number     TEXT,
