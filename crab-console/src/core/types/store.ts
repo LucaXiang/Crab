@@ -467,6 +467,93 @@ export interface LabelTemplateUpdate {
   test_data?: string;
 }
 
+// ── Attribute Option Independent CRUD ──
+
+export interface AttributeOptionCreate {
+  name: string;
+  price_modifier?: number;
+  display_order?: number;
+  receipt_name?: string;
+  kitchen_print_name?: string;
+  enable_quantity?: boolean;
+  max_quantity?: number;
+}
+
+export interface AttributeOptionUpdate {
+  name?: string;
+  price_modifier?: number;
+  display_order?: number;
+  is_active?: boolean;
+  receipt_name?: string;
+  kitchen_print_name?: string;
+  enable_quantity?: boolean;
+  max_quantity?: number;
+}
+
+// ── Attribute Binding ──
+
+export interface BindAttributeRequest {
+  owner_type: 'product' | 'category';
+  owner_id: number;
+  attribute_id: number;
+  is_required?: boolean;
+  display_order?: number;
+  default_option_ids?: number[];
+}
+
+export interface UnbindAttributeRequest {
+  binding_id: number;
+}
+
+// ── Sort Order ──
+
+export interface SortOrderItem {
+  id: number;
+  sort_order: number;
+}
+
+// ── Bulk Delete ──
+
+export interface BulkDeleteRequest {
+  ids: number[];
+}
+
+// ── Store Info ──
+
+export interface StoreInfo {
+  name: string;
+  address: string | null;
+  phone: string | null;
+  nif: string | null;
+  email: string | null;
+  website: string | null;
+  business_day_cutoff: string | null;
+  currency_code: string | null;
+  currency_symbol: string | null;
+  currency_decimal_places: number | null;
+  logo: string | null;
+  timezone: string | null;
+  receipt_header: string | null;
+  receipt_footer: string | null;
+}
+
+export interface StoreInfoUpdate {
+  name?: string;
+  address?: string;
+  phone?: string;
+  nif?: string;
+  email?: string;
+  website?: string;
+  business_day_cutoff?: string;
+  currency_code?: string;
+  currency_symbol?: string;
+  currency_decimal_places?: number;
+  logo?: string;
+  timezone?: string;
+  receipt_header?: string;
+  receipt_footer?: string;
+}
+
 // ── StoreOpResult ──
 
 export interface StoreOpResult {

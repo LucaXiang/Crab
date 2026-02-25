@@ -4,8 +4,12 @@ import type {
   StoreCategory, CategoryCreate, CategoryUpdate,
   StoreTag, TagCreate, TagUpdate,
   StoreAttribute, AttributeCreate, AttributeUpdate,
+  AttributeOptionCreate, AttributeOptionUpdate,
+  BindAttributeRequest, UnbindAttributeRequest,
   PriceRule, PriceRuleCreate, PriceRuleUpdate,
   LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate,
+  SortOrderItem, BulkDeleteRequest,
+  StoreInfo, StoreInfoUpdate,
   StoreOpResult,
 } from '@/core/types/store';
 
@@ -25,6 +29,12 @@ export const updateProduct = (token: string, storeId: number, id: number, data: 
 export const deleteProduct = (token: string, storeId: number, id: number) =>
   request<StoreOpResult>('DELETE', `${storePath(storeId, 'products')}/${id}`, undefined, token);
 
+export const batchUpdateProductSortOrder = (token: string, storeId: number, items: SortOrderItem[]) =>
+  request<StoreOpResult>('PATCH', `${storePath(storeId, 'products/sort-order')}`, { items }, token);
+
+export const bulkDeleteProducts = (token: string, storeId: number, ids: number[]) =>
+  request<StoreOpResult>('POST', `${storePath(storeId, 'products/bulk-delete')}`, { ids } as BulkDeleteRequest, token);
+
 // ── Categories ──
 export const listCategories = (token: string, storeId: number) =>
   request<StoreCategory[]>('GET', storePath(storeId, 'categories'), undefined, token);
@@ -37,6 +47,9 @@ export const updateCategory = (token: string, storeId: number, id: number, data:
 
 export const deleteCategory = (token: string, storeId: number, id: number) =>
   request<StoreOpResult>('DELETE', `${storePath(storeId, 'categories')}/${id}`, undefined, token);
+
+export const batchUpdateCategorySortOrder = (token: string, storeId: number, items: SortOrderItem[]) =>
+  request<StoreOpResult>('PATCH', `${storePath(storeId, 'categories/sort-order')}`, { items }, token);
 
 // ── Tags ──
 export const listTags = (token: string, storeId: number) =>
@@ -64,6 +77,26 @@ export const updateAttribute = (token: string, storeId: number, id: number, data
 export const deleteAttribute = (token: string, storeId: number, id: number) =>
   request<StoreOpResult>('DELETE', `${storePath(storeId, 'attributes')}/${id}`, undefined, token);
 
+// ── Attribute Options (independent CRUD) ──
+export const createAttributeOption = (token: string, storeId: number, attributeId: number, data: AttributeOptionCreate) =>
+  request<StoreOpResult>('POST', `${storePath(storeId, `attributes/${attributeId}/options`)}`, data, token);
+
+export const updateAttributeOption = (token: string, storeId: number, attributeId: number, optionId: number, data: AttributeOptionUpdate) =>
+  request<StoreOpResult>('PUT', `${storePath(storeId, `attributes/${attributeId}/options/${optionId}`)}`, data, token);
+
+export const deleteAttributeOption = (token: string, storeId: number, attributeId: number, optionId: number) =>
+  request<StoreOpResult>('DELETE', `${storePath(storeId, `attributes/${attributeId}/options/${optionId}`)}`, undefined, token);
+
+export const batchUpdateOptionSortOrder = (token: string, storeId: number, attributeId: number, items: SortOrderItem[]) =>
+  request<StoreOpResult>('PATCH', `${storePath(storeId, `attributes/${attributeId}/options/sort-order`)}`, { items }, token);
+
+// ── Attribute Binding ──
+export const bindAttribute = (token: string, storeId: number, data: BindAttributeRequest) =>
+  request<StoreOpResult>('POST', storePath(storeId, 'attributes/bind'), data, token);
+
+export const unbindAttribute = (token: string, storeId: number, bindingId: number) =>
+  request<StoreOpResult>('POST', storePath(storeId, 'attributes/unbind'), { binding_id: bindingId } as UnbindAttributeRequest, token);
+
 // ── Price Rules ──
 export const listPriceRules = (token: string, storeId: number) =>
   request<PriceRule[]>('GET', storePath(storeId, 'price-rules'), undefined, token);
@@ -89,6 +122,13 @@ export const updateLabelTemplate = (token: string, storeId: number, id: number, 
 
 export const deleteLabelTemplate = (token: string, storeId: number, id: number) =>
   request<StoreOpResult>('DELETE', `${storePath(storeId, 'label-templates')}/${id}`, undefined, token);
+
+// ── Store Info ──
+export const getStoreInfo = (token: string, storeId: number) =>
+  request<StoreInfo>('GET', storePath(storeId, 'store-info'), undefined, token);
+
+export const updateStoreInfo = (token: string, storeId: number, data: StoreInfoUpdate) =>
+  request<StoreOpResult>('PUT', storePath(storeId, 'store-info'), data, token);
 
 // ── Image Upload ──
 
