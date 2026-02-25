@@ -84,6 +84,10 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/red-flags",
             get(tenant::get_store_red_flags),
         )
+        .route(
+            "/api/tenant/stores/{id}/reports/{date}",
+            get(tenant::get_report_detail),
+        )
         .route("/api/tenant/billing-portal", post(tenant::billing_portal))
         .route("/api/tenant/create-checkout", post(tenant::create_checkout))
         .route("/api/tenant/audit-log", get(tenant::audit_log))
@@ -135,6 +139,10 @@ pub fn public_router(state: AppState) -> Router {
         .route(
             "/api/tenant/stores/{id}/attributes/{aid}",
             put(store::update_attribute).delete(store::delete_attribute),
+        )
+        .route(
+            "/api/tenant/stores/{id}/attributes/bindings",
+            get(store::list_bindings),
         )
         .route(
             "/api/tenant/stores/{id}/attributes/bind",

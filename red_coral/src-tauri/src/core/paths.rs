@@ -23,8 +23,8 @@
 //!     ├── certs/               # Edge Server 证书 (work_dir/certs/)
 //!     │   ├── root_ca.pem      # Root CA
 //!     │   ├── tenant_ca.pem    # Tenant CA
-//!     │   ├── edge_cert.pem    # Edge Server 证书
-//!     │   └── edge_key.pem     # Edge Server 私钥
+//!     │   ├── server.pem        # Server 证书
+//!     │   └── server.key.pem    # Server 私钥
 //!     ├── data/
 //!     │   ├── main.db           # SQLite 数据库
 //!     │   ├── orders.redb      # 订单 Event Sourcing
@@ -163,16 +163,14 @@ impl TenantPaths {
         self.certs_dir().join("tenant_ca.pem")
     }
 
-    /// Edge Server 证书: {tenant}/server/certs/edge_cert.pem
-    ///
-    /// 位于 server/certs/ 目录，edge-server 从 work_dir/certs/ 读取
-    pub fn edge_cert(&self) -> PathBuf {
-        self.server_certs_dir().join("edge_cert.pem")
+    /// Server 证书: {tenant}/server/certs/server.pem
+    pub fn server_cert(&self) -> PathBuf {
+        self.server_certs_dir().join("server.pem")
     }
 
-    /// Edge Server 密钥: {tenant}/server/certs/edge_key.pem
-    pub fn edge_key(&self) -> PathBuf {
-        self.server_certs_dir().join("edge_key.pem")
+    /// Server 私钥: {tenant}/server/certs/server.key.pem
+    pub fn server_key(&self) -> PathBuf {
+        self.server_certs_dir().join("server.key.pem")
     }
 
     /// Server Root CA: {tenant}/server/certs/root_ca.pem
@@ -223,9 +221,11 @@ impl TenantPaths {
 
     /// 检查 Server 模式证书是否存在
     ///
-    /// 检查 edge_cert.pem, edge_key.pem, tenant_ca.pem 三个文件
+    /// 检查 server.pem, server.key.pem, tenant_ca.pem
     pub fn has_server_certificates(&self) -> bool {
-        self.edge_cert().exists() && self.edge_key().exists() && self.server_tenant_ca().exists()
+        self.server_cert().exists()
+            && self.server_key().exists()
+            && self.server_tenant_ca().exists()
     }
 
     /// 检查 Server 模式凭证是否存在
@@ -337,12 +337,12 @@ mod tests {
 
         // Edge Server 证书 (在 server/certs/ 下)
         assert_eq!(
-            paths.edge_cert(),
-            PathBuf::from("/data/tenants/tenant-123/server/certs/edge_cert.pem")
+            paths.server_cert(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs/server.pem")
         );
         assert_eq!(
-            paths.edge_key(),
-            PathBuf::from("/data/tenants/tenant-123/server/certs/edge_key.pem")
+            paths.server_key(),
+            PathBuf::from("/data/tenants/tenant-123/server/certs/server.key.pem")
         );
         assert_eq!(
             paths.server_root_ca(),

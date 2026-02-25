@@ -287,6 +287,16 @@ pub enum ErrorCode {
     PrinterNotAvailable = 9201,
     /// Print operation failed
     PrintFailed = 9202,
+    /// No printers configured for destination
+    PrintNoPrintersConfigured = 9203,
+    /// All printers offline for destination
+    PrintAllPrintersOffline = 9204,
+    /// Kitchen printing is not enabled
+    PrintKitchenDisabled = 9205,
+    /// Label printing is not enabled
+    PrintLabelDisabled = 9206,
+    /// No print destination configured for product/category
+    PrintDestinationNotConfigured = 9207,
     /// Client disconnected
     ClientDisconnected = 9301,
 
@@ -459,6 +469,11 @@ impl ErrorCode {
             ErrorCode::BridgeConnectionFailed => "Bridge connection failed",
             ErrorCode::PrinterNotAvailable => "Printer is not available",
             ErrorCode::PrintFailed => "Print operation failed",
+            ErrorCode::PrintNoPrintersConfigured => "No printers configured for destination",
+            ErrorCode::PrintAllPrintersOffline => "All printers offline for destination",
+            ErrorCode::PrintKitchenDisabled => "Kitchen printing is not enabled",
+            ErrorCode::PrintLabelDisabled => "Label printing is not enabled",
+            ErrorCode::PrintDestinationNotConfigured => "No print destination configured",
             ErrorCode::ClientDisconnected => "Client disconnected",
 
             // Storage
@@ -634,6 +649,11 @@ impl TryFrom<u16> for ErrorCode {
             9103 => Ok(ErrorCode::BridgeConnectionFailed),
             9201 => Ok(ErrorCode::PrinterNotAvailable),
             9202 => Ok(ErrorCode::PrintFailed),
+            9203 => Ok(ErrorCode::PrintNoPrintersConfigured),
+            9204 => Ok(ErrorCode::PrintAllPrintersOffline),
+            9205 => Ok(ErrorCode::PrintKitchenDisabled),
+            9206 => Ok(ErrorCode::PrintLabelDisabled),
+            9207 => Ok(ErrorCode::PrintDestinationNotConfigured),
             9301 => Ok(ErrorCode::ClientDisconnected),
 
             // Storage
@@ -768,6 +788,11 @@ mod tests {
         assert_eq!(ErrorCode::BridgeConnectionFailed.code(), 9103);
         assert_eq!(ErrorCode::PrinterNotAvailable.code(), 9201);
         assert_eq!(ErrorCode::PrintFailed.code(), 9202);
+        assert_eq!(ErrorCode::PrintNoPrintersConfigured.code(), 9203);
+        assert_eq!(ErrorCode::PrintAllPrintersOffline.code(), 9204);
+        assert_eq!(ErrorCode::PrintKitchenDisabled.code(), 9205);
+        assert_eq!(ErrorCode::PrintLabelDisabled.code(), 9206);
+        assert_eq!(ErrorCode::PrintDestinationNotConfigured.code(), 9207);
 
         // Storage
         assert_eq!(ErrorCode::StorageFull.code(), 9401);
@@ -967,12 +992,12 @@ mod tests {
             8101, 8102, 8103, 8104, // 81xx Role (9)
             9001, 9002, 9003, 9004, 9005, // 9xxx System
             9101, 9102, 9103, // 91xx Bridge
-            9201, 9202, // 92xx Printer
+            9201, 9202, 9203, 9204, 9205, 9206, 9207, // 92xx Printer
             9301, // 93xx Client
             9401, 9402, 9403, 9404, // 94xx Storage (15)
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 124;
+        const EXPECTED_VARIANT_COUNT: usize = 129;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

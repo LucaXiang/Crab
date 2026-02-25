@@ -24,6 +24,23 @@ pub enum PrintExecutorError {
     PrinterOffline(String),
 }
 
+impl From<PrintExecutorError> for shared::error::AppError {
+    fn from(err: PrintExecutorError) -> Self {
+        use shared::error::{AppError, ErrorCode};
+        match err {
+            PrintExecutorError::NoPrinters(dest) => {
+                AppError::with_message(ErrorCode::PrintNoPrintersConfigured, dest)
+            }
+            PrintExecutorError::PrintFailed(msg) => {
+                AppError::with_message(ErrorCode::PrintFailed, msg)
+            }
+            PrintExecutorError::PrinterOffline(msg) => {
+                AppError::with_message(ErrorCode::PrintAllPrintersOffline, msg)
+            }
+        }
+    }
+}
+
 pub type PrintExecutorResult<T> = Result<T, PrintExecutorError>;
 
 /// Print job executor
@@ -332,7 +349,7 @@ impl PrintExecutor {
         Ok(())
     }
 
-    /// Print label records (non-Windows: not supported)
+    /// Print label records (non-Windows: not supported, GDI+ required)
     #[cfg(not(windows))]
     pub async fn print_label_records(
         &self,

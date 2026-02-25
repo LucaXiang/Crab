@@ -10,7 +10,7 @@ import { formatCurrency } from '@/utils/format';
 import { Spinner } from '@/presentation/components/ui/Spinner';
 import type { DailyReportEntry } from '@/core/types/stats';
 
-export const StatsScreen: React.FC = () => {
+export const ReportsScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const storeId = useStoreId();
@@ -62,7 +62,7 @@ export const StatsScreen: React.FC = () => {
                 {reports.map(entry => (
                     <tr key={entry.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
                       <td className="py-2 text-slate-700">
-                        <Link to={`/stores/${storeId}/stats/${entry.business_date}`} className="text-primary-500 hover:text-primary-600 font-medium hover:underline">
+                        <Link to={`/stores/${storeId}/reports/${entry.business_date}`} className="text-primary-500 hover:text-primary-600 font-medium hover:underline">
                           {entry.business_date}
                         </Link>
                       </td>
@@ -81,7 +81,7 @@ export const StatsScreen: React.FC = () => {
         {/* Mobile cards */}
         <div className="md:hidden space-y-3">
           {reports.map(entry => (
-              <Link key={entry.id} to={`/stores/${storeId}/stats/${entry.business_date}`} className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors">
+              <Link key={entry.id} to={`/stores/${storeId}/reports/${entry.business_date}`} className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors">
                 <div className="text-primary-500 font-medium mb-2">{entry.business_date}</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <div>

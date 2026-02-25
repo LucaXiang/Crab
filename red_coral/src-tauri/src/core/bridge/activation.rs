@@ -331,7 +331,7 @@ impl ClientBridge {
         if error_lower.contains("expired") {
             // 证书过期
             if let Some(paths) = tenant_manager.current_paths() {
-                if let Ok(cert_pem) = std::fs::read_to_string(paths.edge_cert()) {
+                if let Ok(cert_pem) = std::fs::read_to_string(paths.server_cert()) {
                     if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
                         let now = time::OffsetDateTime::now_utc();
                         let duration = metadata.not_after - now;
@@ -448,7 +448,7 @@ impl ClientBridge {
 
         // 3. 读取证书检查有效性
         let cert_path = if for_server {
-            paths.edge_cert()
+            paths.server_cert()
         } else {
             paths.client_cert()
         };

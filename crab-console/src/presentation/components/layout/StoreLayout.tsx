@@ -46,7 +46,7 @@ export const StoreLayout: React.FC = () => {
         { key: 'nav.overview', href: `/stores/${storeId}/overview`, icon: BarChart3 },
         { key: 'nav.live_orders', href: `/stores/${storeId}/live`, icon: Radio },
         { key: 'nav.orders', href: `/stores/${storeId}/orders`, icon: ShoppingBag },
-        { key: 'nav.daily_report', href: `/stores/${storeId}/stats`, icon: ScrollText },
+        { key: 'nav.daily_report', href: `/stores/${storeId}/reports`, icon: ScrollText },
       ],
     },
     {

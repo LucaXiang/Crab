@@ -30,7 +30,7 @@ export const ForgotPasswordScreen: React.FC = () => {
       setSuccess(t('auth.reset_code_sent'));
       setStep('reset');
     } catch (err) {
-      if (err instanceof ApiError) setError(apiErrorMessage(t, err.code, err.message));
+      if (err instanceof ApiError) setError(apiErrorMessage(t, err.code, err.message, err.status));
       else setError(t('auth.error_generic'));
     } finally {
       setLoading(false);
@@ -53,7 +53,7 @@ export const ForgotPasswordScreen: React.FC = () => {
       setSuccess(t('auth.password_reset_success'));
       setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
-      if (err instanceof ApiError) setError(apiErrorMessage(t, err.code, err.message));
+      if (err instanceof ApiError) setError(apiErrorMessage(t, err.code, err.message, err.status));
       else setError(t('auth.error_generic'));
     } finally {
       setLoading(false);

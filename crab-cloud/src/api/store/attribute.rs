@@ -1,6 +1,6 @@
 use axum::{
     Extension, Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
 use shared::cloud::store_op::{BindingOwner, StoreOp, StoreOpResult};
 use shared::error::AppError;
@@ -214,6 +214,27 @@ pub async fn batch_update_option_sort_order(
 }
 
 // ── Attribute Binding ──
+
+#[derive(serde::Deserialize)]
+pub struct ListBindingsQuery {
+    pub owner_type: String,
+    pub owner_id: i64,
+}
+
+pub async fn list_bindings(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Query(query): Query<ListBindingsQuery>,
+) -> ApiResult<Vec<store::StoreBinding>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let bindings =
+        store::list_bindings_by_owner(&state.pool, store_id, &query.owner_type, query.owner_id)
+            .await
+            .map_err(internal)?;
+    Ok(Json(bindings))
+}
 
 #[derive(serde::Deserialize)]
 pub struct BindAttributeRequest {

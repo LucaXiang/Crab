@@ -540,17 +540,10 @@ pub struct TokenRefreshRequest {
 /// Token 刷新响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenRefreshResponse {
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub error_code: Option<ErrorCode>,
     /// 新的 access token
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
+    pub token: String,
     /// 新的 refresh token (轮转)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refresh_token: Option<String>,
+    pub refresh_token: String,
 }
 
 // === Deactivate Types (注销证书，释放配额) ===

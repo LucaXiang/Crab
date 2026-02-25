@@ -27,9 +27,9 @@ pub struct CloudService {
 impl CloudService {
     /// Create a new CloudService with mTLS configuration
     pub fn new(cloud_url: String, edge_id: String, certs_dir: &Path) -> Result<Self, AppError> {
-        let edge_cert_pem = std::fs::read(certs_dir.join("edge_cert.pem"))
+        let edge_cert_pem = std::fs::read(certs_dir.join("server.pem"))
             .map_err(|e| AppError::internal(format!("Failed to read edge cert: {e}")))?;
-        let edge_key_pem = std::fs::read(certs_dir.join("edge_key.pem"))
+        let edge_key_pem = std::fs::read(certs_dir.join("server.key.pem"))
             .map_err(|e| AppError::internal(format!("Failed to read edge key: {e}")))?;
         let tenant_ca_pem = std::fs::read(certs_dir.join("tenant_ca.pem"))
             .map_err(|e| AppError::internal(format!("Failed to read tenant CA: {e}")))?;
@@ -119,9 +119,9 @@ impl CloudService {
 
     /// Build rustls ClientConfig with mTLS certs
     fn build_rustls_config(&self) -> Result<rustls::ClientConfig, AppError> {
-        let edge_cert_pem = std::fs::read(self.certs_dir.join("edge_cert.pem"))
+        let edge_cert_pem = std::fs::read(self.certs_dir.join("server.pem"))
             .map_err(|e| AppError::internal(format!("Read edge cert: {e}")))?;
-        let edge_key_pem = std::fs::read(self.certs_dir.join("edge_key.pem"))
+        let edge_key_pem = std::fs::read(self.certs_dir.join("server.key.pem"))
             .map_err(|e| AppError::internal(format!("Read edge key: {e}")))?;
         let tenant_ca_pem = std::fs::read(self.certs_dir.join("tenant_ca.pem"))
             .map_err(|e| AppError::internal(format!("Read tenant CA: {e}")))?;
@@ -150,7 +150,7 @@ impl CloudService {
         let mut cursor = std::io::Cursor::new(&edge_key_pem);
         let key: PrivateKeyDer<'static> = rustls_pemfile::private_key(&mut cursor)
             .map_err(|e| AppError::internal(format!("Parse edge key: {e}")))?
-            .ok_or_else(|| AppError::internal("No private key found in edge_key.pem"))?;
+            .ok_or_else(|| AppError::internal("No private key found in server.key.pem"))?;
 
         // Root store with root CA
         let mut root_store = rustls::RootCertStore::empty();

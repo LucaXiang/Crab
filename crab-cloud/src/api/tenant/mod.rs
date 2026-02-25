@@ -43,7 +43,9 @@ pub use account::{
 
 pub use store::{list_stores, update_store};
 
-pub use analytics::{get_stats, get_store_overview, get_store_red_flags, get_tenant_overview};
+pub use analytics::{
+    get_report_detail, get_stats, get_store_overview, get_store_red_flags, get_tenant_overview,
+};
 
 pub use order::{get_order_detail, list_orders};
 

@@ -14,7 +14,6 @@ export { usePOSUIActions } from './useUIStore';
 // Printer Store (打印机配置)
 export {
   useReceiptPrinter,
-  useKitchenPrinter,
   useLabelPrinter,
   useCashDrawerPrinter,
   useActiveLabelTemplateId,

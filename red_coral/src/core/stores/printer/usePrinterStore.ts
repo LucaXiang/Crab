@@ -8,7 +8,6 @@ import { useShallow } from 'zustand/react/shallow';
 interface PrinterStore {
   // State
   receiptPrinter: string | null;
-  kitchenPrinter: string | null;
   labelPrinter: string | null;
   cashDrawerPrinter: string | null;
   activeLabelTemplateId: number | null;
@@ -16,7 +15,6 @@ interface PrinterStore {
 
   // Actions
   setReceiptPrinter: (name: string | null) => void;
-  setKitchenPrinter: (name: string | null) => void;
   setLabelPrinter: (name: string | null) => void;
   setCashDrawerPrinter: (name: string | null) => void;
   setActiveLabelTemplateId: (id: number | null) => void;
@@ -40,7 +38,6 @@ const setItem = (key: string, value: string | null) => {
 export const usePrinterStore = create<PrinterStore>((set) => ({
   // Initial State (from localStorage)
   receiptPrinter: getItem('printer_receipt'),
-  kitchenPrinter: getItem('printer_kitchen'),
   labelPrinter: getItem('printer_label'),
   cashDrawerPrinter: getItem('printer_cash_drawer'),
   activeLabelTemplateId: (() => { const v = getItem('active_label_template_id'); return v ? Number(v) : null; })(),
@@ -50,11 +47,6 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
   setReceiptPrinter: (name) => {
     setItem('printer_receipt', name);
     set({ receiptPrinter: name });
-  },
-
-  setKitchenPrinter: (name) => {
-    setItem('printer_kitchen', name);
-    set({ kitchenPrinter: name });
   },
 
   setLabelPrinter: (name) => {
@@ -80,7 +72,6 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
 
 // Selectors
 export const useReceiptPrinter = () => usePrinterStore((state) => state.receiptPrinter);
-export const useKitchenPrinter = () => usePrinterStore((state) => state.kitchenPrinter);
 export const useLabelPrinter = () => usePrinterStore((state) => state.labelPrinter);
 export const useCashDrawerPrinter = () => usePrinterStore((state) => state.cashDrawerPrinter);
 export const useActiveLabelTemplateId = () => usePrinterStore((state) => state.activeLabelTemplateId);
@@ -91,7 +82,6 @@ export const useAutoOpenCashDrawerAfterReceipt = () => usePrinterStore((state) =
 export const usePrinterActions = () => usePrinterStore(
   useShallow((state) => ({
     setReceiptPrinter: state.setReceiptPrinter,
-    setKitchenPrinter: state.setKitchenPrinter,
     setLabelPrinter: state.setLabelPrinter,
     setCashDrawerPrinter: state.setCashDrawerPrinter,
     setActiveLabelTemplateId: state.setActiveLabelTemplateId,

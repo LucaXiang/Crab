@@ -90,7 +90,7 @@ export const DashboardScreen: React.FC = () => {
           navigate('/login');
           return;
         }
-        setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+        setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
       } finally {
         setLoading(false);
       }
@@ -105,7 +105,7 @@ export const DashboardScreen: React.FC = () => {
       if (!isSafeStripeUrl(res.url)) { setError('Invalid billing URL'); return; }
       window.location.href = res.url;
     } catch (err) {
-      setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+      setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
     } finally {
       setBillingLoading(false);
     }
@@ -122,7 +122,7 @@ export const DashboardScreen: React.FC = () => {
       setP12Expires(res.expires_at);
       setOnboardStep('plan');
     } catch (err) {
-      setP12Error(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+      setP12Error(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
     } finally {
       setP12Uploading(false);
     }
@@ -138,7 +138,7 @@ export const DashboardScreen: React.FC = () => {
       if (!isSafeStripeUrl(res.checkout_url)) { setError('Invalid checkout URL'); return; }
       window.location.href = res.checkout_url;
     } catch (err) {
-      setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+      setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
     } finally {
       setCheckoutLoading('');
     }

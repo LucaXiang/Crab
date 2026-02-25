@@ -37,30 +37,27 @@ impl ClientBridge {
             .await
             .map_err(|e| BridgeError::Config(format!("Token refresh network error: {e}")))?;
 
+        if !resp.status().is_success() {
+            let msg = resp
+                .text()
+                .await
+                .unwrap_or_else(|_| "Token refresh failed".to_string());
+            return Err(BridgeError::Config(format!("Token refresh failed: {msg}")));
+        }
+
         let data: shared::activation::TokenRefreshResponse = resp
             .json()
             .await
             .map_err(|e| BridgeError::Config(format!("Token refresh parse error: {e}")))?;
 
-        if !data.success {
-            return Err(BridgeError::Config(
-                data.error
-                    .unwrap_or_else(|| "Token refresh failed".to_string()),
-            ));
-        }
-
-        let token = data
-            .token
-            .ok_or_else(|| BridgeError::Config("No token in refresh response".to_string()))?;
-
         // 保存新的 refresh_token（轮转后旧的失效）
-        if let Some(new_rt) = data.refresh_token {
+        {
             let mut config = self.config.write().await;
-            config.refresh_token = Some(new_rt);
+            config.refresh_token = Some(data.refresh_token);
             config.save(&self.config_path)?;
         }
 
-        Ok(token)
+        Ok(data.token)
     }
 
     /// 获取服务器模式配置

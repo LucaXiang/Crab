@@ -2,8 +2,10 @@ import { request, requestFormData } from './client';
 
 export interface LoginResponse {
   token: string;
+  refresh_token: string;
   tenant_id: string;
 }
+
 
 export function login(email: string, password: string): Promise<LoginResponse> {
   return request('POST', '/api/tenant/login', { email, password });

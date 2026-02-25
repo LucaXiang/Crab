@@ -83,9 +83,15 @@ export function apiErrorMessage(
   translate: (key: string) => string,
   code: number | null,
   fallback: string,
+  httpStatus?: number,
 ): string {
   if (code !== null) {
     const key = `error.${code}`;
+    const msg = translate(key);
+    if (msg !== key) return msg;
+  }
+  if (httpStatus) {
+    const key = `httpStatus.${httpStatus}`;
     const msg = translate(key);
     if (msg !== key) return msg;
   }
@@ -99,8 +105,9 @@ export const i18n = {
   t,
 };
 
-// Initialize
+// Initialize: load translations, then detect locale and notify subscribers to trigger re-render
 loadTranslations().then(() => {
   currentLocale = detectLocale();
   document.documentElement.lang = currentLocale;
+  subscribers.forEach(cb => cb(currentLocale));
 });

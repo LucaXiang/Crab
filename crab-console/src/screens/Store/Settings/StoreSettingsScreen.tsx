@@ -65,7 +65,7 @@ export const StoreSettingsScreen: React.FC = () => {
       await updateStore(token, storeId, form);
       setMsg({ text: t('store.saved'), ok: true });
     } catch (err) {
-      setMsg({ text: err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'), ok: false });
+      setMsg({ text: err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'), ok: false });
     } finally { setSaving(false); }
   };
 

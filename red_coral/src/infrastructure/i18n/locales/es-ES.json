@@ -277,15 +277,12 @@
       "description": "Conectar a Edge Server existente. Requiere conexión de red.",
       "select": "Seleccionar"
     },
-    "configure_server_title": "Configurar modo servidor",
-    "configure_server_desc": "Configure puertos del servidor local",
-    "configure_client_title": "Configurar modo cliente",
+    "configure_server_title": "Iniciar servidor",
+    "configure_server_desc": "Active e inicie el servidor local",
+    "configure_client_title": "Conectar al servidor",
     "configure_client_desc": "Introduzca datos del servidor remoto",
     "server": {
-      "http_port_label": "Puerto HTTP",
-      "http_port_help": "Puerto API HTTP (por defecto: 9625)",
-      "message_port_label": "Puerto mensajería",
-      "message_port_help": "Puerto tiempo real (por defecto: 9626)"
+      "ready_message": "Pulse el botón para activar e iniciar el servidor. Los datos se guardarán de forma segura en el dispositivo."
     },
     "client": {
       "edge_url_label": "Dirección Edge Server",
@@ -1591,7 +1588,9 @@
         "title": "Estaciones cocina",
         "no_data": "Cree su primera estación",
         "default_name": "Estación",
-        "add_station": "Añadir estación"
+        "add_station": "Añadir estación",
+        "confirm_delete": "¿Eliminar la estación \"{{name}}\"?",
+        "deleted": "Estación eliminada"
       },
       "form": {
         "target_printer": "Impresora destino",
@@ -2144,6 +2143,13 @@
     "3019": "Debe subir el certificado P12 primero",
     "3020": "El ID del hardware no coincide con el certificado",
     "3021": "El certificado no tiene extensión device_id",
+    "3022": "Se ha alcanzado el límite de recursos",
+    "3023": "Formato de archivo P12/PFX no válido",
+    "3024": "Contraseña P12 incorrecta",
+    "3025": "El archivo P12 no contiene clave privada",
+    "3026": "El archivo P12 no contiene certificado",
+    "3027": "Fallo en la verificación de la cadena de certificados",
+    "3028": "La CA raíz no es reconocida por la AEAT",
     "4001": "Pedido no existe",
     "4002": "Pedido ya pagado",
     "4003": "Pedido completado",
@@ -2213,8 +2219,12 @@
     "9102": "Sin conexión servidor",
     "9103": "Error conexión",
     "9201": "Impresora no disponible",
-    "9202": "Error impresión",
-    "9203": "Etiquetas en desarrollo",
+    "9202": "Error de impresión",
+    "9203": "Estación sin impresoras configuradas",
+    "9204": "Todas las impresoras fuera de línea",
+    "9205": "Impresión de cocina no habilitada",
+    "9206": "Impresión de etiquetas no habilitada",
+    "9207": "Sin destino de impresión configurado",
     "9301": "Cliente desconectado",
     "9401": "Sin espacio",
     "9402": "Sin memoria",

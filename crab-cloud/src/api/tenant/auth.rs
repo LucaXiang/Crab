@@ -20,6 +20,7 @@ pub struct LoginRequest {
 #[derive(serde::Serialize)]
 pub struct LoginResponse {
     pub token: String,
+    pub refresh_token: String,
     pub tenant_id: String,
     pub status: String,
 }
@@ -53,11 +54,19 @@ pub async fn login(
                 AppError::new(ErrorCode::InternalError)
             })?;
 
+    let refresh_token = db::refresh_tokens::create(&state.pool, &tenant.id, "console")
+        .await
+        .map_err(|e| {
+            tracing::error!("Refresh token creation failed: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
+
     let now = shared::util::now_millis();
     let _ = db::audit::log(&state.pool, &tenant.id, "login", None, None, now).await;
 
     Ok(Json(LoginResponse {
         token,
+        refresh_token,
         tenant_id: tenant.id.clone(),
         status: tenant.status,
     }))

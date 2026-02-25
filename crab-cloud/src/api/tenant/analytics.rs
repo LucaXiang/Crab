@@ -116,3 +116,32 @@ pub async fn get_store_red_flags(
 
     Ok(Json(red_flags))
 }
+
+/// GET /api/tenant/stores/:id/reports/:date
+pub async fn get_report_detail(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, date)): Path<(i64, String)>,
+) -> ApiResult<tenant_queries::DailyReportDetail> {
+    // Validate YYYY-MM-DD format
+    if date.len() != 10 || !date.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
+        return Err(AppError::validation(
+            "Invalid date format, expected YYYY-MM-DD",
+        ));
+    }
+
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let detail =
+        tenant_queries::get_daily_report_detail(&state.pool, store_id, &identity.tenant_id, &date)
+            .await
+            .map_err(|e| {
+                tracing::error!("Report detail query error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?
+            .ok_or_else(|| {
+                AppError::with_message(ErrorCode::NotFound, "Daily report not found for this date")
+            })?;
+
+    Ok(Json(detail))
+}

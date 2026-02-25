@@ -1324,14 +1324,32 @@ impl CatalogService {
     }
 
     /// Check if kitchen printing is enabled (system level)
+    ///
+    /// True if there's a default kitchen destination OR any category has kitchen destinations configured.
     pub fn is_kitchen_print_enabled(&self) -> bool {
         let defaults = self.print_defaults.read();
-        defaults.kitchen_destination.is_some()
+        if defaults.kitchen_destination.is_some() {
+            return true;
+        }
+        drop(defaults);
+        let categories = self.categories.read();
+        categories
+            .values()
+            .any(|c| !c.kitchen_print_destinations.is_empty())
     }
 
     /// Check if label printing is enabled (system level)
+    ///
+    /// True if there's a default label destination OR any category has label destinations configured.
     pub fn is_label_print_enabled(&self) -> bool {
         let defaults = self.print_defaults.read();
-        defaults.label_destination.is_some()
+        if defaults.label_destination.is_some() {
+            return true;
+        }
+        drop(defaults);
+        let categories = self.categories.read();
+        categories
+            .values()
+            .any(|c| !c.label_print_destinations.is_empty())
     }
 }

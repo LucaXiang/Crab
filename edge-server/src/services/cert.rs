@@ -13,8 +13,8 @@ use crate::utils::AppError;
 /// work_dir/certs/
 /// ├── root_ca.pem      # 根证书 (用于验证 tenant_ca)
 /// ├── tenant_ca.pem    # 租户 CA 证书 (用于验证客户端)
-/// ├── edge_cert.pem    # 边缘服务器证书
-/// └── edge_key.pem     # 边缘服务器私钥
+/// ├── server.pem    # 边缘服务器证书
+/// └── server.key.pem     # 边缘服务器私钥
 /// ```
 ///
 /// # 职责
@@ -137,9 +137,9 @@ impl CertService {
             .map_err(|e| AppError::internal(format!("Failed to write root CA: {}", e)))?;
         fs::write(certs_dir.join("tenant_ca.pem"), tenant_ca_pem)
             .map_err(|e| AppError::internal(format!("Failed to write tenant CA: {}", e)))?;
-        fs::write(certs_dir.join("edge_cert.pem"), edge_cert_pem)
+        fs::write(certs_dir.join("server.pem"), edge_cert_pem)
             .map_err(|e| AppError::internal(format!("Failed to write edge cert: {}", e)))?;
-        fs::write(certs_dir.join("edge_key.pem"), edge_key_pem)
+        fs::write(certs_dir.join("server.key.pem"), edge_key_pem)
             .map_err(|e| AppError::internal(format!("Failed to write edge key: {}", e)))?;
 
         tracing::info!("Certificates saved to {:?}", certs_dir);
@@ -158,8 +158,8 @@ impl CertService {
 
         let certs_dir = self.work_dir.join("certs");
         let tenant_ca_path = certs_dir.join("tenant_ca.pem");
-        let edge_cert_path = certs_dir.join("edge_cert.pem");
-        let edge_key_path = certs_dir.join("edge_key.pem");
+        let edge_cert_path = certs_dir.join("server.pem");
+        let edge_key_path = certs_dir.join("server.key.pem");
 
         // 检查必需的证书文件
         if !tenant_ca_path.exists() || !edge_cert_path.exists() || !edge_key_path.exists() {
@@ -349,7 +349,7 @@ impl CertService {
         tracing::warn!("Cleaning up certificate files after self-check failure...");
 
         let certs_dir = self.work_dir.join("certs");
-        let edge_cert_path = certs_dir.join("edge_cert.pem");
+        let edge_cert_path = certs_dir.join("server.pem");
         let tenant_ca_path = certs_dir.join("tenant_ca.pem");
 
         // 删除证书文件
@@ -372,7 +372,7 @@ impl CertService {
     fn read_certs(&self) -> Result<(String, String), AppError> {
         use std::fs;
         let certs_dir = self.work_dir.join("certs");
-        let edge_cert_path = certs_dir.join("edge_cert.pem");
+        let edge_cert_path = certs_dir.join("server.pem");
         let tenant_ca_path = certs_dir.join("tenant_ca.pem");
 
         if !edge_cert_path.exists() || !tenant_ca_path.exists() {

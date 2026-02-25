@@ -13,7 +13,7 @@ export const AuthScreen: React.FC = () => {
     const tenantId = searchParams.get('tenant_id');
 
     if (token && tenantId) {
-      setAuth(token, tenantId);
+      setAuth(token, null, tenantId);
       navigate('/', { replace: true });
     } else {
       window.location.href = 'https://redcoral.app/login';

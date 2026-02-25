@@ -219,34 +219,44 @@ impl ArchiveWorker {
             None => return,
         };
 
-        // 2. Archive to SQLite (async)
+        // 2. Get current open shift ID for this order
+        let shift_id = match shift::find_any_open(&self.pool).await {
+            Ok(Some(s)) => Some(s.id),
+            Ok(None) => None,
+            Err(e) => {
+                tracing::warn!(order_id = %order_id, error = %e, "Failed to query open shift");
+                None
+            }
+        };
+
+        // 3. Archive to SQLite (async)
         match self
             .archive_service
-            .archive_order(&snapshot, events.clone())
+            .archive_order(&snapshot, events.clone(), shift_id)
             .await
         {
             Ok(newly_archived) => {
                 // Only run post-processing for newly archived orders (skip on idempotency hit)
                 if newly_archived {
-                    // 3. Update shift expected_cash for cash payments
+                    // 4. Update shift expected_cash for cash payments
                     self.update_shift_cash(&snapshot).await;
 
-                    // 4. Write payment records to independent payment table
+                    // 5. Write payment records to independent payment table
                     self.write_payment_records(&snapshot, &events).await;
 
-                    // 5. Update member stats (points + total_spent) for completed orders
+                    // 6. Update member stats (points + total_spent) for completed orders
                     self.update_member_stats(&snapshot).await;
 
-                    // 6. Write audit log for terminal event
+                    // 7. Write audit log for terminal event
                     self.write_order_audit(&snapshot, &events).await;
                 }
 
-                // 7. Cleanup redb (synchronous) — always run to clear the queue
+                // 8. Cleanup redb (synchronous) — always run to clear the queue
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
 
-                // 8. Notify CloudWorker to sync immediately (push + periodic scan)
+                // 9. Notify CloudWorker to sync immediately (push + periodic scan)
                 self.archive_notify.notify_one();
             }
             Err(e) => {

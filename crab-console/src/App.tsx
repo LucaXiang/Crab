@@ -11,8 +11,8 @@ import { AuthScreen } from '@/screens/Auth/AuthScreen';
 import { StoreOverviewScreen } from '@/screens/Store/Overview/StoreOverviewScreen';
 import { LiveOrdersScreen } from '@/screens/Store/LiveOrders/LiveOrdersScreen';
 import { OrdersScreen } from '@/screens/Store/Orders/OrdersScreen';
-import { StatsScreen } from '@/screens/Store/Stats/StatsScreen';
-import { StatsDetailScreen } from '@/screens/Store/Stats/StatsDetailScreen';
+import { ReportsScreen } from '@/screens/Store/Reports/ReportsScreen';
+import { ReportDetailScreen } from '@/screens/Store/Reports/ReportDetailScreen';
 import { RedFlagsScreen } from '@/screens/Store/RedFlags/RedFlagsScreen';
 import { SettingsScreen } from '@/screens/Settings/SettingsScreen';
 import { AuditScreen } from '@/screens/Audit/AuditScreen';
@@ -46,8 +46,8 @@ export const App: React.FC = () => (
       <Route path="overview" element={<StoreOverviewScreen />} />
       <Route path="live" element={<LiveOrdersScreen />} />
       <Route path="orders" element={<OrdersScreen />} />
-      <Route path="stats" element={<StatsScreen />} />
-      <Route path="stats/:date" element={<StatsDetailScreen />} />
+      <Route path="reports" element={<ReportsScreen />} />
+      <Route path="reports/:date" element={<ReportDetailScreen />} />
       <Route path="products" element={<ProductManagement />} />
       <Route path="categories" element={<CategoryManagement />} />
       <Route path="tags" element={<TagManagement />} />

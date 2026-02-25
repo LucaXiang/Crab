@@ -34,6 +34,34 @@ pub struct PaymentMethodBreakdown {
     pub count: i64,
 }
 
+/// Shift breakdown within a daily report
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+pub struct ShiftBreakdown {
+    pub id: i64,
+    pub report_id: i64,
+    pub shift_id: i64,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub status: String,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub starting_cash: f64,
+    pub expected_cash: f64,
+    pub actual_cash: Option<f64>,
+    pub cash_variance: Option<f64>,
+    pub abnormal_close: bool,
+    pub total_orders: i64,
+    pub completed_orders: i64,
+    pub void_orders: i64,
+    pub total_sales: f64,
+    pub total_paid: f64,
+    pub void_amount: f64,
+    pub total_tax: f64,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+}
+
 /// Daily Report - end-of-day settlement report
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "db", derive(sqlx::FromRow))]
@@ -65,6 +93,9 @@ pub struct DailyReport {
     #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]
     pub payment_breakdowns: Vec<PaymentMethodBreakdown>,
+    #[cfg_attr(feature = "db", sqlx(skip))]
+    #[serde(default)]
+    pub shift_breakdowns: Vec<ShiftBreakdown>,
 }
 
 /// Generate daily report payload

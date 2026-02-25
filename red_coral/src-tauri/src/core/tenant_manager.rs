@@ -329,8 +329,8 @@ impl TenantManager {
         // 6. 保存 Edge Server 证书到 {tenant}/server/certs/
         // edge-server 的 work_dir = {tenant}/server/，从 work_dir/certs/ 读取
         // 注意：不再写 client 路径，Client 模式需要调用 activate_client() 获取专用证书
-        std::fs::write(paths.edge_cert(), &data.entity_cert)?;
-        std::fs::write(paths.edge_key(), &data.entity_key)?;
+        std::fs::write(paths.server_cert(), &data.entity_cert)?;
+        std::fs::write(paths.server_key(), &data.entity_key)?;
         std::fs::write(paths.server_tenant_ca(), &data.tenant_ca_cert)?;
         std::fs::write(paths.server_root_ca(), &data.root_ca_cert)?;
 

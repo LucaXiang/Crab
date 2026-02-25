@@ -79,8 +79,6 @@ export const SetupScreen: React.FC = () => {
 
   // Configuration state
   const [configError, setConfigError] = useState('');
-  const [httpPort, setHttpPort] = useState(DEFAULT_HTTP_PORT);
-  const [messagePort, setMessagePort] = useState(DEFAULT_MESSAGE_PORT);
   const [edgeUrl, setEdgeUrl] = useState('https://edge.example.com');
   const [messageAddr, setMessageAddr] = useState('edge.example.com:9626');
 
@@ -256,7 +254,7 @@ export const SetupScreen: React.FC = () => {
 
       // Configure + start
       if (modeChoice === 'server') {
-        await updateServerConfig(httpPort, messagePort);
+        await updateServerConfig(DEFAULT_HTTP_PORT, DEFAULT_MESSAGE_PORT);
         await startServerMode();
       } else if (modeChoice === 'client') {
         await updateClientConfig(edgeUrl, messageAddr);
@@ -300,7 +298,7 @@ export const SetupScreen: React.FC = () => {
 
       // Configure + start after replacement
       if (modeChoice === 'server') {
-        await updateServerConfig(httpPort, messagePort);
+        await updateServerConfig(DEFAULT_HTTP_PORT, DEFAULT_MESSAGE_PORT);
         await startServerMode();
       } else if (modeChoice === 'client') {
         await updateClientConfig(edgeUrl, messageAddr);
@@ -848,36 +846,9 @@ export const SetupScreen: React.FC = () => {
 
       <form onSubmit={handleConfigure} className="space-y-6">
         {isServer ? (
-          <>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">{t('setup.server.http_port_label')}</label>
-              <input
-                type="number"
-                value={httpPort}
-                onChange={(e) => setHttpPort(parseInt(e.target.value) || DEFAULT_HTTP_PORT)}
-                placeholder="9625"
-                min={1024}
-                max={65535}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                disabled={isLoading}
-              />
-              <p className="text-xs text-gray-400">{t('setup.server.http_port_help')}</p>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">{t('setup.server.message_port_label')}</label>
-              <input
-                type="number"
-                value={messagePort}
-                onChange={(e) => setMessagePort(parseInt(e.target.value) || DEFAULT_MESSAGE_PORT)}
-                placeholder="9626"
-                min={1024}
-                max={65535}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                disabled={isLoading}
-              />
-              <p className="text-xs text-gray-400">{t('setup.server.message_port_help')}</p>
-            </div>
-          </>
+          <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 text-center">
+            {t('setup.server.ready_message')}
+          </div>
         ) : (
           <>
             <div className="space-y-1">

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Mail, CreditCard, Globe, Save, ExternalLink } from 'lucide-react';
+import { User, Lock, CreditCard, Globe, Save, ExternalLink } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getProfile, updateProfile, createBillingPortal } from '@/infrastructure/api/profile';
-import { changePassword, changeEmail, confirmEmailChange } from '@/infrastructure/api/auth';
+import { changePassword } from '@/infrastructure/api/auth';
 import { ApiError } from '@/infrastructure/api/client';
 import { apiErrorMessage } from '@/infrastructure/i18n';
 import { Spinner } from '@/presentation/components/ui/Spinner';
@@ -34,13 +34,6 @@ export const SettingsScreen: React.FC = () => {
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdSaving, setPwdSaving] = useState(false);
 
-  // Email
-  const [emailPwd, setEmailPwd] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [emailCode, setEmailCode] = useState('');
-  const [emailStep, setEmailStep] = useState<'form' | 'code'>('form');
-  const [emailMsg, setEmailMsg] = useState('');
-  const [emailSaving, setEmailSaving] = useState(false);
 
   // Language
   const [lang, setLang] = useState<Locale>(getLocale());
@@ -69,7 +62,7 @@ export const SettingsScreen: React.FC = () => {
       await updateProfile(token, name);
       setSaveMsg(t('settings.saved'));
     } catch (err) {
-      setSaveMsg(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+      setSaveMsg(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
     } finally { setSaving(false); }
   };
 
@@ -81,30 +74,10 @@ export const SettingsScreen: React.FC = () => {
       setPwdMsg(t('settings.password_changed'));
       setCurPwd(''); setNewPwd('');
     } catch (err) {
-      setPwdMsg(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+      setPwdMsg(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
     } finally { setPwdSaving(false); }
   };
 
-  const handleChangeEmail = async () => {
-    if (!token) return;
-    setEmailSaving(true); setEmailMsg('');
-    try {
-      if (emailStep === 'form') {
-        await changeEmail(token, emailPwd, newEmail);
-        setEmailMsg(t('settings.email_code_sent'));
-        setEmailStep('code');
-      } else {
-        await confirmEmailChange(token, newEmail, emailCode);
-        setEmailMsg(t('settings.email_changed'));
-        setEmailStep('form'); setNewEmail(''); setEmailPwd(''); setEmailCode('');
-        // Refresh profile
-        const res = await getProfile(token);
-        setProfile(res.profile);
-      }
-    } catch (err) {
-      setEmailMsg(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
-    } finally { setEmailSaving(false); }
-  };
 
   const handleBilling = async () => {
     if (!token) return;
@@ -166,34 +139,6 @@ export const SettingsScreen: React.FC = () => {
         </div>
       </Section>
 
-      {/* Email */}
-      <Section icon={Mail} title={t('settings.change_email')}>
-        <div className="space-y-3">
-          {emailStep === 'form' ? (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t('auth.password')}</label>
-                <input type="password" value={emailPwd} onChange={e => setEmailPwd(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.new_email')}</label>
-                <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30" />
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.confirm_code')}</label>
-              <input value={emailCode} onChange={e => setEmailCode(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30" />
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <button onClick={handleChangeEmail} disabled={emailSaving} className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50">
-              {emailSaving ? '...' : emailStep === 'form' ? t('settings.change_email') : t('common.action.confirm')}
-            </button>
-            {emailMsg && <span className="text-sm text-slate-500">{emailMsg}</span>}
-          </div>
-        </div>
-      </Section>
 
       {/* Language */}
       <Section icon={Globe} title={t('settings.language')}>
@@ -234,7 +179,7 @@ export const SettingsScreen: React.FC = () => {
         <Section icon={Lock} title={t('onboard.p12_uploaded')}>
           <div className="text-sm space-y-1">
             {p12.subject && <p><span className="text-slate-500">{t('onboard.p12_subject')}:</span> <span className="text-slate-900 font-medium">{p12.subject}</span></p>}
-            {p12.expires_at && <p><span className="text-slate-500">{t('onboard.p12_expires')}:</span> <span className="text-slate-900">{new Date(p12.expires_at * 1000).toLocaleDateString()}</span></p>}
+            {p12.expires_at && <p><span className="text-slate-500">{t('onboard.p12_expires')}:</span> <span className="text-slate-900">{new Date(p12.expires_at).toLocaleDateString()}</span></p>}
           </div>
         </Section>
       )}

@@ -419,9 +419,9 @@ pub async fn get_tenant_details(
         })
     });
 
-    // 证书信息 — Server 模式读 edge_cert, Client 模式读 client_cert
+    // 证书信息 — Server 模式读 server.pem, Client 模式读 entity.pem
     let cert_path = if is_server {
-        paths.edge_cert()
+        paths.server_cert()
     } else {
         paths.client_cert()
     };

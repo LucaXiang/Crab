@@ -31,7 +31,7 @@ export const StoresScreen: React.FC = () => {
           navigate('/login');
           return;
         }
-        setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'));
+        setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
       } finally {
         setLoading(false);
       }

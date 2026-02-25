@@ -8,7 +8,7 @@ use serde::Deserialize;
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::tenant_auth::TenantIdentity;
-use crate::db::tenant_queries;
+use crate::db::{store, tenant_queries};
 use crate::state::AppState;
 
 use super::{ApiResult, verify_store};
@@ -73,26 +73,26 @@ pub async fn update_store(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
     Json(payload): Json<UpdateStoreRequest>,
-) -> ApiResult<()> {
+) -> ApiResult<shared::models::store_info::StoreInfo> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    tenant_queries::update_store(
-        &state.pool,
-        store_id,
-        &identity.tenant_id,
-        payload.name,
-        payload.address,
-        payload.phone,
-        payload.nif,
-        payload.email,
-        payload.website,
-        payload.business_day_cutoff,
-    )
-    .await
-    .map_err(|e| {
-        tracing::error!("Update store error: {e}");
-        AppError::new(ErrorCode::InternalError)
-    })?;
+    let update = shared::models::store_info::StoreInfoUpdate {
+        name: payload.name,
+        address: payload.address,
+        nif: payload.nif,
+        logo_url: None,
+        phone: payload.phone,
+        email: payload.email,
+        website: payload.website,
+        business_day_cutoff: payload.business_day_cutoff,
+    };
 
-    Ok(Json(()))
+    let info = store::update_store_info_direct(&state.pool, store_id, &update)
+        .await
+        .map_err(|e| {
+            tracing::error!("Update store info error: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
+
+    Ok(Json(info))
 }

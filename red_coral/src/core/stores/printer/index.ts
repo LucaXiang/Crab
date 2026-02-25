@@ -1,6 +1,5 @@
 export {
   useReceiptPrinter,
-  useKitchenPrinter,
   useLabelPrinter,
   useCashDrawerPrinter,
   useActiveLabelTemplateId,

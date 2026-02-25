@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Printer, ChefHat, Trash2, Edit2, Plus } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
+import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 import { logger } from '@/utils/logger';
 import { PrinterEditModal } from './PrinterEditModal';
 
@@ -72,6 +74,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
       setEditingItem(null);
     } catch (e) {
       logger.error('Failed to save kitchen printer', e);
+      toast.error(getErrorMessage(e));
     }
   };
 
@@ -144,7 +147,15 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                   <Edit2 size={14} />
                 </button>
                 <button
-                  onClick={() => remove(dest.id)}
+                  onClick={async () => {
+                    if (!confirm(t('settings.printer.kitchen_station.confirm_delete', { name: dest.name }))) return;
+                    try {
+                      await remove(dest.id);
+                      toast.success(t('settings.printer.kitchen_station.deleted'));
+                    } catch (error) {
+                      toast.error(getErrorMessage(error));
+                    }
+                  }}
                   className="p-1.5 hover:bg-primary-50 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
                 >
                   <Trash2 size={14} />

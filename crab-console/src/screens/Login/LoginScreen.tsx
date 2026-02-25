@@ -30,11 +30,11 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
     try {
       const res = await login(email, password);
-      setAuth(res.token, res.tenant_id);
+      setAuth(res.token, res.refresh_token, res.tenant_id);
       navigate('/');
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(apiErrorMessage(t, err.code, err.message));
+        setError(apiErrorMessage(t, err.code, err.message, err.status));
       } else {
         setError(t('auth.error_generic'));
       }

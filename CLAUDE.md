@@ -70,8 +70,8 @@ Tauri identifier: `com.craboss.redcoral`
             ├── certs/
             │   ├── root_ca.pem
             │   ├── tenant_ca.pem
-            │   ├── edge_cert.pem
-            │   └── edge_key.pem
+            │   ├── server.pem
+            │   └── server.key.pem
             ├── data/
             │   ├── main.db
             │   ├── orders.redb

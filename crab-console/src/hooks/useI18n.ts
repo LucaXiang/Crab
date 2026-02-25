@@ -12,7 +12,7 @@ export function useI18n() {
   const setLocale = (l: Locale) => i18n.setLocale(l);
   const t = useCallback(
     (key: string, params?: Record<string, string | number>): string => translate(key, params),
-    [],
+    [locale],
   );
 
   return { t, locale, setLocale };

@@ -19,10 +19,10 @@ pub async fn get_health_status(
     // 获取设备信息
     let device_id = crab_cert::generate_hardware_id();
 
-    // 检查证书健康状态 (Server 模式使用 edge_cert)
+    // 检查证书健康状态 (Server 模式使用 server.pem)
     let certificate = if let Some(paths) = tenant_manager.current_paths() {
         if paths.has_server_certificates() {
-            match std::fs::read_to_string(paths.edge_cert()) {
+            match std::fs::read_to_string(paths.server_cert()) {
                 Ok(cert_pem) => match crab_cert::CertMetadata::from_pem(&cert_pem) {
                     Ok(metadata) => {
                         let now = time::OffsetDateTime::now_utc();

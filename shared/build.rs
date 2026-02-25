@@ -86,6 +86,13 @@ export const ErrorCode = {
   P12Required: 3019,
   DeviceIdMismatch: 3020,
   CertificateMissingDeviceId: 3021,
+  ResourceLimitExceeded: 3022,
+  P12InvalidFormat: 3023,
+  P12WrongPassword: 3024,
+  P12MissingPrivateKey: 3025,
+  P12MissingCertificate: 3026,
+  P12ChainVerifyFailed: 3027,
+  P12UntrustedCa: 3028,
 
   // 4xxx: Order
   OrderNotFound: 4001,
@@ -170,6 +177,11 @@ export const ErrorCode = {
   BridgeConnectionFailed: 9103,
   PrinterNotAvailable: 9201,
   PrintFailed: 9202,
+  PrintNoPrintersConfigured: 9203,
+  PrintAllPrintersOffline: 9204,
+  PrintKitchenDisabled: 9205,
+  PrintLabelDisabled: 9206,
+  PrintDestinationNotConfigured: 9207,
   ClientDisconnected: 9301,
 
   // 94xx: Storage
