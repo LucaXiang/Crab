@@ -277,6 +277,14 @@ impl<'a> ReceiptRenderer<'a> {
         }
 
         // ── Tax breakdown ──
+        // Apportion order-level adjustments proportionally across tax groups
+        // so that BASE IMP + CUOTA = TOTAL (fiscal compliance)
+        let adjustment_ratio = if items_subtotal.abs() > 0.001 {
+            self.receipt.total_amount / items_subtotal
+        } else {
+            1.0
+        };
+
         let mut tax_groups: std::collections::HashMap<i32, (f64, f64)> =
             std::collections::HashMap::new();
         let default_tax = 0.10;
@@ -285,8 +293,9 @@ impl<'a> ReceiptRenderer<'a> {
             let rate = item.tax_rate.unwrap_or(default_tax);
             let rate_key = (rate * 100.0).round() as i32;
             let entry = tax_groups.entry(rate_key).or_insert((0.0, 0.0));
-            let item_base = item.total / (1.0 + rate);
-            let item_tax = item.total - item_base;
+            let adjusted_total = item.total * adjustment_ratio;
+            let item_base = adjusted_total / (1.0 + rate);
+            let item_tax = adjusted_total - item_base;
             entry.0 += item_base;
             entry.1 += item_tax;
         }

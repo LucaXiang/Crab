@@ -8,6 +8,7 @@ import type { HeldOrder, AppliedRule } from '@/core/domain/types';
 import type { ArchivedOrderDetail } from '@/core/domain/types/archivedOrder';
 import type { StoreInfo } from '@/core/domain/types/api';
 import type { ReceiptData, ReceiptItem, ReceiptStoreInfo, ReceiptSurchargeInfo, ReceiptDiscountInfo, ReceiptRuleAdjustment } from '@/infrastructure/print/printService';
+import { Currency } from '@/utils/currency';
 
 function formatTimestamp(ms: number): string {
   return new Date(ms).toLocaleString('es-ES', {
@@ -45,14 +46,12 @@ function aggregateRuleAdjustments(order: HeldOrder): ReceiptRuleAdjustment[] {
     if (item._removed || item.is_comped) continue;
     for (const rule of item.applied_rules) {
       if (rule.skipped) continue;
+      const lineAmount = Currency.mul(rule.calculated_amount, item.quantity).toNumber();
       const existing = ruleMap.get(rule.rule_id);
       if (existing) {
-        existing.totalAmount += rule.calculated_amount * item.quantity;
+        existing.totalAmount = Currency.add(existing.totalAmount, lineAmount).toNumber();
       } else {
-        ruleMap.set(rule.rule_id, {
-          rule,
-          totalAmount: rule.calculated_amount * item.quantity,
-        });
+        ruleMap.set(rule.rule_id, { rule, totalAmount: lineAmount });
       }
     }
   }
@@ -62,23 +61,20 @@ function aggregateRuleAdjustments(order: HeldOrder): ReceiptRuleAdjustment[] {
     if (rule.skipped) continue;
     const existing = ruleMap.get(rule.rule_id);
     if (existing) {
-      existing.totalAmount += rule.calculated_amount;
+      existing.totalAmount = Currency.add(existing.totalAmount, rule.calculated_amount).toNumber();
     } else {
-      ruleMap.set(rule.rule_id, {
-        rule,
-        totalAmount: rule.calculated_amount,
-      });
+      ruleMap.set(rule.rule_id, { rule, totalAmount: rule.calculated_amount });
     }
   }
 
   return Array.from(ruleMap.values())
-    .filter((entry) => Math.abs(entry.totalAmount) > 0.005)
+    .filter((entry) => Currency.gt(Currency.abs(entry.totalAmount), 0.005))
     .map((entry) => ({
       name: entry.rule.receipt_name || entry.rule.display_name || entry.rule.name,
       rule_type: entry.rule.rule_type,
       adjustment_type: entry.rule.adjustment_type,
       value: entry.rule.adjustment_value,
-      amount: Math.abs(entry.totalAmount),
+      amount: Currency.abs(entry.totalAmount).toNumber(),
     }));
 }
 
@@ -220,28 +216,29 @@ export function buildArchivedReceiptData(
   for (const item of order.items) {
     if (item.is_comped) continue;
     for (const rule of item.applied_rules ?? []) {
+      const lineAmount = Currency.mul(rule.calculated_amount, item.quantity).toNumber();
       const existing = ruleMap.get(rule.rule_id);
       if (existing) {
-        existing.totalAmount += rule.calculated_amount * item.quantity;
+        existing.totalAmount = Currency.add(existing.totalAmount, lineAmount).toNumber();
       } else {
         ruleMap.set(rule.rule_id, {
           name: rule.receipt_name || rule.display_name || rule.name,
           rule_type: rule.rule_type,
           adjustment_type: rule.adjustment_type,
           value: rule.adjustment_value,
-          totalAmount: rule.calculated_amount * item.quantity,
+          totalAmount: lineAmount,
         });
       }
     }
   }
   const rule_adjustments: ReceiptRuleAdjustment[] = Array.from(ruleMap.values())
-    .filter((entry) => Math.abs(entry.totalAmount) > 0.005)
+    .filter((entry) => Currency.gt(Currency.abs(entry.totalAmount), 0.005))
     .map((entry) => ({
       name: entry.name,
       rule_type: entry.rule_type,
       adjustment_type: entry.adjustment_type,
       value: entry.value,
-      amount: Math.abs(entry.totalAmount),
+      amount: Currency.abs(entry.totalAmount).toNumber(),
     }));
 
   // PVP = 原价
