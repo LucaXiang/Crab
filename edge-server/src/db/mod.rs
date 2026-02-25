@@ -25,6 +25,7 @@ impl DbService {
             .journal_mode(SqliteJournalMode::Wal)
             .synchronous(SqliteSynchronous::Normal)
             .pragma("foreign_keys", "ON")
+            .pragma("busy_timeout", "5000")
             .optimize_on_close(true, None);
 
         let pool = SqlitePoolOptions::new()
@@ -32,12 +33,6 @@ impl DbService {
             .connect_with(options)
             .await
             .map_err(|e| AppError::database(format!("Failed to open database: {e}")))?;
-
-        // busy_timeout: 写冲突时等待 5s 而非立即失败
-        sqlx::query("PRAGMA busy_timeout = 5000;")
-            .execute(&pool)
-            .await
-            .map_err(|e| AppError::database(format!("Failed to set busy_timeout: {e}")))?;
 
         tracing::info!("Database connection established (SQLite WAL, busy_timeout=5000ms)");
 

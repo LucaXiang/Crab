@@ -396,6 +396,7 @@ pub async fn build_order_detail_sync(
         loss_amount: Option<f64>,
         void_note: Option<String>,
         member_name: Option<String>,
+        cloud_synced: bool,
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
@@ -404,7 +405,8 @@ pub async fn build_order_detail_sync(
          original_total, subtotal, paid_amount, discount_amount, surcharge_amount, \
          comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, \
          order_rule_discount_amount, order_rule_surcharge_amount, start_time, \
-         operator_name, void_type, loss_reason, loss_amount, void_note, member_name \
+         operator_name, void_type, loss_reason, loss_amount, void_note, member_name, \
+         cloud_synced \
          FROM archived_order WHERE id = ?",
     )
     .bind(order_pk)
@@ -440,6 +442,15 @@ pub async fn build_order_detail_sync(
     .bind(order_pk)
     .fetch_all(pool)
     .await?;
+
+    // Guard: if detail sub-tables were cleaned (cloud_synced + no items), return error
+    // so callers know to use the cloud-stored copy instead
+    if item_rows.is_empty() && order.cloud_synced {
+        return Err(RepoError::NotFound(format!(
+            "Order {} detail already cleaned (cloud_synced), use cloud copy",
+            order.order_key
+        )));
+    }
 
     // Batch load options
     let item_ids: Vec<i64> = item_rows.iter().map(|r| r.id).collect();

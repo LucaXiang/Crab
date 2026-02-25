@@ -507,7 +507,7 @@ impl CloudWorker {
 
             let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
             let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
-            let mut build_failed = false;
+            let mut skipped_ids: Vec<i64> = Vec::new();
 
             for &id in &ids {
                 match order::build_order_detail_sync(&self.state.pool, id).await {
@@ -517,10 +517,10 @@ impl CloudWorker {
                             Err(e) => {
                                 tracing::error!(
                                     order_id = id,
-                                    "Failed to serialize OrderDetailSync, stopping batch: {e}"
+                                    "Failed to serialize OrderDetailSync, skipping: {e}"
                                 );
-                                build_failed = true;
-                                break;
+                                skipped_ids.push(id);
+                                continue;
                             }
                         };
                         items.push(CloudSyncItem {
@@ -535,19 +535,30 @@ impl CloudWorker {
                     Err(e) => {
                         tracing::error!(
                             order_id = id,
-                            "Failed to build OrderDetailSync, stopping batch: {e}"
+                            "Failed to build OrderDetailSync, skipping: {e}"
                         );
-                        build_failed = true;
-                        break;
+                        skipped_ids.push(id);
                     }
                 }
             }
 
-            if items.is_empty() {
+            // Mark permanently failed orders as synced to unblock the queue
+            if !skipped_ids.is_empty() {
                 tracing::warn!(
-                    "Archived order catch-up stopped: first order in batch failed to build"
+                    count = skipped_ids.len(),
+                    ids = ?skipped_ids,
+                    "Skipped unbuildable orders, marking as synced to prevent queue blockage"
                 );
-                break;
+                if let Err(e) = order::mark_cloud_synced(&self.state.pool, &skipped_ids).await {
+                    tracing::error!("Failed to mark skipped orders as synced: {e}");
+                }
+            }
+
+            if items.is_empty() {
+                if skipped_ids.is_empty() {
+                    break; // No more orders
+                }
+                continue; // All were skipped, try next batch
             }
 
             let batch_count = items.len();
@@ -593,8 +604,8 @@ impl CloudWorker {
                 "Archived orders synced and confirmed via HTTP"
             );
 
-            // Stop if we had a build failure or this was the last batch
-            if build_failed || (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
+            // Stop if this was the last batch
+            if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
                 break;
             }
         }

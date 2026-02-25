@@ -201,11 +201,11 @@ impl Server {
         let audit_handle = state.audit_worker_handle.lock().await.take();
         drop(state);
         if let Some(handle) = audit_handle
-            && tokio::time::timeout(std::time::Duration::from_secs(5), handle)
+            && tokio::time::timeout(std::time::Duration::from_millis(500), handle)
                 .await
                 .is_err()
         {
-            tracing::warn!("Audit worker drain timed out after 5s");
+            tracing::warn!("Audit worker drain timed out after 500ms");
         }
         // audit worker 完成后再关闭 pool，确保残留审计消息写入成功
         pool.close().await;

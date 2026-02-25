@@ -189,6 +189,7 @@ impl OrderArchiveService {
         &self,
         snapshot: &OrderSnapshot,
         events: Vec<OrderEvent>,
+        shift_id: Option<i64>,
     ) -> ArchiveResult<bool> {
         // Acquire semaphore permit to limit concurrent archives
         let _permit = self
@@ -200,7 +201,10 @@ impl OrderArchiveService {
         let mut last_error = None;
 
         for attempt in 0..MAX_RETRY_ATTEMPTS {
-            match self.archive_order_internal(snapshot, &events).await {
+            match self
+                .archive_order_internal(snapshot, &events, shift_id)
+                .await
+            {
                 Ok(newly_archived) => return Ok(newly_archived),
                 Err(e) => {
                     tracing::error!(
@@ -285,8 +289,12 @@ impl OrderArchiveService {
         &self,
         snapshot: &OrderSnapshot,
         events: &[OrderEvent],
+        shift_id: Option<i64>,
     ) -> ArchiveResult<bool> {
-        // 0. Idempotency check
+        // Acquire hash chain lock first to prevent TOCTOU race on idempotency check
+        let _hash_lock = self.hash_chain_lock.lock().await;
+
+        // 0. Idempotency check (inside lock to prevent concurrent duplicate inserts)
         let exists: bool = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM archived_order WHERE receipt_number = ?)",
         )
@@ -299,9 +307,6 @@ impl OrderArchiveService {
             tracing::debug!(order_id = %snapshot.order_id, "Order already archived, skipping");
             return Ok(false);
         }
-
-        // Acquire hash chain lock to prevent concurrent hash chain corruption
-        let _hash_lock = self.hash_chain_lock.lock().await;
 
         // 1. Get last order hash from system_state
         let system_state = system_state::get_or_create(&self.pool)
@@ -375,7 +380,7 @@ impl OrderArchiveService {
                 operator_id, operator_name, \
                 void_type, loss_reason, loss_amount, void_note, \
                 member_id, member_name, \
-                prev_hash, curr_hash, created_at, order_key, queue_number\
+                prev_hash, curr_hash, created_at, order_key, queue_number, shift_id\
             ) VALUES (\
                 ?1, ?2, ?3, ?4, ?5, ?6, \
                 ?7, ?8, ?9, ?10, \
@@ -386,7 +391,7 @@ impl OrderArchiveService {
                 ?21, ?22, \
                 ?23, ?24, ?25, ?26, \
                 ?27, ?28, \
-                ?29, ?30, ?31, ?32, ?33\
+                ?29, ?30, ?31, ?32, ?33, ?34\
             ) RETURNING id",
         )
         .bind(&snapshot.receipt_number)
@@ -432,6 +437,7 @@ impl OrderArchiveService {
         .bind(now)
         .bind(&snapshot.order_id)
         .bind(snapshot.queue_number.map(|q| q as i64))
+        .bind(shift_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
