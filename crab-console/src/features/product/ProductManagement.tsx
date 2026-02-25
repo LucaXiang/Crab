@@ -1,24 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Package, X, Trash2 } from 'lucide-react';
+import { Plus, Package, Trash2, CheckSquare, Link, Unlink } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import {
   listProducts, createProduct, updateProduct, deleteProduct,
-  listCategories, listTags,
+  listCategories, listTags, listAttributes,
+  listBindings, bindAttribute, unbindAttribute,
+  batchUpdateProductSortOrder,
+  bulkDeleteProducts,
 } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
-import { DataTable, type Column } from '@/shared/components/DataTable';
-import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
-import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
-import { FormField, FormSection, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
+import { MasterDetail } from '@/shared/components/MasterDetail';
+import { DetailPanel } from '@/shared/components/DetailPanel';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
-import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
 import { TagPicker } from '@/shared/components/TagPicker/TagPicker';
+import { ImageUpload } from '@/shared/components/ImageUpload';
+import { Thumbnail } from '@/shared/components/Thumbnail';
 import { formatCurrency } from '@/utils/format';
 import type {
   StoreProduct, ProductCreate, ProductUpdate, ProductSpecInput,
-  StoreCategory, StoreTag,
+  StoreCategory, StoreTag, StoreAttribute, StoreBinding,
 } from '@/core/types/store';
 
 interface FormSpec {
@@ -40,6 +44,12 @@ function computePriceDisplay(specs: { price: number; is_active: boolean }[]): st
   return `${formatCurrency(min)} - ${formatCurrency(max)}`;
 }
 
+type PanelState =
+  | { type: 'closed' }
+  | { type: 'create' }
+  | { type: 'edit'; item: StoreProduct }
+  | { type: 'delete'; item: StoreProduct };
+
 export const ProductManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
@@ -48,17 +58,16 @@ export const ProductManagement: React.FC = () => {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [tags, setTags] = useState<StoreTag[]>([]);
+  const [attributes, setAttributes] = useState<StoreAttribute[]>([]);
+  const [bindings, setBindings] = useState<StoreBinding[]>([]);
+  const [bindingLoading, setBindingLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Modal state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<StoreProduct | null>(null);
+  const [search, setSearch] = useState('');
+  const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Form fields — basic
+  // Form fields
   const [formName, setFormName] = useState('');
   const [formCategoryId, setFormCategoryId] = useState<number | ''>('');
   const [formTaxRate, setFormTaxRate] = useState<number>(0);
@@ -69,92 +78,136 @@ export const ProductManagement: React.FC = () => {
   const [formIsLabelPrint, setFormIsLabelPrint] = useState(0);
   const [formExternalId, setFormExternalId] = useState('');
   const [formTagIds, setFormTagIds] = useState<number[]>([]);
+  const [formImage, setFormImage] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formSpecs, setFormSpecs] = useState<FormSpec[]>([]);
 
-  // Delete confirmation
-  const [deleteTarget, setDeleteTarget] = useState<StoreProduct | null>(null);
+  // Bulk selection
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const toggleBulkItem = (id: number) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+
+  const handleBulkDelete = async () => {
+    if (!token || bulkSelected.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteProducts(token, storeId, Array.from(bulkSelected));
+      setBulkSelected(new Set());
+      setBulkMode(false);
+      setShowBulkConfirm(false);
+      await load();
+    } catch (err) { setShowBulkConfirm(false); handleError(err); }
+    finally { setBulkDeleting(false); }
+  };
+
+  const handleError = useCallback((err: unknown) => {
+    alert(err instanceof ApiError ? err.message : t('auth.error_generic'));
+  }, [t]);
+
+  const load = useCallback(async () => {
     if (!token) return;
     try {
-      setLoading(true);
-      const [prodData, catData, tagData] = await Promise.all([
+      const [prodData, catData, tagData, attrData] = await Promise.all([
         listProducts(token, storeId),
         listCategories(token, storeId),
         listTags(token, storeId),
+        listAttributes(token, storeId),
       ]);
       setProducts(prodData);
       setCategories(catData);
       setTags(tagData);
-      setError('');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setLoading(false);
-    }
-  }, [token, storeId, t]);
+      setAttributes(attrData);
+    } catch (err) { handleError(err); }
+    finally { setLoading(false); }
+  }, [token, storeId, handleError]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase();
+    if (!search.trim()) return products;
+    const q = search.toLowerCase();
     return products.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.category_name?.toLowerCase().includes(q))
+      p.name.toLowerCase().includes(q) || (p.category_name?.toLowerCase().includes(q))
     );
-  }, [products, searchQuery]);
+  }, [products, search]);
+
+  const selectedId = panel.type === 'edit' ? panel.item.source_id : null;
 
   const categoryOptions = useMemo(() =>
-    categories
-      .filter(c => c.is_active)
-      .map(c => ({ value: c.source_id, label: c.name })),
+    categories.filter(c => c.is_active).map(c => ({ value: c.source_id, label: c.name })),
     [categories]
   );
 
+  const toggleTag = (tagId: number) => {
+    setFormTagIds(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  };
+
   const openCreate = () => {
-    setEditing(null);
-    setFormName('');
-    setFormCategoryId('');
-    setFormTaxRate(0);
-    setFormSortOrder(0);
-    setFormReceiptName('');
-    setFormKitchenPrintName('');
-    setFormIsKitchenPrint(0);
-    setFormIsLabelPrint(0);
-    setFormExternalId('');
-    setFormTagIds([]);
-    setFormIsActive(true);
+    setFormName(''); setFormImage(''); setFormCategoryId(''); setFormTaxRate(0); setFormSortOrder(0);
+    setFormReceiptName(''); setFormKitchenPrintName('');
+    setFormIsKitchenPrint(0); setFormIsLabelPrint(0); setFormExternalId('');
+    setFormTagIds([]); setFormIsActive(true);
     setFormSpecs([{ name: '', price: 0, receipt_name: '', is_default: true, is_active: true }]);
     setFormError('');
-    setModalOpen(true);
+    setPanel({ type: 'create' });
+  };
+
+  const loadBindings = useCallback(async (productId: number) => {
+    if (!token) return;
+    setBindingLoading(true);
+    try {
+      const data = await listBindings(token, storeId, 'product', productId);
+      setBindings(data);
+    } catch (err) { handleError(err); }
+    finally { setBindingLoading(false); }
+  }, [token, storeId, handleError]);
+
+  const handleBind = async (attributeId: number) => {
+    if (!token || panel.type !== 'edit') return;
+    try {
+      await bindAttribute(token, storeId, {
+        owner: { type: 'Product', id: panel.item.source_id },
+        attribute_id: attributeId,
+      });
+      await loadBindings(panel.item.source_id);
+    } catch (err) { handleError(err); }
+  };
+
+  const handleUnbind = async (bindingId: number) => {
+    if (!token) return;
+    try {
+      await unbindAttribute(token, storeId, bindingId);
+      if (panel.type === 'edit') await loadBindings(panel.item.source_id);
+    } catch (err) { handleError(err); }
   };
 
   const openEdit = (prod: StoreProduct) => {
-    setEditing(prod);
-    setFormName(prod.name);
-    setFormCategoryId(prod.category_source_id);
-    setFormTaxRate(prod.tax_rate);
-    setFormSortOrder(prod.sort_order);
-    setFormReceiptName(prod.receipt_name ?? '');
-    setFormKitchenPrintName(prod.kitchen_print_name ?? '');
-    setFormIsKitchenPrint(prod.is_kitchen_print_enabled);
-    setFormIsLabelPrint(prod.is_label_print_enabled);
+    setFormName(prod.name); setFormImage(prod.image ?? ''); setFormCategoryId(prod.category_source_id);
+    setFormTaxRate(prod.tax_rate); setFormSortOrder(prod.sort_order);
+    setFormReceiptName(prod.receipt_name ?? ''); setFormKitchenPrintName(prod.kitchen_print_name ?? '');
+    setFormIsKitchenPrint(prod.is_kitchen_print_enabled); setFormIsLabelPrint(prod.is_label_print_enabled);
     setFormExternalId(prod.external_id != null ? String(prod.external_id) : '');
-    setFormTagIds(prod.tag_ids ?? []);
-    setFormIsActive(prod.is_active);
-    setFormSpecs(
-      prod.specs.map(s => ({
-        name: s.name,
-        price: s.price,
-        receipt_name: s.receipt_name ?? '',
-        is_default: s.is_default,
-        is_active: s.is_active,
-      }))
-    );
+    setFormTagIds(prod.tag_ids ?? []); setFormIsActive(prod.is_active);
+    setFormSpecs(prod.specs.map(s => ({
+      name: s.name, price: s.price, receipt_name: s.receipt_name ?? '',
+      is_default: s.is_default, is_active: s.is_active,
+    })));
     setFormError('');
-    setModalOpen(true);
+    setBindings([]);
+    setPanel({ type: 'edit', item: prod });
+    loadBindings(prod.source_id);
   };
 
   const addSpec = () => {
@@ -177,17 +230,14 @@ export const ProductManagement: React.FC = () => {
 
   const buildSpecInputs = (): ProductSpecInput[] =>
     formSpecs.map((s, i) => ({
-      name: s.name.trim(),
-      price: s.price,
-      display_order: i,
-      is_default: s.is_default,
-      is_active: s.is_active,
+      name: s.name.trim(), price: s.price, display_order: i,
+      is_default: s.is_default, is_active: s.is_active,
       is_root: formSpecs.length === 1,
       receipt_name: s.receipt_name.trim() || undefined,
     }));
 
   const handleSave = async () => {
-    if (!token) return;
+    if (!token || saving) return;
     if (!formName.trim()) { setFormError(t('settings.common.required_field')); return; }
     if (formCategoryId === '') { setFormError(t('settings.common.required_field')); return; }
     if (formSpecs.length === 0) { setFormError(t('settings.product.spec_required')); return; }
@@ -196,197 +246,155 @@ export const ProductManagement: React.FC = () => {
     setFormError('');
     try {
       const common = {
-        name: formName.trim(),
+        name: formName.trim(), image: formImage || undefined,
         category_id: Number(formCategoryId),
-        tax_rate: formTaxRate,
-        sort_order: formSortOrder,
+        tax_rate: formTaxRate, sort_order: formSortOrder,
         receipt_name: formReceiptName.trim() || undefined,
         kitchen_print_name: formKitchenPrintName.trim() || undefined,
-        is_kitchen_print_enabled: formIsKitchenPrint,
-        is_label_print_enabled: formIsLabelPrint,
+        is_kitchen_print_enabled: formIsKitchenPrint, is_label_print_enabled: formIsLabelPrint,
         external_id: formExternalId ? Number(formExternalId) : undefined,
         tags: formTagIds.length > 0 ? formTagIds : undefined,
         specs: buildSpecInputs(),
       };
 
-      if (editing) {
-        const payload: ProductUpdate = {
-          ...common,
-          is_active: formIsActive,
-        };
-        await updateProduct(token, storeId, editing.source_id, payload);
-      } else {
+      if (panel.type === 'edit') {
+        const payload: ProductUpdate = { ...common, is_active: formIsActive };
+        await updateProduct(token, storeId, panel.item.source_id, payload);
+      } else if (panel.type === 'create') {
         const payload: ProductCreate = common;
         await createProduct(token, storeId, payload);
       }
-      setModalOpen(false);
-      await loadData();
+      setPanel({ type: 'closed' });
+      await load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
-    if (!token || !deleteTarget) return;
+    if (!token || panel.type !== 'delete') return;
+    setSaving(true);
     try {
-      await deleteProduct(token, storeId, deleteTarget.source_id);
-      setDeleteTarget(null);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-      setDeleteTarget(null);
-    }
+      await deleteProduct(token, storeId, panel.item.source_id);
+      setPanel({ type: 'closed' });
+      await load();
+    } catch (err) { handleError(err); }
+    finally { setSaving(false); }
   };
 
-  const handleToggleActive = async (prod: StoreProduct) => {
-    if (!token) return;
-    try {
-      await updateProduct(token, storeId, prod.source_id, { is_active: !prod.is_active });
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    }
-  };
-
-  const toggleTag = (tagId: number) => {
-    setFormTagIds(prev =>
-      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
-    );
-  };
-
-  const columns: Column<StoreProduct>[] = [
-    {
-      key: 'name',
-      header: t('settings.common.name'),
-      render: (p) => (
-        <span className={`font-medium ${p.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
-          {p.name}
-        </span>
-      ),
-    },
-    {
-      key: 'category',
-      header: t('settings.product.category'),
-      width: '140px',
-      render: (p) => (
-        p.category_name ? (
-          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">
-            {p.category_name}
+  const renderItem = (prod: StoreProduct, isSelected: boolean) => (
+    <div className={`px-4 py-3.5 flex items-center gap-3 ${isSelected ? 'font-medium' : ''}`}>
+      {bulkMode && (
+        <input
+          type="checkbox"
+          checked={bulkSelected.has(prod.source_id)}
+          onChange={() => toggleBulkItem(prod.source_id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+        />
+      )}
+      <Thumbnail hash={prod.image} size={36} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <span className={`text-sm truncate ${prod.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+            {prod.name}
           </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      ),
-    },
-    {
-      key: 'price',
-      header: t('settings.product.price'),
-      width: '150px',
-      render: (p) => (
-        <span className="text-sm font-medium text-gray-900">
-          {computePriceDisplay(p.specs)}
-        </span>
-      ),
-    },
-    {
-      key: 'tags',
-      header: t('settings.product.tags'),
-      width: '120px',
-      render: (p) => (
-        p.tag_ids.length > 0 ? (
-          <span className="text-xs text-gray-500">{p.tag_ids.length} tags</span>
-        ) : null
-      ),
-    },
-    {
-      key: 'status',
-      header: t('settings.common.status'),
-      width: '100px',
-      render: (p) => (
-        <StatusToggle isActive={p.is_active} onClick={() => handleToggleActive(p)} />
-      ),
-    },
-  ];
+          <span className="text-xs font-medium text-gray-500 tabular-nums shrink-0 ml-2">
+            {computePriceDisplay(prod.specs)}
+          </span>
+        </div>
+        {prod.category_name && (
+          <p className="text-xs text-gray-400 mt-0.5">{prod.category_name}</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const handleReorder = useCallback(async (reordered: StoreProduct[]) => {
+    if (!token) return;
+    const withOrder = reordered.map((p, i) => ({ ...p, sort_order: i }));
+    setProducts(withOrder);
+    const items = withOrder.map((p) => ({ id: p.source_id, sort_order: p.sort_order }));
+    try { await batchUpdateProductSortOrder(token, storeId, items); }
+    catch (err) { handleError(err); await load(); }
+  }, [token, storeId, handleError, load]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-            <Package size={20} className="text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{t('settings.product.title')}</h2>
-            <p className="text-sm text-gray-500">{t('settings.product.subtitle')}</p>
-          </div>
+    <div className="h-full flex flex-col p-4 lg:p-6">
+      <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+          <Package className="w-5 h-5 text-blue-600" />
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus size={16} />
-          {t('common.action.add')}
-        </button>
+        <h1 className="text-xl font-bold text-slate-900">{t('settings.product.title')}</h1>
+        <div className="ml-auto flex items-center gap-2">
+          {bulkMode ? (
+            <>
+              <span className="text-xs text-gray-500">{bulkSelected.size} {t('common.selection.selected')}</span>
+              <button
+                onClick={() => setShowBulkConfirm(true)}
+                disabled={bulkSelected.size === 0 || bulkDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors disabled:opacity-40"
+              >
+                <Trash2 size={12} />
+                {t('common.action.batch_delete')}
+              </button>
+              <button
+                onClick={() => { setBulkMode(false); setBulkSelected(new Set()); }}
+                className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                {t('common.action.cancel')}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => { setBulkMode(true); setBulkSelected(new Set()); setPanel({ type: 'closed' }); }}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title={t('common.action.batch_delete')}
+            >
+              <CheckSquare size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>
-      )}
-
-      <FilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        totalCount={filtered.length}
-        countUnit={t('settings.product.unit')}
-        themeColor="blue"
-      />
-
-      <DataTable
-        data={filtered}
-        columns={columns}
-        loading={loading}
-        onEdit={openEdit}
-        onDelete={(p) => setDeleteTarget(p)}
-        getRowKey={(p) => p.source_id}
-        themeColor="blue"
-      />
-
-      {/* Modal */}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+      <div className="flex-1 min-h-0">
+        <MasterDetail
+          items={filtered}
+          getItemId={(p) => p.source_id}
+          renderItem={renderItem}
+          selectedId={selectedId}
+          onSelect={bulkMode ? (p) => toggleBulkItem(p.source_id) : openEdit}
+          onDeselect={() => setPanel({ type: 'closed' })}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          totalCount={filtered.length}
+          countUnit={t('settings.product.unit')}
+          onCreateNew={openCreate}
+          createLabel={t('common.action.add')}
+          isCreating={panel.type === 'create'}
+          themeColor="blue"
+          loading={loading}
+          onReorder={!search.trim() ? handleReorder : undefined}
         >
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col" style={{ animation: 'slideUp 0.25s ease-out' }}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editing ? t('common.action.edit') : t('common.action.add')} {t('settings.product.title')}
-              </h3>
-              <button onClick={() => setModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-5 space-y-4 overflow-y-auto">
+          {(panel.type === 'create' || panel.type === 'edit') && (
+            <DetailPanel
+              title={panel.type === 'create' ? `${t('common.action.add')} ${t('settings.product.title')}` : `${t('common.action.edit')} ${t('settings.product.title')}`}
+              isCreating={panel.type === 'create'}
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              onDelete={panel.type === 'edit' ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              saving={saving}
+              saveDisabled={!formName.trim() || formCategoryId === '' || formSpecs.length === 0}
+            >
               {formError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
               )}
 
-              {/* Basic info */}
               <FormField label={t('settings.common.name')} required>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.product.name_placeholder')}
-                />
+                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus placeholder={t('settings.product.name_placeholder')} />
               </FormField>
+
+              <ImageUpload value={formImage} onChange={setFormImage} />
 
               <SelectField
                 label={t('settings.product.category')}
@@ -399,101 +407,92 @@ export const ProductManagement: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('settings.product.tax_rate')}>
-                  <input
-                    type="number"
-                    value={formTaxRate}
-                    onChange={(e) => setFormTaxRate(Number(e.target.value))}
-                    className={inputClass}
-                    step="0.01"
-                    min={0}
-                  />
+                  <input type="number" value={formTaxRate} onChange={e => setFormTaxRate(Number(e.target.value))} className={inputClass} step="0.01" min={0} />
                 </FormField>
                 <FormField label={t('settings.product.sort_order')}>
-                  <input
-                    type="number"
-                    value={formSortOrder}
-                    onChange={(e) => setFormSortOrder(Number(e.target.value))}
-                    className={inputClass}
-                    min={0}
-                  />
+                  <input type="number" value={formSortOrder} onChange={e => setFormSortOrder(Number(e.target.value))} className={inputClass} min={0} />
                 </FormField>
               </div>
 
-              {/* Print names */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('settings.product.receipt_name')}>
-                  <input
-                    type="text"
-                    value={formReceiptName}
-                    onChange={(e) => setFormReceiptName(e.target.value)}
-                    className={inputClass}
-                    placeholder={t('settings.product.receipt_name')}
-                  />
+                  <input value={formReceiptName} onChange={e => setFormReceiptName(e.target.value)} className={inputClass} />
                 </FormField>
                 <FormField label={t('settings.product.kitchen_print_name')}>
-                  <input
-                    type="text"
-                    value={formKitchenPrintName}
-                    onChange={(e) => setFormKitchenPrintName(e.target.value)}
-                    className={inputClass}
-                    placeholder={t('settings.product.kitchen_print_name')}
-                  />
+                  <input value={formKitchenPrintName} onChange={e => setFormKitchenPrintName(e.target.value)} className={inputClass} />
                 </FormField>
               </div>
 
-              {/* Print toggles */}
               <div className="flex gap-6">
-                <CheckboxField
-                  id="prod-kitchen-print"
-                  label={t('settings.product.kitchen_print')}
-                  checked={formIsKitchenPrint === 1}
-                  onChange={(v) => setFormIsKitchenPrint(v ? 1 : 0)}
-                />
-                <CheckboxField
-                  id="prod-label-print"
-                  label={t('settings.product.label_print')}
-                  checked={formIsLabelPrint === 1}
-                  onChange={(v) => setFormIsLabelPrint(v ? 1 : 0)}
-                />
+                <CheckboxField id="prod-kitchen-print" label={t('settings.product.kitchen_print')} checked={formIsKitchenPrint === 1} onChange={(v) => setFormIsKitchenPrint(v ? 1 : 0)} />
+                <CheckboxField id="prod-label-print" label={t('settings.product.label_print')} checked={formIsLabelPrint === 1} onChange={(v) => setFormIsLabelPrint(v ? 1 : 0)} />
               </div>
 
-              {/* External ID */}
               <FormField label={t('settings.product.external_id')}>
-                <input
-                  type="number"
-                  value={formExternalId}
-                  onChange={(e) => setFormExternalId(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.product.external_id')}
-                />
+                <input type="number" value={formExternalId} onChange={e => setFormExternalId(e.target.value)} className={inputClass} />
               </FormField>
 
-              {/* Tags */}
               {tags.filter(tag => tag.is_active).length > 0 && (
                 <FormField label={t('settings.product.tags')}>
                   <TagPicker tags={tags} selectedIds={formTagIds} onToggle={toggleTag} themeColor="blue" />
                 </FormField>
               )}
 
-              {/* Active toggle (edit only) */}
-              {editing && (
-                <CheckboxField
-                  id="prod-is-active"
-                  label={t('settings.common.active')}
-                  checked={formIsActive}
-                  onChange={setFormIsActive}
-                />
+              {panel.type === 'edit' && (
+                <CheckboxField id="prod-is-active" label={t('settings.common.active')} checked={formIsActive} onChange={setFormIsActive} />
+              )}
+
+              {/* Attribute Bindings (edit mode only) */}
+              {panel.type === 'edit' && attributes.length > 0 && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">{t('settings.attribute.title')}</label>
+                  {bindingLoading ? (
+                    <div className="text-sm text-gray-400 text-center py-4">{t('common.loading')}</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {attributes.filter(a => a.is_active).map(attr => {
+                        const binding = bindings.find(b => b.attribute_source_id === attr.source_id);
+                        return (
+                          <div key={attr.source_id} className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-xl">
+                            <div className="min-w-0">
+                              <span className="text-sm text-slate-800">{attr.name}</span>
+                              <span className="ml-2 text-xs text-gray-400">
+                                {attr.is_multi_select ? t('settings.attribute.multi') : t('settings.attribute.single')}
+                                {attr.options.length > 0 && ` · ${attr.options.length} ${t('settings.attribute.options')}`}
+                              </span>
+                            </div>
+                            {binding ? (
+                              <button
+                                type="button"
+                                onClick={() => handleUnbind(binding.source_id)}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                              >
+                                <Unlink size={12} />
+                                {t('common.action.unbind')}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleBind(attr.source_id)}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                              >
+                                <Link size={12} />
+                                {t('common.action.bind')}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Specs */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="block text-sm font-medium text-gray-700">{t('settings.product.specs')}</label>
-                  <button
-                    type="button"
-                    onClick={addSpec}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                  >
+                  <button type="button" onClick={addSpec} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
                     <Plus size={12} />
                     {t('settings.product.add_spec')}
                   </button>
@@ -509,88 +508,57 @@ export const ProductManagement: React.FC = () => {
                   <div key={idx} className="bg-gray-50 rounded-xl p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <input
-                        type="text"
-                        value={spec.name}
+                        type="text" value={spec.name}
                         onChange={(e) => updateSpec(idx, 'name', e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         placeholder={t('settings.product.spec_name')}
                       />
                       <input
-                        type="number"
-                        value={spec.price}
+                        type="number" value={spec.price}
                         onChange={(e) => updateSpec(idx, 'price', Number(e.target.value))}
                         className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        placeholder={t('settings.product.price')}
-                        step="0.01"
-                        min={0}
+                        placeholder={t('settings.product.price')} step="0.01" min={0}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeSpec(idx)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      >
+                      <button type="button" onClick={() => removeSpec(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={spec.receipt_name}
-                        onChange={(e) => updateSpec(idx, 'receipt_name', e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        placeholder={t('settings.product.spec_receipt_name')}
-                      />
-                    </div>
+                    <input
+                      type="text" value={spec.receipt_name}
+                      onChange={(e) => updateSpec(idx, 'receipt_name', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder={t('settings.product.spec_receipt_name')}
+                    />
                     <div className="flex items-center gap-4 px-1">
                       <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="default_spec"
-                          checked={spec.is_default}
-                          onChange={() => updateSpec(idx, 'is_default', true)}
-                          className="text-blue-600 focus:ring-blue-500"
-                        />
+                        <input type="radio" name="default_spec" checked={spec.is_default} onChange={() => updateSpec(idx, 'is_default', true)} className="text-blue-600 focus:ring-blue-500" />
                         {t('settings.product.is_default')}
                       </label>
-                      <CheckboxField
-                        id={`spec_active_${idx}`}
-                        label={t('settings.common.active')}
-                        checked={spec.is_active}
-                        onChange={(v) => updateSpec(idx, 'is_active', v)}
-                      />
+                      <CheckboxField id={`spec_active_${idx}`} label={t('settings.common.active')} checked={spec.is_active} onChange={(v) => updateSpec(idx, 'is_active', v)} />
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </DetailPanel>
+          )}
+        </MasterDetail>
+      </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
-                {t('common.action.cancel')}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {saving ? t('auth.loading') : t('common.action.save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={!!deleteTarget}
+        isOpen={panel.type === 'delete'}
         title={t('common.dialog.confirm_delete')}
         description={t('settings.product.confirm.delete')}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => setPanel({ type: 'closed' })}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={showBulkConfirm}
+        title={t('common.action.batch_delete')}
+        description={`${t('common.dialog.confirm_delete')} (${bulkSelected.size})`}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setShowBulkConfirm(false)}
         variant="danger"
       />
     </div>

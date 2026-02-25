@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Tag, Pencil, Trash2, Copy, Loader2 } from 'lucide-react';
+import { Plus, Tag, Pencil, Trash2, Copy, Loader2, Monitor } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -22,6 +22,15 @@ export const LabelTemplateManagement: React.FC = () => {
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Editor state
   const [editingTemplate, setEditingTemplate] = useState<LabelTemplate | null>(null);
@@ -72,7 +81,7 @@ export const LabelTemplateManagement: React.FC = () => {
   };
 
   const handleCreateBlank = () => {
-    // Open editor with a blank template (will be created on save)
+    if (isMobile) return;
     setIsCreating(true);
     setEditingTemplate({
       id: 0, // Sentinel: new template
@@ -91,6 +100,7 @@ export const LabelTemplateManagement: React.FC = () => {
   };
 
   const handleEdit = (tmpl: LabelTemplate) => {
+    if (isMobile) return;
     setIsCreating(false);
     setEditingTemplate(tmpl);
   };
@@ -206,12 +216,20 @@ export const LabelTemplateManagement: React.FC = () => {
         </div>
         <button
           onClick={handleCreateBlank}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium"
+          disabled={isMobile}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus size={18} />
           {t('common.action.create')}
         </button>
       </div>
+
+      {isMobile && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+          <Monitor size={18} className="shrink-0" />
+          {t('common.hint.desktop_only')}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
@@ -238,11 +256,12 @@ export const LabelTemplateManagement: React.FC = () => {
                         <p className="text-xs text-gray-500 mt-0.5">{tmpl.description}</p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className={`flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                       <button
                         onClick={() => handleEdit(tmpl)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title={t('common.action.edit')}
+                        disabled={isMobile}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent"
+                        title={isMobile ? t('common.hint.desktop_only') : t('common.action.edit')}
                       >
                         <Pencil size={14} />
                       </button>
@@ -311,15 +330,17 @@ export const LabelTemplateManagement: React.FC = () => {
                 {DEFAULT_LABEL_TEMPLATES.map((preset, i) => (
                   <button
                     key={i}
-                    onClick={() => handleCreateFromPreset(preset)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                    onClick={() => !isMobile && handleCreateFromPreset(preset)}
+                    disabled={isMobile}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {preset.name}
                   </button>
                 ))}
                 <button
                   onClick={handleCreateBlank}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors text-sm font-medium"
+                  disabled={isMobile}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {t('settings.label.create_blank')}
                 </button>

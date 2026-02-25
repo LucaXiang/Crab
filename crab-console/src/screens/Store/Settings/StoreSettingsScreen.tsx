@@ -5,9 +5,11 @@ import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getStores, updateStore } from '@/infrastructure/api/stores';
+import { getStoreInfo, updateStoreInfo } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { apiErrorMessage } from '@/infrastructure/i18n';
 import { Spinner } from '@/presentation/components/ui/Spinner';
+import { ImageUpload } from '@/shared/components/ImageUpload';
 import type { StoreDetail } from '@/core/types/store';
 
 export const StoreSettingsScreen: React.FC = () => {
@@ -22,6 +24,7 @@ export const StoreSettingsScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  const [formLogo, setFormLogo] = useState('');
   const [form, setForm] = useState({
     name: '',
     address: '',
@@ -36,7 +39,10 @@ export const StoreSettingsScreen: React.FC = () => {
     if (!token) return;
     (async () => {
       try {
-        const stores = await getStores(token);
+        const [stores, info] = await Promise.all([
+          getStores(token),
+          getStoreInfo(token, storeId),
+        ]);
         const s = stores.find(s => s.id === storeId);
         if (s) {
           setStore(s);
@@ -50,6 +56,7 @@ export const StoreSettingsScreen: React.FC = () => {
             business_day_cutoff: s.business_day_cutoff ?? '',
           });
         }
+        setFormLogo(info.logo ?? '');
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
       } finally {
@@ -62,7 +69,10 @@ export const StoreSettingsScreen: React.FC = () => {
     if (!token) return;
     setSaving(true); setMsg(null);
     try {
-      await updateStore(token, storeId, form);
+      await Promise.all([
+        updateStore(token, storeId, form),
+        updateStoreInfo(token, storeId, { logo: formLogo || undefined }),
+      ]);
       setMsg({ text: t('store.saved'), ok: true });
     } catch (err) {
       setMsg({ text: err instanceof ApiError ? apiErrorMessage(t, err.code, err.message) : t('auth.error_generic'), ok: false });
@@ -96,6 +106,12 @@ export const StoreSettingsScreen: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Logo */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+        <label className="block text-xs font-medium text-slate-500">{t('store.logo')}</label>
+        <ImageUpload value={formLogo} onChange={setFormLogo} />
+      </div>
 
       {/* Name + Address */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">

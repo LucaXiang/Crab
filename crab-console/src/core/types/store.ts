@@ -517,9 +517,12 @@ export interface AttributeOptionUpdate {
 
 // ── Attribute Binding ──
 
+export type BindingOwner =
+  | { type: 'Product'; id: number }
+  | { type: 'Category'; id: number };
+
 export interface BindAttributeRequest {
-  owner_type: 'product' | 'category';
-  owner_id: number;
+  owner: BindingOwner;
   attribute_id: number;
   is_required?: boolean;
   display_order?: number;
@@ -528,6 +531,16 @@ export interface BindAttributeRequest {
 
 export interface UnbindAttributeRequest {
   binding_id: number;
+}
+
+export interface StoreBinding {
+  source_id: number;
+  owner_type: string;
+  owner_source_id: number;
+  attribute_source_id: number;
+  is_required: boolean;
+  display_order: number;
+  default_option_ids: number[] | null;
 }
 
 // ── Sort Order ──

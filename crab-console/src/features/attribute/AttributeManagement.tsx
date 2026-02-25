@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, SlidersHorizontal, X, Trash2, Edit, Search, List, Star, Hash, DollarSign, ChefHat, ReceiptText } from 'lucide-react';
+import { Plus, SlidersHorizontal, Trash2, Edit, Star, Hash, DollarSign, ChefHat, ReceiptText, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -8,16 +8,16 @@ import {
   createAttributeOption, updateAttributeOption, deleteAttributeOption,
 } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
-import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
-import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
+import { MasterDetail } from '@/shared/components/MasterDetail';
+import { DetailPanel } from '@/shared/components/DetailPanel';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField';
+import { formatCurrency } from '@/utils/format';
 import type {
   StoreAttribute, StoreAttributeOption,
   AttributeCreate, AttributeUpdate,
   AttributeOptionCreate, AttributeOptionUpdate,
 } from '@/core/types/store';
-import { formatCurrency } from '@/utils/format';
-
-// ── Option Modal ──
 
 interface OptionFormState {
   name: string;
@@ -29,15 +29,15 @@ interface OptionFormState {
 }
 
 const emptyOptionForm: OptionFormState = {
-  name: '',
-  price_modifier: '0',
-  receipt_name: '',
-  kitchen_print_name: '',
-  enable_quantity: false,
-  max_quantity: '',
+  name: '', price_modifier: '0', receipt_name: '',
+  kitchen_print_name: '', enable_quantity: false, max_quantity: '',
 };
 
-// ── Main Component ──
+type PanelState =
+  | { type: 'closed' }
+  | { type: 'create' }
+  | { type: 'edit'; item: StoreAttribute }
+  | { type: 'delete'; item: StoreAttribute };
 
 export const AttributeManagement: React.FC = () => {
   const { t } = useI18n();
@@ -46,189 +46,158 @@ export const AttributeManagement: React.FC = () => {
 
   const [attributes, setAttributes] = useState<StoreAttribute[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  // Selected attribute (master-detail)
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-
-  // Attribute modal state
-  const [attrModalOpen, setAttrModalOpen] = useState(false);
-  const [editingAttr, setEditingAttr] = useState<StoreAttribute | null>(null);
-  const [attrSaving, setAttrSaving] = useState(false);
-  const [attrFormError, setAttrFormError] = useState('');
+  // Attribute form
   const [formName, setFormName] = useState('');
   const [formIsMultiSelect, setFormIsMultiSelect] = useState(false);
   const [formMaxSelections, setFormMaxSelections] = useState<number | ''>('');
 
-  // Option modal state
-  const [optModalOpen, setOptModalOpen] = useState(false);
-  const [editingOpt, setEditingOpt] = useState<StoreAttributeOption | null>(null);
+  // Option sub-CRUD
+  const [optEditing, setOptEditing] = useState<StoreAttributeOption | null>(null);
+  const [optCreating, setOptCreating] = useState(false);
+  const [optForm, setOptForm] = useState<OptionFormState>(emptyOptionForm);
   const [optSaving, setOptSaving] = useState(false);
   const [optFormError, setOptFormError] = useState('');
-  const [optForm, setOptForm] = useState<OptionFormState>(emptyOptionForm);
 
-  // Delete confirmations
-  const [deleteAttrTarget, setDeleteAttrTarget] = useState<StoreAttribute | null>(null);
+  // Delete option
   const [deleteOptTarget, setDeleteOptTarget] = useState<{ attr: StoreAttribute; opt: StoreAttributeOption } | null>(null);
 
-  const loadData = useCallback(async () => {
+  const handleError = useCallback((err: unknown) => {
+    alert(err instanceof ApiError ? err.message : t('auth.error_generic'));
+  }, [t]);
+
+  const load = useCallback(async () => {
     if (!token) return;
     try {
-      setLoading(true);
       const data = await listAttributes(token, storeId);
       setAttributes(data);
-      setError('');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setLoading(false);
-    }
-  }, [token, storeId, t]);
+    } catch (err) { handleError(err); }
+    finally { setLoading(false); }
+  }, [token, storeId, handleError]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     let list = [...attributes].sort((a, b) => a.display_order - b.display_order);
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (search.trim()) {
+      const q = search.toLowerCase();
       list = list.filter(a => a.name.toLowerCase().includes(q));
     }
     return list;
-  }, [attributes, searchQuery]);
+  }, [attributes, search]);
 
+  const selectedId = panel.type === 'edit' ? panel.item.source_id : null;
+
+  // Keep edit panel synced with latest data
   const selectedAttr = useMemo(() => {
-    if (!selectedId) return null;
-    return attributes.find(a => a.source_id === selectedId) ?? null;
-  }, [attributes, selectedId]);
+    if (panel.type !== 'edit') return null;
+    return attributes.find(a => a.source_id === panel.item.source_id) ?? null;
+  }, [attributes, panel]);
 
   const selectedOptions = useMemo(() => {
     if (!selectedAttr) return [];
     return [...selectedAttr.options].sort((a, b) => a.display_order - b.display_order);
   }, [selectedAttr]);
 
-  // Auto-select first attribute
-  useEffect(() => {
-    if (!selectedId && filtered.length > 0) {
-      setSelectedId(filtered[0].source_id);
-    }
-  }, [filtered, selectedId]);
+  const getFeatures = (attr: StoreAttribute) => ({
+    hasPrice: attr.options.some(o => o.price_modifier !== 0),
+    hasQuantity: attr.options.some(o => o.enable_quantity),
+  });
 
-  // Clear selection if deleted
-  useEffect(() => {
-    if (selectedId && !attributes.find(a => a.source_id === selectedId)) {
-      setSelectedId(filtered.length > 0 ? filtered[0].source_id : null);
-    }
-  }, [attributes, filtered, selectedId]);
+  const closeOptionForm = () => { setOptEditing(null); setOptCreating(false); setOptFormError(''); };
 
-  // ── Attribute modal handlers ──
-
-  const openCreateAttr = () => {
-    setEditingAttr(null);
-    setFormName('');
-    setFormIsMultiSelect(false);
-    setFormMaxSelections('');
-    setAttrFormError('');
-    setAttrModalOpen(true);
+  const openCreate = () => {
+    setFormName(''); setFormIsMultiSelect(false); setFormMaxSelections('');
+    setFormError(''); closeOptionForm();
+    setPanel({ type: 'create' });
   };
 
-  const openEditAttr = (attr: StoreAttribute) => {
-    setEditingAttr(attr);
-    setFormName(attr.name);
-    setFormIsMultiSelect(attr.is_multi_select);
+  const openEdit = (attr: StoreAttribute) => {
+    setFormName(attr.name); setFormIsMultiSelect(attr.is_multi_select);
     setFormMaxSelections(attr.max_selections ?? '');
-    setAttrFormError('');
-    setAttrModalOpen(true);
+    setFormError(''); closeOptionForm();
+    setPanel({ type: 'edit', item: attr });
   };
 
-  const handleSaveAttr = async () => {
-    if (!token) return;
-    if (!formName.trim()) { setAttrFormError(t('settings.common.required_field')); return; }
+  const handleSave = async () => {
+    if (!token || saving) return;
+    if (!formName.trim()) { setFormError(t('settings.common.required_field')); return; }
 
-    setAttrSaving(true);
-    setAttrFormError('');
+    setSaving(true); setFormError('');
     try {
-      if (editingAttr) {
+      if (panel.type === 'edit') {
         const payload: AttributeUpdate = {
-          name: formName.trim(),
-          is_multi_select: formIsMultiSelect,
+          name: formName.trim(), is_multi_select: formIsMultiSelect,
           max_selections: formMaxSelections !== '' ? Number(formMaxSelections) : undefined,
         };
-        await updateAttribute(token, storeId, editingAttr.source_id, payload);
-      } else {
+        await updateAttribute(token, storeId, panel.item.source_id, payload);
+      } else if (panel.type === 'create') {
         const payload: AttributeCreate = {
-          name: formName.trim(),
-          is_multi_select: formIsMultiSelect,
+          name: formName.trim(), is_multi_select: formIsMultiSelect,
           max_selections: formMaxSelections !== '' ? Number(formMaxSelections) : undefined,
         };
         await createAttribute(token, storeId, payload);
       }
-      setAttrModalOpen(false);
-      await loadData();
+      setPanel({ type: 'closed' });
+      await load();
     } catch (err) {
-      setAttrFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setAttrSaving(false);
-    }
+      setFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
+    } finally { setSaving(false); }
   };
 
-  const handleDeleteAttr = async () => {
-    if (!token || !deleteAttrTarget) return;
+  const handleDelete = async () => {
+    if (!token || panel.type !== 'delete') return;
+    setSaving(true);
     try {
-      await deleteAttribute(token, storeId, deleteAttrTarget.source_id);
-      setDeleteAttrTarget(null);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-      setDeleteAttrTarget(null);
-    }
+      await deleteAttribute(token, storeId, panel.item.source_id);
+      setPanel({ type: 'closed' });
+      await load();
+    } catch (err) { handleError(err); }
+    finally { setSaving(false); }
   };
 
-  // ── Option modal handlers ──
+  // ── Option CRUD ──
 
   const openCreateOpt = () => {
-    setEditingOpt(null);
-    setOptForm(emptyOptionForm);
-    setOptFormError('');
-    setOptModalOpen(true);
+    setOptEditing(null); setOptCreating(true);
+    setOptForm(emptyOptionForm); setOptFormError('');
   };
 
   const openEditOpt = (opt: StoreAttributeOption) => {
-    setEditingOpt(opt);
+    setOptCreating(false);
+    setOptEditing(opt);
     setOptForm({
-      name: opt.name,
-      price_modifier: String(opt.price_modifier),
-      receipt_name: opt.receipt_name ?? '',
-      kitchen_print_name: opt.kitchen_print_name ?? '',
+      name: opt.name, price_modifier: String(opt.price_modifier),
+      receipt_name: opt.receipt_name ?? '', kitchen_print_name: opt.kitchen_print_name ?? '',
       enable_quantity: opt.enable_quantity,
       max_quantity: opt.max_quantity != null ? String(opt.max_quantity) : '',
     });
     setOptFormError('');
-    setOptModalOpen(true);
   };
 
   const handleSaveOpt = async () => {
     if (!token || !selectedAttr) return;
     if (!optForm.name.trim()) { setOptFormError(t('settings.common.required_field')); return; }
 
-    setOptSaving(true);
-    setOptFormError('');
+    setOptSaving(true); setOptFormError('');
     try {
       const priceMod = parseFloat(optForm.price_modifier) || 0;
-      if (editingOpt) {
+      if (optEditing) {
         const payload: AttributeOptionUpdate = {
-          name: optForm.name.trim(),
-          price_modifier: priceMod,
+          name: optForm.name.trim(), price_modifier: priceMod,
           receipt_name: optForm.receipt_name.trim() || undefined,
           kitchen_print_name: optForm.kitchen_print_name.trim() || undefined,
           enable_quantity: optForm.enable_quantity,
           max_quantity: optForm.enable_quantity && optForm.max_quantity ? Number(optForm.max_quantity) : undefined,
         };
-        await updateAttributeOption(token, storeId, selectedAttr.source_id, editingOpt.source_id, payload);
+        await updateAttributeOption(token, storeId, selectedAttr.source_id, optEditing.source_id, payload);
       } else {
         const payload: AttributeOptionCreate = {
-          name: optForm.name.trim(),
-          price_modifier: priceMod,
+          name: optForm.name.trim(), price_modifier: priceMod,
           receipt_name: optForm.receipt_name.trim() || undefined,
           kitchen_print_name: optForm.kitchen_print_name.trim() || undefined,
           enable_quantity: optForm.enable_quantity,
@@ -236,13 +205,11 @@ export const AttributeManagement: React.FC = () => {
         };
         await createAttributeOption(token, storeId, selectedAttr.source_id, payload);
       }
-      setOptModalOpen(false);
-      await loadData();
+      closeOptionForm();
+      await load();
     } catch (err) {
       setOptFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setOptSaving(false);
-    }
+    } finally { setOptSaving(false); }
   };
 
   const handleDeleteOpt = async () => {
@@ -250,511 +217,285 @@ export const AttributeManagement: React.FC = () => {
     try {
       await deleteAttributeOption(token, storeId, deleteOptTarget.attr.source_id, deleteOptTarget.opt.source_id);
       setDeleteOptTarget(null);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-      setDeleteOptTarget(null);
-    }
+      await load();
+    } catch (err) { handleError(err); setDeleteOptTarget(null); }
   };
-
-  // ── Default option toggle ──
 
   const handleToggleDefault = async (optionId: number) => {
     if (!token || !selectedAttr) return;
     const current = selectedAttr.default_option_ids ?? [];
     const isDefault = current.includes(optionId);
-
     let newDefaults: number[];
     if (selectedAttr.is_multi_select) {
       if (isDefault) {
         newDefaults = current.filter(id => id !== optionId);
       } else {
-        if (selectedAttr.max_selections && current.length >= selectedAttr.max_selections) {
-          setError(t('settings.attribute.max_defaults_reached'));
-          return;
-        }
+        if (selectedAttr.max_selections && current.length >= selectedAttr.max_selections) return;
         newDefaults = [...current, optionId];
       }
     } else {
       newDefaults = isDefault ? [] : [optionId];
     }
-
     try {
-      await updateAttribute(token, storeId, selectedAttr.source_id, {
-        default_option_ids: newDefaults,
-      });
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    }
+      await updateAttribute(token, storeId, selectedAttr.source_id, { default_option_ids: newDefaults });
+      await load();
+    } catch (err) { handleError(err); }
   };
 
-  // ── Feature indicators ──
-
-  const getFeatures = (attr: StoreAttribute) => ({
-    hasPrice: attr.options.some(o => o.price_modifier !== 0),
-    hasQuantity: attr.options.some(o => o.enable_quantity),
-  });
-
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-            <SlidersHorizontal size={20} className="text-purple-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{t('settings.attribute.title')}</h2>
-            <p className="text-sm text-gray-500">{t('settings.attribute.subtitle')}</p>
+  const renderItem = (attr: StoreAttribute, isSelected: boolean) => {
+    const { hasPrice, hasQuantity } = getFeatures(attr);
+    return (
+      <div className={`px-4 py-3.5 ${isSelected ? 'font-medium' : ''}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm truncate text-slate-900">{attr.name}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            {hasQuantity && <Hash size={12} className="text-purple-500" />}
+            {hasPrice && <DollarSign size={12} className="text-orange-500" />}
+            {attr.show_on_kitchen_print && <ChefHat size={12} className="text-purple-400" />}
+            {attr.show_on_receipt && <ReceiptText size={12} className="text-blue-400" />}
           </div>
         </div>
-        <button
-          onClick={openCreateAttr}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm"
-        >
-          <Plus size={16} />
-          {t('common.action.add')}
+        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+          <span className={`px-1.5 py-0.5 rounded ${isSelected ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+            {attr.is_multi_select ? t('settings.attribute.multi') : t('settings.attribute.single')}
+          </span>
+          <span>· {attr.options.length} {t('settings.attribute.options')}</span>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Option inline form (shown inside detail panel) ──
+  const optionFormSection = (optCreating || optEditing) && (
+    <div className="bg-purple-50/50 border border-purple-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-bold text-purple-900">
+          {optEditing ? t('settings.attribute.edit_option') : t('settings.attribute.add_option')}
+        </h4>
+        <button onClick={closeOptionForm} className="p-1 rounded-lg hover:bg-purple-100 transition-colors">
+          <X size={16} className="text-purple-400" />
         </button>
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>
+      {optFormError && (
+        <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{optFormError}</div>
       )}
 
-      {/* Master-Detail Panel */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex" style={{ minHeight: '28rem' }}>
-        {loading && attributes.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-gray-400 text-sm text-center flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-gray-200 border-t-purple-500 rounded-full animate-spin" />
-              <span>{t('auth.loading')}</span>
-            </div>
-          </div>
-        ) : attributes.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-              <SlidersHorizontal className="text-gray-300" size={32} />
-            </div>
-            <p className="text-gray-500 font-medium">{t('settings.attribute.no_options')}</p>
-          </div>
-        ) : (
-          <>
-            {/* Left Panel - Attribute List */}
-            <div className="w-72 border-r border-gray-100 bg-gray-50/50 flex flex-col shrink-0">
-              <div className="p-3 border-b border-gray-100">
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('settings.common.search')}
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
-                  />
-                </div>
-              </div>
+      <FormField label={t('settings.common.name')} required>
+        <input value={optForm.name} onChange={e => setOptForm(prev => ({ ...prev, name: e.target.value }))} className={inputClass} autoFocus />
+      </FormField>
 
-              <div className="flex-1 overflow-y-auto">
-                <div className="py-1">
-                  {filtered.map((attr) => {
-                    const isSelected = selectedId === attr.source_id;
-                    const { hasPrice, hasQuantity } = getFeatures(attr);
-                    return (
-                      <div
-                        key={attr.source_id}
-                        onClick={() => setSelectedId(attr.source_id)}
-                        className={`mx-2 my-1 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-purple-50 border-l-[3px] border-l-purple-500 shadow-sm'
-                            : 'hover:bg-white border-l-[3px] border-l-transparent'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className={`font-medium text-sm truncate ${isSelected ? 'text-purple-900' : 'text-gray-800'}`}>
-                            {attr.name}
-                          </h3>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {hasQuantity && <Hash size={12} className="text-purple-500" />}
-                            {hasPrice && <DollarSign size={12} className="text-orange-500" />}
-                            {attr.show_on_kitchen_print && <ChefHat size={12} className="text-purple-400" />}
-                            {attr.show_on_receipt && <ReceiptText size={12} className="text-blue-400" />}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                          <span className={`px-1.5 py-0.5 rounded ${isSelected ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                            {attr.is_multi_select ? t('settings.attribute.multi') : t('settings.attribute.single')}
-                          </span>
-                          <span>· {attr.options.length} {t('settings.attribute.options')}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+      <FormField label={t('settings.attribute.price')}>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+          <input
+            type="text" inputMode="decimal" value={optForm.price_modifier}
+            onChange={e => setOptForm(prev => ({ ...prev, price_modifier: e.target.value }))}
+            className={`${inputClass} pl-7`} placeholder="0.00"
+          />
+        </div>
+      </FormField>
 
-            {/* Right Panel - Options Detail */}
-            <div className="flex-1 flex flex-col min-w-0">
-              {!selectedAttr ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                  <List size={32} className="mb-2 text-gray-300" />
-                  <p className="text-sm">{t('settings.attribute.select_attribute')}</p>
-                </div>
-              ) : (
-                <>
-                  {/* Attribute Header */}
-                  <div className="p-4 border-b border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-lg font-semibold text-gray-900">{selectedAttr.name}</h2>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                          <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded font-medium text-xs">
-                            {selectedAttr.is_multi_select ? t('settings.attribute.multi') : t('settings.attribute.single')}
-                          </span>
-                          {selectedAttr.show_on_receipt && (
-                            <span className="flex items-center gap-1 text-blue-600">
-                              <ReceiptText size={12} />
-                              {t('settings.attribute.show_on_receipt')}
-                            </span>
-                          )}
-                          {selectedAttr.show_on_kitchen_print && (
-                            <span className="flex items-center gap-1 text-purple-600">
-                              <ChefHat size={12} />
-                              {t('settings.attribute.show_on_kitchen_print')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openEditAttr(selectedAttr)}
-                          className="px-3 py-1.5 text-sm text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-1"
-                        >
-                          <Edit size={14} />
-                          {t('common.action.edit')}
-                        </button>
-                        <button
-                          onClick={() => setDeleteAttrTarget(selectedAttr)}
-                          className="px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={14} />
-                          {t('common.action.delete')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Options List Header */}
-                  <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
-                    <h3 className="font-medium text-gray-700 text-sm">{t('settings.attribute.options')}</h3>
-                    <button
-                      onClick={openCreateOpt}
-                      className="px-3 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-1"
-                    >
-                      <Plus size={14} />
-                      {t('settings.attribute.add_option')}
-                    </button>
-                  </div>
-
-                  {/* Options List */}
-                  <div className="flex-1 overflow-y-auto p-4">
-                    {selectedOptions.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl text-gray-400 min-h-[12rem]">
-                        <List size={24} className="mb-2 text-gray-300" />
-                        <p className="text-sm">{t('settings.attribute.no_options')}</p>
-                        <button
-                          onClick={openCreateOpt}
-                          className="mt-2 text-purple-600 hover:text-purple-700 text-sm font-medium hover:underline"
-                        >
-                          {t('settings.attribute.add_first_hint')}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {selectedOptions.map((option) => {
-                          const isDefault = selectedAttr.default_option_ids?.includes(option.source_id) ?? false;
-                          const hasPriceMod = option.price_modifier !== 0;
-
-                          return (
-                            <div
-                              key={option.source_id}
-                              className={`p-3 rounded-lg border transition-colors group ${
-                                isDefault ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-gray-200 hover:border-gray-300'
-                              }`}
-                            >
-                              {/* Row 1: Name + Price + Actions */}
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleToggleDefault(option.source_id)}
-                                  className={`shrink-0 p-1 rounded transition-colors ${
-                                    isDefault ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-400'
-                                  }`}
-                                  title={isDefault ? t('settings.attribute.unset_default') : t('settings.attribute.set_default')}
-                                >
-                                  <Star size={16} fill={isDefault ? 'currentColor' : 'none'} />
-                                </button>
-
-                                <span className={`font-medium ${isDefault ? 'text-gray-900' : 'text-gray-800'}`}>
-                                  {option.name}
-                                </span>
-
-                                <div className="flex-1" />
-
-                                {hasPriceMod && (
-                                  <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
-                                    option.price_modifier > 0
-                                      ? 'bg-orange-50 text-orange-600 border border-orange-100'
-                                      : 'bg-green-50 text-green-600 border border-green-100'
-                                  }`}>
-                                    {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
-                                  </span>
-                                )}
-
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => openEditOpt(option)}
-                                    className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
-                                  >
-                                    <Edit size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteOptTarget({ attr: selectedAttr, opt: option })}
-                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Row 2: Quantity control */}
-                              {option.enable_quantity && (
-                                <div className="mt-2 flex items-center gap-2 text-xs text-purple-600">
-                                  <Hash size={12} />
-                                  <span>{t('settings.attribute.quantity_range').replace('{max}', String(option.max_quantity ?? 99))}</span>
-                                </div>
-                              )}
-
-                              {/* Row 3: Receipt/Kitchen names */}
-                              {(option.receipt_name || option.kitchen_print_name) && (
-                                <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                                  {option.receipt_name && (
-                                    <span className="flex items-center gap-1 text-blue-500">
-                                      <ReceiptText size={11} />
-                                      {option.receipt_name}
-                                    </span>
-                                  )}
-                                  {option.kitchen_print_name && (
-                                    <span className="flex items-center gap-1 text-purple-500">
-                                      <ChefHat size={11} />
-                                      {option.kitchen_print_name}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={t('settings.attribute.receipt_name')}>
+          <input value={optForm.receipt_name} onChange={e => setOptForm(prev => ({ ...prev, receipt_name: e.target.value }))} className={inputClass} />
+        </FormField>
+        <FormField label={t('settings.attribute.kitchen_print_name')}>
+          <input value={optForm.kitchen_print_name} onChange={e => setOptForm(prev => ({ ...prev, kitchen_print_name: e.target.value }))} className={inputClass} />
+        </FormField>
       </div>
 
-      {/* ── Attribute Modal ── */}
-      {attrModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setAttrModalOpen(false); }}
+      <CheckboxField
+        id="opt-enable-quantity" label={t('settings.attribute.enable_quantity')}
+        description={t('settings.attribute.enable_quantity_desc')}
+        checked={optForm.enable_quantity} onChange={v => setOptForm(prev => ({ ...prev, enable_quantity: v }))}
+      />
+
+      {optForm.enable_quantity && (
+        <FormField label={t('settings.attribute.max_quantity')}>
+          <input type="number" min={1} max={99} value={optForm.max_quantity}
+            onChange={e => setOptForm(prev => ({ ...prev, max_quantity: e.target.value }))}
+            className={inputClass} placeholder="99"
+          />
+        </FormField>
+      )}
+
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={closeOptionForm} className="px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+          {t('common.action.cancel')}
+        </button>
+        <button onClick={handleSaveOpt} disabled={optSaving || !optForm.name.trim()}
+          className="px-3 py-1.5 text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors disabled:opacity-50">
+          {optSaving ? t('catalog.saving') : t('common.action.save')}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="h-full flex flex-col p-4 lg:p-6">
+      <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+          <SlidersHorizontal className="w-5 h-5 text-purple-600" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('settings.attribute.title')}</h1>
+          <p className="text-xs text-gray-400">{t('settings.attribute.subtitle')}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <MasterDetail
+          items={filtered}
+          getItemId={(a) => a.source_id}
+          renderItem={renderItem}
+          selectedId={selectedId}
+          onSelect={openEdit}
+          onDeselect={() => setPanel({ type: 'closed' })}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          totalCount={filtered.length}
+          countUnit={t('settings.attribute.title')}
+          onCreateNew={openCreate}
+          createLabel={t('common.action.add')}
+          isCreating={panel.type === 'create'}
+          themeColor="purple"
+          loading={loading}
         >
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-md overflow-hidden" style={{ animation: 'slideUp 0.25s ease-out' }}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editingAttr ? t('common.action.edit') : t('common.action.add')} {t('settings.attribute.title')}
-              </h3>
-              <button onClick={() => setAttrModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4">
-              {attrFormError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{attrFormError}</div>
+          {panel.type === 'create' && (
+            <DetailPanel
+              title={`${t('common.action.add')} ${t('settings.attribute.title')}`}
+              isCreating
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              saving={saving}
+              saveDisabled={!formName.trim()}
+            >
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
               )}
-
               <FormField label={t('settings.common.name')} required>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.attribute.name_placeholder')}
-                />
+                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus placeholder={t('settings.attribute.name_placeholder')} />
               </FormField>
-
-              <CheckboxField
-                id="attr-is-multi-select"
-                label={t('settings.attribute.multi_select')}
-                description={t('settings.attribute.multi_select_desc')}
-                checked={formIsMultiSelect}
-                onChange={setFormIsMultiSelect}
-              />
-
+              <CheckboxField id="attr-multi-select" label={t('settings.attribute.multi_select')} description={t('settings.attribute.multi_select_desc')} checked={formIsMultiSelect} onChange={setFormIsMultiSelect} />
               {formIsMultiSelect && (
                 <FormField label={t('settings.attribute.max_selections')}>
-                  <input
-                    type="number"
-                    value={formMaxSelections}
-                    onChange={(e) => setFormMaxSelections(e.target.value === '' ? '' : Number(e.target.value))}
-                    className={inputClass}
-                    placeholder={t('settings.attribute.max_selections_placeholder')}
-                    min={1}
-                  />
+                  <input type="number" value={formMaxSelections} onChange={e => setFormMaxSelections(e.target.value === '' ? '' : Number(e.target.value))} className={inputClass} placeholder={t('settings.attribute.max_selections_placeholder')} min={1} />
                 </FormField>
               )}
-            </div>
+            </DetailPanel>
+          )}
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => setAttrModalOpen(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
-                {t('common.action.cancel')}
-              </button>
-              <button
-                onClick={handleSaveAttr}
-                disabled={attrSaving}
-                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
-              >
-                {attrSaving ? t('auth.loading') : t('common.action.save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Option Modal ── */}
-      {optModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setOptModalOpen(false); }}
-        >
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col" style={{ animation: 'slideUp 0.25s ease-out' }}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editingOpt ? t('settings.attribute.edit_option') : t('settings.attribute.add_option')}
-              </h3>
-              <button onClick={() => setOptModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4 overflow-y-auto">
-              {optFormError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{optFormError}</div>
+          {panel.type === 'edit' && selectedAttr && (
+            <DetailPanel
+              title={`${t('common.action.edit')} ${t('settings.attribute.title')}`}
+              isCreating={false}
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              onDelete={() => setPanel({ type: 'delete', item: selectedAttr })}
+              saving={saving}
+              saveDisabled={!formName.trim()}
+            >
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
               )}
 
               <FormField label={t('settings.common.name')} required>
-                <input
-                  type="text"
-                  value={optForm.name}
-                  onChange={(e) => setOptForm(prev => ({ ...prev, name: e.target.value }))}
-                  className={inputClass}
-                  placeholder={t('settings.common.name')}
-                />
+                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} />
               </FormField>
-
-              <FormField label={t('settings.attribute.price')}>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={optForm.price_modifier}
-                    onChange={(e) => setOptForm(prev => ({ ...prev, price_modifier: e.target.value }))}
-                    className={`${inputClass} pl-7`}
-                    placeholder="0.00"
-                  />
-                </div>
-              </FormField>
-
-              <FormField label={t('settings.attribute.receipt_name')}>
-                <input
-                  type="text"
-                  value={optForm.receipt_name}
-                  onChange={(e) => setOptForm(prev => ({ ...prev, receipt_name: e.target.value }))}
-                  className={inputClass}
-                  placeholder={t('settings.attribute.receipt_name')}
-                />
-              </FormField>
-
-              <FormField label={t('settings.attribute.kitchen_print_name')}>
-                <input
-                  type="text"
-                  value={optForm.kitchen_print_name}
-                  onChange={(e) => setOptForm(prev => ({ ...prev, kitchen_print_name: e.target.value }))}
-                  className={inputClass}
-                  placeholder={t('settings.attribute.kitchen_print_name')}
-                />
-              </FormField>
-
-              <CheckboxField
-                id="opt-enable-quantity"
-                label={t('settings.attribute.enable_quantity')}
-                description={t('settings.attribute.enable_quantity_desc')}
-                checked={optForm.enable_quantity}
-                onChange={(v) => setOptForm(prev => ({ ...prev, enable_quantity: v }))}
-              />
-
-              {optForm.enable_quantity && (
-                <FormField label={t('settings.attribute.max_quantity')}>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={optForm.max_quantity}
-                    onChange={(e) => setOptForm(prev => ({ ...prev, max_quantity: e.target.value }))}
-                    className={inputClass}
-                    placeholder="99"
-                  />
+              <CheckboxField id="attr-multi-select" label={t('settings.attribute.multi_select')} description={t('settings.attribute.multi_select_desc')} checked={formIsMultiSelect} onChange={setFormIsMultiSelect} />
+              {formIsMultiSelect && (
+                <FormField label={t('settings.attribute.max_selections')}>
+                  <input type="number" value={formMaxSelections} onChange={e => setFormMaxSelections(e.target.value === '' ? '' : Number(e.target.value))} className={inputClass} min={1} />
                 </FormField>
               )}
-            </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setOptModalOpen(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
-                {t('common.action.cancel')}
-              </button>
-              <button
-                onClick={handleSaveOpt}
-                disabled={optSaving}
-                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
-              >
-                {optSaving ? t('auth.loading') : t('common.action.save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              {/* ── Options section ── */}
+              <div className="border-t border-gray-200 pt-4 mt-2 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-gray-700">{t('settings.attribute.options')} ({selectedOptions.length})</h3>
+                  {!optCreating && !optEditing && (
+                    <button onClick={openCreateOpt} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+                      <Plus size={12} /> {t('settings.attribute.add_option')}
+                    </button>
+                  )}
+                </div>
 
-      {/* Delete Attribute Confirmation */}
+                {/* Option inline form */}
+                {optionFormSection}
+
+                {/* Options list */}
+                {selectedOptions.length === 0 && !optCreating ? (
+                  <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+                    <p className="text-sm">{t('settings.attribute.no_options')}</p>
+                    <button onClick={openCreateOpt} className="mt-1 text-purple-600 hover:text-purple-700 text-sm font-medium hover:underline">
+                      {t('settings.attribute.add_first_hint')}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedOptions.map(option => {
+                      const isDefault = selectedAttr.default_option_ids?.includes(option.source_id) ?? false;
+                      const hasPriceMod = option.price_modifier !== 0;
+                      return (
+                        <div key={option.source_id}
+                          className={`p-3 rounded-lg border transition-colors group ${isDefault ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleToggleDefault(option.source_id)}
+                              className={`shrink-0 p-1 rounded transition-colors ${isDefault ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-400'}`}
+                              title={isDefault ? t('settings.attribute.unset_default') : t('settings.attribute.set_default')}
+                            >
+                              <Star size={16} fill={isDefault ? 'currentColor' : 'none'} />
+                            </button>
+                            <span className={`font-medium ${isDefault ? 'text-gray-900' : 'text-gray-800'}`}>{option.name}</span>
+                            <div className="flex-1" />
+                            {hasPriceMod && (
+                              <span className={`text-sm font-semibold px-2 py-0.5 rounded ${option.price_modifier > 0 ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                                {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => openEditOpt(option)} className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => setDeleteOptTarget({ attr: selectedAttr, opt: option })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          {option.enable_quantity && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-purple-600">
+                              <Hash size={12} />
+                              <span>{t('settings.attribute.quantity_range').replace('{max}', String(option.max_quantity ?? 99))}</span>
+                            </div>
+                          )}
+                          {(option.receipt_name || option.kitchen_print_name) && (
+                            <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                              {option.receipt_name && <span className="flex items-center gap-1 text-blue-500"><ReceiptText size={11} />{option.receipt_name}</span>}
+                              {option.kitchen_print_name && <span className="flex items-center gap-1 text-purple-500"><ChefHat size={11} />{option.kitchen_print_name}</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </DetailPanel>
+          )}
+        </MasterDetail>
+      </div>
+
       <ConfirmDialog
-        isOpen={!!deleteAttrTarget}
+        isOpen={panel.type === 'delete'}
         title={t('common.dialog.confirm_delete')}
         description={t('settings.attribute.confirm.delete')}
-        onConfirm={handleDeleteAttr}
-        onCancel={() => setDeleteAttrTarget(null)}
+        onConfirm={handleDelete}
+        onCancel={() => setPanel({ type: 'closed' })}
         variant="danger"
       />
 
-      {/* Delete Option Confirmation */}
       <ConfirmDialog
         isOpen={!!deleteOptTarget}
         title={t('common.dialog.confirm_delete')}

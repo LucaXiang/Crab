@@ -1,18 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Map, Plus } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { ApiError } from '@/infrastructure/api/client';
-import { DataTable, type Column } from '@/shared/components/DataTable';
-import { FilterBar } from '@/shared/components/FilterBar';
+import { MasterDetail } from '@/shared/components/MasterDetail';
+import { DetailPanel } from '@/shared/components/DetailPanel';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, inputClass } from '@/shared/components/FormField';
 import { listZones, createZone, updateZone, deleteZone } from '@/infrastructure/api/management';
 import type { Zone, ZoneCreate, ZoneUpdate } from '@/core/types/store';
 
-type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: Zone } | { type: 'delete'; item: Zone };
+type PanelState =
+  | { type: 'closed' }
+  | { type: 'create' }
+  | { type: 'edit'; item: Zone }
+  | { type: 'delete'; item: Zone };
 
 export const ZoneManagement: React.FC = () => {
   const { t } = useI18n();
@@ -24,7 +28,7 @@ export const ZoneManagement: React.FC = () => {
   const [items, setItems] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<ModalState>({ type: 'closed' });
+  const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
   const [saving, setSaving] = useState(false);
 
   // Form state
@@ -38,9 +42,8 @@ export const ZoneManagement: React.FC = () => {
 
   const load = useCallback(async () => {
     if (!token) return;
-    try {
-      setItems(await listZones(token, storeId));
-    } catch (err) { handleError(err); }
+    try { setItems(await listZones(token, storeId)); }
+    catch (err) { handleError(err); }
     finally { setLoading(false); }
   }, [token, storeId, handleError]);
 
@@ -52,113 +55,118 @@ export const ZoneManagement: React.FC = () => {
     return items.filter(z => z.name.toLowerCase().includes(q) || (z.description && z.description.toLowerCase().includes(q)));
   }, [items, search]);
 
+  const selectedId = panel.type === 'edit' ? panel.item.id : null;
+
   const openCreate = () => {
     setFormName(''); setFormDescription('');
-    setModal({ type: 'create' });
+    setPanel({ type: 'create' });
   };
 
   const openEdit = (item: Zone) => {
     setFormName(item.name); setFormDescription(item.description || '');
-    setModal({ type: 'edit', item });
+    setPanel({ type: 'edit', item });
   };
 
   const handleSave = async () => {
     if (!token || saving) return;
     setSaving(true);
     try {
-      if (modal.type === 'create') {
+      if (panel.type === 'create') {
         const data: ZoneCreate = { name: formName.trim(), description: formDescription.trim() || undefined };
         await createZone(token, storeId, data);
-      } else if (modal.type === 'edit') {
+      } else if (panel.type === 'edit') {
         const data: ZoneUpdate = { name: formName.trim(), description: formDescription.trim() || undefined };
-        await updateZone(token, storeId, modal.item.id, data);
+        await updateZone(token, storeId, panel.item.id, data);
       }
-      setModal({ type: 'closed' });
+      setPanel({ type: 'closed' });
       await load();
     } catch (err) { handleError(err); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
-    if (!token || modal.type !== 'delete') return;
+    if (!token || panel.type !== 'delete') return;
     setSaving(true);
     try {
-      await deleteZone(token, storeId, modal.item.id);
-      setModal({ type: 'closed' });
+      await deleteZone(token, storeId, panel.item.id);
+      setPanel({ type: 'closed' });
       await load();
     } catch (err) { handleError(err); }
     finally { setSaving(false); }
   };
 
-  const columns: Column<Zone>[] = useMemo(() => [
-    {
-      key: 'name', header: t('catalog.name'),
-      render: (z) => (
-        <div className="flex items-center gap-2">
-          <Map className="w-4 h-4 text-blue-500" />
-          <span className={`font-medium ${z.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>{z.name}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'description', header: t('zones.description'),
-      render: (z) => <span className="text-slate-500">{z.description || '-'}</span>,
-    },
-  ], [t]);
-
-  const isFormOpen = modal.type === 'create' || modal.type === 'edit';
+  const renderItem = (zone: Zone, isSelected: boolean) => (
+    <div className={`px-4 py-3.5 ${isSelected ? 'font-medium' : ''}`}>
+      <div className="flex items-center gap-2.5">
+        <MapPin className="w-4 h-4 text-teal-500 shrink-0" />
+        <span className={`text-sm ${zone.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+          {zone.name}
+        </span>
+      </div>
+      {zone.description && (
+        <p className="text-xs text-gray-400 mt-1 ml-[26px] truncate">{zone.description}</p>
+      )}
+    </div>
+  );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center"><Map className="w-5 h-5 text-blue-600" /></div>
-          <h1 className="text-xl font-bold text-slate-900">{t('zones.title')}</h1>
+    <div className="h-full flex flex-col p-4 lg:p-6">
+      {/* 页面标题 */}
+      <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+          <MapPin className="w-5 h-5 text-teal-600" />
         </div>
-        <button onClick={openCreate} className="flex items-center gap-1.5 px-3 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors">
-          <Plus className="w-4 h-4" />{t('zones.new')}
-        </button>
+        <h1 className="text-xl font-bold text-slate-900">{t('zones.title')}</h1>
       </div>
 
-      <FilterBar searchQuery={search} onSearchChange={setSearch} totalCount={filtered.length} countUnit={t('zones.title')} themeColor="blue" />
+      {/* Master-Detail 布局 */}
+      <div className="flex-1 min-h-0">
+        <MasterDetail
+          items={filtered}
+          getItemId={(z) => z.id}
+          renderItem={renderItem}
+          selectedId={selectedId}
+          onSelect={openEdit}
+          onDeselect={() => setPanel({ type: 'closed' })}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          totalCount={filtered.length}
+          countUnit={t('zones.title')}
+          onCreateNew={openCreate}
+          createLabel={t('zones.new')}
+          isCreating={panel.type === 'create'}
+          themeColor="teal"
+          loading={loading}
+          emptyText={t('zones.empty')}
+        >
+          {(panel.type === 'create' || panel.type === 'edit') && (
+            <DetailPanel
+              title={panel.type === 'create' ? t('zones.new') : t('zones.edit')}
+              isCreating={panel.type === 'create'}
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              onDelete={panel.type === 'edit' ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              saving={saving}
+              saveDisabled={!formName.trim()}
+            >
+              <FormField label={t('catalog.name')} required>
+                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
+              </FormField>
+              <FormField label={t('zones.description')}>
+                <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)} className={inputClass} rows={3} />
+              </FormField>
+            </DetailPanel>
+          )}
+        </MasterDetail>
+      </div>
 
-      <DataTable
-        data={filtered}
-        columns={columns}
-        loading={loading}
-        emptyText={t('zones.empty')}
-        getRowKey={(z) => z.id}
-        onEdit={openEdit}
-        onDelete={(z) => setModal({ type: 'delete', item: z })}
-        themeColor="blue"
-      />
-
-      {/* Create/Edit Modal */}
-      {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setModal({ type: 'closed' })}>
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()} style={{ animation: 'slideUp 0.25s ease-out' }}>
-            <h2 className="text-lg font-bold text-slate-900">{modal.type === 'create' ? t('zones.new') : t('zones.edit')}</h2>
-            <FormField label={t('catalog.name')} required>
-              <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
-            </FormField>
-            <FormField label={t('zones.description')}>
-              <input value={formDescription} onChange={e => setFormDescription(e.target.value)} className={inputClass} />
-            </FormField>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setModal({ type: 'closed' })} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">{t('catalog.cancel')}</button>
-              <button onClick={handleSave} disabled={saving || !formName.trim()} className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50">{saving ? t('catalog.saving') : t('catalog.save')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
+      {/* 删除确认 */}
       <ConfirmDialog
-        isOpen={modal.type === 'delete'}
+        isOpen={panel.type === 'delete'}
         title={t('catalog.confirm_delete')}
         description={t('catalog.confirm_delete_desc')}
         onConfirm={handleDelete}
-        onCancel={() => setModal({ type: 'closed' })}
+        onCancel={() => setPanel({ type: 'closed' })}
         variant="danger"
       />
     </div>
