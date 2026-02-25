@@ -322,10 +322,26 @@
       "max_selections": "Máx. selecciones",
       "max_selections_placeholder": "Sin límite",
       "add_option": "Añadir opción",
+      "edit_option": "Editar opción",
       "no_options": "Sin opciones. Añade una.",
       "price": "Precio extra",
+      "select_attribute": "Selecciona un atributo para ver detalles",
+      "add_first_hint": "Haz clic para añadir la primera opción",
+      "receipt_name": "Nombre en recibo",
+      "kitchen_print_name": "Nombre en impresión cocina",
+      "enable_quantity": "Habilitar control de cantidad",
+      "enable_quantity_desc": "Permitir configurar cantidad para esta opción.",
+      "max_quantity": "Cantidad máxima",
+      "default_option": "Opción por defecto",
+      "set_default": "Establecer como defecto",
+      "unset_default": "Quitar defecto",
+      "max_defaults_reached": "Máximo de opciones por defecto alcanzado",
+      "quantity_range": "Cant: 1~{max}",
+      "show_on_receipt": "Mostrar en recibo",
+      "show_on_kitchen_print": "Mostrar en impresión cocina",
       "confirm": {
-        "delete": "Este atributo se eliminará permanentemente. ¿Continuar?"
+        "delete": "Este atributo se eliminará permanentemente. ¿Continuar?",
+        "delete_option": "Esta opción se eliminará permanentemente. ¿Continuar?"
       }
     },
     "employee": {

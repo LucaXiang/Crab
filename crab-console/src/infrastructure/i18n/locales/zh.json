@@ -322,10 +322,26 @@
       "max_selections": "最大选择数",
       "max_selections_placeholder": "无限制",
       "add_option": "添加选项",
+      "edit_option": "编辑选项",
       "no_options": "暂无选项，请添加。",
       "price": "加价",
+      "select_attribute": "选择左侧的属性查看详情",
+      "add_first_hint": "点击添加第一个选项",
+      "receipt_name": "小票名称",
+      "kitchen_print_name": "厨打名称",
+      "enable_quantity": "启用数量控制",
+      "enable_quantity_desc": "允许对此选项设置数量。",
+      "max_quantity": "最大数量",
+      "default_option": "默认选项",
+      "set_default": "设为默认",
+      "unset_default": "取消默认",
+      "max_defaults_reached": "已达到最大默认选项数",
+      "quantity_range": "数量: 1~{max}",
+      "show_on_receipt": "显示在小票",
+      "show_on_kitchen_print": "显示在厨打",
       "confirm": {
-        "delete": "此属性将被永久删除，确定继续？"
+        "delete": "此属性将被永久删除，确定继续？",
+        "delete_option": "此选项将被永久删除，确定继续？"
       }
     },
     "employee": {

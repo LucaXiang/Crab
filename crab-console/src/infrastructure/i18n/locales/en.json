@@ -322,10 +322,26 @@
       "max_selections": "Max selections",
       "max_selections_placeholder": "No limit",
       "add_option": "Add option",
+      "edit_option": "Edit option",
       "no_options": "No options yet. Add one.",
       "price": "Extra price",
+      "select_attribute": "Select an attribute to view details",
+      "add_first_hint": "Click to add the first option",
+      "receipt_name": "Receipt name",
+      "kitchen_print_name": "Kitchen print name",
+      "enable_quantity": "Enable quantity control",
+      "enable_quantity_desc": "Allow setting quantity for this option.",
+      "max_quantity": "Max quantity",
+      "default_option": "Default option",
+      "set_default": "Set as default",
+      "unset_default": "Unset default",
+      "max_defaults_reached": "Max default options reached",
+      "quantity_range": "Qty: 1~{max}",
+      "show_on_receipt": "Show on receipt",
+      "show_on_kitchen_print": "Show on kitchen print",
       "confirm": {
-        "delete": "This attribute will be permanently removed. Continue?"
+        "delete": "This attribute will be permanently removed. Continue?",
+        "delete_option": "This option will be permanently removed. Continue?"
       }
     },
     "employee": {

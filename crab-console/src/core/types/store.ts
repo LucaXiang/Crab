@@ -194,6 +194,7 @@ export interface AttributeUpdate {
   name?: string;
   is_multi_select?: boolean;
   max_selections?: number;
+  default_option_ids?: number[];
   display_order?: number;
   options?: AttributeOptionInput[];
   is_active?: boolean;
