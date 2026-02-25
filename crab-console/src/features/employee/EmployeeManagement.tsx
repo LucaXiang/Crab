@@ -8,7 +8,7 @@ import { ApiError } from '@/infrastructure/api/client';
 import { DataTable, type Column } from '@/shared/components/DataTable';
 import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
-import { FormField, inputClass } from '@/shared/components/FormField/FormField';
+import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
 import type { Employee, EmployeeCreate, EmployeeUpdate } from '@/core/types/store';
 
@@ -61,6 +61,7 @@ export const EmployeeManagement: React.FC = () => {
   const [formPassword, setFormPassword] = useState('');
   const [formDisplayName, setFormDisplayName] = useState('');
   const [formRoleId, setFormRoleId] = useState<number>(3);
+  const [formIsActive, setFormIsActive] = useState(true);
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
@@ -96,6 +97,7 @@ export const EmployeeManagement: React.FC = () => {
     setFormPassword('');
     setFormDisplayName('');
     setFormRoleId(3);
+    setFormIsActive(true);
     setFormError('');
     setModalOpen(true);
   };
@@ -106,6 +108,7 @@ export const EmployeeManagement: React.FC = () => {
     setFormPassword('');
     setFormDisplayName(emp.display_name);
     setFormRoleId(emp.role_id);
+    setFormIsActive(emp.is_active);
     setFormError('');
     setModalOpen(true);
   };
@@ -123,6 +126,7 @@ export const EmployeeManagement: React.FC = () => {
           username: formUsername.trim(),
           display_name: formDisplayName.trim() || undefined,
           role_id: formRoleId,
+          is_active: formIsActive,
         };
         if (formPassword.trim()) payload.password = formPassword.trim();
         await updateEmployee(token, storeId, editing.id, payload);
@@ -153,6 +157,16 @@ export const EmployeeManagement: React.FC = () => {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
       setDeleteTarget(null);
+    }
+  };
+
+  const handleToggleActive = async (emp: Employee) => {
+    if (!token) return;
+    try {
+      await updateEmployee(token, storeId, emp.id, { is_active: !emp.is_active });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
     }
   };
 
@@ -190,11 +204,15 @@ export const EmployeeManagement: React.FC = () => {
       header: t('settings.common.status'),
       width: '100px',
       render: (e) => (
-        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-          e.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-        }`}>
+        <button
+          onClick={(ev) => { ev.stopPropagation(); if (!e.is_system) handleToggleActive(e); }}
+          disabled={e.is_system}
+          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+            e.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          } ${e.is_system ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+        >
           {e.is_active ? t('settings.common.active') : t('settings.common.inactive')}
-        </span>
+        </button>
       ),
     },
   ];
@@ -307,6 +325,15 @@ export const EmployeeManagement: React.FC = () => {
                 options={roleOptions}
                 required
               />
+
+              {editing && (
+                <CheckboxField
+                  id="employee-is-active"
+                  label={t('settings.common.active')}
+                  checked={formIsActive}
+                  onChange={setFormIsActive}
+                />
+              )}
             </div>
 
             {/* Modal Footer */}
