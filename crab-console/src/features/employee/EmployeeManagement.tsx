@@ -10,6 +10,7 @@ import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
+import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
 import type { Employee, EmployeeCreate, EmployeeUpdate } from '@/core/types/store';
 
 function useRoleOptions(t: (key: string) => string) {
@@ -204,15 +205,7 @@ export const EmployeeManagement: React.FC = () => {
       header: t('settings.common.status'),
       width: '100px',
       render: (e) => (
-        <button
-          onClick={(ev) => { ev.stopPropagation(); if (!e.is_system) handleToggleActive(e); }}
-          disabled={e.is_system}
-          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-            e.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          } ${e.is_system ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-        >
-          {e.is_active ? t('settings.common.active') : t('settings.common.inactive')}
-        </button>
+        <StatusToggle isActive={e.is_active} onClick={() => handleToggleActive(e)} disabled={e.is_system} />
       ),
     },
   ];

@@ -10,6 +10,7 @@ import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import { FormField, FormSection, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
+import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
 import { formatCurrency } from '@/utils/format';
 import type {
   PriceRule, PriceRuleCreate, PriceRuleUpdate,
@@ -303,14 +304,7 @@ export const PriceRuleManagement: React.FC = () => {
       header: t('settings.common.status'),
       width: '100px',
       render: (r) => (
-        <button
-          onClick={(ev) => { ev.stopPropagation(); handleToggleActive(r); }}
-          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-            r.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-        >
-          {r.is_active ? t('settings.common.active') : t('settings.common.inactive')}
-        </button>
+        <StatusToggle isActive={r.is_active} onClick={() => handleToggleActive(r)} />
       ),
     },
   ];

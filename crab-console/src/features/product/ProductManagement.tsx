@@ -13,6 +13,8 @@ import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import { FormField, FormSection, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
+import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
+import { TagPicker } from '@/shared/components/TagPicker/TagPicker';
 import { formatCurrency } from '@/utils/format';
 import type {
   StoreProduct, ProductCreate, ProductUpdate, ProductSpecInput,
@@ -303,14 +305,7 @@ export const ProductManagement: React.FC = () => {
       header: t('settings.common.status'),
       width: '100px',
       render: (p) => (
-        <button
-          onClick={(ev) => { ev.stopPropagation(); handleToggleActive(p); }}
-          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-            p.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-        >
-          {p.is_active ? t('settings.common.active') : t('settings.common.inactive')}
-        </button>
+        <StatusToggle isActive={p.is_active} onClick={() => handleToggleActive(p)} />
       ),
     },
   ];
@@ -476,22 +471,7 @@ export const ProductManagement: React.FC = () => {
               {/* Tags */}
               {tags.filter(tag => tag.is_active).length > 0 && (
                 <FormField label={t('settings.product.tags')}>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.filter(tag => tag.is_active).map((tag) => (
-                      <button
-                        key={tag.source_id}
-                        type="button"
-                        onClick={() => toggleTag(tag.source_id)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                          formTagIds.includes(tag.source_id)
-                            ? 'bg-blue-50 text-blue-700 border-blue-300'
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        {tag.name}
-                      </button>
-                    ))}
-                  </div>
+                  <TagPicker tags={tags} selectedIds={formTagIds} onToggle={toggleTag} themeColor="blue" />
                 </FormField>
               )}
 

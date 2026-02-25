@@ -9,6 +9,8 @@ import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
 import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
+import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
+import { TagPicker } from '@/shared/components/TagPicker/TagPicker';
 import { listCategories, createCategory, updateCategory, deleteCategory, listTags } from '@/infrastructure/api/store';
 import type { StoreCategory, StoreTag, CategoryCreate, CategoryUpdate } from '@/core/types/store';
 
@@ -202,14 +204,7 @@ export const CategoryManagement: React.FC = () => {
           {!c.is_display && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{t('categories.hidden')}</span>
           )}
-          <button
-            onClick={(ev) => { ev.stopPropagation(); handleToggleActive(c); }}
-            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-              c.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            {c.is_active ? t('settings.common.active') : t('settings.common.inactive')}
-          </button>
+          <StatusToggle isActive={c.is_active} onClick={() => handleToggleActive(c)} />
         </div>
       ),
     },
@@ -332,25 +327,7 @@ export const CategoryManagement: React.FC = () => {
                   />
 
                   <FormField label={t('categories.tag_filter')}>
-                    <div className="flex flex-wrap gap-2">
-                      {tags.filter(tag => tag.is_active).map((tag) => (
-                        <button
-                          key={tag.source_id}
-                          type="button"
-                          onClick={() => toggleTag(tag.source_id)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                            formTagIds.includes(tag.source_id)
-                              ? 'bg-purple-50 text-purple-700 border-purple-300'
-                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          {tag.name}
-                        </button>
-                      ))}
-                      {tags.filter(tag => tag.is_active).length === 0 && (
-                        <span className="text-xs text-gray-400">{t('settings.attribute.no_options')}</span>
-                      )}
-                    </div>
+                    <TagPicker tags={tags} selectedIds={formTagIds} onToggle={toggleTag} themeColor="purple" />
                   </FormField>
                 </div>
               )}
