@@ -94,44 +94,25 @@ pub async fn create_option(
         return StoreOpResult::err(format!("Attribute {attribute_id} not found"));
     }
 
-    let id = if let Some(aid) = assigned_id {
-        match sqlx::query_scalar::<_, i64>(
-            "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id",
-        )
-        .bind(aid)
-        .bind(attribute_id)
-        .bind(&data.name)
-        .bind(data.price_modifier)
-        .bind(data.display_order)
-        .bind(&data.receipt_name)
-        .bind(&data.kitchen_print_name)
-        .bind(data.enable_quantity)
-        .bind(data.max_quantity)
-        .fetch_one(&state.pool)
-        .await
-        {
-            Ok(id) => id,
-            Err(e) => return StoreOpResult::err(e.to_string()),
-        }
-    } else {
-        match sqlx::query_scalar::<_, i64>(
-            "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8) RETURNING id",
-        )
-        .bind(attribute_id)
-        .bind(&data.name)
-        .bind(data.price_modifier)
-        .bind(data.display_order)
-        .bind(&data.receipt_name)
-        .bind(&data.kitchen_print_name)
-        .bind(data.enable_quantity)
-        .bind(data.max_quantity)
-        .fetch_one(&state.pool)
-        .await
-        {
-            Ok(id) => id,
-            Err(e) => return StoreOpResult::err(e.to_string()),
-        }
-    };
+    let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    match sqlx::query(
+        "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9)",
+    )
+    .bind(id)
+    .bind(attribute_id)
+    .bind(&data.name)
+    .bind(data.price_modifier)
+    .bind(data.display_order)
+    .bind(&data.receipt_name)
+    .bind(&data.kitchen_print_name)
+    .bind(data.enable_quantity)
+    .bind(data.max_quantity)
+    .execute(&state.pool)
+    .await
+    {
+        Ok(_) => {}
+        Err(e) => return StoreOpResult::err(e.to_string()),
+    }
 
     state
         .broadcast_sync::<()>(
@@ -266,7 +247,7 @@ pub async fn bind(
     attribute_id: i64,
     is_required: bool,
     display_order: i32,
-    default_option_ids: Option<Vec<i32>>,
+    default_option_ids: Option<Vec<i64>>,
 ) -> StoreOpResult {
     use crate::db::repository::attribute;
 

@@ -244,7 +244,7 @@ pub struct BindAttributeRequest {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 #[derive(serde::Deserialize)]

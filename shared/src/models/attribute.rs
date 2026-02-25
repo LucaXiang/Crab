@@ -31,7 +31,7 @@ pub struct Attribute {
     pub max_selections: Option<i32>,
     /// Default option IDs (JSON array of int in DB)
     #[cfg_attr(feature = "db", sqlx(json))]
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
     pub display_order: i32,
     pub is_active: bool,
     pub show_on_receipt: bool,
@@ -67,7 +67,7 @@ pub struct AttributeCreate {
     pub name: String,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
     pub display_order: Option<i32>,
     pub show_on_receipt: Option<bool>,
     pub receipt_name: Option<String>,
@@ -82,7 +82,7 @@ pub struct AttributeUpdate {
     pub name: Option<String>,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
     pub display_order: Option<i32>,
     pub show_on_receipt: Option<bool>,
     pub receipt_name: Option<String>,
@@ -133,7 +133,7 @@ pub struct AttributeBinding {
     pub display_order: i32,
     /// Override attribute's default option IDs (JSON array of int in DB)
     #[cfg_attr(feature = "db", sqlx(json))]
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 /// Attribute binding with full attribute data (for API responses)
@@ -144,7 +144,7 @@ pub struct AttributeBindingFull {
     pub attribute: Attribute,
     pub is_required: bool,
     pub display_order: i32,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
     /// Whether this binding is inherited from the product's category
     #[serde(default)]
     pub is_inherited: bool,

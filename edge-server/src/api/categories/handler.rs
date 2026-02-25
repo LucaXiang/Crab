@@ -246,7 +246,7 @@ pub async fn batch_update_sort_order(
 pub struct BindAttributePayload {
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 /// GET /api/categories/:id/attributes - 获取分类关联的属性

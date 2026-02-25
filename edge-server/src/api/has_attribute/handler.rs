@@ -26,7 +26,7 @@ pub struct CreateBindingRequest {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 /// 更新绑定的请求体
@@ -34,7 +34,7 @@ pub struct CreateBindingRequest {
 pub struct UpdateBindingRequest {
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 /// 绑定响应 (包含属性详情)

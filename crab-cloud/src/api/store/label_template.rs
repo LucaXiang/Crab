@@ -34,7 +34,7 @@ pub async fn create_label_template(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    let (pg_id, op_data) =
+    let (source_id, op_data) =
         store::create_label_template_direct(&state.pool, store_id, &identity.tenant_id, &data)
             .await
             .map_err(internal)?;
@@ -46,13 +46,13 @@ pub async fn create_label_template(
         &state,
         store_id,
         StoreOp::CreateLabelTemplate {
-            id: Some(pg_id),
+            id: Some(source_id),
             data,
         },
     )
     .await;
 
-    Ok(Json(StoreOpResult::created(pg_id).with_data(op_data)))
+    Ok(Json(StoreOpResult::created(source_id).with_data(op_data)))
 }
 
 pub async fn update_label_template(

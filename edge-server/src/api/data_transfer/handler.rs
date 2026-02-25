@@ -72,15 +72,36 @@ pub async fn import(
 pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError> {
     let categories = state.catalog_service.list_categories();
     let products = state.catalog_service.list_products();
-    let tags = tag::find_all_with_inactive(&state.pool)
+    let mut tags = tag::find_all_with_inactive(&state.pool)
         .await
         .map_err(AppError::from)?;
+    tags.sort_by_key(|t| t.display_order);
     let attributes = attribute::find_all(&state.pool)
         .await
         .map_err(AppError::from)?;
-    let bindings = attribute::find_all_bindings(&state.pool)
+    let all_bindings = attribute::find_all_bindings(&state.pool)
         .await
         .map_err(AppError::from)?;
+
+    // Filter bindings: only include those referencing exported entities + attributes
+    let exported_category_ids: std::collections::HashSet<i64> =
+        categories.iter().map(|c| c.id).collect();
+    let exported_product_ids: std::collections::HashSet<i64> =
+        products.iter().map(|p| p.id).collect();
+    let exported_attribute_ids: std::collections::HashSet<i64> =
+        attributes.iter().map(|a| a.id).collect();
+
+    let bindings: Vec<_> = all_bindings
+        .into_iter()
+        .filter(|b| {
+            let owner_valid = match b.owner_type.as_str() {
+                "product" => exported_product_ids.contains(&b.owner_id),
+                "category" => exported_category_ids.contains(&b.owner_id),
+                _ => false,
+            };
+            owner_valid && exported_attribute_ids.contains(&b.attribute_id)
+        })
+        .collect();
 
     let catalog = CatalogExport {
         version: 1,
@@ -432,6 +453,7 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
     }
 
     // === Attributes: match by name ===
+    // Phase 1: Insert attributes + options (populate remap.options)
     for attr in &catalog.attributes {
         let existing: Option<(i64,)> = sqlx::query_as("SELECT id FROM attribute WHERE name = ?")
             .bind(&attr.name)
@@ -441,16 +463,12 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
 
         let new_id = IdRemap::get_or_create(&mut remap.attributes, attr.id, existing.map(|r| r.0));
 
-        let default_option_ids_json = attr
-            .default_option_ids
-            .as_ref()
-            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "null".to_string()));
-
+        // Insert attribute without default_option_ids first (options not yet remapped)
         sqlx::query(
             "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET name=excluded.name, is_multi_select=excluded.is_multi_select,
-                max_selections=excluded.max_selections, default_option_ids=excluded.default_option_ids,
+                max_selections=excluded.max_selections,
                 display_order=excluded.display_order, is_active=excluded.is_active,
                 show_on_receipt=excluded.show_on_receipt, receipt_name=excluded.receipt_name,
                 show_on_kitchen_print=excluded.show_on_kitchen_print,
@@ -460,7 +478,6 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .bind(&attr.name)
         .bind(attr.is_multi_select)
         .bind(attr.max_selections)
-        .bind(&default_option_ids_json)
         .bind(attr.display_order)
         .bind(attr.is_active)
         .bind(attr.show_on_receipt)
@@ -509,6 +526,24 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         }
     }
 
+    // Phase 2: Back-fill attribute default_option_ids with remapped option IDs
+    for attr in &catalog.attributes {
+        if let Some(ref old_ids) = attr.default_option_ids {
+            let new_attr_id = remap.attributes[&attr.id];
+            let remapped: Vec<i64> = old_ids
+                .iter()
+                .filter_map(|old| remap.options.get(old).copied())
+                .collect();
+            let json = serde_json::to_string(&remapped).unwrap_or_else(|_| "null".to_string());
+            sqlx::query("UPDATE attribute SET default_option_ids = ? WHERE id = ?")
+                .bind(&json)
+                .bind(new_attr_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| AppError::database(e.to_string()))?;
+        }
+    }
+
     // === Attribute bindings: remap all FK references ===
     for binding in &catalog.attribute_bindings {
         // Remap owner_id based on owner_type
@@ -521,13 +556,27 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
 
         // Skip bindings with unmapped references
         let (Some(owner_id), Some(attr_id)) = (new_owner_id, new_attr_id) else {
+            tracing::warn!(
+                owner_type = %binding.owner_type,
+                owner_id = binding.owner_id,
+                attribute_id = binding.attribute_id,
+                owner_mapped = new_owner_id.is_some(),
+                attr_mapped = new_attr_id.is_some(),
+                "Skipping attribute binding: unmapped reference"
+            );
             continue;
         };
 
         let new_id = shared::util::snowflake_id();
 
-        let default_option_ids_json = binding
-            .default_option_ids
+        // Remap default_option_ids to new option IDs
+        let remapped_default_opts: Option<Vec<i64>> =
+            binding.default_option_ids.as_ref().map(|ids| {
+                ids.iter()
+                    .filter_map(|old| remap.options.get(old).copied())
+                    .collect()
+            });
+        let default_option_ids_json = remapped_default_opts
             .as_ref()
             .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "null".to_string()));
 

@@ -291,9 +291,31 @@ pub async fn list_label_templates(
     pool: &PgPool,
     edge_server_id: i64,
 ) -> Result<Vec<LabelTemplate>, BoxError> {
-    let templates: Vec<LabelTemplate> = sqlx::query_as(
+    // Use internal struct to hold PG id for field join, expose source_id as id
+    #[derive(sqlx::FromRow)]
+    struct TmplRow {
+        pg_id: i64,
+        id: i64,
+        name: String,
+        description: Option<String>,
+        width: f32,
+        height: f32,
+        padding: f32,
+        is_default: bool,
+        is_active: bool,
+        width_mm: Option<f32>,
+        height_mm: Option<f32>,
+        padding_mm_x: Option<f32>,
+        padding_mm_y: Option<f32>,
+        render_dpi: Option<i32>,
+        test_data: Option<String>,
+        created_at: Option<i64>,
+        updated_at: Option<i64>,
+    }
+
+    let rows: Vec<TmplRow> = sqlx::query_as(
         r#"
-        SELECT id, name, description, width, height, padding,
+        SELECT id AS pg_id, source_id AS id, name, description, width, height, padding,
                is_default, is_active, width_mm, height_mm,
                padding_mm_x, padding_mm_y, render_dpi, test_data,
                created_at, updated_at
@@ -306,11 +328,11 @@ pub async fn list_label_templates(
     .fetch_all(pool)
     .await?;
 
-    if templates.is_empty() {
+    if rows.is_empty() {
         return Ok(vec![]);
     }
 
-    let template_ids: Vec<i64> = templates.iter().map(|t| t.id).collect();
+    let pg_ids: Vec<i64> = rows.iter().map(|r| r.pg_id).collect();
     let fields: Vec<LabelField> = sqlx::query_as(
         r#"
         SELECT id, template_id, field_id, name, field_type,
@@ -323,7 +345,7 @@ pub async fn list_label_templates(
         ORDER BY id
         "#,
     )
-    .bind(&template_ids)
+    .bind(&pg_ids)
     .fetch_all(pool)
     .await?;
 
@@ -333,11 +355,26 @@ pub async fn list_label_templates(
         field_map.entry(f.template_id).or_default().push(f);
     }
 
-    Ok(templates
+    Ok(rows
         .into_iter()
-        .map(|mut t| {
-            t.fields = field_map.remove(&t.id).unwrap_or_default();
-            t
+        .map(|r| LabelTemplate {
+            id: r.id,
+            name: r.name,
+            description: r.description,
+            width: r.width,
+            height: r.height,
+            padding: r.padding,
+            is_default: r.is_default,
+            is_active: r.is_active,
+            width_mm: r.width_mm,
+            height_mm: r.height_mm,
+            padding_mm_x: r.padding_mm_x,
+            padding_mm_y: r.padding_mm_y,
+            render_dpi: r.render_dpi,
+            test_data: r.test_data,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            fields: field_map.remove(&r.pg_id).unwrap_or_default(),
         })
         .collect())
 }
@@ -433,18 +470,18 @@ pub async fn create_label_template_direct(
 pub async fn update_label_template_direct(
     pool: &PgPool,
     edge_server_id: i64,
-    template_id: i64,
+    source_id: i64,
     data: &shared::models::label_template::LabelTemplateUpdate,
 ) -> Result<StoreOpData, BoxError> {
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
 
-    // Verify ownership
-    let _: i64 = sqlx::query_scalar(
-        "SELECT id FROM store_label_templates WHERE id = $1 AND edge_server_id = $2",
+    // Resolve PG id from source_id
+    let pg_id: i64 = sqlx::query_scalar(
+        "SELECT id FROM store_label_templates WHERE edge_server_id = $1 AND source_id = $2",
     )
-    .bind(template_id)
     .bind(edge_server_id)
+    .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
     .ok_or("Label template not found")?;
@@ -483,22 +520,22 @@ pub async fn update_label_template_direct(
     .bind(data.render_dpi)
     .bind(&data.test_data)
     .bind(now)
-    .bind(template_id)
+    .bind(pg_id)
     .execute(&mut *tx)
     .await?;
 
     if let Some(ref fields) = data.fields {
         sqlx::query("DELETE FROM store_label_fields WHERE template_id = $1")
-            .bind(template_id)
+            .bind(pg_id)
             .execute(&mut *tx)
             .await?;
-        batch_insert_field_inputs(&mut *tx, template_id, fields).await?;
+        batch_insert_field_inputs(&mut *tx, pg_id, fields).await?;
     }
 
-    // Read back full template
+    // Read back full template (expose source_id as id)
     let tmpl: LabelTemplate = sqlx::query_as(
         r#"
-        SELECT id, name, description, width, height, padding,
+        SELECT source_id AS id, name, description, width, height, padding,
                is_default, is_active, width_mm, height_mm,
                padding_mm_x, padding_mm_y, render_dpi, test_data,
                created_at, updated_at
@@ -506,7 +543,7 @@ pub async fn update_label_template_direct(
         WHERE id = $1
         "#,
     )
-    .bind(template_id)
+    .bind(pg_id)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -522,7 +559,7 @@ pub async fn update_label_template_direct(
         ORDER BY id
         "#,
     )
-    .bind(template_id)
+    .bind(pg_id)
     .fetch_all(&mut *tx)
     .await?;
 
@@ -536,14 +573,15 @@ pub async fn update_label_template_direct(
 pub async fn delete_label_template_direct(
     pool: &PgPool,
     edge_server_id: i64,
-    template_id: i64,
+    source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows =
-        sqlx::query("DELETE FROM store_label_templates WHERE id = $1 AND edge_server_id = $2")
-            .bind(template_id)
-            .bind(edge_server_id)
-            .execute(pool)
-            .await?;
+    let rows = sqlx::query(
+        "DELETE FROM store_label_templates WHERE edge_server_id = $1 AND source_id = $2",
+    )
+    .bind(edge_server_id)
+    .bind(source_id)
+    .execute(pool)
+    .await?;
     if rows.rows_affected() == 0 {
         return Err("Label template not found".into());
     }

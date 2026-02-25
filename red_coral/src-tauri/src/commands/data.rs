@@ -428,7 +428,7 @@ pub struct BindCategoryAttributeData {
     pub attribute_id: i64,
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 /// Bind attribute to category

@@ -175,7 +175,7 @@ pub async fn export_catalog(
     let attribute_bindings: Vec<AttributeBinding> = store_bindings
         .iter()
         .map(|b| {
-            let default_ids: Option<Vec<i32>> = b
+            let default_ids: Option<Vec<i64>> = b
                 .default_option_ids
                 .as_ref()
                 .and_then(|v| serde_json::from_value(v.clone()).ok());

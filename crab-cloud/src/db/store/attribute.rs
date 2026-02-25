@@ -170,7 +170,7 @@ pub struct StoreAttribute {
     pub name: String,
     pub is_multi_select: bool,
     pub max_selections: Option<i32>,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
     pub display_order: i32,
     pub is_active: bool,
     pub show_on_receipt: bool,
@@ -283,7 +283,7 @@ pub async fn list_attributes(
     Ok(rows
         .into_iter()
         .map(|r| {
-            let default_ids: Option<Vec<i32>> = r
+            let default_ids: Option<Vec<i64>> = r
                 .default_option_ids
                 .and_then(|v| serde_json::from_value(v).ok());
             StoreAttribute {
@@ -699,7 +699,7 @@ pub struct BindAttributeParams<'a> {
     pub attribute_id: i64,
     pub is_required: bool,
     pub display_order: i32,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 pub async fn bind_attribute_direct(

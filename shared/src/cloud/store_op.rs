@@ -97,7 +97,7 @@ pub enum StoreOp {
         is_required: bool,
         #[serde(default)]
         display_order: i32,
-        default_option_ids: Option<Vec<i32>>,
+        default_option_ids: Option<Vec<i64>>,
     },
     UnbindAttribute {
         binding_id: i64,
@@ -273,7 +273,7 @@ pub struct SnapshotBinding {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    pub default_option_ids: Option<Vec<i32>>,
+    pub default_option_ids: Option<Vec<i64>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

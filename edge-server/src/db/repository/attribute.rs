@@ -248,7 +248,7 @@ pub async fn link(
     attribute_id: i64,
     is_required: bool,
     display_order: i32,
-    default_option_ids: Option<Vec<i32>>,
+    default_option_ids: Option<Vec<i64>>,
 ) -> RepoResult<AttributeBinding> {
     let indices_json = default_option_ids
         .as_ref()
@@ -308,7 +308,7 @@ pub async fn update_binding(
     id: i64,
     is_required: Option<bool>,
     display_order: Option<i32>,
-    default_option_ids: Option<Vec<i32>>,
+    default_option_ids: Option<Vec<i64>>,
 ) -> RepoResult<AttributeBinding> {
     let indices_json = default_option_ids
         .as_ref()
