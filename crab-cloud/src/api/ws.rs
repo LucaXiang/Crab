@@ -290,6 +290,9 @@ async fn handle_edge_message<S>(
             let mut accepted = 0u32;
             let mut rejected = 0u32;
             let mut errors = Vec::new();
+            // Track max version per resource type for batch cursor update
+            let mut cursor_maxes: std::collections::HashMap<&str, i64> =
+                std::collections::HashMap::new();
 
             for (idx, item) in items.iter().enumerate() {
                 match sync_store::upsert_resource(
@@ -303,19 +306,12 @@ async fn handle_edge_message<S>(
                 {
                     Ok(()) => {
                         accepted += 1;
-                        if let Err(e) = sync_store::update_cursor(
-                            &state.pool,
-                            edge_server_id,
-                            item.resource,
-                            i64::try_from(item.version).unwrap_or(i64::MAX),
-                            now,
-                        )
-                        .await
-                        {
-                            tracing::warn!(
-                                resource = %item.resource,
-                                "Failed to update sync cursor: {e}"
-                            );
+                        let version = i64::try_from(item.version).unwrap_or(i64::MAX);
+                        let entry = cursor_maxes
+                            .entry(item.resource.as_str())
+                            .or_insert(version);
+                        if version > *entry {
+                            *entry = version;
                         }
                     }
                     Err(e) => {
@@ -326,6 +322,21 @@ async fn handle_edge_message<S>(
                             message: e.to_string(),
                         });
                     }
+                }
+            }
+
+            // Batch cursor update (1 query for all resource types instead of N)
+            if !cursor_maxes.is_empty() {
+                let cursor_pairs: Vec<(&str, i64)> = cursor_maxes.into_iter().collect();
+                if let Err(e) = sync_store::update_cursors_batch(
+                    &state.pool,
+                    edge_server_id,
+                    &cursor_pairs,
+                    now,
+                )
+                .await
+                {
+                    tracing::warn!(edge_server_id, "Failed to batch update sync cursors: {e}");
                 }
             }
 

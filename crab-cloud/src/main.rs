@@ -104,7 +104,7 @@ async fn main() -> Result<(), BoxError> {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
         loop {
             interval.tick().await;
-            rate_limiter.cleanup().await;
+            rate_limiter.cleanup();
         }
     });
 

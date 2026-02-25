@@ -202,22 +202,13 @@ pub async fn create_price_rule_direct(
         .and_then(|v| v.as_str().map(String::from))
         .unwrap_or_default();
 
-    let mut tx = pool.begin().await?;
-
-    let (pg_id,): (i64,) = sqlx::query_as(
-        r#"INSERT INTO store_price_rules (edge_server_id, source_id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, TRUE, $19, $20, $20) RETURNING id"#,
-    )
-    .bind(edge_server_id).bind(&data.name).bind(&data.display_name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(is_stackable).bind(is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.created_by).bind(now)
-    .fetch_one(&mut *tx).await?;
-
     let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_price_rules SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
 
-    tx.commit().await?;
+    sqlx::query(
+        r#"INSERT INTO store_price_rules (edge_server_id, source_id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, TRUE, $20, $21, $21)"#,
+    )
+    .bind(edge_server_id).bind(source_id).bind(&data.name).bind(&data.display_name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(is_stackable).bind(is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.created_by).bind(now)
+    .execute(pool).await?;
 
     let rule = shared::models::PriceRule {
         id: source_id,

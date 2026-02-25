@@ -66,23 +66,30 @@ pub async fn upsert_category_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for dest_id in &cat.kitchen_print_destinations {
-        sqlx::query(
-            "INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'kitchen')",
-        )
-        .bind(pg_id)
-        .bind(dest_id)
-        .execute(&mut *tx)
-        .await?;
-    }
-    for dest_id in &cat.label_print_destinations {
-        sqlx::query(
-            "INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'label')",
-        )
-        .bind(pg_id)
-        .bind(dest_id)
-        .execute(&mut *tx)
-        .await?;
+    {
+        let mut cat_ids = Vec::new();
+        let mut dest_ids = Vec::new();
+        let mut purposes = Vec::new();
+        for dest_id in &cat.kitchen_print_destinations {
+            cat_ids.push(pg_id);
+            dest_ids.push(*dest_id);
+            purposes.push("kitchen".to_string());
+        }
+        for dest_id in &cat.label_print_destinations {
+            cat_ids.push(pg_id);
+            dest_ids.push(*dest_id);
+            purposes.push("label".to_string());
+        }
+        if !cat_ids.is_empty() {
+            sqlx::query(
+                "INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[])",
+            )
+            .bind(&cat_ids)
+            .bind(&dest_ids)
+            .bind(&purposes)
+            .execute(&mut *tx)
+            .await?;
+        }
     }
 
     // Replace tag associations
@@ -91,12 +98,15 @@ pub async fn upsert_category_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for tag_id in &cat.tag_ids {
-        sqlx::query("INSERT INTO store_category_tag (category_id, tag_source_id) VALUES ($1, $2)")
-            .bind(pg_id)
-            .bind(tag_id)
-            .execute(&mut *tx)
-            .await?;
+    if !cat.tag_ids.is_empty() {
+        let cat_ids: Vec<i64> = cat.tag_ids.iter().map(|_| pg_id).collect();
+        sqlx::query(
+            "INSERT INTO store_category_tag (category_id, tag_source_id) SELECT * FROM UNNEST($1::bigint[], $2::bigint[])",
+        )
+        .bind(&cat_ids)
+        .bind(&cat.tag_ids)
+        .execute(&mut *tx)
+        .await?;
     }
 
     tx.commit().await?;
@@ -238,6 +248,7 @@ pub async fn create_category_direct(
     let match_mode = data.match_mode.as_deref().unwrap_or("any");
     let is_display = data.is_display.unwrap_or(true);
 
+    let source_id = super::snowflake_id();
     let mut tx = pool.begin().await?;
 
     let (pg_id,): (i64,) = sqlx::query_as(
@@ -247,11 +258,12 @@ pub async fn create_category_direct(
             is_kitchen_print_enabled, is_label_print_enabled,
             is_active, is_virtual, match_mode, is_display, updated_at
         )
-        VALUES ($1, 0, $2, $3, $4, $5, TRUE, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, $9, $10)
         RETURNING id
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(&data.name)
     .bind(sort_order)
     .bind(is_kitchen_print_enabled)
@@ -263,33 +275,40 @@ pub async fn create_category_direct(
     .fetch_one(&mut *tx)
     .await?;
 
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_categories SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
+    {
+        let mut cat_ids = Vec::new();
+        let mut dest_ids = Vec::new();
+        let mut purposes = Vec::new();
+        for dest_id in &data.kitchen_print_destinations {
+            cat_ids.push(pg_id);
+            dest_ids.push(*dest_id);
+            purposes.push("kitchen".to_string());
+        }
+        for dest_id in &data.label_print_destinations {
+            cat_ids.push(pg_id);
+            dest_ids.push(*dest_id);
+            purposes.push("label".to_string());
+        }
+        if !cat_ids.is_empty() {
+            sqlx::query(
+                "INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[])",
+            )
+            .bind(&cat_ids)
+            .bind(&dest_ids)
+            .bind(&purposes)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+    if !data.tag_ids.is_empty() {
+        let cat_ids: Vec<i64> = data.tag_ids.iter().map(|_| pg_id).collect();
+        sqlx::query(
+            "INSERT INTO store_category_tag (category_id, tag_source_id) SELECT * FROM UNNEST($1::bigint[], $2::bigint[])",
+        )
+        .bind(&cat_ids)
+        .bind(&data.tag_ids)
         .execute(&mut *tx)
         .await?;
-
-    for dest_id in &data.kitchen_print_destinations {
-        sqlx::query("INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'kitchen')")
-            .bind(pg_id)
-            .bind(dest_id)
-            .execute(&mut *tx)
-            .await?;
-    }
-    for dest_id in &data.label_print_destinations {
-        sqlx::query("INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'label')")
-            .bind(pg_id)
-            .bind(dest_id)
-            .execute(&mut *tx)
-            .await?;
-    }
-    for tag_id in &data.tag_ids {
-        sqlx::query("INSERT INTO store_category_tag (category_id, tag_source_id) VALUES ($1, $2)")
-            .bind(pg_id)
-            .bind(tag_id)
-            .execute(&mut *tx)
-            .await?;
     }
 
     tx.commit().await?;
@@ -364,9 +383,17 @@ pub async fn update_category_direct(
         .bind(pg_id)
         .execute(&mut *tx)
         .await?;
-        for dest_id in dests {
-            sqlx::query("INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'kitchen')")
-                .bind(pg_id).bind(dest_id).execute(&mut *tx).await?;
+        if !dests.is_empty() {
+            let cat_ids: Vec<i64> = dests.iter().map(|_| pg_id).collect();
+            let purposes: Vec<String> = dests.iter().map(|_| "kitchen".to_string()).collect();
+            sqlx::query(
+                "INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[])",
+            )
+            .bind(&cat_ids)
+            .bind(dests)
+            .bind(&purposes)
+            .execute(&mut *tx)
+            .await?;
         }
     }
     if let Some(ref dests) = data.label_print_destinations {
@@ -376,9 +403,17 @@ pub async fn update_category_direct(
         .bind(pg_id)
         .execute(&mut *tx)
         .await?;
-        for dest_id in dests {
-            sqlx::query("INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) VALUES ($1, $2, 'label')")
-                .bind(pg_id).bind(dest_id).execute(&mut *tx).await?;
+        if !dests.is_empty() {
+            let cat_ids: Vec<i64> = dests.iter().map(|_| pg_id).collect();
+            let purposes: Vec<String> = dests.iter().map(|_| "label".to_string()).collect();
+            sqlx::query(
+                "INSERT INTO store_category_print_dest (category_id, dest_source_id, purpose) SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[])",
+            )
+            .bind(&cat_ids)
+            .bind(dests)
+            .bind(&purposes)
+            .execute(&mut *tx)
+            .await?;
         }
     }
 
@@ -387,12 +422,13 @@ pub async fn update_category_direct(
             .bind(pg_id)
             .execute(&mut *tx)
             .await?;
-        for tag_id in tags {
+        if !tags.is_empty() {
+            let cat_ids: Vec<i64> = tags.iter().map(|_| pg_id).collect();
             sqlx::query(
-                "INSERT INTO store_category_tag (category_id, tag_source_id) VALUES ($1, $2)",
+                "INSERT INTO store_category_tag (category_id, tag_source_id) SELECT * FROM UNNEST($1::bigint[], $2::bigint[])",
             )
-            .bind(pg_id)
-            .bind(tag_id)
+            .bind(&cat_ids)
+            .bind(tags)
             .execute(&mut *tx)
             .await?;
         }
@@ -407,20 +443,24 @@ pub async fn batch_update_sort_order_categories(
     edge_server_id: i64,
     items: &[shared::cloud::store_op::SortOrderItem],
 ) -> Result<(), BoxError> {
-    let now = shared::util::now_millis();
-    let mut tx = pool.begin().await?;
-    for item in items {
-        sqlx::query(
-            "UPDATE store_categories SET sort_order = $1, updated_at = $2 WHERE edge_server_id = $3 AND source_id = $4",
-        )
-        .bind(item.sort_order)
-        .bind(now)
-        .bind(edge_server_id)
-        .bind(item.id)
-        .execute(&mut *tx)
-        .await?;
+    if items.is_empty() {
+        return Ok(());
     }
-    tx.commit().await?;
+    let now = shared::util::now_millis();
+    let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+    let orders: Vec<i32> = items.iter().map(|i| i.sort_order).collect();
+    let nows: Vec<i64> = items.iter().map(|_| now).collect();
+    sqlx::query(
+        r#"UPDATE store_categories SET sort_order = u.sort_order, updated_at = u.updated_at
+        FROM (SELECT * FROM UNNEST($1::bigint[], $2::integer[], $3::bigint[])) AS u(source_id, sort_order, updated_at)
+        WHERE store_categories.edge_server_id = $4 AND store_categories.source_id = u.source_id"#,
+    )
+    .bind(&ids)
+    .bind(&orders)
+    .bind(&nows)
+    .bind(edge_server_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

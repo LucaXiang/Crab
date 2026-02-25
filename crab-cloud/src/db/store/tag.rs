@@ -81,31 +81,22 @@ pub async fn create_tag_direct(
     let color = data.color.as_deref().unwrap_or("#3B82F6");
     let display_order = data.display_order.unwrap_or(0);
 
-    let mut tx = pool.begin().await?;
+    let source_id = super::snowflake_id();
 
-    let (pg_id,): (i64,) = sqlx::query_as(
+    sqlx::query(
         r#"
         INSERT INTO store_tags (edge_server_id, source_id, name, color, display_order, is_active, is_system, updated_at)
-        VALUES ($1, 0, $2, $3, $4, TRUE, FALSE, $5)
-        RETURNING id
+        VALUES ($1, $2, $3, $4, $5, TRUE, FALSE, $6)
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(&data.name)
     .bind(color)
     .bind(display_order)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .execute(pool)
     .await?;
-
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_tags SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
 
     let tag = Tag {
         id: source_id,

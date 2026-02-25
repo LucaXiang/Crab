@@ -2,11 +2,33 @@
 
 use shared::cloud::store_op::StoreOpData;
 use shared::models::label_template::{
-    LabelField, LabelFieldInput, LabelTemplate, LabelTemplateCreate,
+    LabelField, LabelFieldAlignment, LabelFieldInput, LabelFieldType, LabelTemplate,
+    LabelTemplateCreate,
 };
 use sqlx::PgPool;
 
 use super::BoxError;
+
+fn field_type_to_str(ft: &LabelFieldType) -> &'static str {
+    match ft {
+        LabelFieldType::Text => "text",
+        LabelFieldType::Barcode => "barcode",
+        LabelFieldType::Qrcode => "qrcode",
+        LabelFieldType::Image => "image",
+        LabelFieldType::Separator => "separator",
+        LabelFieldType::Datetime => "datetime",
+        LabelFieldType::Price => "price",
+        LabelFieldType::Counter => "counter",
+    }
+}
+
+fn alignment_to_str(a: &LabelFieldAlignment) -> &'static str {
+    match a {
+        LabelFieldAlignment::Left => "left",
+        LabelFieldAlignment::Center => "center",
+        LabelFieldAlignment::Right => "right",
+    }
+}
 
 // ── Edge Sync ──
 
@@ -77,105 +99,187 @@ pub async fn upsert_label_template_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for f in &fields {
-        insert_field(&mut *tx, pg_id, f).await?;
-    }
+    batch_insert_fields(&mut *tx, pg_id, &fields).await?;
 
     tx.commit().await?;
     Ok(())
 }
 
-async fn insert_field(
+async fn batch_insert_fields(
     conn: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     template_id: i64,
-    f: &LabelField,
+    fields: &[LabelField],
 ) -> Result<(), BoxError> {
+    if fields.is_empty() {
+        return Ok(());
+    }
+    let tids: Vec<i64> = fields.iter().map(|_| template_id).collect();
+    let field_ids: Vec<&str> = fields.iter().map(|f| f.field_id.as_str()).collect();
+    let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
+    let field_types: Vec<&str> = fields
+        .iter()
+        .map(|f| field_type_to_str(&f.field_type))
+        .collect();
+    let xs: Vec<f32> = fields.iter().map(|f| f.x).collect();
+    let ys: Vec<f32> = fields.iter().map(|f| f.y).collect();
+    let widths: Vec<f32> = fields.iter().map(|f| f.width).collect();
+    let heights: Vec<f32> = fields.iter().map(|f| f.height).collect();
+    let font_sizes: Vec<i32> = fields.iter().map(|f| f.font_size).collect();
+    let font_weights: Vec<Option<&str>> = fields.iter().map(|f| f.font_weight.as_deref()).collect();
+    let font_families: Vec<Option<&str>> =
+        fields.iter().map(|f| f.font_family.as_deref()).collect();
+    let colors: Vec<Option<&str>> = fields.iter().map(|f| f.color.as_deref()).collect();
+    let rotates: Vec<Option<i32>> = fields.iter().map(|f| f.rotate).collect();
+    let alignments: Vec<Option<&str>> = fields
+        .iter()
+        .map(|f| f.alignment.as_ref().map(alignment_to_str))
+        .collect();
+    let data_sources: Vec<&str> = fields.iter().map(|f| f.data_source.as_str()).collect();
+    let formats: Vec<Option<&str>> = fields.iter().map(|f| f.format.as_deref()).collect();
+    let visibles: Vec<bool> = fields.iter().map(|f| f.visible).collect();
+    let labels: Vec<Option<&str>> = fields.iter().map(|f| f.label.as_deref()).collect();
+    let templates: Vec<Option<&str>> = fields.iter().map(|f| f.template.as_deref()).collect();
+    let data_keys: Vec<Option<&str>> = fields.iter().map(|f| f.data_key.as_deref()).collect();
+    let source_types: Vec<Option<&str>> = fields.iter().map(|f| f.source_type.as_deref()).collect();
+    let maintain_ratios: Vec<Option<bool>> =
+        fields.iter().map(|f| f.maintain_aspect_ratio).collect();
+    let styles: Vec<Option<&str>> = fields.iter().map(|f| f.style.as_deref()).collect();
+    let aligns: Vec<Option<&str>> = fields.iter().map(|f| f.align.as_deref()).collect();
+    let v_aligns: Vec<Option<&str>> = fields.iter().map(|f| f.vertical_align.as_deref()).collect();
+    let line_styles: Vec<Option<&str>> = fields.iter().map(|f| f.line_style.as_deref()).collect();
+
     sqlx::query(
-        r#"
-        INSERT INTO store_label_fields (
+        r#"INSERT INTO store_label_fields (
             template_id, field_id, name, field_type,
             x, y, width, height, font_size, font_weight, font_family,
             color, rotate, alignment, data_source, format, visible,
             label, template, data_key, source_type,
             maintain_aspect_ratio, style, align, vertical_align, line_style
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-        "#,
+        ) SELECT * FROM UNNEST(
+            $1::bigint[], $2::text[], $3::text[], $4::text[]::label_field_type[],
+            $5::real[], $6::real[], $7::real[], $8::real[],
+            $9::integer[], $10::text[], $11::text[],
+            $12::text[], $13::integer[], $14::text[]::label_field_alignment[], $15::text[], $16::text[], $17::boolean[],
+            $18::text[], $19::text[], $20::text[], $21::text[],
+            $22::boolean[], $23::text[], $24::text[], $25::text[], $26::text[]
+        )"#,
     )
-    .bind(template_id)
-    .bind(&f.field_id)
-    .bind(&f.name)
-    .bind(&f.field_type)
-    .bind(f.x)
-    .bind(f.y)
-    .bind(f.width)
-    .bind(f.height)
-    .bind(f.font_size)
-    .bind(&f.font_weight)
-    .bind(&f.font_family)
-    .bind(&f.color)
-    .bind(f.rotate)
-    .bind(&f.alignment)
-    .bind(&f.data_source)
-    .bind(&f.format)
-    .bind(f.visible)
-    .bind(&f.label)
-    .bind(&f.template)
-    .bind(&f.data_key)
-    .bind(&f.source_type)
-    .bind(f.maintain_aspect_ratio)
-    .bind(&f.style)
-    .bind(&f.align)
-    .bind(&f.vertical_align)
-    .bind(&f.line_style)
+    .bind(&tids)
+    .bind(&field_ids)
+    .bind(&names)
+    .bind(&field_types)
+    .bind(&xs)
+    .bind(&ys)
+    .bind(&widths)
+    .bind(&heights)
+    .bind(&font_sizes)
+    .bind(&font_weights)
+    .bind(&font_families)
+    .bind(&colors)
+    .bind(&rotates)
+    .bind(&alignments)
+    .bind(&data_sources)
+    .bind(&formats)
+    .bind(&visibles)
+    .bind(&labels)
+    .bind(&templates)
+    .bind(&data_keys)
+    .bind(&source_types)
+    .bind(&maintain_ratios)
+    .bind(&styles)
+    .bind(&aligns)
+    .bind(&v_aligns)
+    .bind(&line_styles)
     .execute(conn)
     .await?;
     Ok(())
 }
 
-async fn insert_field_input(
+async fn batch_insert_field_inputs(
     conn: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     template_id: i64,
-    f: &LabelFieldInput,
+    fields: &[LabelFieldInput],
 ) -> Result<(), BoxError> {
+    if fields.is_empty() {
+        return Ok(());
+    }
+    let tids: Vec<i64> = fields.iter().map(|_| template_id).collect();
+    let field_ids: Vec<&str> = fields.iter().map(|f| f.field_id.as_str()).collect();
+    let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
+    let field_types: Vec<&str> = fields
+        .iter()
+        .map(|f| field_type_to_str(&f.field_type))
+        .collect();
+    let xs: Vec<f32> = fields.iter().map(|f| f.x).collect();
+    let ys: Vec<f32> = fields.iter().map(|f| f.y).collect();
+    let widths: Vec<f32> = fields.iter().map(|f| f.width).collect();
+    let heights: Vec<f32> = fields.iter().map(|f| f.height).collect();
+    let font_sizes: Vec<i32> = fields.iter().map(|f| f.font_size).collect();
+    let font_weights: Vec<Option<&str>> = fields.iter().map(|f| f.font_weight.as_deref()).collect();
+    let font_families: Vec<Option<&str>> =
+        fields.iter().map(|f| f.font_family.as_deref()).collect();
+    let colors: Vec<Option<&str>> = fields.iter().map(|f| f.color.as_deref()).collect();
+    let rotates: Vec<Option<i32>> = fields.iter().map(|f| f.rotate).collect();
+    let alignments: Vec<Option<&str>> = fields
+        .iter()
+        .map(|f| f.alignment.as_ref().map(alignment_to_str))
+        .collect();
+    let data_sources: Vec<&str> = fields.iter().map(|f| f.data_source.as_str()).collect();
+    let formats: Vec<Option<&str>> = fields.iter().map(|f| f.format.as_deref()).collect();
+    let visibles: Vec<bool> = fields.iter().map(|f| f.visible).collect();
+    let labels: Vec<Option<&str>> = fields.iter().map(|f| f.label.as_deref()).collect();
+    let templates: Vec<Option<&str>> = fields.iter().map(|f| f.template.as_deref()).collect();
+    let data_keys: Vec<Option<&str>> = fields.iter().map(|f| f.data_key.as_deref()).collect();
+    let source_types: Vec<Option<&str>> = fields.iter().map(|f| f.source_type.as_deref()).collect();
+    let maintain_ratios: Vec<Option<bool>> =
+        fields.iter().map(|f| f.maintain_aspect_ratio).collect();
+    let styles: Vec<Option<&str>> = fields.iter().map(|f| f.style.as_deref()).collect();
+    let aligns: Vec<Option<&str>> = fields.iter().map(|f| f.align.as_deref()).collect();
+    let v_aligns: Vec<Option<&str>> = fields.iter().map(|f| f.vertical_align.as_deref()).collect();
+    let line_styles: Vec<Option<&str>> = fields.iter().map(|f| f.line_style.as_deref()).collect();
+
     sqlx::query(
-        r#"
-        INSERT INTO store_label_fields (
+        r#"INSERT INTO store_label_fields (
             template_id, field_id, name, field_type,
             x, y, width, height, font_size, font_weight, font_family,
             color, rotate, alignment, data_source, format, visible,
             label, template, data_key, source_type,
             maintain_aspect_ratio, style, align, vertical_align, line_style
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-        "#,
+        ) SELECT * FROM UNNEST(
+            $1::bigint[], $2::text[], $3::text[], $4::text[]::label_field_type[],
+            $5::real[], $6::real[], $7::real[], $8::real[],
+            $9::integer[], $10::text[], $11::text[],
+            $12::text[], $13::integer[], $14::text[]::label_field_alignment[], $15::text[], $16::text[], $17::boolean[],
+            $18::text[], $19::text[], $20::text[], $21::text[],
+            $22::boolean[], $23::text[], $24::text[], $25::text[], $26::text[]
+        )"#,
     )
-    .bind(template_id)
-    .bind(&f.field_id)
-    .bind(&f.name)
-    .bind(&f.field_type)
-    .bind(f.x)
-    .bind(f.y)
-    .bind(f.width)
-    .bind(f.height)
-    .bind(f.font_size)
-    .bind(&f.font_weight)
-    .bind(&f.font_family)
-    .bind(&f.color)
-    .bind(f.rotate)
-    .bind(&f.alignment)
-    .bind(&f.data_source)
-    .bind(&f.format)
-    .bind(f.visible)
-    .bind(&f.label)
-    .bind(&f.template)
-    .bind(&f.data_key)
-    .bind(&f.source_type)
-    .bind(f.maintain_aspect_ratio)
-    .bind(&f.style)
-    .bind(&f.align)
-    .bind(&f.vertical_align)
-    .bind(&f.line_style)
+    .bind(&tids)
+    .bind(&field_ids)
+    .bind(&names)
+    .bind(&field_types)
+    .bind(&xs)
+    .bind(&ys)
+    .bind(&widths)
+    .bind(&heights)
+    .bind(&font_sizes)
+    .bind(&font_weights)
+    .bind(&font_families)
+    .bind(&colors)
+    .bind(&rotates)
+    .bind(&alignments)
+    .bind(&data_sources)
+    .bind(&formats)
+    .bind(&visibles)
+    .bind(&labels)
+    .bind(&templates)
+    .bind(&data_keys)
+    .bind(&source_types)
+    .bind(&maintain_ratios)
+    .bind(&styles)
+    .bind(&aligns)
+    .bind(&v_aligns)
+    .bind(&line_styles)
     .execute(conn)
     .await?;
     Ok(())
@@ -249,6 +353,8 @@ pub async fn create_label_template_direct(
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
 
+    let source_id = super::snowflake_id();
+
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"
         INSERT INTO store_label_templates (
@@ -257,11 +363,12 @@ pub async fn create_label_template_direct(
             width_mm, height_mm, padding_mm_x, padding_mm_y,
             render_dpi, test_data, created_at, updated_at
         )
-        VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17)
         RETURNING id
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(tenant_id)
     .bind(&data.name)
     .bind(&data.description)
@@ -280,16 +387,7 @@ pub async fn create_label_template_direct(
     .fetch_one(&mut *tx)
     .await?;
 
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_label_templates SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    for f in &data.fields {
-        insert_field_input(&mut *tx, pg_id, f).await?;
-    }
+    batch_insert_field_inputs(&mut *tx, pg_id, &data.fields).await?;
 
     // Read back fields with IDs
     let fields: Vec<LabelField> = sqlx::query_as(
@@ -394,9 +492,7 @@ pub async fn update_label_template_direct(
             .bind(template_id)
             .execute(&mut *tx)
             .await?;
-        for f in fields {
-            insert_field_input(&mut *tx, template_id, f).await?;
-        }
+        batch_insert_field_inputs(&mut *tx, template_id, fields).await?;
     }
 
     // Read back full template

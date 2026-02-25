@@ -74,26 +74,44 @@ pub async fn upsert_attribute_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for opt in &attr.options {
+    if !attr.options.is_empty() {
+        let attr_ids: Vec<i64> = attr.options.iter().map(|_| pg_id).collect();
+        let source_ids: Vec<i64> = attr.options.iter().map(|o| o.id).collect();
+        let names: Vec<String> = attr.options.iter().map(|o| o.name.clone()).collect();
+        let prices: Vec<f64> = attr.options.iter().map(|o| o.price_modifier).collect();
+        let orders: Vec<i32> = attr.options.iter().map(|o| o.display_order).collect();
+        let actives: Vec<bool> = attr.options.iter().map(|o| o.is_active).collect();
+        let receipt_names: Vec<Option<String>> = attr
+            .options
+            .iter()
+            .map(|o| o.receipt_name.clone())
+            .collect();
+        let kitchen_names: Vec<Option<String>> = attr
+            .options
+            .iter()
+            .map(|o| o.kitchen_print_name.clone())
+            .collect();
+        let enable_qtys: Vec<bool> = attr.options.iter().map(|o| o.enable_quantity).collect();
+        let max_qtys: Vec<Option<i32>> = attr.options.iter().map(|o| o.max_quantity).collect();
         sqlx::query(
-            r#"
-            INSERT INTO store_attribute_options (
+            r#"INSERT INTO store_attribute_options (
                 attribute_id, source_id, name, price_modifier, display_order,
                 is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            "#,
+            ) SELECT * FROM UNNEST(
+                $1::bigint[], $2::bigint[], $3::text[], $4::double precision[], $5::integer[],
+                $6::boolean[], $7::text[], $8::text[], $9::boolean[], $10::integer[]
+            )"#,
         )
-        .bind(pg_id)
-        .bind(opt.id)
-        .bind(&opt.name)
-        .bind(opt.price_modifier)
-        .bind(opt.display_order)
-        .bind(opt.is_active)
-        .bind(&opt.receipt_name)
-        .bind(&opt.kitchen_print_name)
-        .bind(opt.enable_quantity)
-        .bind(opt.max_quantity)
+        .bind(&attr_ids)
+        .bind(&source_ids)
+        .bind(&names)
+        .bind(&prices)
+        .bind(&orders)
+        .bind(&actives)
+        .bind(&receipt_names)
+        .bind(&kitchen_names)
+        .bind(&enable_qtys)
+        .bind(&max_qtys)
         .execute(&mut *tx)
         .await?;
     }
@@ -305,40 +323,53 @@ pub async fn create_attribute_direct(
         .as_ref()
         .map(serde_json::to_value)
         .transpose()?;
+    let source_id = super::snowflake_id();
     let mut tx = pool.begin().await?;
 
     let (pg_id,): (i64,) = sqlx::query_as(
-        r#"INSERT INTO store_attributes (edge_server_id, source_id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name, updated_at) VALUES ($1, 0, $2, $3, $4, $5, $6, TRUE, $7, $8, $9, $10, $11) RETURNING id"#,
+        r#"INSERT INTO store_attributes (edge_server_id, source_id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9, $10, $11, $12) RETURNING id"#,
     )
-    .bind(edge_server_id).bind(&data.name).bind(is_multi_select).bind(data.max_selections).bind(&default_ids_json).bind(display_order).bind(show_on_receipt).bind(&data.receipt_name).bind(show_on_kitchen_print).bind(&data.kitchen_print_name).bind(now)
+    .bind(edge_server_id).bind(source_id).bind(&data.name).bind(is_multi_select).bind(data.max_selections).bind(&default_ids_json).bind(display_order).bind(show_on_receipt).bind(&data.receipt_name).bind(show_on_kitchen_print).bind(&data.kitchen_print_name).bind(now)
     .fetch_one(&mut *tx).await?;
 
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_attributes SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
+    if let Some(ref options) = data.options
+        && !options.is_empty()
+    {
+        let attr_ids: Vec<i64> = options.iter().map(|_| pg_id).collect();
+        let source_ids: Vec<i64> = options.iter().map(|_| super::snowflake_id()).collect();
+        let names: Vec<String> = options.iter().map(|o| o.name.clone()).collect();
+        let prices: Vec<f64> = options.iter().map(|o| o.price_modifier).collect();
+        let orders: Vec<i32> = options.iter().map(|o| o.display_order).collect();
+        let actives: Vec<bool> = options.iter().map(|_| true).collect();
+        let receipt_names: Vec<Option<String>> =
+            options.iter().map(|o| o.receipt_name.clone()).collect();
+        let kitchen_names: Vec<Option<String>> = options
+            .iter()
+            .map(|o| o.kitchen_print_name.clone())
+            .collect();
+        let enable_qtys: Vec<bool> = options.iter().map(|o| o.enable_quantity).collect();
+        let max_qtys: Vec<Option<i32>> = options.iter().map(|o| o.max_quantity).collect();
+        sqlx::query(
+            r#"INSERT INTO store_attribute_options (
+                    attribute_id, source_id, name, price_modifier, display_order,
+                    is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity
+                ) SELECT * FROM UNNEST(
+                    $1::bigint[], $2::bigint[], $3::text[], $4::double precision[], $5::integer[],
+                    $6::boolean[], $7::text[], $8::text[], $9::boolean[], $10::integer[]
+                )"#,
+        )
+        .bind(&attr_ids)
+        .bind(&source_ids)
+        .bind(&names)
+        .bind(&prices)
+        .bind(&orders)
+        .bind(&actives)
+        .bind(&receipt_names)
+        .bind(&kitchen_names)
+        .bind(&enable_qtys)
+        .bind(&max_qtys)
         .execute(&mut *tx)
         .await?;
-
-    if let Some(ref options) = data.options {
-        for opt in options {
-            sqlx::query("INSERT INTO store_attribute_options (attribute_id, source_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES ($1, 0, $2, $3, $4, TRUE, $5, $6, $7, $8)")
-                .bind(pg_id).bind(&opt.name).bind(opt.price_modifier).bind(opt.display_order).bind(&opt.receipt_name).bind(&opt.kitchen_print_name).bind(opt.enable_quantity).bind(opt.max_quantity)
-                .execute(&mut *tx).await?;
-        }
-        for row in sqlx::query_as::<_, (i64,)>(
-            "SELECT id FROM store_attribute_options WHERE attribute_id = $1",
-        )
-        .bind(pg_id)
-        .fetch_all(&mut *tx)
-        .await?
-        {
-            sqlx::query("UPDATE store_attribute_options SET source_id = $1 WHERE id = $2")
-                .bind(super::snowflake_id())
-                .bind(row.0)
-                .execute(&mut *tx)
-                .await?;
-        }
     }
 
     #[derive(sqlx::FromRow)]
@@ -428,23 +459,42 @@ pub async fn update_attribute_direct(
             .bind(pg_id)
             .execute(&mut *tx)
             .await?;
-        for opt in options {
-            sqlx::query("INSERT INTO store_attribute_options (attribute_id, source_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES ($1, 0, $2, $3, $4, TRUE, $5, $6, $7, $8)")
-                .bind(pg_id).bind(&opt.name).bind(opt.price_modifier).bind(opt.display_order).bind(&opt.receipt_name).bind(&opt.kitchen_print_name).bind(opt.enable_quantity).bind(opt.max_quantity)
-                .execute(&mut *tx).await?;
-        }
-        for row in sqlx::query_as::<_, (i64,)>(
-            "SELECT id FROM store_attribute_options WHERE attribute_id = $1",
-        )
-        .bind(pg_id)
-        .fetch_all(&mut *tx)
-        .await?
-        {
-            sqlx::query("UPDATE store_attribute_options SET source_id = $1 WHERE id = $2")
-                .bind(super::snowflake_id())
-                .bind(row.0)
-                .execute(&mut *tx)
-                .await?;
+        if !options.is_empty() {
+            let attr_ids: Vec<i64> = options.iter().map(|_| pg_id).collect();
+            let source_ids: Vec<i64> = options.iter().map(|_| super::snowflake_id()).collect();
+            let names: Vec<String> = options.iter().map(|o| o.name.clone()).collect();
+            let prices: Vec<f64> = options.iter().map(|o| o.price_modifier).collect();
+            let orders: Vec<i32> = options.iter().map(|o| o.display_order).collect();
+            let actives: Vec<bool> = options.iter().map(|_| true).collect();
+            let receipt_names: Vec<Option<String>> =
+                options.iter().map(|o| o.receipt_name.clone()).collect();
+            let kitchen_names: Vec<Option<String>> = options
+                .iter()
+                .map(|o| o.kitchen_print_name.clone())
+                .collect();
+            let enable_qtys: Vec<bool> = options.iter().map(|o| o.enable_quantity).collect();
+            let max_qtys: Vec<Option<i32>> = options.iter().map(|o| o.max_quantity).collect();
+            sqlx::query(
+                r#"INSERT INTO store_attribute_options (
+                    attribute_id, source_id, name, price_modifier, display_order,
+                    is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity
+                ) SELECT * FROM UNNEST(
+                    $1::bigint[], $2::bigint[], $3::text[], $4::double precision[], $5::integer[],
+                    $6::boolean[], $7::text[], $8::text[], $9::boolean[], $10::integer[]
+                )"#,
+            )
+            .bind(&attr_ids)
+            .bind(&source_ids)
+            .bind(&names)
+            .bind(&prices)
+            .bind(&orders)
+            .bind(&actives)
+            .bind(&receipt_names)
+            .bind(&kitchen_names)
+            .bind(&enable_qtys)
+            .bind(&max_qtys)
+            .execute(&mut *tx)
+            .await?;
         }
     }
 
@@ -487,12 +537,13 @@ pub async fn create_option_direct(
     .await?
     .ok_or("Attribute not found")?;
 
-    let mut tx = pool.begin().await?;
+    let source_id = super::snowflake_id();
 
-    let (pg_id,): (i64,) = sqlx::query_as(
-        r#"INSERT INTO store_attribute_options (attribute_id, source_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES ($1, 0, $2, $3, $4, TRUE, $5, $6, $7, $8) RETURNING id"#,
+    sqlx::query(
+        r#"INSERT INTO store_attribute_options (attribute_id, source_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7, $8, $9)"#,
     )
     .bind(pg_attr_id)
+    .bind(source_id)
     .bind(&data.name)
     .bind(data.price_modifier)
     .bind(data.display_order)
@@ -500,17 +551,9 @@ pub async fn create_option_direct(
     .bind(&data.kitchen_print_name)
     .bind(data.enable_quantity)
     .bind(data.max_quantity)
-    .fetch_one(&mut *tx)
+    .execute(pool)
     .await?;
 
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_attribute_options SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
     Ok(source_id)
 }
 
@@ -576,20 +619,20 @@ pub async fn batch_update_option_sort_order(
     edge_server_id: i64,
     items: &[shared::cloud::store_op::SortOrderItem],
 ) -> Result<(), BoxError> {
-    let mut tx = pool.begin().await?;
-    for item in items {
-        sqlx::query(
-            r#"UPDATE store_attribute_options SET display_order = $1
-            WHERE source_id = $2
-                AND attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $3)"#,
-        )
-        .bind(item.sort_order)
-        .bind(item.id)
-        .bind(edge_server_id)
-        .execute(&mut *tx)
-        .await?;
+    if items.is_empty() {
+        return Ok(());
     }
-    tx.commit().await?;
+    let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+    let orders: Vec<i32> = items.iter().map(|i| i.sort_order).collect();
+    sqlx::query(
+        r#"UPDATE store_attribute_options SET display_order = u.display_order
+        FROM (SELECT * FROM UNNEST($1::bigint[], $2::integer[])) AS u(source_id, display_order)
+        WHERE store_attribute_options.source_id = u.source_id
+            AND store_attribute_options.attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $3)"#,
+    )
+    .bind(&ids).bind(&orders).bind(edge_server_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -625,6 +668,29 @@ pub async fn list_all_bindings(
     Ok(rows)
 }
 
+pub async fn list_bindings_by_owner(
+    pool: &PgPool,
+    edge_server_id: i64,
+    owner_type: &str,
+    owner_id: i64,
+) -> Result<Vec<StoreBinding>, BoxError> {
+    let rows: Vec<StoreBinding> = sqlx::query_as(
+        r#"
+        SELECT source_id, owner_type, owner_source_id, attribute_source_id,
+               is_required, display_order, default_option_ids
+        FROM store_attribute_bindings
+        WHERE edge_server_id = $1 AND owner_type = $2 AND owner_source_id = $3
+        ORDER BY display_order
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(owner_type)
+    .bind(owner_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 // ── Binding CRUD ──
 
 pub struct BindAttributeParams<'a> {
@@ -646,17 +712,10 @@ pub async fn bind_attribute_direct(
         .as_ref()
         .map(serde_json::to_value)
         .transpose()?;
-    let mut tx = pool.begin().await?;
-    let (pg_id,): (i64,) = sqlx::query_as("INSERT INTO store_attribute_bindings (edge_server_id, source_id, owner_type, owner_source_id, attribute_source_id, is_required, display_order, default_option_ids) VALUES ($1, 0, $2, $3, $4, $5, $6, $7) RETURNING id")
-        .bind(edge_server_id).bind(params.owner_type).bind(params.owner_id).bind(params.attribute_id).bind(params.is_required).bind(params.display_order).bind(&default_ids_json)
-        .fetch_one(&mut *tx).await?;
     let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_attribute_bindings SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-    tx.commit().await?;
+    sqlx::query("INSERT INTO store_attribute_bindings (edge_server_id, source_id, owner_type, owner_source_id, attribute_source_id, is_required, display_order, default_option_ids) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
+        .bind(edge_server_id).bind(source_id).bind(params.owner_type).bind(params.owner_id).bind(params.attribute_id).bind(params.is_required).bind(params.display_order).bind(&default_ids_json)
+        .execute(pool).await?;
     Ok(source_id)
 }
 

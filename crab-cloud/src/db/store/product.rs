@@ -76,25 +76,35 @@ pub async fn upsert_product_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for spec in &specs {
+    if !specs.is_empty() {
+        let product_ids: Vec<i64> = specs.iter().map(|_| pg_id).collect();
+        let source_ids: Vec<i64> = specs.iter().map(|s| s.id).collect();
+        let names: Vec<String> = specs.iter().map(|s| s.name.clone()).collect();
+        let prices: Vec<f64> = specs.iter().map(|s| s.price).collect();
+        let display_orders: Vec<i32> = specs.iter().map(|s| s.display_order).collect();
+        let is_defaults: Vec<bool> = specs.iter().map(|s| s.is_default).collect();
+        let is_actives: Vec<bool> = specs.iter().map(|s| s.is_active).collect();
+        let receipt_names: Vec<Option<String>> =
+            specs.iter().map(|s| s.receipt_name.clone()).collect();
+        let is_roots: Vec<bool> = specs.iter().map(|s| s.is_root).collect();
         sqlx::query(
             r#"
             INSERT INTO store_product_specs (
                 product_id, source_id, name, price, display_order,
                 is_default, is_active, receipt_name, is_root
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[], $4::double precision[], $5::integer[], $6::boolean[], $7::boolean[], $8::text[], $9::boolean[])
             "#,
         )
-        .bind(pg_id)
-        .bind(spec.id)
-        .bind(&spec.name)
-        .bind(spec.price)
-        .bind(spec.display_order)
-        .bind(spec.is_default)
-        .bind(spec.is_active)
-        .bind(&spec.receipt_name)
-        .bind(spec.is_root)
+        .bind(&product_ids)
+        .bind(&source_ids)
+        .bind(&names)
+        .bind(&prices)
+        .bind(&display_orders)
+        .bind(&is_defaults)
+        .bind(&is_actives)
+        .bind(&receipt_names)
+        .bind(&is_roots)
         .execute(&mut *tx)
         .await?;
     }
@@ -105,19 +115,21 @@ pub async fn upsert_product_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for tag_val in &tags {
-        let tag_id = if let Some(id) = tag_val.as_i64() {
-            id
-        } else if let Some(id) = tag_val.get("id").and_then(|v| v.as_i64()) {
-            id
-        } else {
-            continue;
-        };
+    let tag_ids: Vec<i64> = tags
+        .iter()
+        .filter_map(|tag_val| {
+            tag_val
+                .as_i64()
+                .or_else(|| tag_val.get("id").and_then(|v| v.as_i64()))
+        })
+        .collect();
+    if !tag_ids.is_empty() {
+        let product_ids: Vec<i64> = tag_ids.iter().map(|_| pg_id).collect();
         sqlx::query(
-            "INSERT INTO store_product_tag (product_id, tag_source_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO store_product_tag (product_id, tag_source_id) SELECT * FROM UNNEST($1::bigint[], $2::bigint[]) ON CONFLICT DO NOTHING",
         )
-        .bind(pg_id)
-        .bind(tag_id)
+        .bind(&product_ids)
+        .bind(&tag_ids)
         .execute(&mut *tx)
         .await?;
     }
@@ -310,6 +322,7 @@ pub async fn create_product_direct(
     let is_kitchen_print_enabled = data.is_kitchen_print_enabled.unwrap_or(-1);
     let is_label_print_enabled = data.is_label_print_enabled.unwrap_or(-1);
 
+    let source_id = super::snowflake_id();
     let mut tx = pool.begin().await?;
 
     let (pg_id,): (i64,) = sqlx::query_as(
@@ -320,11 +333,12 @@ pub async fn create_product_direct(
             is_kitchen_print_enabled, is_label_print_enabled,
             is_active, external_id, updated_at
         )
-        VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE, $12, $13)
         RETURNING id
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(&data.name)
     .bind(image)
     .bind(data.category_id)
@@ -339,59 +353,50 @@ pub async fn create_product_direct(
     .fetch_one(&mut *tx)
     .await?;
 
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_products SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    for spec in &data.specs {
+    if !data.specs.is_empty() {
+        let product_ids: Vec<i64> = data.specs.iter().map(|_| pg_id).collect();
+        let spec_source_ids: Vec<i64> = data.specs.iter().map(|_| super::snowflake_id()).collect();
+        let names: Vec<String> = data.specs.iter().map(|s| s.name.clone()).collect();
+        let prices: Vec<f64> = data.specs.iter().map(|s| s.price).collect();
+        let display_orders: Vec<i32> = data.specs.iter().map(|s| s.display_order).collect();
+        let is_defaults: Vec<bool> = data.specs.iter().map(|s| s.is_default).collect();
+        let is_actives: Vec<bool> = data.specs.iter().map(|s| s.is_active).collect();
+        let receipt_names: Vec<Option<String>> =
+            data.specs.iter().map(|s| s.receipt_name.clone()).collect();
+        let is_roots: Vec<bool> = data.specs.iter().map(|s| s.is_root).collect();
         sqlx::query(
             r#"
             INSERT INTO store_product_specs (
                 product_id, source_id, name, price, display_order,
                 is_default, is_active, receipt_name, is_root
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[], $4::double precision[], $5::integer[], $6::boolean[], $7::boolean[], $8::text[], $9::boolean[])
             "#,
         )
-        .bind(pg_id)
-        .bind(0i64)
-        .bind(&spec.name)
-        .bind(spec.price)
-        .bind(spec.display_order)
-        .bind(spec.is_default)
-        .bind(spec.is_active)
-        .bind(&spec.receipt_name)
-        .bind(spec.is_root)
+        .bind(&product_ids)
+        .bind(&spec_source_ids)
+        .bind(&names)
+        .bind(&prices)
+        .bind(&display_orders)
+        .bind(&is_defaults)
+        .bind(&is_actives)
+        .bind(&receipt_names)
+        .bind(&is_roots)
         .execute(&mut *tx)
         .await?;
     }
 
-    for row in
-        sqlx::query_as::<_, (i64,)>("SELECT id FROM store_product_specs WHERE product_id = $1")
-            .bind(pg_id)
-            .fetch_all(&mut *tx)
-            .await?
+    if let Some(ref tags) = data.tags
+        && !tags.is_empty()
     {
-        sqlx::query("UPDATE store_product_specs SET source_id = $1 WHERE id = $2")
-            .bind(super::snowflake_id())
-            .bind(row.0)
-            .execute(&mut *tx)
-            .await?;
-    }
-
-    if let Some(ref tags) = data.tags {
-        for tag_id in tags {
-            sqlx::query(
-                "INSERT INTO store_product_tag (product_id, tag_source_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        let product_ids: Vec<i64> = tags.iter().map(|_| pg_id).collect();
+        sqlx::query(
+                "INSERT INTO store_product_tag (product_id, tag_source_id) SELECT * FROM UNNEST($1::bigint[], $2::bigint[]) ON CONFLICT DO NOTHING",
             )
-            .bind(pg_id)
-            .bind(tag_id)
+            .bind(&product_ids)
+            .bind(tags)
             .execute(&mut *tx)
             .await?;
-        }
     }
 
     let spec_rows: Vec<StoreProductSpecRow> = sqlx::query_as(
@@ -495,39 +500,37 @@ pub async fn update_product_direct(
             .bind(pg_id)
             .execute(&mut *tx)
             .await?;
-        for spec in specs {
+        if !specs.is_empty() {
+            let product_ids: Vec<i64> = specs.iter().map(|_| pg_id).collect();
+            let spec_source_ids: Vec<i64> = specs.iter().map(|_| super::snowflake_id()).collect();
+            let names: Vec<String> = specs.iter().map(|s| s.name.clone()).collect();
+            let prices: Vec<f64> = specs.iter().map(|s| s.price).collect();
+            let display_orders: Vec<i32> = specs.iter().map(|s| s.display_order).collect();
+            let is_defaults: Vec<bool> = specs.iter().map(|s| s.is_default).collect();
+            let is_actives: Vec<bool> = specs.iter().map(|s| s.is_active).collect();
+            let receipt_names: Vec<Option<String>> =
+                specs.iter().map(|s| s.receipt_name.clone()).collect();
+            let is_roots: Vec<bool> = specs.iter().map(|s| s.is_root).collect();
             sqlx::query(
                 r#"
                 INSERT INTO store_product_specs (
                     product_id, source_id, name, price, display_order,
                     is_default, is_active, receipt_name, is_root
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                SELECT * FROM UNNEST($1::bigint[], $2::bigint[], $3::text[], $4::double precision[], $5::integer[], $6::boolean[], $7::boolean[], $8::text[], $9::boolean[])
                 "#,
             )
-            .bind(pg_id)
-            .bind(0i64)
-            .bind(&spec.name)
-            .bind(spec.price)
-            .bind(spec.display_order)
-            .bind(spec.is_default)
-            .bind(spec.is_active)
-            .bind(&spec.receipt_name)
-            .bind(spec.is_root)
+            .bind(&product_ids)
+            .bind(&spec_source_ids)
+            .bind(&names)
+            .bind(&prices)
+            .bind(&display_orders)
+            .bind(&is_defaults)
+            .bind(&is_actives)
+            .bind(&receipt_names)
+            .bind(&is_roots)
             .execute(&mut *tx)
             .await?;
-        }
-        for row in
-            sqlx::query_as::<_, (i64,)>("SELECT id FROM store_product_specs WHERE product_id = $1")
-                .bind(pg_id)
-                .fetch_all(&mut *tx)
-                .await?
-        {
-            sqlx::query("UPDATE store_product_specs SET source_id = $1 WHERE id = $2")
-                .bind(super::snowflake_id())
-                .bind(row.0)
-                .execute(&mut *tx)
-                .await?;
         }
     }
 
@@ -536,12 +539,13 @@ pub async fn update_product_direct(
             .bind(pg_id)
             .execute(&mut *tx)
             .await?;
-        for tag_id in tags {
+        if !tags.is_empty() {
+            let product_ids: Vec<i64> = tags.iter().map(|_| pg_id).collect();
             sqlx::query(
-                "INSERT INTO store_product_tag (product_id, tag_source_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                "INSERT INTO store_product_tag (product_id, tag_source_id) SELECT * FROM UNNEST($1::bigint[], $2::bigint[]) ON CONFLICT DO NOTHING",
             )
-            .bind(pg_id)
-            .bind(tag_id)
+            .bind(&product_ids)
+            .bind(tags)
             .execute(&mut *tx)
             .await?;
         }
@@ -556,20 +560,24 @@ pub async fn batch_update_sort_order_products(
     edge_server_id: i64,
     items: &[shared::cloud::store_op::SortOrderItem],
 ) -> Result<(), BoxError> {
-    let now = shared::util::now_millis();
-    let mut tx = pool.begin().await?;
-    for item in items {
-        sqlx::query(
-            "UPDATE store_products SET sort_order = $1, updated_at = $2 WHERE edge_server_id = $3 AND source_id = $4",
-        )
-        .bind(item.sort_order)
-        .bind(now)
-        .bind(edge_server_id)
-        .bind(item.id)
-        .execute(&mut *tx)
-        .await?;
+    if items.is_empty() {
+        return Ok(());
     }
-    tx.commit().await?;
+    let now = shared::util::now_millis();
+    let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+    let orders: Vec<i32> = items.iter().map(|i| i.sort_order).collect();
+    let nows: Vec<i64> = items.iter().map(|_| now).collect();
+    sqlx::query(
+        r#"UPDATE store_products SET sort_order = u.sort_order, updated_at = u.updated_at
+        FROM (SELECT * FROM UNNEST($1::bigint[], $2::integer[], $3::bigint[])) AS u(source_id, sort_order, updated_at)
+        WHERE store_products.edge_server_id = $4 AND store_products.source_id = u.source_id"#,
+    )
+    .bind(&ids)
+    .bind(&orders)
+    .bind(&nows)
+    .bind(edge_server_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -581,23 +589,11 @@ pub async fn bulk_delete_products(
     if source_ids.is_empty() {
         return Ok(());
     }
-    // Build dynamic SQL: DELETE FROM store_products WHERE edge_server_id = $1 AND source_id IN ($2, $3, ...)
-    let mut sql =
-        String::from("DELETE FROM store_products WHERE edge_server_id = $1 AND source_id IN (");
-    for (i, _) in source_ids.iter().enumerate() {
-        if i > 0 {
-            sql.push_str(", ");
-        }
-        sql.push('$');
-        sql.push_str(&(i + 2).to_string());
-    }
-    sql.push(')');
-
-    let mut query = sqlx::query(&sql).bind(edge_server_id);
-    for id in source_ids {
-        query = query.bind(id);
-    }
-    query.execute(pool).await?;
+    sqlx::query("DELETE FROM store_products WHERE edge_server_id = $1 AND source_id = ANY($2)")
+        .bind(edge_server_id)
+        .bind(source_ids)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

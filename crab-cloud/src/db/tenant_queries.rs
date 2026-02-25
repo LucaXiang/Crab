@@ -75,58 +75,26 @@ pub struct StoreSummary {
 pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
-        SELECT id, entity_id, name, address, phone, nif, email, website, business_day_cutoff, device_id, last_sync_at, registered_at
-        FROM edge_servers
-        WHERE tenant_id = $1
-        ORDER BY registered_at DESC
+        SELECT
+            e.id, e.entity_id,
+            COALESCE(NULLIF(si.name, ''), e.name) AS name,
+            COALESCE(NULLIF(si.address, ''), e.address) AS address,
+            COALESCE(si.phone, e.phone) AS phone,
+            COALESCE(NULLIF(si.nif, ''), e.nif) AS nif,
+            COALESCE(si.email, e.email) AS email,
+            COALESCE(si.website, e.website) AS website,
+            COALESCE(si.business_day_cutoff, e.business_day_cutoff) AS business_day_cutoff,
+            e.device_id, e.last_sync_at, e.registered_at
+        FROM edge_servers e
+        LEFT JOIN store_info si ON si.edge_server_id = e.id
+        WHERE e.tenant_id = $1
+        ORDER BY e.registered_at DESC
         "#,
     )
     .bind(tenant_id)
     .fetch_all(pool)
     .await?;
     Ok(rows)
-}
-
-/// Update store
-#[allow(clippy::too_many_arguments)]
-pub async fn update_store(
-    pool: &PgPool,
-    store_id: i64,
-    tenant_id: &str,
-    name: Option<String>,
-    address: Option<String>,
-    phone: Option<String>,
-    nif: Option<String>,
-    email: Option<String>,
-    website: Option<String>,
-    business_day_cutoff: Option<String>,
-) -> Result<(), BoxError> {
-    sqlx::query(
-        r#"
-        UPDATE edge_servers 
-        SET 
-            name = COALESCE($1, name),
-            address = COALESCE($2, address),
-            phone = COALESCE($3, phone),
-            nif = COALESCE($4, nif),
-            email = COALESCE($5, email),
-            website = COALESCE($6, website),
-            business_day_cutoff = COALESCE($7, business_day_cutoff)
-        WHERE id = $8 AND tenant_id = $9
-        "#,
-    )
-    .bind(name)
-    .bind(address)
-    .bind(phone)
-    .bind(nif)
-    .bind(email)
-    .bind(website)
-    .bind(business_day_cutoff)
-    .bind(store_id)
-    .bind(tenant_id)
-    .execute(pool)
-    .await?;
-    Ok(())
 }
 
 /// Archived order summary
@@ -191,9 +159,9 @@ pub async fn list_orders(
 pub struct DailyReportEntry {
     pub id: i64,
     pub business_date: String,
-    pub total_orders: i32,
-    pub completed_orders: i32,
-    pub void_orders: i32,
+    pub total_orders: i64,
+    pub completed_orders: i64,
+    pub void_orders: i64,
     pub total_sales: f64,
     pub total_paid: f64,
     pub total_unpaid: f64,
@@ -232,6 +200,184 @@ pub async fn list_daily_reports(
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+/// Daily report detail with all breakdowns
+#[derive(Debug, serde::Serialize)]
+pub struct DailyReportDetail {
+    pub id: i64,
+    pub business_date: String,
+    pub total_orders: i64,
+    pub completed_orders: i64,
+    pub void_orders: i64,
+    pub total_sales: f64,
+    pub total_paid: f64,
+    pub total_unpaid: f64,
+    pub void_amount: f64,
+    pub total_tax: f64,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+    pub generated_at: Option<i64>,
+    pub generated_by_id: Option<i64>,
+    pub generated_by_name: Option<String>,
+    pub note: Option<String>,
+    pub tax_breakdowns: Vec<TaxBreakdownDetail>,
+    pub payment_breakdowns: Vec<PaymentBreakdownDetail>,
+    pub shift_breakdowns: Vec<ShiftBreakdownDetail>,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct TaxBreakdownDetail {
+    pub tax_rate: i32,
+    pub net_amount: f64,
+    pub tax_amount: f64,
+    pub gross_amount: f64,
+    pub order_count: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct PaymentBreakdownDetail {
+    pub method: String,
+    pub amount: f64,
+    pub count: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct ShiftBreakdownDetail {
+    pub shift_source_id: i64,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub status: String,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub starting_cash: f64,
+    pub expected_cash: f64,
+    pub actual_cash: Option<f64>,
+    pub cash_variance: Option<f64>,
+    pub abnormal_close: bool,
+    pub total_orders: i64,
+    pub completed_orders: i64,
+    pub void_orders: i64,
+    pub total_sales: f64,
+    pub total_paid: f64,
+    pub void_amount: f64,
+    pub total_tax: f64,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+}
+
+pub async fn get_daily_report_detail(
+    pool: &PgPool,
+    edge_server_id: i64,
+    tenant_id: &str,
+    date: &str,
+) -> Result<Option<DailyReportDetail>, BoxError> {
+    // Main report
+    #[derive(sqlx::FromRow)]
+    struct ReportRow {
+        id: i64,
+        business_date: String,
+        total_orders: i64,
+        completed_orders: i64,
+        void_orders: i64,
+        total_sales: f64,
+        total_paid: f64,
+        total_unpaid: f64,
+        void_amount: f64,
+        total_tax: f64,
+        total_discount: f64,
+        total_surcharge: f64,
+        generated_at: Option<i64>,
+        generated_by_id: Option<i64>,
+        generated_by_name: Option<String>,
+        note: Option<String>,
+    }
+
+    let report: Option<ReportRow> = sqlx::query_as(
+        r#"
+        SELECT dr.id, dr.business_date, dr.total_orders, dr.completed_orders, dr.void_orders,
+               dr.total_sales, dr.total_paid, dr.total_unpaid, dr.void_amount,
+               dr.total_tax, dr.total_discount, dr.total_surcharge,
+               dr.generated_at, dr.generated_by_id, dr.generated_by_name, dr.note
+        FROM store_daily_reports dr
+        JOIN edge_servers es ON es.id = dr.edge_server_id
+        WHERE dr.edge_server_id = $1 AND es.tenant_id = $2 AND dr.business_date = $3
+        "#,
+    )
+    .bind(edge_server_id)
+    .bind(tenant_id)
+    .bind(date)
+    .fetch_optional(pool)
+    .await?;
+
+    let report = match report {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    // Fetch all breakdowns concurrently
+    let (tax_breakdowns, payment_breakdowns, shift_breakdowns) = tokio::join!(
+        sqlx::query_as::<_, TaxBreakdownDetail>(
+            r#"
+            SELECT tax_rate, net_amount, tax_amount, gross_amount, order_count
+            FROM store_daily_report_tax_breakdown
+            WHERE report_id = $1
+            ORDER BY tax_rate
+            "#,
+        )
+        .bind(report.id)
+        .fetch_all(pool),
+        sqlx::query_as::<_, PaymentBreakdownDetail>(
+            r#"
+            SELECT method, amount, count
+            FROM store_daily_report_payment_breakdown
+            WHERE report_id = $1
+            ORDER BY amount DESC
+            "#,
+        )
+        .bind(report.id)
+        .fetch_all(pool),
+        sqlx::query_as::<_, ShiftBreakdownDetail>(
+            r#"
+            SELECT shift_source_id, operator_id, operator_name, status,
+                   start_time, end_time, starting_cash, expected_cash,
+                   actual_cash, cash_variance, abnormal_close,
+                   total_orders, completed_orders, void_orders,
+                   total_sales, total_paid, void_amount,
+                   total_tax, total_discount, total_surcharge
+            FROM store_daily_report_shift_breakdown
+            WHERE report_id = $1
+            ORDER BY start_time
+            "#,
+        )
+        .bind(report.id)
+        .fetch_all(pool),
+    );
+    let tax_breakdowns = tax_breakdowns?;
+    let payment_breakdowns = payment_breakdowns?;
+    let shift_breakdowns = shift_breakdowns?;
+
+    Ok(Some(DailyReportDetail {
+        id: report.id,
+        business_date: report.business_date,
+        total_orders: report.total_orders,
+        completed_orders: report.completed_orders,
+        void_orders: report.void_orders,
+        total_sales: report.total_sales,
+        total_paid: report.total_paid,
+        total_unpaid: report.total_unpaid,
+        void_amount: report.void_amount,
+        total_tax: report.total_tax,
+        total_discount: report.total_discount,
+        total_surcharge: report.total_surcharge,
+        generated_at: report.generated_at,
+        generated_by_id: report.generated_by_id,
+        generated_by_name: report.generated_by_name,
+        note: report.note,
+        tax_breakdowns,
+        payment_breakdowns,
+        shift_breakdowns,
+    }))
 }
 
 /// Get order detail from store_archived_orders.detail JSONB column
@@ -434,167 +580,169 @@ async fn get_overview(
         0.0
     };
 
-    // 2. Revenue trend (by hour of day)
-    let revenue_trend: Vec<RevenueTrendPoint> = sqlx::query_as(
-        r#"
-        SELECT
-            EXTRACT(HOUR FROM TO_TIMESTAMP(end_time / 1000.0))::INTEGER AS hour,
-            COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
-            COUNT(*) AS orders
-        FROM store_archived_orders
-        WHERE tenant_id = $1
-            AND ($2::BIGINT IS NULL OR edge_server_id = $2)
-            AND end_time >= $3 AND end_time < $4
-            AND status = 'COMPLETED'
-        GROUP BY hour
-        ORDER BY hour
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(edge_server_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await?;
+    // 2-7. Run all independent queries concurrently
+    let (
+        revenue_trend_r,
+        tax_breakdown_r,
+        payment_breakdown_r,
+        top_products_r,
+        category_sales_r,
+        tag_sales_r,
+    ) = tokio::join!(
+        // 2. Revenue trend (by hour of day)
+        sqlx::query_as::<_, RevenueTrendPoint>(
+            r#"
+            SELECT
+                EXTRACT(HOUR FROM TO_TIMESTAMP(end_time / 1000.0))::INTEGER AS hour,
+                COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
+                COUNT(*) AS orders
+            FROM store_archived_orders
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR edge_server_id = $2)
+                AND end_time >= $3 AND end_time < $4
+                AND status = 'COMPLETED'
+            GROUP BY hour
+            ORDER BY hour
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(edge_server_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 3. Tax breakdown from desglose JSONB
+        sqlx::query_as::<_, TaxBreakdownEntry>(
+            r#"
+            SELECT
+                (d->>'tax_rate')::INTEGER AS tax_rate,
+                COALESCE(SUM((d->>'base_amount')::DOUBLE PRECISION), 0) AS base_amount,
+                COALESCE(SUM((d->>'tax_amount')::DOUBLE PRECISION), 0) AS tax_amount
+            FROM store_archived_orders,
+                 jsonb_array_elements(desglose) AS d
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR edge_server_id = $2)
+                AND end_time >= $3 AND end_time < $4
+                AND status = 'COMPLETED'
+                AND desglose IS NOT NULL AND jsonb_typeof(desglose) = 'array'
+            GROUP BY tax_rate
+            ORDER BY tax_rate
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(edge_server_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 4. Payment breakdown from detail JSONB
+        sqlx::query_as::<_, PaymentBreakdownEntry>(
+            r#"
+            SELECT
+                p->>'method' AS method,
+                COALESCE(SUM((p->>'amount')::DOUBLE PRECISION), 0) AS amount,
+                COUNT(*) AS count
+            FROM store_archived_orders o
+            CROSS JOIN jsonb_array_elements(o.detail->'payments') AS p
+            WHERE o.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND o.end_time >= $3 AND o.end_time < $4
+                AND o.status = 'COMPLETED'
+                AND o.detail IS NOT NULL
+                AND (p->>'cancelled')::BOOLEAN IS NOT TRUE
+            GROUP BY method
+            ORDER BY amount DESC
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(edge_server_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 5. Top products from detail JSONB
+        sqlx::query_as::<_, TopProductEntry>(
+            r#"
+            SELECT
+                i->>'name' AS name,
+                COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity,
+                COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
+            FROM store_archived_orders o
+            CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+            WHERE o.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND o.end_time >= $3 AND o.end_time < $4
+                AND o.status = 'COMPLETED'
+                AND o.detail IS NOT NULL
+            GROUP BY name
+            ORDER BY quantity DESC
+            LIMIT 10
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(edge_server_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 6. Category sales from detail JSONB
+        sqlx::query_as::<_, CategorySaleEntry>(
+            r#"
+            SELECT
+                COALESCE(i->>'category_name', 'Sin categoría') AS name,
+                COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
+            FROM store_archived_orders o
+            CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+            WHERE o.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND o.end_time >= $3 AND o.end_time < $4
+                AND o.status = 'COMPLETED'
+                AND o.detail IS NOT NULL
+            GROUP BY name
+            ORDER BY revenue DESC
+            LIMIT 10
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(edge_server_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 7. Tag sales — JSONB items → store_products → store_product_tag → store_tags
+        sqlx::query_as::<_, TagSaleEntry>(
+            r#"
+            SELECT
+                t.name,
+                t.color,
+                COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue,
+                COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity
+            FROM store_archived_orders o
+            CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+            JOIN store_products p ON p.source_id = (i->>'product_source_id')::BIGINT
+                AND p.edge_server_id = o.edge_server_id
+            JOIN store_product_tag pt ON pt.product_id = p.id
+            JOIN store_tags t ON t.source_id = pt.tag_source_id
+                AND t.edge_server_id = o.edge_server_id
+            WHERE o.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND o.end_time >= $3 AND o.end_time < $4
+                AND o.status = 'COMPLETED'
+                AND o.detail IS NOT NULL
+                AND i->>'product_source_id' IS NOT NULL
+            GROUP BY t.name, t.color
+            ORDER BY revenue DESC
+            LIMIT 10
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(edge_server_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+    );
 
-    // 3. Tax breakdown from desglose JSONB (already aggregated per order)
-    let tax_breakdown: Vec<TaxBreakdownEntry> = sqlx::query_as(
-        r#"
-        SELECT
-            (d->>'tax_rate')::INTEGER AS tax_rate,
-            COALESCE(SUM((d->>'base_amount')::DOUBLE PRECISION), 0) AS base_amount,
-            COALESCE(SUM((d->>'tax_amount')::DOUBLE PRECISION), 0) AS tax_amount
-        FROM store_archived_orders,
-             jsonb_array_elements(desglose) AS d
-        WHERE tenant_id = $1
-            AND ($2::BIGINT IS NULL OR edge_server_id = $2)
-            AND end_time >= $3 AND end_time < $4
-            AND status = 'COMPLETED'
-            AND desglose IS NOT NULL AND jsonb_typeof(desglose) = 'array'
-        GROUP BY tax_rate
-        ORDER BY tax_rate
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(edge_server_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    // 4. Payment breakdown from detail JSONB
-    let payment_breakdown: Vec<PaymentBreakdownEntry> = sqlx::query_as(
-        r#"
-        SELECT
-            p->>'method' AS method,
-            COALESCE(SUM((p->>'amount')::DOUBLE PRECISION), 0) AS amount,
-            COUNT(*) AS count
-        FROM store_archived_orders o
-        CROSS JOIN jsonb_array_elements(o.detail->'payments') AS p
-        WHERE o.tenant_id = $1
-            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-            AND o.detail IS NOT NULL
-            AND (p->>'cancelled')::BOOLEAN IS NOT TRUE
-        GROUP BY method
-        ORDER BY amount DESC
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(edge_server_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    // 5. Top products from detail JSONB
-    let top_products: Vec<TopProductEntry> = sqlx::query_as(
-        r#"
-        SELECT
-            i->>'name' AS name,
-            COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity,
-            COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
-        FROM store_archived_orders o
-        CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
-        WHERE o.tenant_id = $1
-            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-            AND o.detail IS NOT NULL
-        GROUP BY name
-        ORDER BY quantity DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(edge_server_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    // 6. Category sales from detail JSONB
-    let category_sales: Vec<CategorySaleEntry> = sqlx::query_as(
-        r#"
-        SELECT
-            COALESCE(i->>'category_name', 'Sin categoría') AS name,
-            COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
-        FROM store_archived_orders o
-        CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
-        WHERE o.tenant_id = $1
-            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-            AND o.detail IS NOT NULL
-        GROUP BY name
-        ORDER BY revenue DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(edge_server_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    // 7. Tag sales — JSONB items → store_product_tag → store_tags
-    let tag_sales: Vec<TagSaleEntry> = sqlx::query_as(
-        r#"
-        SELECT
-            t.name,
-            t.color,
-            COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue,
-            COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity
-        FROM store_archived_orders o
-        CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
-        JOIN store_product_tag pt ON pt.product_source_id = (i->>'product_source_id')::BIGINT
-            AND pt.store_id = o.edge_server_id
-        JOIN store_tags t ON t.source_id = pt.tag_source_id
-            AND t.store_id = o.edge_server_id
-        WHERE o.tenant_id = $1
-            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-            AND o.detail IS NOT NULL
-            AND i->>'product_source_id' IS NOT NULL
-        GROUP BY t.name, t.color
-        ORDER BY revenue DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(edge_server_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
+    let revenue_trend = revenue_trend_r?;
+    let tax_breakdown = tax_breakdown_r.unwrap_or_default();
+    let payment_breakdown = payment_breakdown_r.unwrap_or_default();
+    let top_products = top_products_r.unwrap_or_default();
+    let category_sales = category_sales_r.unwrap_or_default();
+    let tag_sales = tag_sales_r.unwrap_or_default();
 
     Ok(StoreOverview {
         revenue,

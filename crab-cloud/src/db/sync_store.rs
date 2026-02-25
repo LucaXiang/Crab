@@ -82,6 +82,38 @@ pub async fn update_cursor(
     Ok(())
 }
 
+/// Batch update sync cursors for multiple resources at once
+pub async fn update_cursors_batch(
+    pool: &PgPool,
+    edge_server_id: i64,
+    cursors: &[(&str, i64)],
+    now: i64,
+) -> Result<(), BoxError> {
+    if cursors.is_empty() {
+        return Ok(());
+    }
+    let eids: Vec<i64> = cursors.iter().map(|_| edge_server_id).collect();
+    let resources: Vec<&str> = cursors.iter().map(|(r, _)| *r).collect();
+    let versions: Vec<i64> = cursors.iter().map(|(_, v)| *v).collect();
+    let nows: Vec<i64> = cursors.iter().map(|_| now).collect();
+    sqlx::query(
+        r#"
+        INSERT INTO store_sync_cursors (edge_server_id, resource, last_version, updated_at)
+        SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::bigint[], $4::bigint[])
+        ON CONFLICT (edge_server_id, resource)
+        DO UPDATE SET last_version = GREATEST(store_sync_cursors.last_version, EXCLUDED.last_version),
+                      updated_at = EXCLUDED.updated_at
+        "#,
+    )
+    .bind(&eids)
+    .bind(&resources)
+    .bind(&versions)
+    .bind(&nows)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Get all sync cursors for an edge-server (resource → last_version)
 pub async fn get_cursors(
     pool: &PgPool,

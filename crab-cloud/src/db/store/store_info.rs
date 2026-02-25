@@ -57,34 +57,26 @@ pub async fn update_store_info_direct(
 ) -> Result<StoreInfo, BoxError> {
     let now = shared::util::now_millis();
 
-    // Ensure row exists (edge may not have synced yet)
-    sqlx::query(
+    // Single UPSERT + RETURNING (replaces INSERT DO NOTHING + UPDATE + SELECT)
+    let info: StoreInfo = sqlx::query_as(
         r#"
-        INSERT INTO store_info (edge_server_id, name, address, nif, business_day_cutoff, created_at, updated_at)
-        VALUES ($1, '', '', '', '02:00', $2, $2)
-        ON CONFLICT (edge_server_id) DO NOTHING
+        INSERT INTO store_info (edge_server_id, name, address, nif, logo_url, phone, email, website, business_day_cutoff, created_at, updated_at)
+        VALUES ($1, COALESCE($2, ''), COALESCE($3, ''), COALESCE($4, ''), $5, $6, $7, $8, COALESCE($9, '02:00'), $10, $10)
+        ON CONFLICT (edge_server_id)
+        DO UPDATE SET
+            name = COALESCE($2, store_info.name),
+            address = COALESCE($3, store_info.address),
+            nif = COALESCE($4, store_info.nif),
+            logo_url = COALESCE($5, store_info.logo_url),
+            phone = COALESCE($6, store_info.phone),
+            email = COALESCE($7, store_info.email),
+            website = COALESCE($8, store_info.website),
+            business_day_cutoff = COALESCE($9, store_info.business_day_cutoff),
+            updated_at = $10
+        RETURNING 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website, business_day_cutoff, created_at, updated_at
         "#,
     )
     .bind(edge_server_id)
-    .bind(now)
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
-        UPDATE store_info SET
-            name = COALESCE($1, name),
-            address = COALESCE($2, address),
-            nif = COALESCE($3, nif),
-            logo_url = COALESCE($4, logo_url),
-            phone = COALESCE($5, phone),
-            email = COALESCE($6, email),
-            website = COALESCE($7, website),
-            business_day_cutoff = COALESCE($8, business_day_cutoff),
-            updated_at = $9
-        WHERE edge_server_id = $10
-        "#,
-    )
     .bind(&data.name)
     .bind(&data.address)
     .bind(&data.nif)
@@ -94,13 +86,10 @@ pub async fn update_store_info_direct(
     .bind(&data.website)
     .bind(&data.business_day_cutoff)
     .bind(now)
-    .bind(edge_server_id)
-    .execute(pool)
+    .fetch_one(pool)
     .await?;
 
-    get_store_info(pool, edge_server_id)
-        .await?
-        .ok_or_else(|| "Store info not found after update".into())
+    Ok(info)
 }
 
 // ── Console Read ──

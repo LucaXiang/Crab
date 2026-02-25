@@ -45,9 +45,9 @@ pub async fn upsert_daily_report_from_sync(
     .bind(edge_server_id)
     .bind(source_id)
     .bind(&report.business_date)
-    .bind(report.total_orders as i32)
-    .bind(report.completed_orders as i32)
-    .bind(report.void_orders as i32)
+    .bind(report.total_orders)
+    .bind(report.completed_orders)
+    .bind(report.void_orders)
     .bind(report.total_sales)
     .bind(report.total_paid)
     .bind(report.total_unpaid)
@@ -69,21 +69,35 @@ pub async fn upsert_daily_report_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for tb in &report.tax_breakdowns {
+    if !report.tax_breakdowns.is_empty() {
+        let rids: Vec<i64> = report.tax_breakdowns.iter().map(|_| pg_id).collect();
+        let rates: Vec<i32> = report.tax_breakdowns.iter().map(|t| t.tax_rate).collect();
+        let nets: Vec<f64> = report.tax_breakdowns.iter().map(|t| t.net_amount).collect();
+        let taxes: Vec<f64> = report.tax_breakdowns.iter().map(|t| t.tax_amount).collect();
+        let grosses: Vec<f64> = report
+            .tax_breakdowns
+            .iter()
+            .map(|t| t.gross_amount)
+            .collect();
+        let counts: Vec<i64> = report
+            .tax_breakdowns
+            .iter()
+            .map(|t| t.order_count)
+            .collect();
         sqlx::query(
-            r#"
-            INSERT INTO store_daily_report_tax_breakdown (
+            r#"INSERT INTO store_daily_report_tax_breakdown (
                 report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count
-            )
-            VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
+            ) SELECT * FROM UNNEST(
+                $1::bigint[], $2::integer[], $3::double precision[],
+                $4::double precision[], $5::double precision[], $6::bigint[]
+            )"#,
         )
-        .bind(pg_id)
-        .bind(tb.tax_rate)
-        .bind(tb.net_amount)
-        .bind(tb.tax_amount)
-        .bind(tb.gross_amount)
-        .bind(tb.order_count as i32)
+        .bind(&rids)
+        .bind(&rates)
+        .bind(&nets)
+        .bind(&taxes)
+        .bind(&grosses)
+        .bind(&counts)
         .execute(&mut *tx)
         .await?;
     }
@@ -94,19 +108,169 @@ pub async fn upsert_daily_report_from_sync(
         .execute(&mut *tx)
         .await?;
 
-    for pb in &report.payment_breakdowns {
+    if !report.payment_breakdowns.is_empty() {
+        let rids: Vec<i64> = report.payment_breakdowns.iter().map(|_| pg_id).collect();
+        let methods: Vec<String> = report
+            .payment_breakdowns
+            .iter()
+            .map(|p| p.method.clone())
+            .collect();
+        let amounts: Vec<f64> = report.payment_breakdowns.iter().map(|p| p.amount).collect();
+        let counts: Vec<i64> = report.payment_breakdowns.iter().map(|p| p.count).collect();
         sqlx::query(
-            r#"
-            INSERT INTO store_daily_report_payment_breakdown (
+            r#"INSERT INTO store_daily_report_payment_breakdown (
                 report_id, method, amount, count
-            )
-            VALUES ($1, $2, $3, $4)
-            "#,
+            ) SELECT * FROM UNNEST(
+                $1::bigint[], $2::text[], $3::double precision[], $4::bigint[]
+            )"#,
         )
+        .bind(&rids)
+        .bind(&methods)
+        .bind(&amounts)
+        .bind(&counts)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // Replace shift breakdowns
+    sqlx::query("DELETE FROM store_daily_report_shift_breakdown WHERE report_id = $1")
         .bind(pg_id)
-        .bind(&pb.method)
-        .bind(pb.amount)
-        .bind(pb.count as i32)
+        .execute(&mut *tx)
+        .await?;
+
+    if !report.shift_breakdowns.is_empty() {
+        let rids: Vec<i64> = report.shift_breakdowns.iter().map(|_| pg_id).collect();
+        let shift_ids: Vec<i64> = report.shift_breakdowns.iter().map(|s| s.shift_id).collect();
+        let operator_ids: Vec<i64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.operator_id)
+            .collect();
+        let operator_names: Vec<String> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.operator_name.clone())
+            .collect();
+        let statuses: Vec<String> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.status.clone())
+            .collect();
+        let start_times: Vec<i64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.start_time)
+            .collect();
+        let end_times: Vec<Option<i64>> =
+            report.shift_breakdowns.iter().map(|s| s.end_time).collect();
+        let starting_cashes: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.starting_cash)
+            .collect();
+        let expected_cashes: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.expected_cash)
+            .collect();
+        let actual_cashes: Vec<Option<f64>> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.actual_cash)
+            .collect();
+        let cash_variances: Vec<Option<f64>> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.cash_variance)
+            .collect();
+        let abnormal_closes: Vec<bool> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.abnormal_close)
+            .collect();
+        let total_orders: Vec<i64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.total_orders)
+            .collect();
+        let completed_orders: Vec<i64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.completed_orders)
+            .collect();
+        let void_orders: Vec<i64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.void_orders)
+            .collect();
+        let total_sales: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.total_sales)
+            .collect();
+        let total_paid: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.total_paid)
+            .collect();
+        let void_amounts: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.void_amount)
+            .collect();
+        let total_tax: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.total_tax)
+            .collect();
+        let total_discount: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.total_discount)
+            .collect();
+        let total_surcharge: Vec<f64> = report
+            .shift_breakdowns
+            .iter()
+            .map(|s| s.total_surcharge)
+            .collect();
+        sqlx::query(
+            r#"INSERT INTO store_daily_report_shift_breakdown (
+                report_id, shift_source_id, operator_id, operator_name, status,
+                start_time, end_time, starting_cash, expected_cash,
+                actual_cash, cash_variance, abnormal_close,
+                total_orders, completed_orders, void_orders,
+                total_sales, total_paid, void_amount,
+                total_tax, total_discount, total_surcharge
+            ) SELECT * FROM UNNEST(
+                $1::bigint[], $2::bigint[], $3::bigint[], $4::text[], $5::text[],
+                $6::bigint[], $7::bigint[], $8::double precision[], $9::double precision[],
+                $10::double precision[], $11::double precision[], $12::boolean[],
+                $13::bigint[], $14::bigint[], $15::bigint[],
+                $16::double precision[], $17::double precision[], $18::double precision[],
+                $19::double precision[], $20::double precision[], $21::double precision[]
+            )"#,
+        )
+        .bind(&rids)
+        .bind(&shift_ids)
+        .bind(&operator_ids)
+        .bind(&operator_names)
+        .bind(&statuses)
+        .bind(&start_times)
+        .bind(&end_times)
+        .bind(&starting_cashes)
+        .bind(&expected_cashes)
+        .bind(&actual_cashes)
+        .bind(&cash_variances)
+        .bind(&abnormal_closes)
+        .bind(&total_orders)
+        .bind(&completed_orders)
+        .bind(&void_orders)
+        .bind(&total_sales)
+        .bind(&total_paid)
+        .bind(&void_amounts)
+        .bind(&total_tax)
+        .bind(&total_discount)
+        .bind(&total_surcharge)
         .execute(&mut *tx)
         .await?;
     }

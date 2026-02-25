@@ -5,10 +5,9 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use dashmap::DashMap;
 use shared::error::{AppError, ErrorCode};
-use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 struct IpEntry {
@@ -19,29 +18,22 @@ struct IpEntry {
 #[derive(Clone)]
 pub struct RateLimiter {
     /// route name -> (IP -> entry)
-    inner: Arc<Mutex<HashMap<&'static str, HashMap<String, IpEntry>>>>,
+    inner: Arc<DashMap<&'static str, DashMap<String, IpEntry>>>,
 }
 
 impl RateLimiter {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(HashMap::new())),
+            inner: Arc::new(DashMap::new()),
         }
     }
 
     /// Returns `true` if the request is allowed, `false` if rate-limited.
-    async fn check(
-        &self,
-        route: &'static str,
-        ip: &str,
-        max_requests: u32,
-        window_secs: u64,
-    ) -> bool {
-        let mut map = self.inner.lock().await;
-        let route_map = map.entry(route).or_default();
+    fn check(&self, route: &'static str, ip: &str, max_requests: u32, window_secs: u64) -> bool {
+        let route_map = self.inner.entry(route).or_default();
         let now = Instant::now();
 
-        let entry = route_map.entry(ip.to_owned()).or_insert_with(|| IpEntry {
+        let mut entry = route_map.entry(ip.to_owned()).or_insert_with(|| IpEntry {
             count: 0,
             window_start: now,
         });
@@ -57,17 +49,16 @@ impl RateLimiter {
     }
 
     /// Remove entries older than 5 minutes
-    pub async fn cleanup(&self) {
-        let mut map = self.inner.lock().await;
+    pub fn cleanup(&self) {
         let cutoff = std::time::Duration::from_secs(300);
         let now = Instant::now();
 
-        for route_map in map.values_mut() {
+        for route_map in self.inner.iter() {
             route_map.retain(|_, entry| now.duration_since(entry.window_start) < cutoff);
         }
 
         // Remove empty route maps
-        map.retain(|_, route_map| !route_map.is_empty());
+        self.inner.retain(|_, route_map| !route_map.is_empty());
     }
 }
 
@@ -113,7 +104,7 @@ pub async fn login_rate_limit(
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("login", &ip, 10, 60).await {
+    if !state.rate_limiter.check("login", &ip, 10, 60) {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)
@@ -126,7 +117,7 @@ pub async fn register_rate_limit(
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("register", &ip, 3, 60).await {
+    if !state.rate_limiter.check("register", &ip, 3, 60) {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)
@@ -139,7 +130,7 @@ pub async fn password_reset_rate_limit(
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("password_reset", &ip, 3, 60).await {
+    if !state.rate_limiter.check("password_reset", &ip, 3, 60) {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)
@@ -152,7 +143,7 @@ pub async fn p12_upload_rate_limit(
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("p12_upload", &ip, 5, 60).await {
+    if !state.rate_limiter.check("p12_upload", &ip, 5, 60) {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)
@@ -169,7 +160,7 @@ pub async fn global_rate_limit(
     next: Next,
 ) -> Result<Response, Response> {
     let ip = extract_ip(&request);
-    if !state.rate_limiter.check("global", &ip, 200, 60).await {
+    if !state.rate_limiter.check("global", &ip, 200, 60) {
         return Err(too_many_requests());
     }
     Ok(next.run(request).await)

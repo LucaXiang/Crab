@@ -55,7 +55,7 @@ struct EmployeeSyncData {
     hash_pass: String,
     #[serde(default)]
     display_name: String,
-    role_id: i32,
+    role_id: i64,
     #[serde(default)]
     is_system: bool,
     #[serde(default = "default_true")]
@@ -109,35 +109,26 @@ pub async fn create_employee_direct(
             .to_string()
     };
 
-    let mut tx = pool.begin().await?;
+    let source_id = super::snowflake_id();
 
-    let (pg_id,): (i64,) = sqlx::query_as(
+    sqlx::query(
         r#"
         INSERT INTO store_employees (
             edge_server_id, source_id, username, hash_pass, display_name,
             role_id, is_system, is_active, created_at, updated_at
         )
-        VALUES ($1, 0, $2, $3, $4, $5, FALSE, TRUE, $6, $6)
-        RETURNING id
+        VALUES ($1, $2, $3, $4, $5, $6, FALSE, TRUE, $7, $7)
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(&data.username)
     .bind(&hash_pass)
     .bind(display_name)
     .bind(data.role_id)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .execute(pool)
     .await?;
-
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_employees SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
 
     let employee = Employee {
         id: source_id,

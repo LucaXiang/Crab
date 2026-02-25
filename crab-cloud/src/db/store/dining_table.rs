@@ -69,33 +69,24 @@ pub async fn create_table_direct(
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();
     let capacity = data.capacity.unwrap_or(4);
-    let mut tx = pool.begin().await?;
+    let source_id = super::snowflake_id();
 
-    let (pg_id,): (i64,) = sqlx::query_as(
+    sqlx::query(
         r#"
         INSERT INTO store_dining_tables (
             edge_server_id, source_id, name, zone_source_id, capacity, is_active, updated_at
         )
-        VALUES ($1, 0, $2, $3, $4, TRUE, $5)
-        RETURNING id
+        VALUES ($1, $2, $3, $4, $5, TRUE, $6)
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(&data.name)
     .bind(data.zone_id)
     .bind(capacity)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .execute(pool)
     .await?;
-
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_dining_tables SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
 
     let table = DiningTable {
         id: source_id,

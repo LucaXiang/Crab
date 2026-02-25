@@ -66,32 +66,23 @@ pub async fn create_zone_direct(
     data: &ZoneCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();
-    let mut tx = pool.begin().await?;
+    let source_id = super::snowflake_id();
 
-    let (pg_id,): (i64,) = sqlx::query_as(
+    sqlx::query(
         r#"
         INSERT INTO store_zones (
             edge_server_id, source_id, name, description, is_active, updated_at
         )
-        VALUES ($1, 0, $2, $3, TRUE, $4)
-        RETURNING id
+        VALUES ($1, $2, $3, $4, TRUE, $5)
         "#,
     )
     .bind(edge_server_id)
+    .bind(source_id)
     .bind(&data.name)
     .bind(&data.description)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .execute(pool)
     .await?;
-
-    let source_id = super::snowflake_id();
-    sqlx::query("UPDATE store_zones SET source_id = $1 WHERE id = $2")
-        .bind(source_id)
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
 
     let zone = Zone {
         id: source_id,

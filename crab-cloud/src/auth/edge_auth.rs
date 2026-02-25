@@ -57,8 +57,18 @@ pub async fn edge_auth_middleware(
             AppError::new(ErrorCode::InternalError).into_response()
         })?;
 
-    // Verify signature
-    binding.verify_signature(&tenant_ca_cert).map_err(|e| {
+    // Verify signature (CPU-intensive ECDSA — run off async runtime)
+    let binding_clone = binding.clone();
+    let cert_clone = tenant_ca_cert.clone();
+    let verify_result =
+        tokio::task::spawn_blocking(move || binding_clone.verify_signature(&cert_clone))
+            .await
+            .map_err(|e| {
+                tracing::error!("spawn_blocking join error: {e}");
+                AppError::new(ErrorCode::InternalError).into_response()
+            })?;
+
+    verify_result.map_err(|e| {
         tracing::warn!(
             entity_id = %binding.entity_id,
             tenant_id = %binding.tenant_id,
