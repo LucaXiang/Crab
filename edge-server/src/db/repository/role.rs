@@ -48,14 +48,16 @@ pub async fn create(pool: &SqlitePool, data: RoleCreate) -> RepoResult<Role> {
     let permissions_json =
         serde_json::to_string(&data.permissions).unwrap_or_else(|_| "[]".to_string());
 
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO role (name, display_name, description, permissions) VALUES (?, ?, ?, ?) RETURNING id as "id!""#,
-        data.name,
-        display_name,
-        data.description,
-        permissions_json
+    let id = shared::util::snowflake_id();
+    sqlx::query(
+        "INSERT INTO role (id, name, display_name, description, permissions) VALUES (?, ?, ?, ?, ?)",
     )
-    .fetch_one(pool)
+    .bind(id)
+    .bind(&data.name)
+    .bind(&display_name)
+    .bind(&data.description)
+    .bind(&permissions_json)
+    .execute(pool)
     .await?;
 
     find_by_id(pool, id)

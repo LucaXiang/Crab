@@ -35,23 +35,9 @@ use sqlx::PgPool;
 
 pub(crate) type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// Generate a Snowflake-style i64 for use as source_id.
-///
-/// Layout (53 bits, fits in JavaScript's Number.MAX_SAFE_INTEGER):
-///   - 41 bits: milliseconds since 2024-01-01 UTC (~69 years)
-///   - 12 bits: random (4096 values per ms, collision-free at POS scale)
-///
-/// Properties: non-sequential (can't infer record count), roughly time-ordered,
-/// i64 compatible, stateless (no counter to persist across restarts).
-/// UNIQUE constraint on (edge_server_id, source_id) is the ultimate safety net.
+/// Generate a Snowflake-style i64 — delegates to shared::util::snowflake_id().
 pub(crate) fn snowflake_id() -> i64 {
-    use rand::Rng;
-    // Custom epoch: 2024-01-01 00:00:00 UTC
-    const EPOCH_MS: i64 = 1_704_067_200_000;
-    let now = shared::util::now_millis();
-    let ts = (now - EPOCH_MS) & 0x1FF_FFFF_FFFF; // 41 bits
-    let rand_bits: i64 = rand::thread_rng().gen_range(0..0x1000); // 12 bits
-    (ts << 12) | rand_bits
+    shared::util::snowflake_id()
 }
 
 /// Increment store version for an edge server, returning the new version.

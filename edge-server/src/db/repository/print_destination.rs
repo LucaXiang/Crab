@@ -60,29 +60,33 @@ pub async fn create(
 ) -> RepoResult<PrintDestination> {
     let mut tx = pool.begin().await?;
 
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO print_destination (name, description, purpose, is_active) VALUES (?, ?, ?, ?) RETURNING id as "id!""#,
-        data.name,
-        data.description,
-        data.purpose,
-        data.is_active
+    let id = shared::util::snowflake_id();
+    sqlx::query(
+        "INSERT INTO print_destination (id, name, description, purpose, is_active) VALUES (?, ?, ?, ?, ?)",
     )
-    .fetch_one(&mut *tx)
+    .bind(id)
+    .bind(&data.name)
+    .bind(&data.description)
+    .bind(&data.purpose)
+    .bind(data.is_active)
+    .execute(&mut *tx)
     .await?;
 
     // Create printers
     for printer in &data.printers {
-        sqlx::query!(
-            "INSERT INTO printer (print_destination_id, connection, protocol, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            id,
-            printer.connection,
-            printer.protocol,
-            printer.ip,
-            printer.port,
-            printer.driver_name,
-            printer.priority,
-            printer.is_active
+        let printer_id = shared::util::snowflake_id();
+        sqlx::query(
+            "INSERT INTO printer (id, print_destination_id, connection, protocol, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )
+        .bind(printer_id)
+        .bind(id)
+        .bind(&printer.connection)
+        .bind(&printer.protocol)
+        .bind(&printer.ip)
+        .bind(printer.port)
+        .bind(&printer.driver_name)
+        .bind(printer.priority)
+        .bind(printer.is_active)
         .execute(&mut *tx)
         .await?;
     }
@@ -123,17 +127,19 @@ pub async fn update(
             .execute(&mut *tx)
             .await?;
         for printer in printers {
-            sqlx::query!(
-                "INSERT INTO printer (print_destination_id, connection, protocol, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                id,
-                printer.connection,
-                printer.protocol,
-                printer.ip,
-                printer.port,
-                printer.driver_name,
-                printer.priority,
-                printer.is_active
+            let printer_id = shared::util::snowflake_id();
+            sqlx::query(
+                "INSERT INTO printer (id, print_destination_id, connection, protocol, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             )
+            .bind(printer_id)
+            .bind(id)
+            .bind(&printer.connection)
+            .bind(&printer.protocol)
+            .bind(&printer.ip)
+            .bind(printer.port)
+            .bind(&printer.driver_name)
+            .bind(printer.priority)
+            .bind(printer.is_active)
             .execute(&mut *tx)
             .await?;
         }

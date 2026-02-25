@@ -153,25 +153,27 @@ pub async fn generate(
     // Create report + breakdowns in a single transaction
     let mut tx = pool.begin().await?;
 
-    let report_id = sqlx::query_scalar!(
-        r#"INSERT INTO daily_report (business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING id as "id!""#,
-        data.business_date,
-        total_orders,
-        completed_orders,
-        void_orders,
-        total_sales,
-        total_paid,
-        total_unpaid,
-        void_amount,
-        total_tax,
-        total_discount,
-        total_surcharge,
-        now,
-        operator_id,
-        operator_name,
-        data.note,
+    let report_id = shared::util::snowflake_id();
+    sqlx::query(
+        "INSERT INTO daily_report (id, business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
     )
-    .fetch_one(&mut *tx)
+    .bind(report_id)
+    .bind(&data.business_date)
+    .bind(total_orders)
+    .bind(completed_orders)
+    .bind(void_orders)
+    .bind(total_sales)
+    .bind(total_paid)
+    .bind(total_unpaid)
+    .bind(void_amount)
+    .bind(total_tax)
+    .bind(total_discount)
+    .bind(total_surcharge)
+    .bind(now)
+    .bind(operator_id)
+    .bind(&operator_name)
+    .bind(&data.note)
+    .execute(&mut *tx)
     .await?;
 
     // Tax breakdown by rate (use subquery directly — both strings are compile-time constants)
@@ -184,15 +186,17 @@ pub async fn generate(
     .await?;
 
     for (tax_rate, gross, tax_amt, net, order_count) in &tax_rows {
-        sqlx::query!(
-            "INSERT INTO daily_report_tax_breakdown (report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count) VALUES (?, ?, ?, ?, ?, ?)",
-            report_id,
-            tax_rate,
-            net,
-            tax_amt,
-            gross,
-            order_count,
+        let tb_id = shared::util::snowflake_id();
+        sqlx::query(
+            "INSERT INTO daily_report_tax_breakdown (id, report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         )
+        .bind(tb_id)
+        .bind(report_id)
+        .bind(tax_rate)
+        .bind(net)
+        .bind(tax_amt)
+        .bind(gross)
+        .bind(order_count)
         .execute(&mut *tx)
         .await?;
     }
@@ -207,13 +211,15 @@ pub async fn generate(
     .await?;
 
     for (method, amount, count) in &payment_rows {
-        sqlx::query!(
-            "INSERT INTO daily_report_payment_breakdown (report_id, method, amount, count) VALUES (?, ?, ?, ?)",
-            report_id,
-            method,
-            amount,
-            count,
+        let pb_id = shared::util::snowflake_id();
+        sqlx::query(
+            "INSERT INTO daily_report_payment_breakdown (id, report_id, method, amount, count) VALUES (?1, ?2, ?3, ?4, ?5)",
         )
+        .bind(pb_id)
+        .bind(report_id)
+        .bind(method)
+        .bind(amount)
+        .bind(count)
         .execute(&mut *tx)
         .await?;
     }

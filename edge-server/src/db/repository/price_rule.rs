@@ -76,58 +76,32 @@ pub async fn create(
 
     let is_stackable = data.is_stackable.unwrap_or(true);
     let is_exclusive = data.is_exclusive.unwrap_or(false);
-    let id: i64 = if let Some(aid) = assigned_id {
-        sqlx::query_scalar(
-            r#"INSERT INTO price_rule (id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, 1, ?19, ?20) RETURNING id"#,
-        )
-        .bind(aid)
-        .bind(&data.name)
-        .bind(&data.display_name)
-        .bind(&data.receipt_name)
-        .bind(&data.description)
-        .bind(&data.rule_type)
-        .bind(&data.product_scope)
-        .bind(data.target_id)
-        .bind(&zone_scope)
-        .bind(&data.adjustment_type)
-        .bind(data.adjustment_value)
-        .bind(is_stackable)
-        .bind(is_exclusive)
-        .bind(data.valid_from)
-        .bind(data.valid_until)
-        .bind(&active_days_json)
-        .bind(&data.active_start_time)
-        .bind(&data.active_end_time)
-        .bind(data.created_by)
-        .bind(now)
-        .fetch_one(pool)
-        .await?
-    } else {
-        sqlx::query_scalar!(
-            r#"INSERT INTO price_rule (name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19) RETURNING id as "id!""#,
-            data.name,
-            data.display_name,
-            data.receipt_name,
-            data.description,
-            data.rule_type,
-            data.product_scope,
-            data.target_id,
-            zone_scope,
-            data.adjustment_type,
-            data.adjustment_value,
-            is_stackable,
-            is_exclusive,
-            data.valid_from,
-            data.valid_until,
-            active_days_json,
-            data.active_start_time,
-            data.active_end_time,
-            data.created_by,
-            now
-        )
-        .fetch_one(pool)
-        .await?
-    };
+    let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    sqlx::query(
+        "INSERT INTO price_rule (id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, 1, ?19, ?20)",
+    )
+    .bind(id)
+    .bind(&data.name)
+    .bind(&data.display_name)
+    .bind(&data.receipt_name)
+    .bind(&data.description)
+    .bind(&data.rule_type)
+    .bind(&data.product_scope)
+    .bind(data.target_id)
+    .bind(&zone_scope)
+    .bind(&data.adjustment_type)
+    .bind(data.adjustment_value)
+    .bind(is_stackable)
+    .bind(is_exclusive)
+    .bind(data.valid_from)
+    .bind(data.valid_until)
+    .bind(&active_days_json)
+    .bind(&data.active_start_time)
+    .bind(&data.active_end_time)
+    .bind(data.created_by)
+    .bind(now)
+    .execute(pool)
+    .await?;
 
     find_by_id(pool, id)
         .await?

@@ -71,82 +71,62 @@ pub async fn create(
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
 
-    let id: i64 = if let Some(aid) = assigned_id {
-        sqlx::query_scalar!(
-            r#"INSERT INTO label_template (id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id as "id!""#,
-            aid,
-            data.name,
-            data.description,
-            data.width,
-            data.height,
-            data.padding,
-            data.is_default,
-            data.is_active,
-            data.width_mm,
-            data.height_mm,
-            data.padding_mm_x,
-            data.padding_mm_y,
-            data.render_dpi,
-            data.test_data,
-            now,
-            now,
-        )
-        .fetch_one(&mut *tx)
-        .await?
-    } else {
-        sqlx::query_scalar!(
-            r#"INSERT INTO label_template (name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id as "id!""#,
-            data.name,
-            data.description,
-            data.width,
-            data.height,
-            data.padding,
-            data.is_default,
-            data.is_active,
-            data.width_mm,
-            data.height_mm,
-            data.padding_mm_x,
-            data.padding_mm_y,
-            data.render_dpi,
-            data.test_data,
-            now,
-            now,
-        )
-        .fetch_one(&mut *tx)
-        .await?
-    };
+    let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    sqlx::query(
+        "INSERT INTO label_template (id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+    )
+    .bind(id)
+    .bind(&data.name)
+    .bind(&data.description)
+    .bind(data.width)
+    .bind(data.height)
+    .bind(data.padding)
+    .bind(data.is_default)
+    .bind(data.is_active)
+    .bind(data.width_mm)
+    .bind(data.height_mm)
+    .bind(data.padding_mm_x)
+    .bind(data.padding_mm_y)
+    .bind(data.render_dpi)
+    .bind(&data.test_data)
+    .bind(now)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
 
     // Create fields
     for field in &data.fields {
-        sqlx::query!(
-            "INSERT INTO label_field (template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            id,
-            field.field_id,
-            field.name,
-            field.field_type,
-            field.x,
-            field.y,
-            field.width,
-            field.height,
-            field.font_size,
-            field.font_weight,
-            field.font_family,
-            field.color,
-            field.rotate,
-            field.alignment,
-            field.data_source,
-            field.format,
-            field.visible,
-            field.label,
-            field.template,
-            field.data_key,
-            field.source_type,
-            field.maintain_aspect_ratio,
-            field.style,
-            field.align,
-            field.vertical_align,
-            field.line_style,
+        let field_db_id = shared::util::snowflake_id();
+        sqlx::query(
+            "INSERT INTO label_field (id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
         )
+        .bind(field_db_id)
+        .bind(id)
+        .bind(&field.field_id)
+        .bind(&field.name)
+        .bind(&field.field_type)
+        .bind(field.x)
+        .bind(field.y)
+        .bind(field.width)
+        .bind(field.height)
+        .bind(field.font_size)
+        .bind(&field.font_weight)
+        .bind(&field.font_family)
+        .bind(&field.color)
+        .bind(field.rotate)
+        .bind(&field.alignment)
+        .bind(&field.data_source)
+        .bind(&field.format)
+        .bind(field.visible)
+        .bind(&field.label)
+        .bind(&field.template)
+        .bind(&field.data_key)
+        .bind(&field.source_type)
+        .bind(field.maintain_aspect_ratio)
+        .bind(&field.style)
+        .bind(&field.align)
+        .bind(&field.vertical_align)
+        .bind(&field.line_style)
         .execute(&mut *tx)
         .await?;
     }
@@ -218,35 +198,37 @@ pub async fn update(
             .execute(&mut *tx)
             .await?;
         for field in fields {
-            sqlx::query!(
-                "INSERT INTO label_field (template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id,
-                field.field_id,
-                field.name,
-                field.field_type,
-                field.x,
-                field.y,
-                field.width,
-                field.height,
-                field.font_size,
-                field.font_weight,
-                field.font_family,
-                field.color,
-                field.rotate,
-                field.alignment,
-                field.data_source,
-                field.format,
-                field.visible,
-                field.label,
-                field.template,
-                field.data_key,
-                field.source_type,
-                field.maintain_aspect_ratio,
-                field.style,
-                field.align,
-                field.vertical_align,
-                field.line_style,
+            let field_db_id = shared::util::snowflake_id();
+            sqlx::query(
+                "INSERT INTO label_field (id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
             )
+            .bind(field_db_id)
+            .bind(id)
+            .bind(&field.field_id)
+            .bind(&field.name)
+            .bind(&field.field_type)
+            .bind(field.x)
+            .bind(field.y)
+            .bind(field.width)
+            .bind(field.height)
+            .bind(field.font_size)
+            .bind(&field.font_weight)
+            .bind(&field.font_family)
+            .bind(&field.color)
+            .bind(field.rotate)
+            .bind(&field.alignment)
+            .bind(&field.data_source)
+            .bind(&field.format)
+            .bind(field.visible)
+            .bind(&field.label)
+            .bind(&field.template)
+            .bind(&field.data_key)
+            .bind(&field.source_type)
+            .bind(field.maintain_aspect_ratio)
+            .bind(&field.style)
+            .bind(&field.align)
+            .bind(&field.vertical_align)
+            .bind(&field.line_style)
             .execute(&mut *tx)
             .await?;
         }

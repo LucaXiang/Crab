@@ -104,30 +104,18 @@ pub async fn create(
     let display_name = data.display_name.unwrap_or_else(|| data.username.clone());
     let now = shared::util::now_millis();
 
-    let id: i64 = if let Some(aid) = assigned_id {
-        sqlx::query_scalar(
-            r#"INSERT INTO employee (id, username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?) RETURNING id"#,
-        )
-        .bind(aid)
-        .bind(&data.username)
-        .bind(&hash_pass)
-        .bind(&display_name)
-        .bind(data.role_id)
-        .bind(now)
-        .fetch_one(pool)
-        .await?
-    } else {
-        sqlx::query_scalar!(
-            r#"INSERT INTO employee (username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, 0, 1, ?) RETURNING id as "id!""#,
-            data.username,
-            hash_pass,
-            display_name,
-            data.role_id,
-            now
-        )
-        .fetch_one(pool)
-        .await?
-    };
+    let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    sqlx::query(
+        "INSERT INTO employee (id, username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?)",
+    )
+    .bind(id)
+    .bind(&data.username)
+    .bind(&hash_pass)
+    .bind(&display_name)
+    .bind(data.role_id)
+    .bind(now)
+    .execute(pool)
+    .await?;
 
     find_by_id(pool, id)
         .await?

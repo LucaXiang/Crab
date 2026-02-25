@@ -38,24 +38,13 @@ pub async fn create(
     assigned_id: Option<i64>,
     data: ZoneCreate,
 ) -> RepoResult<Zone> {
-    let id: i64 = if let Some(aid) = assigned_id {
-        sqlx::query_scalar(
-            r#"INSERT INTO zone (id, name, description) VALUES (?, ?, ?) RETURNING id"#,
-        )
-        .bind(aid)
+    let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    sqlx::query("INSERT INTO zone (id, name, description) VALUES (?, ?, ?)")
+        .bind(id)
         .bind(&data.name)
         .bind(&data.description)
-        .fetch_one(pool)
-        .await?
-    } else {
-        sqlx::query_scalar!(
-            r#"INSERT INTO zone (name, description) VALUES (?, ?) RETURNING id as "id!""#,
-            data.name,
-            data.description
-        )
-        .fetch_one(pool)
-        .await?
-    };
+        .execute(pool)
+        .await?;
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create zone".into()))

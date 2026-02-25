@@ -499,7 +499,7 @@ impl CatalogService {
         .fetch_one(&self.pool)
         .await?;
 
-        // Insert specs (each spec gets a snowflake ID)
+        // Insert specs (each with snowflake ID)
         for spec in &data.specs {
             let spec_id = shared::util::snowflake_id();
             sqlx::query(

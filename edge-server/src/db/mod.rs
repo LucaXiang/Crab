@@ -2,6 +2,7 @@
 //!
 //! Handles SQLite connection pool and migrations
 
+pub mod id_migration;
 pub mod repository;
 
 use crate::utils::AppError;
@@ -48,6 +49,11 @@ impl DbService {
             .await
             .map_err(|e| AppError::database(format!("Failed to apply migrations: {e}")))?;
         tracing::info!("Database migrations applied");
+
+        // One-time migration: remap legacy autoincrement IDs to snowflake IDs
+        id_migration::migrate_ids_if_needed(&pool)
+            .await
+            .map_err(|e| AppError::database(format!("ID migration failed: {e}")))?;
 
         Ok(Self { pool })
     }

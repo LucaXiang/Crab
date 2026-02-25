@@ -53,53 +53,39 @@ pub async fn create(
     let display_order = data.display_order.unwrap_or(0);
     let show_on_receipt = data.show_on_receipt.unwrap_or(false);
     let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(false);
-    let id: i64 = if let Some(aid) = assigned_id {
-        sqlx::query_scalar(
-            r#"INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10) RETURNING id"#,
-        )
-        .bind(aid)
-        .bind(&data.name)
-        .bind(is_multi_select)
-        .bind(data.max_selections)
-        .bind(&default_option_ids_json)
-        .bind(display_order)
-        .bind(show_on_receipt)
-        .bind(&data.receipt_name)
-        .bind(show_on_kitchen_print)
-        .bind(&data.kitchen_print_name)
-        .fetch_one(&mut *tx)
-        .await?
-    } else {
-        sqlx::query_scalar!(
-            r#"INSERT INTO attribute (name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id as "id!""#,
-            data.name,
-            is_multi_select,
-            data.max_selections,
-            default_option_ids_json,
-            display_order,
-            show_on_receipt,
-            data.receipt_name,
-            show_on_kitchen_print,
-            data.kitchen_print_name,
-        )
-        .fetch_one(&mut *tx)
-        .await?
-    };
+    let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    sqlx::query(
+        "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10)",
+    )
+    .bind(id)
+    .bind(&data.name)
+    .bind(is_multi_select)
+    .bind(data.max_selections)
+    .bind(&default_option_ids_json)
+    .bind(display_order)
+    .bind(show_on_receipt)
+    .bind(&data.receipt_name)
+    .bind(show_on_kitchen_print)
+    .bind(&data.kitchen_print_name)
+    .execute(&mut *tx)
+    .await?;
 
     // Create options
     if let Some(options) = data.options {
         for opt in options {
-            sqlx::query!(
-                "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
-                id,
-                opt.name,
-                opt.price_modifier,
-                opt.display_order,
-                opt.receipt_name,
-                opt.kitchen_print_name,
-                opt.enable_quantity,
-                opt.max_quantity,
+            let opt_id = shared::util::snowflake_id();
+            sqlx::query(
+                "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9)",
             )
+            .bind(opt_id)
+            .bind(id)
+            .bind(&opt.name)
+            .bind(opt.price_modifier)
+            .bind(opt.display_order)
+            .bind(&opt.receipt_name)
+            .bind(&opt.kitchen_print_name)
+            .bind(opt.enable_quantity)
+            .bind(opt.max_quantity)
             .execute(&mut *tx)
             .await?;
         }
@@ -146,17 +132,19 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
             .execute(&mut *tx)
             .await?;
         for opt in &options {
-            sqlx::query!(
-                "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
-                id,
-                opt.name,
-                opt.price_modifier,
-                opt.display_order,
-                opt.receipt_name,
-                opt.kitchen_print_name,
-                opt.enable_quantity,
-                opt.max_quantity,
+            let opt_id = shared::util::snowflake_id();
+            sqlx::query(
+                "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9)",
             )
+            .bind(opt_id)
+            .bind(id)
+            .bind(&opt.name)
+            .bind(opt.price_modifier)
+            .bind(opt.display_order)
+            .bind(&opt.receipt_name)
+            .bind(&opt.kitchen_print_name)
+            .bind(opt.enable_quantity)
+            .bind(opt.max_quantity)
             .execute(&mut *tx)
             .await?;
         }
@@ -266,16 +254,18 @@ pub async fn link(
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO attribute_binding (owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id as "id!""#,
-        owner_type,
-        owner_id,
-        attribute_id,
-        is_required,
-        display_order,
-        indices_json,
+    let id = shared::util::snowflake_id();
+    sqlx::query(
+        "INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )
-    .fetch_one(pool)
+    .bind(id)
+    .bind(owner_type)
+    .bind(owner_id)
+    .bind(attribute_id)
+    .bind(is_required)
+    .bind(display_order)
+    .bind(&indices_json)
+    .execute(pool)
     .await?;
 
     find_binding_by_id(pool, id)

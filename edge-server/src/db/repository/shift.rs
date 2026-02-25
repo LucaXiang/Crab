@@ -32,15 +32,17 @@ pub async fn create(pool: &SqlitePool, data: ShiftCreate) -> RepoResult<Shift> {
     }
 
     let now = shared::util::now_millis();
-    let id = sqlx::query_scalar!(
-        r#"INSERT INTO shift (operator_id, operator_name, status, start_time, starting_cash, expected_cash, abnormal_close, last_active_at, note, created_at, updated_at) VALUES (?1, ?2, 'OPEN', ?3, ?4, ?4, 0, ?3, ?5, ?3, ?3) RETURNING id as "id!""#,
-        data.operator_id,
-        data.operator_name,
-        now,
-        data.starting_cash,
-        data.note
+    let id = shared::util::snowflake_id();
+    sqlx::query(
+        "INSERT INTO shift (id, operator_id, operator_name, status, start_time, starting_cash, expected_cash, abnormal_close, last_active_at, note, created_at, updated_at) VALUES (?1, ?2, ?3, 'OPEN', ?4, ?5, ?5, 0, ?4, ?6, ?4, ?4)",
     )
-    .fetch_one(pool)
+    .bind(id)
+    .bind(data.operator_id)
+    .bind(&data.operator_name)
+    .bind(now)
+    .bind(data.starting_cash)
+    .bind(&data.note)
+    .execute(pool)
     .await?;
 
     find_by_id(pool, id)
