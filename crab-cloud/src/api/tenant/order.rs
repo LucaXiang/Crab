@@ -53,7 +53,7 @@ pub async fn list_orders(
 
 /// GET /api/tenant/stores/:id/orders/:order_key/detail
 ///
-/// 30-day cache first, fallback to on-demand edge fetch if edge is online.
+/// Permanent detail store first, fallback to on-demand edge fetch if not yet synced.
 pub async fn get_order_detail(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
@@ -61,7 +61,7 @@ pub async fn get_order_detail(
 ) -> ApiResult<shared::cloud::OrderDetailResponse> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
-    // 1. Check 30-day cache
+    // 1. Check permanent detail store
     if let Some(detail_json) =
         tenant_queries::get_order_detail(&state.pool, store_id, &identity.tenant_id, &order_key)
             .await
@@ -95,7 +95,7 @@ pub async fn get_order_detail(
         }));
     }
 
-    // 2. Cache miss — fetch from edge via RPC
+    // 2. Not yet synced — fetch from edge via RPC
     let rpc = shared::cloud::ws::CloudRpc::GetOrderDetail {
         order_key: order_key.clone(),
     };
@@ -135,50 +135,22 @@ pub async fn get_order_detail(
             AppError::new(ErrorCode::InternalError)
         })?;
 
-    // 3. Write fetched detail back to cache (best-effort)
-    let now = shared::util::now_millis();
-    let archived_order_id: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM store_archived_orders WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3",
-    )
-    .bind(store_id)
-    .bind(&identity.tenant_id)
-    .bind(&order_key)
-    .fetch_optional(&state.pool)
-    .await
-    .unwrap_or(None);
-
-    if let Some(order_id) = archived_order_id
-        && let Ok(detail_json) = serde_json::to_value(&detail_sync.detail)
-    {
+    // 3. Write fetched detail back to store_archived_orders (best-effort)
+    if let Ok(detail_json) = serde_json::to_value(&detail_sync.detail) {
         let _ = sqlx::query(
             r#"
-                INSERT INTO store_order_details (archived_order_id, detail, synced_at)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (archived_order_id)
-                DO UPDATE SET detail = EXCLUDED.detail, synced_at = EXCLUDED.synced_at
-                "#,
+            UPDATE store_archived_orders
+            SET detail = $4
+            WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3
+            "#,
         )
-        .bind(order_id)
+        .bind(store_id)
+        .bind(&identity.tenant_id)
+        .bind(&order_key)
         .bind(&detail_json)
-        .bind(now)
         .execute(&state.pool)
         .await;
     }
-
-    // Audit
-    let fetch_detail = serde_json::json!({
-        "order_key": order_key,
-        "store_id": store_id,
-    });
-    let _ = crate::db::audit::log(
-        &state.pool,
-        &identity.tenant_id,
-        "order_detail_fetched",
-        Some(&fetch_detail),
-        None,
-        now,
-    )
-    .await;
 
     Ok(Json(shared::cloud::OrderDetailResponse {
         source: "edge".to_string(),

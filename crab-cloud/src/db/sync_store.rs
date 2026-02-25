@@ -234,11 +234,7 @@ pub async fn upsert_resource(
     }
 }
 
-/// Upsert archived order with four-layer storage:
-/// 1. store_archived_orders (永久摘要 + desglose JSONB)
-/// 2. store_order_items (永久轻量级菜品统计，含 tax_rate)
-/// 3. store_order_payments (永久轻量级支付统计)
-/// 4. store_order_details (30 天缓存，完整详情 JSONB)
+/// Upsert archived order — single table with summary columns + detail JSONB.
 async fn upsert_archived_order(
     pool: &PgPool,
     edge_server_id: i64,
@@ -249,21 +245,19 @@ async fn upsert_archived_order(
     use shared::cloud::OrderDetailSync;
 
     let detail_sync: OrderDetailSync = serde_json::from_value(item.data.clone())?;
-
-    let mut tx = pool.begin().await?;
-
-    // 1. UPSERT store_archived_orders
     let desglose_json = serde_json::to_value(&detail_sync.desglose)?;
-    let row: Option<(i64,)> = sqlx::query_as(
+    let detail_json = serde_json::to_value(&detail_sync.detail)?;
+
+    sqlx::query(
         r#"
         INSERT INTO store_archived_orders (
             edge_server_id, tenant_id, source_id, order_key,
             receipt_number, status, end_time, total, tax,
             prev_hash, curr_hash, desglose,
             guest_count, discount_amount, void_type, loss_amount, start_time,
-            version, synced_at
+            detail, version, synced_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         ON CONFLICT (tenant_id, edge_server_id, order_key)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -278,10 +272,10 @@ async fn upsert_archived_order(
                       void_type = EXCLUDED.void_type,
                       loss_amount = EXCLUDED.loss_amount,
                       start_time = EXCLUDED.start_time,
+                      detail = EXCLUDED.detail,
                       version = EXCLUDED.version,
                       synced_at = EXCLUDED.synced_at
         WHERE store_archived_orders.version <= EXCLUDED.version
-        RETURNING id
         "#,
     )
     .bind(edge_server_id)
@@ -301,104 +295,12 @@ async fn upsert_archived_order(
     .bind(&detail_sync.detail.void_type)
     .bind(detail_sync.detail.loss_amount)
     .bind(detail_sync.detail.start_time)
+    .bind(&detail_json)
     .bind(version_to_i64(item.version))
     .bind(now)
-    .fetch_optional(&mut *tx)
+    .execute(pool)
     .await?;
 
-    let Some((order_row_id,)) = row else {
-        tx.commit().await?;
-        return Ok(());
-    };
-
-    // 2. Replace store_order_items
-    sqlx::query("DELETE FROM store_order_items WHERE archived_order_id = $1")
-        .bind(order_row_id)
-        .execute(&mut *tx)
-        .await?;
-
-    for item_sync in &detail_sync.detail.items {
-        sqlx::query(
-            r#"
-            INSERT INTO store_order_items (archived_order_id, name, category_name, quantity, line_total, tax_rate, product_source_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#,
-        )
-        .bind(order_row_id)
-        .bind(&item_sync.name)
-        .bind(&item_sync.category_name)
-        .bind(item_sync.quantity)
-        .bind(item_sync.line_total)
-        .bind(item_sync.tax_rate)
-        .bind(item_sync.product_source_id)
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    // 3. Replace store_order_payments
-    sqlx::query("DELETE FROM store_order_payments WHERE archived_order_id = $1")
-        .bind(order_row_id)
-        .execute(&mut *tx)
-        .await?;
-
-    for pay in &detail_sync.detail.payments {
-        if pay.cancelled {
-            continue;
-        }
-        sqlx::query(
-            r#"
-            INSERT INTO store_order_payments (archived_order_id, method, amount)
-            VALUES ($1, $2, $3)
-            "#,
-        )
-        .bind(order_row_id)
-        .bind(&pay.method)
-        .bind(pay.amount)
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    // 4. Replace store_order_events
-    sqlx::query("DELETE FROM store_order_events WHERE archived_order_id = $1")
-        .bind(order_row_id)
-        .execute(&mut *tx)
-        .await?;
-
-    for ev in &detail_sync.detail.events {
-        sqlx::query(
-            r#"
-            INSERT INTO store_order_events (archived_order_id, seq, event_type, timestamp, operator_id, operator_name)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-        )
-        .bind(order_row_id)
-        .bind(ev.seq)
-        .bind(&ev.event_type)
-        .bind(ev.timestamp)
-        .bind(ev.operator_id)
-        .bind(&ev.operator_name)
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    // 5. UPSERT store_order_details (30 天缓存)
-    let detail_json = serde_json::to_value(&detail_sync.detail)?;
-    sqlx::query(
-        r#"
-        INSERT INTO store_order_details (archived_order_id, detail, synced_at)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (archived_order_id)
-        DO UPDATE SET detail = EXCLUDED.detail,
-                      synced_at = EXCLUDED.synced_at
-        "#,
-    )
-    .bind(order_row_id)
-    .bind(&detail_json)
-    .bind(now)
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
     Ok(())
 }
 

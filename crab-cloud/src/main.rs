@@ -108,33 +108,6 @@ async fn main() -> Result<(), BoxError> {
         }
     });
 
-    // Periodic order detail cleanup (every hour, delete details older than 30 days)
-    let cleanup_pool = state.pool.clone();
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
-        loop {
-            interval.tick().await;
-            let cutoff = shared::util::now_millis() - 30 * 24 * 3600 * 1000;
-            match sqlx::query("DELETE FROM store_order_details WHERE synced_at < $1")
-                .bind(cutoff)
-                .execute(&cleanup_pool)
-                .await
-            {
-                Ok(result) => {
-                    if result.rows_affected() > 0 {
-                        tracing::info!(
-                            deleted = result.rows_affected(),
-                            "Cleaned up old order details (>30 days)"
-                        );
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!("Order detail cleanup failed: {e}");
-                }
-            }
-        }
-    });
-
     // Periodic pending_rpcs cleanup (every 30s, remove entries older than 60s)
     let pending_rpcs = state.edges.pending_rpcs.clone();
     tokio::spawn(async move {

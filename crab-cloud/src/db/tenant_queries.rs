@@ -234,7 +234,7 @@ pub async fn list_daily_reports(
     Ok(rows)
 }
 
-/// Get cached order detail (from store_order_details, 30-day cache)
+/// Get order detail from store_archived_orders.detail JSONB column
 pub async fn get_order_detail(
     pool: &PgPool,
     edge_server_id: i64,
@@ -243,10 +243,10 @@ pub async fn get_order_detail(
 ) -> Result<Option<serde_json::Value>, BoxError> {
     let row: Option<(serde_json::Value,)> = sqlx::query_as(
         r#"
-        SELECT d.detail
-        FROM store_order_details d
-        JOIN store_archived_orders o ON o.id = d.archived_order_id
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2 AND o.order_key = $3
+        SELECT detail
+        FROM store_archived_orders
+        WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3
+            AND detail IS NOT NULL
         "#,
     )
     .bind(edge_server_id)
@@ -283,7 +283,7 @@ pub async fn get_order_desglose(
     }
 }
 
-// ── Store overview statistics (computed from store_archived_orders) ──
+// ── Store overview statistics ──
 
 /// Overview statistics for a time range
 #[derive(Debug, serde::Serialize)]
@@ -315,28 +315,28 @@ pub struct RevenueTrendPoint {
     pub orders: i64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct TaxBreakdownEntry {
     pub tax_rate: i32,
     pub base_amount: f64,
     pub tax_amount: f64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct PaymentBreakdownEntry {
     pub method: String,
     pub amount: f64,
     pub count: i64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct TopProductEntry {
     pub name: String,
     pub quantity: i64,
     pub revenue: f64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct CategorySaleEntry {
     pub name: String,
     pub revenue: f64,
@@ -350,11 +350,33 @@ pub struct TagSaleEntry {
     pub quantity: i64,
 }
 
-/// Compute store overview statistics for a time range (from..to as unix millis)
+/// Compute store overview for a single store
 pub async fn get_store_overview(
     pool: &PgPool,
     edge_server_id: i64,
     tenant_id: &str,
+    from: i64,
+    to: i64,
+) -> Result<StoreOverview, BoxError> {
+    get_overview(pool, tenant_id, Some(edge_server_id), from, to).await
+}
+
+/// Compute tenant-wide overview (all stores combined)
+pub async fn get_tenant_overview(
+    pool: &PgPool,
+    tenant_id: &str,
+    from: i64,
+    to: i64,
+) -> Result<StoreOverview, BoxError> {
+    get_overview(pool, tenant_id, None, from, to).await
+}
+
+/// Parameterized overview: edge_server_id=None → tenant-wide, Some → single store.
+/// All queries enforce tenant_id isolation.
+async fn get_overview(
+    pool: &PgPool,
+    tenant_id: &str,
+    edge_server_id: Option<i64>,
     from: i64,
     to: i64,
 ) -> Result<StoreOverview, BoxError> {
@@ -376,12 +398,13 @@ pub async fn get_store_overview(
             COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
             COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
         FROM store_archived_orders
-        WHERE edge_server_id = $1 AND tenant_id = $2
+        WHERE tenant_id = $1
+            AND ($2::BIGINT IS NULL OR edge_server_id = $2)
             AND end_time >= $3 AND end_time < $4
         "#,
     )
-    .bind(edge_server_id)
     .bind(tenant_id)
+    .bind(edge_server_id)
     .bind(from)
     .bind(to)
     .fetch_one(pool)
@@ -419,427 +442,154 @@ pub async fn get_store_overview(
             COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
             COUNT(*) AS orders
         FROM store_archived_orders
-        WHERE edge_server_id = $1 AND tenant_id = $2
+        WHERE tenant_id = $1
+            AND ($2::BIGINT IS NULL OR edge_server_id = $2)
             AND end_time >= $3 AND end_time < $4
             AND status = 'COMPLETED'
         GROUP BY hour
         ORDER BY hour
         "#,
     )
-    .bind(edge_server_id)
     .bind(tenant_id)
+    .bind(edge_server_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)
     .await?;
 
-    // 3. Tax breakdown from store_order_items (permanent, computed from line_total + tax_rate)
-    let tax_rows: Vec<(i32, f64)> = sqlx::query_as(
+    // 3. Tax breakdown from desglose JSONB (already aggregated per order)
+    let tax_breakdown: Vec<TaxBreakdownEntry> = sqlx::query_as(
         r#"
         SELECT
-            i.tax_rate,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS base_amount
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-        GROUP BY i.tax_rate
-        ORDER BY i.tax_rate
-        "#,
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await?;
-
-    let tax_breakdown: Vec<TaxBreakdownEntry> = tax_rows
-        .into_iter()
-        .map(|(tax_rate, base_amount)| {
-            let tax_amount = base_amount * tax_rate as f64 / 100.0;
-            TaxBreakdownEntry {
-                tax_rate,
-                base_amount,
-                tax_amount,
-            }
-        })
-        .collect();
-
-    // 4. Payment breakdown from store_order_payments (permanent)
-    let payment_rows: Vec<(String, f64, i64)> = sqlx::query_as(
-        r#"
-        SELECT
-            p.method,
-            COALESCE(SUM(p.amount), 0)::DOUBLE PRECISION AS amount,
-            COUNT(*) AS count
-        FROM store_order_payments p
-        JOIN store_archived_orders o ON o.id = p.archived_order_id
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-        GROUP BY p.method
-        ORDER BY amount DESC
-        "#,
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    let payment_breakdown: Vec<PaymentBreakdownEntry> = payment_rows
-        .into_iter()
-        .map(|(method, amount, count)| PaymentBreakdownEntry {
-            method,
-            amount,
-            count,
-        })
-        .collect();
-
-    // 5. Top products from store_order_items (permanent)
-    let product_rows: Vec<(String, i64, f64)> = sqlx::query_as(
-        r#"
-        SELECT
-            i.name,
-            COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-        GROUP BY i.name
-        ORDER BY quantity DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    let top_products: Vec<TopProductEntry> = product_rows
-        .into_iter()
-        .map(|(name, quantity, revenue)| TopProductEntry {
-            name,
-            quantity,
-            revenue,
-        })
-        .collect();
-
-    // 6. Category sales from store_order_items (permanent)
-    let category_rows: Vec<(String, f64)> = sqlx::query_as(
-        r#"
-        SELECT
-            COALESCE(i.category_name, 'Sin categoría') AS name,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-        GROUP BY name
-        ORDER BY revenue DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    let category_sales: Vec<CategorySaleEntry> = category_rows
-        .into_iter()
-        .map(|(name, revenue)| CategorySaleEntry { name, revenue })
-        .collect();
-
-    // 7. Tag sales — JOIN order_items → store_product_tag → store_tags
-    let tag_sales: Vec<TagSaleEntry> = sqlx::query_as(
-        r#"
-        SELECT
-            t.name,
-            t.color,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
-            COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
-        JOIN store_product_tag pt ON pt.product_source_id = i.product_source_id
-            AND pt.store_id = $1
-        JOIN store_tags t ON t.source_id = pt.tag_source_id
-            AND t.store_id = $1
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
-            AND o.end_time >= $3 AND o.end_time < $4
-            AND o.status = 'COMPLETED'
-            AND i.product_source_id IS NOT NULL
-        GROUP BY t.name, t.color
-        ORDER BY revenue DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(edge_server_id)
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-
-    Ok(StoreOverview {
-        revenue,
-        orders,
-        guests,
-        average_order_value,
-        per_guest_spend,
-        average_dining_minutes,
-        total_tax,
-        total_discount,
-        voided_orders,
-        voided_amount,
-        loss_orders,
-        loss_amount,
-        revenue_trend,
-        tax_breakdown,
-        payment_breakdown,
-        top_products,
-        category_sales,
-        tag_sales,
-    })
-}
-
-/// Compute tenant-wide overview statistics (all stores combined) for a time range
-pub async fn get_tenant_overview(
-    pool: &PgPool,
-    tenant_id: &str,
-    from: i64,
-    to: i64,
-) -> Result<StoreOverview, BoxError> {
-    #[allow(clippy::type_complexity)]
-    let overview: (f64, i64, i64, f64, f64, i64, f64, f64, i64, f64, f64) = sqlx::query_as(
-        r#"
-        SELECT
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total ELSE 0 END), 0)::DOUBLE PRECISION,
-            COUNT(*) FILTER (WHERE status = 'COMPLETED'),
-            COUNT(*) FILTER (WHERE status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED')),
-            COALESCE(SUM(CASE WHEN status = 'VOID' THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(tax, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(guest_count, 0) ELSE 0 END), 0)::BIGINT,
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(discount_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(AVG(CASE WHEN status = 'COMPLETED' AND start_time IS NOT NULL AND end_time IS NOT NULL
-                THEN (end_time - start_time) / 60000.0 END), 0)::DOUBLE PRECISION,
-            COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LOSS_SETTLED'),
-            COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
-        FROM store_archived_orders
+            (d->>'tax_rate')::INTEGER AS tax_rate,
+            COALESCE(SUM((d->>'base_amount')::DOUBLE PRECISION), 0) AS base_amount,
+            COALESCE(SUM((d->>'tax_amount')::DOUBLE PRECISION), 0) AS tax_amount
+        FROM store_archived_orders,
+             jsonb_array_elements(desglose) AS d
         WHERE tenant_id = $1
-            AND end_time >= $2 AND end_time < $3
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_one(pool)
-    .await?;
-
-    let (
-        revenue,
-        orders,
-        voided_orders,
-        _voided_amount_all,
-        total_tax,
-        guests,
-        total_discount,
-        average_dining_minutes,
-        loss_orders,
-        loss_amount,
-        voided_amount,
-    ) = overview;
-    let average_order_value = if orders > 0 {
-        revenue / orders as f64
-    } else {
-        0.0
-    };
-    let per_guest_spend = if guests > 0 {
-        revenue / guests as f64
-    } else {
-        0.0
-    };
-
-    let revenue_trend: Vec<RevenueTrendPoint> = sqlx::query_as(
-        r#"
-        SELECT
-            EXTRACT(HOUR FROM TO_TIMESTAMP(end_time / 1000.0))::INTEGER AS hour,
-            COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
-            COUNT(*) AS orders
-        FROM store_archived_orders
-        WHERE tenant_id = $1
-            AND end_time >= $2 AND end_time < $3
+            AND ($2::BIGINT IS NULL OR edge_server_id = $2)
+            AND end_time >= $3 AND end_time < $4
             AND status = 'COMPLETED'
-        GROUP BY hour
-        ORDER BY hour
+            AND desglose IS NOT NULL AND jsonb_typeof(desglose) = 'array'
+        GROUP BY tax_rate
+        ORDER BY tax_rate
         "#,
     )
     .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await?;
-
-    let tax_rows: Vec<(i32, f64)> = sqlx::query_as(
-        r#"
-        SELECT
-            i.tax_rate,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS base_amount
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
-        WHERE o.tenant_id = $1
-            AND o.end_time >= $2 AND o.end_time < $3
-            AND o.status = 'COMPLETED'
-        GROUP BY i.tax_rate
-        ORDER BY i.tax_rate
-        "#,
-    )
-    .bind(tenant_id)
-    .bind(from)
-    .bind(to)
-    .fetch_all(pool)
-    .await?;
-
-    let tax_breakdown: Vec<TaxBreakdownEntry> = tax_rows
-        .into_iter()
-        .map(|(tax_rate, base_amount)| {
-            let tax_amount = base_amount * tax_rate as f64 / 100.0;
-            TaxBreakdownEntry {
-                tax_rate,
-                base_amount,
-                tax_amount,
-            }
-        })
-        .collect();
-
-    let payment_rows: Vec<(String, f64, i64)> = sqlx::query_as(
-        r#"
-        SELECT
-            p.method,
-            COALESCE(SUM(p.amount), 0)::DOUBLE PRECISION AS amount,
-            COUNT(*) AS count
-        FROM store_order_payments p
-        JOIN store_archived_orders o ON o.id = p.archived_order_id
-        WHERE o.tenant_id = $1
-            AND o.end_time >= $2 AND o.end_time < $3
-            AND o.status = 'COMPLETED'
-        GROUP BY p.method
-        ORDER BY amount DESC
-        "#,
-    )
-    .bind(tenant_id)
+    .bind(edge_server_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)
     .await
     .unwrap_or_default();
 
-    let payment_breakdown: Vec<PaymentBreakdownEntry> = payment_rows
-        .into_iter()
-        .map(|(method, amount, count)| PaymentBreakdownEntry {
-            method,
-            amount,
-            count,
-        })
-        .collect();
-
-    let product_rows: Vec<(String, i64, f64)> = sqlx::query_as(
+    // 4. Payment breakdown from detail JSONB
+    let payment_breakdown: Vec<PaymentBreakdownEntry> = sqlx::query_as(
         r#"
         SELECT
-            i.name,
-            COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
+            p->>'method' AS method,
+            COALESCE(SUM((p->>'amount')::DOUBLE PRECISION), 0) AS amount,
+            COUNT(*) AS count
+        FROM store_archived_orders o
+        CROSS JOIN jsonb_array_elements(o.detail->'payments') AS p
         WHERE o.tenant_id = $1
-            AND o.end_time >= $2 AND o.end_time < $3
+            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+            AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
-        GROUP BY i.name
+            AND o.detail IS NOT NULL
+            AND (p->>'cancelled')::BOOLEAN IS NOT TRUE
+        GROUP BY method
+        ORDER BY amount DESC
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(edge_server_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    // 5. Top products from detail JSONB
+    let top_products: Vec<TopProductEntry> = sqlx::query_as(
+        r#"
+        SELECT
+            i->>'name' AS name,
+            COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity,
+            COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
+        FROM store_archived_orders o
+        CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+        WHERE o.tenant_id = $1
+            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+            AND o.end_time >= $3 AND o.end_time < $4
+            AND o.status = 'COMPLETED'
+            AND o.detail IS NOT NULL
+        GROUP BY name
         ORDER BY quantity DESC
         LIMIT 10
         "#,
     )
     .bind(tenant_id)
+    .bind(edge_server_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)
     .await
     .unwrap_or_default();
 
-    let top_products: Vec<TopProductEntry> = product_rows
-        .into_iter()
-        .map(|(name, quantity, revenue)| TopProductEntry {
-            name,
-            quantity,
-            revenue,
-        })
-        .collect();
-
-    let category_rows: Vec<(String, f64)> = sqlx::query_as(
+    // 6. Category sales from detail JSONB
+    let category_sales: Vec<CategorySaleEntry> = sqlx::query_as(
         r#"
         SELECT
-            COALESCE(i.category_name, 'Sin categoría') AS name,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
+            COALESCE(i->>'category_name', 'Sin categoría') AS name,
+            COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
+        FROM store_archived_orders o
+        CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
         WHERE o.tenant_id = $1
-            AND o.end_time >= $2 AND o.end_time < $3
+            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+            AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
+            AND o.detail IS NOT NULL
         GROUP BY name
         ORDER BY revenue DESC
         LIMIT 10
         "#,
     )
     .bind(tenant_id)
+    .bind(edge_server_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)
     .await
     .unwrap_or_default();
 
-    let category_sales: Vec<CategorySaleEntry> = category_rows
-        .into_iter()
-        .map(|(name, revenue)| CategorySaleEntry { name, revenue })
-        .collect();
-
-    // Tenant-wide tag sales (across all stores)
+    // 7. Tag sales — JSONB items → store_product_tag → store_tags
     let tag_sales: Vec<TagSaleEntry> = sqlx::query_as(
         r#"
         SELECT
             t.name,
             t.color,
-            COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
-            COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
-        FROM store_order_items i
-        JOIN store_archived_orders o ON o.id = i.archived_order_id
-        JOIN store_product_tag pt ON pt.product_source_id = i.product_source_id
+            COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue,
+            COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity
+        FROM store_archived_orders o
+        CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+        JOIN store_product_tag pt ON pt.product_source_id = (i->>'product_source_id')::BIGINT
             AND pt.store_id = o.edge_server_id
         JOIN store_tags t ON t.source_id = pt.tag_source_id
             AND t.store_id = o.edge_server_id
         WHERE o.tenant_id = $1
-            AND o.end_time >= $2 AND o.end_time < $3
+            AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+            AND o.end_time >= $3 AND o.end_time < $4
             AND o.status = 'COMPLETED'
-            AND i.product_source_id IS NOT NULL
+            AND o.detail IS NOT NULL
+            AND i->>'product_source_id' IS NOT NULL
         GROUP BY t.name, t.color
         ORDER BY revenue DESC
         LIMIT 10
         "#,
     )
     .bind(tenant_id)
+    .bind(edge_server_id)
     .bind(from)
     .bind(to)
     .fetch_all(pool)
@@ -918,19 +668,20 @@ pub async fn get_red_flags(
     let rows: Vec<Row> = sqlx::query_as(
         r#"
         SELECT
-            e.operator_id,
-            e.operator_name,
-            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_REMOVED') AS item_removals,
-            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_COMPED') AS item_comps,
-            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_VOIDED') AS order_voids,
-            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
-            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_MODIFIED') AS price_modifications
-        FROM store_order_events e
-        JOIN store_archived_orders o ON o.id = e.archived_order_id
+            (e->>'operator_id')::BIGINT AS operator_id,
+            e->>'operator_name' AS operator_name,
+            COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_REMOVED') AS item_removals,
+            COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_COMPED') AS item_comps,
+            COUNT(*) FILTER (WHERE e->>'event_type' = 'ORDER_VOIDED') AS order_voids,
+            COUNT(*) FILTER (WHERE e->>'event_type' = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
+            COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_MODIFIED') AS price_modifications
+        FROM store_archived_orders o
+        CROSS JOIN jsonb_array_elements(o.detail->'events') AS e
         WHERE o.edge_server_id = $1 AND o.tenant_id = $2
-            AND e.timestamp >= $3 AND e.timestamp < $4
-            AND e.event_type IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
-        GROUP BY e.operator_id, e.operator_name
+            AND o.detail IS NOT NULL
+            AND (e->>'timestamp')::BIGINT >= $3 AND (e->>'timestamp')::BIGINT < $4
+            AND e->>'event_type' IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
+        GROUP BY operator_id, operator_name
         ORDER BY COUNT(*) DESC
         "#,
     )

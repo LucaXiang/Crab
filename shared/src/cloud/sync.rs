@@ -211,7 +211,7 @@ pub struct CloudSyncError {
 
 /// 归档订单完整详情（edge→cloud 推送）
 ///
-/// 包含摘要层（永久保存，含 VeriFactu desglose）和详情层（30 天滚动）。
+/// 两层存储：摘要层（永久，含 VeriFactu desglose）+ 详情层（永久，完整 JSONB）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderDetailSync {
     // ── 摘要层（永久保存） ──
@@ -228,7 +228,7 @@ pub struct OrderDetailSync {
     /// VeriFactu 税率分拆
     pub desglose: Vec<TaxDesglose>,
 
-    // ── 详情层（30 天滚动） ──
+    // ── 详情层（永久保存） ──
     pub detail: OrderDetailPayload,
 }
 
