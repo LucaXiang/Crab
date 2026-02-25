@@ -46,6 +46,8 @@ pub struct KitchenOrder {
     pub id: String, // = event_id
     pub order_id: String,
     pub table_name: Option<String>,
+    pub queue_number: Option<u32>,
+    pub is_retail: bool,
     pub created_at: i64, // 时间戳
     pub items: Vec<KitchenOrderItem>,
     pub print_count: u32, // 打印次数
@@ -58,6 +60,8 @@ pub struct LabelPrintRecord {
     pub order_id: String,
     pub kitchen_order_id: String, // 关联的 KitchenOrder
     pub table_name: Option<String>,
+    pub queue_number: Option<u32>,
+    pub is_retail: bool,
     pub created_at: i64,
     pub context: PrintItemContext,
     pub print_count: u32,

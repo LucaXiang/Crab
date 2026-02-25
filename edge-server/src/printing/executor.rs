@@ -84,6 +84,8 @@ impl PrintExecutor {
                 id: order.id.clone(),
                 order_id: order.order_id.clone(),
                 table_name: order.table_name.clone(),
+                queue_number: order.queue_number,
+                is_retail: order.is_retail,
                 created_at: order.created_at,
                 items,
                 print_count: order.print_count,
@@ -243,8 +245,6 @@ impl PrintExecutor {
         records: &[super::types::LabelPrintRecord],
         destinations: &HashMap<String, PrintDestination>,
         template: &crab_printer::label::LabelTemplate,
-        table_name: Option<&str>,
-        queue_number: Option<u32>,
     ) -> PrintExecutorResult<()> {
         for record in records {
             tracing::debug!(
@@ -282,7 +282,7 @@ impl PrintExecutor {
                     }
                 };
 
-                let data = build_label_data(&record.context, table_name, queue_number);
+                let data = build_label_data(record);
 
                 let options = crab_printer::label::PrintOptions {
                     printer_name: Some(driver_name),
@@ -338,21 +338,16 @@ impl PrintExecutor {
         &self,
         _records: &[super::types::LabelPrintRecord],
         _destinations: &HashMap<String, PrintDestination>,
-        _table_name: Option<&str>,
-        _queue_number: Option<u32>,
     ) -> PrintExecutorResult<()> {
         warn!("Label printing requires Windows (GDI+)");
         Ok(())
     }
 }
 
-/// Build label data JSON from PrintItemContext
+/// Build label data JSON from LabelPrintRecord
 #[cfg(windows)]
-fn build_label_data(
-    ctx: &super::types::PrintItemContext,
-    table_name: Option<&str>,
-    queue_number: Option<u32>,
-) -> serde_json::Value {
+fn build_label_data(record: &super::types::LabelPrintRecord) -> serde_json::Value {
+    let ctx = &record.context;
     let time = chrono::Local::now().format("%H:%M").to_string();
     serde_json::json!({
         "product_name": ctx.product_name,
@@ -366,8 +361,8 @@ fn build_label_data(
         "index": ctx.index.as_deref().unwrap_or(""),
         "note": ctx.note.as_deref().unwrap_or(""),
         "external_id": ctx.external_id.unwrap_or(0),
-        "table_name": table_name.unwrap_or(""),
-        "queue_number": queue_number.map(|n| format!("#{:03}", n)).unwrap_or_default(),
+        "table_name": record.table_name.as_deref().unwrap_or(""),
+        "queue_number": record.queue_number.map(|n| format!("#{:03}", n)).unwrap_or_default(),
         "time": time,
     })
 }
@@ -467,6 +462,8 @@ mod tests {
             id: "evt-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("100桌".to_string()),
+            queue_number: None,
+            is_retail: false,
             created_at: 1705912335000, // 2024-01-22 14:32:15 UTC (millis)
             items: vec![KitchenOrderItem {
                 context: PrintItemContext {

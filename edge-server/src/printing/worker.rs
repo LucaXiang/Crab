@@ -8,7 +8,7 @@ use crate::orders::OrdersManager;
 use crate::printing::{KitchenPrintService, PrintExecutor};
 use crate::services::CatalogService;
 use chrono_tz::Tz;
-use shared::order::OrderEvent;
+use shared::order::{OrderEvent, OrderEventType};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,8 +20,9 @@ type ArcOrderEvent = Arc<OrderEvent>;
 
 /// 厨房打印工作者
 ///
-/// 监听打印事件通道（仅 ItemsAdded），执行厨房打印。
-/// 通过 EventRouter 解耦，不直接依赖 OrdersManager 的 broadcast。
+/// 监听打印事件通道（ItemsAdded + OrderCompleted），执行厨房打印。
+/// - ItemsAdded: 堂食立即打印，零售创建记录但跳过打印
+/// - OrderCompleted: 零售订单完成时执行打印
 pub struct KitchenPrintWorker {
     orders_manager: Arc<OrdersManager>,
     kitchen_print_service: Arc<KitchenPrintService>,
@@ -49,7 +50,7 @@ impl KitchenPrintWorker {
 
     /// 运行工作者（阻塞直到通道关闭）
     ///
-    /// 接收来自 EventRouter 的 mpsc 通道（已过滤为仅 ItemsAdded）
+    /// 接收来自 EventRouter 的 mpsc 通道（ItemsAdded + OrderCompleted）
     pub async fn run(
         self,
         mut event_rx: mpsc::Receiver<ArcOrderEvent>,
@@ -69,69 +70,80 @@ impl KitchenPrintWorker {
                         tracing::info!("Print channel closed, kitchen print worker stopping");
                         break;
                     };
-                    self.handle_items_added(&event, &executor).await;
+                    match event.event_type {
+                        OrderEventType::ItemsAdded => {
+                            self.handle_items_added(&event, &executor).await;
+                        }
+                        OrderEventType::OrderCompleted => {
+                            self.handle_order_completed(&event, &executor).await;
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
     }
 
     /// 处理 ItemsAdded 事件
-    async fn handle_items_added(
-        &self,
-        event: &shared::order::OrderEvent,
-        executor: &PrintExecutor,
-    ) {
+    async fn handle_items_added(&self, event: &OrderEvent, executor: &PrintExecutor) {
         tracing::debug!(
             order_id = %event.order_id,
             event_id = %event.event_id,
             "handle_items_added: start"
         );
 
-        // Get table name and queue_number from order snapshot
-        let (table_name, queue_number) = self
-            .orders_manager
-            .get_snapshot(&event.order_id)
-            .ok()
-            .flatten()
-            .map(|s| (s.table_name, s.queue_number))
-            .unwrap_or((None, None));
+        // Get full snapshot
+        let snapshot = match self.orders_manager.get_snapshot(&event.order_id) {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                tracing::warn!(order_id = %event.order_id, "Snapshot not found");
+                return;
+            }
+            Err(e) => {
+                tracing::error!(order_id = %event.order_id, error = ?e, "Failed to get snapshot");
+                return;
+            }
+        };
 
         tracing::debug!(
-            table_name = ?table_name,
-            queue_number = ?queue_number,
+            table_name = ?snapshot.table_name,
+            queue_number = ?snapshot.queue_number,
+            is_retail = snapshot.is_retail,
             "handle_items_added: order context loaded"
         );
 
-        // Process the event (create KitchenOrder record)
+        // Process the event (create KitchenOrder + LabelPrintRecord)
         match self.kitchen_print_service.process_items_added(
             event,
-            table_name.clone(),
+            &snapshot,
             &self.catalog_service,
         ) {
             Ok(Some(kitchen_order_id)) => {
                 tracing::info!(
                     order_id = %event.order_id,
                     kitchen_order_id = %kitchen_order_id,
+                    is_retail = snapshot.is_retail,
                     "Created kitchen order"
                 );
 
-                // Execute kitchen printing
-                self.execute_print(&kitchen_order_id, executor).await;
+                // 零售模式：创建记录但跳过打印（等 OrderCompleted 再打）
+                if snapshot.is_retail {
+                    tracing::debug!(
+                        order_id = %event.order_id,
+                        "Retail order: deferring print until OrderCompleted"
+                    );
+                    return;
+                }
 
-                // Execute label printing
-                self.execute_label_print(
-                    &event.order_id,
-                    &kitchen_order_id,
-                    executor,
-                    table_name.as_deref(),
-                    queue_number,
-                )
-                .await;
+                // 堂食模式：立即打印
+                self.execute_print(&kitchen_order_id, executor).await;
+                self.execute_label_print(&event.order_id, &kitchen_order_id, executor)
+                    .await;
             }
             Ok(None) => {
                 tracing::debug!(
                     order_id = %event.order_id,
-                    "handle_items_added: no print records created (printing disabled or no matching destinations)"
+                    "handle_items_added: no print records created"
                 );
             }
             Err(e) => {
@@ -144,7 +156,48 @@ impl KitchenPrintWorker {
         }
     }
 
-    /// 执行打印
+    /// 处理 OrderCompleted 事件（零售订单延迟打印）
+    async fn handle_order_completed(&self, event: &OrderEvent, executor: &PrintExecutor) {
+        // 读取该订单所有 KitchenOrder
+        let kitchen_orders = match self
+            .kitchen_print_service
+            .get_kitchen_orders_for_order(&event.order_id)
+        {
+            Ok(orders) => orders,
+            Err(e) => {
+                tracing::error!(
+                    order_id = %event.order_id,
+                    error = ?e,
+                    "Failed to get kitchen orders for completed order"
+                );
+                return;
+            }
+        };
+
+        // 仅处理零售订单（is_retail=true 且 print_count=0 的记录）
+        let pending: Vec<_> = kitchen_orders
+            .iter()
+            .filter(|ko| ko.is_retail && ko.print_count == 0)
+            .collect();
+
+        if pending.is_empty() {
+            return;
+        }
+
+        tracing::info!(
+            order_id = %event.order_id,
+            pending_count = pending.len(),
+            "OrderCompleted: executing deferred retail prints"
+        );
+
+        for ko in pending {
+            self.execute_print(&ko.id, executor).await;
+            self.execute_label_print(&event.order_id, &ko.id, executor)
+                .await;
+        }
+    }
+
+    /// 执行厨房打印
     async fn execute_print(&self, kitchen_order_id: &str, executor: &PrintExecutor) {
         let order = match self
             .kitchen_print_service
@@ -192,8 +245,6 @@ impl KitchenPrintWorker {
         order_id: &str,
         kitchen_order_id: &str,
         executor: &PrintExecutor,
-        table_name: Option<&str>,
-        queue_number: Option<u32>,
     ) {
         use crate::db::repository::label_template;
 
@@ -251,7 +302,7 @@ impl KitchenPrintWorker {
         };
 
         if let Err(e) = executor
-            .print_label_records(&records, &destinations, &template, table_name, queue_number)
+            .print_label_records(&records, &destinations, &template)
             .await
         {
             tracing::error!(order_id = %order_id, error = %e, "Failed to print labels");
@@ -262,20 +313,18 @@ impl KitchenPrintWorker {
     #[cfg(not(windows))]
     async fn execute_label_print(
         &self,
-        _order_id: &str,
-        _kitchen_order_id: &str,
+        order_id: &str,
+        kitchen_order_id: &str,
         executor: &PrintExecutor,
-        table_name: Option<&str>,
-        queue_number: Option<u32>,
     ) {
         // 获取该 kitchen order 关联的标签记录
         let records = match self
             .kitchen_print_service
-            .get_label_records_for_order(_order_id)
+            .get_label_records_for_order(order_id)
         {
             Ok(r) => r
                 .into_iter()
-                .filter(|r| r.kitchen_order_id == _kitchen_order_id)
+                .filter(|r| r.kitchen_order_id == kitchen_order_id)
                 .collect::<Vec<_>>(),
             Err(e) => {
                 tracing::error!(error = ?e, "Failed to load label records");
@@ -296,11 +345,8 @@ impl KitchenPrintWorker {
             }
         };
 
-        if let Err(e) = executor
-            .print_label_records(&records, &destinations, table_name, queue_number)
-            .await
-        {
-            tracing::error!(order_id = %_order_id, error = %e, "Failed to print labels");
+        if let Err(e) = executor.print_label_records(&records, &destinations).await {
+            tracing::error!(order_id = %order_id, error = %e, "Failed to print labels");
         }
     }
 }
