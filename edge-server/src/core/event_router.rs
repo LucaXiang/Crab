@@ -7,7 +7,7 @@
 //!        │
 //!        └── EventRouter
 //!               ├── mpsc ──► ArchiveWorker (terminal events only) [CRITICAL]
-//!               ├── mpsc ──► KitchenPrintWorker (ItemsAdded only) [best-effort]
+//!               ├── mpsc ──► KitchenPrintWorker (ItemsAdded + OrderCompleted) [best-effort]
 //!               └── mpsc ──► OrderSyncForwarder (all events) [best-effort]
 //! ```
 //!
@@ -32,7 +32,7 @@ const TERMINAL_EVENTS: &[OrderEventType] = &[
 pub struct EventChannels {
     /// 归档事件（仅终端事件）- Arc 包装减少克隆开销
     pub archive_rx: mpsc::Receiver<Arc<OrderEvent>>,
-    /// 打印事件（仅 ItemsAdded）
+    /// 打印事件（ItemsAdded + OrderCompleted）
     pub print_rx: mpsc::Receiver<Arc<OrderEvent>>,
     /// 同步事件（所有事件）
     pub sync_rx: mpsc::Receiver<Arc<OrderEvent>>,
@@ -140,7 +140,12 @@ impl EventRouter {
         }
 
         // 3. 打印通道：best-effort，满则丢弃
-        if event.event_type == OrderEventType::ItemsAdded {
+        //    ItemsAdded: 创建厨房单/标签记录 + 堂食立即打印
+        //    OrderCompleted: 零售订单延迟打印
+        if matches!(
+            event.event_type,
+            OrderEventType::ItemsAdded | OrderEventType::OrderCompleted
+        ) {
             match self.print_tx.try_send(Arc::clone(&event)) {
                 Ok(()) => {}
                 Err(mpsc::error::TrySendError::Full(_)) => {
@@ -216,9 +221,10 @@ mod tests {
         let completed = make_test_event(OrderEventType::OrderCompleted, 2);
         tx.send(completed).unwrap();
 
-        // Should receive on sync and archive channels
+        // Should receive on sync, archive, and print channels
         assert!(channels.sync_rx.recv().await.is_some());
         assert!(channels.archive_rx.recv().await.is_some());
+        assert!(channels.print_rx.recv().await.is_some());
     }
 
     #[tokio::test]

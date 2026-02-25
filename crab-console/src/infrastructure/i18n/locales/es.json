@@ -82,6 +82,7 @@
     "device_id": "ID de dispositivo",
     "registered": "Registrado",
     "back": "Volver",
+    "logo": "Logo del local",
     "name": "Nombre",
     "address": "Dirección",
     "phone": "Teléfono",
@@ -629,13 +630,23 @@
       "confirm": "Confirmar",
       "filter": "Filtrar",
       "create": "Crear",
-      "duplicate": "Duplicar"
+      "duplicate": "Duplicar",
+      "upload_image": "Subir imagen",
+      "change": "Cambiar",
+      "bind": "Vincular",
+      "unbind": "Desvincular"
     },
     "dialog": {
       "confirm_delete": "Confirmar eliminación"
     },
     "hint": {
-      "search_placeholder": "Buscar..."
+      "search_placeholder": "Buscar...",
+      "select_item": "Selecciona un elemento",
+      "desktop_only": "Por favor, usa esta función en escritorio"
+    },
+    "error": {
+      "invalid_image": "Por favor, selecciona un archivo de imagen válido",
+      "file_too_large": "El tamaño del archivo no debe superar los 20MB"
     }
   },
   "timeline": {

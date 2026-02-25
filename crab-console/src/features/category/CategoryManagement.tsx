@@ -1,18 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FolderTree, Plus, Filter, X } from 'lucide-react';
+import { FolderTree, Filter } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { ApiError } from '@/infrastructure/api/client';
-import { DataTable, type Column } from '@/shared/components/DataTable';
-import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
-import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
-import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
+import { MasterDetail } from '@/shared/components/MasterDetail';
+import { DetailPanel } from '@/shared/components/DetailPanel';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
-import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
 import { TagPicker } from '@/shared/components/TagPicker/TagPicker';
-import { listCategories, createCategory, updateCategory, deleteCategory, listTags } from '@/infrastructure/api/store';
+import { listCategories, createCategory, updateCategory, deleteCategory, listTags, batchUpdateCategorySortOrder } from '@/infrastructure/api/store';
 import type { StoreCategory, StoreTag, CategoryCreate, CategoryUpdate } from '@/core/types/store';
+
+type PanelState =
+  | { type: 'closed' }
+  | { type: 'create' }
+  | { type: 'edit'; item: StoreCategory }
+  | { type: 'delete'; item: StoreCategory };
 
 export const CategoryManagement: React.FC = () => {
   const { t } = useI18n();
@@ -22,12 +27,8 @@ export const CategoryManagement: React.FC = () => {
   const [items, setItems] = useState<StoreCategory[]>([]);
   const [tags, setTags] = useState<StoreTag[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-
-  // Modal state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<StoreCategory | null>(null);
+  const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -42,28 +43,24 @@ export const CategoryManagement: React.FC = () => {
   const [formKitchenPrint, setFormKitchenPrint] = useState(false);
   const [formLabelPrint, setFormLabelPrint] = useState(false);
 
-  // Delete confirmation
-  const [deleteTarget, setDeleteTarget] = useState<StoreCategory | null>(null);
+  const handleError = useCallback((err: unknown) => {
+    alert(err instanceof ApiError ? err.message : t('auth.error_generic'));
+  }, [t]);
 
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!token) return;
     try {
-      setLoading(true);
       const [cats, allTags] = await Promise.all([
         listCategories(token, storeId),
         listTags(token, storeId),
       ]);
       setItems(cats);
       setTags(allTags);
-      setError('');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setLoading(false);
-    }
-  }, [token, storeId, t]);
+    } catch (err) { handleError(err); }
+    finally { setLoading(false); }
+  }, [token, storeId, handleError]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     if (!search) return items;
@@ -71,34 +68,34 @@ export const CategoryManagement: React.FC = () => {
     return items.filter(c => c.name.toLowerCase().includes(q));
   }, [items, search]);
 
+  const selectedId = panel.type === 'edit' ? panel.item.source_id : null;
+
+  const matchModeOptions = [
+    { value: 'any', label: t('categories.match_any') },
+    { value: 'all', label: t('categories.match_all') },
+  ];
+
+  const toggleTag = (tagId: number) => {
+    setFormTagIds(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  };
+
   const openCreate = () => {
-    setEditing(null);
-    setFormName('');
-    setFormSortOrder(0);
-    setFormIsVirtual(false);
-    setFormIsDisplay(true);
-    setFormIsActive(true);
-    setFormMatchMode('any');
-    setFormTagIds([]);
-    setFormKitchenPrint(false);
-    setFormLabelPrint(false);
+    setFormName(''); setFormSortOrder(0); setFormIsVirtual(false);
+    setFormIsDisplay(true); setFormIsActive(true); setFormMatchMode('any');
+    setFormTagIds([]); setFormKitchenPrint(false); setFormLabelPrint(false);
     setFormError('');
-    setModalOpen(true);
+    setPanel({ type: 'create' });
   };
 
   const openEdit = (item: StoreCategory) => {
-    setEditing(item);
-    setFormName(item.name);
-    setFormSortOrder(item.sort_order);
-    setFormIsVirtual(item.is_virtual);
-    setFormIsDisplay(item.is_display);
-    setFormIsActive(item.is_active);
-    setFormMatchMode(item.match_mode || 'any');
-    setFormTagIds(item.tag_ids ?? []);
-    setFormKitchenPrint(item.is_kitchen_print_enabled);
-    setFormLabelPrint(item.is_label_print_enabled);
-    setFormError('');
-    setModalOpen(true);
+    setFormName(item.name); setFormSortOrder(item.sort_order);
+    setFormIsVirtual(item.is_virtual); setFormIsDisplay(item.is_display);
+    setFormIsActive(item.is_active); setFormMatchMode(item.match_mode || 'any');
+    setFormTagIds(item.tag_ids ?? []); setFormKitchenPrint(item.is_kitchen_print_enabled);
+    setFormLabelPrint(item.is_label_print_enabled); setFormError('');
+    setPanel({ type: 'edit', item });
   };
 
   const handleSave = async () => {
@@ -108,213 +105,132 @@ export const CategoryManagement: React.FC = () => {
     setSaving(true);
     setFormError('');
     try {
-      if (editing) {
+      if (panel.type === 'edit') {
         const data: CategoryUpdate = {
-          name: formName.trim(),
-          sort_order: formSortOrder,
-          is_virtual: formIsVirtual,
-          is_display: formIsDisplay,
-          is_active: formIsActive,
-          is_kitchen_print_enabled: formKitchenPrint,
-          is_label_print_enabled: formLabelPrint,
+          name: formName.trim(), sort_order: formSortOrder,
+          is_virtual: formIsVirtual, is_display: formIsDisplay, is_active: formIsActive,
+          is_kitchen_print_enabled: formKitchenPrint, is_label_print_enabled: formLabelPrint,
           match_mode: formIsVirtual ? formMatchMode : undefined,
           tag_ids: formIsVirtual ? formTagIds : undefined,
         };
-        await updateCategory(token, storeId, editing.source_id, data);
-      } else {
+        await updateCategory(token, storeId, panel.item.source_id, data);
+      } else if (panel.type === 'create') {
         const data: CategoryCreate = {
-          name: formName.trim(),
-          sort_order: formSortOrder,
-          is_virtual: formIsVirtual,
-          is_display: formIsDisplay,
-          is_kitchen_print_enabled: formKitchenPrint,
-          is_label_print_enabled: formLabelPrint,
+          name: formName.trim(), sort_order: formSortOrder,
+          is_virtual: formIsVirtual, is_display: formIsDisplay,
+          is_kitchen_print_enabled: formKitchenPrint, is_label_print_enabled: formLabelPrint,
           match_mode: formIsVirtual ? formMatchMode : undefined,
           tag_ids: formIsVirtual ? formTagIds : undefined,
         };
         await createCategory(token, storeId, data);
       }
-      setModalOpen(false);
-      await loadData();
+      setPanel({ type: 'closed' });
+      await load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
-    if (!token || !deleteTarget) return;
+    if (!token || panel.type !== 'delete') return;
+    setSaving(true);
     try {
-      await deleteCategory(token, storeId, deleteTarget.source_id);
-      setDeleteTarget(null);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-      setDeleteTarget(null);
-    }
+      await deleteCategory(token, storeId, panel.item.source_id);
+      setPanel({ type: 'closed' });
+      await load();
+    } catch (err) { handleError(err); }
+    finally { setSaving(false); }
   };
 
-  const handleToggleActive = async (cat: StoreCategory) => {
-    if (!token) return;
-    try {
-      await updateCategory(token, storeId, cat.source_id, { is_active: !cat.is_active });
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    }
-  };
-
-  const toggleTag = (tagId: number) => {
-    setFormTagIds(prev =>
-      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
-    );
-  };
-
-  const matchModeOptions = [
-    { value: 'any', label: t('categories.match_any') },
-    { value: 'all', label: t('categories.match_all') },
-  ];
-
-  const columns: Column<StoreCategory>[] = [
-    {
-      key: 'name',
-      header: t('settings.common.name'),
-      render: (c) => (
-        <div className="flex items-center gap-2">
-          {c.is_virtual
-            ? <Filter className="w-4 h-4 text-purple-500" />
-            : <FolderTree className="w-4 h-4 text-teal-500" />
-          }
-          <span className={`font-medium ${c.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
-            {c.name}
+  const renderItem = (cat: StoreCategory, isSelected: boolean) => (
+    <div className={`px-4 py-3.5 ${isSelected ? 'font-medium' : ''}`}>
+      <div className="flex items-center gap-2.5">
+        {cat.is_virtual
+          ? <Filter className="w-4 h-4 text-purple-500 shrink-0" />
+          : <FolderTree className="w-4 h-4 text-teal-500 shrink-0" />
+        }
+        <span className={`text-sm flex-1 truncate ${cat.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+          {cat.name}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1 ml-[26px]">
+        {cat.is_virtual && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+            {t('categories.virtual')}
           </span>
-        </div>
-      ),
-    },
-    {
-      key: 'flags',
-      header: t('settings.common.status'),
-      width: '160px',
-      render: (c) => (
-        <div className="flex items-center gap-1.5">
-          {c.is_virtual && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">{t('categories.virtual')}</span>
-          )}
-          {!c.is_display && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{t('categories.hidden')}</span>
-          )}
-          <StatusToggle isActive={c.is_active} onClick={() => handleToggleActive(c)} />
-        </div>
-      ),
-    },
-    {
-      key: 'sort_order',
-      header: t('settings.common.sort_order'),
-      width: '80px',
-      align: 'center',
-      render: (c) => <span className="text-gray-500 tabular-nums">{c.sort_order}</span>,
-    },
-  ];
+        )}
+        {!cat.is_display && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+            {t('categories.hidden')}
+          </span>
+        )}
+        <span className="text-xs text-gray-400 tabular-nums ml-auto">#{cat.sort_order}</span>
+      </div>
+    </div>
+  );
+
+  const handleReorder = useCallback(async (reordered: StoreCategory[]) => {
+    if (!token) return;
+    const withOrder = reordered.map((c, i) => ({ ...c, sort_order: i }));
+    setItems(withOrder);
+    const sortItems = withOrder.map((c) => ({ id: c.source_id, sort_order: c.sort_order }));
+    try { await batchUpdateCategorySortOrder(token, storeId, sortItems); }
+    catch (err) { handleError(err); await load(); }
+  }, [token, storeId, handleError, load]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-            <FolderTree size={20} className="text-teal-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{t('categories.title')}</h2>
-          </div>
+    <div className="h-full flex flex-col p-4 lg:p-6">
+      <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+          <FolderTree className="w-5 h-5 text-teal-600" />
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 transition-colors shadow-sm"
-        >
-          <Plus size={16} />
-          {t('categories.new')}
-        </button>
+        <h1 className="text-xl font-bold text-slate-900">{t('categories.title')}</h1>
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>
-      )}
-
-      <FilterBar
-        searchQuery={search}
-        onSearchChange={setSearch}
-        totalCount={filtered.length}
-        countUnit={t('categories.title')}
-        themeColor="teal"
-      />
-
-      <DataTable
-        data={filtered}
-        columns={columns}
-        loading={loading}
-        onEdit={openEdit}
-        onDelete={(c) => setDeleteTarget(c)}
-        getRowKey={(c) => c.source_id}
-        themeColor="teal"
-      />
-
-      {/* Create/Edit Modal */}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+      <div className="flex-1 min-h-0">
+        <MasterDetail
+          items={filtered}
+          getItemId={(c) => c.source_id}
+          renderItem={renderItem}
+          selectedId={selectedId}
+          onSelect={openEdit}
+          onDeselect={() => setPanel({ type: 'closed' })}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          totalCount={filtered.length}
+          countUnit={t('categories.title')}
+          onCreateNew={openCreate}
+          createLabel={t('categories.new')}
+          isCreating={panel.type === 'create'}
+          themeColor="teal"
+          loading={loading}
+          emptyText={t('categories.empty')}
+          onReorder={!search.trim() ? handleReorder : undefined}
         >
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col" style={{ animation: 'slideUp 0.25s ease-out' }}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editing ? t('categories.edit') : t('categories.new')}
-              </h3>
-              <button onClick={() => setModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-5 space-y-4 overflow-y-auto">
+          {(panel.type === 'create' || panel.type === 'edit') && (
+            <DetailPanel
+              title={panel.type === 'create' ? t('categories.new') : t('categories.edit')}
+              isCreating={panel.type === 'create'}
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              onDelete={panel.type === 'edit' ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              saving={saving}
+              saveDisabled={!formName.trim()}
+            >
               {formError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
               )}
 
               <FormField label={t('settings.common.name')} required>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className={inputClass}
-                  autoFocus
-                />
+                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
               </FormField>
 
               <FormField label={t('settings.common.sort_order')}>
-                <input
-                  type="number"
-                  value={formSortOrder}
-                  onChange={(e) => setFormSortOrder(Number(e.target.value))}
-                  className={inputClass}
-                />
+                <input type="number" value={formSortOrder} onChange={e => setFormSortOrder(Number(e.target.value))} className={inputClass} />
               </FormField>
 
-              <CheckboxField
-                id="cat-is-virtual"
-                label={t('categories.virtual')}
-                checked={formIsVirtual}
-                onChange={setFormIsVirtual}
-              />
-
-              <CheckboxField
-                id="cat-is-display"
-                label={t('categories.display')}
-                checked={formIsDisplay}
-                onChange={setFormIsDisplay}
-              />
+              <CheckboxField id="cat-is-virtual" label={t('categories.virtual')} checked={formIsVirtual} onChange={setFormIsVirtual} />
+              <CheckboxField id="cat-is-display" label={t('categories.display')} checked={formIsDisplay} onChange={setFormIsDisplay} />
 
               {/* Virtual category settings */}
               {formIsVirtual && (
@@ -325,7 +241,6 @@ export const CategoryManagement: React.FC = () => {
                     onChange={(v) => setFormMatchMode(String(v))}
                     options={matchModeOptions}
                   />
-
                   <FormField label={t('categories.tag_filter')}>
                     <TagPicker tags={tags} selectedIds={formTagIds} onToggle={toggleTag} themeColor="purple" />
                   </FormField>
@@ -335,59 +250,26 @@ export const CategoryManagement: React.FC = () => {
               {/* Print settings (regular categories) */}
               {!formIsVirtual && (
                 <div className="space-y-2">
-                  <CheckboxField
-                    id="cat-kitchen-print"
-                    label={t('categories.kitchen_print')}
-                    checked={formKitchenPrint}
-                    onChange={setFormKitchenPrint}
-                  />
-                  <CheckboxField
-                    id="cat-label-print"
-                    label={t('categories.label_print')}
-                    checked={formLabelPrint}
-                    onChange={setFormLabelPrint}
-                  />
+                  <CheckboxField id="cat-kitchen-print" label={t('categories.kitchen_print')} checked={formKitchenPrint} onChange={setFormKitchenPrint} />
+                  <CheckboxField id="cat-label-print" label={t('categories.label_print')} checked={formLabelPrint} onChange={setFormLabelPrint} />
                 </div>
               )}
 
               {/* Active toggle (edit only) */}
-              {editing && (
-                <CheckboxField
-                  id="cat-is-active"
-                  label={t('categories.is_active')}
-                  checked={formIsActive}
-                  onChange={setFormIsActive}
-                />
+              {panel.type === 'edit' && (
+                <CheckboxField id="cat-is-active" label={t('categories.is_active')} checked={formIsActive} onChange={setFormIsActive} />
               )}
-            </div>
+            </DetailPanel>
+          )}
+        </MasterDetail>
+      </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
-                {t('common.action.cancel')}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !formName.trim()}
-                className="px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50"
-              >
-                {saving ? t('auth.loading') : t('common.action.save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={!!deleteTarget}
+        isOpen={panel.type === 'delete'}
         title={t('common.dialog.confirm_delete')}
         description={t('settings.category.confirm.delete')}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => setPanel({ type: 'closed' })}
         variant="danger"
       />
     </div>

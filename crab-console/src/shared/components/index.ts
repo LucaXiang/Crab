@@ -1,6 +1,10 @@
 export { DataTable } from './DataTable';
 export type { Column } from './DataTable';
+export { MasterDetail } from './MasterDetail';
+export { DetailPanel } from './DetailPanel';
 export { FormField, FormSection, CheckboxField, SubField, inputClass, selectClass, SelectField } from './FormField';
 export { ConfirmDialog } from './ConfirmDialog';
 export { DeleteConfirmation } from './DeleteConfirmation';
 export { FilterBar } from './FilterBar';
+export { ImageUpload } from './ImageUpload';
+export { Thumbnail } from './Thumbnail';

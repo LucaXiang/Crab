@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Users, X } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { listEmployees, createEmployee, updateEmployee, deleteEmployee } from '@/infrastructure/api/management';
 import { ApiError } from '@/infrastructure/api/client';
-import { DataTable, type Column } from '@/shared/components/DataTable';
-import { FilterBar } from '@/shared/components/FilterBar/FilterBar';
-import { ConfirmDialog } from '@/shared/components/ConfirmDialog/ConfirmDialog';
-import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField/FormField';
+import { MasterDetail } from '@/shared/components/MasterDetail';
+import { DetailPanel } from '@/shared/components/DetailPanel';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
-import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
 import type { Employee, EmployeeCreate, EmployeeUpdate } from '@/core/types/store';
 
 function useRoleOptions(t: (key: string) => string) {
@@ -23,22 +22,22 @@ function useRoleOptions(t: (key: string) => string) {
 
 function roleBadge(roleId: number, t: (key: string) => string) {
   switch (roleId) {
-    case 1: return { label: t('settings.employee.role_admin'), cls: 'bg-red-50 text-red-700 border-red-200' };
-    case 2: return { label: t('settings.employee.role_manager'), cls: 'bg-blue-50 text-blue-700 border-blue-200' };
-    case 3: return { label: t('settings.employee.role_user'), cls: 'bg-green-50 text-green-700 border-green-200' };
-    default: return { label: `Role ${roleId}`, cls: 'bg-gray-50 text-gray-700 border-gray-200' };
+    case 1: return { label: t('settings.employee.role_admin'), cls: 'bg-red-50 text-red-700' };
+    case 2: return { label: t('settings.employee.role_manager'), cls: 'bg-blue-50 text-blue-700' };
+    case 3: return { label: t('settings.employee.role_user'), cls: 'bg-green-50 text-green-700' };
+    default: return { label: `Role ${roleId}`, cls: 'bg-gray-50 text-gray-700' };
   }
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map(w => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  return name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 }
+
+type PanelState =
+  | { type: 'closed' }
+  | { type: 'create' }
+  | { type: 'edit'; item: Employee }
+  | { type: 'delete'; item: Employee };
 
 export const EmployeeManagement: React.FC = () => {
   const { t } = useI18n();
@@ -48,12 +47,8 @@ export const EmployeeManagement: React.FC = () => {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Modal state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Employee | null>(null);
+  const [search, setSearch] = useState('');
+  const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -64,18 +59,13 @@ export const EmployeeManagement: React.FC = () => {
   const [formRoleId, setFormRoleId] = useState<number>(3);
   const [formIsActive, setFormIsActive] = useState(true);
 
-  // Delete confirmation
-  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
-
   const loadData = useCallback(async () => {
     if (!token) return;
     try {
       setLoading(true);
-      const data = await listEmployees(token, storeId);
-      setEmployees(data);
-      setError('');
+      setEmployees(await listEmployees(token, storeId));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
+      alert(err instanceof ApiError ? err.message : t('auth.error_generic'));
     } finally {
       setLoading(false);
     }
@@ -84,45 +74,38 @@ export const EmployeeManagement: React.FC = () => {
   useEffect(() => { loadData(); }, [loadData]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return employees;
-    const q = searchQuery.toLowerCase();
+    if (!search.trim()) return employees;
+    const q = search.toLowerCase();
     return employees.filter(e =>
-      e.username.toLowerCase().includes(q) ||
-      e.display_name.toLowerCase().includes(q)
+      e.username.toLowerCase().includes(q) || e.display_name.toLowerCase().includes(q)
     );
-  }, [employees, searchQuery]);
+  }, [employees, search]);
+
+  const selectedId = panel.type === 'edit' ? panel.item.id : null;
 
   const openCreate = () => {
-    setEditing(null);
-    setFormUsername('');
-    setFormPassword('');
-    setFormDisplayName('');
-    setFormRoleId(3);
-    setFormIsActive(true);
-    setFormError('');
-    setModalOpen(true);
+    setFormUsername(''); setFormPassword(''); setFormDisplayName('');
+    setFormRoleId(3); setFormIsActive(true); setFormError('');
+    setPanel({ type: 'create' });
   };
 
   const openEdit = (emp: Employee) => {
-    setEditing(emp);
-    setFormUsername(emp.username);
-    setFormPassword('');
-    setFormDisplayName(emp.display_name);
-    setFormRoleId(emp.role_id);
-    setFormIsActive(emp.is_active);
-    setFormError('');
-    setModalOpen(true);
+    if (emp.is_system) return;
+    setFormUsername(emp.username); setFormPassword('');
+    setFormDisplayName(emp.display_name); setFormRoleId(emp.role_id);
+    setFormIsActive(emp.is_active); setFormError('');
+    setPanel({ type: 'edit', item: emp });
   };
 
   const handleSave = async () => {
     if (!token) return;
     if (!formUsername.trim()) { setFormError(t('settings.common.required_field')); return; }
-    if (!editing && !formPassword.trim()) { setFormError(t('settings.common.required_field')); return; }
+    if (panel.type === 'create' && !formPassword.trim()) { setFormError(t('settings.common.required_field')); return; }
 
     setSaving(true);
     setFormError('');
     try {
-      if (editing) {
+      if (panel.type === 'edit') {
         const payload: EmployeeUpdate = {
           username: formUsername.trim(),
           display_name: formDisplayName.trim() || undefined,
@@ -130,8 +113,8 @@ export const EmployeeManagement: React.FC = () => {
           is_active: formIsActive,
         };
         if (formPassword.trim()) payload.password = formPassword.trim();
-        await updateEmployee(token, storeId, editing.id, payload);
-      } else {
+        await updateEmployee(token, storeId, panel.item.id, payload);
+      } else if (panel.type === 'create') {
         const payload: EmployeeCreate = {
           username: formUsername.trim(),
           password: formPassword.trim(),
@@ -140,7 +123,7 @@ export const EmployeeManagement: React.FC = () => {
         };
         await createEmployee(token, storeId, payload);
       }
-      setModalOpen(false);
+      setPanel({ type: 'closed' });
       await loadData();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
@@ -150,176 +133,104 @@ export const EmployeeManagement: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!token || !deleteTarget) return;
+    if (!token || panel.type !== 'delete') return;
     try {
-      await deleteEmployee(token, storeId, deleteTarget.id);
-      setDeleteTarget(null);
+      await deleteEmployee(token, storeId, panel.item.id);
+      setPanel({ type: 'closed' });
       await loadData();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-      setDeleteTarget(null);
+      alert(err instanceof ApiError ? err.message : t('auth.error_generic'));
     }
   };
 
-  const handleToggleActive = async (emp: Employee) => {
-    if (!token) return;
-    try {
-      await updateEmployee(token, storeId, emp.id, { is_active: !emp.is_active });
-      await loadData();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
-    }
-  };
-
-  const columns: Column<Employee>[] = [
-    {
-      key: 'name',
-      header: t('settings.common.name'),
-      render: (e) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-bold">
-            {getInitials(e.display_name || e.username)}
-          </div>
-          <div>
-            <div className="font-medium text-gray-900">{e.display_name || e.username}</div>
-            <div className="text-xs text-gray-500">@{e.username}</div>
-          </div>
+  const renderItem = (emp: Employee, isSelected: boolean) => (
+    <div className={`px-4 py-3.5 flex items-center gap-3 ${isSelected ? 'font-medium' : ''}`}>
+      <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-bold shrink-0">
+        {getInitials(emp.display_name || emp.username)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm truncate ${emp.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+          {emp.display_name || emp.username}
         </div>
-      ),
-    },
-    {
-      key: 'role',
-      header: t('settings.employee.role'),
-      width: '120px',
-      render: (e) => {
-        const badge = roleBadge(e.role_id, t);
-        return (
-          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${badge.cls}`}>
-            {badge.label}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'status',
-      header: t('settings.common.status'),
-      width: '100px',
-      render: (e) => (
-        <StatusToggle isActive={e.is_active} onClick={() => handleToggleActive(e)} disabled={e.is_system} />
-      ),
-    },
-  ];
+        <div className="text-xs text-gray-400 truncate">@{emp.username}</div>
+      </div>
+      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${roleBadge(emp.role_id, t).cls}`}>
+        {roleBadge(emp.role_id, t).label}
+      </span>
+    </div>
+  );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-            <Users size={20} className="text-orange-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{t('settings.employee.title')}</h2>
-            <p className="text-sm text-gray-500">{t('settings.employee.subtitle')}</p>
-          </div>
+    <div className="h-full flex flex-col p-4 lg:p-6">
+      <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+          <Users className="w-5 h-5 text-orange-600" />
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-medium hover:bg-orange-700 transition-colors shadow-sm"
-        >
-          <Plus size={16} />
-          {t('common.action.add')}
-        </button>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('settings.employee.title')}</h1>
+          <p className="text-xs text-gray-400">{t('settings.employee.subtitle')}</p>
+        </div>
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>
-      )}
-
-      {/* Filter */}
-      <FilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        totalCount={filtered.length}
-        countUnit={t('settings.employee.unit')}
-        themeColor="orange"
-      />
-
-      {/* Table */}
-      <DataTable
-        data={filtered}
-        columns={columns}
-        loading={loading}
-        onEdit={openEdit}
-        onDelete={(e) => setDeleteTarget(e)}
-        isEditable={(e) => !e.is_system}
-        isDeletable={(e) => !e.is_system}
-        getRowKey={(e) => e.id}
-        themeColor="orange"
-      />
-
-      {/* Modal */}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+      <div className="flex-1 min-h-0">
+        <MasterDetail
+          items={filtered}
+          getItemId={(emp) => emp.id}
+          renderItem={renderItem}
+          selectedId={selectedId}
+          onSelect={openEdit}
+          onDeselect={() => setPanel({ type: 'closed' })}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          totalCount={filtered.length}
+          countUnit={t('settings.employee.unit')}
+          onCreateNew={openCreate}
+          createLabel={t('common.action.add')}
+          isCreating={panel.type === 'create'}
+          themeColor="orange"
+          loading={loading}
         >
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-md overflow-hidden" style={{ animation: 'slideUp 0.25s ease-out' }}>
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editing ? t('common.action.edit') : t('common.action.add')} {t('settings.employee.title')}
-              </h3>
-              <button onClick={() => setModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-5 space-y-4">
+          {(panel.type === 'create' || panel.type === 'edit') && (
+            <DetailPanel
+              title={panel.type === 'create' ? `${t('common.action.add')} ${t('settings.employee.title')}` : `${t('common.action.edit')} ${t('settings.employee.title')}`}
+              isCreating={panel.type === 'create'}
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              onDelete={panel.type === 'edit' && !panel.item.is_system ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              saving={saving}
+              saveDisabled={!formUsername.trim() || (panel.type === 'create' && !formPassword.trim())}
+            >
               {formError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
               )}
 
               <FormField label={t('settings.employee.username')} required>
-                <input
-                  type="text"
-                  value={formUsername}
-                  onChange={(e) => setFormUsername(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.employee.username')}
-                />
+                <input value={formUsername} onChange={e => setFormUsername(e.target.value)} className={inputClass} autoFocus />
               </FormField>
 
-              <FormField label={t('settings.employee.password')} required={!editing}>
+              <FormField label={t('settings.employee.password')} required={panel.type === 'create'}>
                 <input
                   type="password"
                   value={formPassword}
-                  onChange={(e) => setFormPassword(e.target.value)}
+                  onChange={e => setFormPassword(e.target.value)}
                   className={inputClass}
-                  placeholder={editing ? t('settings.employee.password_keep') : t('settings.employee.password')}
+                  placeholder={panel.type === 'edit' ? t('settings.employee.password_keep') : ''}
                 />
               </FormField>
 
               <FormField label={t('settings.employee.display_name')}>
-                <input
-                  type="text"
-                  value={formDisplayName}
-                  onChange={(e) => setFormDisplayName(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.employee.display_name')}
-                />
+                <input value={formDisplayName} onChange={e => setFormDisplayName(e.target.value)} className={inputClass} />
               </FormField>
 
               <SelectField
                 label={t('settings.employee.role')}
                 value={formRoleId}
-                onChange={(v) => setFormRoleId(Number(v))}
+                onChange={v => setFormRoleId(Number(v))}
                 options={roleOptions}
                 required
               />
 
-              {editing && (
+              {panel.type === 'edit' && (
                 <CheckboxField
                   id="employee-is-active"
                   label={t('settings.common.active')}
@@ -327,35 +238,17 @@ export const EmployeeManagement: React.FC = () => {
                   onChange={setFormIsActive}
                 />
               )}
-            </div>
+            </DetailPanel>
+          )}
+        </MasterDetail>
+      </div>
 
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
-                {t('common.action.cancel')}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-medium hover:bg-orange-700 transition-colors disabled:opacity-50"
-              >
-                {saving ? t('auth.loading') : t('common.action.save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={!!deleteTarget}
+        isOpen={panel.type === 'delete'}
         title={t('common.dialog.confirm_delete')}
         description={t('settings.employee.confirm.delete')}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => setPanel({ type: 'closed' })}
         variant="danger"
       />
     </div>

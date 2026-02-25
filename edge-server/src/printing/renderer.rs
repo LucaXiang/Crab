@@ -49,13 +49,22 @@ impl KitchenTicketRenderer {
 
     /// Render the header section
     fn render_header(&self, b: &mut EscPosBuilder, order: &KitchenOrder) {
-        // Table name (large, centered)
+        // Title (large, centered)
         b.center();
         b.double_size();
         b.bold();
 
-        let table_name = order.table_name.as_deref().unwrap_or("外卖");
-        b.line(table_name);
+        let title = if let Some(ref name) = order.table_name {
+            name.clone()
+        } else if order.is_retail {
+            order
+                .queue_number
+                .map(|n| format!("#{:03}", n))
+                .unwrap_or_else(|| "Para llevar".to_string())
+        } else {
+            "Para llevar".to_string()
+        };
+        b.line(&title);
 
         b.bold_off();
         b.reset_size();
@@ -185,7 +194,7 @@ impl KitchenTicketRenderer {
             b.newline();
             b.center();
             b.bold();
-            b.line(&format!("*** 补打 #{} ***", order.print_count));
+            b.line(&format!("*** REIMPRESIÓN #{} ***", order.print_count));
             b.bold_off();
             b.left();
         }
@@ -207,7 +216,7 @@ fn format_timestamp(ts: i64, tz: Tz) -> String {
     if let Some(dt) = chrono::DateTime::from_timestamp_millis(ts) {
         dt.with_timezone(&tz).format("%m-%d %H:%M:%S").to_string()
     } else {
-        "时间未知".to_string()
+        "--:--".to_string()
     }
 }
 
@@ -221,6 +230,8 @@ mod tests {
             id: "evt-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("100桌".to_string()),
+            queue_number: None,
+            is_retail: false,
             created_at: 1705912335000, // 2024-01-22 14:32:15 UTC (millis)
             items: vec![
                 KitchenOrderItem {

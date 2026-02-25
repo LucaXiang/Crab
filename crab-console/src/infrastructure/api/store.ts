@@ -5,7 +5,7 @@ import type {
   StoreTag, TagCreate, TagUpdate,
   StoreAttribute, AttributeCreate, AttributeUpdate,
   AttributeOptionCreate, AttributeOptionUpdate,
-  BindAttributeRequest, UnbindAttributeRequest,
+  BindAttributeRequest, UnbindAttributeRequest, StoreBinding,
   PriceRule, PriceRuleCreate, PriceRuleUpdate,
   LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate,
   SortOrderItem, BulkDeleteRequest,
@@ -91,6 +91,9 @@ export const batchUpdateOptionSortOrder = (token: string, storeId: number, attri
   request<StoreOpResult>('PATCH', `${storePath(storeId, `attributes/${attributeId}/options/sort-order`)}`, { items }, token);
 
 // ── Attribute Binding ──
+export const listBindings = (token: string, storeId: number, ownerType: string, ownerId: number) =>
+  request<StoreBinding[]>('GET', `${storePath(storeId, 'attributes/bindings')}?owner_type=${ownerType}&owner_id=${ownerId}`, undefined, token);
+
 export const bindAttribute = (token: string, storeId: number, data: BindAttributeRequest) =>
   request<StoreOpResult>('POST', storePath(storeId, 'attributes/bind'), data, token);
 

@@ -1,18 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid3X3, Plus } from 'lucide-react';
+import { Grid3X3 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { ApiError } from '@/infrastructure/api/client';
-import { DataTable, type Column } from '@/shared/components/DataTable';
-import { FilterBar } from '@/shared/components/FilterBar';
+import { MasterDetail } from '@/shared/components/MasterDetail';
+import { DetailPanel } from '@/shared/components/DetailPanel';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, inputClass, SelectField } from '@/shared/components/FormField';
 import { listZones, listTables, createTable, updateTable, deleteTable } from '@/infrastructure/api/management';
 import type { Zone, DiningTable, DiningTableCreate, DiningTableUpdate } from '@/core/types/store';
 
-type ModalState = { type: 'closed' } | { type: 'create' } | { type: 'edit'; item: DiningTable } | { type: 'delete'; item: DiningTable };
+type PanelState =
+  | { type: 'closed' }
+  | { type: 'create' }
+  | { type: 'edit'; item: DiningTable }
+  | { type: 'delete'; item: DiningTable };
 
 export const TableManagement: React.FC = () => {
   const { t } = useI18n();
@@ -25,7 +29,7 @@ export const TableManagement: React.FC = () => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<ModalState>({ type: 'closed' });
+  const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
   const [saving, setSaving] = useState(false);
 
   // Form state
@@ -53,147 +57,138 @@ export const TableManagement: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const zoneMap = useMemo(() => {
-    const m = new Map<number, Zone>();
-    zones.forEach(z => m.set(z.id, z));
-    return m;
-  }, [zones]);
+  const zoneMap = useMemo(() => new Map(zones.map(z => [z.id, z.name])), [zones]);
 
   const filtered = useMemo(() => {
     if (!search) return items;
     const q = search.toLowerCase();
     return items.filter(tbl => {
-      const zone = zoneMap.get(tbl.zone_id);
-      return tbl.name.toLowerCase().includes(q) || (zone && zone.name.toLowerCase().includes(q));
+      const zoneName = zoneMap.get(tbl.zone_id);
+      return tbl.name.toLowerCase().includes(q) || (zoneName && zoneName.toLowerCase().includes(q));
     });
   }, [items, search, zoneMap]);
 
+  const selectedId = panel.type === 'edit' ? panel.item.id : null;
+
+  const zoneOptions = useMemo(() =>
+    zones.filter(z => z.is_active).map(z => ({ value: String(z.id), label: z.name })),
+  [zones]);
+
   const openCreate = () => {
     setFormName(''); setFormZoneId(zones[0]?.id ?? 0); setFormCapacity(4);
-    setModal({ type: 'create' });
+    setPanel({ type: 'create' });
   };
 
   const openEdit = (item: DiningTable) => {
     setFormName(item.name); setFormZoneId(item.zone_id); setFormCapacity(item.capacity);
-    setModal({ type: 'edit', item });
+    setPanel({ type: 'edit', item });
   };
 
   const handleSave = async () => {
     if (!token || saving) return;
     setSaving(true);
     try {
-      if (modal.type === 'create') {
+      if (panel.type === 'create') {
         const data: DiningTableCreate = { name: formName.trim(), zone_id: formZoneId, capacity: formCapacity };
         await createTable(token, storeId, data);
-      } else if (modal.type === 'edit') {
+      } else if (panel.type === 'edit') {
         const data: DiningTableUpdate = { name: formName.trim(), zone_id: formZoneId, capacity: formCapacity };
-        await updateTable(token, storeId, modal.item.id, data);
+        await updateTable(token, storeId, panel.item.id, data);
       }
-      setModal({ type: 'closed' });
+      setPanel({ type: 'closed' });
       await load();
     } catch (err) { handleError(err); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
-    if (!token || modal.type !== 'delete') return;
+    if (!token || panel.type !== 'delete') return;
     setSaving(true);
     try {
-      await deleteTable(token, storeId, modal.item.id);
-      setModal({ type: 'closed' });
+      await deleteTable(token, storeId, panel.item.id);
+      setPanel({ type: 'closed' });
       await load();
     } catch (err) { handleError(err); }
     finally { setSaving(false); }
   };
 
-  const zoneOptions = useMemo(() =>
-    zones.map(z => ({ value: String(z.id), label: z.name })),
-  [zones]);
-
-  const columns: Column<DiningTable>[] = useMemo(() => [
-    {
-      key: 'name', header: t('catalog.name'),
-      render: (tbl) => (
-        <div className="flex items-center gap-2">
-          <Grid3X3 className="w-4 h-4 text-indigo-500" />
-          <span className={`font-medium ${tbl.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>{tbl.name}</span>
+  const renderItem = (table: DiningTable, isSelected: boolean) => (
+    <div className={`px-4 py-3.5 ${isSelected ? 'font-medium' : ''}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Grid3X3 className="w-4 h-4 text-blue-500 shrink-0" />
+          <span className={`text-sm ${table.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+            {table.name}
+          </span>
         </div>
-      ),
-    },
-    {
-      key: 'zone', header: t('tables.zone'), width: '160px',
-      render: (tbl) => {
-        const zone = zoneMap.get(tbl.zone_id);
-        return zone
-          ? <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{zone.name}</span>
-          : <span className="text-slate-400">-</span>;
-      },
-    },
-    {
-      key: 'capacity', header: t('tables.capacity'), width: '100px', align: 'center',
-      render: (tbl) => <span className="text-slate-500 tabular-nums">{tbl.capacity}</span>,
-    },
-  ], [t, zoneMap]);
-
-  const isFormOpen = modal.type === 'create' || modal.type === 'edit';
+        <span className="text-xs text-gray-400 tabular-nums">{table.capacity} {t('tables.seats')}</span>
+      </div>
+      <p className="text-xs text-gray-400 mt-0.5 ml-[26px]">{zoneMap.get(table.zone_id) || '-'}</p>
+    </div>
+  );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center"><Grid3X3 className="w-5 h-5 text-indigo-600" /></div>
-          <h1 className="text-xl font-bold text-slate-900">{t('tables.title')}</h1>
+    <div className="h-full flex flex-col p-4 lg:p-6">
+      <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+          <Grid3X3 className="w-5 h-5 text-blue-600" />
         </div>
-        <button onClick={openCreate} className="flex items-center gap-1.5 px-3 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors">
-          <Plus className="w-4 h-4" />{t('tables.new')}
-        </button>
+        <h1 className="text-xl font-bold text-slate-900">{t('tables.title')}</h1>
       </div>
 
-      <FilterBar searchQuery={search} onSearchChange={setSearch} totalCount={filtered.length} countUnit={t('tables.title')} themeColor="indigo" />
+      <div className="flex-1 min-h-0">
+        <MasterDetail
+          items={filtered}
+          getItemId={(tbl) => tbl.id}
+          renderItem={renderItem}
+          selectedId={selectedId}
+          onSelect={openEdit}
+          onDeselect={() => setPanel({ type: 'closed' })}
+          searchQuery={search}
+          onSearchChange={setSearch}
+          totalCount={filtered.length}
+          countUnit={t('tables.title')}
+          onCreateNew={openCreate}
+          createLabel={t('tables.new')}
+          isCreating={panel.type === 'create'}
+          themeColor="blue"
+          loading={loading}
+          emptyText={t('tables.empty')}
+        >
+          {(panel.type === 'create' || panel.type === 'edit') && (
+            <DetailPanel
+              title={panel.type === 'create' ? t('tables.new') : t('tables.edit')}
+              isCreating={panel.type === 'create'}
+              onClose={() => setPanel({ type: 'closed' })}
+              onSave={handleSave}
+              onDelete={panel.type === 'edit' ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              saving={saving}
+              saveDisabled={!formName.trim() || !formZoneId}
+            >
+              <FormField label={t('catalog.name')} required>
+                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
+              </FormField>
+              <SelectField
+                label={t('tables.zone')}
+                value={String(formZoneId)}
+                onChange={v => setFormZoneId(Number(v))}
+                options={zoneOptions}
+                required
+              />
+              <FormField label={t('tables.capacity')}>
+                <input type="number" value={formCapacity} onChange={e => setFormCapacity(Number(e.target.value))} className={inputClass} min={1} />
+              </FormField>
+            </DetailPanel>
+          )}
+        </MasterDetail>
+      </div>
 
-      <DataTable
-        data={filtered}
-        columns={columns}
-        loading={loading}
-        emptyText={t('tables.empty')}
-        getRowKey={(tbl) => tbl.id}
-        onEdit={openEdit}
-        onDelete={(tbl) => setModal({ type: 'delete', item: tbl })}
-        themeColor="indigo"
-      />
-
-      {/* Create/Edit Modal */}
-      {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setModal({ type: 'closed' })}>
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()} style={{ animation: 'slideUp 0.25s ease-out' }}>
-            <h2 className="text-lg font-bold text-slate-900">{modal.type === 'create' ? t('tables.new') : t('tables.edit')}</h2>
-            <FormField label={t('catalog.name')} required>
-              <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
-            </FormField>
-            <SelectField
-              label={t('tables.zone')}
-              value={String(formZoneId)}
-              onChange={v => setFormZoneId(Number(v))}
-              options={zoneOptions}
-            />
-            <FormField label={t('tables.capacity')}>
-              <input type="number" value={formCapacity} onChange={e => setFormCapacity(Number(e.target.value))} className={inputClass} min={1} />
-            </FormField>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setModal({ type: 'closed' })} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">{t('catalog.cancel')}</button>
-              <button onClick={handleSave} disabled={saving || !formName.trim() || !formZoneId} className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50">{saving ? t('catalog.saving') : t('catalog.save')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={modal.type === 'delete'}
+        isOpen={panel.type === 'delete'}
         title={t('catalog.confirm_delete')}
         description={t('catalog.confirm_delete_desc')}
         onConfirm={handleDelete}
-        onCancel={() => setModal({ type: 'closed' })}
+        onCancel={() => setPanel({ type: 'closed' })}
         variant="danger"
       />
     </div>

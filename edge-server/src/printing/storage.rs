@@ -428,6 +428,8 @@ mod tests {
             id: "ko-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("Table 1".to_string()),
+            queue_number: None,
+            is_retail: false,
             created_at: shared::util::now_millis(),
             items: vec![],
             print_count: 0,

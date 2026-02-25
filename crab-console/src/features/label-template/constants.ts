@@ -58,8 +58,8 @@ export const LabelFieldHelpers = {
 
 export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 'updated_at'>[] = [
   {
-    name: '小标签 (30×20)',
-    description: '适用于小规格标签',
+    name: 'Etiqueta pequeña (30×20)',
+    description: 'Para etiquetas pequeñas',
     width: 30,
     height: 20,
     width_mm: 30,
@@ -97,8 +97,8 @@ export const DEFAULT_LABEL_TEMPLATES: Omit<LabelTemplate, 'id' | 'created_at' | 
     ],
   },
   {
-    name: '标准标签 (40×30)',
-    description: '适用于标准规格标签',
+    name: 'Etiqueta estándar (40×30)',
+    description: 'Para etiquetas estándar',
     width: 40,
     height: 30,
     width_mm: 40,

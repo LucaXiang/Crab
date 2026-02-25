@@ -3,7 +3,7 @@
 use super::storage::{PrintStorage, PrintStorageError};
 use super::types::{KitchenOrder, KitchenOrderItem, LabelPrintRecord, PrintItemContext};
 use crate::services::CatalogService;
-use shared::order::{CartItemSnapshot, EventPayload, OrderEvent};
+use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -66,7 +66,7 @@ impl KitchenPrintService {
     pub fn process_items_added(
         &self,
         event: &OrderEvent,
-        table_name: Option<String>,
+        snapshot: &OrderSnapshot,
         catalog: &CatalogService,
     ) -> PrintServiceResult<Option<String>> {
         // Quick check: is any printing enabled?
@@ -132,7 +132,9 @@ impl KitchenPrintService {
                         id: uuid::Uuid::new_v4().to_string(),
                         order_id: event.order_id.clone(),
                         kitchen_order_id: event.event_id.clone(),
-                        table_name: table_name.clone(),
+                        table_name: snapshot.table_name.clone(),
+                        queue_number: snapshot.queue_number,
+                        is_retail: snapshot.is_retail,
                         created_at: event.timestamp,
                         context: label_context,
                         print_count: 0,
@@ -155,7 +157,9 @@ impl KitchenPrintService {
         let kitchen_order = KitchenOrder {
             id: event.event_id.clone(),
             order_id: event.order_id.clone(),
-            table_name,
+            table_name: snapshot.table_name.clone(),
+            queue_number: snapshot.queue_number,
+            is_retail: snapshot.is_retail,
             created_at: event.timestamp,
             items: kitchen_items,
             print_count: 0,

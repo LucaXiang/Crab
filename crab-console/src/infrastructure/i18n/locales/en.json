@@ -82,6 +82,7 @@
     "device_id": "Device ID",
     "registered": "Registered",
     "back": "Back",
+    "logo": "Store Logo",
     "name": "Name",
     "address": "Address",
     "phone": "Phone",
@@ -629,13 +630,23 @@
       "confirm": "Confirm",
       "filter": "Filter",
       "create": "Create",
-      "duplicate": "Duplicate"
+      "duplicate": "Duplicate",
+      "upload_image": "Upload image",
+      "change": "Change",
+      "bind": "Bind",
+      "unbind": "Unbind"
     },
     "dialog": {
       "confirm_delete": "Confirm deletion"
     },
     "hint": {
-      "search_placeholder": "Search..."
+      "search_placeholder": "Search...",
+      "select_item": "Select an item",
+      "desktop_only": "Please use this feature on desktop"
+    },
+    "error": {
+      "invalid_image": "Please select a valid image file",
+      "file_too_large": "File size must not exceed 20MB"
     }
   },
   "timeline": {
