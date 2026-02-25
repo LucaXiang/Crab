@@ -221,7 +221,14 @@
     "edit": "Edit category",
     "virtual": "Virtual",
     "display": "Visible",
-    "hidden": "Hidden"
+    "hidden": "Hidden",
+    "match_mode": "Match mode",
+    "match_any": "Match any tag",
+    "match_all": "Match all tags",
+    "tag_filter": "Tag filter",
+    "kitchen_print": "Kitchen print",
+    "label_print": "Label print",
+    "is_active": "Active"
   },
   "tags": {
     "title": "Tags",

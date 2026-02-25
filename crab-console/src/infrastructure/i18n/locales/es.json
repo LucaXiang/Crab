@@ -221,7 +221,14 @@
     "edit": "Editar categoría",
     "virtual": "Virtual",
     "display": "Visible",
-    "hidden": "Oculta"
+    "hidden": "Oculta",
+    "match_mode": "Modo coincidencia",
+    "match_any": "Coincidir cualquier etiqueta",
+    "match_all": "Coincidir todas las etiquetas",
+    "tag_filter": "Filtro de etiquetas",
+    "kitchen_print": "Impresión cocina",
+    "label_print": "Impresión etiqueta",
+    "is_active": "Activa"
   },
   "tags": {
     "title": "Etiquetas",

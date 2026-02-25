@@ -107,14 +107,26 @@ export interface StoreCategory {
 export interface CategoryCreate {
   name: string;
   sort_order?: number;
+  is_kitchen_print_enabled?: boolean;
+  is_label_print_enabled?: boolean;
+  kitchen_print_destinations?: number[];
+  label_print_destinations?: number[];
   is_virtual?: boolean;
+  tag_ids?: number[];
+  match_mode?: string;
   is_display?: boolean;
 }
 
 export interface CategoryUpdate {
   name?: string;
   sort_order?: number;
+  is_kitchen_print_enabled?: boolean;
+  is_label_print_enabled?: boolean;
+  kitchen_print_destinations?: number[];
+  label_print_destinations?: number[];
   is_virtual?: boolean;
+  tag_ids?: number[];
+  match_mode?: string;
   is_active?: boolean;
   is_display?: boolean;
 }

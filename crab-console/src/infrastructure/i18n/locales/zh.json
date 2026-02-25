@@ -221,7 +221,14 @@
     "edit": "编辑分类",
     "virtual": "虚拟分类",
     "display": "显示",
-    "hidden": "隐藏"
+    "hidden": "隐藏",
+    "match_mode": "匹配模式",
+    "match_any": "匹配任意标签",
+    "match_all": "匹配所有标签",
+    "tag_filter": "标签筛选",
+    "kitchen_print": "厨房打印",
+    "label_print": "标签打印",
+    "is_active": "启用"
   },
   "tags": {
     "title": "标签",
