@@ -30,6 +30,7 @@ pub async fn list_stores(
         .map(|s| shared::cloud::StoreDetailResponse {
             id: s.id,
             entity_id: s.entity_id,
+            alias: s.alias,
             name: s.name,
             address: s.address,
             phone: s.phone,
@@ -50,6 +51,7 @@ pub async fn list_stores(
 /// PATCH /api/tenant/stores/:id
 #[derive(Deserialize)]
 pub struct UpdateStoreRequest {
+    pub alias: Option<String>,
     pub name: Option<String>,
     pub address: Option<String>,
     pub phone: Option<String>,
@@ -66,6 +68,15 @@ pub async fn update_store(
     Json(payload): Json<UpdateStoreRequest>,
 ) -> ApiResult<shared::models::store_info::StoreInfo> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    if let Some(alias) = &payload.alias {
+        store::update_store_alias(&state.pool, store_id, alias)
+            .await
+            .map_err(|e| {
+                tracing::error!("Update store alias error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
+    }
 
     let update = shared::models::store_info::StoreInfoUpdate {
         name: payload.name,

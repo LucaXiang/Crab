@@ -27,8 +27,10 @@ pub async fn ensure_store(
     let id = shared::util::snowflake_id();
     let row: (i64,) = sqlx::query_as(
         r#"
-        INSERT INTO stores (id, entity_id, tenant_id, device_id, registered_at, store_number)
-        VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3))
+        INSERT INTO stores (id, entity_id, tenant_id, device_id, registered_at, store_number, alias)
+        VALUES ($1, $2, $3, $4, $5,
+                (SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3),
+                'Store' || LPAD((SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3)::TEXT, 2, '0'))
         ON CONFLICT (entity_id, tenant_id) DO UPDATE SET device_id = EXCLUDED.device_id
         RETURNING id
         "#,

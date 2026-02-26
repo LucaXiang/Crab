@@ -85,6 +85,16 @@ pub async fn update_store_info_direct(
     Ok(info)
 }
 
+/// Update store alias (cloud-only field, not synced from edge)
+pub async fn update_store_alias(pool: &PgPool, store_id: i64, alias: &str) -> Result<(), BoxError> {
+    sqlx::query("UPDATE stores SET alias = $2 WHERE id = $1")
+        .bind(store_id)
+        .bind(alias)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 // ── Console Read ──
 
 pub async fn get_store_info(pool: &PgPool, store_id: i64) -> Result<Option<StoreInfo>, BoxError> {

@@ -60,6 +60,7 @@ pub async fn get_subscription(
 pub struct StoreSummary {
     pub id: i64,
     pub entity_id: String,
+    pub alias: String,
     pub name: Option<String>,
     pub address: Option<String>,
     pub phone: Option<String>,
@@ -75,7 +76,7 @@ pub struct StoreSummary {
 pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
-        SELECT id, entity_id, name, address, phone, nif, email, website,
+        SELECT id, entity_id, alias, name, address, phone, nif, email, website,
                business_day_cutoff, device_id, last_sync_at, registered_at
         FROM stores
         WHERE tenant_id = $1

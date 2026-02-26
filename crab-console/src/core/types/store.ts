@@ -1,6 +1,7 @@
 export interface StoreDetail {
   id: number;
   entity_id: string;
+  alias: string;
   name?: string;
   address?: string;
   phone?: string;

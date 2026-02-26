@@ -26,6 +26,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "menu": "Menu",
     "stores": "Stores",
     "audit": "Audit Log",
     "settings": "Settings",
@@ -75,7 +76,9 @@
     "view_store": "View store",
     "download_app": "RedCoral POS",
     "download_desc": "Download the latest version for Windows.",
-    "download_windows": "Download"
+    "download_windows": "Download",
+    "welcome": "Welcome",
+    "system_operational": "System operational"
   },
   "store": {
     "title": "Store",
@@ -83,7 +86,10 @@
     "registered": "Registered",
     "back": "Back",
     "logo": "Store Logo",
-    "name": "Name",
+    "alias": "Display Name",
+    "alias_desc": "A friendly name to identify this store in Console (e.g. \"Main Street\").",
+    "name": "Receipt Name",
+    "name_desc": "The name printed on receipts (synced from the terminal).",
     "address": "Address",
     "phone": "Phone",
     "nif": "Tax ID (NIF)",
@@ -225,7 +231,8 @@
     "active": "Active",
     "inactive": "Inactive",
     "sort_order": "Order",
-    "search": "Search..."
+    "search": "Search...",
+    "description": "Description"
   },
   "red_flags": {
     "title": "Operation alerts",
@@ -278,7 +285,8 @@
     "edit": "Edit table",
     "zone": "Zone",
     "capacity": "Capacity",
-    "no_zone": "No zone"
+    "no_zone": "No zone",
+    "seats": "seats"
   },
   "audit": {
     "title": "Audit Log",
@@ -322,7 +330,8 @@
       "inactive": "Inactive",
       "required_field": "Please fill in all required fields.",
       "sort_order": "Sort Order",
-      "search": "Search..."
+      "search": "Search...",
+      "properties": "Properties"
     },
     "product": {
       "title": "Products",
@@ -347,6 +356,21 @@
       "spec_receipt_name": "Spec receipt name",
       "is_default": "Default",
       "spec_required": "At least one spec is required.",
+      "name": "Name",
+      "step_basics": "Basics",
+      "step_basics_desc": "Product name, image, and category.",
+      "step_pricing": "Pricing",
+      "step_pricing_desc": "Specs and pricing.",
+      "step_operations": "Operations",
+      "step_operations_desc": "Tax, sort order, and printing.",
+      "step_org": "Organization",
+      "step_org_desc": "Tags and external ID.",
+      "create_title": "New Product",
+      "add_variant": "Add variant",
+      "printing": "Printing",
+      "is_kitchen_print": "Kitchen print",
+      "is_label_print": "Label print",
+      "last_selected_category": "Last selected category",
       "confirm": {
         "delete": "This product and its specs will be permanently removed. Continue?"
       }
@@ -444,6 +468,18 @@
       "day_4": "Thu",
       "day_5": "Fri",
       "day_6": "Sat",
+      "step_basics": "Basics",
+      "step_basics_desc": "Rule name and description.",
+      "step_config": "Configuration",
+      "step_config_desc": "Price type and adjustment.",
+      "step_scope": "Scope",
+      "step_scope_desc": "Which products this applies to.",
+      "step_constraints": "Constraints",
+      "step_constraints_desc": "Days, hours, and validity period.",
+      "advanced": "Advanced",
+      "create_title": "New Price Rule",
+      "target_id_hint": "ID of the resource this rule applies to.",
+      "zone_hint": "Leave empty to apply to all zones.",
       "confirm": {
         "delete": "This price rule will be permanently removed. Continue?"
       }
@@ -520,6 +556,8 @@
       "zoom_in": "Zoom In",
       "zoom_out": "Zoom Out",
       "fit_to_screen": "Fit to Screen",
+      "is_default": "Default template",
+      "is_default_desc": "Use this template as the default for label printing.",
       "field_helper_hint": "Use {variable} syntax in template fields to insert dynamic data.",
       "field": {
         "text": "Text",
@@ -571,7 +609,8 @@
     "dine_in": "Dine-in",
     "takeout": "Takeout",
     "comped": "Comped",
-    "events": "Events"
+    "events": "Events",
+    "order_detail": "Order Detail"
   },
   "onboard": {
     "title": "Choose your plan",
@@ -608,12 +647,17 @@
     "step_plan": "Plan"
   },
   "common": {
+    "loading": "Loading...",
+    "status": {
+      "saving": "Saving..."
+    },
     "label": {
       "none": "No data",
       "items": "items",
       "total": "Total",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "active": "active"
     },
     "selection": {
       "selected": "Selected",
@@ -641,6 +685,7 @@
     "hint": {
       "search_placeholder": "Search...",
       "select_item": "Select an item",
+      "select_option": "Select...",
       "desktop_only": "Please use this feature on desktop"
     },
     "error": {

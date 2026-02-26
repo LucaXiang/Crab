@@ -343,13 +343,14 @@ export const DashboardScreen: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-base font-semibold text-slate-900 truncate group-hover:text-primary-600 transition-colors">
-                          {store.name ?? `Store #${store.id}`}
+                          {store.alias}
                         </p>
                         {store.is_online && (
                           <span className="inline-flex w-2 h-2 bg-green-500 rounded-full ring-2 ring-white shadow-sm" title="Online"></span>
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        {store.name && <span className="truncate max-w-[200px]">{store.name}</span>}
                         <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">ID: {store.device_id.slice(0, 8)}</span>
                         {store.address && (
                           <span className="flex items-center gap-1 truncate max-w-[200px]">

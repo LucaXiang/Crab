@@ -26,6 +26,7 @@ export const StoreSettingsScreen: React.FC = () => {
 
   const [formLogo, setFormLogo] = useState('');
   const [form, setForm] = useState({
+    alias: '',
     name: '',
     address: '',
     phone: '',
@@ -47,6 +48,7 @@ export const StoreSettingsScreen: React.FC = () => {
         if (s) {
           setStore(s);
           setForm({
+            alias: s.alias,
             name: s.name ?? '',
             address: s.address ?? '',
             phone: s.phone ?? '',
@@ -113,9 +115,10 @@ export const StoreSettingsScreen: React.FC = () => {
         <ImageUpload value={formLogo} onChange={setFormLogo} />
       </div>
 
-      {/* Name + Address */}
+      {/* Alias + Name + Address */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-        <Field label={t('store.name')} value={form.name} onChange={v => update('name', v)} />
+        <Field label={t('store.alias')} value={form.alias} onChange={v => update('alias', v)} desc={t('store.alias_desc')} />
+        <Field label={t('store.name')} value={form.name} onChange={v => update('name', v)} desc={t('store.name_desc')} />
         <Field label={t('store.address')} value={form.address} onChange={v => update('address', v)} icon={MapPin} />
       </div>
 
@@ -184,7 +187,8 @@ const Field: React.FC<{
   type?: string;
   placeholder?: string;
   icon?: React.FC<{ className?: string }>;
-}> = ({ label, value, onChange, type = 'text', placeholder, icon: Icon }) => (
+  desc?: string;
+}> = ({ label, value, onChange, type = 'text', placeholder, icon: Icon, desc }) => (
   <div>
     <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
     <div className="relative">
@@ -201,5 +205,6 @@ const Field: React.FC<{
         className={`w-full py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-all ${Icon ? 'pl-10 pr-3' : 'px-3'}`}
       />
     </div>
+    {desc && <p className="mt-1 text-[11px] text-slate-400">{desc}</p>}
   </div>
 );

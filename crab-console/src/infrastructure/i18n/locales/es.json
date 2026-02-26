@@ -26,6 +26,7 @@
   },
   "nav": {
     "dashboard": "Resumen",
+    "menu": "Menú",
     "stores": "Locales",
     "audit": "Auditoría",
     "settings": "Ajustes",
@@ -75,7 +76,9 @@
     "view_store": "Ver local",
     "download_app": "RedCoral POS",
     "download_desc": "Descarga la última versión para Windows.",
-    "download_windows": "Descargar"
+    "download_windows": "Descargar",
+    "welcome": "Bienvenido",
+    "system_operational": "Sistema operativo"
   },
   "store": {
     "title": "Local",
@@ -83,7 +86,10 @@
     "registered": "Registrado",
     "back": "Volver",
     "logo": "Logo del local",
-    "name": "Nombre",
+    "alias": "Nombre visible",
+    "alias_desc": "Un nombre para identificar este local en la consola (ej. \"Calle Mayor\").",
+    "name": "Nombre en ticket",
+    "name_desc": "El nombre que aparece en los tickets (sincronizado desde el terminal).",
     "address": "Dirección",
     "phone": "Teléfono",
     "nif": "NIF",
@@ -225,7 +231,8 @@
     "active": "Activo",
     "inactive": "Inactivo",
     "sort_order": "Orden",
-    "search": "Buscar..."
+    "search": "Buscar...",
+    "description": "Descripción"
   },
   "red_flags": {
     "title": "Alertas de operación",
@@ -278,7 +285,8 @@
     "edit": "Editar mesa",
     "zone": "Zona",
     "capacity": "Capacidad",
-    "no_zone": "Sin zona"
+    "no_zone": "Sin zona",
+    "seats": "plazas"
   },
   "audit": {
     "title": "Registro de auditoría",
@@ -322,7 +330,8 @@
       "inactive": "Inactivo",
       "required_field": "Rellena todos los campos obligatorios.",
       "sort_order": "Orden",
-      "search": "Buscar..."
+      "search": "Buscar...",
+      "properties": "Propiedades"
     },
     "product": {
       "title": "Productos",
@@ -347,6 +356,21 @@
       "spec_receipt_name": "Nombre recibo del spec",
       "is_default": "Por defecto",
       "spec_required": "Se requiere al menos una especificación.",
+      "name": "Nombre",
+      "step_basics": "Básico",
+      "step_basics_desc": "Nombre, imagen y categoría del producto.",
+      "step_pricing": "Precio",
+      "step_pricing_desc": "Especificaciones y precios.",
+      "step_operations": "Operaciones",
+      "step_operations_desc": "Impuestos, orden e impresión.",
+      "step_org": "Organización",
+      "step_org_desc": "Etiquetas e ID externo.",
+      "create_title": "Nuevo producto",
+      "add_variant": "Añadir variante",
+      "printing": "Impresión",
+      "is_kitchen_print": "Imprimir en cocina",
+      "is_label_print": "Imprimir etiqueta",
+      "last_selected_category": "Última categoría seleccionada",
       "confirm": {
         "delete": "Este producto y sus especificaciones se eliminarán permanentemente. ¿Continuar?"
       }
@@ -444,6 +468,18 @@
       "day_4": "Jue",
       "day_5": "Vie",
       "day_6": "Sáb",
+      "step_basics": "Básico",
+      "step_basics_desc": "Nombre y descripción de la regla.",
+      "step_config": "Configuración",
+      "step_config_desc": "Tipo y ajuste de precio.",
+      "step_scope": "Alcance",
+      "step_scope_desc": "A qué productos aplica.",
+      "step_constraints": "Restricciones",
+      "step_constraints_desc": "Días, horarios y período de validez.",
+      "advanced": "Avanzado",
+      "create_title": "Nueva regla de precio",
+      "target_id_hint": "ID del recurso al que aplica esta regla.",
+      "zone_hint": "Dejar vacío para aplicar en todas las zonas.",
       "confirm": {
         "delete": "Esta regla de precio se eliminará permanentemente. ¿Continuar?"
       }
@@ -520,6 +556,8 @@
       "zoom_in": "Acercar",
       "zoom_out": "Alejar",
       "fit_to_screen": "Ajustar a pantalla",
+      "is_default": "Plantilla por defecto",
+      "is_default_desc": "Usar esta plantilla como predeterminada para impresión de etiquetas.",
       "field_helper_hint": "Usa la sintaxis {variable} en los campos de plantilla para insertar datos dinámicos.",
       "field": {
         "text": "Texto",
@@ -571,7 +609,8 @@
     "dine_in": "En sala",
     "takeout": "Para llevar",
     "comped": "Cortesía",
-    "events": "Eventos"
+    "events": "Eventos",
+    "order_detail": "Detalle del pedido"
   },
   "onboard": {
     "title": "Elige tu plan",
@@ -608,12 +647,17 @@
     "step_plan": "Plan"
   },
   "common": {
+    "loading": "Cargando...",
+    "status": {
+      "saving": "Guardando..."
+    },
     "label": {
       "none": "Sin datos",
       "items": "elementos",
       "total": "Total",
       "yes": "Sí",
-      "no": "No"
+      "no": "No",
+      "active": "activos"
     },
     "selection": {
       "selected": "Seleccionados",
@@ -641,6 +685,7 @@
     "hint": {
       "search_placeholder": "Buscar...",
       "select_item": "Selecciona un elemento",
+      "select_option": "Seleccionar...",
       "desktop_only": "Por favor, usa esta función en escritorio"
     },
     "error": {

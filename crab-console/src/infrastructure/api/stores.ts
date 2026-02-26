@@ -9,6 +9,7 @@ export function updateStore(
   token: string,
   storeId: number,
   data: {
+    alias?: string;
     name?: string;
     address?: string;
     phone?: string;

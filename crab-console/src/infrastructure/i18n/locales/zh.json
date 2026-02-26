@@ -26,6 +26,7 @@
   },
   "nav": {
     "dashboard": "概览",
+    "menu": "菜单",
     "stores": "门店",
     "audit": "审计日志",
     "settings": "设置",
@@ -75,7 +76,9 @@
     "view_store": "查看门店",
     "download_app": "RedCoral POS",
     "download_desc": "下载最新 Windows 版本。",
-    "download_windows": "下载"
+    "download_windows": "下载",
+    "welcome": "欢迎",
+    "system_operational": "系统运行正常"
   },
   "store": {
     "title": "门店",
@@ -83,7 +86,10 @@
     "registered": "注册时间",
     "back": "返回",
     "logo": "门店 Logo",
-    "name": "名称",
+    "alias": "显示名称",
+    "alias_desc": "在管理后台中识别门店的别名（如「总店」「分店」）。",
+    "name": "小票名称",
+    "name_desc": "打印在小票上的名称（从终端同步）。",
     "address": "地址",
     "phone": "电话",
     "nif": "税号 (NIF)",
@@ -225,7 +231,8 @@
     "active": "启用",
     "inactive": "停用",
     "sort_order": "排序",
-    "search": "搜索..."
+    "search": "搜索...",
+    "description": "描述"
   },
   "red_flags": {
     "title": "操作异常监控",
@@ -278,7 +285,8 @@
     "edit": "编辑餐桌",
     "zone": "区域",
     "capacity": "容量",
-    "no_zone": "无区域"
+    "no_zone": "无区域",
+    "seats": "座"
   },
   "audit": {
     "title": "审计日志",
@@ -322,7 +330,8 @@
       "inactive": "停用",
       "required_field": "请填写所有必填项。",
       "sort_order": "排序",
-      "search": "搜索..."
+      "search": "搜索...",
+      "properties": "属性"
     },
     "product": {
       "title": "产品",
@@ -347,6 +356,21 @@
       "spec_receipt_name": "规格小票名",
       "is_default": "默认",
       "spec_required": "至少需要一个规格。",
+      "name": "名称",
+      "step_basics": "基本信息",
+      "step_basics_desc": "产品名称、图片和分类。",
+      "step_pricing": "定价",
+      "step_pricing_desc": "规格与价格。",
+      "step_operations": "运营",
+      "step_operations_desc": "税率、排序和打印设置。",
+      "step_org": "归类",
+      "step_org_desc": "标签和外部 ID。",
+      "create_title": "新建产品",
+      "add_variant": "添加规格",
+      "printing": "打印设置",
+      "is_kitchen_print": "厨房打印",
+      "is_label_print": "标签打印",
+      "last_selected_category": "上次选择的分类",
       "confirm": {
         "delete": "此产品及其规格将被永久删除，确定继续？"
       }
@@ -444,6 +468,18 @@
       "day_4": "周四",
       "day_5": "周五",
       "day_6": "周六",
+      "step_basics": "基本信息",
+      "step_basics_desc": "规则名称和描述。",
+      "step_config": "配置",
+      "step_config_desc": "价格类型和调整方式。",
+      "step_scope": "范围",
+      "step_scope_desc": "适用的产品范围。",
+      "step_constraints": "约束条件",
+      "step_constraints_desc": "生效星期、时段和有效期。",
+      "advanced": "高级选项",
+      "create_title": "新建价格规则",
+      "target_id_hint": "此规则适用的资源 ID。",
+      "zone_hint": "留空则适用于所有区域。",
       "confirm": {
         "delete": "此价格规则将被永久删除，确定继续？"
       }
@@ -520,6 +556,8 @@
       "zoom_in": "放大",
       "zoom_out": "缩小",
       "fit_to_screen": "适应屏幕",
+      "is_default": "默认模板",
+      "is_default_desc": "将此模板设为标签打印的默认模板。",
       "field_helper_hint": "在模板字段中使用 {变量名} 语法插入动态数据。",
       "field": {
         "text": "文本",
@@ -571,7 +609,8 @@
     "dine_in": "堂食",
     "takeout": "外卖",
     "comped": "赠送",
-    "events": "事件"
+    "events": "事件",
+    "order_detail": "订单详情"
   },
   "onboard": {
     "title": "选择你的方案",
@@ -608,12 +647,17 @@
     "step_plan": "方案"
   },
   "common": {
+    "loading": "加载中...",
+    "status": {
+      "saving": "保存中..."
+    },
     "label": {
       "none": "暂无数据",
       "items": "项",
       "total": "共计",
       "yes": "是",
-      "no": "否"
+      "no": "否",
+      "active": "活跃"
     },
     "selection": {
       "selected": "已选择",
@@ -641,6 +685,7 @@
     "hint": {
       "search_placeholder": "搜索...",
       "select_item": "选择一个项目",
+      "select_option": "请选择...",
       "desktop_only": "请在桌面端使用此功能"
     },
     "error": {

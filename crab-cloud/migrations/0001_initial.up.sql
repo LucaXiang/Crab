@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS stores (
     tenant_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
     store_number INT NOT NULL,
+    alias TEXT NOT NULL DEFAULT 'Store01',
     name TEXT,
     address TEXT,
     phone TEXT,
