@@ -210,7 +210,7 @@ impl KitchenTicketRenderer {
         }
     }
 
-    /// Footer: reprint indicator
+    /// Footer: reprint indicator + bottom margin + cut
     fn render_footer(&self, b: &mut EscPosBuilder, order: &KitchenOrder) {
         b.sep_double();
 
@@ -224,7 +224,11 @@ impl KitchenTicketRenderer {
             b.left();
         }
 
-        b.feed(2);
+        // feed(6) = flush print buffer + feed 6 lines past cutter.
+        // Typical 80mm printer: cutter is ~25mm above print head ≈ 5 lines.
+        // 6 lines ensures content clears the cutter with 1 line bottom margin.
+        // Trade-off: next ticket will have ~6 lines top whitespace (hardware limit).
+        b.feed(6);
         b.cut();
     }
 }

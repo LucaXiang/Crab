@@ -168,6 +168,16 @@ impl EscPosBuilder {
         self
     }
 
+    /// Full cut with feed — feeds n lines then cuts.
+    /// Uses GS V 66 n, which lets the printer manage cutter-to-head distance.
+    /// This produces less top-margin waste on the next ticket compared to
+    /// separate feed() + cut() calls.
+    pub fn cut_feed(&mut self, lines: u8) -> &mut Self {
+        // GS V 66 n - Full cut after feeding n lines
+        self.buf.extend_from_slice(&[0x1D, 0x56, 0x42, lines]);
+        self
+    }
+
     /// Partial cut (leave a small connection)
     pub fn cut_partial(&mut self) -> &mut Self {
         // GS V 1 - Partial cut
