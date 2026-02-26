@@ -1575,7 +1575,7 @@ dependencies = [
 
 [[package]]
 name = "crab-cert"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1604,7 +1604,7 @@ dependencies = [
 
 [[package]]
 name = "crab-client"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "aws-lc-rs",
@@ -1637,7 +1637,7 @@ dependencies = [
 
 [[package]]
 name = "crab-cloud"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -1683,7 +1683,7 @@ dependencies = [
 
 [[package]]
 name = "crab-printer"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "encoding_rs",
@@ -2199,7 +2199,7 @@ dependencies = [
 
 [[package]]
 name = "edge-server"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "argon2",
  "async-trait",
@@ -5631,7 +5631,7 @@ dependencies = [
 
 [[package]]
 name = "red-coral"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -6519,7 +6519,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "1.1.2"
+version = "0.1.2"
 dependencies = [
  "axum",
  "base64 0.22.1",

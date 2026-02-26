@@ -1,6 +1,6 @@
 [package]
 name = "red-coral"
-version = "1.1.2"
+version = "0.1.2"
 description = "RedCoral POS - A Tauri App"
 authors = ["you"]
 publish = false
