@@ -810,7 +810,7 @@ interface CategoryAttribute extends AttributeBinding {
  * 打印上下文 (完整 JSON，模板自取所需字段)
  * Aligned with edge-server printing types
  */
-interface PrintItemContext {
+export interface PrintItemContext {
   // 分类
   category_id: number;
   category_name: string;
@@ -840,7 +840,7 @@ interface PrintItemContext {
 }
 
 /** 厨房订单菜品 */
-interface KitchenOrderItem {
+export interface KitchenOrderItem {
   context: PrintItemContext;
 }
 
@@ -848,7 +848,7 @@ interface KitchenOrderItem {
  * 一次点单的厨房记录（对应一个 ItemsAdded 事件）
  * Used for kitchen order display and reprint
  */
-interface KitchenOrder {
+export interface KitchenOrder {
   /** Kitchen order ID (= event_id, UUID) */
   id: string;
   /** Parent order ID (UUID) */
@@ -867,7 +867,7 @@ interface KitchenOrder {
  * 标签打印记录（单品级别）
  * Each item in an order can have multiple labels (one per quantity unit)
  */
-interface LabelPrintRecord {
+export interface LabelPrintRecord {
   /** Label record ID (UUID) */
   id: string;
   /** Parent order ID (UUID) */
@@ -885,7 +885,7 @@ interface LabelPrintRecord {
 }
 
 /** Response for kitchen order list */
-interface KitchenOrderListResponse {
+export interface KitchenOrderListResponse {
   items: KitchenOrder[];
   total: number | null;
 }

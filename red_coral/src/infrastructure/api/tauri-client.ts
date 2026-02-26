@@ -58,6 +58,8 @@ import type {
   DailyReport,
   DailyReportGenerate,
   AuditListResponse,
+  KitchenOrderListResponse,
+  LabelPrintRecord,
   SystemIssue,
   ResolveSystemIssueRequest,
 } from '@/core/domain/types/api';
@@ -542,6 +544,36 @@ export class TauriApiClient {
     await invokeApi<unknown>('api_post', {
       path: '/api/system-issues/resolve',
       body: data,
+    });
+  }
+
+  // ============ Kitchen Orders (厨房补打) ============
+
+  async getKitchenOrdersForOrder(orderId: string): Promise<KitchenOrderListResponse> {
+    return invokeApi<KitchenOrderListResponse>('api_get', {
+      path: `/api/kitchen-orders?order_id=${orderId}`,
+    });
+  }
+
+  async reprintKitchenOrder(id: string): Promise<boolean> {
+    return invokeApi<boolean>('api_post', {
+      path: `/api/kitchen-orders/${id}/reprint`,
+      body: {},
+    });
+  }
+
+  // ============ Label Records (标签补打) ============
+
+  async getLabelRecordsForOrder(orderId: string): Promise<LabelPrintRecord[]> {
+    return invokeApi<LabelPrintRecord[]>('api_get', {
+      path: `/api/label-records?order_id=${orderId}`,
+    });
+  }
+
+  async reprintLabelRecord(id: string): Promise<boolean> {
+    return invokeApi<boolean>('api_post', {
+      path: `/api/label-records/${id}/reprint`,
+      body: {},
     });
   }
 }

@@ -469,6 +469,23 @@
       "success": "订单已合并到桌台",
       "failed": "合并到桌台失败"
     },
+    "kitchen_reprint": {
+      "title": "补打记录",
+      "desc": "补打厨房小票",
+      "tab_kitchen": "厨房小票",
+      "empty": "暂无厨房打印记录",
+      "button": "补打",
+      "success": "已发送补打",
+      "failed": "补打失败",
+      "print_count": "已打印 {count} 次"
+    },
+    "label_reprint": {
+      "tab_label": "标签",
+      "empty": "暂无标签打印记录",
+      "button": "补打",
+      "success": "标签补打已发送",
+      "failed": "标签补打失败"
+    },
     "error": {
       "no_receipt_number": "订单缺少单号",
       "insufficient": "金额不足",

@@ -5,11 +5,13 @@ import { useI18n } from '@/hooks/useI18n';
 import { useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency, computePriceBreakdown } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
-import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp } from 'lucide-react';
+import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp, Tag } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { TimelineList } from '@/shared/components/TimelineList';
 import { calculateItemSink } from '@/utils/itemSorting';
+import { KitchenReprintModal } from '@/screens/Checkout/KitchenReprintModal';
+import { LabelReprintModal } from '@/screens/Checkout/LabelReprintModal';
 
 interface HistoryDetailProps {
   order?: ArchivedOrderDetail;
@@ -49,6 +51,8 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
 export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [showKitchenReprint, setShowKitchenReprint] = useState(false);
+  const [showLabelReprint, setShowLabelReprint] = useState(false);
   const categories = useCategoryStore((s) => s.items);
 
   // Convert archived events to OrderEvent format for TimelineList
@@ -167,6 +171,20 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 <span>{t('history.action.reprint')}</span>
               </button>
             </EscalatableGate>
+            <button
+              onClick={() => setShowKitchenReprint(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white border border-amber-300 rounded-lg shadow-sm text-sm font-medium text-amber-700 hover:bg-amber-50 hover:text-amber-900 transition-colors"
+            >
+              <Printer size={16} />
+              <span>{t('checkout.kitchen_reprint.tab_kitchen')}</span>
+            </button>
+            <button
+              onClick={() => setShowLabelReprint(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white border border-amber-300 rounded-lg shadow-sm text-sm font-medium text-amber-700 hover:bg-amber-50 hover:text-amber-900 transition-colors"
+            >
+              <Tag size={16} />
+              <span>{t('checkout.label_reprint.tab_label')}</span>
+            </button>
           </div>
           <div className="flex gap-4 text-sm text-gray-500">
             {order.table_name && order.table_name !== 'RETAIL' && (
@@ -332,6 +350,21 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
           </div>
         </div>
       </div>
+
+      {order && (
+        <>
+          <KitchenReprintModal
+            isOpen={showKitchenReprint}
+            orderId={order.order_key}
+            onClose={() => setShowKitchenReprint(false)}
+          />
+          <LabelReprintModal
+            isOpen={showLabelReprint}
+            orderId={order.order_key}
+            onClose={() => setShowLabelReprint(false)}
+          />
+        </>
+      )}
     </div>
   );
 };

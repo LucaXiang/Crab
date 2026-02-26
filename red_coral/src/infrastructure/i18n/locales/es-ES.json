@@ -469,6 +469,23 @@
       "success": "Pedido combinado a mesa",
       "failed": "Error al combinar a mesa"
     },
+    "kitchen_reprint": {
+      "title": "Reimprimir",
+      "desc": "Reimprimir tickets de cocina",
+      "tab_kitchen": "Tickets cocina",
+      "empty": "Sin registros de cocina",
+      "button": "Reimprimir",
+      "success": "Reimpresión enviada",
+      "failed": "Error al reimprimir",
+      "print_count": "Impreso {count} veces"
+    },
+    "label_reprint": {
+      "tab_label": "Etiquetas",
+      "empty": "Sin registros de etiquetas",
+      "button": "Reimprimir",
+      "success": "Etiqueta reimpresa",
+      "failed": "Error al reimprimir etiqueta"
+    },
     "error": {
       "no_receipt_number": "Pedido sin número",
       "insufficient": "Importe insuficiente",

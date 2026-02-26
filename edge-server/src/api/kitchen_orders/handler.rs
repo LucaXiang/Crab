@@ -233,21 +233,85 @@ pub async fn get_label_by_id(
     Ok(Json(record))
 }
 
-/// POST /api/label-records/:id/reprint - Reprint a label record
+/// POST /api/label-records/:id/reprint - Reprint a single label
 ///
-/// Note: Label reprint currently only increments the counter.
-/// Actual label re-printing requires the label template renderer (Windows GDI+),
-/// which is only available on the Tauri frontend.
+/// Takes any LabelPrintRecord ID, builds a new label with index="1/1",
+/// and sends it to the printer. Increments print_count on the original record.
 pub async fn reprint_label(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let service = state.kitchen_print_service();
 
-    service.reprint_label_record(&id)?;
+    // Get original record (redb or archived)
+    let record = if let Some(r) = service.get_label_record(&id)? {
+        // Increment print_count in redb
+        service.reprint_label_record(&id)?;
+        r
+    } else {
+        // Archived label — no redb record to update
+        // Return not found for now; archived labels are rebuilt from events
+        return Err(AppError::not_found(format!("Label record {id}")));
+    };
 
-    tracing::info!(label_record_id = %id, "Label record reprinted via API");
+    // Build a reprint record with index="1/1"
+    let mut reprint_context = record.context.clone();
+    reprint_context.index = Some("1/1".to_string());
+    reprint_context.quantity = 1;
 
+    let reprint_record = LabelPrintRecord {
+        id: format!("reprint-{}", uuid::Uuid::new_v4()),
+        order_id: record.order_id,
+        kitchen_order_id: record.kitchen_order_id,
+        table_name: record.table_name,
+        queue_number: record.queue_number,
+        is_retail: record.is_retail,
+        created_at: chrono::Utc::now().timestamp_millis(),
+        context: reprint_context,
+        print_count: 0,
+    };
+
+    // Load destinations and print
+    let destinations: HashMap<String, _> = print_destination::find_all(&state.pool)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?
+        .into_iter()
+        .map(|d| (d.id.to_string(), d))
+        .collect();
+
+    let executor = PrintExecutor::with_config(48, state.config.timezone);
+
+    #[cfg(windows)]
+    {
+        use crate::db::repository::label_template;
+        let template = match label_template::get_default(&state.pool).await {
+            Ok(Some(db_tmpl)) => crate::printing::executor::convert_label_template(&db_tmpl),
+            _ => {
+                tracing::warn!("No default label template for reprint, using built-in");
+                crab_printer::label::LabelTemplate::default()
+            }
+        };
+        if let Err(e) = executor
+            .print_label_records(&[reprint_record], &destinations, &template)
+            .await
+        {
+            tracing::warn!(label_record_id = %id, error = %e, "Label reprint failed");
+            return Ok(Json(false));
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        if let Err(e) = executor
+            .print_label_records(&[reprint_record], &destinations)
+            .await
+        {
+            tracing::warn!(label_record_id = %id, error = %e, "Label reprint failed");
+            return Ok(Json(false));
+        }
+    }
+
+    tracing::info!(label_record_id = %id, "Label reprinted successfully");
     Ok(Json(true))
 }
 

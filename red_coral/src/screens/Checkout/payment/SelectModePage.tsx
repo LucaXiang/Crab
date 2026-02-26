@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { HeldOrder } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid, Tag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -29,6 +29,8 @@ import { StampRedeemModal } from './StampRedeemModal';
 import { getMatchingItems, getDesignatedMatchingItems } from '@/utils/stampMatching';
 import { useStampProgress } from './useStampProgress';
 import { usePaymentActions } from './usePaymentActions';
+import { KitchenReprintModal } from '../KitchenReprintModal';
+import { LabelReprintModal } from '../LabelReprintModal';
 
 type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL' | 'MEMBER_DETAIL';
 
@@ -66,6 +68,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
   const [showSurchargeModal, setShowSurchargeModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [showMergeTableModal, setShowMergeTableModal] = useState(false);
+  const [showKitchenReprintModal, setShowKitchenReprintModal] = useState(false);
+  const [showLabelReprintModal, setShowLabelReprintModal] = useState(false);
 
   const handleBackClick = useCallback(() => {
     if (order.is_retail) {
@@ -174,6 +178,14 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     {t('checkout.pre_payment.receipt')}
                   </button>
                 )}
+                <button onClick={() => setShowKitchenReprintModal(true)} className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <Printer size={20} />
+                  {t('checkout.kitchen_reprint.tab_kitchen')}
+                </button>
+                <button onClick={() => setShowLabelReprintModal(true)} className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <Tag size={20} />
+                  {t('checkout.label_reprint.tab_label')}
+                </button>
                 {isPaidInFull && (
                   <button onClick={() => setShowCompleteConfirm(true)} disabled={payment.isProcessing} className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                     <Check size={20} />
@@ -498,6 +510,17 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
           />
         </div>
       )}
+
+      <KitchenReprintModal
+        isOpen={showKitchenReprintModal}
+        orderId={order.order_id}
+        onClose={() => setShowKitchenReprintModal(false)}
+      />
+      <LabelReprintModal
+        isOpen={showLabelReprintModal}
+        orderId={order.order_id}
+        onClose={() => setShowLabelReprintModal(false)}
+      />
 
       {stamp.stampRedeemActivity && (() => {
         const spa = stamp.stampRedeemActivity;

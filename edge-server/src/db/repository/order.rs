@@ -11,6 +11,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrderDetail {
     pub order_id: i64,
+    pub order_key: String,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
@@ -102,6 +103,7 @@ pub struct OrderDetailEvent {
 #[derive(sqlx::FromRow)]
 struct OrderRow {
     id: i64,
+    order_key: String,
     receipt_number: String,
     table_name: Option<String>,
     zone_name: Option<String>,
@@ -181,7 +183,7 @@ struct ItemRow {
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
     let order: OrderRow = sqlx::query_as::<_, OrderRow>(
-        "SELECT id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number FROM archived_order WHERE id = ?",
+        "SELECT id, order_key, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -297,6 +299,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
 
     Ok(OrderDetail {
         order_id: order.id,
+        order_key: order.order_key,
         receipt_number: order.receipt_number,
         table_name: order.table_name,
         zone_name: order.zone_name,
@@ -697,4 +700,57 @@ pub async fn cleanup_synced_order_details(
         .map_err(|e| RepoError::Database(e.to_string()))?;
 
     Ok(total)
+}
+
+/// Archived event row for ITEMS_ADDED events (for kitchen reprint fallback)
+#[derive(Debug, sqlx::FromRow)]
+pub struct ArchivedItemsAddedEvent {
+    pub event_id: i64,
+    pub timestamp: i64,
+    pub data: Option<String>,
+}
+
+/// Archived order metadata for rebuilding kitchen orders
+#[derive(Debug, sqlx::FromRow)]
+pub struct ArchivedOrderMeta {
+    pub order_key: String,
+    pub table_name: Option<String>,
+    pub zone_name: Option<String>,
+    pub is_retail: bool,
+    pub queue_number: Option<i32>,
+}
+
+/// Get ITEMS_ADDED events for an archived order by order_key (UUID)
+pub async fn get_items_added_events_by_order_key(
+    pool: &SqlitePool,
+    order_key: &str,
+) -> RepoResult<(Option<ArchivedOrderMeta>, Vec<ArchivedItemsAddedEvent>)> {
+    // 1. Find order pk and metadata by order_key
+    let meta = sqlx::query_as::<_, ArchivedOrderMeta>(
+        "SELECT order_key, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE order_key = ?",
+    )
+    .bind(order_key)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(meta) = meta else {
+        return Ok((None, vec![]));
+    };
+
+    let order_pk =
+        sqlx::query_scalar::<_, i64>("SELECT id FROM archived_order WHERE order_key = ?")
+            .bind(order_key)
+            .fetch_one(pool)
+            .await?;
+
+    // 2. Get ITEMS_ADDED events
+    let events = sqlx::query_as::<_, ArchivedItemsAddedEvent>(
+        "SELECT id as event_id, timestamp, data FROM archived_order_event \
+         WHERE order_pk = ? AND event_type = 'ITEMS_ADDED' ORDER BY seq",
+    )
+    .bind(order_pk)
+    .fetch_all(pool)
+    .await?;
+
+    Ok((Some(meta), events))
 }

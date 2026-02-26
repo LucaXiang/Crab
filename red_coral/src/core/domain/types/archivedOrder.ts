@@ -115,6 +115,7 @@ export type ArchivedLossReason = 'CUSTOMER_FLED' | 'REFUSED_TO_PAY' | 'OTHER';
 /** Full order detail (matches backend OrderDetail) */
 export interface ArchivedOrderDetail {
   order_id: number;
+  order_key: string;
   receipt_number: string;
   table_name: string | null;
   zone_name: string | null;
