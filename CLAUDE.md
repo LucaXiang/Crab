@@ -154,7 +154,7 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 ### 安全要求
 
 - **全栈 HTTPS**: 所有 auth_url 强制 `https://`，无 `danger_accept_invalid_certs`
-- **P12 安全**: 客户电子签名存 AWS Secrets Manager，PG 只存元数据，密码不入日志
+- **P12 安全**: 客户电子签名 (P12+密码) 经 AES-256-GCM 加密后存 PG，加密密钥 (MasterKey) 存 AWS Secrets Manager，密码不入日志
 - **mTLS**: edge-server ↔ crab-cloud 通过 8443 端口双向 TLS
 - **私钥文件**: 写入私钥/凭据文件必须使用 `crab_cert::write_secret_file()` (Unix 下 0o600 权限)
 
@@ -168,9 +168,9 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 - 使用 String 格式 ID (用 i64)
 - 使用 `string` 格式的时间戳 (用 `i64` Unix 毫秒)
 - EventApplier 中执行 I/O 或副作用
-- 使用 `f64` 进行金额计算 (用 `rust_decimal`)
+- 使用 `f64` 进行金额**算术运算** (用 `rust_decimal`，存储/传输/序列化用 `f64` 是允许的)
 - 添加转换函数/兼容层/适配器来修复类型不匹配 (从源头修)
-- 使用 INTEGER cents 存储金额 (用 REAL + `rust_decimal`)
+- 使用 INTEGER cents 存储金额 (用 REAL/DOUBLE PRECISION，Rust 侧计算用 `rust_decimal`)
 - 使用 JSON TEXT 列存储嵌套对象 (用独立关联表)
 - 绕过 `shared::ErrorCode` 自造错误码或字符串错误 (所有错误必须通过 ErrorCode → AppError → ApiResponse 链路)
 

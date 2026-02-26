@@ -85,19 +85,20 @@ pub async fn escalate_permission(
     {
         Ok(response) => Ok(ApiResponse::success(response.authorizer)),
         Err(e) => {
-            let error_msg = e.to_string();
-            // 区分权限不足和凭据错误
-            if error_msg.contains("permission") {
-                Ok(ApiResponse::error_with_code(
-                    ErrorCode::PermissionDenied,
-                    error_msg,
-                ))
-            } else {
-                Ok(ApiResponse::error_with_code(
-                    ErrorCode::InvalidCredentials,
-                    error_msg,
-                ))
-            }
+            // Extract structured ErrorCode from ClientError::Api if available
+            let (code, msg) = match &e {
+                crate::core::bridge::BridgeError::Client(crab_client::ClientError::Api {
+                    code,
+                    message,
+                    ..
+                }) => {
+                    let error_code =
+                        ErrorCode::try_from(*code as u16).unwrap_or(ErrorCode::InternalError);
+                    (error_code, message.clone())
+                }
+                _ => (ErrorCode::InvalidCredentials, e.to_string()),
+            };
+            Ok(ApiResponse::error_with_code(code, msg))
         }
     }
 }

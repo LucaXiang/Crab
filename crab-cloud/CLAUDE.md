@@ -18,6 +18,11 @@ src/
 ├── main.rs          # Axum 长驻服务入口 (HTTP + mTLS 双端口)
 ├── config.rs        # DATABASE_URL, MTLS_PORT, ROOT_CA, P12 配置
 ├── state.rs         # AppState { pool, ca_store, sm, edges } + CaStore (PKI 全功能)
+├── crypto.rs        # MasterKey (AES-256-GCM 加解密, Secrets Manager 读写)
+├── error.rs         # 错误类型
+├── util.rs          # 工具函数
+├── live/            # LiveOrderHub (Console 实时订单推送)
+│   └── mod.rs
 ├── auth/
 │   ├── mod.rs
 │   ├── edge_auth.rs   # mTLS + SignedBinding 验证 → EdgeIdentity
@@ -103,8 +108,10 @@ src/
 ## PKI 层级
 
 Root CA → Tenant CA → Entity Cert (Server / Client)
-- 存储: AWS Secrets Manager
-- P12: S3 + KMS 加密
+- Root CA: Secrets Manager (或本地文件 `ROOT_CA_PATH` fallback)
+- Tenant CA: 加密存 PG (`tenants.ca_cert_pem` + `ca_key_encrypted`)，MasterKey 加密
+- MasterKey: AWS Secrets Manager (`crab/master-key`)，AES-256-GCM
+- P12: AES-256-GCM 加密存 PG，MasterKey 加密
 
 ## 数据库
 

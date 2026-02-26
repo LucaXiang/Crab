@@ -150,11 +150,8 @@ pub struct OrderArchiveService {
 }
 
 impl OrderArchiveService {
-    pub fn new(pool: SqlitePool, tz: chrono_tz::Tz) -> Self {
-        let bad_archive_dir = std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join("data")
-            .join("bad_archives");
+    pub fn new(pool: SqlitePool, tz: chrono_tz::Tz, data_dir: &std::path::Path) -> Self {
+        let bad_archive_dir = data_dir.join("bad_archives");
 
         Self {
             pool,

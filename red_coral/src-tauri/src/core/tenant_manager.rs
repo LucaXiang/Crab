@@ -330,7 +330,7 @@ impl TenantManager {
         // edge-server 的 work_dir = {tenant}/server/，从 work_dir/certs/ 读取
         // 注意：不再写 client 路径，Client 模式需要调用 activate_client() 获取专用证书
         std::fs::write(paths.server_cert(), &data.entity_cert)?;
-        std::fs::write(paths.server_key(), &data.entity_key)?;
+        crab_cert::write_secret_file(paths.server_key(), &data.entity_key)?;
         std::fs::write(paths.server_tenant_ca(), &data.tenant_ca_cert)?;
         std::fs::write(paths.server_root_ca(), &data.root_ca_cert)?;
 
@@ -351,7 +351,7 @@ impl TenantManager {
             TenantError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         })?;
 
-        std::fs::write(&credential_path, &credential_json).map_err(|e| {
+        crab_cert::write_secret_file(&credential_path, &credential_json).map_err(|e| {
             tracing::error!("Failed to write credential to {:?}: {}", credential_path, e);
             TenantError::Io(e)
         })?;
@@ -451,7 +451,7 @@ impl TenantManager {
         // 5. 保存客户端证书到 {tenant}/certs/ (用于 mTLS Client Mode)
         paths.ensure_client_dirs()?;
         std::fs::write(paths.client_cert(), &data.entity_cert)?;
-        std::fs::write(paths.client_key(), &data.entity_key)?;
+        crab_cert::write_secret_file(paths.client_key(), &data.entity_key)?;
         std::fs::write(paths.client_tenant_ca(), &data.tenant_ca_cert)?;
 
         // 6. 保存 Credential
@@ -470,7 +470,7 @@ impl TenantManager {
             TenantError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         })?;
 
-        std::fs::write(&credential_path, &credential_json).map_err(|e| {
+        crab_cert::write_secret_file(&credential_path, &credential_json).map_err(|e| {
             tracing::error!("Failed to write credential to {:?}: {}", credential_path, e);
             TenantError::Io(e)
         })?;

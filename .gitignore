@@ -36,6 +36,7 @@ auth_storage/
 *.crt
 *.p12
 *.pfx
+credential.json
 Credential.json
 
 # ========== Runtime Data ==========

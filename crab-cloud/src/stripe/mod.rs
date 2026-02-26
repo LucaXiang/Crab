@@ -142,8 +142,11 @@ pub fn verify_webhook_signature(
     // Reject events older than 5 minutes to prevent replay attacks
     let ts: i64 = timestamp.parse().map_err(|_| "Invalid timestamp")?;
     let now = chrono::Utc::now().timestamp();
-    if (now - ts).abs() > 300 {
+    if now - ts > 300 {
         return Err("Webhook timestamp too old");
+    }
+    if ts > now + 60 {
+        return Err("Webhook timestamp in the future");
     }
 
     Ok(())

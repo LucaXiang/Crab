@@ -109,6 +109,7 @@ export function createResourceStore<T extends { id: number }>(
       // Gap detected: need full refresh
       // Only trigger fetchAll if we have a previous version to compare against
       if (state.lastVersion > 0 && version > state.lastVersion + 1) {
+        set({ lastVersion: version });
         if (state.isLoaded) {
           get().fetchAll(true);
         }
@@ -222,6 +223,7 @@ export function createCrudResourceStore<
       // Gap detected: need full refresh
       // Only trigger fetchAll if we have a previous version to compare against
       if (state.lastVersion > 0 && version > state.lastVersion + 1) {
+        set({ lastVersion: version });
         if (state.isLoaded) {
           get().fetchAll(true);
         }

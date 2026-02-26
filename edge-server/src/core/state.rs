@@ -228,7 +228,7 @@ impl ServerState {
                 ))
             })?;
         orders_manager.set_catalog_service(catalog_service.clone());
-        orders_manager.set_archive_service(pool.clone());
+        orders_manager.set_archive_service(pool.clone(), &config.data_dir());
 
         // Note: ArchiveWorker is started in start_background_tasks()
 
