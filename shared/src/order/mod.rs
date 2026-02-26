@@ -7,6 +7,7 @@
 
 pub mod applied_mg_rule;
 pub mod applied_rule;
+pub mod canonical;
 pub mod command;
 pub mod event;
 pub mod snapshot;
@@ -15,6 +16,7 @@ pub mod types;
 // Re-exports
 pub use applied_mg_rule::AppliedMgRule;
 pub use applied_rule::AppliedRule;
+pub use canonical::CanonicalHash;
 pub use command::{OrderCommand, OrderCommandPayload};
 pub use event::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};
