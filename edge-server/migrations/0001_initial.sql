@@ -734,10 +734,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_single_open
 -- ============================================================
 
 -- Admin role + user (password: 'admin')
-INSERT INTO role (id, name, display_name, description, permissions, is_system, is_active)
-VALUES (1, 'admin', 'admin', 'administrator', '["*"]', 1, 1);
+INSERT INTO role (id, name, description, permissions, is_system, is_active)
+VALUES (1, 'admin', 'administrator', '["*"]', 1, 1);
 
-INSERT INTO employee (id, username, hash_pass, display_name, role_id, is_system, is_active, created_at)
+INSERT INTO employee (id, username, hash_pass, name, role_id, is_system, is_active, created_at)
 VALUES (1, 'admin', '$argon2id$v=19$m=19456,t=2,p=1$4K7SyBwr5d3uF4hroPQf2w$hPqq7x5rSE1d9TTf+hK3eipuaeeElC7GMHuSJIozDws', 'admin', 1, 1, 1, 0);
 
 -- Store info + system state
@@ -882,9 +882,9 @@ VALUES (6, 'category', 1, 4, 0, 2);
 
 -- Reglas de precio: Terraza 附加费
 -- 1: Terraza 全品 +€0.30 (GLOBAL scope, zone_scope=Terraza zone_id=2)
-INSERT INTO price_rule (id, name, display_name, receipt_name, description, rule_type, product_scope, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, is_active, created_at)
-VALUES (1, 'terraza_surcharge', 'Supl. Terraza', 'TERRAZA', 'Suplemento terraza para todos los productos', 'SURCHARGE', 'GLOBAL', '2', 'FIXED_AMOUNT', 0.30, 0, 0, 1, 0);
+INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, is_active, created_at)
+VALUES (1, 'Supl. Terraza', 'TERRAZA', 'Suplemento terraza para todos los productos', 'SURCHARGE', 'GLOBAL', '2', 'FIXED_AMOUNT', 0.30, 0, 0, 1, 0);
 -- 2: Terraza 酒水 +€0.20 (CATEGORY scope, target_id=5 Bebidas, zone_scope=Terraza)
 --    CATEGORY 优先级 (11) > GLOBAL (10)，non-stackable winner 机制自动覆盖
-INSERT INTO price_rule (id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, is_active, created_at)
-VALUES (2, 'terraza_bebidas_surcharge', 'Supl. Terraza Bebidas', 'TERRAZA BEB', 'Suplemento terraza para bebidas (prioridad sobre regla global)', 'SURCHARGE', 'CATEGORY', 5, '2', 'FIXED_AMOUNT', 0.20, 0, 0, 1, 0);
+INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, is_active, created_at)
+VALUES (2, 'Supl. Terraza Bebidas', 'TERRAZA BEB', 'Suplemento terraza para bebidas (prioridad sobre regla global)', 'SURCHARGE', 'CATEGORY', 5, '2', 'FIXED_AMOUNT', 0.20, 0, 0, 1, 0);
