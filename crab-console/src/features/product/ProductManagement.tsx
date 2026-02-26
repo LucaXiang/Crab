@@ -20,6 +20,7 @@ import { TagPicker } from '@/shared/components/TagPicker/TagPicker';
 import { ImageUpload } from '@/shared/components/ImageUpload';
 import { Thumbnail } from '@/shared/components/Thumbnail';
 import { formatCurrency } from '@/utils/format';
+import { ProductWizard } from './ProductWizard';
 import type {
   StoreProduct, ProductCreate, ProductUpdate, ProductSpecInput,
   StoreCategory, StoreTag, StoreAttribute, StoreBinding,
@@ -66,6 +67,7 @@ export const ProductManagement: React.FC = () => {
   const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [lastSelectedCategoryId, setLastSelectedCategoryId] = useState<number | undefined>();
 
   // Form fields
   const [formName, setFormName] = useState('');
@@ -236,8 +238,21 @@ export const ProductManagement: React.FC = () => {
       receipt_name: s.receipt_name.trim() || undefined,
     }));
 
-  const handleSave = async () => {
+  const handleCreate = async (data: ProductCreate) => {
     if (!token || saving) return;
+    setSaving(true);
+    try {
+      await createProduct(token, storeId, data);
+      setLastSelectedCategoryId(data.category_id);
+      setPanel({ type: 'closed' });
+      await load();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t('auth.error_generic'));
+    } finally { setSaving(false); }
+  };
+
+  const handleUpdate = async () => {
+    if (!token || saving || panel.type !== 'edit') return;
     if (!formName.trim()) { setFormError(t('settings.common.required_field')); return; }
     if (formCategoryId === '') { setFormError(t('settings.common.required_field')); return; }
     if (formSpecs.length === 0) { setFormError(t('settings.product.spec_required')); return; }
@@ -245,7 +260,7 @@ export const ProductManagement: React.FC = () => {
     setSaving(true);
     setFormError('');
     try {
-      const common = {
+      const payload: ProductUpdate = {
         name: formName.trim(), image: formImage || undefined,
         category_id: Number(formCategoryId),
         tax_rate: formTaxRate, sort_order: formSortOrder,
@@ -255,15 +270,10 @@ export const ProductManagement: React.FC = () => {
         external_id: formExternalId ? Number(formExternalId) : undefined,
         tags: formTagIds.length > 0 ? formTagIds : undefined,
         specs: buildSpecInputs(),
+        is_active: formIsActive,
       };
 
-      if (panel.type === 'edit') {
-        const payload: ProductUpdate = { ...common, is_active: formIsActive };
-        await updateProduct(token, storeId, panel.item.source_id, payload);
-      } else if (panel.type === 'create') {
-        const payload: ProductCreate = common;
-        await createProduct(token, storeId, payload);
-      }
+      await updateProduct(token, storeId, panel.item.source_id, payload);
       setPanel({ type: 'closed' });
       await load();
     } catch (err) {
@@ -376,13 +386,25 @@ export const ProductManagement: React.FC = () => {
           loading={loading}
           onReorder={!search.trim() ? handleReorder : undefined}
         >
-          {(panel.type === 'create' || panel.type === 'edit') && (
+          {panel.type === 'create' && (
+            <div className="h-full p-4 lg:p-8 bg-slate-50/50">
+              <ProductWizard
+                categories={categories}
+                tags={tags}
+                initialCategoryId={lastSelectedCategoryId}
+                onFinish={handleCreate}
+                onCancel={() => setPanel({ type: 'closed' })}
+                isSubmitting={saving}
+              />
+            </div>
+          )}
+          {panel.type === 'edit' && (
             <DetailPanel
-              title={panel.type === 'create' ? `${t('common.action.add')} ${t('settings.product.title')}` : `${t('common.action.edit')} ${t('settings.product.title')}`}
-              isCreating={panel.type === 'create'}
+              title={`${t('common.action.edit')} ${t('settings.product.title')}`}
+              isCreating={false}
               onClose={() => setPanel({ type: 'closed' })}
-              onSave={handleSave}
-              onDelete={panel.type === 'edit' ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              onSave={handleUpdate}
+              onDelete={() => setPanel({ type: 'delete', item: panel.item })}
               saving={saving}
               saveDisabled={!formName.trim() || formCategoryId === '' || formSpecs.length === 0}
             >

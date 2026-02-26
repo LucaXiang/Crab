@@ -12,11 +12,15 @@ import { getErrorMessage } from '@/utils/error';
 import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { ProductForm } from './ProductForm';
+import { ProductWizard } from './ProductWizard';
 import { createProduct, updateProduct, deleteProduct, loadProductFullData } from './mutations';
 import { createTauriClient } from '@/infrastructure/api';
 import { DeleteConfirmation } from '@/shared/components/DeleteConfirmation';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { Permission } from '@/core/domain/types';
+import { Permission, ProductCreate } from '@/core/domain/types';
+import { useTags } from '@/features/tag';
+
+import { useProductStore } from './store';
 
 export const ProductModal: React.FC = React.memo(() => {
   const { t } = useI18n();
@@ -26,9 +30,11 @@ export const ProductModal: React.FC = React.memo(() => {
   // Data from resources stores
   const categoryStore = useCategoryStore();
   const categories = categoryStore.items;
+  const tags = useTags();
 
   // UI actions from settings store
   const setLastSelectedCategory = useSettingsStore((s) => s.setLastSelectedCategory);
+  const lastSelectedCategoryId = useSettingsStore((s) => s.lastSelectedCategory);
 
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
@@ -221,6 +227,39 @@ export const ProductModal: React.FC = React.memo(() => {
     }
   };
 
+  const handleSelectImageAsync = async (): Promise<string | null> => {
+    try {
+      const file = await dialogOpen({
+        multiple: false,
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      });
+      if (!file || Array.isArray(file)) return null;
+      return await invoke<string>('save_image', { sourcePath: file });
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+      return null;
+    }
+  };
+
+  const handleCreate = async (data: ProductCreate) => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const client = createTauriClient();
+      const created = await client.createProduct(data);
+      if (created) {
+        useProductStore.getState().optimisticAdd(created as any);
+      }
+      toast.success(t('settings.product.message.created'));
+      setLastSelectedCategory(String(data.category_id));
+      closeModal();
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const accent = 'orange';
   const hasError = Object.values(formErrors).some(Boolean);
   const isSaveDisabled = !isFormDirty || hasError || isSaving;
@@ -261,6 +300,24 @@ export const ProductModal: React.FC = React.memo(() => {
       />
     );
   };
+
+  if (action === 'CREATE') {
+    return (
+      <div className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="w-full max-w-3xl h-[85vh] bg-transparent" onClick={(e) => e.stopPropagation()}>
+          <ProductWizard
+            categories={categories}
+            tags={tags}
+            initialCategoryId={lastSelectedCategoryId ? Number(lastSelectedCategoryId) : undefined}
+            onFinish={handleCreate}
+            onCancel={handleClose}
+            onSelectImage={handleSelectImageAsync}
+            isSubmitting={isSaving}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -311,7 +368,7 @@ export const ProductModal: React.FC = React.memo(() => {
               disabled={isSaveDisabled}
               className={isSaveDisabled ? saveDisabledClass : saveEnabledClass}
             >
-              {action === 'CREATE' ? t('common.action.create') : t('common.action.save')}
+              {t('common.action.save')}
             </button>
           )}
         </div>

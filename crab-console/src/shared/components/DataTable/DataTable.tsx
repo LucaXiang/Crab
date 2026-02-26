@@ -292,15 +292,17 @@ export function DataTable<T>({
       )}
 
       {/* ── Mobile Card View ── */}
-      <div className="md:hidden divide-y divide-gray-100">
+      <div className="md:hidden space-y-3 p-3 bg-slate-50/50">
         {currentData.map((item, index) => {
           const key = getRowKey(item);
           const isSelected = selectedKeys.has(key);
           return (
             <div
               key={key}
-              className={`p-4 transition-colors ${
-                isSelected ? theme.rowSelected : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+              className={`p-4 rounded-xl border transition-all duration-200 relative overflow-hidden ${
+                isSelected 
+                  ? 'bg-blue-50/60 border-blue-200 shadow-sm' 
+                  : 'bg-white border-slate-200/60 shadow-sm active:scale-[0.98]'
               }`}
               onTouchStart={() => handleLongPress(item, onEdit)}
               onTouchEnd={clearLongPress}
@@ -310,40 +312,40 @@ export function DataTable<T>({
                 {isSelectionMode && (
                   <button
                     onClick={() => toggleSelection(key)}
-                    className={`mt-0.5 w-5 h-5 rounded-sm border-2 flex items-center justify-center shrink-0 transition-colors ${
-                      isSelected ? theme.checkboxActive : `border-gray-300 ${theme.checkboxHover}`
+                    className={`mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${
+                      isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300'
                     }`}
                   >
-                    {isSelected && <Check size={12} className="text-white" />}
+                    {isSelected && <Check size={14} className="text-white" />}
                   </button>
                 )}
 
                 {/* Primary column (name) */}
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 text-sm">
+                  <div className={`font-semibold text-base mb-1 ${isSelected ? 'text-blue-700' : 'text-slate-900'}`}>
                     {primaryCol.render ? primaryCol.render(item) : String((item as Record<string, unknown>)[primaryCol.key] ?? '')}
                   </div>
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons - Improved touch targets */}
                 {showActions && !isSelectionMode && (
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {onEdit && (!isEditable || isEditable(item)) && (
                       <button
                         onClick={() => onEdit(item)}
-                        className="p-1.5 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors border border-amber-200/50"
+                        className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-600 rounded-full hover:bg-primary-50 hover:text-primary-600 transition-colors border border-slate-200"
                         title={t('common.action.edit')}
                       >
-                        <Edit3 size={14} />
+                        <Edit3 size={16} />
                       </button>
                     )}
                     {onDelete && (!isDeletable || isDeletable(item)) && (
                       <button
                         onClick={() => onDelete(item)}
-                        className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors border border-red-200/50"
+                        className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-600 rounded-full hover:bg-red-50 hover:text-red-600 transition-colors border border-slate-200"
                         title={t('common.action.delete')}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     )}
                   </div>
@@ -352,13 +354,13 @@ export function DataTable<T>({
 
               {/* Secondary columns as key:value pairs */}
               {secondaryColumns.length > 0 && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-x-4 gap-y-2">
                   {secondaryColumns.map(col => {
                     const val = col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key] ?? '');
                     return (
-                      <div key={col.key} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-400">{col.header}</span>
-                        <span className="text-gray-700">{val}</span>
+                      <div key={col.key} className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-0.5">{col.header}</span>
+                        <span className="text-sm text-slate-700 font-medium truncate">{val}</span>
                       </div>
                     );
                   })}

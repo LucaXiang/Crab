@@ -285,12 +285,62 @@ impl CatalogService {
         let products_count = self.products.read().len();
         tracing::debug!(count = products_count, "CatalogService loaded products");
 
-        // 6. Load persisted print defaults + auto-fix if destinations exist but defaults are NULL
+        // 6. Load persisted print defaults + validate + auto-fix
         match crate::db::repository::print_config::get(&self.pool).await {
             Ok(row) => {
                 let mut kitchen = row.default_kitchen_printer;
                 let mut label = row.default_label_printer;
                 let mut changed = false;
+
+                // Validate: if stored default points to a non-existent/inactive destination, clear it
+                if let Some(ref kid) = kitchen {
+                    if let Ok(kid_i64) = kid.parse::<i64>() {
+                        let exists = sqlx::query_scalar::<_, i64>(
+                            "SELECT id FROM print_destination WHERE id = ? AND purpose = 'kitchen' AND is_active = 1",
+                        )
+                        .bind(kid_i64)
+                        .fetch_optional(&self.pool)
+                        .await
+                        .ok()
+                        .flatten();
+                        if exists.is_none() {
+                            tracing::warn!(
+                                stale_id = %kid,
+                                "print_config default_kitchen_printer points to non-existent destination, clearing"
+                            );
+                            kitchen = None;
+                            changed = true;
+                        }
+                    } else {
+                        tracing::warn!(invalid_value = %kid, "print_config default_kitchen_printer is not a valid ID, clearing");
+                        kitchen = None;
+                        changed = true;
+                    }
+                }
+                if let Some(ref lid) = label {
+                    if let Ok(lid_i64) = lid.parse::<i64>() {
+                        let exists = sqlx::query_scalar::<_, i64>(
+                            "SELECT id FROM print_destination WHERE id = ? AND purpose = 'label' AND is_active = 1",
+                        )
+                        .bind(lid_i64)
+                        .fetch_optional(&self.pool)
+                        .await
+                        .ok()
+                        .flatten();
+                        if exists.is_none() {
+                            tracing::warn!(
+                                stale_id = %lid,
+                                "print_config default_label_printer points to non-existent destination, clearing"
+                            );
+                            label = None;
+                            changed = true;
+                        }
+                    } else {
+                        tracing::warn!(invalid_value = %lid, "print_config default_label_printer is not a valid ID, clearing");
+                        label = None;
+                        changed = true;
+                    }
+                }
 
                 // Auto-fix: if defaults are NULL but active destinations exist, auto-set them
                 if kitchen.is_none()
@@ -1254,6 +1304,17 @@ impl CatalogService {
             real_category.map(|c| c.is_kitchen_print_enabled),
         );
 
+        tracing::debug!(
+            product_id,
+            product_flag = product.is_kitchen_print_enabled,
+            category_id = product.category_id,
+            category_found = category.is_some(),
+            is_virtual = category.map(|c| c.is_virtual),
+            category_flag = real_category.map(|c| c.is_kitchen_print_enabled),
+            enabled,
+            "get_kitchen_print_config: resolved enabled flag"
+        );
+
         if !enabled {
             return Some(KitchenPrintConfig {
                 enabled: false,
@@ -1313,13 +1374,20 @@ impl CatalogService {
         get_default: impl FnOnce(&PrintDefaults) -> Option<&str>,
     ) -> Vec<String> {
         if let Some(dests) = category_dests.filter(|d| !d.is_empty()) {
+            tracing::debug!(
+                dests = ?dests,
+                "resolve_destinations: using category-specific destinations"
+            );
             dests.iter().map(|id| id.to_string()).collect()
         } else {
             let defaults = self.print_defaults.read();
-            get_default(&defaults)
-                .into_iter()
-                .map(String::from)
-                .collect()
+            let default_dest = get_default(&defaults);
+            tracing::debug!(
+                category_dests = ?category_dests,
+                default_dest = ?default_dest,
+                "resolve_destinations: category dests empty/none, falling back to global default"
+            );
+            default_dest.into_iter().map(String::from).collect()
         }
     }
 

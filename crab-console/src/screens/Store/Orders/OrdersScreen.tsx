@@ -208,36 +208,38 @@ export const OrdersScreen: React.FC = () => {
       {/* ── Mobile: card list + bottom sheet ── */}
       <div className="md:hidden px-4 py-4 space-y-4">
         {/* Header + Search */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-            <Clock className="w-5 h-5 text-primary-600" />
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shadow-sm">
+              <Clock className="w-5 h-5 text-primary-600" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-xl font-bold text-slate-900">{t('orders.title')}</h1>
+              <p className="text-sm text-slate-500">{filteredOrders.length} {t('orders.title')}</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-slate-900">{t('orders.title')}</h1>
-            <p className="text-sm text-slate-500">{filteredOrders.length} {t('orders.title')}</p>
-          </div>
-        </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <input
-            type="text"
-            placeholder={`${t('orders.receipt')}...`}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full bg-white border border-slate-200 pl-9 pr-4 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 transition-all"
-          />
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder={`${t('orders.receipt')}...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full bg-white border border-slate-200 pl-11 pr-4 py-3 rounded-xl text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all placeholder:text-slate-400"
+            />
+          </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20"><Spinner className="w-8 h-8 text-primary-500" /></div>
         ) : filteredOrders.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
             <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">{t('orders.empty')}</p>
+            <p className="text-slate-500 font-medium">{t('orders.empty')}</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-20">
             {filteredOrders.map(order => {
               const isVoid = order.status === 'VOID';
               const isMerged = order.status === 'MERGED';
@@ -246,36 +248,38 @@ export const OrdersScreen: React.FC = () => {
                   key={order.id}
                   type="button"
                   onClick={() => setSelectedId(order.source_id)}
-                  className="bg-white rounded-xl border border-slate-200 p-4 w-full text-left transition-all hover:border-primary-200 hover:shadow-sm cursor-pointer"
+                  className="bg-white rounded-xl border border-slate-200 p-4 w-full text-left transition-all active:scale-[0.98] active:bg-slate-50 shadow-sm"
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold text-slate-900">
                         {order.receipt_number ?? order.source_id.slice(0, 8)}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isVoid ? 'bg-red-100 text-red-600' : isMerged ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${isVoid ? 'bg-red-100 text-red-600' : isMerged ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                         {isVoid ? t('orders.void') : isMerged ? t('orders.merged') : t('orders.completed')}
                       </span>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-slate-300" />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                      <Clock className="w-3.5 h-3.5" />
+                      {new Date(order.end_time ?? order.synced_at).toLocaleString([], { hour12: false })}
+                    </div>
                     <span className={`text-lg font-bold ${isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                       {order.total != null ? formatCurrency(order.total) : '\u2014'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {new Date(order.end_time ?? order.synced_at).toLocaleString([], { hour12: false })}
                     </span>
                   </div>
                 </button>
               );
             })}
 
-            <div className="flex justify-center pt-2 pb-4">
+            <div className="flex justify-center pt-4 pb-8">
               <button
                 onClick={handleLoadMore}
                 disabled={!hasMore || loadingMore}
-                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-default flex items-center gap-2 cursor-pointer text-sm"
+                className="w-full py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 disabled:cursor-default flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 {loadingMore ? <Spinner className="w-4 h-4" /> : null}
                 <span>{hasMore ? t('orders.load_more') : t('orders.empty')}</span>

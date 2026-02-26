@@ -81,24 +81,27 @@ export const ReportsScreen: React.FC = () => {
         {/* Mobile cards */}
         <div className="md:hidden space-y-3">
           {reports.map(entry => (
-              <Link key={entry.id} to={`/stores/${storeId}/reports/${entry.business_date}`} className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors">
-                <div className="text-primary-500 font-medium mb-2">{entry.business_date}</div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              <Link key={entry.id} to={`/stores/${storeId}/reports/${entry.business_date}`} className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-all active:scale-[0.99]">
+                <div className="flex justify-between items-center mb-3 pb-3 border-b border-slate-50">
+                  <div className="text-slate-900 font-bold">{entry.business_date}</div>
+                  <div className="text-primary-600 font-bold text-lg">{formatCurrency(entry.total_sales)}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div>
-                    <p className="text-xs text-slate-400">{t('stats.total_sales')}</p>
-                    <p className="font-semibold text-slate-900">{formatCurrency(entry.total_sales)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.completed_orders')}</p>
+                    <p className="font-semibold text-slate-800">{entry.completed_orders}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">{t('stats.completed_orders')}</p>
-                    <p className="font-semibold text-slate-900">{entry.completed_orders}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.total_paid')}</p>
+                    <p className="font-semibold text-emerald-600">{formatCurrency(entry.total_paid)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">{t('stats.total_paid')}</p>
-                    <p className="text-slate-700">{formatCurrency(entry.total_paid)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.total_discount')}</p>
+                    <p className="font-medium text-orange-500">{formatCurrency(entry.total_discount)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">{t('stats.total_discount')}</p>
-                    <p className="text-orange-500">{formatCurrency(entry.total_discount)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.void_orders')}</p>
+                    <p className="font-medium text-red-500">{entry.void_orders}</p>
                   </div>
                 </div>
               </Link>

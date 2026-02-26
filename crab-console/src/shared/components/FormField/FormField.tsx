@@ -95,10 +95,10 @@ export const CheckboxField: React.FC<CheckboxFieldProps> = ({
         className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500 disabled:cursor-not-allowed"
       />
     </div>
-    <label htmlFor={id} className={`text-gray-700 select-none ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-      <span className="font-medium block text-sm">{label}</span>
+    <label htmlFor={id} className={`text-slate-700 select-none ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'} flex-1`}>
+      <span className="font-medium block text-base md:text-sm">{label}</span>
       {description && (
-        <span className="text-xs text-gray-500 block">{description}</span>
+        <span className="text-xs text-slate-500 block mt-0.5">{description}</span>
       )}
     </label>
   </div>
@@ -115,14 +115,14 @@ interface SubFieldProps {
 export const SubField: React.FC<SubFieldProps> = ({ children, show = true }) => {
   if (!show) return null;
   return (
-    <div className="pl-4 border-l-2 border-teal-100 space-y-3 ml-2">
+    <div className="pl-4 border-l-2 border-slate-100 space-y-3 ml-2">
       {children}
     </div>
   );
 };
 
 export const inputClass =
-  'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors placeholder:text-gray-400';
+  'w-full px-3 py-3 md:py-2.5 border border-slate-200 rounded-xl text-base md:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-slate-400';
 
 export const selectClass =
-  'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors appearance-none cursor-pointer';
+  'w-full px-3 py-3 md:py-2.5 border border-slate-200 rounded-xl text-base md:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors appearance-none cursor-pointer';

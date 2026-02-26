@@ -34,12 +34,17 @@ pub async fn update(
 ) -> RepoResult<()> {
     let now = shared::util::now_millis();
     sqlx::query(
-        "UPDATE print_config SET default_kitchen_printer = ?1, default_label_printer = ?2, updated_at = ?3 WHERE id = ?4",
+        "INSERT INTO print_config (id, default_kitchen_printer, default_label_printer, updated_at)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(id) DO UPDATE SET
+           default_kitchen_printer = excluded.default_kitchen_printer,
+           default_label_printer = excluded.default_label_printer,
+           updated_at = excluded.updated_at",
     )
+    .bind(SINGLETON_ID)
     .bind(kitchen)
     .bind(label)
     .bind(now)
-    .bind(SINGLETON_ID)
     .execute(pool)
     .await?;
     Ok(())

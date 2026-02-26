@@ -115,32 +115,38 @@ export function createResourceStore<T extends { id: number }>(
         return;
       }
 
+      // Batch operation (data is null): trigger full refresh to pick up changes
+      if (!data) {
+        set({ lastVersion: version });
+        if (state.isLoaded) {
+          get().fetchAll(true);
+        }
+        return;
+      }
+
       switch (action) {
-        case 'created':
-          if (data) {
-            // Check if item already exists (from optimistic add)
-            const exists = state.items.some((item) => item.id === id);
-            if (exists) {
-              // Update existing item instead of adding duplicate
-              set((s) => ({
-                items: s.items.map((item) => (item.id === id ? data : item)),
-                lastVersion: version,
-              }));
-            } else {
-              set((s) => ({
-                items: [...s.items, data],
-                lastVersion: version,
-              }));
-            }
-          }
-          break;
-        case 'updated':
-          if (data) {
+        case 'created': {
+          // Check if item already exists (from optimistic add)
+          const exists = state.items.some((item) => item.id === id);
+          if (exists) {
+            // Update existing item instead of adding duplicate
             set((s) => ({
               items: s.items.map((item) => (item.id === id ? data : item)),
               lastVersion: version,
             }));
+          } else {
+            set((s) => ({
+              items: [...s.items, data],
+              lastVersion: version,
+            }));
           }
+          break;
+        }
+        case 'updated':
+          set((s) => ({
+            items: s.items.map((item) => (item.id === id ? data : item)),
+            lastVersion: version,
+          }));
           break;
         case 'deleted':
           set((s) => ({
@@ -222,32 +228,38 @@ export function createCrudResourceStore<
         return;
       }
 
+      // Batch operation (data is null): trigger full refresh to pick up changes
+      if (!data) {
+        set({ lastVersion: version });
+        if (state.isLoaded) {
+          get().fetchAll(true);
+        }
+        return;
+      }
+
       switch (action) {
-        case 'created':
-          if (data) {
-            // Check if item already exists (from optimistic add)
-            const exists = state.items.some((item) => item.id === id);
-            if (exists) {
-              // Update existing item instead of adding duplicate
-              set((s) => ({
-                items: s.items.map((item) => (item.id === id ? data : item)),
-                lastVersion: version,
-              }));
-            } else {
-              set((s) => ({
-                items: [...s.items, data],
-                lastVersion: version,
-              }));
-            }
-          }
-          break;
-        case 'updated':
-          if (data) {
+        case 'created': {
+          // Check if item already exists (from optimistic add)
+          const exists = state.items.some((item) => item.id === id);
+          if (exists) {
+            // Update existing item instead of adding duplicate
             set((s) => ({
               items: s.items.map((item) => (item.id === id ? data : item)),
               lastVersion: version,
             }));
+          } else {
+            set((s) => ({
+              items: [...s.items, data],
+              lastVersion: version,
+            }));
           }
+          break;
+        }
+        case 'updated':
+          set((s) => ({
+            items: s.items.map((item) => (item.id === id ? data : item)),
+            lastVersion: version,
+          }));
           break;
         case 'deleted':
           set((s) => ({

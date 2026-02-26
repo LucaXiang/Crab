@@ -46,6 +46,7 @@ pub struct KitchenOrder {
     pub id: String, // = event_id
     pub order_id: String,
     pub table_name: Option<String>,
+    pub zone_name: Option<String>,
     pub queue_number: Option<u32>,
     pub is_retail: bool,
     pub created_at: i64, // 时间戳

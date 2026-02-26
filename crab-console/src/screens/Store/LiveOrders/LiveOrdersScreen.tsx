@@ -163,10 +163,19 @@ export const LiveOrdersScreen: React.FC = () => {
       {/* Mobile detail modal */}
       {selectedOrder && (
         <div
-          className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+          className="lg:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end justify-center"
           onClick={() => setSelectedOrderId(null)}
         >
-          <div className="bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()} style={{ animation: 'slideUp 0.25s ease-out' }}>
+          <div className="bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()} style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-md">
+              <span className="font-bold text-lg text-slate-900">{t('live.order_detail')}</span>
+              <button 
+                onClick={() => setSelectedOrderId(null)}
+                className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <OrderDetailPanel order={selectedOrder} onClose={() => setSelectedOrderId(null)} t={t} />
           </div>
         </div>

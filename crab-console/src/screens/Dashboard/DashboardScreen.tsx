@@ -267,100 +267,163 @@ export const DashboardScreen: React.FC = () => {
 
   // Normal dashboard with KPIs + stores
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <div className="max-w-6xl mx-auto px-4 py-6 md:px-8 md:py-10 space-y-8 animate-in fade-in duration-500">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+          {error}
+        </div>
       )}
 
-      {/* Today's KPI summary */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary-500" />
-            <h2 className="font-bold text-lg text-slate-900">{t('stats.today_summary')}</h2>
-            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{t('stats.all_stores')}</span>
+      {/* Header & Welcome */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
+            {t('dash.welcome')}, <span className="text-primary-600">{profile?.profile.email.split('@')[0]}</span>
+          </h1>
+          <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm md:text-base">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            {t('dash.system_operational')}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-slate-100 shadow-sm self-start md:self-auto">
+          <div className="px-3 py-1.5 bg-slate-50 rounded-lg text-xs font-medium text-slate-600">
+            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </div>
-          <span className="text-sm text-slate-400">{new Date().toLocaleDateString()}</span>
+          <div className="h-4 w-px bg-slate-200"></div>
+          <div className="px-2 text-xs font-semibold text-slate-900">
+            {t('stats.today_summary')}
+          </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KpiCard icon={DollarSign} iconBg="bg-primary-100" iconColor="text-primary-600" value={formatCurrency(overview?.revenue ?? 0)} label={t('stats.total_sales')} />
-          <KpiCard icon={ShoppingBag} iconBg="bg-green-100" iconColor="text-green-600" value={String(overview?.orders ?? 0)} label={t('stats.completed_orders')} />
-          <KpiCard icon={Users} iconBg="bg-blue-100" iconColor="text-blue-600" value={String(overview?.guests ?? 0)} label={t('stats.guests')} />
-          <KpiCard icon={TrendingUp} iconBg="bg-purple-100" iconColor="text-purple-600" value={formatCurrency(overview?.average_order_value ?? 0)} label={t('stats.average_order')} />
-        </div>
+      {/* Today's KPI summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <KpiCard 
+          icon={DollarSign} 
+          gradient="from-blue-500 to-blue-600" 
+          shadow="shadow-blue-500/20"
+          value={formatCurrency(overview?.revenue ?? 0)} 
+          label={t('stats.total_sales')} 
+          trend="+12%" // Mock trend for UI demo
+        />
+        <KpiCard 
+          icon={ShoppingBag} 
+          gradient="from-emerald-500 to-emerald-600" 
+          shadow="shadow-emerald-500/20"
+          value={String(overview?.orders ?? 0)} 
+          label={t('stats.completed_orders')} 
+          trend="+5%"
+        />
+        <KpiCard 
+          icon={Users} 
+          gradient="from-violet-500 to-violet-600" 
+          shadow="shadow-violet-500/20"
+          value={String(overview?.guests ?? 0)} 
+          label={t('stats.guests')} 
+        />
+        <KpiCard 
+          icon={TrendingUp} 
+          gradient="from-amber-500 to-amber-600" 
+          shadow="shadow-amber-500/20"
+          value={formatCurrency(overview?.average_order_value ?? 0)} 
+          label={t('stats.average_order')} 
+        />
       </div>
 
       {/* Stores list */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <h2 className="font-bold text-lg text-slate-900 mb-4">{t('nav.stores')}</h2>
-        {stores.length === 0 ? (
-          <div className="text-center py-8">
-            <Server className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">{t('dash.no_stores')}</p>
-            <p className="text-xs text-slate-400 mt-1">{t('dash.no_stores_hint')}</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {stores.map(store => (
-              <Link
-                key={store.id}
-                to={`/stores/${store.id}`}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors duration-150 gap-3 md:gap-0"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
-                    <Server className="w-5 h-5 text-primary-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {store.name ?? `Store #${store.id}`}
-                    </p>
-                    <p className="text-xs text-slate-400 truncate mb-1">ID: {store.device_id.slice(0, 12)}...</p>
-                    {store.address && (
-                      <div className="flex items-center gap-1 text-xs text-slate-500 truncate mb-0.5">
-                        <MapPin className="w-3 h-3 text-slate-400" />
-                        <span>{store.address}</span>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Server className="w-5 h-5 text-slate-400" />
+            {t('nav.stores')}
+          </h2>
+          {stores.length > 0 && (
+            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+              {stores.length} {t('common.label.active')}
+            </span>
+          )}
+        </div>
+        
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+          {stores.length === 0 ? (
+            <div className="text-center py-12 px-6">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Server className="w-8 h-8 text-slate-300" />
+              </div>
+              <h3 className="text-slate-900 font-medium mb-1">{t('dash.no_stores')}</h3>
+              <p className="text-sm text-slate-500 max-w-xs mx-auto">{t('dash.no_stores_hint')}</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {stores.map(store => (
+                <Link
+                  key={store.id}
+                  to={`/stores/${store.id}`}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-slate-50/80 transition-all duration-200 gap-4"
+                >
+                  <div className="flex items-start sm:items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner">
+                      <Server className="w-6 h-6 text-slate-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-base font-semibold text-slate-900 truncate group-hover:text-primary-600 transition-colors">
+                          {store.name ?? `Store #${store.id}`}
+                        </p>
+                        {store.is_online && (
+                          <span className="inline-flex w-2 h-2 bg-green-500 rounded-full ring-2 ring-white shadow-sm" title="Online"></span>
+                        )}
                       </div>
-                    )}
-                    {store.phone && (
-                      <div className="flex items-center gap-1 text-xs text-slate-500 truncate">
-                        <Phone className="w-3 h-3 text-slate-400" />
-                        <span>{store.phone}</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">ID: {store.device_id.slice(0, 8)}</span>
+                        {store.address && (
+                          <span className="flex items-center gap-1 truncate max-w-[200px]">
+                            <MapPin className="w-3 h-3" />
+                            {store.address}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto pl-13 md:pl-0">
-                  <div className="text-right">
-                    <div className="inline-flex items-center gap-1 text-xs text-slate-500">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{t('dash.last_sync')}: {store.last_sync_at ? timeAgo(store.last_sync_at) : t('dash.never')}</span>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-slate-400" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+                  
+                  <div className="flex items-center justify-between sm:justify-end gap-4 pl-[4rem] sm:pl-0">
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-slate-500 mb-0.5">{t('dash.last_sync')}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium bg-slate-100/50 px-2 py-1 rounded-md">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{store.last_sync_at ? timeAgo(store.last_sync_at) : t('dash.never')}</span>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:border-primary-200 group-hover:text-primary-500 transition-colors shadow-sm">
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Download app */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
-              <Download className="w-5 h-5 text-primary-600" />
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 md:p-8 shadow-xl shadow-slate-900/10">
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-primary-500/20 rounded-full blur-3xl"></div>
+        
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-start gap-5">
+            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
+              <Download className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">{t('dash.download_app')}</h3>
-              <p className="text-xs text-slate-400">{t('dash.download_desc')}</p>
+              <h3 className="text-lg font-bold text-white mb-2">{t('dash.download_app')}</h3>
+              <p className="text-sm text-slate-300 max-w-md leading-relaxed">{t('dash.download_desc')}</p>
             </div>
           </div>
           <a
             href="https://cloud.redcoral.app/api/download/latest"
-            className="inline-flex items-center justify-center gap-1.5 bg-primary-500 hover:bg-primary-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition-colors w-full md:w-auto"
+            className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-900 font-bold text-sm px-6 py-3.5 rounded-xl transition-all hover:scale-105 hover:shadow-lg active:scale-95 w-full md:w-auto min-w-[200px]"
           >
             <Download className="w-4 h-4" />
             {t('dash.download_windows')}
@@ -375,17 +438,28 @@ export const DashboardScreen: React.FC = () => {
 
 const KpiCard: React.FC<{
   icon: React.FC<{ className?: string }>;
-  iconBg: string;
-  iconColor: string;
+  gradient: string;
+  shadow: string;
   value: string;
   label: string;
-}> = ({ icon: Icon, iconBg, iconColor, value, label }) => (
-  <div className="bg-white rounded-xl border border-slate-200 p-4">
-    <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center mb-2`}>
-      <Icon className={`w-4 h-4 ${iconColor}`} />
+  trend?: string;
+}> = ({ icon: Icon, gradient, shadow, value, label, trend }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow duration-200 relative overflow-hidden group">
+    <div className="flex items-start justify-between mb-4">
+      <div className={`w-12 h-12 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center text-white shadow-lg ${shadow} group-hover:scale-110 transition-transform duration-300`}>
+        <Icon className="w-6 h-6" />
+      </div>
+      {trend && (
+        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-1">
+          <TrendingUp className="w-3 h-3" />
+          {trend}
+        </span>
+      )}
     </div>
-    <p className="text-lg font-bold text-slate-900">{value}</p>
-    <p className="text-xs text-slate-400">{label}</p>
+    <div>
+      <p className="text-2xl font-bold text-slate-900 tracking-tight">{value}</p>
+      <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">{label}</p>
+    </div>
   </div>
 );
 

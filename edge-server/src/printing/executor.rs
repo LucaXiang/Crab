@@ -101,6 +101,7 @@ impl PrintExecutor {
                 id: order.id.clone(),
                 order_id: order.order_id.clone(),
                 table_name: order.table_name.clone(),
+                zone_name: order.zone_name.clone(),
                 queue_number: order.queue_number,
                 is_retail: order.is_retail,
                 created_at: order.created_at,
@@ -479,6 +480,7 @@ mod tests {
             id: "evt-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("100桌".to_string()),
+            zone_name: Some("大厅".to_string()),
             queue_number: None,
             is_retail: false,
             created_at: 1705912335000, // 2024-01-22 14:32:15 UTC (millis)

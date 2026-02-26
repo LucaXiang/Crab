@@ -121,7 +121,7 @@ export const StoreSettingsScreen: React.FC = () => {
 
       {/* Contact + Web */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t('store.phone')} value={form.phone} onChange={v => update('phone', v)} icon={Phone} />
           <Field label={t('store.email')} value={form.email} onChange={v => update('email', v)} icon={Mail} type="email" />
         </div>
@@ -130,7 +130,7 @@ export const StoreSettingsScreen: React.FC = () => {
 
       {/* Fiscal + Operations */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t('store.nif')} value={form.nif} onChange={v => update('nif', v)} icon={FileText} />
           <Field label={t('store.business_day_cutoff')} value={form.business_day_cutoff} onChange={v => update('business_day_cutoff', v)} icon={Clock} placeholder="04:00" />
         </div>
@@ -189,8 +189,8 @@ const Field: React.FC<{
     <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
     <div className="relative">
       {Icon && (
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-          <Icon className="w-4 h-4 text-slate-300" />
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+          <Icon className="w-4 h-4 text-slate-400" />
         </div>
       )}
       <input
@@ -198,7 +198,7 @@ const Field: React.FC<{
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`w-full py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-all ${Icon ? 'pl-9 pr-3' : 'px-3'}`}
+        className={`w-full py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-all ${Icon ? 'pl-10 pr-3' : 'px-3'}`}
       />
     </div>
   </div>

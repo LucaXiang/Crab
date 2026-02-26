@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, FormSection, inputClass, CheckboxField } from '@/shared/components/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
 import { formatCurrency } from '@/utils/format';
+import { PriceRuleWizard } from './PriceRuleWizard';
 import type {
   PriceRule, PriceRuleCreate, PriceRuleUpdate,
   RuleType, ProductScope, AdjustmentType,
@@ -128,12 +129,6 @@ export const PriceRuleManagement: React.FC = () => {
   };
 
   const openCreate = () => {
-    setFormName(''); setFormDisplayName(''); setFormReceiptName(''); setFormDescription('');
-    setFormRuleType('DISCOUNT'); setFormProductScope('GLOBAL'); setFormTargetId('');
-    setFormZoneScope('all'); setFormAdjustmentType('PERCENTAGE'); setFormAdjustmentValue(0);
-    setFormIsStackable(false); setFormIsExclusive(false); setFormIsActive(true);
-    setFormActiveDays([]); setFormActiveStartTime(''); setFormActiveEndTime('');
-    setFormValidFrom(''); setFormValidUntil(''); setFormError('');
     setPanel({ type: 'create' });
   };
 
@@ -155,15 +150,29 @@ export const PriceRuleManagement: React.FC = () => {
     setPanel({ type: 'edit', item: rule });
   };
 
-  const handleSave = async () => {
+  const handleCreate = async (data: PriceRuleCreate) => {
     if (!token || saving) return;
+    setSaving(true);
+    try {
+      await createPriceRule(token, storeId, data);
+      setPanel({ type: 'closed' });
+      await load();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!token || saving || panel.type !== 'edit') return;
     if (!formName.trim() || !formDisplayName.trim() || !formReceiptName.trim()) {
       setFormError(t('settings.common.required_field')); return;
     }
 
     setSaving(true); setFormError('');
     try {
-      const common = {
+      const payload: PriceRuleUpdate = {
         name: formName.trim(), display_name: formDisplayName.trim(),
         receipt_name: formReceiptName.trim(),
         description: formDescription.trim() || undefined,
@@ -176,15 +185,10 @@ export const PriceRuleManagement: React.FC = () => {
         active_start_time: formActiveStartTime || undefined,
         active_end_time: formActiveEndTime || undefined,
         valid_from: dateStrToTs(formValidFrom), valid_until: dateStrToTs(formValidUntil),
+        is_active: formIsActive,
       };
 
-      if (panel.type === 'edit') {
-        const payload: PriceRuleUpdate = { ...common, is_active: formIsActive };
-        await updatePriceRule(token, storeId, panel.item.source_id, payload);
-      } else if (panel.type === 'create') {
-        const payload: PriceRuleCreate = common;
-        await createPriceRule(token, storeId, payload);
-      }
+      await updatePriceRule(token, storeId, panel.item.source_id, payload);
       setPanel({ type: 'closed' });
       await load();
     } catch (err) {
@@ -335,13 +339,22 @@ export const PriceRuleManagement: React.FC = () => {
           themeColor="orange"
           loading={loading}
         >
-          {(panel.type === 'create' || panel.type === 'edit') && (
+          {panel.type === 'create' && (
+            <div className="h-full p-4 lg:p-8 bg-slate-50/50">
+              <PriceRuleWizard 
+                onFinish={handleCreate} 
+                onCancel={() => setPanel({ type: 'closed' })}
+                isSubmitting={saving}
+              />
+            </div>
+          )}
+          {panel.type === 'edit' && (
             <DetailPanel
-              title={panel.type === 'create' ? `${t('common.action.add')} ${t('settings.price_rule.title')}` : `${t('common.action.edit')} ${t('settings.price_rule.title')}`}
-              isCreating={panel.type === 'create'}
+              title={`${t('common.action.edit')} ${t('settings.price_rule.title')}`}
+              isCreating={false}
               onClose={() => setPanel({ type: 'closed' })}
-              onSave={handleSave}
-              onDelete={panel.type === 'edit' ? () => setPanel({ type: 'delete', item: panel.item }) : undefined}
+              onSave={handleUpdate}
+              onDelete={() => setPanel({ type: 'delete', item: panel.item })}
               saving={saving}
               saveDisabled={!formName.trim() || !formDisplayName.trim() || !formReceiptName.trim()}
             >

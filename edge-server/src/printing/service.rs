@@ -158,6 +158,7 @@ impl KitchenPrintService {
             id: event.event_id.clone(),
             order_id: event.order_id.clone(),
             table_name: snapshot.table_name.clone(),
+            zone_name: snapshot.zone_name.clone(),
             queue_number: snapshot.queue_number,
             is_retail: snapshot.is_retail,
             created_at: event.timestamp,
@@ -233,24 +234,31 @@ impl KitchenPrintService {
         // Get product external_id (now at product level)
         let external_id = product.as_ref().and_then(|p| p.external_id);
 
-        // Build options list (with quantity if > 1), respecting show_on_kitchen_print
+        // Build options list grouped by attribute: "Attr: opt1, opt2"
         let options: Vec<String> = item
             .selected_options
             .as_ref()
             .map(|opts| {
-                opts.iter()
-                    .filter(|opt| opt.show_on_kitchen_print)
-                    .map(|opt| {
-                        let name = opt
-                            .kitchen_print_name
-                            .as_deref()
-                            .unwrap_or(&opt.option_name);
-                        if opt.quantity > 1 {
-                            format!("{}×{}", name, opt.quantity)
-                        } else {
-                            name.to_string()
-                        }
-                    })
+                let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+                for opt in opts.iter().filter(|o| o.show_on_kitchen_print) {
+                    let name = opt
+                        .kitchen_print_name
+                        .as_deref()
+                        .unwrap_or(&opt.option_name);
+                    let display = if opt.quantity > 1 {
+                        format!("{}×{}", name, opt.quantity)
+                    } else {
+                        name.to_string()
+                    };
+                    if let Some(group) = groups.iter_mut().find(|(a, _)| *a == opt.attribute_name) {
+                        group.1.push(display);
+                    } else {
+                        groups.push((opt.attribute_name.clone(), vec![display]));
+                    }
+                }
+                groups
+                    .into_iter()
+                    .map(|(attr, vals)| format!("{}: {}", attr, vals.join(", ")))
                     .collect()
             })
             .unwrap_or_default();

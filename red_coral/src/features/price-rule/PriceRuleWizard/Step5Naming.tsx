@@ -29,6 +29,13 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
     }
   }, [state.rule_type, state.adjustment_type, state.adjustment_value]);
 
+  // Auto-fill receipt_name based on display_name
+  React.useEffect(() => {
+    if (state.display_name && !state.receipt_name) {
+      updateState({ receipt_name: state.display_name.slice(0, MAX_RECEIPT_NAME_LEN) });
+    }
+  }, [state.display_name]);
+
   // Build summary text
   const buildSummary = () => {
     const parts: string[] = [];

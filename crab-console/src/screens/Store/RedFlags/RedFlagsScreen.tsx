@@ -69,7 +69,7 @@ export const RedFlagsScreen: React.FC = () => {
       ) : data ? (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <FlagCard value={data.summary.item_removals} label={t('red_flags.item_removals')} borderColor="border-red-200" textColor="text-red-600" />
             <FlagCard value={data.summary.item_comps} label={t('red_flags.item_comps')} borderColor="border-orange-200" textColor="text-orange-600" />
             <FlagCard value={data.summary.order_voids} label={t('red_flags.order_voids')} borderColor="border-red-200" textColor="text-red-600" />

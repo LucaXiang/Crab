@@ -132,6 +132,16 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const canProceed = useCallback((): boolean => {
     switch (currentStep) {
       case 1:

@@ -175,37 +175,51 @@ export function MasterDetail<T>({
 
   // ─── 详情内容 ───
   const detailContent = showDetail ? (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white">
       {isMobile && (
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white sticky top-0 z-10">
-          <button onClick={handleBack} className="p-1.5 -ml-1 rounded-lg hover:bg-gray-100 transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 bg-white sticky top-0 z-20 shadow-sm">
+          <button 
+            onClick={handleBack} 
+            className="p-2 -ml-2 rounded-full hover:bg-slate-100 active:bg-slate-200 transition-colors text-slate-600"
+          >
+            <ArrowLeft className="w-6 h-6" />
           </button>
+          <span className="font-semibold text-slate-900 text-lg">{isCreating ? createLabel : t('common.action.edit')}</span>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-white">
         {children}
       </div>
     </div>
   ) : (
-    <div className="flex flex-col items-center justify-center h-full text-gray-300 gap-2">
-      <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
-        <Search className="w-5 h-5 text-gray-300" />
+    <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-3 p-8 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center">
+        <Search className="w-8 h-8 text-slate-300" />
       </div>
-      <span className="text-sm">{t('common.hint.select_item')}</span>
+      <p className="text-sm font-medium text-slate-400 max-w-[200px]">{t('common.hint.select_item')}</p>
     </div>
   );
 
   // ─── 手机端：列表或详情全屏 ───
   if (isMobile) {
-    if (showDetail) {
-      return (
-        <div className="fixed inset-0 z-40 bg-white" style={{ animation: 'slideInRight 0.2s ease-out' }}>
+    return (
+      <div className="h-full relative overflow-hidden bg-white">
+        <div 
+          className={`absolute inset-0 transition-transform duration-300 ease-out bg-white z-10 ${
+            showDetail ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'
+          }`}
+        >
+          {listContent}
+        </div>
+        <div 
+          className={`absolute inset-0 transition-transform duration-300 ease-out bg-white z-20 ${
+            showDetail ? 'translate-x-0' : 'translate-x-full pointer-events-none'
+          }`}
+        >
           {detailContent}
         </div>
-      );
-    }
-    return <div className="h-full">{listContent}</div>;
+      </div>
+    );
   }
 
   // ─── 桌面端：左右分栏 ───

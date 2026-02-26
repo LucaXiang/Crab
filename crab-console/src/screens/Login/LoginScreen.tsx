@@ -89,32 +89,40 @@ export const LoginScreen: React.FC = () => {
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">{t('auth.email')}</label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-500 group-focus-within:text-primary-400 transition-colors">
+                    <Mail className="w-5 h-5" />
+                  </div>
                   <input
                     type="email"
                     id="email"
+                    name="email"
+                    autoComplete="email"
                     required
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder={t('auth.email')}
-                    className="w-full pl-11 pr-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-all duration-150"
+                    className="w-full pl-12 pr-4 py-3.5 bg-white/[0.06] border border-white/10 rounded-xl text-base text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-all duration-200"
                   />
                 </div>
               </div>
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">{t('auth.password')}</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-500 group-focus-within:text-primary-400 transition-colors">
+                    <Lock className="w-5 h-5" />
+                  </div>
                   <input
                     type="password"
                     id="password"
+                    name="password"
+                    autoComplete="current-password"
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder={t('auth.password')}
-                    className="w-full pl-11 pr-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-all duration-150"
+                    className="w-full pl-12 pr-4 py-3.5 bg-white/[0.06] border border-white/10 rounded-xl text-base text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-all duration-200"
                   />
                 </div>
               </div>

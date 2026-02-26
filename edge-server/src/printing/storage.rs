@@ -428,6 +428,7 @@ mod tests {
             id: "ko-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("Table 1".to_string()),
+            zone_name: None,
             queue_number: None,
             is_retail: false,
             created_at: shared::util::now_millis(),
