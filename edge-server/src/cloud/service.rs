@@ -108,10 +108,27 @@ impl CloudService {
             .body(())
             .map_err(|e| AppError::internal(format!("Failed to build WS request: {e}")))?;
 
-        let (ws_stream, _response) =
-            tokio_tungstenite::connect_async_tls_with_config(request, None, false, Some(connector))
-                .await
-                .map_err(|e| AppError::internal(format!("WebSocket connection failed: {e}")))?;
+        let (ws_stream, _response) = tokio_tungstenite::connect_async_tls_with_config(
+            request,
+            None,
+            false,
+            Some(connector),
+        )
+        .await
+        .map_err(|e| {
+            // Distinguish auth failures (401/403) from transient errors so the
+            // caller can apply a longer backoff for permanent auth issues.
+            if let tungstenite::Error::Http(ref resp) = e {
+                let status = resp.status().as_u16();
+                if status == 401 || status == 403 {
+                    return AppError::with_message(
+                        shared::error::ErrorCode::NotAuthenticated,
+                        format!("Cloud rejected connection (HTTP {status}): authentication failed"),
+                    );
+                }
+            }
+            AppError::internal(format!("WebSocket connection failed: {e}"))
+        })?;
 
         tracing::info!(url = %url, "WebSocket connected to crab-cloud");
         Ok(ws_stream)

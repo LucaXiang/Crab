@@ -27,8 +27,10 @@ const DEBOUNCE_MS: u64 = 500;
 const MAX_RETRIES: u32 = 3;
 /// Initial retry delay (1s for fast first reconnect, then exponential backoff)
 const INITIAL_RETRY_DELAY_SECS: u64 = 1;
-/// Max reconnect delay
+/// Max reconnect delay for transient errors
 const MAX_RECONNECT_DELAY_SECS: u64 = 120;
+/// Max reconnect delay when cloud rejects authentication (permanent failure until restart/reactivation)
+const MAX_AUTH_FAIL_DELAY_SECS: u64 = 1800; // 30 minutes
 /// Archived order sync batch size
 const ARCHIVED_ORDER_BATCH_SIZE: i64 = 50;
 /// Archived order sync interval (aggregate before pushing)
@@ -84,10 +86,19 @@ impl CloudWorker {
             };
 
             // Attempt WebSocket connection
-            match self.cloud_service.connect_ws(&binding).await {
+            let max_delay = match self.cloud_service.connect_ws(&binding).await {
                 Ok(ws) => {
                     reconnect_delay = Duration::from_secs(INITIAL_RETRY_DELAY_SECS);
                     self.run_ws_session(ws).await;
+                    MAX_RECONNECT_DELAY_SECS
+                }
+                Err(e) if e.code == shared::error::ErrorCode::NotAuthenticated => {
+                    // Permanent auth failure — back off aggressively (up to 30 min)
+                    tracing::error!(
+                        delay_secs = reconnect_delay.as_secs(),
+                        "Cloud authentication failed (credentials may be stale): {e}"
+                    );
+                    MAX_AUTH_FAIL_DELAY_SECS
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -98,16 +109,16 @@ impl CloudWorker {
                     if let Err(e) = self.full_sync_http().await {
                         tracing::error!("HTTP fallback full sync failed: {e}");
                     }
+                    MAX_RECONNECT_DELAY_SECS
                 }
-            }
+            };
 
             // Wait before reconnecting
             tokio::select! {
                 _ = self.shutdown.cancelled() => break,
                 _ = tokio::time::sleep(reconnect_delay) => {},
             }
-            reconnect_delay =
-                (reconnect_delay * 2).min(Duration::from_secs(MAX_RECONNECT_DELAY_SECS));
+            reconnect_delay = (reconnect_delay * 2).min(Duration::from_secs(max_delay));
         }
 
         tracing::info!("CloudWorker stopped");
@@ -292,11 +303,19 @@ impl CloudWorker {
                 let result = self.handle_rpc(&payload).await;
                 tracing::info!(rpc_id = %id, kind = ?std::mem::discriminant(&result), "RPC executed");
 
-                let reply = CloudMessage::RpcResult { id, result };
-                if let Ok(json) = serde_json::to_string(&reply)
-                    && let Err(e) = ws_sink.send(Message::Text(json.into())).await
-                {
-                    tracing::warn!("Failed to send RPC result via WS: {e}");
+                let reply = CloudMessage::RpcResult {
+                    id: id.clone(),
+                    result,
+                };
+                match serde_json::to_string(&reply) {
+                    Ok(json) => {
+                        if let Err(e) = ws_sink.send(Message::Text(json.into())).await {
+                            tracing::warn!(rpc_id = %id, "Failed to send RPC result via WS: {e}");
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(rpc_id = %id, "Failed to serialize RPC result: {e}");
+                    }
                 }
             }
             CloudMessage::SyncAck {
@@ -702,14 +721,23 @@ impl CloudWorker {
             items: &mut Vec<CloudSyncItem>,
         ) {
             for record in records {
-                if let Ok(data) = serde_json::to_value(record) {
-                    items.push(CloudSyncItem {
-                        resource,
-                        version,
-                        action: shared::cloud::SyncAction::Upsert,
-                        resource_id: id_fn(record).to_string(),
-                        data,
-                    });
+                match serde_json::to_value(record) {
+                    Ok(data) => {
+                        items.push(CloudSyncItem {
+                            resource,
+                            version,
+                            action: shared::cloud::SyncAction::Upsert,
+                            resource_id: id_fn(record).to_string(),
+                            data,
+                        });
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            resource = %resource,
+                            id = id_fn(record),
+                            "Failed to serialize record for sync: {e}"
+                        );
+                    }
                 }
             }
         }
@@ -723,18 +751,16 @@ impl CloudWorker {
                 let categories = self.state.catalog_service.list_categories();
                 push_many(&categories, resource, version, |c| c.id, items);
             }
-            SyncResource::Tag => {
-                if let Ok(v) = tag::find_all(&self.state.pool).await {
-                    push_many(&v, resource, version, |t| t.id, items);
-                }
-            }
-            SyncResource::Attribute => {
-                if let Ok(v) = attribute::find_all(&self.state.pool).await {
-                    push_many(&v, resource, version, |a| a.id, items);
-                }
-            }
+            SyncResource::Tag => match tag::find_all(&self.state.pool).await {
+                Ok(v) => push_many(&v, resource, version, |t| t.id, items),
+                Err(e) => tracing::warn!(resource = %resource, "Failed to collect for sync: {e}"),
+            },
+            SyncResource::Attribute => match attribute::find_all(&self.state.pool).await {
+                Ok(v) => push_many(&v, resource, version, |a| a.id, items),
+                Err(e) => tracing::warn!(resource = %resource, "Failed to collect for sync: {e}"),
+            },
             SyncResource::AttributeBinding => {
-                if let Ok(v) = sqlx::query_as::<_, shared::models::attribute::AttributeBinding>(
+                match sqlx::query_as::<_, shared::models::attribute::AttributeBinding>(
                     "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, \
                      COALESCE(default_option_ids, 'null') as default_option_ids \
                      FROM attribute_binding ORDER BY display_order",
@@ -742,45 +768,56 @@ impl CloudWorker {
                 .fetch_all(&self.state.pool)
                 .await
                 {
-                    push_many(&v, resource, version, |b| b.id, items);
+                    Ok(v) => push_many(&v, resource, version, |b| b.id, items),
+                    Err(e) => {
+                        tracing::warn!(resource = %resource, "Failed to collect for sync: {e}")
+                    }
                 }
             }
-            SyncResource::Zone => {
-                if let Ok(v) = zone::find_all(&self.state.pool).await {
-                    push_many(&v, resource, version, |z| z.id, items);
-                }
-            }
-            SyncResource::DiningTable => {
-                if let Ok(v) = dining_table::find_all(&self.state.pool).await {
-                    push_many(&v, resource, version, |t| t.id, items);
-                }
-            }
+            SyncResource::Zone => match zone::find_all(&self.state.pool).await {
+                Ok(v) => push_many(&v, resource, version, |z| z.id, items),
+                Err(e) => tracing::warn!(resource = %resource, "Failed to collect for sync: {e}"),
+            },
+            SyncResource::DiningTable => match dining_table::find_all(&self.state.pool).await {
+                Ok(v) => push_many(&v, resource, version, |t| t.id, items),
+                Err(e) => tracing::warn!(resource = %resource, "Failed to collect for sync: {e}"),
+            },
             SyncResource::Employee => {
-                if let Ok(v) = employee::find_all_with_inactive(&self.state.pool).await {
-                    push_many(&v, resource, version, |e| e.id, items);
+                match employee::find_all_with_inactive(&self.state.pool).await {
+                    Ok(v) => push_many(&v, resource, version, |e| e.id, items),
+                    Err(e) => {
+                        tracing::warn!(resource = %resource, "Failed to collect for sync: {e}")
+                    }
                 }
             }
-            SyncResource::PriceRule => {
-                if let Ok(v) = price_rule::find_all(&self.state.pool).await {
-                    push_many(&v, resource, version, |r| r.id, items);
-                }
-            }
-            SyncResource::LabelTemplate => {
-                if let Ok(v) = label_template::list_all(&self.state.pool).await {
-                    push_many(&v, resource, version, |t| t.id, items);
-                }
-            }
+            SyncResource::PriceRule => match price_rule::find_all(&self.state.pool).await {
+                Ok(v) => push_many(&v, resource, version, |r| r.id, items),
+                Err(e) => tracing::warn!(resource = %resource, "Failed to collect for sync: {e}"),
+            },
+            SyncResource::LabelTemplate => match label_template::list_all(&self.state.pool).await {
+                Ok(v) => push_many(&v, resource, version, |t| t.id, items),
+                Err(e) => tracing::warn!(resource = %resource, "Failed to collect for sync: {e}"),
+            },
             SyncResource::StoreInfo => {
-                if let Ok(Some(info)) = store_info::get(&self.state.pool).await
-                    && let Ok(data) = serde_json::to_value(&info)
-                {
-                    items.push(CloudSyncItem {
-                        resource,
-                        version,
-                        action: shared::cloud::SyncAction::Upsert,
-                        resource_id: "1".into(),
-                        data,
-                    });
+                match store_info::get(&self.state.pool).await {
+                    Ok(Some(info)) => match serde_json::to_value(&info) {
+                        Ok(data) => {
+                            items.push(CloudSyncItem {
+                                resource,
+                                version,
+                                action: shared::cloud::SyncAction::Upsert,
+                                resource_id: "1".into(),
+                                data,
+                            });
+                        }
+                        Err(e) => {
+                            tracing::warn!(resource = %resource, "Failed to serialize StoreInfo: {e}")
+                        }
+                    },
+                    Ok(None) => {} // no store info configured yet
+                    Err(e) => {
+                        tracing::warn!(resource = %resource, "Failed to collect for sync: {e}")
+                    }
                 }
             }
             _ => {}
@@ -863,11 +900,17 @@ impl CloudWorker {
 
         let count = orders.len();
         for order in orders {
-            let events = self
+            let events = match self
                 .state
                 .orders_manager
                 .get_events_for_order(&order.order_id)
-                .unwrap_or_default();
+            {
+                Ok(events) => events,
+                Err(e) => {
+                    tracing::warn!(order_id = %order.order_id, "Failed to get events for active order push: {e}");
+                    Vec::new()
+                }
+            };
             let msg = CloudMessage::ActiveOrderSnapshot {
                 snapshot: Box::new(order),
                 events,
@@ -895,7 +938,10 @@ impl CloudWorker {
             return None;
         }
 
-        let payload: SyncPayload = serde_json::from_slice(&msg.payload).ok()?;
+        let payload: SyncPayload = match serde_json::from_slice(&msg.payload) {
+            Ok(p) => p,
+            Err(_) => return None, // non-sync payloads are normal
+        };
         if payload.resource != SyncResource::OrderSync {
             return None;
         }
@@ -912,11 +958,13 @@ impl CloudWorker {
         // created/updated = 活跃订单变更，读取最新快照 + 事件历史
         match self.state.orders_manager.get_snapshot(order_id) {
             Ok(Some(snap)) if snap.is_active() => {
-                let events = self
-                    .state
-                    .orders_manager
-                    .get_events_for_order(order_id)
-                    .unwrap_or_default();
+                let events = match self.state.orders_manager.get_events_for_order(order_id) {
+                    Ok(events) => events,
+                    Err(e) => {
+                        tracing::warn!(order_id, "Failed to get events for order push: {e}");
+                        Vec::new()
+                    }
+                };
                 Some(CloudMessage::ActiveOrderSnapshot {
                     snapshot: Box::new(snap),
                     events,

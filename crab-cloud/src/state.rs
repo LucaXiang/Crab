@@ -157,6 +157,7 @@ impl AppState {
 ///
 /// Root CA 从 Secrets Manager 读写，Tenant CA 从 PostgreSQL 读写。
 /// 内存缓存：Root CA 和 Tenant CA 创建后不变，缓存在进程内。
+/// Negative cache：缺失的 Tenant CA 缓存 5 分钟，避免反复查 PG。
 #[derive(Clone)]
 pub struct CaStore {
     sm: SmClient,
@@ -166,7 +167,12 @@ pub struct CaStore {
     root_ca_cache: std::sync::Arc<OnceCell<CaSecret>>,
     /// Tenant CA in-process cache (tenant_id → CaSecret, never changes after creation)
     tenant_ca_cache: Arc<DashMap<String, CaSecret>>,
+    /// Negative cache: tenant_ids known to have no CA cert (value = expiry instant)
+    tenant_ca_negative: Arc<DashMap<String, tokio::time::Instant>>,
 }
+
+/// How long a negative cache entry (missing tenant CA) is valid before retrying PG.
+const NEGATIVE_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(300);
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 struct CaSecret {
@@ -177,6 +183,7 @@ struct CaSecret {
 impl CaStore {
     pub fn new(sm: SmClient, pool: PgPool, master_key: Arc<MasterKey>) -> Self {
         Self {
+            tenant_ca_negative: Arc::new(DashMap::new()),
             sm,
             pool,
             master_key,
@@ -282,19 +289,42 @@ impl CaStore {
         )?)
     }
 
-    /// Load Tenant CA cert PEM only (cached, for mTLS verification in edge_auth, reads from PostgreSQL)
+    /// Load Tenant CA cert PEM only (cached, for mTLS verification in edge_auth, reads from PostgreSQL).
+    /// Missing tenants are negative-cached to avoid hammering PG on repeated requests from
+    /// stale edge-servers whose tenant was deleted (e.g. after a database reset).
     pub async fn load_tenant_ca_cert(&self, tenant_id: &str) -> Result<String, BoxError> {
+        // Positive cache hit
         if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
             return Ok(cached.cert_pem.clone());
         }
 
-        let (cert_pem, key_encrypted) = sqlx::query_as::<_, (String, String)>(
+        // Negative cache hit — skip PG query until TTL expires
+        if let Some(expiry) = self.tenant_ca_negative.get(tenant_id) {
+            if tokio::time::Instant::now() < *expiry {
+                return Err(format!("Tenant CA cert not found for {tenant_id} (cached)").into());
+            }
+            // TTL expired — remove and retry
+            drop(expiry);
+            self.tenant_ca_negative.remove(tenant_id);
+        }
+
+        let row = sqlx::query_as::<_, (String, String)>(
             "SELECT ca_cert_pem, ca_key_encrypted FROM tenants WHERE id = $1 AND ca_cert_pem IS NOT NULL",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| format!("Tenant CA cert not found for {tenant_id}"))?;
+        .await?;
+
+        let (cert_pem, key_encrypted) = match row {
+            Some(r) => r,
+            None => {
+                // Insert negative cache entry
+                let expiry = tokio::time::Instant::now() + NEGATIVE_CACHE_TTL;
+                self.tenant_ca_negative
+                    .insert(tenant_id.to_string(), expiry);
+                return Err(format!("Tenant CA cert not found for {tenant_id}").into());
+            }
+        };
 
         let key_pem = self
             .master_key

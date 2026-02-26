@@ -10,11 +10,21 @@ use axum::response::IntoResponse;
 use futures::{SinkExt, StreamExt};
 use shared::cloud::CloudMessage;
 use shared::error::{AppError, ErrorCode};
+use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::time::Instant;
 
 use crate::auth::EdgeIdentity;
 use crate::db::{audit, sync_store};
 use crate::state::AppState;
+
+/// Server-side ping interval (seconds). Cloud proactively pings edge to detect dead connections.
+const PING_INTERVAL_SECS: u64 = 30;
+
+/// If no activity (any incoming frame) is received within this duration, the connection is
+/// considered dead and will be closed. Set to 3× ping interval so that the edge (which also
+/// sends pings every 30s) has ample time to respond even under transient network hiccups.
+const HEARTBEAT_TIMEOUT_SECS: u64 = 90;
 
 /// GET /api/edge/ws — upgrade to WebSocket
 pub async fn handle_edge_ws(
@@ -95,12 +105,17 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     match sync_store::get_cursors(&state.pool, edge_server_id).await {
         Ok(cursors) => {
             let welcome = CloudMessage::Welcome { cursors };
-            if let Ok(json) = serde_json::to_string(&welcome)
-                && ws_sink.send(Message::Text(json.into())).await.is_err()
-            {
-                tracing::warn!(edge_server_id, "Failed to send Welcome, disconnecting");
-                state.edges.connected.remove(&edge_server_id);
-                return;
+            match serde_json::to_string(&welcome) {
+                Ok(json) => {
+                    if ws_sink.send(Message::Text(json.into())).await.is_err() {
+                        tracing::warn!(edge_server_id, "Failed to send Welcome, disconnecting");
+                        state.edges.connected.remove(&edge_server_id);
+                        return;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(edge_server_id, "Failed to serialize Welcome: {e}");
+                }
             }
         }
         Err(e) => {
@@ -146,7 +161,14 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                     return;
                 }
                 // Successfully sent — delete from queue
-                let _ = crate::db::store::pending_ops::delete_one(&state.pool, row_id).await;
+                if let Err(e) = crate::db::store::pending_ops::delete_one(&state.pool, row_id).await
+                {
+                    tracing::warn!(
+                        edge_server_id,
+                        row_id,
+                        "Failed to delete sent pending op: {e}"
+                    );
+                }
                 sent += 1;
             }
             tracing::info!(edge_server_id, count = sent, "Pending ops replayed to edge");
@@ -162,13 +184,39 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         .live_orders
         .mark_edge_online(&identity.tenant_id, edge_server_id);
 
+    // Server-side heartbeat: ping edge and detect dead connections
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECS));
+    ping_interval.tick().await; // skip immediate first tick
+    let mut last_activity = Instant::now();
+    let heartbeat_timeout = Duration::from_secs(HEARTBEAT_TIMEOUT_SECS);
+
     // Main select loop
     loop {
         tokio::select! {
+            // Server-side ping + heartbeat timeout check
+            _ = ping_interval.tick() => {
+                if last_activity.elapsed() > heartbeat_timeout {
+                    tracing::warn!(
+                        edge_id = %identity.entity_id,
+                        elapsed_secs = last_activity.elapsed().as_secs(),
+                        "Edge heartbeat timeout, disconnecting"
+                    );
+                    break;
+                }
+                if ws_sink.send(Message::Ping(vec![].into())).await.is_err() {
+                    tracing::warn!(
+                        edge_id = %identity.entity_id,
+                        "Failed to send ping, disconnecting"
+                    );
+                    break;
+                }
+            }
+
             // Incoming message from edge
             msg = ws_stream.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
+                        last_activity = Instant::now();
                         handle_edge_message(
                             &text,
                             &state,
@@ -179,7 +227,11 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                         .await;
                     }
                     Some(Ok(Message::Ping(data))) => {
+                        last_activity = Instant::now();
                         let _ = ws_sink.send(Message::Pong(data)).await;
+                    }
+                    Some(Ok(Message::Pong(_))) => {
+                        last_activity = Instant::now();
                     }
                     Some(Ok(Message::Close(_))) | None => {
                         tracing::info!(
@@ -195,7 +247,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                         );
                         break;
                     }
-                    _ => {} // Binary, Pong — ignore
+                    _ => {}
                 }
             }
 
@@ -203,13 +255,22 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
             msg = msg_rx.recv() => {
                 match msg {
                     Some(cloud_msg) => {
-                        if let Ok(json) = serde_json::to_string(&cloud_msg)
-                            && ws_sink.send(Message::Text(json.into())).await.is_err() {
-                                tracing::warn!("Failed to push message via WS");
-                                break;
+                        match serde_json::to_string(&cloud_msg) {
+                            Ok(json) => {
+                                if ws_sink.send(Message::Text(json.into())).await.is_err() {
+                                    tracing::warn!(edge_server_id, "Failed to push message via WS");
+                                    break;
+                                }
                             }
+                            Err(e) => {
+                                tracing::error!(edge_server_id, "Failed to serialize push message: {e}");
+                            }
+                        }
                     }
-                    None => break, // channel closed
+                    None => {
+                        tracing::info!(edge_server_id, "Push channel closed (connection replaced), exiting");
+                        break;
+                    }
                 }
             }
         }
@@ -346,8 +407,15 @@ async fn handle_edge_message<S>(
                 rejected,
                 errors,
             };
-            if let Ok(json) = serde_json::to_string(&ack) {
-                let _ = ws_sink.send(Message::Text(json.into())).await;
+            match serde_json::to_string(&ack) {
+                Ok(json) => {
+                    if let Err(e) = ws_sink.send(Message::Text(json.into())).await {
+                        tracing::warn!(edge_server_id, "Failed to send SyncAck: {e}");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(edge_server_id, "Failed to serialize SyncAck: {e}");
+                }
             }
 
             tracing::info!(

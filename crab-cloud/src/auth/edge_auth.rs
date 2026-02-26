@@ -50,11 +50,11 @@ pub async fn edge_auth_middleware(
         .load_tenant_ca_cert(&binding.tenant_id)
         .await
         .map_err(|e| {
-            tracing::error!(
+            tracing::warn!(
                 tenant_id = %binding.tenant_id,
                 "Failed to load Tenant CA cert: {e}"
             );
-            AppError::new(ErrorCode::InternalError).into_response()
+            AppError::new(ErrorCode::NotAuthenticated).into_response()
         })?;
 
     // Verify signature (CPU-intensive ECDSA — run off async runtime)
