@@ -1,5 +1,5 @@
 use crate::auth::tenant_auth;
-use crate::db::{activations, p12, subscriptions, tenants};
+use crate::db::{activations, p12, subscriptions, sync_store, tenants};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -278,9 +278,20 @@ pub async fn activate(
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 
+    // Query store_number for this edge-server
+    let store_number = match sync_store::get_store_number(&state.pool, &entity_id, &tenant.id).await
+    {
+        Ok(n) => n,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get store_number");
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
+        }
+    };
+
     tracing::info!(
         entity_id = %entity_id,
         tenant_id = %tenant.id,
+        store_number = store_number,
         "Activated server"
     );
 
@@ -298,6 +309,7 @@ pub async fn activate(
             entity_key,
             binding: signed_binding,
             subscription: Some(signed_subscription),
+            store_number,
         }),
         quota_info: None,
     })

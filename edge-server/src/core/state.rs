@@ -221,14 +221,23 @@ impl ServerState {
 
         // 4. Initialize OrdersManager (event sourcing) with CatalogService
         let orders_db_path = config.orders_db_file();
-        let mut orders_manager =
-            OrdersManager::new(&orders_db_path, config.timezone).map_err(|e| {
+        let store_number = {
+            let cred = activation.credential_cache.read().await;
+            cred.as_ref().map(|c| c.store_number).unwrap_or(1)
+        };
+        let mut orders_manager = OrdersManager::new(&orders_db_path, config.timezone, store_number)
+            .map_err(|e| {
                 crate::utils::AppError::internal(format!(
                     "Failed to initialize orders manager: {e}"
                 ))
             })?;
         orders_manager.set_catalog_service(catalog_service.clone());
         orders_manager.set_archive_service(pool.clone(), &config.data_dir());
+
+        // Initialize business_day_cutoff from store_info
+        if let Ok(Some(info)) = crate::db::repository::store_info::get(&pool).await {
+            orders_manager.update_business_day_cutoff(&info.business_day_cutoff);
+        }
 
         // Note: ArchiveWorker is started in start_background_tasks()
 

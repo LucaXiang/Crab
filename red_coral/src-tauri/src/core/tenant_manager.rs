@@ -339,8 +339,10 @@ impl TenantManager {
         tracing::info!("Saving credential to: {:?}", credential_path);
 
         // 包装在 TenantBinding 中，subscription 直接使用 shared::activation::SubscriptionInfo
-        let mut tenant_binding =
-            edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
+        let mut tenant_binding = edge_server::services::tenant_binding::TenantBinding::from_signed(
+            data.binding.clone(),
+            data.store_number,
+        );
 
         if let Some(mut sub_info) = data.subscription.clone() {
             sub_info.last_checked_at = shared::util::now_millis();
@@ -458,8 +460,10 @@ impl TenantManager {
         let credential_path = paths.credential_file();
         tracing::info!("Saving credential to: {:?}", credential_path);
 
-        let mut tenant_binding =
-            edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
+        let mut tenant_binding = edge_server::services::tenant_binding::TenantBinding::from_signed(
+            data.binding.clone(),
+            data.store_number,
+        );
 
         if let Some(mut sub_info) = data.subscription.clone() {
             sub_info.last_checked_at = shared::util::now_millis();

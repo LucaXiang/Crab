@@ -26,8 +26,8 @@ pub async fn ensure_edge_server(
 ) -> Result<i64, BoxError> {
     let row: (i64,) = sqlx::query_as(
         r#"
-        INSERT INTO edge_servers (entity_id, tenant_id, device_id, registered_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO edge_servers (entity_id, tenant_id, device_id, registered_at, store_number)
+        VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(store_number), 0) + 1 FROM edge_servers WHERE tenant_id = $2))
         ON CONFLICT (entity_id, tenant_id) DO UPDATE SET device_id = EXCLUDED.device_id
         RETURNING id
         "#,
@@ -40,6 +40,23 @@ pub async fn ensure_edge_server(
     .await?;
 
     Ok(row.0)
+}
+
+/// Get the store_number for an edge-server
+pub async fn get_store_number(
+    pool: &PgPool,
+    entity_id: &str,
+    tenant_id: &str,
+) -> Result<u32, BoxError> {
+    let row: (i32,) = sqlx::query_as(
+        "SELECT store_number FROM edge_servers WHERE entity_id = $1 AND tenant_id = $2",
+    )
+    .bind(entity_id)
+    .bind(tenant_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(row.0 as u32)
 }
 
 /// Update last_sync_at for an edge-server

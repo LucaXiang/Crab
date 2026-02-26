@@ -100,6 +100,7 @@ impl PrintExecutor {
             let sub_order = KitchenOrder {
                 id: order.id.clone(),
                 order_id: order.order_id.clone(),
+                receipt_number: order.receipt_number.clone(),
                 table_name: order.table_name.clone(),
                 zone_name: order.zone_name.clone(),
                 queue_number: order.queue_number,
@@ -479,6 +480,7 @@ mod tests {
         KitchenOrder {
             id: "evt-1".to_string(),
             order_id: "order-1".to_string(),
+            receipt_number: "FAC202401220001".to_string(),
             table_name: Some("100桌".to_string()),
             zone_name: Some("大厅".to_string()),
             queue_number: None,

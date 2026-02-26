@@ -87,6 +87,15 @@ pub struct ActivationData {
     // === 订阅信息 ===
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscription: Option<SubscriptionInfo>,
+
+    // === 门店编号 ===
+    /// 门店编号 (per-tenant 递增，如 1, 2, 3)
+    #[serde(default = "default_store_number")]
+    pub store_number: u32,
+}
+
+fn default_store_number() -> u32 {
+    1
 }
 
 /// 签名的绑定数据

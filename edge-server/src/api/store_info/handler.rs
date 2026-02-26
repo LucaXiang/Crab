@@ -77,5 +77,10 @@ pub async fn update(
     // 通知依赖配置的调度器（如班次检测器）立即重检
     state.config_notify.notify_waiters();
 
+    // 更新 OrdersManager 的 business_day_cutoff 缓存
+    state
+        .orders_manager
+        .update_business_day_cutoff(&store_info.business_day_cutoff);
+
     Ok(Json(store_info))
 }

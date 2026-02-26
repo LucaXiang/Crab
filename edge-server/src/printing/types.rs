@@ -45,6 +45,8 @@ pub struct KitchenOrderItem {
 pub struct KitchenOrder {
     pub id: String, // = event_id
     pub order_id: String,
+    #[serde(default)]
+    pub receipt_number: String, // 人类可读订单号
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
     pub queue_number: Option<u32>,

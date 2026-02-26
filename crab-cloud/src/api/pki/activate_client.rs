@@ -301,6 +301,7 @@ pub async fn activate_client(
             entity_key,
             binding: signed_binding,
             subscription: Some(signed_subscription),
+            store_number: 0, // Client 不需要门店编号
         }),
         quota_info: None,
     })

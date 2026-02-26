@@ -63,6 +63,8 @@ const SEQUENCE_KEY: &str = "seq";
 const ORDER_COUNT_KEY: &str = "order_count";
 const QUEUE_NUMBER_KEY: &str = "queue_number";
 const QUEUE_DATE_KEY: &str = "queue_date";
+const DAILY_COUNT_KEY: &str = "daily_count";
+const DAILY_DATE_KEY: &str = "daily_date";
 
 /// Pending archive queue entry
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -270,6 +272,38 @@ impl OrderStorage {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(SEQUENCE_TABLE)?;
         Ok(table.get(ORDER_COUNT_KEY)?.map(|g| g.value()).unwrap_or(0))
+    }
+
+    /// Get and increment daily receipt count, resetting on new business day
+    ///
+    /// `business_date` is in YYYYMMDD format (e.g. "20260226").
+    /// Returns the NEW count after increment (starts from 1 each business day).
+    pub fn next_daily_count(&self, business_date: &str) -> StorageResult<u64> {
+        let txn = self.db.begin_write()?;
+        let mut table = txn.open_table(SEQUENCE_TABLE)?;
+
+        // Read stored date as raw bytes → string
+        let stored_date = table.get(DAILY_DATE_KEY)?.map(|g| g.value());
+
+        // SAFETY: DAILY_DATE_KEY stores u64 representation of YYYYMMDD
+        // business_date is also YYYYMMDD, so we parse to u64 for comparison
+        let today_u64: u64 = business_date.parse().unwrap_or(0);
+
+        let count = if stored_date != Some(today_u64) {
+            // New business day → reset
+            table.insert(DAILY_DATE_KEY, today_u64)?;
+            table.insert(DAILY_COUNT_KEY, 1u64)?;
+            1
+        } else {
+            let current = table.get(DAILY_COUNT_KEY)?.map(|g| g.value()).unwrap_or(0);
+            let next = current + 1;
+            table.insert(DAILY_COUNT_KEY, next)?;
+            next
+        };
+
+        drop(table);
+        txn.commit()?;
+        Ok(count)
     }
 
     /// Get next queue number for retail orders (叫号)

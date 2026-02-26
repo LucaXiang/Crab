@@ -714,6 +714,7 @@ pub struct ArchivedItemsAddedEvent {
 #[derive(Debug, sqlx::FromRow)]
 pub struct ArchivedOrderMeta {
     pub order_key: String,
+    pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
     pub is_retail: bool,
@@ -727,7 +728,7 @@ pub async fn get_items_added_events_by_order_key(
 ) -> RepoResult<(Option<ArchivedOrderMeta>, Vec<ArchivedItemsAddedEvent>)> {
     // 1. Find order pk and metadata by order_key
     let meta = sqlx::query_as::<_, ArchivedOrderMeta>(
-        "SELECT order_key, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE order_key = ?",
+        "SELECT order_key, receipt_number, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE order_key = ?",
     )
     .bind(order_key)
     .fetch_optional(pool)

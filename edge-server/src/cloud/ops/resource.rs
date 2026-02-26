@@ -307,6 +307,10 @@ pub async fn update_store_info(
                 .await;
             // Notify shift schedulers (business_day_cutoff may have changed)
             state.config_notify.notify_waiters();
+            // Update OrdersManager's business_day_cutoff cache
+            state
+                .orders_manager
+                .update_business_day_cutoff(&info.business_day_cutoff);
             StoreOpResult::ok().with_data(StoreOpData::StoreInfo(info))
         }
         Err(e) => StoreOpResult::err(e.to_string()),

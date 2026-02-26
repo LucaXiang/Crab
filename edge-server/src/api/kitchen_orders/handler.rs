@@ -66,7 +66,15 @@ pub async fn list(
 
     let items = if let Some(order_id) = query.order_id {
         // Try redb first
-        let redb_items = service.get_kitchen_orders_for_order(&order_id)?;
+        tracing::debug!(order_id = %order_id, "kitchen_orders::list querying redb");
+        let redb_items = match service.get_kitchen_orders_for_order(&order_id) {
+            Ok(items) => items,
+            Err(e) => {
+                tracing::warn!(order_id = %order_id, error = %e, "redb query failed, trying archive");
+                vec![]
+            }
+        };
+        tracing::debug!(order_id = %order_id, redb_count = redb_items.len(), "redb result");
         if redb_items.is_empty() {
             // Fallback: rebuild from archived events
             rebuild_kitchen_orders_from_archive(&state, &order_id).await?
@@ -131,8 +139,8 @@ pub async fn reprint(
         if let Some((_event_id, timestamp, data)) = event_row {
             // Get order metadata
             let order_meta =
-                sqlx::query_as::<_, (Option<String>, Option<String>, bool, Option<i32>, String)>(
-                    "SELECT o.table_name, o.zone_name, o.is_retail, o.queue_number, o.order_key \
+                sqlx::query_as::<_, (Option<String>, Option<String>, bool, Option<i32>, String, String)>(
+                    "SELECT o.table_name, o.zone_name, o.is_retail, o.queue_number, o.order_key, o.receipt_number \
                  FROM archived_order o \
                  JOIN archived_order_event e ON e.order_pk = o.id \
                  WHERE CAST(e.id AS TEXT) = ?",
@@ -142,13 +150,15 @@ pub async fn reprint(
                 .await
                 .map_err(|e| AppError::database(e.to_string()))?;
 
-            let (table_name, zone_name, is_retail, queue_number, order_key) = order_meta
-                .ok_or_else(|| AppError::not_found(format!("Archived order for event {id}")))?;
+            let (table_name, zone_name, is_retail, queue_number, order_key, receipt_number) =
+                order_meta
+                    .ok_or_else(|| AppError::not_found(format!("Archived order for event {id}")))?;
 
             rebuild_single_kitchen_order(
                 &state,
                 &id,
                 &order_key,
+                &receipt_number,
                 table_name,
                 zone_name,
                 is_retail,
@@ -359,6 +369,7 @@ async fn rebuild_kitchen_orders_from_archive(
         orders.push(KitchenOrder {
             id: event.event_id.to_string(),
             order_id: meta.order_key.clone(),
+            receipt_number: meta.receipt_number.clone(),
             table_name: meta.table_name.clone(),
             zone_name: meta.zone_name.clone(),
             queue_number: meta.queue_number.map(|n| n as u32),
@@ -433,6 +444,7 @@ fn rebuild_single_kitchen_order(
     state: &ServerState,
     event_id: &str,
     order_key: &str,
+    receipt_number: &str,
     table_name: Option<String>,
     zone_name: Option<String>,
     is_retail: bool,
@@ -458,6 +470,7 @@ fn rebuild_single_kitchen_order(
     Ok(KitchenOrder {
         id: event_id.to_string(),
         order_id: order_key.to_string(),
+        receipt_number: receipt_number.to_string(),
         table_name,
         zone_name,
         queue_number,

@@ -58,22 +58,35 @@ pub struct TenantBinding {
     /// 订阅信息 (独立签名，直接使用 shared 统一类型)
     #[serde(default)]
     pub subscription: Option<SubscriptionInfo>,
+    /// 门店编号 (per-tenant 递增，Cloud 激活时分配)
+    #[serde(default = "default_store_number")]
+    pub store_number: u32,
+}
+
+fn default_store_number() -> u32 {
+    1
 }
 
 impl TenantBinding {
     /// 从 SignedBinding 创建（无订阅数据）
-    pub fn from_signed(binding: SignedBinding) -> Self {
+    pub fn from_signed(binding: SignedBinding, store_number: u32) -> Self {
         Self {
             binding,
             subscription: None,
+            store_number,
         }
     }
 
     /// 从激活响应创建（包含订阅数据）
-    pub fn from_activation(binding: SignedBinding, subscription: Option<SubscriptionInfo>) -> Self {
+    pub fn from_activation(
+        binding: SignedBinding,
+        subscription: Option<SubscriptionInfo>,
+        store_number: u32,
+    ) -> Self {
         Self {
             binding,
             subscription,
+            store_number,
         }
     }
 

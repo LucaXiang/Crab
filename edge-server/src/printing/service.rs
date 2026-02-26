@@ -157,6 +157,7 @@ impl KitchenPrintService {
         let kitchen_order = KitchenOrder {
             id: event.event_id.clone(),
             order_id: event.order_id.clone(),
+            receipt_number: snapshot.receipt_number.clone(),
             table_name: snapshot.table_name.clone(),
             zone_name: snapshot.zone_name.clone(),
             queue_number: snapshot.queue_number,

@@ -93,15 +93,14 @@ impl KitchenTicketRenderer {
         b.reset_size();
         b.left();
 
-        // Line 2: zone | order_id (+service tag)
+        // Line 2: zone | receipt_number (+ service tag)
         let zone = order.zone_name.as_deref().unwrap_or("");
-        let service_tag = if order.is_retail && order.queue_number.is_none() {
-            " [LLEVAR]"
+        let right = if order.is_retail && order.queue_number.is_none() {
+            format!("{} [LLEVAR]", order.receipt_number)
         } else {
-            ""
+            order.receipt_number.clone()
         };
-        let order_ref = format!("#{}{}", order.order_id, service_tag);
-        b.line_lr(zone, &order_ref);
+        b.line_lr(zone, &right);
 
         // Line 3: total count | timestamp
         let count_str = if total_kinds as i32 == total_qty {
@@ -161,8 +160,6 @@ impl KitchenTicketRenderer {
 
     /// Render a single item with fixed-column layout
     fn render_item(&self, b: &mut EscPosBuilder, item: &PrintItemContext) {
-        let indent = Self::COL_QTY + Self::COL_EID;
-
         // Main line: "  2x 0001 Espresso"
         let qty_col = format!(
             "{:>width$}",
@@ -180,22 +177,27 @@ impl KitchenTicketRenderer {
             name.push_str(&format!(" [{}]", index));
         }
 
-        b.double_height();
+        // Item name — normal size
         b.line(&format!("{}{} {}", qty_col, eid_col, name));
-        b.reset_size();
 
-        let prefix = " ".repeat(indent);
+        let prefix = " ".repeat(Self::COL_QTY);
 
-        // Spec (规格)
+        // Spec (规格) — bold
         if let Some(ref spec) = item.spec_name
             && !spec.is_empty()
         {
-            b.line(&format!("{} SPEC: {}", prefix, spec));
+            b.bold();
+            b.line(&format!("{} > SPEC: {}", prefix, spec));
+            b.bold_off();
         }
 
-        // Options (属性: 选项1, 选项2)
-        for opt in &item.options {
-            b.line(&format!("{} {}", prefix, opt));
+        // Options (属性: 选项1, 选项2) — bold
+        if !item.options.is_empty() {
+            b.bold();
+            for opt in &item.options {
+                b.line(&format!("{} > {}", prefix, opt));
+            }
+            b.bold_off();
         }
 
         // Note (备注) — bold
@@ -253,6 +255,7 @@ mod tests {
         KitchenOrder {
             id: "evt-1".to_string(),
             order_id: "order-1".to_string(),
+            receipt_number: "FAC202401220001".to_string(),
             table_name: Some("B1".to_string()),
             zone_name: Some("Barra".to_string()),
             queue_number: None,
@@ -304,6 +307,7 @@ mod tests {
         KitchenOrder {
             id: "evt-2".to_string(),
             order_id: "order-2".to_string(),
+            receipt_number: "FAC202401220002".to_string(),
             table_name: Some("100桌".to_string()),
             zone_name: Some("大厅".to_string()),
             queue_number: None,

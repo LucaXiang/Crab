@@ -34,7 +34,6 @@ use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplie
 use crate::order_money;
 use crate::pricing::matcher::is_time_valid;
 use crate::services::catalog_service::ProductMeta;
-use chrono::Utc;
 use chrono_tz::Tz;
 use parking_lot::RwLock;
 use shared::models::PriceRule;
@@ -105,6 +104,10 @@ pub struct OrdersManager {
     archive_service: Option<crate::archiving::OrderArchiveService>,
     /// 业务时区
     tz: Tz,
+    /// 门店编号 (per-tenant 递增，Cloud 激活时分配)
+    store_number: u32,
+    /// 营业日分界时间 (HH:MM 格式)
+    business_day_cutoff: RwLock<chrono::NaiveTime>,
 }
 
 impl std::fmt::Debug for OrdersManager {
@@ -119,11 +122,11 @@ impl std::fmt::Debug for OrdersManager {
 
 impl OrdersManager {
     /// Create a new OrdersManager with the given database path
-    pub fn new(db_path: impl AsRef<Path>, tz: Tz) -> ManagerResult<Self> {
+    pub fn new(db_path: impl AsRef<Path>, tz: Tz, store_number: u32) -> ManagerResult<Self> {
         let storage = OrderStorage::open(db_path)?;
         let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let epoch = uuid::Uuid::new_v4().to_string();
-        tracing::info!(epoch = %epoch, "OrdersManager started with new epoch");
+        tracing::info!(epoch = %epoch, store_number = store_number, "OrdersManager started with new epoch");
         Ok(Self {
             storage,
             event_tx,
@@ -133,6 +136,8 @@ impl OrdersManager {
             pool: None,
             archive_service: None,
             tz,
+            store_number,
+            business_day_cutoff: RwLock::new(chrono::NaiveTime::MIN),
         })
     }
 
@@ -150,13 +155,21 @@ impl OrdersManager {
     }
 
     /// Generate next receipt number (crash-safe via redb)
+    ///
+    /// Format: `{store_number:02}-{YYYYMMDD}-{daily_seq:04}`
+    /// Example: `01-20260226-0001`
     fn next_receipt_number(&self) -> String {
-        let count = self.storage.next_order_count().unwrap_or(1);
-        let date_str = Utc::now()
-            .with_timezone(&self.tz)
-            .format("%Y%m%d")
-            .to_string();
-        format!("FAC{}{}", date_str, 10000 + count)
+        let cutoff = *self.business_day_cutoff.read();
+        let business_date = crate::utils::time::current_business_date(cutoff, self.tz);
+        let date_str = business_date.format("%Y%m%d").to_string();
+        let count = self.storage.next_daily_count(&date_str).unwrap_or(1);
+        format!("{:02}-{}-{:04}", self.store_number, date_str, count)
+    }
+
+    /// Update the cached business_day_cutoff (called when store_info changes)
+    pub fn update_business_day_cutoff(&self, cutoff: &str) {
+        let parsed = crate::utils::time::parse_cutoff(cutoff);
+        *self.business_day_cutoff.write() = parsed;
     }
 
     /// Create an OrdersManager with existing storage (for testing)
@@ -173,6 +186,8 @@ impl OrdersManager {
             pool: None,
             archive_service: None,
             tz: chrono_tz::Europe::Madrid,
+            store_number: 1,
+            business_day_cutoff: RwLock::new(chrono::NaiveTime::MIN),
         }
     }
 
@@ -1266,6 +1281,8 @@ impl Clone for OrdersManager {
             pool: self.pool.clone(),
             archive_service: self.archive_service.clone(),
             tz: self.tz,
+            store_number: self.store_number,
+            business_day_cutoff: RwLock::new(*self.business_day_cutoff.read()),
         }
     }
 }
