@@ -139,7 +139,6 @@ async fn batch_insert_fields(
     let visibles: Vec<bool> = fields.iter().map(|f| f.visible).collect();
     let labels: Vec<Option<&str>> = fields.iter().map(|f| f.label.as_deref()).collect();
     let templates: Vec<Option<&str>> = fields.iter().map(|f| f.template.as_deref()).collect();
-    let data_keys: Vec<Option<&str>> = fields.iter().map(|f| f.data_key.as_deref()).collect();
     let source_types: Vec<Option<&str>> = fields.iter().map(|f| f.source_type.as_deref()).collect();
     let maintain_ratios: Vec<Option<bool>> =
         fields.iter().map(|f| f.maintain_aspect_ratio).collect();
@@ -153,15 +152,15 @@ async fn batch_insert_fields(
             template_id, field_id, name, field_type,
             x, y, width, height, font_size, font_weight, font_family,
             color, rotate, alignment, data_source, format, visible,
-            label, template, data_key, source_type,
+            label, template, source_type,
             maintain_aspect_ratio, style, align, vertical_align, line_style
         ) SELECT * FROM UNNEST(
             $1::bigint[], $2::text[], $3::text[], $4::text[]::label_field_type[],
             $5::real[], $6::real[], $7::real[], $8::real[],
             $9::integer[], $10::text[], $11::text[],
             $12::text[], $13::integer[], $14::text[]::label_field_alignment[], $15::text[], $16::text[], $17::boolean[],
-            $18::text[], $19::text[], $20::text[], $21::text[],
-            $22::boolean[], $23::text[], $24::text[], $25::text[], $26::text[]
+            $18::text[], $19::text[], $20::text[],
+            $21::boolean[], $22::text[], $23::text[], $24::text[], $25::text[]
         )"#,
     )
     .bind(&tids)
@@ -183,7 +182,6 @@ async fn batch_insert_fields(
     .bind(&visibles)
     .bind(&labels)
     .bind(&templates)
-    .bind(&data_keys)
     .bind(&source_types)
     .bind(&maintain_ratios)
     .bind(&styles)
@@ -229,7 +227,6 @@ async fn batch_insert_field_inputs(
     let visibles: Vec<bool> = fields.iter().map(|f| f.visible).collect();
     let labels: Vec<Option<&str>> = fields.iter().map(|f| f.label.as_deref()).collect();
     let templates: Vec<Option<&str>> = fields.iter().map(|f| f.template.as_deref()).collect();
-    let data_keys: Vec<Option<&str>> = fields.iter().map(|f| f.data_key.as_deref()).collect();
     let source_types: Vec<Option<&str>> = fields.iter().map(|f| f.source_type.as_deref()).collect();
     let maintain_ratios: Vec<Option<bool>> =
         fields.iter().map(|f| f.maintain_aspect_ratio).collect();
@@ -243,15 +240,15 @@ async fn batch_insert_field_inputs(
             template_id, field_id, name, field_type,
             x, y, width, height, font_size, font_weight, font_family,
             color, rotate, alignment, data_source, format, visible,
-            label, template, data_key, source_type,
+            label, template, source_type,
             maintain_aspect_ratio, style, align, vertical_align, line_style
         ) SELECT * FROM UNNEST(
             $1::bigint[], $2::text[], $3::text[], $4::text[]::label_field_type[],
             $5::real[], $6::real[], $7::real[], $8::real[],
             $9::integer[], $10::text[], $11::text[],
             $12::text[], $13::integer[], $14::text[]::label_field_alignment[], $15::text[], $16::text[], $17::boolean[],
-            $18::text[], $19::text[], $20::text[], $21::text[],
-            $22::boolean[], $23::text[], $24::text[], $25::text[], $26::text[]
+            $18::text[], $19::text[], $20::text[],
+            $21::boolean[], $22::text[], $23::text[], $24::text[], $25::text[]
         )"#,
     )
     .bind(&tids)
@@ -273,7 +270,6 @@ async fn batch_insert_field_inputs(
     .bind(&visibles)
     .bind(&labels)
     .bind(&templates)
-    .bind(&data_keys)
     .bind(&source_types)
     .bind(&maintain_ratios)
     .bind(&styles)
@@ -338,7 +334,7 @@ pub async fn list_label_templates(
         SELECT id, template_id, field_id, name, field_type,
                x, y, width, height, font_size, font_weight, font_family,
                color, rotate, alignment, data_source, format, visible,
-               label, template, data_key, source_type,
+               label, template, source_type,
                maintain_aspect_ratio, style, align, vertical_align, line_style
         FROM store_label_fields
         WHERE template_id = ANY($1)
@@ -432,7 +428,7 @@ pub async fn create_label_template_direct(
         SELECT id, template_id, field_id, name, field_type,
                x, y, width, height, font_size, font_weight, font_family,
                color, rotate, alignment, data_source, format, visible,
-               label, template, data_key, source_type,
+               label, template, source_type,
                maintain_aspect_ratio, style, align, vertical_align, line_style
         FROM store_label_fields
         WHERE template_id = $1
@@ -552,7 +548,7 @@ pub async fn update_label_template_direct(
         SELECT id, template_id, field_id, name, field_type,
                x, y, width, height, font_size, font_weight, font_family,
                color, rotate, alignment, data_source, format, visible,
-               label, template, data_key, source_type,
+               label, template, source_type,
                maintain_aspect_ratio, style, align, vertical_align, line_style
         FROM store_label_fields
         WHERE template_id = $1

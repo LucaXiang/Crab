@@ -159,11 +159,7 @@ mod platform {
                             }
                             _ => crab_printer::label::TextAlign::Left,
                         },
-                        template: f
-                            .template
-                            .clone()
-                            .or_else(|| f.data_key.as_ref().map(|k| format!("{{{}}}", k)))
-                            .unwrap_or_default(),
+                        template: f.resolve_text_template(),
                     })
                 }
                 LabelFieldType::Image | LabelFieldType::Barcode | LabelFieldType::Qrcode => {
@@ -173,7 +169,7 @@ mod platform {
                         width: f.width,
                         height: f.height,
                         maintain_aspect_ratio: f.maintain_aspect_ratio.unwrap_or(true),
-                        data_key: f.data_key.clone().unwrap_or_else(|| f.name.clone()),
+                        data_key: f.resolve_image_data_key(),
                     })
                 }
                 LabelFieldType::Separator => crab_printer::label::TemplateField::Separator(

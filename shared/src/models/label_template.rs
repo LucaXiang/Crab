@@ -66,13 +66,40 @@ pub struct LabelField {
     pub visible: bool,
     pub label: Option<String>,
     pub template: Option<String>,
-    pub data_key: Option<String>,
+
     pub source_type: Option<String>,
     pub maintain_aspect_ratio: Option<bool>,
     pub style: Option<String>,
     pub align: Option<String>,
     pub vertical_align: Option<String>,
     pub line_style: Option<String>,
+}
+
+impl LabelField {
+    /// Resolve the render template string for text fields.
+    ///
+    /// Priority: explicit `template` > `data_source`.
+    /// - `template`: custom format string e.g. `€{price}`, `{product_name} ({spec_name})`
+    /// - `data_source`: canonical flat key matching `build_label_data()` JSON keys
+    pub fn resolve_text_template(&self) -> String {
+        self.template
+            .as_deref()
+            .filter(|t| !t.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| {
+                if self.data_source.is_empty() {
+                    String::new()
+                } else {
+                    format!("{{{}}}", self.data_source)
+                }
+            })
+    }
+
+    /// Resolve the data key for image/barcode/qrcode fields.
+    /// Uses `data_source` as the canonical key.
+    pub fn resolve_image_data_key(&self) -> String {
+        self.data_source.clone()
+    }
 }
 
 fn default_font_size() -> i32 {
@@ -139,7 +166,7 @@ pub struct LabelFieldInput {
     pub visible: bool,
     pub label: Option<String>,
     pub template: Option<String>,
-    pub data_key: Option<String>,
+
     pub source_type: Option<String>,
     pub maintain_aspect_ratio: Option<bool>,
     pub style: Option<String>,

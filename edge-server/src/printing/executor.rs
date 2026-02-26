@@ -363,26 +363,38 @@ impl PrintExecutor {
     }
 }
 
-/// Build label data JSON from LabelPrintRecord
+/// Build label data JSON from LabelPrintRecord.
+///
+/// Keys here are the single source of truth — they must match
+/// `SUPPORTED_LABEL_FIELDS.key` in the frontend and `data_source` values
+/// in label templates. To add a new field:
+/// 1. Add the key here
+/// 2. Add to `SUPPORTED_LABEL_FIELDS` in `labelTemplate.ts`
+/// 3. Populate from `PrintItemContext` (extend if needed)
 #[cfg(windows)]
 fn build_label_data(record: &super::types::LabelPrintRecord) -> serde_json::Value {
     let ctx = &record.context;
-    let time = chrono::Local::now().format("%H:%M").to_string();
+    let now = chrono::Local::now();
     serde_json::json!({
+        // Product
         "product_name": ctx.product_name,
         "kitchen_name": ctx.kitchen_name,
-        "item_name": ctx.kitchen_name,
         "category_name": ctx.category_name,
+        "external_id": ctx.external_id.unwrap_or(0),
+        // Specification
         "spec_name": ctx.spec_name.as_deref().unwrap_or(""),
-        "specs": ctx.spec_name.as_deref().unwrap_or(""),
-        "options": ctx.options.join(", "),
+        // Item
         "quantity": ctx.quantity,
         "index": ctx.index.as_deref().unwrap_or(""),
+        "options": ctx.label_options.join(", "),
         "note": ctx.note.as_deref().unwrap_or(""),
-        "external_id": ctx.external_id.unwrap_or(0),
+        // Order
         "table_name": record.table_name.as_deref().unwrap_or(""),
         "queue_number": record.queue_number.map(|n| format!("#{:03}", n)).unwrap_or_default(),
-        "time": time,
+        // Print
+        "time": now.format("%H:%M").to_string(),
+        "date": now.format("%Y-%m-%d").to_string(),
+        "datetime": now.format("%Y-%m-%d %H:%M").to_string(),
     })
 }
 
@@ -438,11 +450,7 @@ fn convert_label_field(
                     }
                     _ => crab_printer::label::TextAlign::Left,
                 },
-                template: f
-                    .template
-                    .clone()
-                    .or_else(|| f.data_key.as_ref().map(|k| format!("{{{}}}", k)))
-                    .unwrap_or_default(),
+                template: f.resolve_text_template(),
             },
         )),
         LabelFieldType::Image | LabelFieldType::Barcode | LabelFieldType::Qrcode => Some(
@@ -452,7 +460,7 @@ fn convert_label_field(
                 width: f.width,
                 height: f.height,
                 maintain_aspect_ratio: f.maintain_aspect_ratio.unwrap_or(true),
-                data_key: f.data_key.clone().unwrap_or_else(|| f.name.clone()),
+                data_key: f.resolve_image_data_key(),
             }),
         ),
         LabelFieldType::Separator => Some(crab_printer::label::TemplateField::Separator(

@@ -33,13 +33,13 @@ export interface LabelField {
   color?: string;
   rotate?: number;
   alignment?: 'left' | 'center' | 'right';
-  data_source: string;  // Field data source path
+  /** Canonical flat key matching build_label_data() JSON keys (e.g. "product_name") */
+  data_source: string;
   format?: string;  // Format pattern (e.g., for date/time)
   visible: boolean;
-  // UI-specific properties for editor
   label?: string;
+  /** Custom format template for text (e.g. "€{price}"), or image hash for image fields */
   template?: string;
-  data_key?: string;
   source_type?: 'productImage' | 'qrCode' | 'barcode' | 'image';
   maintain_aspect_ratio?: boolean;
   /** Temporary local file path for pending image upload (editor only, not persisted) */
@@ -140,21 +140,19 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         height: 32,
         font_size: 10,
         font_weight: 'bold',
-        data_source: 'product.name',
+        data_source: 'product_name',
         visible: true,
       },
       {
-        field_id: 'price',
-        name: '价格',
-        field_type: 'price',
+        field_id: 'spec',
+        name: '规格',
+        field_type: 'text',
         x: 8,
-        y: 64,
+        y: 56,
         width: 224,
-        height: 32,
-        font_size: 12,
-        font_weight: 'bold',
-        data_source: 'product.price',
-        format: '€{value}',
+        height: 24,
+        font_size: 8,
+        data_source: 'spec_name',
         visible: true,
       },
       {
@@ -162,12 +160,25 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '条码',
         field_type: 'barcode',
         x: 8,
-        y: 112,
+        y: 88,
         width: 224,
         height: 40,
         font_size: 8,
-        data_source: 'product.externalId',
+        data_source: 'external_id',
         format: 'CODE128',
+        visible: true,
+      },
+      {
+        field_id: 'datetime',
+        name: '打印时间',
+        field_type: 'datetime',
+        x: 8,
+        y: 136,
+        width: 224,
+        height: 20,
+        font_size: 7,
+        data_source: 'time',
+        alignment: 'center',
         visible: true,
       },
     ],
@@ -192,12 +203,12 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '商品名称',
         field_type: 'text',
         x: 16,
-        y: 16,
+        y: 12,
         width: 288,
-        height: 48,
+        height: 44,
         font_size: 14,
         font_weight: 'bold',
-        data_source: 'product.name',
+        data_source: 'product_name',
         visible: true,
       },
       {
@@ -205,26 +216,11 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '规格',
         field_type: 'text',
         x: 16,
-        y: 80,
-        width: 160,
-        height: 32,
+        y: 64,
+        width: 288,
+        height: 28,
         font_size: 10,
-        data_source: 'specification.name',
-        visible: true,
-      },
-      {
-        field_id: 'price',
-        name: '价格',
-        field_type: 'price',
-        x: 192,
-        y: 80,
-        width: 112,
-        height: 32,
-        font_size: 12,
-        font_weight: 'bold',
-        data_source: 'product.price',
-        format: '€{value}',
-        alignment: 'right',
+        data_source: 'spec_name',
         visible: true,
       },
       {
@@ -232,11 +228,11 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '条码',
         field_type: 'barcode',
         x: 16,
-        y: 128,
+        y: 100,
         width: 288,
         height: 80,
         font_size: 10,
-        data_source: 'product.externalId',
+        data_source: 'external_id',
         format: 'CODE128',
         visible: true,
       },
@@ -245,12 +241,11 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '打印时间',
         field_type: 'datetime',
         x: 16,
-        y: 216,
+        y: 188,
         width: 288,
         height: 24,
         font_size: 8,
-        data_source: 'print.time',
-        format: 'yyyy-MM-dd HH:mm',
+        data_source: 'time',
         alignment: 'center',
         visible: true,
       },
@@ -281,7 +276,7 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         height: 64,
         font_size: 24,
         font_weight: 'bold',
-        data_source: 'order.receiptNumber',
+        data_source: 'queue_number',
         alignment: 'center',
         visible: true,
       },
@@ -290,12 +285,12 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '桌号',
         field_type: 'text',
         x: 24,
-        y: 112,
+        y: 108,
         width: 176,
         height: 48,
         font_size: 18,
         font_weight: 'bold',
-        data_source: 'order.tableName',
+        data_source: 'table_name',
         visible: true,
       },
       {
@@ -303,12 +298,12 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '数量',
         field_type: 'text',
         x: 224,
-        y: 112,
+        y: 108,
         width: 152,
         height: 48,
         font_size: 18,
         font_weight: 'bold',
-        data_source: 'item.quantity',
+        data_source: 'quantity',
         alignment: 'right',
         visible: true,
       },
@@ -317,12 +312,12 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '菜品名称',
         field_type: 'text',
         x: 24,
-        y: 184,
+        y: 176,
         width: 352,
         height: 80,
         font_size: 16,
         font_weight: 'bold',
-        data_source: 'item.productName',
+        data_source: 'kitchen_name',
         alignment: 'center',
         visible: true,
       },
@@ -331,12 +326,12 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         name: '加料',
         field_type: 'text',
         x: 24,
-        y: 280,
+        y: 268,
         width: 352,
         height: 32,
         font_size: 10,
         color: '#666666',
-        data_source: 'item.options',
+        data_source: 'options',
         alignment: 'center',
         visible: true,
       },
@@ -388,18 +383,17 @@ export const LabelFieldHelpers = {
           height: 6,
           font_size: 10,
           font_weight: 'bold',
-          data_source: 'product.name',
+          data_source: 'product_name',
         }),
         this.createField({
-          name: '价格',
-          field_type: 'price',
+          name: '规格',
+          field_type: 'text',
           x: 1,
           y: 10,
           width: 28,
           height: 5,
-          font_size: 12,
-          data_source: 'product.price',
-          format: '€{value}',
+          font_size: 9,
+          data_source: 'spec_name',
         }),
       ];
     }
@@ -413,59 +407,28 @@ export const LabelFieldHelpers = {
         height: 8,
         font_size: 14,
         font_weight: 'bold',
-        data_source: 'product.name',
+        data_source: 'product_name',
         alignment: 'center',
       }),
       this.createField({
-        name: '价格',
-        field_type: 'price',
+        name: '规格',
+        field_type: 'text',
         x: 2,
         y: 14,
         width: width - 4,
         height: 6,
-        font_size: 16,
-        data_source: 'product.price',
-        format: '€{value}',
+        font_size: 10,
+        data_source: 'spec_name',
         alignment: 'center',
       }),
     ];
   },
 };
 
-// Additional types for UI components
 export type TextAlign = 'left' | 'center' | 'right';
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
 
-export interface TextField {
-  type: 'text';
-  label: string;
-  data_key: string;
-  style?: TextStyle;
-  align?: TextAlign;
-}
-
-export interface ImageField {
-  type: 'image';
-  source_type: 'productImage' | 'qrCode' | 'barcode';
-  template?: string;
-  maintain_aspect_ratio?: boolean;
-}
-
-export interface SeparatorField {
-  type: 'separator';
-  line_style?: 'solid' | 'dashed' | 'dotted';
-}
-
-export type FieldType = 'text' | 'image' | 'separator';
-
-export interface TextStyle {
-  font_size: number;
-  font_weight?: string;
-  color?: string;
-  font_family?: string;
-}
-
-// Supported label fields for UI
+// Supported label fields for UI — key must match build_label_data() JSON keys
 export interface SupportedLabelField {
   key: string;
   type: 'text' | 'image' | 'separator';
@@ -473,22 +436,29 @@ export interface SupportedLabelField {
   category: string;
   description: string;
   example: string;
-  data_key?: string;
   source_type?: 'productImage' | 'qrCode' | 'barcode';
 }
 
-// key 必须与 edge-server/src/printing/executor.rs 的 build_label_data 一致
+// key 必须与 edge-server/src/printing/executor.rs 的 build_label_data 一致。
+// 添加新字段：1) build_label_data 加 key  2) 这里加条目  3) PrintItemContext 扩展
 export const SUPPORTED_LABEL_FIELDS: SupportedLabelField[] = [
+  // Product
   { key: 'product_name', type: 'text', label: '商品名称', category: 'Product', description: '商品原始名称', example: 'Coffee' },
   { key: 'kitchen_name', type: 'text', label: '厨房显示名', category: 'Product', description: '厨房打印名(=商品名)', example: 'Coffee' },
   { key: 'category_name', type: 'text', label: '分类名称', category: 'Product', description: '商品分类', example: 'Drinks' },
+  { key: 'external_id', type: 'text', label: '外部ID', category: 'Product', description: '商品外部ID', example: '10042' },
+  // Specification
   { key: 'spec_name', type: 'text', label: '规格名称', category: 'Product', description: '商品规格', example: 'Large' },
-  { key: 'options', type: 'text', label: '选项', category: 'Product', description: '商品选项/加料', example: 'No sugar' },
+  // Item
   { key: 'quantity', type: 'text', label: '数量', category: 'Item', description: '商品数量', example: '2' },
   { key: 'index', type: 'text', label: '序号', category: 'Item', description: '商品在订单中的序号', example: '1/3' },
+  { key: 'options', type: 'text', label: '选项', category: 'Item', description: '商品选项/加料', example: 'No sugar' },
   { key: 'note', type: 'text', label: '备注', category: 'Item', description: '商品备注', example: '少辣' },
-  { key: 'external_id', type: 'text', label: '外部ID', category: 'Product', description: '商品外部ID', example: '10042' },
+  // Order
   { key: 'table_name', type: 'text', label: '桌号', category: 'Order', description: '桌号名称', example: 'Mesa 5' },
   { key: 'queue_number', type: 'text', label: '叫号', category: 'Order', description: '零售叫号(#001格式)', example: '#001' },
-  { key: 'time', type: 'text', label: '打印时间', category: 'Print', description: '打印时间(HH:MM)', example: '14:30' },
+  // Print
+  { key: 'time', type: 'text', label: '时间', category: 'Print', description: '打印时间(HH:MM)', example: '14:30' },
+  { key: 'date', type: 'text', label: '日期', category: 'Print', description: '打印日期(YYYY-MM-DD)', example: '2026-02-26' },
+  { key: 'datetime', type: 'text', label: '日期时间', category: 'Print', description: '打印日期时间', example: '2026-02-26 14:30' },
 ];

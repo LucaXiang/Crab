@@ -229,7 +229,9 @@ impl KitchenPrintService {
         let kitchen_name = kitchen_config
             .as_ref()
             .and_then(|c| c.kitchen_name.clone())
+            .filter(|n| !n.is_empty())
             .or_else(|| product.as_ref().map(|p| p.name.clone()))
+            .filter(|n| !n.is_empty())
             .unwrap_or_else(|| item.name.clone());
 
         // Get product external_id (now at product level)

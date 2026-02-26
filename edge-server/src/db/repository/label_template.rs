@@ -98,7 +98,7 @@ pub async fn create(
     for field in &data.fields {
         let field_db_id = shared::util::snowflake_id();
         sqlx::query(
-            "INSERT INTO label_field (id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
+            "INSERT INTO label_field (id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
         )
         .bind(field_db_id)
         .bind(id)
@@ -120,7 +120,6 @@ pub async fn create(
         .bind(field.visible)
         .bind(&field.label)
         .bind(&field.template)
-        .bind(&field.data_key)
         .bind(&field.source_type)
         .bind(field.maintain_aspect_ratio)
         .bind(&field.style)
@@ -200,7 +199,7 @@ pub async fn update(
         for field in fields {
             let field_db_id = shared::util::snowflake_id();
             sqlx::query(
-                "INSERT INTO label_field (id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
+                "INSERT INTO label_field (id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
             )
             .bind(field_db_id)
             .bind(id)
@@ -222,7 +221,6 @@ pub async fn update(
             .bind(field.visible)
             .bind(&field.label)
             .bind(&field.template)
-            .bind(&field.data_key)
             .bind(&field.source_type)
             .bind(field.maintain_aspect_ratio)
             .bind(&field.style)
@@ -272,7 +270,7 @@ pub async fn hard_delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
 
 async fn find_fields(pool: &SqlitePool, template_id: i64) -> RepoResult<Vec<LabelField>> {
     let fields = sqlx::query_as::<_, LabelField>(
-        "SELECT id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style FROM label_field WHERE template_id = ?",
+        "SELECT id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style FROM label_field WHERE template_id = ?",
     )
     .bind(template_id)
     .fetch_all(pool)
@@ -288,7 +286,7 @@ async fn batch_load_fields(pool: &SqlitePool, templates: &mut [LabelTemplate]) -
     let ids: Vec<i64> = templates.iter().map(|t| t.id).collect();
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style FROM label_field WHERE template_id IN ({placeholders})"
+        "SELECT id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style FROM label_field WHERE template_id IN ({placeholders})"
     );
     let mut query = sqlx::query_as::<_, LabelField>(&sql);
     for id in &ids {

@@ -72,7 +72,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
           if (field._pending_image_path && source_type === 'image') {
             src = convertFileSrc(field._pending_image_path);
           } else {
-            let content = field.template || field.data_key || '';
+            let content = field.template || field.data_source || '';
 
             // Inject test data variables
             content = content.replace(/\{(\w+)\}/g, (_, key) =>
