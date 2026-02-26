@@ -278,6 +278,15 @@ pub async fn activate(
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 
+    // Ensure store record exists (first activation creates it)
+    let now = shared::util::now_millis();
+    if let Err(e) =
+        sync_store::ensure_store(&state.pool, &entity_id, &tenant.id, &req.device_id, now).await
+    {
+        tracing::error!(error = %e, "Failed to ensure store record");
+        return Json(fail(ErrorCode::InternalError, "Internal error"));
+    }
+
     // Query store_number for this edge-server
     let store_number = match sync_store::get_store_number(&state.pool, &entity_id, &tenant.id).await
     {
