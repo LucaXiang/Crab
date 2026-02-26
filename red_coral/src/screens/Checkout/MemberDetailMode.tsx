@@ -46,7 +46,12 @@ export const MemberDetailMode: React.FC<MemberDetailModeProps> = ({
   const { t } = useI18n();
   const categories = useCategoryStore(s => s.items);
   const tags = useTagStore(s => s.items);
+  const tagsLoaded = useTagStore(s => s.isLoaded);
   const products = useProductStore(s => s.items);
+
+  useEffect(() => {
+    if (!tagsLoaded) useTagStore.getState().fetchAll();
+  }, [tagsLoaded]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [stampProgress, setStampProgress] = useState<MemberStampProgressDetail[]>([]);
   const [groupDetail, setGroupDetail] = useState<MarketingGroupDetail | null>(null);

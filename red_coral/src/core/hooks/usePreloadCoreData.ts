@@ -15,6 +15,7 @@ import { useZoneStore } from '@/features/zone';
 import { useTableStore } from '@/features/table';
 import { useCategoryStore } from '@/features/category';
 import { useProductStore } from '@/features/product';
+import { useTagStore } from '@/features/tag';
 import { toast } from '@/presentation/components/Toast';
 import { t } from '@/infrastructure/i18n';
 
@@ -24,6 +25,7 @@ const CORE_STORES: { key: string; fetch: () => Promise<unknown> }[] = [
   { key: 'common.resource.table', fetch: () => useTableStore.getState().fetchAll() },
   { key: 'common.resource.category', fetch: () => useCategoryStore.getState().fetchAll() },
   { key: 'common.resource.product', fetch: () => useProductStore.getState().fetchAll() },
+  { key: 'common.resource.tag', fetch: () => useTagStore.getState().fetchAll() },
 ];
 
 /**

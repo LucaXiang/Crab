@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Percent, Settings, Plus, FlaskConical } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePriceRuleStore } from './store';
+import { useCategoryStore } from '@/features/category/store';
+import { useTagStore } from '@/features/tag/store';
+import { useProductStore } from '@/features/product/store';
+import { useZoneStore } from '@/features/zone/store';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -38,6 +42,10 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
 
   useEffect(() => {
     priceRuleStore.fetchAll();
+    useCategoryStore.getState().fetchAll();
+    useTagStore.getState().fetchAll();
+    useProductStore.getState().fetchAll();
+    useZoneStore.getState().fetchAll();
   }, []);
 
   // Auto-select first rule if none selected

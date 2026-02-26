@@ -6,6 +6,9 @@ import { usePermission } from '@/hooks/usePermission';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { FilterBar } from '@/shared/components/FilterBar';
 import { useMarketingGroupStore } from './store';
+import { useCategoryStore } from '@/features/category/store';
+import { useTagStore } from '@/features/tag/store';
+import { useProductStore } from '@/features/product/store';
 import {
   createMarketingGroup,
   updateMarketingGroup,
@@ -54,6 +57,9 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
 
   useEffect(() => {
     store.fetchAll();
+    useCategoryStore.getState().fetchAll();
+    useTagStore.getState().fetchAll();
+    useProductStore.getState().fetchAll();
   }, []);
 
   useEffect(() => {

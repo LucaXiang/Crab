@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Printer } from 'lucide-react';
 import { FormField } from './FormField';
 import { usePrintDestinationStore } from '@/core/stores/resources';
@@ -24,6 +24,12 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
   t
 }) => {
   const allItems = usePrintDestinationStore((state) => state.items);
+  const isLoaded = usePrintDestinationStore((state) => state.isLoaded);
+  const fetchAll = usePrintDestinationStore((state) => state.fetchAll);
+
+  useEffect(() => {
+    if (!isLoaded) fetchAll();
+  }, [isLoaded, fetchAll]);
   const items = purpose ? allItems.filter((p) => p.purpose === purpose) : allItems;
 
   const handleToggle = (id: number) => {
@@ -33,6 +39,14 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
       onChange([...value, id]);
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <FormField label={label || t('settings.kitchen_printer')}>
+        <p className="text-sm text-gray-400 py-2">...</p>
+      </FormField>
+    );
+  }
 
   if (items.length === 0) {
     return (

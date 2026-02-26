@@ -54,6 +54,11 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
   const [showKitchenReprint, setShowKitchenReprint] = useState(false);
   const [showLabelReprint, setShowLabelReprint] = useState(false);
   const categories = useCategoryStore((s) => s.items);
+  const categoriesLoaded = useCategoryStore((s) => s.isLoaded);
+
+  useEffect(() => {
+    if (!categoriesLoaded) useCategoryStore.getState().fetchAll();
+  }, [categoriesLoaded]);
 
   // Convert archived events to OrderEvent format for TimelineList
   const timelineEvents = useMemo(() => {
