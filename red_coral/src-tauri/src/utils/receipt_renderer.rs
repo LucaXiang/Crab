@@ -420,7 +420,7 @@ impl<'a> ReceiptRenderer<'a> {
         b.bold_off();
         b.eq_sep();
 
-        b.write("\n\n\n");
+        b.write("\n\n\n\n\n");
         b.write("\x1D\x56\x00");
         b.finalize()
     }

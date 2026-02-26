@@ -126,49 +126,56 @@ impl KitchenTicketRenderer {
             .collect()
     }
 
-    /// Render a single item: quantity first, then name, spec, options, note
+    /// Column layout: QTY(4) + EXT_ID(5) + NAME(rest)
+    /// Sub-lines (spec, options, note) indent to align under NAME column.
+    const COL_QTY: usize = 4; // "  2x"
+    const COL_EID: usize = 5; // " 0001"
+
+    /// Render a single item with fixed-column layout
     fn render_item(&self, b: &mut EscPosBuilder, item: &PrintItemContext) {
-        // Main line: "2x #01 Espresso (Grande)" in double height
-        let qty_prefix = format!("{}x ", item.quantity);
+        let indent = Self::COL_QTY + Self::COL_EID;
 
-        let mut name_part = String::new();
+        // Main line: "  2x 0001 Espresso"
+        let qty_col = format!(
+            "{:>width$}",
+            format!("{}x", item.quantity),
+            width = Self::COL_QTY
+        );
+        let eid_col = if let Some(ext_id) = item.external_id {
+            format!("{:>width$}", ext_id, width = Self::COL_EID)
+        } else {
+            " ".repeat(Self::COL_EID)
+        };
 
-        // External ID (product number)
-        if let Some(ext_id) = item.external_id {
-            name_part.push_str(&format!("#{:02} ", ext_id));
+        let mut name = item.kitchen_name.clone();
+        if let Some(ref index) = item.index {
+            name.push_str(&format!(" [{}]", index));
         }
 
-        name_part.push_str(&item.kitchen_name);
+        b.double_height();
+        b.line(&format!("{}{} {}", qty_col, eid_col, name));
+        b.reset_size();
 
-        // Append spec
+        let prefix = " ".repeat(indent);
+
+        // Spec (规格)
         if let Some(ref spec) = item.spec_name
             && !spec.is_empty()
         {
-            name_part.push_str(&format!(" ({})", spec));
+            b.line(&format!("{} SPEC: {}", prefix, spec));
         }
 
-        // Append label index (e.g., "2/5")
-        if let Some(ref index) = item.index {
-            name_part.push_str(&format!(" [{}]", index));
-        }
-
-        let line = format!("{}{}", qty_prefix, name_part);
-
-        b.double_size();
-        b.line(&line);
-        b.reset_size();
-
-        // Options (做法)
+        // Options (属性: 选项1, 选项2)
         for opt in &item.options {
-            b.line(&format!("  > {}", opt));
+            b.line(&format!("{} {}", prefix, opt));
         }
 
-        // Note (备注) — bold to stand out
+        // Note (备注) — bold
         if let Some(ref note) = item.note
             && !note.is_empty()
         {
             b.bold();
-            b.line(&format!("  ** {} **", note));
+            b.line(&format!("{} ** {} **", prefix, note));
             b.bold_off();
         }
     }
@@ -210,7 +217,7 @@ impl KitchenTicketRenderer {
             b.left();
         }
 
-        b.feed(3);
+        b.feed(5);
         b.cut();
     }
 }

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { HeldOrder } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid, Tag } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid, Tag, MoreHorizontal } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -42,6 +42,67 @@ interface SelectModePageProps {
   onManageTable?: () => void;
   onNavigate: (mode: PaymentMode) => void;
 }
+
+const MoreActionsDropdown: React.FC<{
+  onKitchenReprint: () => void;
+  onLabelReprint: () => void;
+  onOpenCashDrawer: () => void;
+}> = ({ onKitchenReprint, onLabelReprint, onOpenCashDrawer }) => {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+      >
+        <MoreHorizontal size={20} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 min-w-[200px]">
+          <button
+            onClick={() => { setOpen(false); onKitchenReprint(); }}
+            className="w-full px-4 py-3 text-left hover:bg-amber-50 text-gray-700 flex items-center gap-3 transition-colors"
+          >
+            <Printer size={18} className="text-amber-600" />
+            {t('checkout.kitchen_reprint.tab_kitchen')}
+          </button>
+          <button
+            onClick={() => { setOpen(false); onLabelReprint(); }}
+            className="w-full px-4 py-3 text-left hover:bg-amber-50 text-gray-700 flex items-center gap-3 transition-colors"
+          >
+            <Tag size={18} className="text-amber-600" />
+            {t('checkout.label_reprint.tab_label')}
+          </button>
+          <EscalatableGate
+            permission={Permission.CASH_DRAWER_OPEN}
+            mode="intercept"
+            description={t('app.action.open_cash_drawer')}
+            onAuthorized={() => { setOpen(false); onOpenCashDrawer(); }}
+          >
+            <button
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-3 transition-colors"
+            >
+              <Archive size={18} className="text-gray-500" />
+              {t('app.action.open_cash_drawer')}
+            </button>
+          </EscalatableGate>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplete, onCancel, onVoid, onManageTable, onNavigate }) => {
   const { t } = useI18n();
@@ -178,34 +239,20 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     {t('checkout.pre_payment.receipt')}
                   </button>
                 )}
-                <button onClick={() => setShowKitchenReprintModal(true)} className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg font-medium transition-colors flex items-center gap-2">
-                  <Printer size={20} />
-                  {t('checkout.kitchen_reprint.tab_kitchen')}
-                </button>
-                <button onClick={() => setShowLabelReprintModal(true)} className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg font-medium transition-colors flex items-center gap-2">
-                  <Tag size={20} />
-                  {t('checkout.label_reprint.tab_label')}
-                </button>
                 {isPaidInFull && (
                   <button onClick={() => setShowCompleteConfirm(true)} disabled={payment.isProcessing} className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                     <Check size={20} />
                     {t('checkout.complete_order')}
                   </button>
                 )}
-                <EscalatableGate
-                  permission={Permission.CASH_DRAWER_OPEN}
-                  mode="intercept"
-                  description={t('app.action.open_cash_drawer')}
-                  onAuthorized={() => {
+                <MoreActionsDropdown
+                  onKitchenReprint={() => setShowKitchenReprintModal(true)}
+                  onLabelReprint={() => setShowLabelReprintModal(true)}
+                  onOpenCashDrawer={() => {
                     openCashDrawer();
                     toast.success(t('app.action.cash_drawer_opened'));
                   }}
-                >
-                  <button className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
-                    <Archive size={20} />
-                    {t('app.action.open_cash_drawer')}
-                  </button>
-                </EscalatableGate>
+                />
                 {order.is_retail && (
                   <button
                     onClick={() => setShowMergeTableModal(true)}
