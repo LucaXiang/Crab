@@ -32,5 +32,4 @@ ALTER TABLE store_employees ALTER COLUMN created_at DROP DEFAULT;
 ALTER TABLE store_archived_orders ALTER COLUMN tax TYPE DOUBLE PRECISION;
 ALTER TABLE store_archived_orders ALTER COLUMN discount_amount TYPE DOUBLE PRECISION;
 ALTER TABLE store_archived_orders ALTER COLUMN loss_amount TYPE DOUBLE PRECISION;
-ALTER TABLE store_order_items ALTER COLUMN line_total TYPE DOUBLE PRECISION;
-ALTER TABLE store_order_payments ALTER COLUMN amount TYPE DOUBLE PRECISION;
+-- store_order_items and store_order_payments were dropped in 0002
