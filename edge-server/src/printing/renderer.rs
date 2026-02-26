@@ -222,7 +222,7 @@ impl KitchenTicketRenderer {
             b.left();
         }
 
-        b.feed(3);
+        b.feed(2);
         b.cut();
     }
 }
