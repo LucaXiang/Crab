@@ -15,7 +15,6 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE role (
     id           INTEGER PRIMARY KEY,
     name         TEXT    NOT NULL,
-    display_name TEXT    NOT NULL DEFAULT '',
     description  TEXT,
     permissions  TEXT    NOT NULL DEFAULT '[]',   -- JSON array of permission strings
     is_system    INTEGER NOT NULL DEFAULT 0,
@@ -27,7 +26,7 @@ CREATE TABLE employee (
     id           INTEGER PRIMARY KEY,
     username     TEXT    NOT NULL,
     hash_pass    TEXT    NOT NULL,
-    display_name TEXT    NOT NULL DEFAULT '',
+    name         TEXT    NOT NULL DEFAULT '',
     role_id      INTEGER NOT NULL REFERENCES role(id),
     is_system    INTEGER NOT NULL DEFAULT 0,
     is_active    INTEGER NOT NULL DEFAULT 1,
@@ -210,8 +209,7 @@ CREATE INDEX idx_attr_binding_owner ON attribute_binding(owner_type, owner_id);
 CREATE TABLE price_rule (
     id                INTEGER PRIMARY KEY,
     name              TEXT    NOT NULL,
-    display_name      TEXT    NOT NULL,
-    receipt_name      TEXT    NOT NULL,
+    receipt_name      TEXT,
     description       TEXT,
     rule_type         TEXT    NOT NULL,          -- 'DISCOUNT' | 'SURCHARGE'
     product_scope     TEXT    NOT NULL,          -- 'GLOBAL' | 'PRODUCT' | 'CATEGORY' | 'TAG'
@@ -237,7 +235,6 @@ CREATE INDEX idx_price_rule_active ON price_rule(is_active, product_scope);
 CREATE TABLE marketing_group (
     id               INTEGER PRIMARY KEY,
     name             TEXT    NOT NULL UNIQUE,
-    display_name     TEXT    NOT NULL,
     description      TEXT,
     sort_order       INTEGER NOT NULL DEFAULT 0,
     points_earn_rate REAL,
@@ -272,8 +269,7 @@ CREATE TABLE mg_discount_rule (
     id                 INTEGER PRIMARY KEY,
     marketing_group_id INTEGER NOT NULL REFERENCES marketing_group(id),
     name               TEXT    NOT NULL,
-    display_name       TEXT    NOT NULL,
-    receipt_name       TEXT    NOT NULL,
+    receipt_name       TEXT,
     product_scope      TEXT    NOT NULL,
     target_id          INTEGER,
     adjustment_type    TEXT    NOT NULL,
@@ -290,7 +286,6 @@ CREATE TABLE stamp_activity (
     id                    INTEGER PRIMARY KEY,
     marketing_group_id    INTEGER NOT NULL REFERENCES marketing_group(id),
     name                  TEXT    NOT NULL,
-    display_name          TEXT    NOT NULL,
     stamps_required       INTEGER NOT NULL,
     reward_quantity       INTEGER NOT NULL DEFAULT 1,
     reward_strategy       TEXT    NOT NULL DEFAULT 'ECONOMIZADOR',
