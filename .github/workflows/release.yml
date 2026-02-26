@@ -2,6 +2,7 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
 
@@ -10,8 +11,78 @@ env:
   SQLX_OFFLINE: true
 
 jobs:
+  # ============================================================
+  # Gate: all-platform test must pass before building release
+  # ============================================================
+  test:
+    name: Test (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install NASM (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Clippy
+        run: cargo clippy --workspace --exclude crab-cloud -- -D warnings
+
+      - name: Test
+        run: cargo nextest run --workspace --exclude crab-cloud --lib
+
+  frontend-check:
+    name: Frontend Type Check
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: red_coral/package-lock.json
+
+      - name: Install dependencies
+        working-directory: red_coral
+        run: npm ci --legacy-peer-deps
+
+      - name: TypeScript type check
+        working-directory: red_coral
+        run: npx tsc --noEmit
+
+  # ============================================================
+  # Build: only after ALL tests pass
+  # ============================================================
   build-windows:
     name: Build Windows Installer
+    needs: [test, frontend-check]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     permissions:
       id-token: write
@@ -32,7 +103,6 @@ jobs:
         with:
           shared-key: "windows-release"
           cache-on-failure: true
-          workspaces: ". -> target"
 
       - name: Install NASM (for aws-lc-rs)
         uses: ilammy/setup-nasm@v1
@@ -74,14 +144,13 @@ jobs:
           # Tauri workspace member outputs to workspace root target/
           NSIS_DIR="target/release/bundle/nsis"
           if [ ! -d "$NSIS_DIR" ]; then
-            # Fallback: check under red_coral/ in case of non-workspace build
             NSIS_DIR="red_coral/target/release/bundle/nsis"
           fi
 
           echo "==> NSIS directory contents:"
           ls -la "${NSIS_DIR}/" || { echo "ERROR: NSIS dir not found"; exit 1; }
 
-          # Upload .exe installer (for fresh installs + Tauri v2 updater)
+          # Upload .exe installer
           INSTALLER=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.exe" ! -name "*.sig" | head -1)
           if [ -z "$INSTALLER" ]; then
             echo "ERROR: No .exe installer found in ${NSIS_DIR}"
@@ -90,12 +159,11 @@ jobs:
           INSTALLER_NAME="redcoral-pos_${VERSION}_x64-setup.exe"
           aws s3 cp "$INSTALLER" \
             "s3://${S3_BUCKET}/releases/${VERSION}/${INSTALLER_NAME}"
-          # Also upload to updates/ for Tauri updater
           aws s3 cp "$INSTALLER" \
             "s3://${S3_BUCKET}/updates/${INSTALLER_NAME}"
           echo "Uploaded installer: $INSTALLER"
 
-          # Read updater signature (.exe.sig — Tauri v2 signs the .exe directly)
+          # Read updater signature
           EXE_SIG=$(find "${NSIS_DIR}" -maxdepth 1 -name "*.exe.sig" | head -1)
           if [ -z "$EXE_SIG" ]; then
             echo "ERROR: No .exe.sig found — TAURI_SIGNING_PRIVATE_KEY may not be set"
@@ -104,7 +172,7 @@ jobs:
           SIGNATURE=$(cat "$EXE_SIG")
           echo "Signature loaded from: $EXE_SIG"
 
-          # Generate update manifest (Tauri v2 updater format)
+          # Generate update manifest
           if [ -n "${MANDATORY_MIN_VERSION:-}" ]; then
             MANDATORY_FIELD="\"mandatory_min_version\": \"${MANDATORY_MIN_VERSION}\","
           else
@@ -123,7 +191,6 @@ jobs:
           echo "    Installer: s3://${S3_BUCKET}/releases/${VERSION}/"
           echo "    Updater:   s3://${S3_BUCKET}/updates/latest.json"
 
-          # Save paths for GitHub Release step
           echo "INSTALLER_PATH=${INSTALLER}" >> "$GITHUB_OUTPUT"
           echo "INSTALLER_NAME=${INSTALLER_NAME}" >> "$GITHUB_OUTPUT"
 
@@ -138,3 +205,33 @@ jobs:
             --generate-notes \
             --draft \
             "${{ steps.upload.outputs.INSTALLER_PATH }}#${{ steps.upload.outputs.INSTALLER_NAME }}"
+
+  # ============================================================
+  # Cache warming: main branch only (no tests needed)
+  # ============================================================
+  warm-cache:
+    name: Warm Release Cache
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "windows-release"
+          cache-on-failure: true
+
+      - name: Install NASM (for aws-lc-rs)
+        uses: ilammy/setup-nasm@v1
+
+      - name: Warm Rust release build
+        working-directory: red_coral
+        run: |
+          mkdir -p dist
+          echo "<html></html>" > dist/index.html
+          cd src-tauri
+          cargo build --release

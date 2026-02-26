@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Star, Check, Lock } from 'lucide-react';
+import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Lock } from 'lucide-react';
 import { FormField, FormSection, inputClass, selectClass, SelectField, AttributeDisplayTag } from '@/shared/components/FormField';
 import { AttributeSelectionModal } from '@/features/attribute';
 import { TagSelectionModal, useTags } from '@/features/tag';
@@ -507,7 +507,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{spec.name}</span>
+                    <span className="font-medium text-gray-900">{spec.name || t('settings.product.specification.label.default')}</span>
                     {spec.is_root && (
                       <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
                         {t('settings.specification.label.root')}
@@ -522,47 +522,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <span className="text-sm font-mono text-gray-600">EUR{spec.price.toFixed(2)}</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                  {/* Receipt Name */}
-                  <FormField label={t('settings.specification.form.receipt_name')}>
-                    <input
-                      value={spec.receipt_name || ''}
-                      onChange={(e) => {
-                        const newSpecs = [...formData.specs!];
-                        newSpecs[index] = { ...newSpecs[index], receipt_name: e.target.value || null };
-                        onFieldChange('specs', newSpecs);
-                      }}
-                      placeholder={t('settings.specification.form.receipt_name_placeholder')}
-                      maxLength={MAX_RECEIPT_NAME_LEN}
-                      className={inputClass}
-                    />
-                  </FormField>
-
-                  {/* Is Root Toggle */}
-                  <FormField label={t('settings.specification.form.is_root')}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newSpecs = formData.specs!.map((s, i) => ({
-                          ...s,
-                          is_root: i === index
-                        }));
-                        onFieldChange('specs', newSpecs);
-                      }}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                        spec.is_root
-                          ? 'bg-amber-100 border-amber-300 text-amber-700'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {spec.is_root ? <Check size={16} /> : <Star size={16} />}
-                      <span className="text-sm">
-                        {spec.is_root ? t('settings.specification.label.root') : t('settings.specification.form.is_root')}
-                      </span>
-                    </button>
-                    <p className="mt-1 text-xs text-gray-500">{t('settings.specification.form.is_root_hint')}</p>
-                  </FormField>
-                </div>
+                {spec.receipt_name && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {t('settings.specification.form.receipt_name')}: {spec.receipt_name}
+                  </p>
+                )}
               </div>
             ))}
           </div>

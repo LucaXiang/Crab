@@ -221,7 +221,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
                   >
                     {/* Name */}
                     <div className="col-span-3 flex items-center gap-2">
-                      <span className="font-medium text-gray-900 truncate">{spec.name}</span>
+                      <span className="font-medium text-gray-900 truncate">{spec.name || t('settings.product.specification.label.default')}</span>
                       {spec.is_root && (
                         <span className="px-1.5 py-0.5 text-[0.625rem] font-medium bg-amber-100 text-amber-700 rounded">
                           {t('settings.specification.label.root')}

@@ -90,6 +90,7 @@ pub struct OrderEventDetail {
 #[derive(Debug, Serialize)]
 pub struct OrderDetail {
     pub order_id: i64,
+    pub order_key: String,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
@@ -129,6 +130,7 @@ pub async fn get_by_id(
     // Convert from repo model to API response
     let response = OrderDetail {
         order_id: detail.order_id,
+        order_key: detail.order_key,
         receipt_number: detail.receipt_number,
         table_name: detail.table_name,
         zone_name: detail.zone_name,

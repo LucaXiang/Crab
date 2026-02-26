@@ -42,7 +42,9 @@
       "batch_delete": "Eliminar selección",
       "upload_image": "Subir imagen",
       "actions": "Acciones",
-      "done": "Listo"
+      "done": "Listo",
+      "next": "Siguiente",
+      "upload": "Subir"
     },
     "time_unit": {
       "year": "Año",
@@ -1296,6 +1298,35 @@
       "edit_product": "Editar plato",
       "delete_product": "Eliminar plato",
       "product_deleted": "Plato eliminado",
+      "wizard": {
+        "create_title": "Nuevo plato",
+        "step_basics": "Básico",
+        "step_basics_desc": "Nombre, categoría e imagen",
+        "step_pricing": "Precio",
+        "step_pricing_desc": "Precios y variantes",
+        "step_operations": "Operaciones",
+        "step_operations_desc": "Impresión e IVA",
+        "step_org": "Organización",
+        "step_org_desc": "Etiquetas y códigos",
+        "last_selected_category": "Última categoría seleccionada",
+        "variant_name": "Nombre variante",
+        "variant_name_placeholder": "Estándar",
+        "is_default": "Por defecto",
+        "add_variant": "Añadir variante",
+        "name_placeholder": "Ej: Hamburguesa con queso",
+        "receipt_name_placeholder": "Vacío = nombre del plato",
+        "external_id_placeholder": "Ej: Código POS",
+        "hint_name_required": "Introduce el nombre del plato",
+        "hint_category_required": "Selecciona una categoría",
+        "hint_variant_name_required": "Las variantes deben tener nombre",
+        "hint_price_invalid": "El precio no puede ser negativo",
+        "variant_root_placeholder": "Dejar vacío",
+        "hint_external_id_required": "Introduce el código del plato",
+        "external_id_hint": "Para acceso rápido en el POS, único por plato",
+        "tax_rate_hint": "Por defecto 10%, 0 para exento",
+        "kitchen_print_hint": "Imprimir automáticamente en cocina al hacer pedido",
+        "tags_hint": "Etiquetas para agrupar y filtrar platos"
+      },
       "header": {
         "category": "Categoría",
         "products": "Platos"

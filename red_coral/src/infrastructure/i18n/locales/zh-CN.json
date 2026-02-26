@@ -42,7 +42,9 @@
       "batch_delete": "批量删除",
       "upload_image": "上传图片",
       "actions": "操作",
-      "done": "完成"
+      "done": "完成",
+      "next": "下一步",
+      "upload": "上传"
     },
     "time_unit": {
       "year": "年",
@@ -1296,6 +1298,35 @@
       "edit_product": "编辑菜品",
       "delete_product": "删除菜品",
       "product_deleted": "菜品已删除",
+      "wizard": {
+        "create_title": "新建菜品",
+        "step_basics": "基本信息",
+        "step_basics_desc": "名称、分类和图片",
+        "step_pricing": "价格",
+        "step_pricing_desc": "定价和规格",
+        "step_operations": "运营",
+        "step_operations_desc": "打印和税率",
+        "step_org": "组织",
+        "step_org_desc": "标签和编号",
+        "last_selected_category": "上次选择的分类",
+        "variant_name": "规格名称",
+        "variant_name_placeholder": "标准",
+        "is_default": "默认",
+        "add_variant": "添加规格",
+        "name_placeholder": "如：芝士汉堡",
+        "receipt_name_placeholder": "留空则使用菜品名称",
+        "external_id_placeholder": "如：POS 编号",
+        "hint_name_required": "请输入菜品名称",
+        "hint_category_required": "请选择分类",
+        "hint_variant_name_required": "非主规格必须填写名称",
+        "hint_price_invalid": "价格不能为负数",
+        "variant_root_placeholder": "可留空",
+        "hint_external_id_required": "请输入菜品编号",
+        "external_id_hint": "用于 POS 快捷输入，每个菜品唯一",
+        "tax_rate_hint": "默认 10%，0 表示免税",
+        "kitchen_print_hint": "下单后自动打印到厨房",
+        "tags_hint": "标签用于分组和筛选菜品"
+      },
       "header": {
         "category": "分类",
         "products": "菜品"
