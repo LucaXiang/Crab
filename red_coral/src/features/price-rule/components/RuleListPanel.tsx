@@ -48,8 +48,7 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
     const q = searchQuery.toLowerCase();
     return rules.filter(
       rule =>
-        rule.name.toLowerCase().includes(q) ||
-        rule.display_name.toLowerCase().includes(q)
+        rule.name.toLowerCase().includes(q)
     );
   }, [rules, searchQuery]);
 
@@ -196,7 +195,7 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
                       }`}
                     />
                     <span className="font-medium text-gray-900 truncate">
-                      {rule.display_name}
+                      {rule.name}
                     </span>
                   </div>
                   <span

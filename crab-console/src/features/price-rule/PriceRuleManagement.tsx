@@ -71,7 +71,6 @@ export const PriceRuleManagement: React.FC = () => {
 
   // Form fields — basic
   const [formName, setFormName] = useState('');
-  const [formDisplayName, setFormDisplayName] = useState('');
   const [formReceiptName, setFormReceiptName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formRuleType, setFormRuleType] = useState<RuleType>('DISCOUNT');
@@ -108,7 +107,7 @@ export const PriceRuleManagement: React.FC = () => {
   const filtered = useMemo(() => {
     if (!search.trim()) return rules;
     const q = search.toLowerCase();
-    return rules.filter(r => r.name.toLowerCase().includes(q) || r.display_name.toLowerCase().includes(q));
+    return rules.filter(r => r.name.toLowerCase().includes(q));
   }, [rules, search]);
 
   const selectedId = panel.type === 'edit' ? panel.item.source_id : null;
@@ -133,8 +132,8 @@ export const PriceRuleManagement: React.FC = () => {
   };
 
   const openEdit = (rule: PriceRule) => {
-    setFormName(rule.name); setFormDisplayName(rule.display_name);
-    setFormReceiptName(rule.receipt_name); setFormDescription(rule.description ?? '');
+    setFormName(rule.name);
+    setFormReceiptName(rule.receipt_name ?? ''); setFormDescription(rule.description ?? '');
     setFormRuleType(rule.rule_type); setFormProductScope(rule.product_scope);
     setFormTargetId(rule.target_id != null ? String(rule.target_id) : '');
     setFormZoneScope(rule.zone_scope || 'all');
@@ -166,15 +165,15 @@ export const PriceRuleManagement: React.FC = () => {
 
   const handleUpdate = async () => {
     if (!token || saving || panel.type !== 'edit') return;
-    if (!formName.trim() || !formDisplayName.trim() || !formReceiptName.trim()) {
+    if (!formName.trim()) {
       setFormError(t('settings.common.required_field')); return;
     }
 
     setSaving(true); setFormError('');
     try {
       const payload: PriceRuleUpdate = {
-        name: formName.trim(), display_name: formDisplayName.trim(),
-        receipt_name: formReceiptName.trim(),
+        name: formName.trim(),
+        receipt_name: formReceiptName.trim() || undefined,
         description: formDescription.trim() || undefined,
         rule_type: formRuleType, product_scope: formProductScope,
         target_id: formProductScope !== 'GLOBAL' && formTargetId ? Number(formTargetId) : undefined,
@@ -239,10 +238,7 @@ export const PriceRuleManagement: React.FC = () => {
       <FormField label={t('settings.price_rule.name')} required>
         <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
       </FormField>
-      <FormField label={t('settings.price_rule.display_name')} required>
-        <input value={formDisplayName} onChange={e => setFormDisplayName(e.target.value)} className={inputClass} />
-      </FormField>
-      <FormField label={t('settings.price_rule.receipt_name')} required>
+      <FormField label={t('settings.price_rule.receipt_name')}>
         <input value={formReceiptName} onChange={e => setFormReceiptName(e.target.value)} className={inputClass} />
       </FormField>
       <FormField label={t('settings.price_rule.description')}>
@@ -356,7 +352,7 @@ export const PriceRuleManagement: React.FC = () => {
               onSave={handleUpdate}
               onDelete={() => setPanel({ type: 'delete', item: panel.item })}
               saving={saving}
-              saveDisabled={!formName.trim() || !formDisplayName.trim() || !formReceiptName.trim()}
+              saveDisabled={!formName.trim()}
             >
               {formContent}
             </DetailPanel>

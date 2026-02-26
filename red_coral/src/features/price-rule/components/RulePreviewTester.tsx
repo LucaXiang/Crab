@@ -358,7 +358,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
                           isDiscount ? 'bg-amber-500' : 'bg-purple-500'
                         }`}
                       />
-                      <span>{rule.display_name}</span>
+                      <span>{rule.name}</span>
                     </div>
                     <span
                       className={`font-medium ${
@@ -394,7 +394,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
                           isDiscount ? 'bg-amber-200' : 'bg-purple-200'
                         }`}
                       />
-                      <span>{rule.display_name}</span>
+                      <span>{rule.name}</span>
                     </div>
                     <span className="text-xs">{reason}</span>
                   </div>

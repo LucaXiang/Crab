@@ -68,7 +68,7 @@ pub async fn create(
         "dining_table",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&table, "dining_table")
     );
 
@@ -105,7 +105,7 @@ pub async fn update(
         "dining_table",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_table, &table, "dining_table")
     );
 
@@ -157,7 +157,7 @@ pub async fn delete(
             "dining_table",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 

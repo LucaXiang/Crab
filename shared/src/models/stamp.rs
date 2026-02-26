@@ -33,7 +33,6 @@ pub struct StampActivity {
     pub id: i64,
     pub marketing_group_id: i64,
     pub name: String,
-    pub display_name: String,
     pub stamps_required: i32,
     pub reward_quantity: i32,
     pub reward_strategy: RewardStrategy,
@@ -48,7 +47,6 @@ pub struct StampActivity {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StampActivityCreate {
     pub name: String,
-    pub display_name: String,
     pub stamps_required: i32,
     pub reward_quantity: Option<i32>,
     pub reward_strategy: Option<RewardStrategy>,
@@ -62,7 +60,6 @@ pub struct StampActivityCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StampActivityUpdate {
     pub name: Option<String>,
-    pub display_name: Option<String>,
     pub stamps_required: Option<i32>,
     pub reward_quantity: Option<i32>,
     pub reward_strategy: Option<RewardStrategy>,

@@ -192,7 +192,7 @@ pub async fn upload(
             "upload",
             hash.clone(),
             Some(current_user.id),
-            Some(current_user.display_name.clone()),
+            Some(current_user.name.clone()),
             serde_json::json!({
                 "original_name": original_name,
                 "filename": filename,

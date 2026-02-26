@@ -173,7 +173,7 @@ pub async fn create(
         "member",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&member, "member")
     );
 
@@ -210,7 +210,7 @@ pub async fn update(
         "member",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_member, &member, "member")
     );
 
@@ -251,7 +251,7 @@ pub async fn delete(
             "member",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 

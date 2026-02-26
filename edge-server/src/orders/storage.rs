@@ -1303,8 +1303,7 @@ mod tests {
         PriceRule {
             id: 0,
             name: name.to_string(),
-            display_name: name.to_string(),
-            receipt_name: name.to_string(),
+            receipt_name: Some(name.to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,

@@ -11,7 +11,7 @@ use super::BoxError;
 
 pub async fn upsert_attribute_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -28,13 +28,13 @@ pub async fn upsert_attribute_from_sync(
     let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_attributes (
-            edge_server_id, source_id, name, is_multi_select, max_selections,
+            store_id, source_id, name, is_multi_select, max_selections,
             default_option_ids, display_order, is_active,
             show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name,
             updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             name = EXCLUDED.name, is_multi_select = EXCLUDED.is_multi_select,
             max_selections = EXCLUDED.max_selections, default_option_ids = EXCLUDED.default_option_ids,
@@ -47,7 +47,7 @@ pub async fn upsert_attribute_from_sync(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&attr.name)
     .bind(attr.is_multi_select)
@@ -122,7 +122,7 @@ pub async fn upsert_attribute_from_sync(
 
 pub async fn upsert_binding_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     _now: i64,
@@ -137,11 +137,11 @@ pub async fn upsert_binding_from_sync(
     sqlx::query(
         r#"
         INSERT INTO store_attribute_bindings (
-            edge_server_id, source_id, owner_type, owner_source_id,
+            store_id, source_id, owner_type, owner_source_id,
             attribute_source_id, is_required, display_order, default_option_ids
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             owner_type = EXCLUDED.owner_type, owner_source_id = EXCLUDED.owner_source_id,
             attribute_source_id = EXCLUDED.attribute_source_id,
@@ -149,7 +149,7 @@ pub async fn upsert_binding_from_sync(
             default_option_ids = EXCLUDED.default_option_ids
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&binding.owner_type)
     .bind(binding.owner_id)
@@ -197,7 +197,7 @@ pub struct StoreAttributeOption {
 
 pub async fn list_attributes(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
 ) -> Result<Vec<StoreAttribute>, BoxError> {
     #[derive(sqlx::FromRow)]
     struct AttrRow {
@@ -235,11 +235,11 @@ pub async fn list_attributes(
                default_option_ids, display_order, is_active,
                show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name
         FROM store_attributes
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY display_order, source_id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
 
@@ -308,7 +308,7 @@ pub async fn list_attributes(
 
 pub async fn create_attribute_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &shared::models::attribute::AttributeCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     use shared::models::attribute::AttributeOption;
@@ -327,9 +327,9 @@ pub async fn create_attribute_direct(
     let mut tx = pool.begin().await?;
 
     let (pg_id,): (i64,) = sqlx::query_as(
-        r#"INSERT INTO store_attributes (edge_server_id, source_id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9, $10, $11, $12) RETURNING id"#,
+        r#"INSERT INTO store_attributes (store_id, source_id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9, $10, $11, $12) RETURNING id"#,
     )
-    .bind(edge_server_id).bind(source_id).bind(&data.name).bind(is_multi_select).bind(data.max_selections).bind(&default_ids_json).bind(display_order).bind(show_on_receipt).bind(&data.receipt_name).bind(show_on_kitchen_print).bind(&data.kitchen_print_name).bind(now)
+    .bind(store_id).bind(source_id).bind(&data.name).bind(is_multi_select).bind(data.max_selections).bind(&default_ids_json).bind(display_order).bind(show_on_receipt).bind(&data.receipt_name).bind(show_on_kitchen_print).bind(&data.kitchen_print_name).bind(now)
     .fetch_one(&mut *tx).await?;
 
     if let Some(ref options) = data.options
@@ -429,7 +429,7 @@ pub async fn create_attribute_direct(
 
 pub async fn update_attribute_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::attribute::AttributeUpdate,
 ) -> Result<(), BoxError> {
@@ -442,9 +442,9 @@ pub async fn update_attribute_direct(
     let mut tx = pool.begin().await?;
 
     let pg_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM store_attributes WHERE edge_server_id = $1 AND source_id = $2",
+        "SELECT id FROM store_attributes WHERE store_id = $1 AND source_id = $2",
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
@@ -504,15 +504,14 @@ pub async fn update_attribute_direct(
 
 pub async fn delete_attribute_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows =
-        sqlx::query("DELETE FROM store_attributes WHERE edge_server_id = $1 AND source_id = $2")
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+    let rows = sqlx::query("DELETE FROM store_attributes WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
+        .bind(source_id)
+        .execute(pool)
+        .await?;
     if rows.rows_affected() == 0 {
         return Err("Attribute not found".into());
     }
@@ -523,15 +522,15 @@ pub async fn delete_attribute_direct(
 
 pub async fn create_option_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     attribute_source_id: i64,
     data: &shared::models::attribute::AttributeOptionCreate,
 ) -> Result<i64, BoxError> {
     // Find PG attribute_id from source_id
     let pg_attr_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM store_attributes WHERE edge_server_id = $1 AND source_id = $2",
+        "SELECT id FROM store_attributes WHERE store_id = $1 AND source_id = $2",
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(attribute_source_id)
     .fetch_optional(pool)
     .await?
@@ -559,7 +558,7 @@ pub async fn create_option_direct(
 
 pub async fn update_option_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     option_source_id: i64,
     data: &shared::models::attribute::AttributeOptionUpdate,
 ) -> Result<(), BoxError> {
@@ -574,7 +573,7 @@ pub async fn update_option_direct(
             enable_quantity = COALESCE($7, enable_quantity),
             max_quantity = COALESCE($8, max_quantity)
         WHERE source_id = $9
-            AND attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $10)"#,
+            AND attribute_id IN (SELECT id FROM store_attributes WHERE store_id = $10)"#,
     )
     .bind(&data.name)
     .bind(data.price_modifier)
@@ -585,7 +584,7 @@ pub async fn update_option_direct(
     .bind(data.enable_quantity)
     .bind(data.max_quantity)
     .bind(option_source_id)
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
@@ -596,16 +595,16 @@ pub async fn update_option_direct(
 
 pub async fn delete_option_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     option_source_id: i64,
 ) -> Result<(), BoxError> {
     let rows = sqlx::query(
         r#"DELETE FROM store_attribute_options
         WHERE source_id = $1
-            AND attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $2)"#,
+            AND attribute_id IN (SELECT id FROM store_attributes WHERE store_id = $2)"#,
     )
     .bind(option_source_id)
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
@@ -616,7 +615,7 @@ pub async fn delete_option_direct(
 
 pub async fn batch_update_option_sort_order(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     items: &[shared::cloud::store_op::SortOrderItem],
 ) -> Result<(), BoxError> {
     if items.is_empty() {
@@ -628,9 +627,9 @@ pub async fn batch_update_option_sort_order(
         r#"UPDATE store_attribute_options SET display_order = u.display_order
         FROM (SELECT * FROM UNNEST($1::bigint[], $2::integer[])) AS u(source_id, display_order)
         WHERE store_attribute_options.source_id = u.source_id
-            AND store_attribute_options.attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $3)"#,
+            AND store_attribute_options.attribute_id IN (SELECT id FROM store_attributes WHERE store_id = $3)"#,
     )
-    .bind(&ids).bind(&orders).bind(edge_server_id)
+    .bind(&ids).bind(&orders).bind(store_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -651,18 +650,18 @@ pub struct StoreBinding {
 
 pub async fn list_all_bindings(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
 ) -> Result<Vec<StoreBinding>, BoxError> {
     let rows: Vec<StoreBinding> = sqlx::query_as(
         r#"
         SELECT source_id, owner_type, owner_source_id, attribute_source_id,
                is_required, display_order, default_option_ids
         FROM store_attribute_bindings
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY owner_type, owner_source_id, display_order
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -670,7 +669,7 @@ pub async fn list_all_bindings(
 
 pub async fn list_bindings_by_owner(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     owner_type: &str,
     owner_id: i64,
 ) -> Result<Vec<StoreBinding>, BoxError> {
@@ -679,11 +678,11 @@ pub async fn list_bindings_by_owner(
         SELECT source_id, owner_type, owner_source_id, attribute_source_id,
                is_required, display_order, default_option_ids
         FROM store_attribute_bindings
-        WHERE edge_server_id = $1 AND owner_type = $2 AND owner_source_id = $3
+        WHERE store_id = $1 AND owner_type = $2 AND owner_source_id = $3
         ORDER BY display_order
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(owner_type)
     .bind(owner_id)
     .fetch_all(pool)
@@ -704,7 +703,7 @@ pub struct BindAttributeParams<'a> {
 
 pub async fn bind_attribute_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     params: BindAttributeParams<'_>,
 ) -> Result<i64, BoxError> {
     let default_ids_json = params
@@ -713,24 +712,23 @@ pub async fn bind_attribute_direct(
         .map(serde_json::to_value)
         .transpose()?;
     let source_id = super::snowflake_id();
-    sqlx::query("INSERT INTO store_attribute_bindings (edge_server_id, source_id, owner_type, owner_source_id, attribute_source_id, is_required, display_order, default_option_ids) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
-        .bind(edge_server_id).bind(source_id).bind(params.owner_type).bind(params.owner_id).bind(params.attribute_id).bind(params.is_required).bind(params.display_order).bind(&default_ids_json)
+    sqlx::query("INSERT INTO store_attribute_bindings (store_id, source_id, owner_type, owner_source_id, attribute_source_id, is_required, display_order, default_option_ids) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
+        .bind(store_id).bind(source_id).bind(params.owner_type).bind(params.owner_id).bind(params.attribute_id).bind(params.is_required).bind(params.display_order).bind(&default_ids_json)
         .execute(pool).await?;
     Ok(source_id)
 }
 
 pub async fn unbind_attribute_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     binding_id: i64,
 ) -> Result<(), BoxError> {
-    let rows = sqlx::query(
-        "DELETE FROM store_attribute_bindings WHERE edge_server_id = $1 AND source_id = $2",
-    )
-    .bind(edge_server_id)
-    .bind(binding_id)
-    .execute(pool)
-    .await?;
+    let rows =
+        sqlx::query("DELETE FROM store_attribute_bindings WHERE store_id = $1 AND source_id = $2")
+            .bind(store_id)
+            .bind(binding_id)
+            .execute(pool)
+            .await?;
     if rows.rows_affected() == 0 {
         return Err("Attribute binding not found".into());
     }

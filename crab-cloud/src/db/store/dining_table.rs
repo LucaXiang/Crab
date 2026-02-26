@@ -10,7 +10,7 @@ use super::BoxError;
 
 pub async fn upsert_dining_table_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -19,10 +19,10 @@ pub async fn upsert_dining_table_from_sync(
     sqlx::query(
         r#"
         INSERT INTO store_dining_tables (
-            edge_server_id, source_id, name, zone_source_id, capacity, is_active, updated_at
+            store_id, source_id, name, zone_source_id, capacity, is_active, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             name = EXCLUDED.name, zone_source_id = EXCLUDED.zone_source_id,
             capacity = EXCLUDED.capacity, is_active = EXCLUDED.is_active,
@@ -30,7 +30,7 @@ pub async fn upsert_dining_table_from_sync(
         WHERE store_dining_tables.updated_at <= EXCLUDED.updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&table.name)
     .bind(table.zone_id)
@@ -44,16 +44,16 @@ pub async fn upsert_dining_table_from_sync(
 
 // ── Console Read ──
 
-pub async fn list_tables(pool: &PgPool, edge_server_id: i64) -> Result<Vec<DiningTable>, BoxError> {
+pub async fn list_tables(pool: &PgPool, store_id: i64) -> Result<Vec<DiningTable>, BoxError> {
     let rows: Vec<DiningTable> = sqlx::query_as(
         r#"
         SELECT source_id AS id, name, zone_source_id AS zone_id, capacity, is_active
         FROM store_dining_tables
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY zone_source_id, name
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -63,7 +63,7 @@ pub async fn list_tables(pool: &PgPool, edge_server_id: i64) -> Result<Vec<Dinin
 
 pub async fn create_table_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     _tenant_id: &str,
     data: &DiningTableCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
@@ -74,12 +74,12 @@ pub async fn create_table_direct(
     sqlx::query(
         r#"
         INSERT INTO store_dining_tables (
-            edge_server_id, source_id, name, zone_source_id, capacity, is_active, updated_at
+            store_id, source_id, name, zone_source_id, capacity, is_active, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, TRUE, $6)
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&data.name)
     .bind(data.zone_id)
@@ -100,7 +100,7 @@ pub async fn create_table_direct(
 
 pub async fn update_table_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::dining_table::DiningTableUpdate,
 ) -> Result<StoreOpData, BoxError> {
@@ -114,7 +114,7 @@ pub async fn update_table_direct(
             capacity = COALESCE($3, capacity),
             is_active = COALESCE($4, is_active),
             updated_at = $5
-        WHERE edge_server_id = $6 AND source_id = $7
+        WHERE store_id = $6 AND source_id = $7
         "#,
     )
     .bind(&data.name)
@@ -122,7 +122,7 @@ pub async fn update_table_direct(
     .bind(data.capacity)
     .bind(data.is_active)
     .bind(now)
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .execute(pool)
     .await?;
@@ -131,10 +131,10 @@ pub async fn update_table_direct(
         r#"
         SELECT source_id AS id, name, zone_source_id AS zone_id, capacity, is_active
         FROM store_dining_tables
-        WHERE edge_server_id = $1 AND source_id = $2
+        WHERE store_id = $1 AND source_id = $2
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .fetch_optional(pool)
     .await?
@@ -145,12 +145,12 @@ pub async fn update_table_direct(
 
 pub async fn delete_table_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
     let rows =
-        sqlx::query("DELETE FROM store_dining_tables WHERE edge_server_id = $1 AND source_id = $2")
-            .bind(edge_server_id)
+        sqlx::query("DELETE FROM store_dining_tables WHERE store_id = $1 AND source_id = $2")
+            .bind(store_id)
             .bind(source_id)
             .execute(pool)
             .await?;

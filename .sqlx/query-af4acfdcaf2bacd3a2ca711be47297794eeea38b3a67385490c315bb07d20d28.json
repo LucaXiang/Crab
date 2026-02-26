@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mg_discount_rule (id, marketing_group_id, name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "af4acfdcaf2bacd3a2ca711be47297794eeea38b3a67385490c315bb07d20d28"
+}

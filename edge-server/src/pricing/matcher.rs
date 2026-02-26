@@ -215,8 +215,7 @@ mod tests {
         PriceRule {
             id: 0,
             name: "test".to_string(),
-            display_name: "Test".to_string(),
-            receipt_name: "TEST".to_string(),
+            receipt_name: Some("TEST".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope,

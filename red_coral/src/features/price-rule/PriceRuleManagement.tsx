@@ -255,7 +255,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
               </h3>
               <p className="text-sm text-gray-600 mb-6">
                 {t('settings.price_rule.delete_confirm_message', {
-                  name: deleteConfirm.display_name,
+                  name: deleteConfirm.name,
                 })}
               </p>
               <div className="grid grid-cols-2 gap-3">

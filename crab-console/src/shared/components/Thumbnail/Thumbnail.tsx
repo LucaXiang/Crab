@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getImageBlobUrl } from '@/infrastructure/api/store';
+import { getImageUrl } from '@/infrastructure/api/store';
 
 interface ThumbnailProps {
   hash: string;
@@ -15,23 +15,14 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ hash, size = 40, className
 
   useEffect(() => {
     if (!hash || !token) {
-      setSrc(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setSrc(null);
       return;
     }
     let cancelled = false;
-    getImageBlobUrl(token, hash)
-      .then(url => {
-        if (!cancelled) {
-          setSrc(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
-        } else {
-          URL.revokeObjectURL(url);
-        }
-      })
+    getImageUrl(token, hash)
+      .then(url => { if (!cancelled) setSrc(url); })
       .catch(() => { if (!cancelled) setSrc(null); });
-    return () => {
-      cancelled = true;
-      setSrc(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
-    };
+    return () => { cancelled = true; };
   }, [hash, token]);
 
   const style = { width: size, height: size, minWidth: size };

@@ -1501,8 +1501,7 @@ fn make_applied_rule(
     AppliedRule {
         rule_id,
         name: format!("rule-{rule_id}"),
-        display_name: format!("rule-{rule_id}"),
-        receipt_name: "R".to_string(),
+        receipt_name: Some("R".to_string()),
         rule_type,
         adjustment_type: AdjustmentType::Percentage,
         product_scope: ProductScope::Global,
@@ -2155,8 +2154,7 @@ fn test_fixed_amount_rule_unaffected_by_manual_discount() {
     item.applied_rules = vec![AppliedRule {
         rule_id: 1,
         name: "r1".to_string(),
-        display_name: "r1".to_string(),
-        receipt_name: "R".to_string(),
+        receipt_name: Some("R".to_string()),
         rule_type: RuleType::Discount,
         adjustment_type: AdjustmentType::FixedAmount,
         product_scope: ProductScope::Global,

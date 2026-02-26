@@ -105,7 +105,7 @@ export interface TenantInfo {
 export interface UserInfo {
   id: number;
   username: string;
-  display_name: string;
+  name: string;
   role_id: number;
   role_name: string;
   permissions: string[];

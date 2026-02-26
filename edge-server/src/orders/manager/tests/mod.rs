@@ -88,8 +88,7 @@ fn create_test_rule(name: &str) -> PriceRule {
     PriceRule {
         id: 0,
         name: name.to_string(),
-        display_name: name.to_string(),
-        receipt_name: name.to_string(),
+        receipt_name: Some(name.to_string()),
         description: None,
         rule_type: RuleType::Discount,
         product_scope: ProductScope::Global,
@@ -609,8 +608,7 @@ fn make_discount_rule(id: i64, percent: f64) -> PriceRule {
     PriceRule {
         id,
         name: format!("discount_{}", id),
-        display_name: format!("Discount {}", id),
-        receipt_name: "DISC".to_string(),
+        receipt_name: Some("DISC".to_string()),
         description: None,
         rule_type: RuleType::Discount,
         product_scope: ProductScope::Global,
@@ -637,8 +635,7 @@ fn make_surcharge_rule(id: i64, percent: f64) -> PriceRule {
     PriceRule {
         id,
         name: format!("surcharge_{}", id),
-        display_name: format!("Surcharge {}", id),
-        receipt_name: "SURCH".to_string(),
+        receipt_name: Some("SURCH".to_string()),
         description: None,
         rule_type: RuleType::Surcharge,
         product_scope: ProductScope::Global,
@@ -665,8 +662,7 @@ fn make_fixed_discount_rule(id: i64, amount: f64) -> PriceRule {
     PriceRule {
         id,
         name: format!("fixed_discount_{}", id),
-        display_name: format!("Fixed Discount {}", id),
-        receipt_name: "FDISC".to_string(),
+        receipt_name: Some("FDISC".to_string()),
         description: None,
         rule_type: RuleType::Discount,
         product_scope: ProductScope::Global,
@@ -816,8 +812,7 @@ fn make_timed_discount_rule(
     PriceRule {
         id,
         name: format!("timed_{}", id),
-        display_name: format!("Timed {}", id),
-        receipt_name: "DISC".to_string(),
+        receipt_name: Some("DISC".to_string()),
         description: None,
         rule_type: RuleType::Discount,
         product_scope: ProductScope::Global,

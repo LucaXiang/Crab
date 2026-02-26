@@ -1,4 +1,6 @@
-//! Store info database operations (edge → cloud sync only, singleton per edge_server)
+//! Store info database operations
+//!
+//! After merging edge_servers + store_info → stores, these operate directly on the `stores` table.
 
 use shared::models::store_info::StoreInfo;
 use sqlx::PgPool;
@@ -9,30 +11,24 @@ use super::BoxError;
 
 pub async fn upsert_store_info_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &serde_json::Value,
     now: i64,
 ) -> Result<(), BoxError> {
     let info: StoreInfo = serde_json::from_value(data.clone())?;
     sqlx::query(
         r#"
-        INSERT INTO store_info (
-            edge_server_id, name, address, nif, logo_url,
-            phone, email, website, business_day_cutoff,
-            created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        ON CONFLICT (edge_server_id)
-        DO UPDATE SET
-            name = EXCLUDED.name, address = EXCLUDED.address, nif = EXCLUDED.nif,
-            logo_url = EXCLUDED.logo_url, phone = EXCLUDED.phone,
-            email = EXCLUDED.email, website = EXCLUDED.website,
-            business_day_cutoff = EXCLUDED.business_day_cutoff,
-            updated_at = EXCLUDED.updated_at
-        WHERE store_info.updated_at <= EXCLUDED.updated_at
+        UPDATE stores SET
+            name = $2, address = $3, nif = $4,
+            logo_url = $5, phone = $6,
+            email = $7, website = $8,
+            business_day_cutoff = $9,
+            created_at = COALESCE(created_at, $10),
+            updated_at = $11
+        WHERE id = $1 AND (updated_at IS NULL OR updated_at <= $11)
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(&info.name)
     .bind(&info.address)
     .bind(&info.nif)
@@ -52,31 +48,28 @@ pub async fn upsert_store_info_from_sync(
 
 pub async fn update_store_info_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &shared::models::store_info::StoreInfoUpdate,
 ) -> Result<StoreInfo, BoxError> {
     let now = shared::util::now_millis();
 
-    // Single UPSERT + RETURNING (replaces INSERT DO NOTHING + UPDATE + SELECT)
     let info: StoreInfo = sqlx::query_as(
         r#"
-        INSERT INTO store_info (edge_server_id, name, address, nif, logo_url, phone, email, website, business_day_cutoff, created_at, updated_at)
-        VALUES ($1, COALESCE($2, ''), COALESCE($3, ''), COALESCE($4, ''), $5, $6, $7, $8, COALESCE($9, '02:00'), $10, $10)
-        ON CONFLICT (edge_server_id)
-        DO UPDATE SET
-            name = COALESCE($2, store_info.name),
-            address = COALESCE($3, store_info.address),
-            nif = COALESCE($4, store_info.nif),
-            logo_url = COALESCE($5, store_info.logo_url),
-            phone = COALESCE($6, store_info.phone),
-            email = COALESCE($7, store_info.email),
-            website = COALESCE($8, store_info.website),
-            business_day_cutoff = COALESCE($9, store_info.business_day_cutoff),
+        UPDATE stores SET
+            name = COALESCE($2, name),
+            address = COALESCE($3, address),
+            nif = COALESCE($4, nif),
+            logo_url = COALESCE($5, logo_url),
+            phone = COALESCE($6, phone),
+            email = COALESCE($7, email),
+            website = COALESCE($8, website),
+            business_day_cutoff = COALESCE($9, business_day_cutoff),
             updated_at = $10
+        WHERE id = $1
         RETURNING 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website, business_day_cutoff, created_at, updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(&data.name)
     .bind(&data.address)
     .bind(&data.nif)
@@ -94,19 +87,16 @@ pub async fn update_store_info_direct(
 
 // ── Console Read ──
 
-pub async fn get_store_info(
-    pool: &PgPool,
-    edge_server_id: i64,
-) -> Result<Option<StoreInfo>, BoxError> {
+pub async fn get_store_info(pool: &PgPool, store_id: i64) -> Result<Option<StoreInfo>, BoxError> {
     let row: Option<StoreInfo> = sqlx::query_as(
         r#"
         SELECT 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website,
                business_day_cutoff, created_at, updated_at
-        FROM store_info
-        WHERE edge_server_id = $1
+        FROM stores
+        WHERE id = $1
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_optional(pool)
     .await?;
     Ok(row)

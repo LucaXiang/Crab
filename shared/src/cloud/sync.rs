@@ -356,8 +356,6 @@ pub struct StoreDetailResponse {
     pub is_online: bool,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub store_info: Option<serde_json::Value>,
 }
 
 #[cfg(test)]

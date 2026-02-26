@@ -10,7 +10,7 @@ use super::BoxError;
 
 pub async fn upsert_price_rule_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -24,16 +24,16 @@ pub async fn upsert_price_rule_from_sync(
     sqlx::query(
         r#"
         INSERT INTO store_price_rules (
-            edge_server_id, source_id, name, display_name, receipt_name, description,
+            store_id, source_id, name, receipt_name, description,
             rule_type, product_scope, target_id, zone_scope,
             adjustment_type, adjustment_value, is_stackable, is_exclusive,
             valid_from, valid_until, active_days, active_start_time, active_end_time,
             is_active, created_by, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-        ON CONFLICT (edge_server_id, source_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
-            name = EXCLUDED.name, display_name = EXCLUDED.display_name,
+            name = EXCLUDED.name,
             receipt_name = EXCLUDED.receipt_name, description = EXCLUDED.description,
             rule_type = EXCLUDED.rule_type, product_scope = EXCLUDED.product_scope,
             target_id = EXCLUDED.target_id, zone_scope = EXCLUDED.zone_scope,
@@ -46,10 +46,9 @@ pub async fn upsert_price_rule_from_sync(
         WHERE store_price_rules.updated_at <= EXCLUDED.updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&rule.name)
-    .bind(&rule.display_name)
     .bind(&rule.receipt_name)
     .bind(&rule.description)
     .bind(serde_json::to_value(&rule.rule_type).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default())
@@ -80,8 +79,7 @@ pub async fn upsert_price_rule_from_sync(
 struct PriceRuleRow {
     source_id: i64,
     name: String,
-    display_name: String,
-    receipt_name: String,
+    receipt_name: Option<String>,
     description: Option<String>,
     rule_type: String,
     product_scope: String,
@@ -108,7 +106,6 @@ impl PriceRuleRow {
         shared::models::PriceRule {
             id: self.source_id,
             name: self.name,
-            display_name: self.display_name,
             receipt_name: self.receipt_name,
             description: self.description,
             rule_type: serde_json::from_value::<RuleType>(serde_json::Value::String(
@@ -153,21 +150,21 @@ impl PriceRuleRow {
 
 pub async fn list_price_rules(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
 ) -> Result<Vec<shared::models::PriceRule>, BoxError> {
     let rows = sqlx::query_as::<_, PriceRuleRow>(
         r#"
-        SELECT source_id, name, display_name, receipt_name, description,
+        SELECT source_id, name, receipt_name, description,
                rule_type, product_scope, target_id, zone_scope,
                adjustment_type, adjustment_value, is_stackable, is_exclusive,
                valid_from, valid_until, active_days, active_start_time, active_end_time,
                is_active, created_by, created_at
         FROM store_price_rules
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY created_at DESC
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
 
@@ -178,7 +175,7 @@ pub async fn list_price_rules(
 
 pub async fn create_price_rule_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &PriceRuleCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();
@@ -205,15 +202,14 @@ pub async fn create_price_rule_direct(
     let source_id = super::snowflake_id();
 
     sqlx::query(
-        r#"INSERT INTO store_price_rules (edge_server_id, source_id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, TRUE, $20, $21, $21)"#,
+        r#"INSERT INTO store_price_rules (store_id, source_id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, TRUE, $19, $20, $20)"#,
     )
-    .bind(edge_server_id).bind(source_id).bind(&data.name).bind(&data.display_name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(is_stackable).bind(is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.created_by).bind(now)
+    .bind(store_id).bind(source_id).bind(&data.name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(is_stackable).bind(is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.created_by).bind(now)
     .execute(pool).await?;
 
     let rule = shared::models::PriceRule {
         id: source_id,
         name: data.name.clone(),
-        display_name: data.display_name.clone(),
         receipt_name: data.receipt_name.clone(),
         description: data.description.clone(),
         rule_type: data.rule_type.clone(),
@@ -238,7 +234,7 @@ pub async fn create_price_rule_direct(
 
 pub async fn update_price_rule_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::price_rule::PriceRuleUpdate,
 ) -> Result<(), BoxError> {
@@ -263,8 +259,8 @@ pub async fn update_price_rule_direct(
         .as_ref()
         .map(|days| days.iter().fold(0i32, |mask, &day| mask | (1 << day)));
 
-    let rows = sqlx::query("UPDATE store_price_rules SET name = COALESCE($1, name), display_name = COALESCE($2, display_name), receipt_name = COALESCE($3, receipt_name), description = COALESCE($4, description), rule_type = COALESCE($5, rule_type), product_scope = COALESCE($6, product_scope), target_id = COALESCE($7, target_id), zone_scope = COALESCE($8, zone_scope), adjustment_type = COALESCE($9, adjustment_type), adjustment_value = COALESCE($10, adjustment_value), is_stackable = COALESCE($11, is_stackable), is_exclusive = COALESCE($12, is_exclusive), valid_from = COALESCE($13, valid_from), valid_until = COALESCE($14, valid_until), active_days = COALESCE($15, active_days), active_start_time = COALESCE($16, active_start_time), active_end_time = COALESCE($17, active_end_time), is_active = COALESCE($18, is_active), updated_at = $19 WHERE edge_server_id = $20 AND source_id = $21")
-        .bind(&data.name).bind(&data.display_name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(&data.zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(data.is_stackable).bind(data.is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.is_active).bind(now).bind(edge_server_id).bind(source_id)
+    let rows = sqlx::query("UPDATE store_price_rules SET name = COALESCE($1, name), receipt_name = COALESCE($2, receipt_name), description = COALESCE($3, description), rule_type = COALESCE($4, rule_type), product_scope = COALESCE($5, product_scope), target_id = COALESCE($6, target_id), zone_scope = COALESCE($7, zone_scope), adjustment_type = COALESCE($8, adjustment_type), adjustment_value = COALESCE($9, adjustment_value), is_stackable = COALESCE($10, is_stackable), is_exclusive = COALESCE($11, is_exclusive), valid_from = COALESCE($12, valid_from), valid_until = COALESCE($13, valid_until), active_days = COALESCE($14, active_days), active_start_time = COALESCE($15, active_start_time), active_end_time = COALESCE($16, active_end_time), is_active = COALESCE($17, is_active), updated_at = $18 WHERE store_id = $19 AND source_id = $20")
+        .bind(&data.name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(&data.zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(data.is_stackable).bind(data.is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.is_active).bind(now).bind(store_id).bind(source_id)
         .execute(pool).await?;
     if rows.rows_affected() == 0 {
         return Err("Price rule not found".into());
@@ -274,15 +270,14 @@ pub async fn update_price_rule_direct(
 
 pub async fn delete_price_rule_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows =
-        sqlx::query("DELETE FROM store_price_rules WHERE edge_server_id = $1 AND source_id = $2")
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+    let rows = sqlx::query("DELETE FROM store_price_rules WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
+        .bind(source_id)
+        .execute(pool)
+        .await?;
     if rows.rows_affected() == 0 {
         return Err("Price rule not found".into());
     }

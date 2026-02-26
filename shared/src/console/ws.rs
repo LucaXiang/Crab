@@ -22,14 +22,11 @@ pub enum ConsoleMessage {
     OrderUpdated { snapshot: Box<LiveOrderSnapshot> },
 
     /// 订单已移除（完成/作废/合并）
-    OrderRemoved {
-        order_id: String,
-        edge_server_id: i64,
-    },
+    OrderRemoved { order_id: String, store_id: i64 },
 
     /// Edge 上线/下线通知
     EdgeStatus {
-        edge_server_id: i64,
+        store_id: i64,
         online: bool,
         /// Edge 离线时被清除的订单 ID（console 应移除这些订单）
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -42,13 +39,13 @@ pub enum ConsoleMessage {
 #[serde(tag = "type")]
 pub enum ConsoleCommand {
     /// 订阅指定门店（空列表 = 订阅 tenant 下全部门店）
-    Subscribe { edge_server_ids: Vec<i64> },
+    Subscribe { store_ids: Vec<i64> },
 }
 
 /// 活跃订单快照 + 事件历史 + 来源信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LiveOrderSnapshot {
-    pub edge_server_id: i64,
+    pub store_id: i64,
     #[serde(flatten)]
     pub order: OrderSnapshot,
     /// 该订单的完整事件历史（event sourcing）

@@ -117,7 +117,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
         }
         await storeOpenShift({
           operator_id: user.id,
-          operator_name: user.display_name,
+          operator_name: user.name,
           starting_cash: cashAmount,
         });
         toast.success(t('settings.shift.open_success'));
@@ -271,7 +271,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
               {t('settings.shift.modal.operator')}
             </div>
             <div className="text-lg font-medium text-gray-800">
-              {user?.display_name || '-'}
+              {user?.name || '-'}
             </div>
           </div>
 

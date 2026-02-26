@@ -63,7 +63,7 @@ pub async fn update(
         "print_config",
         "default",
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "default_kitchen_printer": &config.default_kitchen_printer,
             "default_label_printer": &config.default_label_printer,

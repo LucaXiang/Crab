@@ -46,7 +46,7 @@ pub async fn handle_sync(
     let now = shared::util::now_millis();
 
     // Auto-register edge-server
-    let edge_server_id = sync_store::ensure_edge_server(
+    let store_id = sync_store::ensure_store(
         &state.pool,
         &identity.entity_id,
         &identity.tenant_id,
@@ -60,7 +60,7 @@ pub async fn handle_sync(
     })?;
 
     // Update last_sync_at
-    sync_store::update_last_sync(&state.pool, edge_server_id, now)
+    sync_store::update_last_sync(&state.pool, store_id, now)
         .await
         .map_err(|e| {
             tracing::error!("Failed to update last_sync: {e}");
@@ -73,14 +73,8 @@ pub async fn handle_sync(
 
     // Process each item
     for (idx, item) in batch.items.iter().enumerate() {
-        match sync_store::upsert_resource(
-            &state.pool,
-            edge_server_id,
-            &identity.tenant_id,
-            item,
-            now,
-        )
-        .await
+        match sync_store::upsert_resource(&state.pool, store_id, &identity.tenant_id, item, now)
+            .await
         {
             Ok(()) => {
                 accepted += 1;
@@ -88,7 +82,7 @@ pub async fn handle_sync(
                 // Update sync cursor
                 if let Err(e) = sync_store::update_cursor(
                     &state.pool,
-                    edge_server_id,
+                    store_id,
                     item.resource,
                     i64::try_from(item.version).unwrap_or(i64::MAX),
                     now,
@@ -116,7 +110,7 @@ pub async fn handle_sync(
     // Audit
     let sync_detail = serde_json::json!({
         "edge_id": identity.entity_id,
-        "edge_server_id": edge_server_id,
+        "store_id": store_id,
         "accepted": accepted,
         "rejected": rejected,
         "total": batch.items.len(),

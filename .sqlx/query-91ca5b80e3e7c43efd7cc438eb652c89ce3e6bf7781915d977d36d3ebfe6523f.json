@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE price_rule SET name = COALESCE(?1, name), receipt_name = COALESCE(?2, receipt_name), description = COALESCE(?3, description), rule_type = COALESCE(?4, rule_type), product_scope = COALESCE(?5, product_scope), target_id = COALESCE(?6, target_id), zone_scope = COALESCE(?7, zone_scope), adjustment_type = COALESCE(?8, adjustment_type), adjustment_value = COALESCE(?9, adjustment_value), is_stackable = COALESCE(?10, is_stackable), is_exclusive = COALESCE(?11, is_exclusive), valid_from = COALESCE(?12, valid_from), valid_until = COALESCE(?13, valid_until), active_days = COALESCE(?14, active_days), active_start_time = COALESCE(?15, active_start_time), active_end_time = COALESCE(?16, active_end_time), is_active = COALESCE(?17, is_active) WHERE id = ?18",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 18
+    },
+    "nullable": []
+  },
+  "hash": "91ca5b80e3e7c43efd7cc438eb652c89ce3e6bf7781915d977d36d3ebfe6523f"
+}

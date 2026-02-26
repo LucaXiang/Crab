@@ -77,7 +77,7 @@ export const EmployeeManagement: React.FC = () => {
     if (!search.trim()) return employees;
     const q = search.toLowerCase();
     return employees.filter(e =>
-      e.username.toLowerCase().includes(q) || e.display_name.toLowerCase().includes(q)
+      e.username.toLowerCase().includes(q) || e.name.toLowerCase().includes(q)
     );
   }, [employees, search]);
 
@@ -92,7 +92,7 @@ export const EmployeeManagement: React.FC = () => {
   const openEdit = (emp: Employee) => {
     if (emp.is_system) return;
     setFormUsername(emp.username); setFormPassword('');
-    setFormDisplayName(emp.display_name); setFormRoleId(emp.role_id);
+    setFormDisplayName(emp.name); setFormRoleId(emp.role_id);
     setFormIsActive(emp.is_active); setFormError('');
     setPanel({ type: 'edit', item: emp });
   };
@@ -108,7 +108,7 @@ export const EmployeeManagement: React.FC = () => {
       if (panel.type === 'edit') {
         const payload: EmployeeUpdate = {
           username: formUsername.trim(),
-          display_name: formDisplayName.trim() || undefined,
+          name: formDisplayName.trim() || undefined,
           role_id: formRoleId,
           is_active: formIsActive,
         };
@@ -118,7 +118,7 @@ export const EmployeeManagement: React.FC = () => {
         const payload: EmployeeCreate = {
           username: formUsername.trim(),
           password: formPassword.trim(),
-          display_name: formDisplayName.trim() || undefined,
+          name: formDisplayName.trim() || undefined,
           role_id: formRoleId,
         };
         await createEmployee(token, storeId, payload);
@@ -146,11 +146,11 @@ export const EmployeeManagement: React.FC = () => {
   const renderItem = (emp: Employee, isSelected: boolean) => (
     <div className={`px-4 py-3.5 flex items-center gap-3 ${isSelected ? 'font-medium' : ''}`}>
       <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-bold shrink-0">
-        {getInitials(emp.display_name || emp.username)}
+        {getInitials(emp.name || emp.username)}
       </div>
       <div className="flex-1 min-w-0">
         <div className={`text-sm truncate ${emp.is_active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
-          {emp.display_name || emp.username}
+          {emp.name || emp.username}
         </div>
         <div className="text-xs text-gray-400 truncate">@{emp.username}</div>
       </div>
@@ -218,7 +218,7 @@ export const EmployeeManagement: React.FC = () => {
                 />
               </FormField>
 
-              <FormField label={t('settings.employee.display_name')}>
+              <FormField label={t('settings.employee.name')}>
                 <input value={formDisplayName} onChange={e => setFormDisplayName(e.target.value)} className={inputClass} />
               </FormField>
 

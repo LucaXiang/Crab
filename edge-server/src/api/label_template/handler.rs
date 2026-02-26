@@ -88,7 +88,7 @@ pub async fn create(
         "label_template",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&template, "label_template")
     );
 
@@ -131,7 +131,7 @@ pub async fn update(
         "label_template",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_template, &template, "label_template")
     );
 
@@ -171,7 +171,7 @@ pub async fn delete(
             "label_template",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 

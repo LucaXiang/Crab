@@ -80,7 +80,7 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
   }, [selectedGroupId]);
 
   // ── Group CRUD ──
-  const handleSaveGroup = async (data: { name: string; display_name: string; description?: string }) => {
+  const handleSaveGroup = async (data: { name: string; description?: string }) => {
     try {
       if (editingGroup) {
         const updated = await updateMarketingGroup(editingGroup.id, data);
@@ -241,10 +241,10 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
               <GroupDetailPanel
                 detail={detail}
                 onEditGroup={() => { setEditingGroup(detail); setShowGroupForm(true); }}
-                onDeleteGroup={() => setDeleteConfirm({ type: 'group', id: detail.id, name: detail.display_name })}
+                onDeleteGroup={() => setDeleteConfirm({ type: 'group', id: detail.id, name: detail.name })}
                 onAddRule={() => { setEditingRule(null); setShowRuleForm(true); }}
                 onEditRule={(rule) => { setEditingRule(rule); setShowRuleForm(true); }}
-                onDeleteRule={(rule) => setDeleteConfirm({ type: 'rule', id: rule.id, name: rule.display_name })}
+                onDeleteRule={(rule) => setDeleteConfirm({ type: 'rule', id: rule.id, name: rule.name })}
                 onAddStamp={() => { setEditingStamp(null); setShowStampForm(true); }}
                 onEditStamp={(activity) => { setEditingStamp(activity); }}
                 onToggleStamp={async (activity) => {
@@ -357,12 +357,11 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
 
 const GroupFormModal: React.FC<{
   group: MarketingGroup | null;
-  onSave: (data: { name: string; display_name: string; description?: string }) => void;
+  onSave: (data: { name: string; description?: string }) => void;
   onClose: () => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }> = ({ group, onSave, onClose, t }) => {
   const [name, setName] = useState(group?.name || '');
-  const [displayName, setDisplayName] = useState(group?.display_name || '');
   const [description, setDescription] = useState(group?.description || '');
 
   return (
@@ -390,17 +389,6 @@ const GroupFormModal: React.FC<{
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('settings.marketing_group.field.display_name')}
-            </label>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-              placeholder="VIP"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               {t('settings.marketing_group.field.description')}
             </label>
             <textarea
@@ -420,9 +408,9 @@ const GroupFormModal: React.FC<{
           </button>
           <button
             onClick={() =>
-              onSave({ name, display_name: displayName, description: description || undefined })
+              onSave({ name, description: description || undefined })
             }
-            disabled={!name.trim() || !displayName.trim()}
+            disabled={!name.trim()}
             className="flex-1 px-4 py-3 bg-violet-500 text-white rounded-xl font-bold hover:bg-violet-600 disabled:opacity-50 transition-colors"
           >
             {t('common.action.save')}

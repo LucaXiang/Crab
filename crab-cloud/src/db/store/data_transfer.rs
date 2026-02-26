@@ -27,85 +27,85 @@ pub struct CatalogExport {
 /// Runs inside a single transaction. Uses `shared::models` field names (`id`, `category_id`).
 pub async fn import_catalog(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     catalog: &CatalogExport,
 ) -> Result<(), BoxError> {
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
 
     // ── DELETE (FK reverse order) ──
-    sqlx::query("DELETE FROM store_attribute_bindings WHERE edge_server_id = $1")
-        .bind(edge_server_id)
+    sqlx::query("DELETE FROM store_attribute_bindings WHERE store_id = $1")
+        .bind(store_id)
         .execute(&mut *tx)
         .await?;
 
     sqlx::query(
         r#"DELETE FROM store_attribute_options
-        WHERE attribute_id IN (SELECT id FROM store_attributes WHERE edge_server_id = $1)"#,
+        WHERE attribute_id IN (SELECT id FROM store_attributes WHERE store_id = $1)"#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query("DELETE FROM store_attributes WHERE edge_server_id = $1")
-        .bind(edge_server_id)
+    sqlx::query("DELETE FROM store_attributes WHERE store_id = $1")
+        .bind(store_id)
         .execute(&mut *tx)
         .await?;
 
     sqlx::query(
         r#"DELETE FROM store_product_specs
-        WHERE product_id IN (SELECT id FROM store_products WHERE edge_server_id = $1)"#,
+        WHERE product_id IN (SELECT id FROM store_products WHERE store_id = $1)"#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(&mut *tx)
     .await?;
 
     sqlx::query(
         r#"DELETE FROM store_product_tag
-        WHERE product_id IN (SELECT id FROM store_products WHERE edge_server_id = $1)"#,
+        WHERE product_id IN (SELECT id FROM store_products WHERE store_id = $1)"#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query("DELETE FROM store_products WHERE edge_server_id = $1")
-        .bind(edge_server_id)
+    sqlx::query("DELETE FROM store_products WHERE store_id = $1")
+        .bind(store_id)
         .execute(&mut *tx)
         .await?;
 
     sqlx::query(
         r#"DELETE FROM store_category_print_dest
-        WHERE category_id IN (SELECT id FROM store_categories WHERE edge_server_id = $1)"#,
+        WHERE category_id IN (SELECT id FROM store_categories WHERE store_id = $1)"#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(&mut *tx)
     .await?;
 
     sqlx::query(
         r#"DELETE FROM store_category_tag
-        WHERE category_id IN (SELECT id FROM store_categories WHERE edge_server_id = $1)"#,
+        WHERE category_id IN (SELECT id FROM store_categories WHERE store_id = $1)"#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query("DELETE FROM store_categories WHERE edge_server_id = $1")
-        .bind(edge_server_id)
+    sqlx::query("DELETE FROM store_categories WHERE store_id = $1")
+        .bind(store_id)
         .execute(&mut *tx)
         .await?;
 
-    sqlx::query("DELETE FROM store_tags WHERE edge_server_id = $1")
-        .bind(edge_server_id)
+    sqlx::query("DELETE FROM store_tags WHERE store_id = $1")
+        .bind(store_id)
         .execute(&mut *tx)
         .await?;
 
     // ── INSERT tags ──
     for tag in &catalog.tags {
         sqlx::query(
-            r#"INSERT INTO store_tags (edge_server_id, source_id, name, color, display_order, is_active, is_system, updated_at)
+            r#"INSERT INTO store_tags (store_id, source_id, name, color, display_order, is_active, is_system, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(tag.id)
         .bind(&tag.name)
         .bind(&tag.color)
@@ -121,12 +121,12 @@ pub async fn import_catalog(
     for cat in &catalog.categories {
         let (pg_id,): (i64,) = sqlx::query_as(
             r#"INSERT INTO store_categories (
-                edge_server_id, source_id, name, sort_order,
+                store_id, source_id, name, sort_order,
                 is_kitchen_print_enabled, is_label_print_enabled,
                 is_active, is_virtual, match_mode, is_display, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id"#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(cat.id)
         .bind(&cat.name)
         .bind(cat.sort_order)
@@ -173,13 +173,13 @@ pub async fn import_catalog(
     for product in &catalog.products {
         let (pg_id,): (i64,) = sqlx::query_as(
             r#"INSERT INTO store_products (
-                edge_server_id, source_id, name, image, category_source_id,
+                store_id, source_id, name, image, category_source_id,
                 sort_order, tax_rate, receipt_name, kitchen_print_name,
                 is_kitchen_print_enabled, is_label_print_enabled,
                 is_active, external_id, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id"#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(product.id)
         .bind(&product.name)
         .bind(&product.image)
@@ -237,13 +237,13 @@ pub async fn import_catalog(
 
         let (pg_id,): (i64,) = sqlx::query_as(
             r#"INSERT INTO store_attributes (
-                edge_server_id, source_id, name, is_multi_select, max_selections,
+                store_id, source_id, name, is_multi_select, max_selections,
                 default_option_ids, display_order, is_active,
                 show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name,
                 updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id"#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(attr.id)
         .bind(&attr.name)
         .bind(attr.is_multi_select)
@@ -291,11 +291,11 @@ pub async fn import_catalog(
 
         sqlx::query(
             r#"INSERT INTO store_attribute_bindings (
-                edge_server_id, source_id, owner_type, owner_source_id,
+                store_id, source_id, owner_type, owner_source_id,
                 attribute_source_id, is_required, display_order, default_option_ids
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(binding.id)
         .bind(&binding.owner_type)
         .bind(binding.owner_id)

@@ -48,7 +48,7 @@ export function useRuleEditor(rule: PriceRule, onRuleUpdated: () => void) {
     activeEndTime: (isEditing ? editData.active_end_time : undefined) ?? rule.active_end_time,
     validFrom: (isEditing ? editData.valid_from : undefined) ?? rule.valid_from,
     validUntil: (isEditing ? editData.valid_until : undefined) ?? rule.valid_until,
-    displayName: (isEditing ? editData.display_name : undefined) ?? rule.display_name,
+    name: (isEditing ? editData.name : undefined) ?? rule.name,
   };
 
   const isDiscount = current.ruleType === 'DISCOUNT';
@@ -115,7 +115,7 @@ export function useRuleEditor(rule: PriceRule, onRuleUpdated: () => void) {
 
   const handleStartEdit = () => {
     setEditData({
-      display_name: rule.display_name,
+      name: rule.name,
       rule_type: rule.rule_type,
       adjustment_type: rule.adjustment_type,
       adjustment_value: rule.adjustment_value,

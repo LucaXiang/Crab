@@ -290,8 +290,7 @@ mod tests {
         item.applied_rules = vec![AppliedRule {
             rule_id: 1,
             name: "lunch-special".to_string(),
-            display_name: "Lunch Special 10% Off".to_string(),
-            receipt_name: "Lunch 10%".to_string(),
+            receipt_name: Some("Lunch 10%".to_string()),
             rule_type: RuleType::Discount,
             adjustment_type: AdjustmentType::Percentage,
             product_scope: ProductScope::Global,
@@ -321,10 +320,7 @@ mod tests {
         assert_eq!(snapshot.items[0].rule_discount_amount, 10.0);
         assert!(!snapshot.items[0].applied_rules.is_empty());
         assert_eq!(snapshot.items[0].applied_rules.len(), 1);
-        assert_eq!(
-            snapshot.items[0].applied_rules[0].display_name,
-            "Lunch Special 10% Off"
-        );
+        assert_eq!(snapshot.items[0].applied_rules[0].name, "lunch-special");
 
         // Subtotal should be based on the price from Event (90.0), not recalculated
         assert_eq!(snapshot.subtotal, 90.0);
@@ -355,8 +351,7 @@ mod tests {
         existing.applied_rules = vec![AppliedRule {
             rule_id: 2,
             name: "lunch".to_string(),
-            display_name: "Lunch 10%".to_string(),
-            receipt_name: "LUNCH".to_string(),
+            receipt_name: Some("LUNCH".to_string()),
             rule_type: RuleType::Discount,
             adjustment_type: AdjustmentType::Percentage,
             product_scope: ProductScope::Global,

@@ -42,19 +42,19 @@ pub(crate) fn snowflake_id() -> i64 {
 }
 
 /// Increment store version for an edge server, returning the new version.
-pub async fn increment_store_version(pool: &PgPool, edge_server_id: i64) -> Result<i64, BoxError> {
+pub async fn increment_store_version(pool: &PgPool, store_id: i64) -> Result<i64, BoxError> {
     let now = shared::util::now_millis();
     let row: (i64,) = sqlx::query_as(
         r#"
-        INSERT INTO store_versions (edge_server_id, version, updated_at)
+        INSERT INTO store_versions (store_id, version, updated_at)
         VALUES ($1, 1, $2)
-        ON CONFLICT (edge_server_id) DO UPDATE SET
+        ON CONFLICT (store_id) DO UPDATE SET
             version = store_versions.version + 1,
             updated_at = EXCLUDED.updated_at
         RETURNING version
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(now)
     .fetch_one(pool)
     .await?;

@@ -11,7 +11,7 @@ use super::BoxError;
 
 pub async fn upsert_tag_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -19,16 +19,16 @@ pub async fn upsert_tag_from_sync(
     let tag: Tag = serde_json::from_value(data.clone())?;
     sqlx::query(
         r#"
-        INSERT INTO store_tags (edge_server_id, source_id, name, color, display_order, is_active, is_system, updated_at)
+        INSERT INTO store_tags (store_id, source_id, name, color, display_order, is_active, is_system, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color,
                       display_order = EXCLUDED.display_order, is_active = EXCLUDED.is_active,
                       is_system = EXCLUDED.is_system, updated_at = EXCLUDED.updated_at
         WHERE store_tags.updated_at <= EXCLUDED.updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&tag.name)
     .bind(&tag.color)
@@ -55,16 +55,16 @@ pub struct StoreTag {
 
 // ── Console Read ──
 
-pub async fn list_tags(pool: &PgPool, edge_server_id: i64) -> Result<Vec<StoreTag>, BoxError> {
+pub async fn list_tags(pool: &PgPool, store_id: i64) -> Result<Vec<StoreTag>, BoxError> {
     let rows: Vec<StoreTag> = sqlx::query_as(
         r#"
         SELECT source_id, name, color, display_order, is_active, is_system
         FROM store_tags
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY display_order, source_id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -74,7 +74,7 @@ pub async fn list_tags(pool: &PgPool, edge_server_id: i64) -> Result<Vec<StoreTa
 
 pub async fn create_tag_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &TagCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();
@@ -85,11 +85,11 @@ pub async fn create_tag_direct(
 
     sqlx::query(
         r#"
-        INSERT INTO store_tags (edge_server_id, source_id, name, color, display_order, is_active, is_system, updated_at)
+        INSERT INTO store_tags (store_id, source_id, name, color, display_order, is_active, is_system, updated_at)
         VALUES ($1, $2, $3, $4, $5, TRUE, FALSE, $6)
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&data.name)
     .bind(color)
@@ -111,13 +111,13 @@ pub async fn create_tag_direct(
 
 pub async fn update_tag_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::tag::TagUpdate,
 ) -> Result<(), BoxError> {
     let now = shared::util::now_millis();
-    let rows = sqlx::query("UPDATE store_tags SET name = COALESCE($1, name), color = COALESCE($2, color), display_order = COALESCE($3, display_order), is_active = COALESCE($4, is_active), updated_at = $5 WHERE edge_server_id = $6 AND source_id = $7")
-        .bind(&data.name).bind(&data.color).bind(data.display_order).bind(data.is_active).bind(now).bind(edge_server_id).bind(source_id)
+    let rows = sqlx::query("UPDATE store_tags SET name = COALESCE($1, name), color = COALESCE($2, color), display_order = COALESCE($3, display_order), is_active = COALESCE($4, is_active), updated_at = $5 WHERE store_id = $6 AND source_id = $7")
+        .bind(&data.name).bind(&data.color).bind(data.display_order).bind(data.is_active).bind(now).bind(store_id).bind(source_id)
         .execute(pool).await?;
     if rows.rows_affected() == 0 {
         return Err("Tag not found".into());
@@ -127,11 +127,11 @@ pub async fn update_tag_direct(
 
 pub async fn delete_tag_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows = sqlx::query("DELETE FROM store_tags WHERE edge_server_id = $1 AND source_id = $2")
-        .bind(edge_server_id)
+    let rows = sqlx::query("DELETE FROM store_tags WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
         .bind(source_id)
         .execute(pool)
         .await?;

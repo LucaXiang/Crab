@@ -132,6 +132,34 @@ async fn main() -> Result<(), BoxError> {
         }
     });
 
+    // Periodic orphaned image cleanup (every 10 minutes, delete images orphaned >1 hour ago)
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
+            loop {
+                interval.tick().await;
+                let cutoff = shared::util::now_millis() - 3_600_000; // 1 hour grace period
+                match db::tenant_images::fetch_orphans(&state.pool, cutoff, 100).await {
+                    Ok(orphans) if !orphans.is_empty() => {
+                        let count = orphans.len();
+                        for (tenant_id, hash) in orphans {
+                            api::image::delete_s3_image(&state, &tenant_id, &hash).await;
+                            let _ =
+                                db::tenant_images::delete_records(&state.pool, &tenant_id, &hash)
+                                    .await;
+                        }
+                        tracing::info!(count, "Orphaned S3 images cleaned up");
+                    }
+                    Ok(_) => {} // no orphans
+                    Err(e) => {
+                        tracing::warn!("Failed to fetch orphaned images: {e}");
+                    }
+                }
+            }
+        });
+    }
+
     // Wait for HTTP server (it shuts down on SIGTERM via graceful_shutdown)
     http_handle.await?;
 

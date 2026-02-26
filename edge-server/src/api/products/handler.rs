@@ -174,7 +174,7 @@ pub async fn create(
         "product",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&product, "product")
     );
 
@@ -240,7 +240,7 @@ pub async fn update(
         "product",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_product, &product, "product")
     );
 
@@ -279,7 +279,7 @@ pub async fn delete(
         "product",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"name": name_for_audit})
     );
 
@@ -343,7 +343,7 @@ pub async fn add_product_tag(
         "product",
         &product_id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"op": "add_tag", "tag_id": tag_id})
     );
 
@@ -380,7 +380,7 @@ pub async fn remove_product_tag(
         "product",
         &product_id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"op": "remove_tag", "tag_id": tag_id})
     );
 

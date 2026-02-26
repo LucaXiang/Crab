@@ -10,7 +10,7 @@ use super::BoxError;
 /// Queue a StoreOp for later delivery to an offline edge.
 pub async fn insert(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     op: &StoreOp,
     changed_at: i64,
 ) -> Result<(), BoxError> {
@@ -18,10 +18,10 @@ pub async fn insert(
     let op_json = serde_json::to_value(op)?;
 
     sqlx::query(
-        "INSERT INTO store_pending_ops (edge_server_id, op, changed_at, created_at) \
+        "INSERT INTO store_pending_ops (store_id, op, changed_at, created_at) \
          VALUES ($1, $2, $3, $4)",
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(op_json)
     .bind(changed_at)
     .bind(now)
@@ -37,14 +37,14 @@ pub async fn insert(
 /// each row after successful delivery via `delete_one`.
 pub async fn fetch_ordered(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
 ) -> Result<Vec<(i64, StoreOp, i64)>, BoxError> {
     let rows: Vec<(i64, serde_json::Value, i64)> = sqlx::query_as(
         "SELECT id, op, changed_at FROM store_pending_ops \
-         WHERE edge_server_id = $1 \
+         WHERE store_id = $1 \
          ORDER BY id",
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
 

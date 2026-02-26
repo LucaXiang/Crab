@@ -109,10 +109,10 @@ pub async fn generate(
     let end_millis = time::day_start_millis(next_day, tz);
 
     let audit_operator_id = current_user.id;
-    let audit_operator_name = current_user.display_name.clone();
+    let audit_operator_name = current_user.name.clone();
 
     let operator_id = Some(current_user.id);
-    let operator_name = Some(current_user.display_name);
+    let operator_name = Some(current_user.name);
 
     let report = daily_report::generate(
         &state.pool,

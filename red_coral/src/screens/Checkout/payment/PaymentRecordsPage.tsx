@@ -148,7 +148,7 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
                           mode="intercept"
                           description={t('checkout.payment.cancel')}
                           onAuthorized={(user) => {
-                            setCancelAuthorizer({ id: user.id, name: user.display_name });
+                            setCancelAuthorizer({ id: user.id, name: user.name });
                             handleCancelPayment(payment.payment_id, effectiveSplitType !== null);
                           }}
                         >

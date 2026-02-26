@@ -158,6 +158,13 @@ shared 专属序列化约定:
 - 枚举序列化: `SCREAMING_SNAKE_CASE`
 - 可选字段: `#[serde(skip_serializing_if = "Option::is_none")]`
 
+### 实体命名字段约定
+
+- 每个实体只有一个主名称字段 `name`（面向用户的显示名称）
+- `receipt_name: Option<String>` — 可选的小票/厨房票覆盖名，为空时 fallback 到 `name`
+- `kitchen_print_name: Option<String>` — 可选的厨房票覆盖名（仅 Product/Attribute 有）
+- **禁止**: 添加 `display_name` 或 internal `name` 等冗余名称字段
+
 ## 响应语言
 
 使用中文回答。

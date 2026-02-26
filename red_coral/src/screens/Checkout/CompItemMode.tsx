@@ -340,7 +340,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                                 permission={Permission.ORDERS_COMP}
                                 mode="intercept"
                                 description={t('checkout.comp.uncomp_auth_required')}
-                                onAuthorized={(user) => handleUncomp(item.instance_id, { id: user.id, name: user.display_name })}
+                                onAuthorized={(user) => handleUncomp(item.instance_id, { id: user.id, name: user.name })}
                               >
                                 <button
                                   disabled={isProcessing}
@@ -459,7 +459,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                     permission={Permission.ORDERS_COMP}
                     mode="intercept"
                     description={t('checkout.comp.auth_required')}
-                    onAuthorized={(user) => handleConfirmComp({ id: user.id, name: user.display_name })}
+                    onAuthorized={(user) => handleConfirmComp({ id: user.id, name: user.name })}
                   >
                     <button
                       disabled={!canConfirm}

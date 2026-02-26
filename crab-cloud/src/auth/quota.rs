@@ -137,7 +137,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
 
     // Count current edge servers
     let (current_count,): (i64,) =
-        match sqlx::query_as("SELECT COUNT(*) FROM edge_servers WHERE tenant_id = $1")
+        match sqlx::query_as("SELECT COUNT(*) FROM stores WHERE tenant_id = $1")
             .bind(&identity.tenant_id)
             .fetch_one(pool)
             .await
@@ -151,7 +151,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
 
     // Check if this edge-server is already registered
     let already_registered: bool = match sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM edge_servers WHERE entity_id = $1 AND tenant_id = $2",
+        "SELECT COUNT(*) FROM stores WHERE entity_id = $1 AND tenant_id = $2",
     )
     .bind(&identity.entity_id)
     .bind(&identity.tenant_id)

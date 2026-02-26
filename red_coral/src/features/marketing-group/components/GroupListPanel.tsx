@@ -21,7 +21,7 @@ export const GroupListPanel: React.FC<GroupListPanelProps> = ({
     if (!searchQuery.trim()) return groups;
     const q = searchQuery.toLowerCase();
     return groups.filter(
-      (g) => g.display_name.toLowerCase().includes(q) || g.name.toLowerCase().includes(q)
+      (g) => g.name.toLowerCase().includes(q)
     );
   }, [groups, searchQuery]);
 
@@ -59,14 +59,11 @@ export const GroupListPanel: React.FC<GroupListPanelProps> = ({
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-2 h-2 rounded-full shrink-0 bg-violet-500" />
                   <span className="font-medium text-gray-900 truncate">
-                    {group.display_name}
+                    {group.name}
                   </span>
                 </div>
 
-                {/* Row 2: Internal name */}
-                <div className="text-xs text-gray-400 mt-1 ml-4">{group.name}</div>
-
-                {/* Row 3: Description preview */}
+                {/* Row 2: Description preview */}
                 {group.description && (
                   <div className="text-xs text-gray-400 mt-0.5 ml-4 truncate">
                     {group.description}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mg_discount_rule SET name = COALESCE(?1, name), receipt_name = COALESCE(?2, receipt_name), product_scope = COALESCE(?3, product_scope), target_id = COALESCE(?4, target_id), adjustment_type = COALESCE(?5, adjustment_type), adjustment_value = COALESCE(?6, adjustment_value), is_active = COALESCE(?7, is_active), updated_at = ?8 WHERE id = ?9",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "18373c8b0a746d4d15f43dcfbdedecada6be4bc8cd90f39add82be7202f85eaa"
+}

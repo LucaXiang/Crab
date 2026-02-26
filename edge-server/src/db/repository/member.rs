@@ -4,7 +4,7 @@ use super::{RepoError, RepoResult};
 use shared::models::{Member, MemberCreate, MemberUpdate, MemberWithGroup};
 use sqlx::SqlitePool;
 
-const MEMBER_WITH_GROUP_SELECT: &str = "SELECT m.id, m.name, m.phone, m.card_number, m.marketing_group_id, mg.display_name as marketing_group_name, m.birthday, m.email, m.points_balance, m.total_spent, m.notes, m.is_active, m.created_at, m.updated_at FROM member m JOIN marketing_group mg ON m.marketing_group_id = mg.id";
+const MEMBER_WITH_GROUP_SELECT: &str = "SELECT m.id, m.name, m.phone, m.card_number, m.marketing_group_id, mg.name as marketing_group_name, m.birthday, m.email, m.points_balance, m.total_spent, m.notes, m.is_active, m.created_at, m.updated_at FROM member m JOIN marketing_group mg ON m.marketing_group_id = mg.id";
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MemberWithGroup>> {
     let sql = format!(

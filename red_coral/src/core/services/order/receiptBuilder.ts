@@ -70,7 +70,7 @@ function aggregateRuleAdjustments(order: HeldOrder): ReceiptRuleAdjustment[] {
   return Array.from(ruleMap.values())
     .filter((entry) => Currency.gt(Currency.abs(entry.totalAmount), 0.005))
     .map((entry) => ({
-      name: entry.rule.receipt_name || entry.rule.display_name || entry.rule.name,
+      name: entry.rule.receipt_name || entry.rule.name,
       rule_type: entry.rule.rule_type,
       adjustment_type: entry.rule.adjustment_type,
       value: entry.rule.adjustment_value,
@@ -235,7 +235,7 @@ export function buildArchivedReceiptData(
         existing.totalAmount = Currency.add(existing.totalAmount, lineAmount).toNumber();
       } else {
         ruleMap.set(rule.rule_id, {
-          name: rule.receipt_name || rule.display_name || rule.name,
+          name: rule.receipt_name || rule.name,
           rule_type: rule.rule_type,
           adjustment_type: rule.adjustment_type,
           value: rule.adjustment_value,

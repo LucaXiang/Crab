@@ -10,7 +10,7 @@ use super::BoxError;
 
 pub async fn upsert_zone_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -19,17 +19,17 @@ pub async fn upsert_zone_from_sync(
     sqlx::query(
         r#"
         INSERT INTO store_zones (
-            edge_server_id, source_id, name, description, is_active, updated_at
+            store_id, source_id, name, description, is_active, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             name = EXCLUDED.name, description = EXCLUDED.description,
             is_active = EXCLUDED.is_active, updated_at = EXCLUDED.updated_at
         WHERE store_zones.updated_at <= EXCLUDED.updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&zone.name)
     .bind(&zone.description)
@@ -42,16 +42,16 @@ pub async fn upsert_zone_from_sync(
 
 // ── Console Read ──
 
-pub async fn list_zones(pool: &PgPool, edge_server_id: i64) -> Result<Vec<Zone>, BoxError> {
+pub async fn list_zones(pool: &PgPool, store_id: i64) -> Result<Vec<Zone>, BoxError> {
     let rows: Vec<Zone> = sqlx::query_as(
         r#"
         SELECT source_id AS id, name, description, is_active
         FROM store_zones
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY name
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -61,7 +61,7 @@ pub async fn list_zones(pool: &PgPool, edge_server_id: i64) -> Result<Vec<Zone>,
 
 pub async fn create_zone_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     _tenant_id: &str,
     data: &ZoneCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
@@ -71,12 +71,12 @@ pub async fn create_zone_direct(
     sqlx::query(
         r#"
         INSERT INTO store_zones (
-            edge_server_id, source_id, name, description, is_active, updated_at
+            store_id, source_id, name, description, is_active, updated_at
         )
         VALUES ($1, $2, $3, $4, TRUE, $5)
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&data.name)
     .bind(&data.description)
@@ -95,7 +95,7 @@ pub async fn create_zone_direct(
 
 pub async fn update_zone_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::zone::ZoneUpdate,
 ) -> Result<StoreOpData, BoxError> {
@@ -108,14 +108,14 @@ pub async fn update_zone_direct(
             description = COALESCE($2, description),
             is_active = COALESCE($3, is_active),
             updated_at = $4
-        WHERE edge_server_id = $5 AND source_id = $6
+        WHERE store_id = $5 AND source_id = $6
         "#,
     )
     .bind(&data.name)
     .bind(&data.description)
     .bind(data.is_active)
     .bind(now)
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .execute(pool)
     .await?;
@@ -124,10 +124,10 @@ pub async fn update_zone_direct(
         r#"
         SELECT source_id AS id, name, description, is_active
         FROM store_zones
-        WHERE edge_server_id = $1 AND source_id = $2
+        WHERE store_id = $1 AND source_id = $2
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .fetch_optional(pool)
     .await?
@@ -138,11 +138,11 @@ pub async fn update_zone_direct(
 
 pub async fn delete_zone_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows = sqlx::query("DELETE FROM store_zones WHERE edge_server_id = $1 AND source_id = $2")
-        .bind(edge_server_id)
+    let rows = sqlx::query("DELETE FROM store_zones WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
         .bind(source_id)
         .execute(pool)
         .await?;

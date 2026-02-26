@@ -11,7 +11,7 @@ use super::BoxError;
 
 pub async fn upsert_product_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     _version: i64,
@@ -28,13 +28,13 @@ pub async fn upsert_product_from_sync(
     let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_products (
-            edge_server_id, source_id, name, image, category_source_id,
+            store_id, source_id, name, image, category_source_id,
             sort_order, tax_rate, receipt_name, kitchen_print_name,
             is_kitchen_print_enabled, is_label_print_enabled,
             is_active, external_id, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             name = EXCLUDED.name, image = EXCLUDED.image,
             category_source_id = EXCLUDED.category_source_id,
@@ -48,7 +48,7 @@ pub async fn upsert_product_from_sync(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&product.name)
     .bind(&product.image)
@@ -138,13 +138,9 @@ pub async fn upsert_product_from_sync(
     Ok(())
 }
 
-pub async fn delete_product(
-    pool: &PgPool,
-    edge_server_id: i64,
-    source_id: i64,
-) -> Result<(), BoxError> {
-    sqlx::query("DELETE FROM store_products WHERE edge_server_id = $1 AND source_id = $2")
-        .bind(edge_server_id)
+pub async fn delete_product(pool: &PgPool, store_id: i64, source_id: i64) -> Result<(), BoxError> {
+    sqlx::query("DELETE FROM store_products WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
         .bind(source_id)
         .execute(pool)
         .await?;
@@ -219,10 +215,7 @@ pub struct StoreSpec {
 
 // ── Console Read ──
 
-pub async fn list_products(
-    pool: &PgPool,
-    edge_server_id: i64,
-) -> Result<Vec<StoreProduct>, BoxError> {
+pub async fn list_products(pool: &PgPool, store_id: i64) -> Result<Vec<StoreProduct>, BoxError> {
     let rows: Vec<StoreProductRow> = sqlx::query_as(
         r#"
         SELECT p.id, p.source_id, p.name, p.image, p.category_source_id,
@@ -232,12 +225,12 @@ pub async fn list_products(
                c.name AS category_name
         FROM store_products p
         LEFT JOIN store_categories c
-            ON c.edge_server_id = p.edge_server_id AND c.source_id = p.category_source_id
-        WHERE p.edge_server_id = $1
+            ON c.store_id = p.store_id AND c.source_id = p.category_source_id
+        WHERE p.store_id = $1
         ORDER BY c.sort_order, p.sort_order, p.source_id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
 
@@ -312,7 +305,7 @@ pub async fn list_products(
 
 pub async fn create_product_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &ProductCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();
@@ -328,7 +321,7 @@ pub async fn create_product_direct(
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"
         INSERT INTO store_products (
-            edge_server_id, source_id, name, image, category_source_id,
+            store_id, source_id, name, image, category_source_id,
             sort_order, tax_rate, receipt_name, kitchen_print_name,
             is_kitchen_print_enabled, is_label_print_enabled,
             is_active, external_id, updated_at
@@ -337,7 +330,7 @@ pub async fn create_product_direct(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&data.name)
     .bind(image)
@@ -445,21 +438,20 @@ pub async fn create_product_direct(
 
 pub async fn update_product_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::product::ProductUpdate,
 ) -> Result<(), BoxError> {
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
 
-    let pg_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM store_products WHERE edge_server_id = $1 AND source_id = $2",
-    )
-    .bind(edge_server_id)
-    .bind(source_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or("Product not found")?;
+    let pg_id: i64 =
+        sqlx::query_scalar("SELECT id FROM store_products WHERE store_id = $1 AND source_id = $2")
+            .bind(store_id)
+            .bind(source_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or("Product not found")?;
 
     sqlx::query(
         r#"
@@ -557,7 +549,7 @@ pub async fn update_product_direct(
 
 pub async fn batch_update_sort_order_products(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     items: &[shared::cloud::store_op::SortOrderItem],
 ) -> Result<(), BoxError> {
     if items.is_empty() {
@@ -570,12 +562,12 @@ pub async fn batch_update_sort_order_products(
     sqlx::query(
         r#"UPDATE store_products SET sort_order = u.sort_order, updated_at = u.updated_at
         FROM (SELECT * FROM UNNEST($1::bigint[], $2::integer[], $3::bigint[])) AS u(source_id, sort_order, updated_at)
-        WHERE store_products.edge_server_id = $4 AND store_products.source_id = u.source_id"#,
+        WHERE store_products.store_id = $4 AND store_products.source_id = u.source_id"#,
     )
     .bind(&ids)
     .bind(&orders)
     .bind(&nows)
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -583,14 +575,14 @@ pub async fn batch_update_sort_order_products(
 
 pub async fn bulk_delete_products(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_ids: &[i64],
 ) -> Result<(), BoxError> {
     if source_ids.is_empty() {
         return Ok(());
     }
-    sqlx::query("DELETE FROM store_products WHERE edge_server_id = $1 AND source_id = ANY($2)")
-        .bind(edge_server_id)
+    sqlx::query("DELETE FROM store_products WHERE store_id = $1 AND source_id = ANY($2)")
+        .bind(store_id)
         .bind(source_ids)
         .execute(pool)
         .await?;
@@ -599,15 +591,14 @@ pub async fn bulk_delete_products(
 
 pub async fn delete_product_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows =
-        sqlx::query("DELETE FROM store_products WHERE edge_server_id = $1 AND source_id = $2")
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+    let rows = sqlx::query("DELETE FROM store_products WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
+        .bind(source_id)
+        .execute(pool)
+        .await?;
     if rows.rows_affected() == 0 {
         return Err("Product not found".into());
     }

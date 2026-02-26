@@ -84,8 +84,7 @@ mod tests {
             applied_rules: vec![AppliedRule {
                 rule_id,
                 name: "test_rule".to_string(),
-                display_name: "Test Rule".to_string(),
-                receipt_name: "TEST".to_string(),
+                receipt_name: Some("TEST".to_string()),
                 rule_type,
                 adjustment_type: shared::models::price_rule::AdjustmentType::Percentage,
                 product_scope: shared::models::price_rule::ProductScope::Global,
@@ -241,8 +240,7 @@ mod tests {
         snapshot.order_applied_rules = vec![AppliedRule {
             rule_id: 10,
             name: "order_discount".to_string(),
-            display_name: "Order Discount".to_string(),
-            receipt_name: "ORD".to_string(),
+            receipt_name: Some("ORD".to_string()),
             rule_type: shared::models::price_rule::RuleType::Discount,
             adjustment_type: shared::models::price_rule::AdjustmentType::Percentage,
             product_scope: shared::models::price_rule::ProductScope::Global,
@@ -622,8 +620,7 @@ mod tests {
         snapshot.order_applied_rules = vec![AppliedRule {
             rule_id: 10,
             name: "order_discount".to_string(),
-            display_name: "Order Discount".to_string(),
-            receipt_name: "ORD".to_string(),
+            receipt_name: Some("ORD".to_string()),
             rule_type: shared::models::price_rule::RuleType::Discount,
             adjustment_type: shared::models::price_rule::AdjustmentType::Percentage,
             product_scope: shared::models::price_rule::ProductScope::Global,
@@ -711,8 +708,7 @@ mod tests {
                 AppliedRule {
                     rule_id: 1,
                     name: "lunch".to_string(),
-                    display_name: "Lunch Discount".to_string(),
-                    receipt_name: "LUNCH".to_string(),
+                    receipt_name: Some("LUNCH".to_string()),
                     rule_type: shared::models::price_rule::RuleType::Discount,
                     adjustment_type: shared::models::price_rule::AdjustmentType::Percentage,
                     product_scope: shared::models::price_rule::ProductScope::Global,
@@ -726,8 +722,7 @@ mod tests {
                 AppliedRule {
                     rule_id: 2,
                     name: "loyalty".to_string(),
-                    display_name: "Loyalty Discount".to_string(),
-                    receipt_name: "LOY".to_string(),
+                    receipt_name: Some("LOY".to_string()),
                     rule_type: shared::models::price_rule::RuleType::Discount,
                     adjustment_type: shared::models::price_rule::AdjustmentType::Percentage,
                     product_scope: shared::models::price_rule::ProductScope::Global,

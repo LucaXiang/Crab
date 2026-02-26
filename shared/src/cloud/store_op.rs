@@ -207,6 +207,18 @@ pub enum StoreOp {
     },
 }
 
+impl StoreOp {
+    /// Extract image hash from product Create/Update operations (for EnsureImage follow-up)
+    pub fn image_hash(&self) -> Option<&str> {
+        match self {
+            Self::CreateProduct { data, .. } => data.image.as_deref(),
+            Self::UpdateProduct { data, .. } => data.image.as_deref(),
+            _ => None,
+        }
+        .filter(|h| !h.is_empty())
+    }
+}
+
 /// Attribute binding 的多态所有者
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "id")]

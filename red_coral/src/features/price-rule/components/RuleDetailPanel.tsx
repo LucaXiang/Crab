@@ -78,14 +78,13 @@ const RuleDetailContent: React.FC<{
             {editor.isEditing ? (
               <input
                 type="text"
-                value={editor.current.displayName}
-                onChange={e => editor.updateEditData({ display_name: e.target.value })}
+                value={editor.current.name}
+                onChange={e => editor.updateEditData({ name: e.target.value })}
                 className="text-2xl font-bold text-gray-900 border-b-2 border-teal-500 bg-transparent outline-none pb-1 w-full"
               />
             ) : (
-              <h2 className="text-2xl font-bold text-gray-900">{rule.display_name}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{rule.name}</h2>
             )}
-            <p className="text-sm text-gray-400 mt-1">{rule.name}</p>
           </div>
 
           <div className="flex items-center gap-2 ml-4">

@@ -94,7 +94,7 @@ pub async fn create(
         "attribute_binding",
         &binding_id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "op": "bind_attribute",
             "product_id": payload.product_id,
@@ -182,7 +182,7 @@ pub async fn update(
         "attribute_binding",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "op": "update_binding",
             "attribute_name": attr_name,
@@ -252,7 +252,7 @@ pub async fn delete(
         "attribute_binding",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "op": "unbind_attribute",
             "owner_id": owner_id,

@@ -89,7 +89,7 @@ src/
     │   ├── label_template.rs  # 标签模板
     │   ├── daily_report.rs    # 日报 (含 tax/payment breakdown 子表)
     │   ├── shift.rs           # 班次
-    │   └── store_info.rs      # 门店信息 (singleton per edge)
+    │   └── store_info.rs      # 门店信息 (直接操作 stores 表)
     ├── sync_store.rs      # 边缘同步数据写入 (normalized, 无 JSONB)
     ├── audit.rs           # 审计日志
     ├── commands.rs        # 远程命令
@@ -126,7 +126,7 @@ PostgreSQL — 所有门店资源使用 normalized 表（无 JSONB），表名�
 **主要表组**:
 - 平台: tenants, subscriptions, activations, client_connections, refresh_tokens, p12_certificates
 - 门店资源: store_products, store_categories, store_tags, store_attributes, store_employees, store_zones, store_dining_tables, store_price_rules, store_label_templates
-- 门店数据: store_daily_reports, store_shifts, store_info
+- 门店数据: store_daily_reports, store_shifts
 - 子表: store_product_specs, store_attribute_options, store_attribute_bindings, store_category_tag, store_daily_report_tax_breakdown, store_daily_report_payment_breakdown
 
 ## 部署

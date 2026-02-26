@@ -67,7 +67,7 @@ export const UserManagement: React.FC = React.memo(() => {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (u) =>
-          (u.display_name || '').toLowerCase().includes(q) ||
+          (u.name || '').toLowerCase().includes(q) ||
           u.username.toLowerCase().includes(q)
       );
     }
@@ -104,7 +104,7 @@ export const UserManagement: React.FC = React.memo(() => {
       // Disable user logic
       confirmDialog.show(
         t('settings.user.disable_user'),
-        t('settings.user.confirm.disable', { name: user.display_name || user.username }),
+        t('settings.user.confirm.disable', { name: user.name || user.username }),
         async () => {
           confirmDialog.close();
           try {
@@ -121,7 +121,7 @@ export const UserManagement: React.FC = React.memo(() => {
       // Permanent delete logic
       confirmDialog.show(
         t('settings.user.delete_permanently_user'),
-        t('settings.user.confirm.deletePermanently', { name: user.display_name || user.username }),
+        t('settings.user.confirm.deletePermanently', { name: user.name || user.username }),
         async () => {
           confirmDialog.close();
           try {
@@ -150,7 +150,7 @@ export const UserManagement: React.FC = React.memo(() => {
     const roleObj = roles.find(r => r.name === role);
     if (roleObj) {
         if (role === 'admin') return t('auth.roles.admin');
-        return roleObj.display_name;
+        return roleObj.name;
     }
 
     const labels: Record<string, string> = {
@@ -178,11 +178,11 @@ export const UserManagement: React.FC = React.memo(() => {
         render: (user) => (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-              {(user.display_name || user.username).charAt(0).toUpperCase()}
+              {(user.name || user.username).charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{user.display_name || user.username}</span>
+                <span className="font-medium text-gray-900">{user.name || user.username}</span>
                 {user.is_system && (
                   <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
                     {t('common.label.system')}

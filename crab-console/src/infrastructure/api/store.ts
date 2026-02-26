@@ -148,26 +148,12 @@ export async function uploadImage(token: string, file: File): Promise<string> {
   return data.hash as string;
 }
 
-/** Get a presigned S3 URL for an image hash, then create a blob URL for use in <img> / Canvas */
-export async function getImageBlobUrl(token: string, hash: string): Promise<string> {
+/** Get a presigned S3 URL for an image hash (1h expiry, usable directly as img src) */
+export async function getImageUrl(token: string, hash: string): Promise<string> {
   const res = await fetch(`${API_BASE}/api/tenant/images/${hash}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data?.message ?? 'Image not found', data?.code ?? null);
-  // Validate presigned URL is from expected S3 domain
-  try {
-    const parsed = new URL(data.url);
-    if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.amazonaws.com')) {
-      throw new ApiError(400, 'Invalid image URL', null);
-    }
-  } catch (e) {
-    if (e instanceof ApiError) throw e;
-    throw new ApiError(400, 'Invalid image URL', null);
-  }
-  // Fetch from presigned S3 URL and create blob URL
-  const imgRes = await fetch(data.url);
-  if (!imgRes.ok) throw new ApiError(imgRes.status, 'Failed to load image', null);
-  const blob = await imgRes.blob();
-  return URL.createObjectURL(blob);
+  return data.url as string;
 }

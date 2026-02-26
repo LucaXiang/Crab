@@ -31,7 +31,7 @@ export const StoreLayout: React.FC = () => {
     getStores(token).then(stores => {
       const store = stores.find(s => s.id === storeId);
       if (store) {
-        setStoreName(store.name ?? (store.store_info?.name as string) ?? `Store #${storeId}`);
+        setStoreName(store.name ?? `Store #${storeId}`);
         setStoreOnline(store.is_online);
       }
     }).catch(err => {

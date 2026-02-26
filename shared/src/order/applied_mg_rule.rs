@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct AppliedMgRule {
     pub rule_id: i64,
     pub name: String,
-    pub display_name: String,
-    pub receipt_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
     pub product_scope: ProductScope,
     pub adjustment_type: AdjustmentType,
     pub adjustment_value: f64,

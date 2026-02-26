@@ -12,7 +12,6 @@ export interface StoreDetail {
   is_online: boolean;
   last_sync_at: number | null;
   registered_at: number;
-  store_info: Record<string, unknown> | null;
 }
 
 // ── Product ──
@@ -221,8 +220,7 @@ export type AdjustmentType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 export interface PriceRule {
   source_id: number;
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name: string | null;
   description: string | null;
   rule_type: RuleType;
   product_scope: ProductScope;
@@ -244,8 +242,7 @@ export interface PriceRule {
 
 export interface PriceRuleCreate {
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name?: string | null;
   description?: string;
   rule_type: RuleType;
   product_scope: ProductScope;
@@ -264,8 +261,7 @@ export interface PriceRuleCreate {
 
 export interface PriceRuleUpdate {
   name?: string;
-  display_name?: string;
-  receipt_name?: string;
+  receipt_name?: string | null;
   description?: string;
   rule_type?: RuleType;
   product_scope?: ProductScope;
@@ -288,7 +284,7 @@ export interface PriceRuleUpdate {
 export interface Employee {
   id: number;
   username: string;
-  display_name: string;
+  name: string;
   role_id: number;
   is_active: boolean;
   is_system: boolean;
@@ -298,14 +294,14 @@ export interface Employee {
 export interface EmployeeCreate {
   username: string;
   password: string;
-  display_name?: string;
+  name?: string;
   role_id: number;
 }
 
 export interface EmployeeUpdate {
   username?: string;
   password?: string;
-  display_name?: string;
+  name?: string;
   role_id?: number;
   is_active?: boolean;
 }

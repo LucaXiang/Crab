@@ -60,7 +60,7 @@ pub async fn update(
         "store_info",
         "main",
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_store_info, &store_info, "store_info")
     );
 

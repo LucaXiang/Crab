@@ -29,12 +29,12 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
     }
   }, [state.rule_type, state.adjustment_type, state.adjustment_value]);
 
-  // Auto-fill receipt_name based on display_name
+  // Auto-fill receipt_name based on name
   React.useEffect(() => {
-    if (state.display_name && !state.receipt_name) {
-      updateState({ receipt_name: state.display_name.slice(0, MAX_RECEIPT_NAME_LEN) });
+    if (state.name && !state.receipt_name) {
+      updateState({ receipt_name: state.name.slice(0, MAX_RECEIPT_NAME_LEN) });
     }
-  }, [state.display_name]);
+  }, [state.name]);
 
   // Build summary text
   const buildSummary = () => {
@@ -95,21 +95,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
           </p>
         </FormField>
 
-        <FormField label={t('settings.price_rule.form.display_name')} required>
-          <input
-            type="text"
-            value={state.display_name}
-            onChange={(e) => updateState({ display_name: e.target.value })}
-            placeholder={t('settings.price_rule.wizard.display_name_placeholder')}
-            maxLength={MAX_NAME_LEN}
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            {t('settings.price_rule.wizard.display_name_hint')}
-          </p>
-        </FormField>
-
-        <FormField label={t('settings.price_rule.form.receipt_name')} required>
+        <FormField label={t('settings.price_rule.form.receipt_name')}>
           <input
             type="text"
             value={state.receipt_name}

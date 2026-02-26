@@ -70,7 +70,7 @@ pub async fn create(
         "tag",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&t, "tag")
     );
 
@@ -104,7 +104,7 @@ pub async fn update(
         "tag",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_tag, &t, "tag")
     );
 
@@ -154,7 +154,7 @@ pub async fn delete(
             "tag",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 

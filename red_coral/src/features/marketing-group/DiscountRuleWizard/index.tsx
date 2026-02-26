@@ -16,7 +16,6 @@ export interface RuleWizardState {
   product_scope: ProductScope;
   target_id: number | null;
   name: string;
-  display_name: string;
   receipt_name: string;
 }
 
@@ -28,8 +27,7 @@ const getInitialState = (rule?: MgDiscountRule | null): RuleWizardState => {
       product_scope: rule.product_scope,
       target_id: rule.target_id ?? null,
       name: rule.name,
-      display_name: rule.display_name,
-      receipt_name: rule.receipt_name,
+      receipt_name: rule.receipt_name ?? '',
     };
   }
   return {
@@ -38,7 +36,6 @@ const getInitialState = (rule?: MgDiscountRule | null): RuleWizardState => {
     product_scope: 'GLOBAL',
     target_id: null,
     name: '',
-    display_name: '',
     receipt_name: '',
   };
 };
@@ -77,7 +74,7 @@ export const DiscountRuleWizard: React.FC<DiscountRuleWizardProps> = ({
       case 2:
         return state.product_scope === 'GLOBAL' || state.target_id != null;
       case 3:
-        return !!state.name.trim() && !!state.display_name.trim() && !!state.receipt_name.trim();
+        return !!state.name.trim();
       default:
         return true;
     }
@@ -102,8 +99,7 @@ export const DiscountRuleWizard: React.FC<DiscountRuleWizardProps> = ({
     try {
       const payload: MgDiscountRuleCreate = {
         name: state.name.trim(),
-        display_name: state.display_name.trim(),
-        receipt_name: state.receipt_name.trim(),
+        receipt_name: state.receipt_name.trim() || undefined,
         product_scope: state.product_scope,
         target_id: state.product_scope === 'GLOBAL' ? null : state.target_id,
         adjustment_type: state.adjustment_type,

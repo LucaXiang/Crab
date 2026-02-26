@@ -10,7 +10,6 @@ use super::price_rule::{AdjustmentType, ProductScope};
 pub struct MarketingGroup {
     pub id: i64,
     pub name: String,
-    pub display_name: String,
     pub description: Option<String>,
     pub sort_order: i32,
     /// 积分倍率: 消费金额 × rate = 积分 (null = 不累积积分)
@@ -23,7 +22,6 @@ pub struct MarketingGroup {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketingGroupCreate {
     pub name: String,
-    pub display_name: String,
     pub description: Option<String>,
     pub sort_order: Option<i32>,
     pub points_earn_rate: Option<f64>,
@@ -33,7 +31,6 @@ pub struct MarketingGroupCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketingGroupUpdate {
     pub name: Option<String>,
-    pub display_name: Option<String>,
     pub description: Option<String>,
     pub sort_order: Option<i32>,
     pub points_earn_rate: Option<f64>,
@@ -46,8 +43,8 @@ pub struct MgDiscountRule {
     pub id: i64,
     pub marketing_group_id: i64,
     pub name: String,
-    pub display_name: String,
-    pub receipt_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
     pub product_scope: ProductScope,
     pub target_id: Option<i64>,
     pub adjustment_type: AdjustmentType,
@@ -61,8 +58,8 @@ pub struct MgDiscountRule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MgDiscountRuleCreate {
     pub name: String,
-    pub display_name: String,
-    pub receipt_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
     pub product_scope: ProductScope,
     pub target_id: Option<i64>,
     pub adjustment_type: AdjustmentType,
@@ -73,7 +70,6 @@ pub struct MgDiscountRuleCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MgDiscountRuleUpdate {
     pub name: Option<String>,
-    pub display_name: Option<String>,
     pub receipt_name: Option<String>,
     pub product_scope: Option<ProductScope>,
     pub target_id: Option<i64>,

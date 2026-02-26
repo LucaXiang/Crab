@@ -28,7 +28,7 @@ pub struct LoginResponse {
 pub struct UserInfo {
     pub id: i64,
     pub username: String,
-    pub display_name: String,
+    pub name: String,
     pub role_id: i64,
     pub role_name: String,
     pub permissions: Vec<String>,

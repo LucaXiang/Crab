@@ -46,7 +46,6 @@ export interface WizardState {
   valid_until: string;
   // Step 5
   name: string;
-  display_name: string;
   receipt_name: string;
   description: string;
   // Step 6
@@ -78,8 +77,7 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
       valid_from: rule.valid_from ? toLocalDatetimeString(rule.valid_from) : '',
       valid_until: rule.valid_until ? toLocalDatetimeString(rule.valid_until) : '',
       name: rule.name,
-      display_name: rule.display_name,
-      receipt_name: rule.receipt_name,
+      receipt_name: rule.receipt_name ?? '',
       description: rule.description || '',
       is_stackable: rule.is_stackable,
       is_exclusive: rule.is_exclusive,
@@ -99,7 +97,6 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
     valid_from: '',
     valid_until: '',
     name: '',
-    display_name: '',
     receipt_name: '',
     description: '',
     is_stackable: true,
@@ -159,7 +156,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
         }
         return true;
       case 5:
-        return !!state.name.trim() && !!state.display_name.trim() && !!state.receipt_name.trim();
+        return !!state.name.trim();
       case 6:
         return true;
       default:
@@ -182,8 +179,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
   const buildPayload = (): PriceRuleCreate => {
     const payload: PriceRuleCreate = {
       name: state.name.trim(),
-      display_name: state.display_name.trim(),
-      receipt_name: state.receipt_name.trim(),
+      receipt_name: state.receipt_name.trim() || undefined,
       description: state.description.trim() || undefined,
       rule_type: state.rule_type,
       product_scope: state.product_scope,

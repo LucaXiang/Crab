@@ -24,7 +24,7 @@ const RESOURCE: SyncResource = SyncResource::Employee;
 fn validate_create(payload: &EmployeeCreate) -> AppResult<()> {
     validate_required_text(&payload.username, "username", MAX_NAME_LEN)?;
     validate_required_text(&payload.password, "password", MAX_PASSWORD_LEN)?;
-    validate_optional_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.name, "name", MAX_NAME_LEN)?;
     Ok(())
 }
 
@@ -35,7 +35,7 @@ fn validate_update(payload: &EmployeeUpdate) -> AppResult<()> {
     if let Some(password) = &payload.password {
         validate_required_text(password, "password", MAX_PASSWORD_LEN)?;
     }
-    validate_optional_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
+    validate_optional_text(&payload.name, "name", MAX_NAME_LEN)?;
     Ok(())
 }
 
@@ -87,7 +87,7 @@ pub async fn create(
         "employee",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&emp, "employee")
     );
 
@@ -126,7 +126,7 @@ pub async fn update(
         "employee",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_employee, &emp, "employee")
     );
 
@@ -156,7 +156,7 @@ pub async fn delete(
     if result {
         let id_str = id.to_string();
         let (name, username) = emp_for_audit
-            .map(|e| (e.display_name, e.username))
+            .map(|e| (e.name, e.username))
             .unwrap_or_default();
         audit_log!(
             state.audit_service,
@@ -164,7 +164,7 @@ pub async fn delete(
             "employee",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name, "username": username})
         );
 

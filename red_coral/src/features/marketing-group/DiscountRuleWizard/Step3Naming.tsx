@@ -34,18 +34,7 @@ export const Step3Naming: React.FC<Step3NamingProps> = ({ state, updateState }) 
           </p>
         </FormField>
 
-        <FormField label={t('settings.marketing_group.field.display_name')} required>
-          <input
-            type="text"
-            value={state.display_name}
-            onChange={(e) => updateState({ display_name: e.target.value })}
-            className={inputClass}
-            maxLength={MAX_NAME_LEN}
-            placeholder={t('settings.marketing_group.rule_wizard.display_name_placeholder')}
-          />
-        </FormField>
-
-        <FormField label={t('settings.marketing_group.rule_wizard.receipt_name')} required>
+        <FormField label={t('settings.marketing_group.rule_wizard.receipt_name')}>
           <input
             type="text"
             value={state.receipt_name}

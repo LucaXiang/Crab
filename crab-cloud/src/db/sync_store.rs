@@ -16,22 +16,24 @@ fn version_to_i64(version: u64) -> i64 {
     i64::try_from(version).unwrap_or(i64::MAX)
 }
 
-/// Ensure edge-server is registered, returning its database ID
-pub async fn ensure_edge_server(
+/// Ensure edge-server is registered, returning its database ID (snowflake)
+pub async fn ensure_store(
     pool: &PgPool,
     entity_id: &str,
     tenant_id: &str,
     device_id: &str,
     now: i64,
 ) -> Result<i64, BoxError> {
+    let id = shared::util::snowflake_id();
     let row: (i64,) = sqlx::query_as(
         r#"
-        INSERT INTO edge_servers (entity_id, tenant_id, device_id, registered_at, store_number)
-        VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(store_number), 0) + 1 FROM edge_servers WHERE tenant_id = $2))
+        INSERT INTO stores (id, entity_id, tenant_id, device_id, registered_at, store_number)
+        VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3))
         ON CONFLICT (entity_id, tenant_id) DO UPDATE SET device_id = EXCLUDED.device_id
         RETURNING id
         "#,
     )
+    .bind(id)
     .bind(entity_id)
     .bind(tenant_id)
     .bind(device_id)
@@ -48,26 +50,21 @@ pub async fn get_store_number(
     entity_id: &str,
     tenant_id: &str,
 ) -> Result<u32, BoxError> {
-    let row: (i32,) = sqlx::query_as(
-        "SELECT store_number FROM edge_servers WHERE entity_id = $1 AND tenant_id = $2",
-    )
-    .bind(entity_id)
-    .bind(tenant_id)
-    .fetch_one(pool)
-    .await?;
+    let row: (i32,) =
+        sqlx::query_as("SELECT store_number FROM stores WHERE entity_id = $1 AND tenant_id = $2")
+            .bind(entity_id)
+            .bind(tenant_id)
+            .fetch_one(pool)
+            .await?;
 
     Ok(row.0 as u32)
 }
 
 /// Update last_sync_at for an edge-server
-pub async fn update_last_sync(
-    pool: &PgPool,
-    edge_server_id: i64,
-    now: i64,
-) -> Result<(), BoxError> {
-    sqlx::query("UPDATE edge_servers SET last_sync_at = $1 WHERE id = $2")
+pub async fn update_last_sync(pool: &PgPool, store_id: i64, now: i64) -> Result<(), BoxError> {
+    sqlx::query("UPDATE stores SET last_sync_at = $1 WHERE id = $2")
         .bind(now)
-        .bind(edge_server_id)
+        .bind(store_id)
         .execute(pool)
         .await?;
     Ok(())
@@ -76,21 +73,21 @@ pub async fn update_last_sync(
 /// Update sync cursor for a resource
 pub async fn update_cursor(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     resource: SyncResource,
     version: i64,
     now: i64,
 ) -> Result<(), BoxError> {
     sqlx::query(
         r#"
-        INSERT INTO store_sync_cursors (edge_server_id, resource, last_version, updated_at)
+        INSERT INTO store_sync_cursors (store_id, resource, last_version, updated_at)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (edge_server_id, resource)
+        ON CONFLICT (store_id, resource)
         DO UPDATE SET last_version = GREATEST(store_sync_cursors.last_version, EXCLUDED.last_version),
                       updated_at = EXCLUDED.updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(resource.as_str())
     .bind(version)
     .bind(now)
@@ -102,22 +99,22 @@ pub async fn update_cursor(
 /// Batch update sync cursors for multiple resources at once
 pub async fn update_cursors_batch(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     cursors: &[(&str, i64)],
     now: i64,
 ) -> Result<(), BoxError> {
     if cursors.is_empty() {
         return Ok(());
     }
-    let eids: Vec<i64> = cursors.iter().map(|_| edge_server_id).collect();
+    let eids: Vec<i64> = cursors.iter().map(|_| store_id).collect();
     let resources: Vec<&str> = cursors.iter().map(|(r, _)| *r).collect();
     let versions: Vec<i64> = cursors.iter().map(|(_, v)| *v).collect();
     let nows: Vec<i64> = cursors.iter().map(|_| now).collect();
     sqlx::query(
         r#"
-        INSERT INTO store_sync_cursors (edge_server_id, resource, last_version, updated_at)
+        INSERT INTO store_sync_cursors (store_id, resource, last_version, updated_at)
         SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::bigint[], $4::bigint[])
-        ON CONFLICT (edge_server_id, resource)
+        ON CONFLICT (store_id, resource)
         DO UPDATE SET last_version = GREATEST(store_sync_cursors.last_version, EXCLUDED.last_version),
                       updated_at = EXCLUDED.updated_at
         "#,
@@ -132,16 +129,12 @@ pub async fn update_cursors_batch(
 }
 
 /// Get all sync cursors for an edge-server (resource → last_version)
-pub async fn get_cursors(
-    pool: &PgPool,
-    edge_server_id: i64,
-) -> Result<HashMap<String, u64>, BoxError> {
-    let rows: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT resource, last_version FROM store_sync_cursors WHERE edge_server_id = $1",
-    )
-    .bind(edge_server_id)
-    .fetch_all(pool)
-    .await?;
+pub async fn get_cursors(pool: &PgPool, store_id: i64) -> Result<HashMap<String, u64>, BoxError> {
+    let rows: Vec<(String, i64)> =
+        sqlx::query_as("SELECT resource, last_version FROM store_sync_cursors WHERE store_id = $1")
+            .bind(store_id)
+            .fetch_all(pool)
+            .await?;
 
     Ok(rows
         .into_iter()
@@ -152,13 +145,13 @@ pub async fn get_cursors(
 /// Upsert a resource based on its type
 pub async fn upsert_resource(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     item: &CloudSyncItem,
     now: i64,
 ) -> Result<(), BoxError> {
     if item.action == shared::cloud::SyncAction::Delete {
-        return delete_resource(pool, edge_server_id, item.resource, &item.resource_id).await;
+        return delete_resource(pool, store_id, item.resource, &item.resource_id).await;
     }
 
     match item.resource {
@@ -166,7 +159,7 @@ pub async fn upsert_resource(
             let source_id: i64 = item.resource_id.parse()?;
             super::store::upsert_product_from_sync(
                 pool,
-                edge_server_id,
+                store_id,
                 source_id,
                 &item.data,
                 version_to_i64(item.version),
@@ -178,7 +171,7 @@ pub async fn upsert_resource(
             let source_id: i64 = item.resource_id.parse()?;
             super::store::upsert_category_from_sync(
                 pool,
-                edge_server_id,
+                store_id,
                 source_id,
                 &item.data,
                 version_to_i64(item.version),
@@ -187,95 +180,56 @@ pub async fn upsert_resource(
             .await
         }
         SyncResource::ArchivedOrder => {
-            upsert_archived_order(pool, edge_server_id, tenant_id, item, now).await
+            upsert_archived_order(pool, store_id, tenant_id, item, now).await
         }
         SyncResource::DailyReport => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_daily_report_from_sync(
-                pool,
-                edge_server_id,
-                source_id,
-                &item.data,
-                now,
-            )
-            .await
+            super::store::upsert_daily_report_from_sync(pool, store_id, source_id, &item.data, now)
+                .await
         }
         SyncResource::StoreInfo => {
-            super::store::upsert_store_info_from_sync(pool, edge_server_id, &item.data, now).await
+            super::store::upsert_store_info_from_sync(pool, store_id, &item.data, now).await
         }
         SyncResource::Shift => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_shift_from_sync(pool, edge_server_id, source_id, &item.data, now)
-                .await
+            super::store::upsert_shift_from_sync(pool, store_id, source_id, &item.data, now).await
         }
         SyncResource::Employee => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_employee_from_sync(
-                pool,
-                edge_server_id,
-                source_id,
-                &item.data,
-                now,
-            )
-            .await
+            super::store::upsert_employee_from_sync(pool, store_id, source_id, &item.data, now)
+                .await
         }
         SyncResource::Tag => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_tag_from_sync(pool, edge_server_id, source_id, &item.data, now)
-                .await
+            super::store::upsert_tag_from_sync(pool, store_id, source_id, &item.data, now).await
         }
         SyncResource::Attribute => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_attribute_from_sync(
-                pool,
-                edge_server_id,
-                source_id,
-                &item.data,
-                now,
-            )
-            .await
+            super::store::upsert_attribute_from_sync(pool, store_id, source_id, &item.data, now)
+                .await
         }
         SyncResource::AttributeBinding => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_binding_from_sync(pool, edge_server_id, source_id, &item.data, now)
-                .await
+            super::store::upsert_binding_from_sync(pool, store_id, source_id, &item.data, now).await
         }
         SyncResource::PriceRule => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_price_rule_from_sync(
-                pool,
-                edge_server_id,
-                source_id,
-                &item.data,
-                now,
-            )
-            .await
+            super::store::upsert_price_rule_from_sync(pool, store_id, source_id, &item.data, now)
+                .await
         }
         SyncResource::Zone => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_zone_from_sync(pool, edge_server_id, source_id, &item.data, now)
-                .await
+            super::store::upsert_zone_from_sync(pool, store_id, source_id, &item.data, now).await
         }
         SyncResource::DiningTable => {
             let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_dining_table_from_sync(
-                pool,
-                edge_server_id,
-                source_id,
-                &item.data,
-                now,
-            )
-            .await
+            super::store::upsert_dining_table_from_sync(pool, store_id, source_id, &item.data, now)
+                .await
         }
         SyncResource::LabelTemplate => {
             let source_id: i64 = item.resource_id.parse()?;
             super::store::upsert_label_template_from_sync(
-                pool,
-                edge_server_id,
-                tenant_id,
-                source_id,
-                &item.data,
-                now,
+                pool, store_id, tenant_id, source_id, &item.data, now,
             )
             .await
         }
@@ -286,7 +240,7 @@ pub async fn upsert_resource(
 /// Upsert archived order — single table with summary columns + detail JSONB.
 async fn upsert_archived_order(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     item: &CloudSyncItem,
     now: i64,
@@ -300,14 +254,14 @@ async fn upsert_archived_order(
     sqlx::query(
         r#"
         INSERT INTO store_archived_orders (
-            edge_server_id, tenant_id, source_id, order_key,
+            store_id, tenant_id, source_id, order_key,
             receipt_number, status, end_time, total, tax,
             prev_hash, curr_hash, desglose,
             guest_count, discount_amount, void_type, loss_amount, start_time,
             detail, version, synced_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        ON CONFLICT (tenant_id, edge_server_id, order_key)
+        ON CONFLICT (tenant_id, store_id, order_key)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
                       end_time = EXCLUDED.end_time,
@@ -327,7 +281,7 @@ async fn upsert_archived_order(
         WHERE store_archived_orders.version <= EXCLUDED.version
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(&item.resource_id)
     .bind(&detail_sync.order_key)
@@ -355,109 +309,95 @@ async fn upsert_archived_order(
 
 async fn delete_resource(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     resource: SyncResource,
     resource_id: &str,
 ) -> Result<(), BoxError> {
     let source_id: i64 = resource_id.parse()?;
 
     match resource {
-        SyncResource::Product => {
-            super::store::delete_product(pool, edge_server_id, source_id).await
-        }
-        SyncResource::Category => {
-            super::store::delete_category(pool, edge_server_id, source_id).await
-        }
+        SyncResource::Product => super::store::delete_product(pool, store_id, source_id).await,
+        SyncResource::Category => super::store::delete_category(pool, store_id, source_id).await,
         SyncResource::DailyReport => {
-            sqlx::query(
-                "DELETE FROM store_daily_reports WHERE edge_server_id = $1 AND source_id = $2",
-            )
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+            sqlx::query("DELETE FROM store_daily_reports WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
+                .bind(source_id)
+                .execute(pool)
+                .await?;
             Ok(())
         }
         SyncResource::Shift => {
-            sqlx::query("DELETE FROM store_shifts WHERE edge_server_id = $1 AND source_id = $2")
-                .bind(edge_server_id)
+            sqlx::query("DELETE FROM store_shifts WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
                 .bind(source_id)
                 .execute(pool)
                 .await?;
             Ok(())
         }
         SyncResource::Employee => {
-            sqlx::query("DELETE FROM store_employees WHERE edge_server_id = $1 AND source_id = $2")
-                .bind(edge_server_id)
+            sqlx::query("DELETE FROM store_employees WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
                 .bind(source_id)
                 .execute(pool)
                 .await?;
             Ok(())
         }
         SyncResource::Tag => {
-            sqlx::query("DELETE FROM store_tags WHERE edge_server_id = $1 AND source_id = $2")
-                .bind(edge_server_id)
+            sqlx::query("DELETE FROM store_tags WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
                 .bind(source_id)
                 .execute(pool)
                 .await?;
             Ok(())
         }
         SyncResource::Attribute => {
-            sqlx::query(
-                "DELETE FROM store_attributes WHERE edge_server_id = $1 AND source_id = $2",
-            )
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+            sqlx::query("DELETE FROM store_attributes WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
+                .bind(source_id)
+                .execute(pool)
+                .await?;
             Ok(())
         }
         SyncResource::AttributeBinding => {
             sqlx::query(
-                "DELETE FROM store_attribute_bindings WHERE edge_server_id = $1 AND source_id = $2",
+                "DELETE FROM store_attribute_bindings WHERE store_id = $1 AND source_id = $2",
             )
-            .bind(edge_server_id)
+            .bind(store_id)
             .bind(source_id)
             .execute(pool)
             .await?;
             Ok(())
         }
         SyncResource::PriceRule => {
-            sqlx::query(
-                "DELETE FROM store_price_rules WHERE edge_server_id = $1 AND source_id = $2",
-            )
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+            sqlx::query("DELETE FROM store_price_rules WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
+                .bind(source_id)
+                .execute(pool)
+                .await?;
             Ok(())
         }
         SyncResource::Zone => {
-            sqlx::query("DELETE FROM store_zones WHERE edge_server_id = $1 AND source_id = $2")
-                .bind(edge_server_id)
+            sqlx::query("DELETE FROM store_zones WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
                 .bind(source_id)
                 .execute(pool)
                 .await?;
             Ok(())
         }
         SyncResource::DiningTable => {
-            sqlx::query(
-                "DELETE FROM store_dining_tables WHERE edge_server_id = $1 AND source_id = $2",
-            )
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+            sqlx::query("DELETE FROM store_dining_tables WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
+                .bind(source_id)
+                .execute(pool)
+                .await?;
             Ok(())
         }
         SyncResource::LabelTemplate => {
-            sqlx::query(
-                "DELETE FROM store_label_templates WHERE edge_server_id = $1 AND source_id = $2",
-            )
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+            sqlx::query("DELETE FROM store_label_templates WHERE store_id = $1 AND source_id = $2")
+                .bind(store_id)
+                .bind(source_id)
+                .execute(pool)
+                .await?;
             Ok(())
         }
         other => Err(format!("Cannot delete resource type: {other}").into()),

@@ -67,7 +67,6 @@ pub fn calculate_mg_discount(
         applied_rules.push(AppliedMgRule {
             rule_id: rule.id,
             name: rule.name.clone(),
-            display_name: rule.display_name.clone(),
             receipt_name: rule.receipt_name.clone(),
             product_scope: rule.product_scope.clone(),
             adjustment_type: rule.adjustment_type.clone(),
@@ -114,8 +113,7 @@ mod tests {
             id,
             marketing_group_id: 1,
             name: format!("rule_{}", id),
-            display_name: format!("Rule {}", id),
-            receipt_name: format!("R{}", id),
+            receipt_name: Some(format!("R{}", id)),
             product_scope,
             target_id,
             adjustment_type,

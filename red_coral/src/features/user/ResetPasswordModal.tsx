@@ -68,7 +68,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
               <h2 className="text-lg font-bold text-gray-900">
                 {t('settings.reset_password')}
               </h2>
-              <p className="text-sm text-gray-500">{user.display_name} (@{user.username})</p>
+              <p className="text-sm text-gray-500">{user.name} (@{user.username})</p>
             </div>
           </div>
           <button

@@ -410,8 +410,7 @@ export type AdjustmentType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 export interface PriceRule {
   id: number;
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name: string | null;
   description: string | null;
   rule_type: RuleType;
   product_scope: ProductScope;
@@ -435,8 +434,7 @@ export interface PriceRule {
 
 export interface PriceRuleCreate {
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name?: string | null;
   description?: string;
   rule_type: RuleType;
   product_scope: ProductScope;
@@ -458,8 +456,7 @@ export interface PriceRuleCreate {
 
 export interface PriceRuleUpdate {
   name?: string;
-  display_name?: string;
-  receipt_name?: string;
+  receipt_name?: string | null;
   description?: string;
   rule_type?: RuleType;
   product_scope?: ProductScope;
@@ -484,7 +481,6 @@ export interface PriceRuleUpdate {
 export interface MarketingGroup {
   id: number;
   name: string;
-  display_name: string;
   description: string | null;
   sort_order: number;
   points_earn_rate: number | null;
@@ -494,7 +490,6 @@ export interface MarketingGroup {
 
 export interface MarketingGroupCreate {
   name: string;
-  display_name: string;
   description?: string | null;
   sort_order?: number;
   points_earn_rate?: number | null;
@@ -502,7 +497,6 @@ export interface MarketingGroupCreate {
 
 export interface MarketingGroupUpdate {
   name?: string;
-  display_name?: string;
   description?: string | null;
   sort_order?: number;
   points_earn_rate?: number | null;
@@ -512,8 +506,7 @@ export interface MgDiscountRule {
   id: number;
   marketing_group_id: number;
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name: string | null;
   product_scope: ProductScope;
   target_id: number | null;
   adjustment_type: AdjustmentType;
@@ -525,8 +518,7 @@ export interface MgDiscountRule {
 
 export interface MgDiscountRuleCreate {
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name?: string | null;
   product_scope: ProductScope;
   target_id?: number | null;
   adjustment_type: AdjustmentType;
@@ -535,8 +527,7 @@ export interface MgDiscountRuleCreate {
 
 export interface MgDiscountRuleUpdate {
   name?: string;
-  display_name?: string;
-  receipt_name?: string;
+  receipt_name?: string | null;
   product_scope?: ProductScope;
   target_id?: number | null;
   adjustment_type?: AdjustmentType;
@@ -601,7 +592,6 @@ interface StampActivity {
   id: number;
   marketing_group_id: number;
   name: string;
-  display_name: string;
   stamps_required: number;
   reward_quantity: number;
   reward_strategy: RewardStrategy;
@@ -614,7 +604,6 @@ interface StampActivity {
 
 export interface StampActivityCreate {
   name: string;
-  display_name: string;
   stamps_required: number;
   reward_quantity?: number;
   reward_strategy?: RewardStrategy;
@@ -626,7 +615,6 @@ export interface StampActivityCreate {
 
 export interface StampActivityUpdate {
   name?: string;
-  display_name?: string;
   stamps_required?: number;
   reward_quantity?: number;
   reward_strategy?: RewardStrategy;
@@ -693,8 +681,7 @@ export interface MemberStampProgressDetail {
 export interface AppliedMgRule {
   rule_id: number;
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name: string | null;
   product_scope: ProductScope;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
@@ -707,7 +694,7 @@ export interface AppliedMgRule {
 export interface Employee {
   id: number;
   username: string;
-  display_name: string;
+  name: string;
   role_id: number;
   is_system: boolean;
   is_active: boolean;
@@ -718,14 +705,14 @@ export interface Employee {
 interface EmployeeCreate {
   username: string;
   password: string;
-  display_name?: string;
+  name?: string;
   role_id: number;
 }
 
 interface EmployeeUpdate {
   username?: string;
   password?: string;
-  display_name?: string;
+  name?: string;
   role_id?: number;
   is_active?: boolean;
 }
@@ -742,7 +729,6 @@ type TableUpdate = DiningTableUpdate;
 export interface Role {
   id: number;
   name: string;
-  display_name: string;
   description: string | null;
   permissions: string[];
   is_system: boolean;
@@ -751,14 +737,12 @@ export interface Role {
 
 interface RoleCreate {
   name: string;
-  display_name?: string;
   description?: string;
   permissions?: string[];
 }
 
 interface RoleUpdate {
   name?: string;
-  display_name?: string;
   description?: string;
   permissions?: string[];
   is_active?: boolean;
@@ -777,7 +761,7 @@ export interface RolePermission {
 export interface User {
   id: number;
   username: string;
-  display_name: string;
+  name: string;
   role_id: number;
   role_name: string;
   permissions: string[];

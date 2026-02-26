@@ -1077,8 +1077,7 @@ export interface CartItemSnapshot {
 export interface AppliedRule {
   rule_id: number;
   name: string;
-  display_name: string;
-  receipt_name: string;
+  receipt_name: string | null;
   rule_type: 'DISCOUNT' | 'SURCHARGE';
   adjustment_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
   product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';

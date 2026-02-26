@@ -19,7 +19,6 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({ onFinish, onCa
 
   // ── Form State ──
   const [name, setName] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [receiptName, setReceiptName] = useState('');
   const [description, setDescription] = useState('');
   
@@ -71,8 +70,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({ onFinish, onCa
   const handleFinish = () => {
     onFinish({
       name: name.trim(),
-      display_name: displayName.trim(),
-      receipt_name: receiptName.trim(),
+      receipt_name: receiptName.trim() || undefined,
       description: description.trim() || undefined,
       rule_type: ruleType,
       product_scope: productScope,
@@ -96,20 +94,15 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({ onFinish, onCa
     id: 'basics',
     title: t('settings.price_rule.step_basics'),
     description: t('settings.price_rule.step_basics_desc'),
-    isValid: !!name.trim() && !!displayName.trim() && !!receiptName.trim(),
+    isValid: !!name.trim(),
     component: (
       <div className="space-y-4">
         <FormField label={t('settings.price_rule.name')} required>
           <input value={name} onChange={e => setName(e.target.value)} className={inputClass} autoFocus placeholder="e.g. Happy Hour" />
         </FormField>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label={t('settings.price_rule.display_name')} required>
-            <input value={displayName} onChange={e => setDisplayName(e.target.value)} className={inputClass} placeholder="e.g. -10% Off" />
-          </FormField>
-          <FormField label={t('settings.price_rule.receipt_name')} required>
-            <input value={receiptName} onChange={e => setReceiptName(e.target.value)} className={inputClass} placeholder="e.g. DISC-HH" />
-          </FormField>
-        </div>
+        <FormField label={t('settings.price_rule.receipt_name')}>
+          <input value={receiptName} onChange={e => setReceiptName(e.target.value)} className={inputClass} placeholder="e.g. DISC-HH" />
+        </FormField>
         <FormField label={t('settings.price_rule.description')}>
           <textarea value={description} onChange={e => setDescription(e.target.value)} className={`${inputClass} resize-none`} rows={3} placeholder="Optional description..." />
         </FormField>

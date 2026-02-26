@@ -12,7 +12,7 @@ use sqlx::SqlitePool;
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MarketingGroup>> {
     let rows = sqlx::query_as::<_, MarketingGroup>(
-        "SELECT id, name, display_name, description, sort_order, points_earn_rate, created_at, updated_at FROM marketing_group ORDER BY sort_order",
+        "SELECT id, name, description, sort_order, points_earn_rate, created_at, updated_at FROM marketing_group ORDER BY sort_order",
     )
     .fetch_all(pool)
     .await?;
@@ -21,7 +21,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<MarketingGroup>> {
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<MarketingGroup>> {
     let row = sqlx::query_as::<_, MarketingGroup>(
-        "SELECT id, name, display_name, description, sort_order, points_earn_rate, created_at, updated_at FROM marketing_group WHERE id = ?",
+        "SELECT id, name, description, sort_order, points_earn_rate, created_at, updated_at FROM marketing_group WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -34,10 +34,9 @@ pub async fn create(pool: &SqlitePool, data: MarketingGroupCreate) -> RepoResult
     let sort_order = data.sort_order.unwrap_or(0);
     let id = shared::util::snowflake_id();
     sqlx::query!(
-        "INSERT INTO marketing_group (id, name, display_name, description, sort_order, points_earn_rate, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+        "INSERT INTO marketing_group (id, name, description, sort_order, points_earn_rate, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
         id,
         data.name,
-        data.display_name,
         data.description,
         sort_order,
         data.points_earn_rate,
@@ -57,9 +56,8 @@ pub async fn update(
 ) -> RepoResult<MarketingGroup> {
     let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE marketing_group SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), description = COALESCE(?3, description), sort_order = COALESCE(?4, sort_order), points_earn_rate = COALESCE(?5, points_earn_rate), updated_at = ?6 WHERE id = ?7",
+        "UPDATE marketing_group SET name = COALESCE(?1, name), description = COALESCE(?2, description), sort_order = COALESCE(?3, sort_order), points_earn_rate = COALESCE(?4, points_earn_rate), updated_at = ?5 WHERE id = ?6",
         data.name,
-        data.display_name,
         data.description,
         data.sort_order,
         data.points_earn_rate,
@@ -134,7 +132,7 @@ pub async fn find_rules_by_group(
     group_id: i64,
 ) -> RepoResult<Vec<MgDiscountRule>> {
     let rows = sqlx::query_as::<_, MgDiscountRule>(
-        "SELECT id, marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE marketing_group_id = ? ORDER BY created_at DESC",
+        "SELECT id, marketing_group_id, name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE marketing_group_id = ? ORDER BY created_at DESC",
     )
     .bind(group_id)
     .fetch_all(pool)
@@ -147,7 +145,7 @@ pub async fn find_active_rules_by_group(
     group_id: i64,
 ) -> RepoResult<Vec<MgDiscountRule>> {
     let rows = sqlx::query_as::<_, MgDiscountRule>(
-        "SELECT id, marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE marketing_group_id = ? AND is_active = 1 ORDER BY created_at DESC",
+        "SELECT id, marketing_group_id, name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE marketing_group_id = ? AND is_active = 1 ORDER BY created_at DESC",
     )
     .bind(group_id)
     .fetch_all(pool)
@@ -163,11 +161,10 @@ pub async fn create_rule(
     let now = shared::util::now_millis();
     let id = shared::util::snowflake_id();
     sqlx::query!(
-        "INSERT INTO mg_discount_rule (id, marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)",
+        "INSERT INTO mg_discount_rule (id, marketing_group_id, name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9)",
         id,
         group_id,
         data.name,
-        data.display_name,
         data.receipt_name,
         data.product_scope,
         data.target_id,
@@ -179,7 +176,7 @@ pub async fn create_rule(
     .await?;
 
     let row = sqlx::query_as::<_, MgDiscountRule>(
-        "SELECT id, marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE id = ?",
+        "SELECT id, marketing_group_id, name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE id = ?",
     )
     .bind(id)
     .fetch_one(pool)
@@ -194,9 +191,8 @@ pub async fn update_rule(
 ) -> RepoResult<MgDiscountRule> {
     let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE mg_discount_rule SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), receipt_name = COALESCE(?3, receipt_name), product_scope = COALESCE(?4, product_scope), target_id = COALESCE(?5, target_id), adjustment_type = COALESCE(?6, adjustment_type), adjustment_value = COALESCE(?7, adjustment_value), is_active = COALESCE(?8, is_active), updated_at = ?9 WHERE id = ?10",
+        "UPDATE mg_discount_rule SET name = COALESCE(?1, name), receipt_name = COALESCE(?2, receipt_name), product_scope = COALESCE(?3, product_scope), target_id = COALESCE(?4, target_id), adjustment_type = COALESCE(?5, adjustment_type), adjustment_value = COALESCE(?6, adjustment_value), is_active = COALESCE(?7, is_active), updated_at = ?8 WHERE id = ?9",
         data.name,
-        data.display_name,
         data.receipt_name,
         data.product_scope,
         data.target_id,
@@ -214,7 +210,7 @@ pub async fn update_rule(
         )));
     }
     let row = sqlx::query_as::<_, MgDiscountRule>(
-        "SELECT id, marketing_group_id, name, display_name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE id = ?",
+        "SELECT id, marketing_group_id, name, receipt_name, product_scope, target_id, adjustment_type, adjustment_value, is_active, created_at, updated_at FROM mg_discount_rule WHERE id = ?",
     )
     .bind(rule_id)
     .fetch_one(pool)
@@ -241,7 +237,7 @@ pub async fn find_activities_by_group(
     group_id: i64,
 ) -> RepoResult<Vec<StampActivity>> {
     let rows = sqlx::query_as::<_, StampActivity>(
-        "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE marketing_group_id = ? ORDER BY created_at DESC",
+        "SELECT id, marketing_group_id, name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE marketing_group_id = ? ORDER BY created_at DESC",
     )
     .bind(group_id)
     .fetch_all(pool)
@@ -254,7 +250,7 @@ pub async fn find_active_activities_by_group(
     group_id: i64,
 ) -> RepoResult<Vec<StampActivity>> {
     let rows = sqlx::query_as::<_, StampActivity>(
-        "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE marketing_group_id = ? AND is_active = 1 ORDER BY created_at DESC",
+        "SELECT id, marketing_group_id, name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE marketing_group_id = ? AND is_active = 1 ORDER BY created_at DESC",
     )
     .bind(group_id)
     .fetch_all(pool)
@@ -278,11 +274,10 @@ pub async fn create_activity(
 
     let id = shared::util::snowflake_id();
     sqlx::query!(
-        "INSERT INTO stamp_activity (id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)",
+        "INSERT INTO stamp_activity (id, marketing_group_id, name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9)",
         id,
         group_id,
         data.name,
-        data.display_name,
         data.stamps_required,
         reward_quantity,
         reward_strategy,
@@ -311,9 +306,8 @@ pub async fn update_activity(
     let mut tx = pool.begin().await?;
 
     let rows = sqlx::query!(
-        "UPDATE stamp_activity SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), stamps_required = COALESCE(?3, stamps_required), reward_quantity = COALESCE(?4, reward_quantity), reward_strategy = COALESCE(?5, reward_strategy), designated_product_id = COALESCE(?6, designated_product_id), is_cyclic = COALESCE(?7, is_cyclic), is_active = COALESCE(?8, is_active), updated_at = ?9 WHERE id = ?10",
+        "UPDATE stamp_activity SET name = COALESCE(?1, name), stamps_required = COALESCE(?2, stamps_required), reward_quantity = COALESCE(?3, reward_quantity), reward_strategy = COALESCE(?4, reward_strategy), designated_product_id = COALESCE(?5, designated_product_id), is_cyclic = COALESCE(?6, is_cyclic), is_active = COALESCE(?7, is_active), updated_at = ?8 WHERE id = ?9",
         data.name,
-        data.display_name,
         data.stamps_required,
         data.reward_quantity,
         data.reward_strategy,
@@ -438,7 +432,7 @@ async fn load_activity_detail(
     activity_id: i64,
 ) -> RepoResult<StampActivityDetail> {
     let activity = sqlx::query_as::<_, StampActivity>(
-        "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ?",
+        "SELECT id, marketing_group_id, name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ?",
     )
     .bind(activity_id)
     .fetch_optional(pool)

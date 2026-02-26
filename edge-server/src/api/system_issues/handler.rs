@@ -40,7 +40,7 @@ pub async fn resolve(
             "system_issue",
             &req.id.to_string(),
             Some(current_user.id),
-            Some(current_user.display_name.clone()),
+            Some(current_user.name.clone()),
             serde_json::json!({
                 "kind": resolved.kind,
                 "response": req.response,

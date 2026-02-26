@@ -34,16 +34,6 @@ export const Step1Naming: React.FC<Step1NamingProps> = ({ state, updateState }) 
           </p>
         </FormField>
 
-        <FormField label={t('settings.marketing_group.field.display_name')} required>
-          <input
-            type="text"
-            value={state.display_name}
-            onChange={(e) => updateState({ display_name: e.target.value })}
-            className={inputClass}
-            maxLength={MAX_NAME_LEN}
-            placeholder={t('settings.marketing_group.stamp.display_name_placeholder')}
-          />
-        </FormField>
       </div>
     </FormSection>
   );

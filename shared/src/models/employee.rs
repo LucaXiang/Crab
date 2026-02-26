@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Employee {
     pub id: i64,
     pub username: String,
-    pub display_name: String,
+    pub name: String,
     pub role_id: i64,
     pub is_system: bool,
     pub is_active: bool,
@@ -20,7 +20,7 @@ pub struct Employee {
 pub struct EmployeeCreate {
     pub username: String,
     pub password: String,
-    pub display_name: Option<String>,
+    pub name: Option<String>,
     pub role_id: i64,
 }
 
@@ -29,7 +29,7 @@ pub struct EmployeeCreate {
 pub struct EmployeeUpdate {
     pub username: Option<String>,
     pub password: Option<String>,
-    pub display_name: Option<String>,
+    pub name: Option<String>,
     pub role_id: Option<i64>,
     pub is_active: Option<bool>,
 }

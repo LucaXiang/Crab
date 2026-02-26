@@ -60,7 +60,7 @@ export const useAuthStore = create<AuthStore>()(
           const user: User = {
             id: userData.id,
             username: userData.username,
-            display_name: userData.display_name,
+            name: userData.name,
             role_id: userData.role_id,
             role_name: userData.role_name,
             permissions: userData.permissions,
@@ -159,7 +159,7 @@ export const useAuthStore = create<AuthStore>()(
         return employees.map((e): User => ({
           id: e.id,
           username: e.username,
-          display_name: e.display_name,
+          name: e.name,
           role_id: e.role_id,
           role_name: '', // Role name not available in list view
           permissions: [],
@@ -178,7 +178,7 @@ export const useAuthStore = create<AuthStore>()(
         return {
           id: result.id,
           username: result.username,
-          display_name: data.displayName || result.display_name,
+          name: data.displayName || result.name,
           role_id: result.role_id,
           role_name: '',
           permissions: [] as string[],
@@ -196,7 +196,7 @@ export const useAuthStore = create<AuthStore>()(
         return {
           id: result.id,
           username: result.username,
-          display_name: data.displayName || result.display_name,
+          name: data.displayName || result.name,
           role_id: result.role_id,
           role_name: '',
           permissions: [] as string[],

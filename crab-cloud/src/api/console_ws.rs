@@ -134,11 +134,11 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(cmd) = serde_json::from_str::<ConsoleCommand>(&text) {
                             match cmd {
-                                ConsoleCommand::Subscribe { edge_server_ids } => {
-                                    subscribed_edges = if edge_server_ids.is_empty() {
+                                ConsoleCommand::Subscribe { store_ids } => {
+                                    subscribed_edges = if store_ids.is_empty() {
                                         None
                                     } else {
-                                        Some(edge_server_ids.iter().copied().collect())
+                                        Some(store_ids.iter().copied().collect())
                                     };
 
                                     // 重发过滤后的全量快照
@@ -183,42 +183,36 @@ fn convert_hub_event(
 ) -> Option<ConsoleMessage> {
     match event {
         LiveHubEvent::OrderUpdated(snapshot) => {
-            if !passes_filter(subscribed, snapshot.edge_server_id) {
+            if !passes_filter(subscribed, snapshot.store_id) {
                 return None;
             }
             Some(ConsoleMessage::OrderUpdated { snapshot })
         }
-        LiveHubEvent::OrderRemoved {
-            order_id,
-            edge_server_id,
-        } => {
-            if !passes_filter(subscribed, edge_server_id) {
+        LiveHubEvent::OrderRemoved { order_id, store_id } => {
+            if !passes_filter(subscribed, store_id) {
                 return None;
             }
-            Some(ConsoleMessage::OrderRemoved {
-                order_id,
-                edge_server_id,
-            })
+            Some(ConsoleMessage::OrderRemoved { order_id, store_id })
         }
-        LiveHubEvent::EdgeOnline { edge_server_id } => {
-            if !passes_filter(subscribed, edge_server_id) {
+        LiveHubEvent::EdgeOnline { store_id } => {
+            if !passes_filter(subscribed, store_id) {
                 return None;
             }
             Some(ConsoleMessage::EdgeStatus {
-                edge_server_id,
+                store_id,
                 online: true,
                 cleared_order_ids: vec![],
             })
         }
         LiveHubEvent::EdgeOffline {
-            edge_server_id,
+            store_id,
             cleared_order_ids,
         } => {
-            if !passes_filter(subscribed, edge_server_id) {
+            if !passes_filter(subscribed, store_id) {
                 return None;
             }
             Some(ConsoleMessage::EdgeStatus {
-                edge_server_id,
+                store_id,
                 online: false,
                 cleared_order_ids,
             })
@@ -226,10 +220,10 @@ fn convert_hub_event(
     }
 }
 
-fn passes_filter(subscribed: &Option<HashSet<i64>>, edge_server_id: i64) -> bool {
+fn passes_filter(subscribed: &Option<HashSet<i64>>, store_id: i64) -> bool {
     match subscribed {
         None => true,
-        Some(set) => set.contains(&edge_server_id),
+        Some(set) => set.contains(&store_id),
     }
 }
 

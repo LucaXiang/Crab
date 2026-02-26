@@ -25,8 +25,7 @@ const RESOURCE: SyncResource = SyncResource::PriceRule;
 
 fn validate_create(payload: &PriceRuleCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
-    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
-    validate_required_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     validate_optional_text(&payload.zone_scope, "zone_scope", MAX_SHORT_TEXT_LEN)?;
     validate_optional_text(
@@ -45,9 +44,6 @@ fn validate_create(payload: &PriceRuleCreate) -> AppResult<()> {
 fn validate_update(payload: &PriceRuleUpdate) -> AppResult<()> {
     if let Some(name) = &payload.name {
         validate_required_text(name, "name", MAX_NAME_LEN)?;
-    }
-    if let Some(display_name) = &payload.display_name {
-        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
     }
     if let Some(receipt_name) = &payload.receipt_name {
         validate_required_text(receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
@@ -171,7 +167,7 @@ pub async fn create(
         "price_rule",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&rule, "price_rule")
     );
 
@@ -221,7 +217,7 @@ pub async fn update(
         "price_rule",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_rule, &rule, "price_rule")
     );
 
@@ -261,7 +257,7 @@ pub async fn delete(
             "price_rule",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 

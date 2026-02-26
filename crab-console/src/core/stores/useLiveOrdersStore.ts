@@ -29,7 +29,7 @@ export function useLiveOrders(token: string | null, storeId: number) {
         setState(s => {
           const orders = new Map<string, LiveOrderSnapshot>();
           for (const snap of msg.snapshots) {
-            if (snap.edge_server_id === storeId) {
+            if (snap.store_id === storeId) {
               orders.set(snap.order_id, snap);
             }
           }
@@ -38,7 +38,7 @@ export function useLiveOrders(token: string | null, storeId: number) {
         });
         break;
       case 'OrderUpdated':
-        if (msg.snapshot.edge_server_id === storeId) {
+        if (msg.snapshot.store_id === storeId) {
           setState(s => {
             const orders = new Map(s.orders);
             orders.set(msg.snapshot.order_id, msg.snapshot);
@@ -47,7 +47,7 @@ export function useLiveOrders(token: string | null, storeId: number) {
         }
         break;
       case 'OrderRemoved':
-        if (msg.edge_server_id === storeId) {
+        if (msg.store_id === storeId) {
           setState(s => {
             const orders = new Map(s.orders);
             orders.delete(msg.order_id);
@@ -56,7 +56,7 @@ export function useLiveOrders(token: string | null, storeId: number) {
         }
         break;
       case 'EdgeStatus':
-        if (msg.edge_server_id === storeId) {
+        if (msg.store_id === storeId) {
           setState(s => {
             const orders = new Map(s.orders);
             if (!msg.online && msg.cleared_order_ids) {
@@ -85,7 +85,7 @@ export function useLiveOrders(token: string | null, storeId: number) {
       ws.onopen = () => {
         reconnectDelayRef.current = RECONNECT_MIN_MS;
         setState(s => ({ ...s, connectionState: 'connected' }));
-        ws.send(JSON.stringify({ type: 'Subscribe', edge_server_ids: [storeId] }));
+        ws.send(JSON.stringify({ type: 'Subscribe', store_ids: [storeId] }));
       };
 
       ws.onmessage = (event) => {

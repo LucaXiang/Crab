@@ -34,7 +34,7 @@ fn default_status() -> String {
 
 pub async fn upsert_shift_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -43,13 +43,13 @@ pub async fn upsert_shift_from_sync(
     sqlx::query(
         r#"
         INSERT INTO store_shifts (
-            edge_server_id, source_id, operator_id, operator_name, status,
+            store_id, source_id, operator_id, operator_name, status,
             start_time, end_time, starting_cash, expected_cash,
             actual_cash, cash_variance, abnormal_close, last_active_at,
             note, created_at, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             operator_name = EXCLUDED.operator_name, status = EXCLUDED.status,
             end_time = EXCLUDED.end_time,
@@ -59,7 +59,7 @@ pub async fn upsert_shift_from_sync(
             note = EXCLUDED.note, updated_at = EXCLUDED.updated_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(shift.operator_id)
     .bind(&shift.operator_name)

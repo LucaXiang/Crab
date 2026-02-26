@@ -145,7 +145,7 @@ pub async fn create(
         "attribute",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&attr, "attribute")
     );
 
@@ -185,7 +185,7 @@ pub async fn update(
         "attribute",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_attr, &attr, "attribute")
     );
 
@@ -247,7 +247,7 @@ pub async fn delete(
             "attribute",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 
@@ -312,7 +312,7 @@ pub async fn add_option(
         "attribute",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"op": "add_option", "option_name": &option.name})
     );
 
@@ -391,7 +391,7 @@ pub async fn update_option(
         "attribute",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details =
             serde_json::json!({"op": "update_option", "index": idx, "option_name": option_name})
     );
@@ -467,7 +467,7 @@ pub async fn remove_option(
         "attribute",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"op": "remove_option", "index": idx})
     );
 

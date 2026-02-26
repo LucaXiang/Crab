@@ -11,7 +11,7 @@ use super::BoxError;
 
 pub async fn upsert_category_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     _version: i64,
@@ -24,12 +24,12 @@ pub async fn upsert_category_from_sync(
     let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_categories (
-            edge_server_id, source_id, name, sort_order,
+            store_id, source_id, name, sort_order,
             is_kitchen_print_enabled, is_label_print_enabled,
             is_active, is_virtual, match_mode, is_display, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             name = EXCLUDED.name, sort_order = EXCLUDED.sort_order,
             is_kitchen_print_enabled = EXCLUDED.is_kitchen_print_enabled,
@@ -41,7 +41,7 @@ pub async fn upsert_category_from_sync(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&cat.name)
     .bind(cat.sort_order)
@@ -113,13 +113,9 @@ pub async fn upsert_category_from_sync(
     Ok(())
 }
 
-pub async fn delete_category(
-    pool: &PgPool,
-    edge_server_id: i64,
-    source_id: i64,
-) -> Result<(), BoxError> {
-    sqlx::query("DELETE FROM store_categories WHERE edge_server_id = $1 AND source_id = $2")
-        .bind(edge_server_id)
+pub async fn delete_category(pool: &PgPool, store_id: i64, source_id: i64) -> Result<(), BoxError> {
+    sqlx::query("DELETE FROM store_categories WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
         .bind(source_id)
         .execute(pool)
         .await?;
@@ -146,10 +142,7 @@ pub struct StoreCategory {
 
 // ── Console Read ──
 
-pub async fn list_categories(
-    pool: &PgPool,
-    edge_server_id: i64,
-) -> Result<Vec<StoreCategory>, BoxError> {
+pub async fn list_categories(pool: &PgPool, store_id: i64) -> Result<Vec<StoreCategory>, BoxError> {
     #[derive(sqlx::FromRow)]
     struct Row {
         id: i64,
@@ -170,11 +163,11 @@ pub async fn list_categories(
                is_kitchen_print_enabled, is_label_print_enabled,
                is_active, is_virtual, match_mode, is_display
         FROM store_categories
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY sort_order, source_id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
 
@@ -237,7 +230,7 @@ pub async fn list_categories(
 
 pub async fn create_category_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     data: &CategoryCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();
@@ -254,7 +247,7 @@ pub async fn create_category_direct(
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"
         INSERT INTO store_categories (
-            edge_server_id, source_id, name, sort_order,
+            store_id, source_id, name, sort_order,
             is_kitchen_print_enabled, is_label_print_enabled,
             is_active, is_virtual, match_mode, is_display, updated_at
         )
@@ -262,7 +255,7 @@ pub async fn create_category_direct(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&data.name)
     .bind(sort_order)
@@ -332,7 +325,7 @@ pub async fn create_category_direct(
 
 pub async fn update_category_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::category::CategoryUpdate,
 ) -> Result<(), BoxError> {
@@ -340,9 +333,9 @@ pub async fn update_category_direct(
     let mut tx = pool.begin().await?;
 
     let pg_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM store_categories WHERE edge_server_id = $1 AND source_id = $2",
+        "SELECT id FROM store_categories WHERE store_id = $1 AND source_id = $2",
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
@@ -440,7 +433,7 @@ pub async fn update_category_direct(
 
 pub async fn batch_update_sort_order_categories(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     items: &[shared::cloud::store_op::SortOrderItem],
 ) -> Result<(), BoxError> {
     if items.is_empty() {
@@ -453,12 +446,12 @@ pub async fn batch_update_sort_order_categories(
     sqlx::query(
         r#"UPDATE store_categories SET sort_order = u.sort_order, updated_at = u.updated_at
         FROM (SELECT * FROM UNNEST($1::bigint[], $2::integer[], $3::bigint[])) AS u(source_id, sort_order, updated_at)
-        WHERE store_categories.edge_server_id = $4 AND store_categories.source_id = u.source_id"#,
+        WHERE store_categories.store_id = $4 AND store_categories.source_id = u.source_id"#,
     )
     .bind(&ids)
     .bind(&orders)
     .bind(&nows)
-    .bind(edge_server_id)
+    .bind(store_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -466,15 +459,14 @@ pub async fn batch_update_sort_order_categories(
 
 pub async fn delete_category_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows =
-        sqlx::query("DELETE FROM store_categories WHERE edge_server_id = $1 AND source_id = $2")
-            .bind(edge_server_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
+    let rows = sqlx::query("DELETE FROM store_categories WHERE store_id = $1 AND source_id = $2")
+        .bind(store_id)
+        .bind(source_id)
+        .execute(pool)
+        .await?;
     if rows.rows_affected() == 0 {
         return Err("Category not found".into());
     }

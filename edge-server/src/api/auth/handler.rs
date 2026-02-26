@@ -94,7 +94,7 @@ pub async fn login(
         .generate_token(
             emp.id,
             &emp.username,
-            &emp.display_name,
+            &emp.name,
             emp.role_id,
             &role.name,
             &role.permissions,
@@ -110,7 +110,7 @@ pub async fn login(
             "auth",
             emp.id.to_string(),
             Some(emp.id),
-            Some(emp.display_name.clone()),
+            Some(emp.name.clone()),
             serde_json::json!({"username": &emp.username}),
         )
         .await;
@@ -127,7 +127,7 @@ pub async fn login(
         user: UserInfo {
             id: emp.id,
             username: emp.username,
-            display_name: emp.display_name,
+            name: emp.name,
             role_id: emp.role_id,
             role_name: role.name,
             permissions: role.permissions,
@@ -155,7 +155,7 @@ pub async fn me(
     let user_info = UserInfo {
         id: user.id,
         username: user.username,
-        display_name: user.display_name,
+        name: user.name,
         role_id: user.role_id,
         role_name: user.role_name,
         permissions: user.permissions,
@@ -179,7 +179,7 @@ pub async fn logout(
             "auth",
             user.id.to_string(),
             Some(user.id),
-            Some(user.display_name.clone()),
+            Some(user.name.clone()),
             serde_json::json!({"username": &user.username}),
         )
         .await;
@@ -286,12 +286,12 @@ pub async fn escalate(
             "auth",
             authorizer_id.to_string(),
             Some(authorizer_id),
-            Some(emp.display_name.clone()),
+            Some(emp.name.clone()),
             serde_json::json!({
                 "authorizer_username": &emp.username,
                 "required_permission": &req.required_permission,
                 "requester_id": &current_user.id,
-                "requester_name": &current_user.display_name,
+                "requester_name": &current_user.name,
             }),
         )
         .await;
@@ -308,7 +308,7 @@ pub async fn escalate(
         authorizer: UserInfo {
             id: emp.id,
             username: emp.username,
-            display_name: emp.display_name,
+            name: emp.name,
             role_id: emp.role_id,
             role_name: role.name,
             permissions: role.permissions,

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 pub struct Role {
     pub id: i64,
     pub name: String,
-    pub display_name: String,
     pub description: Option<String>,
     /// JSON array of permission strings (e.g. ["*"], ["orders:read", "products:write"])
     #[cfg_attr(feature = "db", sqlx(json))]
@@ -21,7 +20,6 @@ pub struct Role {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleCreate {
     pub name: String,
-    pub display_name: Option<String>,
     pub description: Option<String>,
     pub permissions: Vec<String>,
 }
@@ -30,7 +28,6 @@ pub struct RoleCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleUpdate {
     pub name: Option<String>,
-    pub display_name: Option<String>,
     pub description: Option<String>,
     pub permissions: Option<Vec<String>>,
     pub is_active: Option<bool>,

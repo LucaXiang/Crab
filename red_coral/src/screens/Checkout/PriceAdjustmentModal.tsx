@@ -304,7 +304,7 @@ export const PriceAdjustmentModal: React.FC<PriceAdjustmentModalProps> = ({
               permission={Permission.ORDERS_DISCOUNT}
               mode="intercept"
               description={t(`${config.i18nPrefix}.auth_required`)}
-              onAuthorized={(user) => handleClear({ id: user.id, name: user.display_name })}
+              onAuthorized={(user) => handleClear({ id: user.id, name: user.name })}
             >
               <button
                 disabled={isProcessing}
@@ -325,7 +325,7 @@ export const PriceAdjustmentModal: React.FC<PriceAdjustmentModalProps> = ({
               permission={Permission.ORDERS_DISCOUNT}
               mode="intercept"
               description={t(`${config.i18nPrefix}.auth_required`)}
-              onAuthorized={(user) => handleApply({ id: user.id, name: user.display_name })}
+              onAuthorized={(user) => handleApply({ id: user.id, name: user.name })}
             >
               <button
                 disabled={!canConfirm}

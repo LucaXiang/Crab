@@ -441,7 +441,7 @@ function DiscountRuleCard({ rule, targetName, t }: { rule: MgDiscountRule; targe
           <Percent size={18} className="text-red-500" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-bold text-lg text-gray-800 truncate">{rule.display_name}</div>
+          <div className="font-bold text-lg text-gray-800 truncate">{rule.name}</div>
         </div>
         <div className="text-xl font-black text-red-500 shrink-0">-{valueLabel}</div>
       </div>

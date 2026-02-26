@@ -27,7 +27,6 @@ const RESOURCE: SyncResource = SyncResource::MarketingGroup;
 
 fn validate_group_create(payload: &shared::models::MarketingGroupCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
-    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     Ok(())
 }
@@ -36,26 +35,19 @@ fn validate_group_update(payload: &shared::models::MarketingGroupUpdate) -> AppR
     if let Some(name) = &payload.name {
         validate_required_text(name, "name", MAX_NAME_LEN)?;
     }
-    if let Some(display_name) = &payload.display_name {
-        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
-    }
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     Ok(())
 }
 
 fn validate_rule_create(payload: &MgDiscountRuleCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
-    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
-    validate_required_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
+    validate_optional_text(&payload.receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
     Ok(())
 }
 
 fn validate_rule_update(payload: &MgDiscountRuleUpdate) -> AppResult<()> {
     if let Some(name) = &payload.name {
         validate_required_text(name, "name", MAX_NAME_LEN)?;
-    }
-    if let Some(display_name) = &payload.display_name {
-        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
     }
     if let Some(receipt_name) = &payload.receipt_name {
         validate_required_text(receipt_name, "receipt_name", MAX_RECEIPT_NAME_LEN)?;
@@ -65,16 +57,12 @@ fn validate_rule_update(payload: &MgDiscountRuleUpdate) -> AppResult<()> {
 
 fn validate_activity_create(payload: &shared::models::StampActivityCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
-    validate_required_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
     Ok(())
 }
 
 fn validate_activity_update(payload: &shared::models::StampActivityUpdate) -> AppResult<()> {
     if let Some(name) = &payload.name {
         validate_required_text(name, "name", MAX_NAME_LEN)?;
-    }
-    if let Some(display_name) = &payload.display_name {
-        validate_required_text(display_name, "display_name", MAX_NAME_LEN)?;
     }
     Ok(())
 }
@@ -197,7 +185,7 @@ pub async fn create(
         "marketing_group",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&group, "marketing_group")
     );
 
@@ -237,7 +225,7 @@ pub async fn update(
         "marketing_group",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_group, &group, "marketing_group")
     );
 
@@ -278,7 +266,7 @@ pub async fn delete(
             "marketing_group",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 
@@ -321,7 +309,7 @@ pub async fn create_rule(
         "mg_discount_rule",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&rule, "mg_discount_rule")
     );
 
@@ -373,7 +361,7 @@ pub async fn update_rule(
         "mg_discount_rule",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&rule, "mg_discount_rule")
     );
 
@@ -410,7 +398,7 @@ pub async fn delete_rule(
             "mg_discount_rule",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"action": "rule_deleted", "rule_id": rule_id})
         );
 
@@ -460,7 +448,7 @@ pub async fn create_activity(
         "stamp_activity",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&detail, "stamp_activity")
     );
 
@@ -496,7 +484,7 @@ pub async fn update_activity(
         "stamp_activity",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&detail, "stamp_activity")
     );
 
@@ -533,7 +521,7 @@ pub async fn delete_activity(
             "stamp_activity",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"action": "activity_deleted", "activity_id": activity_id})
         );
 

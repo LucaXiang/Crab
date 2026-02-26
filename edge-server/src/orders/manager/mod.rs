@@ -66,7 +66,7 @@ struct PrefetchedData {
 
 struct LinkMemberPrefetch {
     member: shared::models::Member,
-    mg_display_name: String,
+    mg_name: String,
     mg_rules: Vec<shared::models::MgDiscountRule>,
 }
 
@@ -461,7 +461,7 @@ impl OrdersManager {
 
                 data.link_member = Some(LinkMemberPrefetch {
                     member,
-                    mg_display_name: mg.display_name,
+                    mg_name: mg.name,
                     mg_rules,
                 });
             }
@@ -483,7 +483,7 @@ impl OrdersManager {
                 })?;
 
                 let activity = sqlx::query_as::<_, shared::models::StampActivity>(
-                    "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ? AND is_active = 1",
+                    "SELECT id, marketing_group_id, name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ? AND is_active = 1",
                 )
                 .bind(*stamp_activity_id)
                 .fetch_optional(pool)
@@ -560,7 +560,7 @@ impl OrdersManager {
                         let activity_id = redemption.stamp_activity_id;
 
                         let activity = sqlx::query_as::<_, shared::models::StampActivity>(
-                            "SELECT id, marketing_group_id, name, display_name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ?",
+                            "SELECT id, marketing_group_id, name, stamps_required, reward_quantity, reward_strategy, designated_product_id, is_cyclic, is_active, created_at, updated_at FROM stamp_activity WHERE id = ?",
                         )
                         .bind(activity_id)
                         .fetch_optional(pool)
@@ -758,7 +758,7 @@ impl OrdersManager {
                     member_id: *member_id,
                     member_name: lm.member.name,
                     marketing_group_id: lm.member.marketing_group_id,
-                    marketing_group_name: lm.mg_display_name,
+                    marketing_group_name: lm.mg_name,
                     mg_rules: lm.mg_rules,
                     product_metadata,
                 })
@@ -1182,7 +1182,7 @@ impl OrdersManager {
                     shared::order::OrderEventType::StampRedemptionCancelled,
                     shared::order::EventPayload::StampRedemptionCancelled {
                         stamp_activity_id: activity_id,
-                        stamp_activity_name: activity.display_name.clone(),
+                        stamp_activity_name: activity.name.clone(),
                         reward_instance_id: redemption.reward_instance_id.clone(),
                         is_comp_existing: redemption.is_comp_existing,
                         comp_source_instance_id: redemption.comp_source_instance_id.clone(),

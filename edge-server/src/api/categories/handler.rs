@@ -73,7 +73,7 @@ pub async fn create(
         "category",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&category, "category")
     );
 
@@ -117,7 +117,7 @@ pub async fn update(
         "category",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_category, &category, "category")
     );
 
@@ -156,7 +156,7 @@ pub async fn delete(
         "category",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"name": name_for_audit})
     );
 
@@ -285,7 +285,7 @@ pub async fn bind_category_attribute(
         "category",
         &category_id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({"op": "bind_attribute", "attribute_id": attr_id})
     );
 
@@ -350,7 +350,7 @@ pub async fn unbind_category_attribute(
             "category",
             &category_id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"op": "unbind_attribute", "attribute_id": attr_id})
         );
 

@@ -909,7 +909,6 @@
       },
       "form": {
         "name": "规则名称",
-        "display_name": "显示名称",
         "receipt_name": "小票名称",
         "description": "规则描述",
         "is_stackable": "可叠加",
@@ -1053,8 +1052,6 @@
         "valid_from": "开始日期",
         "valid_until": "结束日期",
         "name_hint": "内部使用的唯一标识，建议使用英文和下划线",
-        "display_name_placeholder": "如：午市特惠",
-        "display_name_hint": "在 POS 界面显示的名称",
         "receipt_name_placeholder": "如：午市折扣",
         "receipt_name_hint": "打印在小票上的名称",
         "description_placeholder": "添加规则说明...",
@@ -1088,7 +1085,6 @@
       "select_group": "请从左侧选择一个营销组查看详情",
       "field": {
         "name": "标识名称",
-        "display_name": "显示名称",
         "description": "描述"
       },
       "scope": {
@@ -1115,7 +1111,6 @@
           "category": "分类",
           "product": "商品"
         },
-        "display_name_placeholder": "咖啡集章送",
         "collect_n": "集 {n} 章",
         "reward_n": "奖 {n} 件"
       },
@@ -1131,7 +1126,6 @@
         "step3_desc": "为规则设置识别名称和小票显示名称",
         "value_label": "折扣值",
         "name_hint": "用于系统内部标识，建议使用英文下划线格式",
-        "display_name_placeholder": "VIP 咖啡9折",
         "receipt_name": "小票名称",
         "receipt_name_placeholder": "VIP",
         "receipt_name_hint": "显示在小票上的简短名称"
@@ -1501,8 +1495,8 @@
         "username_cannot_change": "用户名不可修改",
         "password": "密码",
         "password_placeholder": "输入登录密码",
-        "display_name": "显示名称",
-        "display_name_placeholder": "输入显示名称",
+        "name": "显示名称",
+        "name_placeholder": "输入显示名称",
         "role": "角色",
         "active_status": "启用账号",
         "admin_cannot_disable": "超级管理员不可禁用",
@@ -1511,7 +1505,7 @@
         "password_too_short": "密码至少6位",
         "password_mismatch": "两次输入不一致",
         "username_required": "请输入用户名",
-        "display_name_required": "请输入显示名称"
+        "name_required": "请输入显示名称"
       },
       "add_user": "新增员工",
       "edit_user": "编辑员工",
@@ -2382,7 +2376,6 @@
       "curr_hash": "当前哈希",
       "field": {
         "name": "名称",
-        "display_name": "显示名称",
         "description": "描述",
         "username": "用户名",
         "role_name": "角色名",

@@ -10,7 +10,7 @@ use sqlx::SqlitePool;
 pub struct EmployeeWithHash {
     pub id: i64,
     pub username: String,
-    pub display_name: String,
+    pub name: String,
     pub hash_pass: String,
     pub role_id: i64,
     pub is_system: bool,
@@ -44,7 +44,7 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, argon2::passw
 
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Employee>> {
     let employees = sqlx::query_as::<_, Employee>(
-        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee WHERE is_active = 1 ORDER BY username",
+        "SELECT id, username, name, role_id, is_system, is_active, created_at FROM employee WHERE is_active = 1 ORDER BY username",
     )
     .fetch_all(pool)
     .await?;
@@ -53,7 +53,7 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Employee>> {
 
 pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Employee>> {
     let employees = sqlx::query_as::<_, Employee>(
-        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee ORDER BY username",
+        "SELECT id, username, name, role_id, is_system, is_active, created_at FROM employee ORDER BY username",
     )
     .fetch_all(pool)
     .await?;
@@ -62,7 +62,7 @@ pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Employe
 
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Employee>> {
     let employee = sqlx::query_as::<_, Employee>(
-        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee WHERE id = ?",
+        "SELECT id, username, name, role_id, is_system, is_active, created_at FROM employee WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -72,7 +72,7 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Employe
 
 pub async fn find_by_username(pool: &SqlitePool, username: &str) -> RepoResult<Option<Employee>> {
     let employee = sqlx::query_as::<_, Employee>(
-        "SELECT id, username, display_name, role_id, is_system, is_active, created_at FROM employee WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, role_id, is_system, is_active, created_at FROM employee WHERE username = ? LIMIT 1",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -86,7 +86,7 @@ pub async fn find_by_username_with_hash(
     username: &str,
 ) -> RepoResult<Option<EmployeeWithHash>> {
     let employee = sqlx::query_as::<_, EmployeeWithHash>(
-        "SELECT id, username, display_name, hash_pass, role_id, is_system, is_active, created_at FROM employee WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, hash_pass, role_id, is_system, is_active, created_at FROM employee WHERE username = ? LIMIT 1",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -101,17 +101,17 @@ pub async fn create(
 ) -> RepoResult<Employee> {
     let hash_pass = hash_password(&data.password)
         .map_err(|e| RepoError::Database(format!("Failed to hash password: {e}")))?;
-    let display_name = data.display_name.unwrap_or_else(|| data.username.clone());
+    let name = data.name.unwrap_or_else(|| data.username.clone());
     let now = shared::util::now_millis();
 
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
     sqlx::query(
-        "INSERT INTO employee (id, username, hash_pass, display_name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?)",
+        "INSERT INTO employee (id, username, hash_pass, name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?)",
     )
     .bind(id)
     .bind(&data.username)
     .bind(&hash_pass)
-    .bind(&display_name)
+    .bind(&name)
     .bind(data.role_id)
     .bind(now)
     .execute(pool)
@@ -132,7 +132,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: EmployeeUpdate) -> RepoRes
         && (data.username.is_some()
             || data.role_id.is_some()
             || data.is_active.is_some()
-            || data.display_name.is_some())
+            || data.name.is_some())
     {
         return Err(RepoError::Business(
             ErrorCode::EmployeeIsSystem,
@@ -151,9 +151,9 @@ pub async fn update(pool: &SqlitePool, id: i64, data: EmployeeUpdate) -> RepoRes
     };
 
     let rows = sqlx::query!(
-        "UPDATE employee SET username = COALESCE(?1, username), display_name = COALESCE(?2, display_name), hash_pass = COALESCE(?3, hash_pass), role_id = COALESCE(?4, role_id), is_active = COALESCE(?5, is_active) WHERE id = ?6",
+        "UPDATE employee SET username = COALESCE(?1, username), name = COALESCE(?2, name), hash_pass = COALESCE(?3, hash_pass), role_id = COALESCE(?4, role_id), is_active = COALESCE(?5, is_active) WHERE id = ?6",
         data.username,
-        data.display_name,
+        data.name,
         hash_pass,
         data.role_id,
         data.is_active,

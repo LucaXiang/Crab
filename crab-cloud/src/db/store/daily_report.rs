@@ -9,7 +9,7 @@ use super::BoxError;
 
 pub async fn upsert_daily_report_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -20,14 +20,14 @@ pub async fn upsert_daily_report_from_sync(
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"
         INSERT INTO store_daily_reports (
-            edge_server_id, source_id, business_date,
+            store_id, source_id, business_date,
             total_orders, completed_orders, void_orders,
             total_sales, total_paid, total_unpaid, void_amount,
             total_tax, total_discount, total_surcharge,
             generated_at, generated_by_id, generated_by_name, note, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             business_date = EXCLUDED.business_date,
             total_orders = EXCLUDED.total_orders, completed_orders = EXCLUDED.completed_orders,
@@ -42,7 +42,7 @@ pub async fn upsert_daily_report_from_sync(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(&report.business_date)
     .bind(report.total_orders)

@@ -102,10 +102,10 @@ export const CartItem = React.memo<CartItemProps>(({
                       ? 'bg-amber-100 text-amber-700'
                       : 'bg-purple-100 text-purple-700'
                   }`}
-                  title={`${rule.display_name}: ${rule.adjustment_type === 'PERCENTAGE' ? `${rule.adjustment_value}%` : formatCurrency(rule.adjustment_value)}`}
+                  title={`${rule.name}: ${rule.adjustment_type === 'PERCENTAGE' ? `${rule.adjustment_value}%` : formatCurrency(rule.adjustment_value)}`}
                 >
                   <Percent size={10} />
-                  <span>{rule.receipt_name || rule.display_name}</span>
+                  <span>{rule.receipt_name || rule.name}</span>
                   <span className="font-medium">
                     {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
                     {formatCurrency(Math.abs(rule.calculated_amount))}

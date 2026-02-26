@@ -95,7 +95,7 @@ const useAppInitialization = () => {
           const user = {
             id: session.user_info.id,
             username: session.user_info.username,
-            display_name: session.user_info.display_name,
+            name: session.user_info.name,
             role_id: session.user_info.role_id,
             role_name: session.user_info.role_name,
             permissions: session.user_info.permissions,

@@ -10,7 +10,7 @@ import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { FormSection, FormField, inputClass } from '@/shared/components/FormField';
 import { updateDiscountRule } from '../mutations';
-import type { MgDiscountRule, MgDiscountRuleCreate, ProductScope, AdjustmentType } from '@/core/domain/types/api';
+import type { MgDiscountRule, MgDiscountRuleUpdate, ProductScope, AdjustmentType } from '@/core/domain/types/api';
 
 // ── Single-select card grid (from Step2Scope) ──
 
@@ -114,8 +114,7 @@ export const DiscountRuleEditModal: React.FC<DiscountRuleEditModalProps> = ({
   const [productScope, setProductScope] = useState<ProductScope>(rule.product_scope);
   const [targetId, setTargetId] = useState<number | null>(rule.target_id ?? null);
   const [name, setName] = useState(rule.name);
-  const [displayName, setDisplayName] = useState(rule.display_name);
-  const [receiptName, setReceiptName] = useState(rule.receipt_name);
+  const [receiptName, setReceiptName] = useState(rule.receipt_name ?? '');
 
   const isPercentage = adjustmentType === 'PERCENTAGE';
 
@@ -162,17 +161,15 @@ export const DiscountRuleEditModal: React.FC<DiscountRuleEditModalProps> = ({
     (adjustmentType !== 'PERCENTAGE' || adjustmentValue <= 100) &&
     (productScope === 'GLOBAL' || targetId != null) &&
     name.trim() !== '' &&
-    displayName.trim() !== '' &&
     receiptName.trim() !== '';
 
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     try {
-      const payload: MgDiscountRuleCreate = {
+      const payload: MgDiscountRuleUpdate = {
         name: name.trim(),
-        display_name: displayName.trim(),
-        receipt_name: receiptName.trim(),
+        receipt_name: receiptName.trim() || null,
         product_scope: productScope,
         target_id: productScope === 'GLOBAL' ? null : targetId,
         adjustment_type: adjustmentType,
@@ -278,15 +275,6 @@ export const DiscountRuleEditModal: React.FC<DiscountRuleEditModalProps> = ({
                 <p className="mt-1 text-xs text-gray-500">
                   {t('settings.marketing_group.rule_wizard.name_hint')}
                 </p>
-              </FormField>
-              <FormField label={t('settings.marketing_group.field.display_name')} required>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.marketing_group.rule_wizard.display_name_placeholder')}
-                />
               </FormField>
             </div>
             <FormField label={t('settings.marketing_group.rule_wizard.receipt_name')} required>

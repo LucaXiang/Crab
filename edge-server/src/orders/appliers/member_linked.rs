@@ -160,8 +160,7 @@ mod tests {
             applied_mg_rules: vec![AppliedMgRule {
                 rule_id: 1,
                 name: "vip-10".to_string(),
-                display_name: "VIP 10%".to_string(),
-                receipt_name: "VIP10".to_string(),
+                receipt_name: Some("VIP10".to_string()),
                 product_scope: ProductScope::Global,
                 adjustment_type: AdjustmentType::Percentage,
                 adjustment_value: 10.0,

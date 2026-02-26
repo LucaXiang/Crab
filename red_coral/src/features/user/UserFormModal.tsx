@@ -63,7 +63,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       setFormData({
         username: editingUser.username,
         password: '', // Don't populate password for editing
-        displayName: editingUser.display_name || '',
+        displayName: editingUser.name || '',
         role_id: editingUser.role_id,
         isActive: editingUser.is_active,
       });
@@ -104,7 +104,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       }
     }
     if (!formData.displayName.trim()) {
-      toast.error(t('settings.user.form.display_name_required'));
+      toast.error(t('settings.user.form.name_required'));
       return;
     }
 
@@ -241,13 +241,13 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
           {/* Profile Section */}
           <FormSection title={t('settings.user.section.profile')} icon={UserIcon}>
-            <FormField label={t('settings.user.form.display_name')} required>
+            <FormField label={t('settings.user.form.name')} required>
               <input
                 type="text"
                 value={formData.displayName}
                 onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                 className={inputClass}
-                placeholder={t('settings.user.form.display_name_placeholder')}
+                placeholder={t('settings.user.form.name_placeholder')}
                 maxLength={MAX_NAME_LEN}
               />
             </FormField>
@@ -260,7 +260,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 className={selectClass}
               >
                 {roles.map((role) => {
-                  let label = role.display_name;
+                  let label = role.name;
                   if (role.name === 'admin') label = t('auth.roles.admin') || label;
                   return (
                     <option key={role.id} value={role.id}>

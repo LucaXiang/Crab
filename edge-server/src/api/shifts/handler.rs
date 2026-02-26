@@ -112,7 +112,7 @@ pub async fn create(
         "shift",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "starting_cash": s.starting_cash,
             "opened_at": s.start_time,
@@ -152,7 +152,7 @@ pub async fn update(
         "shift",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = crate::audit::create_diff(&old, &s, "shift")
     );
 
@@ -183,7 +183,7 @@ pub async fn close(
         "shift",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "starting_cash": s.starting_cash,
             "expected_cash": s.expected_cash,
@@ -219,7 +219,7 @@ pub async fn force_close(
         "shift",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = serde_json::json!({
             "forced": true,
             "starting_cash": s.starting_cash,

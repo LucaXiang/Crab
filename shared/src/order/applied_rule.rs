@@ -9,8 +9,8 @@ pub struct AppliedRule {
     // === Rule Identity ===
     pub rule_id: i64,
     pub name: String,
-    pub display_name: String,
-    pub receipt_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
 
     // === Rule Type ===
     pub rule_type: RuleType,
@@ -41,7 +41,6 @@ impl AppliedRule {
         Self {
             rule_id: rule.id,
             name: rule.name.clone(),
-            display_name: rule.display_name.clone(),
             receipt_name: rule.receipt_name.clone(),
             rule_type: rule.rule_type.clone(),
             adjustment_type: rule.adjustment_type.clone(),
@@ -66,8 +65,7 @@ mod tests {
         let rule = PriceRule {
             id: 1,
             name: "lunch".to_string(),
-            display_name: "Lunch Discount".to_string(),
-            receipt_name: "LUNCH".to_string(),
+            receipt_name: Some("LUNCH".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
@@ -91,8 +89,7 @@ mod tests {
 
         assert_eq!(applied.rule_id, 1);
         assert_eq!(applied.name, "lunch");
-        assert_eq!(applied.display_name, "Lunch Discount");
-        assert_eq!(applied.receipt_name, "LUNCH");
+        assert_eq!(applied.receipt_name, Some("LUNCH".to_string()));
         assert_eq!(applied.rule_type, RuleType::Discount);
         assert_eq!(applied.adjustment_type, AdjustmentType::Percentage);
         assert_eq!(applied.product_scope, ProductScope::Global);
@@ -109,8 +106,7 @@ mod tests {
         let applied = AppliedRule {
             rule_id: 1,
             name: "test".to_string(),
-            display_name: "Test".to_string(),
-            receipt_name: "TEST".to_string(),
+            receipt_name: Some("TEST".to_string()),
             rule_type: RuleType::Discount,
             adjustment_type: AdjustmentType::Percentage,
             product_scope: ProductScope::Global,
@@ -133,7 +129,6 @@ mod tests {
         let json = r#"{
             "rule_id": 1,
             "name": "test",
-            "display_name": "Test",
             "receipt_name": "TEST",
             "rule_type": "DISCOUNT",
             "adjustment_type": "PERCENTAGE",

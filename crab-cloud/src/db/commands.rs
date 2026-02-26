@@ -7,7 +7,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Create a new command record for an edge-server (audit trail)
 pub async fn create_command(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     command_type: &str,
     payload: &serde_json::Value,
@@ -15,12 +15,12 @@ pub async fn create_command(
 ) -> Result<i64, BoxError> {
     let row: (i64,) = sqlx::query_as(
         r#"
-        INSERT INTO store_commands (edge_server_id, tenant_id, command_type, payload, status, created_at)
+        INSERT INTO store_commands (store_id, tenant_id, command_type, payload, status, created_at)
         VALUES ($1, $2, $3, $4, 'pending', $5)
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(command_type)
     .bind(payload)
@@ -72,7 +72,7 @@ pub struct CommandRecord {
 
 pub async fn get_command_history(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     limit: i32,
     offset: i32,
@@ -81,12 +81,12 @@ pub async fn get_command_history(
         r#"
         SELECT id, command_type, payload, status, created_at, executed_at, result
         FROM store_commands
-        WHERE edge_server_id = $1 AND tenant_id = $2
+        WHERE store_id = $1 AND tenant_id = $2
         ORDER BY created_at DESC
         LIMIT $3 OFFSET $4
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(limit)
     .bind(offset)

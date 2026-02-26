@@ -8,7 +8,7 @@ import { User } from '@/core/domain/types';
 interface EscalateAuthorizer {
   id: number;
   username: string;
-  display_name: string;
+  name: string;
   role_id: number;
   role_name: string;
   permissions: string[];
@@ -59,7 +59,7 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
       const supervisor: User = {
         id: authorizer.id,
         username: authorizer.username,
-        display_name: authorizer.display_name,
+        name: authorizer.name,
         role_id: authorizer.role_id,
         role_name: authorizer.role_name,
         permissions: authorizer.permissions,

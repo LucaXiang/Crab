@@ -4,7 +4,7 @@ import JsBarcode from 'jsbarcode';
 import type { LabelTemplate, LabelField } from '@/core/types/store';
 import { LabelFieldType, LabelFieldAlignment, LabelVerticalAlign } from '@/core/types/store';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getImageBlobUrl } from '@/infrastructure/api/store';
+import { getImageUrl } from '@/infrastructure/api/store';
 import { useI18n } from '@/hooks/useI18n';
 
 const LABEL_IMAGE_LOAD_DEBOUNCE_MS = 800;
@@ -44,7 +44,6 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [fieldImages, setFieldImages] = useState<Record<string, HTMLImageElement>>({});
-  const cloudBlobUrlsRef = useRef<string[]>([]);
   const [needsRedraw, setNeedsRedraw] = useState(true);
   const isDraggingRef = useRef(false);
 
@@ -61,8 +60,6 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     let isMounted = true;
     const loadImages = async () => {
       // Revoke previous cloud blob URLs to prevent memory leaks
-      cloudBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      cloudBlobUrlsRef.current = [];
 
       const newImages: Record<string, HTMLImageElement> = {};
       const imageFields = template.fields.filter(
@@ -102,8 +99,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
                 // Image hash — load from cloud
                 if (!content.startsWith('http') && !content.startsWith('data:') && content.length < 3) return;
                 if (token && !content.startsWith('http') && !content.startsWith('data:')) {
-                  src = await getImageBlobUrl(token, content);
-                  cloudBlobUrlsRef.current.push(src);
+                  src = await getImageUrl(token, content);
                 } else {
                   src = content;
                 }
@@ -135,8 +131,6 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     return () => {
       isMounted = false;
       clearTimeout(debounceTimer);
-      cloudBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      cloudBlobUrlsRef.current = [];
     };
   }, [template.fields, test_dataObj, token]);
 

@@ -67,8 +67,8 @@ pub struct Claims {
     pub sub: String,
     /// 用户名
     pub username: String,
-    /// 显示名称
-    pub display_name: String,
+    /// 名称
+    pub name: String,
     /// 角色 ID
     pub role_id: i64,
     /// 角色名称
@@ -240,7 +240,7 @@ impl JwtService {
         &self,
         user_id: i64,
         username: &str,
-        display_name: &str,
+        name: &str,
         role_id: i64,
         role_name: &str,
         permissions: &[String],
@@ -254,7 +254,7 @@ impl JwtService {
         let claims = Claims {
             sub: user_id.to_string(),
             username: username.to_string(),
-            display_name: display_name.to_string(),
+            name: name.to_string(),
             role_id,
             role_name: role_name.to_string(),
             permissions: permissions_str,
@@ -336,8 +336,8 @@ pub struct CurrentUser {
     pub id: i64,
     /// 用户名
     pub username: String,
-    /// 显示名称
-    pub display_name: String,
+    /// 名称
+    pub name: String,
     /// 角色 ID
     pub role_id: i64,
     /// 角色名称
@@ -369,7 +369,7 @@ impl TryFrom<Claims> for CurrentUser {
         Ok(Self {
             id,
             username: claims.username,
-            display_name: claims.display_name,
+            name: claims.name,
             role_id: claims.role_id,
             role_name: claims.role_name,
             permissions,
@@ -458,7 +458,7 @@ mod tests {
 
         assert_eq!(claims.sub, "123");
         assert_eq!(claims.username, "john_doe");
-        assert_eq!(claims.display_name, "John Doe");
+        assert_eq!(claims.name, "John Doe");
         assert_eq!(claims.role_id, 1);
         assert_eq!(claims.role_name, "user");
         assert_eq!(claims.permissions, "products:read,products:write");
@@ -470,7 +470,7 @@ mod tests {
         let user = CurrentUser {
             id: 1,
             username: "john".to_string(),
-            display_name: "John Doe".to_string(),
+            name: "John Doe".to_string(),
             role_id: 1,
             role_name: "user".to_string(),
             permissions: vec!["products:read".to_string(), "products:*".to_string()],
@@ -487,7 +487,7 @@ mod tests {
         let admin = CurrentUser {
             id: 1,
             username: "admin".to_string(),
-            display_name: "Admin".to_string(),
+            name: "Admin".to_string(),
             role_id: 1,
             role_name: "admin".to_string(),
             permissions: vec![],
@@ -530,7 +530,7 @@ mod tests {
 
         assert_eq!(claims.sub, "123");
         assert_eq!(claims.username, "john_doe");
-        assert_eq!(claims.display_name, "John Doe");
+        assert_eq!(claims.name, "John Doe");
         assert_eq!(claims.role_id, 1);
         assert_eq!(claims.role_name, "user");
         assert_eq!(claims.permissions, "products:read,products:write");

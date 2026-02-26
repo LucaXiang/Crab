@@ -71,7 +71,7 @@ export interface OrderEvent {
 }
 
 export interface LiveOrderSnapshot {
-  edge_server_id: number;
+  store_id: number;
   order_id: string;
   table_id?: number;
   table_name?: string;
@@ -115,5 +115,5 @@ export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'dis
 export type ConsoleMessage =
   | { type: 'Ready'; snapshots: LiveOrderSnapshot[]; online_edge_ids?: number[] }
   | { type: 'OrderUpdated'; snapshot: LiveOrderSnapshot }
-  | { type: 'OrderRemoved'; order_id: string; edge_server_id: number }
-  | { type: 'EdgeStatus'; edge_server_id: number; online: boolean; cleared_order_ids?: string[] };
+  | { type: 'OrderRemoved'; order_id: string; store_id: number }
+  | { type: 'EdgeStatus'; store_id: number; online: boolean; cleared_order_ids?: string[] };

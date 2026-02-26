@@ -75,20 +75,11 @@ pub struct StoreSummary {
 pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
-        SELECT
-            e.id, e.entity_id,
-            COALESCE(NULLIF(si.name, ''), e.name) AS name,
-            COALESCE(NULLIF(si.address, ''), e.address) AS address,
-            COALESCE(si.phone, e.phone) AS phone,
-            COALESCE(NULLIF(si.nif, ''), e.nif) AS nif,
-            COALESCE(si.email, e.email) AS email,
-            COALESCE(si.website, e.website) AS website,
-            COALESCE(si.business_day_cutoff, e.business_day_cutoff) AS business_day_cutoff,
-            e.device_id, e.last_sync_at, e.registered_at
-        FROM edge_servers e
-        LEFT JOIN store_info si ON si.edge_server_id = e.id
-        WHERE e.tenant_id = $1
-        ORDER BY e.registered_at DESC
+        SELECT id, entity_id, name, address, phone, nif, email, website,
+               business_day_cutoff, device_id, last_sync_at, registered_at
+        FROM stores
+        WHERE tenant_id = $1
+        ORDER BY registered_at DESC
         "#,
     )
     .bind(tenant_id)
@@ -111,7 +102,7 @@ pub struct ArchivedOrderSummary {
 
 pub async fn list_orders(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     status_filter: Option<&str>,
     limit: i32,
@@ -122,12 +113,12 @@ pub async fn list_orders(
             r#"
             SELECT id, source_id, receipt_number, status, end_time, total, synced_at
             FROM store_archived_orders
-            WHERE edge_server_id = $1 AND tenant_id = $2 AND status = $3
+            WHERE store_id = $1 AND tenant_id = $2 AND status = $3
             ORDER BY end_time DESC NULLS LAST
             LIMIT $4 OFFSET $5
             "#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(tenant_id)
         .bind(status)
         .bind(limit)
@@ -139,12 +130,12 @@ pub async fn list_orders(
             r#"
             SELECT id, source_id, receipt_number, status, end_time, total, synced_at
             FROM store_archived_orders
-            WHERE edge_server_id = $1 AND tenant_id = $2
+            WHERE store_id = $1 AND tenant_id = $2
             ORDER BY end_time DESC NULLS LAST
             LIMIT $3 OFFSET $4
             "#,
         )
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(tenant_id)
         .bind(limit)
         .bind(offset)
@@ -174,7 +165,7 @@ pub struct DailyReportEntry {
 
 pub async fn list_daily_reports(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     from: Option<&str>,
     to: Option<&str>,
@@ -185,15 +176,15 @@ pub async fn list_daily_reports(
                dr.total_sales, dr.total_paid, dr.total_unpaid, dr.void_amount,
                dr.total_tax, dr.total_discount, dr.total_surcharge, dr.updated_at
         FROM store_daily_reports dr
-        JOIN edge_servers es ON es.id = dr.edge_server_id
-        WHERE dr.edge_server_id = $1
-            AND es.tenant_id = $2
+        JOIN stores s ON s.id = dr.store_id
+        WHERE dr.store_id = $1
+            AND s.tenant_id = $2
             AND ($3::TEXT IS NULL OR dr.business_date >= $3)
             AND ($4::TEXT IS NULL OR dr.business_date <= $4)
         ORDER BY dr.business_date DESC
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(from)
     .bind(to)
@@ -268,7 +259,7 @@ pub struct ShiftBreakdownDetail {
 
 pub async fn get_daily_report_detail(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     date: &str,
 ) -> Result<Option<DailyReportDetail>, BoxError> {
@@ -300,11 +291,11 @@ pub async fn get_daily_report_detail(
                dr.total_tax, dr.total_discount, dr.total_surcharge,
                dr.generated_at, dr.generated_by_id, dr.generated_by_name, dr.note
         FROM store_daily_reports dr
-        JOIN edge_servers es ON es.id = dr.edge_server_id
-        WHERE dr.edge_server_id = $1 AND es.tenant_id = $2 AND dr.business_date = $3
+        JOIN stores s ON s.id = dr.store_id
+        WHERE dr.store_id = $1 AND s.tenant_id = $2 AND dr.business_date = $3
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(date)
     .fetch_optional(pool)
@@ -383,7 +374,7 @@ pub async fn get_daily_report_detail(
 /// Get order detail from store_archived_orders.detail JSONB column
 pub async fn get_order_detail(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     order_key: &str,
 ) -> Result<Option<serde_json::Value>, BoxError> {
@@ -391,11 +382,11 @@ pub async fn get_order_detail(
         r#"
         SELECT detail
         FROM store_archived_orders
-        WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3
+        WHERE store_id = $1 AND tenant_id = $2 AND order_key = $3
             AND detail IS NOT NULL
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(order_key)
     .fetch_optional(pool)
@@ -406,7 +397,7 @@ pub async fn get_order_detail(
 /// Get order desglose from store_archived_orders.desglose JSONB column
 pub async fn get_order_desglose(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     order_key: &str,
 ) -> Result<Vec<shared::cloud::TaxDesglose>, BoxError> {
@@ -414,10 +405,10 @@ pub async fn get_order_desglose(
         r#"
         SELECT desglose
         FROM store_archived_orders
-        WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3
+        WHERE store_id = $1 AND tenant_id = $2 AND order_key = $3
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(order_key)
     .fetch_optional(pool)
@@ -499,12 +490,12 @@ pub struct TagSaleEntry {
 /// Compute store overview for a single store
 pub async fn get_store_overview(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     from: i64,
     to: i64,
 ) -> Result<StoreOverview, BoxError> {
-    get_overview(pool, tenant_id, Some(edge_server_id), from, to).await
+    get_overview(pool, tenant_id, Some(store_id), from, to).await
 }
 
 /// Compute tenant-wide overview (all stores combined)
@@ -517,12 +508,12 @@ pub async fn get_tenant_overview(
     get_overview(pool, tenant_id, None, from, to).await
 }
 
-/// Parameterized overview: edge_server_id=None → tenant-wide, Some → single store.
+/// Parameterized overview: store_id=None → tenant-wide, Some → single store.
 /// All queries enforce tenant_id isolation.
 async fn get_overview(
     pool: &PgPool,
     tenant_id: &str,
-    edge_server_id: Option<i64>,
+    store_id: Option<i64>,
     from: i64,
     to: i64,
 ) -> Result<StoreOverview, BoxError> {
@@ -545,12 +536,12 @@ async fn get_overview(
             COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION
         FROM store_archived_orders
         WHERE tenant_id = $1
-            AND ($2::BIGINT IS NULL OR edge_server_id = $2)
+            AND ($2::BIGINT IS NULL OR store_id = $2)
             AND end_time >= $3 AND end_time < $4
         "#,
     )
     .bind(tenant_id)
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(from)
     .bind(to)
     .fetch_one(pool)
@@ -598,7 +589,7 @@ async fn get_overview(
                 COUNT(*) AS orders
             FROM store_archived_orders
             WHERE tenant_id = $1
-                AND ($2::BIGINT IS NULL OR edge_server_id = $2)
+                AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
             GROUP BY hour
@@ -606,7 +597,7 @@ async fn get_overview(
             "#,
         )
         .bind(tenant_id)
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(from)
         .bind(to)
         .fetch_all(pool),
@@ -620,7 +611,7 @@ async fn get_overview(
             FROM store_archived_orders,
                  jsonb_array_elements(desglose) AS d
             WHERE tenant_id = $1
-                AND ($2::BIGINT IS NULL OR edge_server_id = $2)
+                AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
                 AND desglose IS NOT NULL AND jsonb_typeof(desglose) = 'array'
@@ -629,7 +620,7 @@ async fn get_overview(
             "#,
         )
         .bind(tenant_id)
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(from)
         .bind(to)
         .fetch_all(pool),
@@ -643,7 +634,7 @@ async fn get_overview(
             FROM store_archived_orders o
             CROSS JOIN jsonb_array_elements(o.detail->'payments') AS p
             WHERE o.tenant_id = $1
-                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
                 AND o.detail IS NOT NULL
@@ -653,7 +644,7 @@ async fn get_overview(
             "#,
         )
         .bind(tenant_id)
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(from)
         .bind(to)
         .fetch_all(pool),
@@ -667,7 +658,7 @@ async fn get_overview(
             FROM store_archived_orders o
             CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
             WHERE o.tenant_id = $1
-                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
                 AND o.detail IS NOT NULL
@@ -677,7 +668,7 @@ async fn get_overview(
             "#,
         )
         .bind(tenant_id)
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(from)
         .bind(to)
         .fetch_all(pool),
@@ -690,7 +681,7 @@ async fn get_overview(
             FROM store_archived_orders o
             CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
             WHERE o.tenant_id = $1
-                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
                 AND o.detail IS NOT NULL
@@ -700,7 +691,7 @@ async fn get_overview(
             "#,
         )
         .bind(tenant_id)
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(from)
         .bind(to)
         .fetch_all(pool),
@@ -715,12 +706,12 @@ async fn get_overview(
             FROM store_archived_orders o
             CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
             JOIN store_products p ON p.source_id = (i->>'product_source_id')::BIGINT
-                AND p.edge_server_id = o.edge_server_id
+                AND p.store_id = o.store_id
             JOIN store_product_tag pt ON pt.product_id = p.id
             JOIN store_tags t ON t.source_id = pt.tag_source_id
-                AND t.edge_server_id = o.edge_server_id
+                AND t.store_id = o.store_id
             WHERE o.tenant_id = $1
-                AND ($2::BIGINT IS NULL OR o.edge_server_id = $2)
+                AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
                 AND o.detail IS NOT NULL
@@ -731,7 +722,7 @@ async fn get_overview(
             "#,
         )
         .bind(tenant_id)
-        .bind(edge_server_id)
+        .bind(store_id)
         .bind(from)
         .bind(to)
         .fetch_all(pool),
@@ -797,7 +788,7 @@ pub struct RedFlagsResponse {
 
 pub async fn get_red_flags(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     from: i64,
     to: i64,
@@ -825,7 +816,7 @@ pub async fn get_red_flags(
             COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_MODIFIED') AS price_modifications
         FROM store_archived_orders o
         CROSS JOIN jsonb_array_elements(o.detail->'events') AS e
-        WHERE o.edge_server_id = $1 AND o.tenant_id = $2
+        WHERE o.store_id = $1 AND o.tenant_id = $2
             AND o.detail IS NOT NULL
             AND (e->>'timestamp')::BIGINT >= $3 AND (e->>'timestamp')::BIGINT < $4
             AND e->>'event_type' IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
@@ -833,7 +824,7 @@ pub async fn get_red_flags(
         ORDER BY COUNT(*) DESC
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(tenant_id)
     .bind(from)
     .bind(to)
@@ -879,14 +870,14 @@ pub async fn get_red_flags(
     })
 }
 
-/// Verify edge-server belongs to tenant, return edge_server_id
+/// Verify edge-server belongs to tenant, return store_id
 pub async fn verify_store_ownership(
     pool: &PgPool,
     store_id: i64,
     tenant_id: &str,
 ) -> Result<Option<i64>, BoxError> {
     let row: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM edge_servers WHERE id = $1 AND tenant_id = $2")
+        sqlx::query_as("SELECT id FROM stores WHERE id = $1 AND tenant_id = $2")
             .bind(store_id)
             .bind(tenant_id)
             .fetch_optional(pool)

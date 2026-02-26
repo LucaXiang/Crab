@@ -328,7 +328,7 @@ const MemberFormModal: React.FC<{
               required
               value={groupId}
               onChange={(v) => setGroupId(Number(v))}
-              options={groups.map((g) => ({ value: g.id, label: g.display_name }))}
+              options={groups.map((g) => ({ value: g.id, label: g.name }))}
             />
 
             <FormField label={t('settings.member.field.birthday')}>

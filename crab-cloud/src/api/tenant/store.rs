@@ -25,33 +25,24 @@ pub async fn list_stores(
             AppError::new(ErrorCode::InternalError)
         })?;
 
-    let mut result = Vec::new();
-    for store in stores {
-        let store_info = crate::db::store::get_store_info(&state.pool, store.id)
-            .await
-            .map_err(|e| {
-                tracing::error!(store_id = store.id, "Failed to get store_info: {e}");
-                AppError::new(ErrorCode::InternalError)
-            })?
-            .and_then(|info| serde_json::to_value(info).ok());
-
-        result.push(shared::cloud::StoreDetailResponse {
-            id: store.id,
-            entity_id: store.entity_id,
-            name: store.name,
-            address: store.address,
-            phone: store.phone,
-            nif: store.nif,
-            email: store.email,
-            website: store.website,
-            business_day_cutoff: store.business_day_cutoff,
-            device_id: store.device_id,
-            is_online: state.edges.connected.contains_key(&store.id),
-            last_sync_at: store.last_sync_at,
-            registered_at: store.registered_at,
-            store_info,
-        });
-    }
+    let result: Vec<_> = stores
+        .into_iter()
+        .map(|s| shared::cloud::StoreDetailResponse {
+            id: s.id,
+            entity_id: s.entity_id,
+            name: s.name,
+            address: s.address,
+            phone: s.phone,
+            nif: s.nif,
+            email: s.email,
+            website: s.website,
+            business_day_cutoff: s.business_day_cutoff,
+            device_id: s.device_id,
+            is_online: state.edges.connected.contains_key(&s.id),
+            last_sync_at: s.last_sync_at,
+            registered_at: s.registered_at,
+        })
+        .collect();
 
     Ok(Json(result))
 }

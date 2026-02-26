@@ -166,7 +166,11 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
             }
         }
 
-        applied_rules.push(rule.receipt_name.clone());
+        applied_rules.push(
+            rule.receipt_name
+                .clone()
+                .unwrap_or_else(|| rule.name.clone()),
+        );
     }
 
     PriceAdjustment {
@@ -190,8 +194,7 @@ mod tests {
         PriceRule {
             id: 0,
             name: "test".to_string(),
-            display_name: "Test".to_string(),
-            receipt_name: "TEST".to_string(),
+            receipt_name: Some("TEST".to_string()),
             description: None,
             rule_type,
             product_scope: ProductScope::Global,

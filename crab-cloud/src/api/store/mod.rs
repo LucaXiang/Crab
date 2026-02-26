@@ -42,10 +42,10 @@ fn internal(e: impl std::fmt::Display) -> AppError {
 }
 
 /// Push StoreOp to edge: direct send if online, queue to pending_ops if offline.
-async fn push_to_edge(state: &AppState, edge_server_id: i64, op: StoreOp) {
+async fn push_to_edge(state: &AppState, store_id: i64, op: StoreOp) {
     let now = shared::util::now_millis();
 
-    if let Some(sender) = state.edges.connected.get(&edge_server_id) {
+    if let Some(sender) = state.edges.connected.get(&store_id) {
         let msg = CloudMessage::Rpc {
             id: format!("push-{}", uuid::Uuid::new_v4()),
             payload: Box::new(CloudRpc::StoreOp {
@@ -55,9 +55,9 @@ async fn push_to_edge(state: &AppState, edge_server_id: i64, op: StoreOp) {
         };
         let _ = sender.try_send(msg);
     } else if let Err(e) =
-        crate::db::store::pending_ops::insert(&state.pool, edge_server_id, &op, now).await
+        crate::db::store::pending_ops::insert(&state.pool, store_id, &op, now).await
     {
-        tracing::error!(edge_server_id, "Failed to queue pending op: {e}");
+        tracing::error!(store_id, "Failed to queue pending op: {e}");
     }
 }
 

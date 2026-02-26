@@ -44,8 +44,8 @@ pub const ZONE_SCOPE_RETAIL: &str = "retail";
 pub struct PriceRule {
     pub id: i64,
     pub name: String,
-    pub display_name: String,
-    pub receipt_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
     pub description: Option<String>,
     pub rule_type: RuleType,
     pub product_scope: ProductScope,
@@ -78,8 +78,8 @@ pub struct PriceRule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceRuleCreate {
     pub name: String,
-    pub display_name: String,
-    pub receipt_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_name: Option<String>,
     pub description: Option<String>,
     pub rule_type: RuleType,
     pub product_scope: ProductScope,
@@ -101,7 +101,6 @@ pub struct PriceRuleCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceRuleUpdate {
     pub name: Option<String>,
-    pub display_name: Option<String>,
     pub receipt_name: Option<String>,
     pub description: Option<String>,
     pub rule_type: Option<RuleType>,

@@ -34,7 +34,7 @@ fn alignment_to_str(a: &LabelFieldAlignment) -> &'static str {
 
 pub async fn upsert_label_template_from_sync(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     source_id: i64,
     data: &serde_json::Value,
@@ -48,13 +48,13 @@ pub async fn upsert_label_template_from_sync(
     let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_label_templates (
-            edge_server_id, source_id, tenant_id, name, description,
+            store_id, source_id, tenant_id, name, description,
             width, height, padding, is_default, is_active,
             width_mm, height_mm, padding_mm_x, padding_mm_y,
             render_dpi, test_data, created_at, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17)
-        ON CONFLICT (edge_server_id, source_id)
+        ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             name = EXCLUDED.name, description = EXCLUDED.description,
             width = EXCLUDED.width, height = EXCLUDED.height,
@@ -68,7 +68,7 @@ pub async fn upsert_label_template_from_sync(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(tenant_id)
     .bind(&tmpl.name)
@@ -289,7 +289,7 @@ async fn batch_insert_field_inputs(
 
 pub async fn list_label_templates(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
 ) -> Result<Vec<LabelTemplate>, BoxError> {
     // Use internal struct to hold PG id for field join, expose source_id as id
     #[derive(sqlx::FromRow)]
@@ -320,11 +320,11 @@ pub async fn list_label_templates(
                padding_mm_x, padding_mm_y, render_dpi, test_data,
                created_at, updated_at
         FROM store_label_templates
-        WHERE edge_server_id = $1
+        WHERE store_id = $1
         ORDER BY created_at
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .fetch_all(pool)
     .await?;
 
@@ -383,7 +383,7 @@ pub async fn list_label_templates(
 
 pub async fn create_label_template_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     tenant_id: &str,
     data: &LabelTemplateCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
@@ -395,7 +395,7 @@ pub async fn create_label_template_direct(
     let (pg_id,): (i64,) = sqlx::query_as(
         r#"
         INSERT INTO store_label_templates (
-            edge_server_id, source_id, tenant_id, name, description,
+            store_id, source_id, tenant_id, name, description,
             width, height, padding, is_default, is_active,
             width_mm, height_mm, padding_mm_x, padding_mm_y,
             render_dpi, test_data, created_at, updated_at
@@ -404,7 +404,7 @@ pub async fn create_label_template_direct(
         RETURNING id
         "#,
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .bind(tenant_id)
     .bind(&data.name)
@@ -469,7 +469,7 @@ pub async fn create_label_template_direct(
 
 pub async fn update_label_template_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
     data: &shared::models::label_template::LabelTemplateUpdate,
 ) -> Result<StoreOpData, BoxError> {
@@ -478,9 +478,9 @@ pub async fn update_label_template_direct(
 
     // Resolve PG id from source_id
     let pg_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM store_label_templates WHERE edge_server_id = $1 AND source_id = $2",
+        "SELECT id FROM store_label_templates WHERE store_id = $1 AND source_id = $2",
     )
-    .bind(edge_server_id)
+    .bind(store_id)
     .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
@@ -572,16 +572,15 @@ pub async fn update_label_template_direct(
 
 pub async fn delete_label_template_direct(
     pool: &PgPool,
-    edge_server_id: i64,
+    store_id: i64,
     source_id: i64,
 ) -> Result<(), BoxError> {
-    let rows = sqlx::query(
-        "DELETE FROM store_label_templates WHERE edge_server_id = $1 AND source_id = $2",
-    )
-    .bind(edge_server_id)
-    .bind(source_id)
-    .execute(pool)
-    .await?;
+    let rows =
+        sqlx::query("DELETE FROM store_label_templates WHERE store_id = $1 AND source_id = $2")
+            .bind(store_id)
+            .bind(source_id)
+            .execute(pool)
+            .await?;
     if rows.rows_affected() == 0 {
         return Err("Label template not found".into());
     }

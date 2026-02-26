@@ -17,7 +17,6 @@ import { Step4Targets } from './Step4Targets';
 
 export interface StampWizardState {
   name: string;
-  display_name: string;
   stamps_required: number;
   reward_quantity: number;
   is_cyclic: boolean;
@@ -29,7 +28,6 @@ export interface StampWizardState {
 
 const INITIAL_STATE: StampWizardState = {
   name: '',
-  display_name: '',
   stamps_required: 10,
   reward_quantity: 1,
   is_cyclic: true,
@@ -66,7 +64,7 @@ export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
   const canProceed = useCallback((): boolean => {
     switch (currentStep) {
       case 1:
-        return !!state.name.trim() && !!state.display_name.trim();
+        return !!state.name.trim();
       case 2:
         return state.stamps_required > 0 && state.reward_quantity > 0;
       case 3:
@@ -97,7 +95,6 @@ export const StampActivityWizard: React.FC<StampActivityWizardProps> = ({
     try {
       const payload: StampActivityCreate = {
         name: state.name.trim(),
-        display_name: state.display_name.trim(),
         stamps_required: state.stamps_required,
         reward_quantity: state.reward_quantity,
         reward_strategy: state.reward_strategy,

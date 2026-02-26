@@ -174,7 +174,6 @@ export const StampEditModal: React.FC<StampEditModalProps> = ({
 
   // ── Form state ──
   const [name, setName] = useState(activity.name);
-  const [displayName, setDisplayName] = useState(activity.display_name);
   const [stampsRequired, setStampsRequired] = useState(activity.stamps_required);
   const [rewardQuantity, setRewardQuantity] = useState(activity.reward_quantity);
   const [isCyclic, setIsCyclic] = useState(activity.is_cyclic);
@@ -215,7 +214,6 @@ export const StampEditModal: React.FC<StampEditModalProps> = ({
 
   const canSave =
     name.trim() !== '' &&
-    displayName.trim() !== '' &&
     stampsRequired > 0 &&
     rewardQuantity > 0 &&
     stampTargets.length > 0 &&
@@ -227,7 +225,6 @@ export const StampEditModal: React.FC<StampEditModalProps> = ({
     try {
       const payload: StampActivityCreate = {
         name: name.trim(),
-        display_name: displayName.trim(),
         stamps_required: stampsRequired,
         reward_quantity: rewardQuantity,
         reward_strategy: rewardStrategy,
@@ -277,15 +274,6 @@ export const StampEditModal: React.FC<StampEditModalProps> = ({
                 <p className="mt-1 text-xs text-gray-500">
                   {t('settings.marketing_group.stamp_wizard.name_hint')}
                 </p>
-              </FormField>
-              <FormField label={t('settings.marketing_group.field.display_name')} required>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className={inputClass}
-                  placeholder={t('settings.marketing_group.stamp.display_name_placeholder')}
-                />
               </FormField>
             </div>
           </FormSection>

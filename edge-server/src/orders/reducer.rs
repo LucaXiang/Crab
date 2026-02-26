@@ -371,8 +371,7 @@ mod tests {
         let discount_rule = PriceRule {
             id: 0,
             name: "test_discount".to_string(),
-            display_name: "Test Discount".to_string(),
-            receipt_name: "TD".to_string(),
+            receipt_name: Some("TD".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
@@ -451,8 +450,7 @@ mod tests {
         let discount_rule = PriceRule {
             id: 0,
             name: "test_discount".to_string(),
-            display_name: "Test Discount".to_string(),
-            receipt_name: "TD".to_string(),
+            receipt_name: Some("TD".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
@@ -504,8 +502,7 @@ mod tests {
         let discount_rule = PriceRule {
             id: 0,
             name: "test_discount".to_string(),
-            display_name: "Test Discount".to_string(),
-            receipt_name: "TD".to_string(),
+            receipt_name: Some("TD".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
@@ -562,8 +559,7 @@ mod tests {
         let discount_rule = PriceRule {
             id: 0,
             name: "test_discount".to_string(),
-            display_name: "Test Discount".to_string(),
-            receipt_name: "TD".to_string(),
+            receipt_name: Some("TD".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
@@ -621,8 +617,7 @@ mod tests {
         let global_rule = PriceRule {
             id: 0,
             name: "global_discount".to_string(),
-            display_name: "Global Discount".to_string(),
-            receipt_name: "GD".to_string(),
+            receipt_name: Some("GD".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
@@ -646,8 +641,7 @@ mod tests {
         let product_p1_rule = PriceRule {
             id: 0,
             name: "product_p1_discount".to_string(),
-            display_name: "P1 Discount".to_string(),
-            receipt_name: "P1D".to_string(),
+            receipt_name: Some("P1D".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Product,
@@ -671,8 +665,7 @@ mod tests {
         let product_p2_rule = PriceRule {
             id: 0,
             name: "product_p2_discount".to_string(),
-            display_name: "P2 Discount".to_string(),
-            receipt_name: "P2D".to_string(),
+            receipt_name: Some("P2D".to_string()),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Product,

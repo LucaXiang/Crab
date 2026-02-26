@@ -170,7 +170,6 @@ export const RolePermissionsEditor: React.FC = () => {
       await invokeApi('create_role', {
         data: {
           name: newRoleName,
-          display_name: newRoleDisplayName,
           description: newRoleDesc,
           is_system: false,
           is_active: true
@@ -203,8 +202,8 @@ export const RolePermissionsEditor: React.FC = () => {
   };
 
   const getRoleDisplayName = (role: Role) => {
-    if (role.name === 'admin') return t('auth.roles.admin') || role.display_name;
-    return role.display_name;
+    if (role.name === 'admin') return t('auth.roles.admin') || role.name;
+    return role.name;
   };
 
   // System roles are protected and cannot be deleted
@@ -250,7 +249,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (role.id) {
-                      setConfirmDelete({ isOpen: true, roleId: role.id, roleName: role.display_name });
+                      setConfirmDelete({ isOpen: true, roleId: role.id, roleName: role.name });
                     }
                   }}
                   className={`p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all ${

@@ -6,7 +6,7 @@ use shared::cloud::store_op::{StoreOp, StoreOpResult};
 use shared::error::{AppError, ErrorCode};
 
 use crate::auth::tenant_auth::TenantIdentity;
-use crate::db::store;
+use crate::db::{store, tenant_images};
 use crate::state::AppState;
 
 use super::{fire_ensure_image, internal, push_to_edge, verify_store};
@@ -41,6 +41,11 @@ pub async fn create_product(
         .await
         .map_err(internal)?;
 
+    // Track image reference
+    if let Some(hash) = data.image.as_deref().filter(|h| !h.is_empty()) {
+        let _ = tenant_images::increment_ref(&state.pool, &identity.tenant_id, hash).await;
+    }
+
     push_to_edge(
         &state,
         store_id,
@@ -63,12 +68,29 @@ pub async fn update_product(
     verify_store(&state, store_id, &identity.tenant_id).await?;
     fire_ensure_image(&state, store_id, &identity.tenant_id, data.image.as_deref()).await;
 
+    // Capture old image hash before update
+    let old_hash = tenant_images::get_product_image(&state.pool, store_id, product_id)
+        .await
+        .unwrap_or(None);
+
     store::update_product_direct(&state.pool, store_id, product_id, &data)
         .await
         .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;
+
+    // Update image references if image changed
+    let new_hash = data.image.as_deref().filter(|h| !h.is_empty());
+    if new_hash != old_hash.as_deref() {
+        let now = shared::util::now_millis();
+        if let Some(h) = new_hash {
+            let _ = tenant_images::increment_ref(&state.pool, &identity.tenant_id, h).await;
+        }
+        if let Some(h) = &old_hash {
+            let _ = tenant_images::decrement_ref(&state.pool, &identity.tenant_id, h, now).await;
+        }
+    }
 
     push_to_edge(
         &state,
@@ -133,12 +155,23 @@ pub async fn bulk_delete_products(
         ));
     }
 
+    // Capture image hashes before deletion
+    let old_hashes = tenant_images::get_product_images_bulk(&state.pool, store_id, &req.ids)
+        .await
+        .unwrap_or_default();
+
     store::bulk_delete_products(&state.pool, store_id, &req.ids)
         .await
         .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;
+
+    // Decrement image references
+    let now = shared::util::now_millis();
+    for hash in &old_hashes {
+        let _ = tenant_images::decrement_ref(&state.pool, &identity.tenant_id, hash, now).await;
+    }
 
     for id in &req.ids {
         push_to_edge(&state, store_id, StoreOp::DeleteProduct { id: *id }).await;
@@ -154,12 +187,23 @@ pub async fn delete_product(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, &identity.tenant_id).await?;
 
+    // Capture image hash before deletion
+    let old_hash = tenant_images::get_product_image(&state.pool, store_id, product_id)
+        .await
+        .unwrap_or(None);
+
     store::delete_product_direct(&state.pool, store_id, product_id)
         .await
         .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;
+
+    // Decrement image reference
+    if let Some(hash) = &old_hash {
+        let now = shared::util::now_millis();
+        let _ = tenant_images::decrement_ref(&state.pool, &identity.tenant_id, hash, now).await;
+    }
 
     push_to_edge(&state, store_id, StoreOp::DeleteProduct { id: product_id }).await;
 

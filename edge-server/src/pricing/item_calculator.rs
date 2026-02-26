@@ -569,8 +569,7 @@ mod tests {
         PriceRule {
             id: 0,
             name: format!("rule_{}", value),
-            display_name: format!("Rule {}", value),
-            receipt_name: format!("R{}", value),
+            receipt_name: Some(format!("R{}", value)),
             description: None,
             rule_type,
             product_scope: ProductScope::Global,

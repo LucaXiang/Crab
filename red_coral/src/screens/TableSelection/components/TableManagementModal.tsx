@@ -266,7 +266,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 permission={Permission.TABLES_MANAGE}
                 mode="intercept"
                 description={t('table.auth_required.merge')}
-                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.display_name }); setMode('MERGE'); }}
+                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.name }); setMode('MERGE'); }}
             >
                 <button
                     onClick={() => setMode('MERGE')}
@@ -290,7 +290,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 permission={Permission.TABLES_MANAGE}
                 mode="intercept"
                 description={t('table.auth_required.move')}
-                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.display_name }); setMode('MOVE'); }}
+                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.name }); setMode('MOVE'); }}
             >
                 <button
                     onClick={() => setMode('MOVE')}
@@ -488,7 +488,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="font-bold text-gray-800">{rule.display_name}</div>
+                                            <div className="font-bold text-gray-800">{rule.name}</div>
                                             <div className="text-xs text-gray-500 mt-1">
                                                 {rule.adjustment_type === 'PERCENTAGE'
                                                     ? `${rule.adjustment_value}%`

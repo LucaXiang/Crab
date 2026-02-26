@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ImagePlus, X, Loader2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { uploadImage, getImageBlobUrl } from '@/infrastructure/api/store';
+import { uploadImage, getImageUrl } from '@/infrastructure/api/store';
 
 interface ImageUploadProps {
   /** Current image hash (from product.image) */
@@ -18,28 +18,22 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
   const token = useAuthStore(s => s.token);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
-  // Load existing image from hash
+  // Load existing image from hash → presigned S3 URL (usable directly as img src)
   useEffect(() => {
     if (!value || !token) {
-      setBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setPreviewUrl(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    getImageBlobUrl(token, value)
-      .then(url => {
-        if (!cancelled) {
-          setBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
-        } else {
-          URL.revokeObjectURL(url);
-        }
-      })
-      .catch(() => { if (!cancelled) setBlobUrl(null); })
+    getImageUrl(token, value)
+      .then(url => { if (!cancelled) setPreviewUrl(url); })
+      .catch(() => { if (!cancelled) setPreviewUrl(null); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [value, token]);
@@ -59,8 +53,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
     setError('');
     try {
       const hash = await uploadImage(token, file);
-      const localUrl = URL.createObjectURL(file);
-      setBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return localUrl; });
+      // Show local preview immediately (no S3 round-trip needed)
+      setPreviewUrl(URL.createObjectURL(file));
       onChange(hash);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.error_generic'));
@@ -83,13 +77,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
   }, [handleFile]);
 
   const handleClear = useCallback(() => {
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    setBlobUrl(null);
+    setPreviewUrl(null);
     onChange('');
     setError('');
-  }, [blobUrl, onChange]);
+  }, [onChange]);
 
-  const showPreview = blobUrl && !loading;
+  const showPreview = previewUrl && !loading;
 
   return (
     <div className={className}>
@@ -105,7 +98,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
         /* ── Preview mode ── */
         <div className="relative group">
           <img
-            src={blobUrl}
+            src={previewUrl}
             alt=""
             className="w-full h-40 object-cover rounded-xl border border-gray-200"
           />

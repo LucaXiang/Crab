@@ -264,7 +264,7 @@ impl CommandHandler for RedeemStampAction {
             OrderEventType::StampRedeemed,
             EventPayload::StampRedeemed {
                 stamp_activity_id: self.stamp_activity_id,
-                stamp_activity_name: self.activity.display_name.clone(),
+                stamp_activity_name: self.activity.name.clone(),
                 reward_instance_id,
                 reward_strategy: strategy_str,
                 product_id: info.product_id,
@@ -303,8 +303,7 @@ mod tests {
         StampActivity {
             id: 1,
             marketing_group_id: 1,
-            name: "coffee_card".to_string(),
-            display_name: "Coffee Card".to_string(),
+            name: "Coffee Card".to_string(),
             stamps_required: 10,
             reward_quantity: 1,
             reward_strategy: strategy,

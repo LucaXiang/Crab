@@ -169,6 +169,18 @@ pub async fn upload_image(
             AppError::with_message(ErrorCode::InternalError, "Image upload failed")
         })?;
 
+    // Register in tenant_images index (ref_count starts at 0, incremented when product references it)
+    if let Err(e) = crate::db::tenant_images::register(
+        &state.pool,
+        &identity.tenant_id,
+        &hash,
+        shared::util::now_millis(),
+    )
+    .await
+    {
+        tracing::warn!(hash = %hash, "Failed to register image in index: {e}");
+    }
+
     tracing::info!(
         tenant_id = %identity.tenant_id,
         hash = %hash,
@@ -230,4 +242,89 @@ pub async fn presigned_get_url(
         })?;
 
     Ok(presigned.uri().to_string())
+}
+
+/// Delete an image from S3. Best-effort, logs errors.
+pub async fn delete_s3_image(state: &AppState, tenant_id: &str, hash: &str) {
+    let key = s3_image_key(tenant_id, hash);
+    if let Err(e) = state
+        .s3
+        .client
+        .delete_object()
+        .bucket(&state.s3.bucket)
+        .key(&key)
+        .send()
+        .await
+    {
+        tracing::warn!(tenant_id, hash, "Failed to delete S3 image: {e}");
+    } else {
+        tracing::info!(tenant_id, hash, "Orphaned S3 image deleted");
+    }
+}
+
+/// Purge all images for a tenant from S3 + tenant_images table.
+/// Used for tenant data cleanup after account cancellation.
+#[allow(dead_code)]
+pub async fn purge_tenant_images(state: &AppState, tenant_id: &str) {
+    // 1. Delete all records from tenant_images, get the hashes
+    let hashes = match crate::db::tenant_images::delete_all_for_tenant(&state.pool, tenant_id).await
+    {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::error!(tenant_id, "Failed to delete tenant_images records: {e}");
+            return;
+        }
+    };
+
+    // 2. Delete S3 objects by listing prefix (catches images not in index too)
+    let prefix = format!("images/{tenant_id}/");
+    let mut deleted = 0u32;
+    let mut continuation_token: Option<String> = None;
+
+    loop {
+        let mut req = state
+            .s3
+            .client
+            .list_objects_v2()
+            .bucket(&state.s3.bucket)
+            .prefix(&prefix);
+        if let Some(token) = &continuation_token {
+            req = req.continuation_token(token);
+        }
+
+        let output = match req.send().await {
+            Ok(o) => o,
+            Err(e) => {
+                tracing::error!(tenant_id, "Failed to list S3 objects for purge: {e}");
+                break;
+            }
+        };
+
+        for obj in output.contents() {
+            if let Some(key) = obj.key() {
+                let _ = state
+                    .s3
+                    .client
+                    .delete_object()
+                    .bucket(&state.s3.bucket)
+                    .key(key)
+                    .send()
+                    .await;
+                deleted += 1;
+            }
+        }
+
+        if output.is_truncated() == Some(true) {
+            continuation_token = output.next_continuation_token().map(|s| s.to_string());
+        } else {
+            break;
+        }
+    }
+
+    tracing::info!(
+        tenant_id,
+        db_records = hashes.len(),
+        s3_deleted = deleted,
+        "Tenant images purged"
+    );
 }

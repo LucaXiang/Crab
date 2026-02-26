@@ -141,7 +141,7 @@ pub async fn get_order_detail(
             r#"
             UPDATE store_archived_orders
             SET detail = $4
-            WHERE edge_server_id = $1 AND tenant_id = $2 AND order_key = $3
+            WHERE store_id = $1 AND tenant_id = $2 AND order_key = $3
             "#,
         )
         .bind(store_id)

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE stamp_activity SET name = COALESCE(?1, name), stamps_required = COALESCE(?2, stamps_required), reward_quantity = COALESCE(?3, reward_quantity), reward_strategy = COALESCE(?4, reward_strategy), designated_product_id = COALESCE(?5, designated_product_id), is_cyclic = COALESCE(?6, is_cyclic), is_active = COALESCE(?7, is_active), updated_at = ?8 WHERE id = ?9",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "34d3c69a2d387be82814a84ca48a858ced1eb233397681ccb8f82f9b5263bb00"
+}

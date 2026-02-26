@@ -22,7 +22,6 @@ use shared::models::{Role, RoleCreate, RoleUpdate};
 
 fn validate_create(payload: &RoleCreate) -> AppResult<()> {
     validate_required_text(&payload.name, "name", MAX_NAME_LEN)?;
-    validate_optional_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     Ok(())
 }
@@ -31,7 +30,6 @@ fn validate_update(payload: &RoleUpdate) -> AppResult<()> {
     if let Some(name) = &payload.name {
         validate_required_text(name, "name", MAX_NAME_LEN)?;
     }
-    validate_optional_text(&payload.display_name, "display_name", MAX_NAME_LEN)?;
     validate_optional_text(&payload.description, "description", MAX_NOTE_LEN)?;
     Ok(())
 }
@@ -126,7 +124,7 @@ pub async fn create(
         "role",
         &id,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&r, "role")
     );
 
@@ -178,7 +176,7 @@ pub async fn update(
         "role",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_role, &r, "role")
     );
 
@@ -224,7 +222,7 @@ pub async fn delete(
             "role",
             &id_str,
             operator_id = Some(current_user.id),
-            operator_name = Some(current_user.display_name.clone()),
+            operator_name = Some(current_user.name.clone()),
             details = serde_json::json!({"role_name": name_for_audit})
         );
 
@@ -280,7 +278,6 @@ pub async fn update_role_permissions(
 
     let update = RoleUpdate {
         name: None,
-        display_name: None,
         description: None,
         permissions: Some(permissions),
         is_active: None,
@@ -300,7 +297,7 @@ pub async fn update_role_permissions(
         "role",
         &id_str,
         operator_id = Some(current_user.id),
-        operator_name = Some(current_user.display_name.clone()),
+        operator_name = Some(current_user.name.clone()),
         details = create_diff(&old_role, &r, "role")
     );
 

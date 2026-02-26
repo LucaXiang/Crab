@@ -85,7 +85,7 @@ export const LoginScreen: React.FC = () => {
         setAuthUser({
           id: userInfo.id,
           username: userInfo.username,
-          display_name: userInfo.display_name,
+          name: userInfo.name,
           role_id: userInfo.role_id,
           role_name: userInfo.role_name,
           permissions: userInfo.permissions,

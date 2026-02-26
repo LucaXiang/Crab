@@ -68,8 +68,7 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold text-gray-900">{detail.display_name}</h2>
-          <p className="text-sm text-gray-400 mt-1">{detail.name}</p>
+          <h2 className="text-2xl font-bold text-gray-900">{detail.name}</h2>
         </div>
         <ProtectedGate permission={Permission.MARKETING_MANAGE}>
           <div className="flex items-center gap-2 ml-4">
@@ -136,7 +135,7 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
                         }`}
                       />
                       <span className="font-medium text-gray-900 truncate">
-                        {rule.display_name}
+                        {rule.name}
                       </span>
                       <span className="text-sm font-bold text-orange-600 shrink-0">
                         {rule.adjustment_type === 'PERCENTAGE'
@@ -217,7 +216,7 @@ export const GroupDetailPanel: React.FC<GroupDetailPanelProps> = ({
                         }`}
                       />
                       <span className="font-medium text-gray-900 truncate">
-                        {a.display_name}
+                        {a.name}
                       </span>
                     </div>
                     <ProtectedGate permission={Permission.MARKETING_MANAGE}>

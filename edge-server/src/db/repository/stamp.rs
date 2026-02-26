@@ -143,7 +143,6 @@ mod tests {
             "CREATE TABLE marketing_group (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                display_name TEXT NOT NULL,
                 is_active INTEGER NOT NULL DEFAULT 1,
                 created_at INTEGER NOT NULL DEFAULT 0,
                 updated_at INTEGER NOT NULL DEFAULT 0
@@ -172,7 +171,6 @@ mod tests {
                 id INTEGER PRIMARY KEY,
                 marketing_group_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
-                display_name TEXT NOT NULL,
                 stamps_required INTEGER NOT NULL,
                 reward_quantity INTEGER NOT NULL DEFAULT 1,
                 reward_strategy TEXT NOT NULL DEFAULT 'ECONOMIZADOR',
@@ -204,19 +202,17 @@ mod tests {
         .unwrap();
 
         // Seed: marketing_group + member + stamp_activity
-        sqlx::query(
-            "INSERT INTO marketing_group (id, name, display_name) VALUES (1, 'VIP', 'VIP')",
-        )
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO marketing_group (id, name) VALUES (1, 'VIP')")
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO member (id, name, marketing_group_id) VALUES (1, 'Alice', 1)")
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::query("INSERT INTO stamp_activity (id, marketing_group_id, name, display_name, stamps_required, is_cyclic) VALUES (1, 1, 'coffee', 'Coffee Card', 10, 1)")
+        sqlx::query("INSERT INTO stamp_activity (id, marketing_group_id, name, stamps_required, is_cyclic) VALUES (1, 1, 'Coffee Card', 10, 1)")
             .execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO stamp_activity (id, marketing_group_id, name, display_name, stamps_required, is_cyclic) VALUES (2, 1, 'tea', 'Tea Card', 5, 0)")
+        sqlx::query("INSERT INTO stamp_activity (id, marketing_group_id, name, stamps_required, is_cyclic) VALUES (2, 1, 'Tea Card', 5, 0)")
             .execute(&pool).await.unwrap();
 
         pool

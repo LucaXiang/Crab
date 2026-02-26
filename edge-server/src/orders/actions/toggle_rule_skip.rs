@@ -57,7 +57,7 @@ impl CommandHandler for ToggleRuleSkipAction {
                     .iter()
                     .find(|r| r.rule_id == self.rule_id)
             })
-            .map(|r| r.display_name.clone());
+            .map(|r| r.name.clone());
 
         let Some(rule_name) = rule_name else {
             return Err(OrderError::InvalidOperation(
@@ -108,8 +108,8 @@ mod tests {
         AppliedRule {
             rule_id,
             name: "test_rule".to_string(),
-            display_name: "Test Rule".to_string(),
-            receipt_name: "TEST".to_string(),
+            receipt_name: Some("TEST".to_string()),
+
             rule_type: RuleType::Discount,
             adjustment_type: AdjustmentType::Percentage,
             product_scope: ProductScope::Global,
