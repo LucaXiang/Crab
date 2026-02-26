@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  DollarSign, ShoppingBag, Users, TrendingUp, BarChart3,
+  DollarSign, ShoppingBag, Users, TrendingUp,
   Download, Server, Clock, ArrowRight, Sparkles, CreditCard,
   AlertTriangle, XCircle, CheckCircle, Upload, ShieldCheck,
   FileKey, MapPin, Phone,
@@ -298,37 +298,11 @@ export const DashboardScreen: React.FC = () => {
       </div>
 
       {/* Today's KPI summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <KpiCard 
-          icon={DollarSign} 
-          gradient="from-blue-500 to-blue-600" 
-          shadow="shadow-blue-500/20"
-          value={formatCurrency(overview?.revenue ?? 0)} 
-          label={t('stats.total_sales')} 
-          trend="+12%" // Mock trend for UI demo
-        />
-        <KpiCard 
-          icon={ShoppingBag} 
-          gradient="from-emerald-500 to-emerald-600" 
-          shadow="shadow-emerald-500/20"
-          value={String(overview?.orders ?? 0)} 
-          label={t('stats.completed_orders')} 
-          trend="+5%"
-        />
-        <KpiCard 
-          icon={Users} 
-          gradient="from-violet-500 to-violet-600" 
-          shadow="shadow-violet-500/20"
-          value={String(overview?.guests ?? 0)} 
-          label={t('stats.guests')} 
-        />
-        <KpiCard 
-          icon={TrendingUp} 
-          gradient="from-amber-500 to-amber-600" 
-          shadow="shadow-amber-500/20"
-          value={formatCurrency(overview?.average_order_value ?? 0)} 
-          label={t('stats.average_order')} 
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard icon={DollarSign} bg="bg-primary-100" color="text-primary-600" value={formatCurrency(overview?.revenue ?? 0)} label={t('stats.total_sales')} accent />
+        <KpiCard icon={ShoppingBag} bg="bg-green-100" color="text-green-600" value={String(overview?.orders ?? 0)} label={t('stats.completed_orders')} />
+        <KpiCard icon={Users} bg="bg-violet-100" color="text-violet-600" value={String(overview?.guests ?? 0)} label={t('stats.guests')} />
+        <KpiCard icon={TrendingUp} bg="bg-amber-100" color="text-amber-600" value={formatCurrency(overview?.average_order_value ?? 0)} label={t('stats.average_order')} />
       </div>
 
       {/* Stores list */}
@@ -438,28 +412,18 @@ export const DashboardScreen: React.FC = () => {
 
 const KpiCard: React.FC<{
   icon: React.FC<{ className?: string }>;
-  gradient: string;
-  shadow: string;
+  bg: string;
+  color: string;
   value: string;
   label: string;
-  trend?: string;
-}> = ({ icon: Icon, gradient, shadow, value, label, trend }) => (
-  <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow duration-200 relative overflow-hidden group">
-    <div className="flex items-start justify-between mb-4">
-      <div className={`w-12 h-12 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center text-white shadow-lg ${shadow} group-hover:scale-110 transition-transform duration-300`}>
-        <Icon className="w-6 h-6" />
-      </div>
-      {trend && (
-        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-1">
-          <TrendingUp className="w-3 h-3" />
-          {trend}
-        </span>
-      )}
+  accent?: boolean;
+}> = ({ icon: Icon, bg, color, value, label, accent }) => (
+  <div className={`bg-white rounded-xl border ${accent ? 'border-primary-200 ring-1 ring-primary-100' : 'border-slate-200'} p-4`}>
+    <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}>
+      <Icon className={`w-4 h-4 ${color}`} />
     </div>
-    <div>
-      <p className="text-2xl font-bold text-slate-900 tracking-tight">{value}</p>
-      <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">{label}</p>
-    </div>
+    <p className={`text-lg font-bold ${accent ? 'text-primary-600' : 'text-slate-900'}`}>{value}</p>
+    <p className="text-xs text-slate-400">{label}</p>
   </div>
 );
 
