@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { logger } from '@/utils/logger';
-import { LabelField, TextAlign, VerticalAlign } from '@/core/domain/types/print';
+import { LabelField, TextAlign, VerticalAlign, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
 import { Type, Image as ImageIcon, X, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Upload, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { NumberInput } from '@/presentation/components/ui/NumberInput';
@@ -42,12 +42,43 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
     );
   }
 
+  const templateRef = useRef<HTMLTextAreaElement>(null);
+
   const isTextField = field.field_type === 'text';
   const isImageField = field.field_type === 'image' || field.field_type === 'barcode' || field.field_type === 'qrcode';
   const isSeparatorField = field.field_type === 'separator';
 
+  // Group supported fields by category
+  const fieldsByCategory = useMemo(() => {
+    const groups: Record<string, typeof SUPPORTED_LABEL_FIELDS> = {};
+    for (const f of SUPPORTED_LABEL_FIELDS) {
+      (groups[f.category] ??= []).push(f);
+    }
+    return groups;
+  }, []);
+
   const handleUpdate = (updates: Partial<LabelField>) => {
     onFieldUpdate({ ...field, ...updates } as LabelField);
+  };
+
+  const insertFieldKey = (key: string) => {
+    const tag = `{${key}}`;
+    const textarea = templateRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const current = field.template || '';
+      const next = current.slice(0, start) + tag + current.slice(end);
+      handleUpdate({ template: next });
+      // Restore cursor after React re-render
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = start + tag.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    } else {
+      handleUpdate({ template: (field.template || '') + tag });
+    }
   };
 
   const handleSelectImage = async () => {
@@ -172,20 +203,67 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
         {/* Text-specific properties */}
         {isTextField && (
           <>
-            {/* Content Template */}
+            {/* Data Source */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t("settings.label.data_source")}
+              </label>
+              <select
+                value={field.data_source || ''}
+                onChange={(e) => {
+                  const key = e.target.value;
+                  // When selecting data source, clear template so resolve_text_template uses {data_source}
+                  handleUpdate({ data_source: key, template: '' });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">{t("settings.label.data_source_none")}</option>
+                {Object.entries(fieldsByCategory).map(([category, fields]) => (
+                  <optgroup key={category} label={category}>
+                    {fields.map((f) => (
+                      <option key={f.key} value={f.key}>
+                        {f.label} ({f.key})
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {t("settings.label.data_source_hint")}
+              </p>
+            </div>
+
+            {/* Content Template (advanced: combine multiple fields or add prefix/suffix) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t("settings.label.content_template")}
               </label>
               <textarea
+                ref={templateRef}
                 value={field.template || ''}
                 onChange={(e) => handleUpdate({ template: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                placeholder="{product_name}"
+                placeholder={field.data_source ? `{${field.data_source}}` : '{product_name}'}
                 rows={2}
               />
+              {/* Insertable field chips */}
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {Object.entries(fieldsByCategory).map(([category, fields]) =>
+                  fields.map((f) => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => insertFieldKey(f.key)}
+                      title={`${f.description} — ${f.example}`}
+                      className="px-1.5 py-0.5 text-xs bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors font-mono"
+                    >
+                      {f.label}
+                    </button>
+                  ))
+                )}
+              </div>
               <p className="mt-1 text-xs text-gray-500">
-                {t("settings.label.text_template_hint")}
+                {t("settings.label.template_advanced_hint")}
               </p>
             </div>
 
