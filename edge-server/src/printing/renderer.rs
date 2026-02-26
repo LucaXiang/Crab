@@ -30,10 +30,18 @@ impl KitchenTicketRenderer {
     pub fn render(&self, order: &KitchenOrder) -> Vec<u8> {
         let mut b = EscPosBuilder::new(self.width);
 
-        self.render_header(&mut b, order);
-
         // Group items by category
         let grouped = self.group_by_category(&order.items);
+
+        // Pre-calculate totals for header
+        let total_kinds: usize = grouped.iter().map(|(_, items)| items.len()).sum();
+        let total_qty: i32 = grouped
+            .iter()
+            .flat_map(|(_, items)| items.iter())
+            .map(|item| item.quantity)
+            .sum();
+
+        self.render_header(&mut b, order, total_kinds, total_qty);
 
         // Single category → flat list, multiple → show category headers
         let show_categories = grouped.len() > 1;
@@ -54,13 +62,20 @@ impl KitchenTicketRenderer {
             }
         }
 
-        self.render_footer(&mut b, order, &grouped);
+        self.render_footer(&mut b, order);
 
         b.build()
     }
 
-    /// Header: table name + timestamp
-    fn render_header(&self, b: &mut EscPosBuilder, order: &KitchenOrder) {
+    /// Header: table/queue (big) + zone|order_id + count|timestamp
+    fn render_header(
+        &self,
+        b: &mut EscPosBuilder,
+        order: &KitchenOrder,
+        total_kinds: usize,
+        total_qty: i32,
+    ) {
+        // Line 1: table/queue name (centered, double size, bold)
         b.center();
         b.double_size();
         b.bold();
@@ -76,16 +91,29 @@ impl KitchenTicketRenderer {
 
         b.bold_off();
         b.reset_size();
-
-        // Zone name (if present, show below table name)
-        if let Some(ref zone) = order.zone_name {
-            b.line(zone);
-        }
-
-        let timestamp = format_timestamp(order.created_at, self.timezone);
-        b.line(&timestamp);
-
         b.left();
+
+        // Line 2: zone | order_id (+service tag)
+        let zone = order.zone_name.as_deref().unwrap_or("");
+        let service_tag = if order.is_retail && order.queue_number.is_none() {
+            " [LLEVAR]"
+        } else {
+            ""
+        };
+        let order_ref = format!("#{}{}", order.order_id, service_tag);
+        b.line_lr(zone, &order_ref);
+
+        // Line 3: total count | timestamp
+        let count_str = if total_kinds as i32 == total_qty {
+            format!("{} uds", total_qty)
+        } else {
+            format!("{} uds ({} items)", total_qty, total_kinds)
+        };
+        let timestamp = format_timestamp(order.created_at, self.timezone);
+        b.bold();
+        b.line_lr(&count_str, &timestamp);
+        b.bold_off();
+
         b.sep_double();
     }
 
@@ -180,32 +208,9 @@ impl KitchenTicketRenderer {
         }
     }
 
-    /// Footer: total count + reprint indicator
-    fn render_footer(
-        &self,
-        b: &mut EscPosBuilder,
-        order: &KitchenOrder,
-        grouped: &[(String, Vec<&PrintItemContext>)],
-    ) {
+    /// Footer: reprint indicator
+    fn render_footer(&self, b: &mut EscPosBuilder, order: &KitchenOrder) {
         b.sep_double();
-
-        // Total: X items / Y units
-        let total_kinds: usize = grouped.iter().map(|(_, items)| items.len()).sum();
-        let total_qty: i32 = grouped
-            .iter()
-            .flat_map(|(_, items)| items.iter())
-            .map(|item| item.quantity)
-            .sum();
-
-        b.center();
-        b.bold();
-        if total_kinds as i32 == total_qty {
-            b.line(&format!("{} uds", total_qty));
-        } else {
-            b.line(&format!("{} uds ({} items)", total_qty, total_kinds));
-        }
-        b.bold_off();
-        b.left();
 
         // Reprint indicator
         if order.print_count > 0 {
@@ -231,7 +236,9 @@ impl Default for KitchenTicketRenderer {
 /// Format unix timestamp (millis) to readable string in given timezone
 fn format_timestamp(ts: i64, tz: Tz) -> String {
     if let Some(dt) = chrono::DateTime::from_timestamp_millis(ts) {
-        dt.with_timezone(&tz).format("%m-%d %H:%M").to_string()
+        dt.with_timezone(&tz)
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string()
     } else {
         "--:--".to_string()
     }
@@ -350,6 +357,79 @@ mod tests {
         let order = create_test_order();
         let data = renderer.render(&order);
         assert!(data.len() > 100);
+    }
+
+    /// Strip ESC/POS control sequences, keep ASCII text
+    fn strip_escpos(data: &[u8]) -> String {
+        let mut out = String::new();
+        let mut i = 0;
+        while i < data.len() {
+            match data[i] {
+                0x1B => {
+                    i += 1;
+                    if i < data.len() {
+                        match data[i] {
+                            b'!' | b'-' => {
+                                i += 2;
+                            }
+                            _ => {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+                0x1D => {
+                    i += 1;
+                    if i < data.len() {
+                        match data[i] {
+                            b'V' => {
+                                i += 2;
+                            }
+                            _ => {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+                0x0A => {
+                    out.push('\n');
+                    i += 1;
+                }
+                b if b >= 0x20 && b < 0x7F => {
+                    out.push(b as char);
+                    i += 1;
+                }
+                _ => {
+                    // GBK double-byte: replace with placeholder
+                    if data[i] >= 0x81 && data[i] <= 0xFE && i + 1 < data.len() {
+                        out.push_str("##"); // 2-byte char placeholder
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn test_render_visual_single() {
+        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
+        let order = create_test_order();
+        let data = renderer.render(&order);
+        let text = strip_escpos(&data);
+        eprintln!("\n{:=<48}\n{}\n{:=<48}", "", text, "");
+    }
+
+    #[test]
+    fn test_render_visual_multi() {
+        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
+        let mut order = create_multi_category_order();
+        order.print_count = 1;
+        let data = renderer.render(&order);
+        let text = strip_escpos(&data);
+        eprintln!("\n{:=<48}\n{}\n{:=<48}", "", text, "");
     }
 
     #[test]

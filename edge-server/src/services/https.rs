@@ -50,6 +50,7 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::print_config::router())
         .merge(crate::api::employees::router())
         .merge(crate::api::orders::router())
+        .merge(crate::api::kitchen_orders::router())
         .merge(crate::api::system_state::router())
         .merge(crate::api::store_info::router())
         .merge(crate::api::label_template::router())
