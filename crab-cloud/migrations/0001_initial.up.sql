@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════
--- Crab Cloud — Unified Schema (consolidated, clean naming)
+-- Crab Cloud — Unified Schema (consolidated from 0001–0007)
 -- ════════════════════════════════════════════════════════════════
--- Naming: store_* = store-scoped (has edge_server_id)
+-- Naming: store_* = store-scoped (has store_id)
 --         no prefix = global infrastructure
 
 -- ── Tenants & Auth ──
@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     created_at         BIGINT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id ON subscriptions(tenant_id);
 
 CREATE TABLE IF NOT EXISTS email_verifications (
@@ -133,43 +132,47 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE INDEX idx_audit_logs_tenant ON audit_logs (tenant_id, created_at);
 
--- ── Edge Servers ──
+-- ── Stores (was edge_servers, merged with store_info) ──
 
-CREATE TABLE IF NOT EXISTS edge_servers (
+CREATE TABLE IF NOT EXISTS stores (
     id BIGSERIAL PRIMARY KEY,
     entity_id TEXT NOT NULL,
     tenant_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
+    store_number INT NOT NULL,
     name TEXT,
     address TEXT,
     phone TEXT,
     nif TEXT,
     email TEXT,
     website TEXT,
+    logo_url TEXT,
     business_day_cutoff TEXT DEFAULT '06:00',
     last_sync_at BIGINT,
     registered_at BIGINT NOT NULL,
+    created_at BIGINT,
+    updated_at BIGINT,
     UNIQUE (entity_id, tenant_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_edge_servers_tenant ON edge_servers (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_stores_tenant ON stores (tenant_id);
 
 -- ── Sync Cursors ──
 
 CREATE TABLE IF NOT EXISTS store_sync_cursors (
     id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     resource TEXT NOT NULL,
     last_version BIGINT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL,
-    UNIQUE (edge_server_id, resource)
+    UNIQUE (store_id, resource)
 );
 
 -- ── Tags ──
 
 CREATE TABLE store_tags (
     id             BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT  NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id       BIGINT  NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id      BIGINT  NOT NULL,
     name           TEXT    NOT NULL,
     color          TEXT    NOT NULL DEFAULT '#3B82F6',
@@ -177,15 +180,15 @@ CREATE TABLE store_tags (
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,
     is_system      BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at     BIGINT  NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_tags_edge ON store_tags (edge_server_id);
+CREATE INDEX idx_store_tags_store ON store_tags (store_id);
 
 -- ── Categories ──
 
 CREATE TABLE store_categories (
     id                       BIGSERIAL PRIMARY KEY,
-    edge_server_id           BIGINT  NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id                 BIGINT  NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id                BIGINT  NOT NULL,
     name                     TEXT    NOT NULL,
     sort_order               INTEGER NOT NULL DEFAULT 0,
@@ -196,9 +199,9 @@ CREATE TABLE store_categories (
     match_mode               TEXT    NOT NULL DEFAULT 'any',
     is_display               BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at               BIGINT  NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_categories_edge ON store_categories (edge_server_id);
+CREATE INDEX idx_store_categories_store ON store_categories (store_id);
 
 CREATE TABLE store_category_print_dest (
     id             BIGSERIAL PRIMARY KEY,
@@ -218,7 +221,7 @@ CREATE TABLE store_category_tag (
 
 CREATE TABLE store_products (
     id                       BIGSERIAL PRIMARY KEY,
-    edge_server_id           BIGINT  NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id                 BIGINT  NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id                BIGINT  NOT NULL,
     name                     TEXT    NOT NULL,
     image                    TEXT    NOT NULL DEFAULT '',
@@ -232,9 +235,9 @@ CREATE TABLE store_products (
     is_active                BOOLEAN NOT NULL DEFAULT TRUE,
     external_id              BIGINT,
     updated_at               BIGINT  NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_products_edge ON store_products (edge_server_id);
+CREATE INDEX idx_store_products_store ON store_products (store_id);
 
 CREATE TABLE store_product_specs (
     id            BIGSERIAL PRIMARY KEY,
@@ -260,7 +263,7 @@ CREATE TABLE store_product_tag (
 
 CREATE TABLE store_attributes (
     id                    BIGSERIAL PRIMARY KEY,
-    edge_server_id        BIGINT  NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id              BIGINT  NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id             BIGINT  NOT NULL,
     name                  TEXT    NOT NULL,
     is_multi_select       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -273,9 +276,9 @@ CREATE TABLE store_attributes (
     show_on_kitchen_print BOOLEAN NOT NULL DEFAULT FALSE,
     kitchen_print_name    TEXT,
     updated_at            BIGINT  NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_attributes_edge ON store_attributes (edge_server_id);
+CREATE INDEX idx_store_attributes_store ON store_attributes (store_id);
 
 CREATE TABLE store_attribute_options (
     id                 BIGSERIAL PRIMARY KEY,
@@ -294,7 +297,7 @@ CREATE INDEX idx_store_options_attribute ON store_attribute_options (attribute_i
 
 CREATE TABLE store_attribute_bindings (
     id                  BIGSERIAL PRIMARY KEY,
-    edge_server_id      BIGINT  NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id            BIGINT  NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id           BIGINT  NOT NULL,
     owner_type          TEXT    NOT NULL,
     owner_source_id     BIGINT  NOT NULL,
@@ -302,16 +305,16 @@ CREATE TABLE store_attribute_bindings (
     is_required         BOOLEAN NOT NULL DEFAULT FALSE,
     display_order       INTEGER NOT NULL DEFAULT 0,
     default_option_ids  JSONB,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_bindings_edge ON store_attribute_bindings (edge_server_id);
+CREATE INDEX idx_store_bindings_store ON store_attribute_bindings (store_id);
 CREATE INDEX idx_store_bindings_owner ON store_attribute_bindings (owner_type, owner_source_id);
 
 -- ── Price Rules ──
 
 CREATE TABLE store_price_rules (
     id               BIGSERIAL PRIMARY KEY,
-    edge_server_id   BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id         BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id        BIGINT NOT NULL,
     name             TEXT NOT NULL,
     receipt_name     TEXT,
@@ -333,14 +336,15 @@ CREATE TABLE store_price_rules (
     created_by       BIGINT,
     created_at       BIGINT NOT NULL,
     updated_at       BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
+CREATE INDEX IF NOT EXISTS idx_store_price_rules_store ON store_price_rules(store_id);
 
 -- ── Store Version Tracking ──
 
 CREATE TABLE store_versions (
     id             BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE UNIQUE,
+    store_id       BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE UNIQUE,
     version        BIGINT NOT NULL DEFAULT 0,
     updated_at     BIGINT NOT NULL
 );
@@ -349,39 +353,39 @@ CREATE TABLE store_versions (
 
 CREATE TABLE store_zones (
     id              BIGSERIAL PRIMARY KEY,
-    edge_server_id  BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id       BIGINT NOT NULL,
     name            TEXT NOT NULL,
     description     TEXT,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at      BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_zones_edge ON store_zones(edge_server_id);
-CREATE INDEX idx_store_zones_name ON store_zones(edge_server_id, name);
+CREATE INDEX idx_store_zones_store ON store_zones(store_id);
+CREATE INDEX idx_store_zones_name ON store_zones(store_id, name);
 
 -- ── Dining Tables ──
 
 CREATE TABLE store_dining_tables (
     id              BIGSERIAL PRIMARY KEY,
-    edge_server_id  BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id       BIGINT NOT NULL,
     name            TEXT NOT NULL,
     zone_source_id  BIGINT NOT NULL,
     capacity        INTEGER NOT NULL DEFAULT 4,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at      BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id),
-    UNIQUE (edge_server_id, zone_source_id, name)
+    UNIQUE (store_id, source_id),
+    UNIQUE (store_id, zone_source_id, name)
 );
-CREATE INDEX idx_store_dining_tables_edge ON store_dining_tables(edge_server_id);
-CREATE INDEX idx_store_dining_tables_zone ON store_dining_tables(edge_server_id, zone_source_id);
+CREATE INDEX idx_store_dining_tables_store ON store_dining_tables(store_id);
+CREATE INDEX idx_store_dining_tables_zone ON store_dining_tables(store_id, zone_source_id);
 
--- ── Orders (archived) ──
+-- ── Orders (archived, simplified — detail as JSONB) ──
 
 CREATE TABLE IF NOT EXISTS store_archived_orders (
     id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     tenant_id TEXT NOT NULL,
     source_id TEXT NOT NULL,
     order_key TEXT NOT NULL,
@@ -389,85 +393,39 @@ CREATE TABLE IF NOT EXISTS store_archived_orders (
     status TEXT NOT NULL,
     end_time BIGINT,
     total DOUBLE PRECISION,
-    tax NUMERIC(12,2),
+    tax DOUBLE PRECISION,
     desglose JSONB NOT NULL DEFAULT '[]'::JSONB,
     guest_count INTEGER,
-    discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
     void_type TEXT,
-    loss_amount NUMERIC(12,2),
+    loss_amount DOUBLE PRECISION,
     start_time BIGINT,
     prev_hash TEXT,
     curr_hash TEXT,
     version BIGINT NOT NULL DEFAULT 0,
+    detail JSONB,
     synced_at BIGINT NOT NULL
 );
 
 CREATE UNIQUE INDEX uq_store_archived_orders_key
-    ON store_archived_orders (tenant_id, edge_server_id, order_key);
+    ON store_archived_orders (tenant_id, store_id, order_key);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_tenant ON store_archived_orders (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_receipt ON store_archived_orders (tenant_id, receipt_number);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_end_time ON store_archived_orders (tenant_id, end_time);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_status ON store_archived_orders (tenant_id, status);
 CREATE INDEX idx_store_archived_orders_list
-    ON store_archived_orders (edge_server_id, tenant_id, status, end_time DESC);
-
-CREATE TABLE IF NOT EXISTS store_order_items (
-    id BIGSERIAL PRIMARY KEY,
-    archived_order_id BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    category_name TEXT,
-    quantity INTEGER NOT NULL,
-    line_total NUMERIC(12,2) NOT NULL,
-    tax_rate INTEGER NOT NULL DEFAULT 0,
-    product_source_id BIGINT
-);
-
-CREATE INDEX idx_store_order_items_order ON store_order_items (archived_order_id);
-CREATE INDEX idx_store_order_items_product ON store_order_items (product_source_id);
-
-CREATE TABLE IF NOT EXISTS store_order_payments (
-    id BIGSERIAL PRIMARY KEY,
-    archived_order_id BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
-    method TEXT NOT NULL,
-    amount NUMERIC(12,2) NOT NULL
-);
-
-CREATE INDEX idx_store_order_payments_order ON store_order_payments (archived_order_id);
-
-CREATE TABLE IF NOT EXISTS store_order_details (
-    id BIGSERIAL PRIMARY KEY,
-    archived_order_id BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
-    detail JSONB NOT NULL,
-    synced_at BIGINT NOT NULL,
-    UNIQUE (archived_order_id)
-);
-
-CREATE INDEX idx_store_order_details_synced_at ON store_order_details (synced_at);
-
--- ── Order Events (for red-flag monitoring) ──
-
-CREATE TABLE IF NOT EXISTS store_order_events (
-    id                BIGSERIAL PRIMARY KEY,
-    archived_order_id BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
-    seq               INTEGER NOT NULL,
-    event_type        TEXT NOT NULL,
-    timestamp         BIGINT NOT NULL,
-    operator_id       BIGINT,
-    operator_name     TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_store_order_events_order ON store_order_events(archived_order_id);
-CREATE INDEX IF NOT EXISTS idx_store_order_events_red_flags ON store_order_events(event_type, timestamp, operator_id);
+    ON store_archived_orders (store_id, tenant_id, status, end_time DESC);
 
 -- ── Daily Reports ──
 
 CREATE TABLE IF NOT EXISTS store_daily_reports (
     id               BIGSERIAL PRIMARY KEY,
-    edge_server_id   BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id         BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id        BIGINT NOT NULL,
     business_date    TEXT NOT NULL,
-    total_orders     INTEGER NOT NULL DEFAULT 0,
-    completed_orders INTEGER NOT NULL DEFAULT 0,
-    void_orders      INTEGER NOT NULL DEFAULT 0,
+    total_orders     BIGINT NOT NULL DEFAULT 0,
+    completed_orders BIGINT NOT NULL DEFAULT 0,
+    void_orders      BIGINT NOT NULL DEFAULT 0,
     total_sales      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     total_paid       DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     total_unpaid     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
@@ -480,11 +438,11 @@ CREATE TABLE IF NOT EXISTS store_daily_reports (
     generated_by_name TEXT,
     note             TEXT,
     updated_at       BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id),
-    UNIQUE (edge_server_id, business_date)
+    UNIQUE (store_id, source_id),
+    UNIQUE (store_id, business_date)
 );
 
-CREATE INDEX IF NOT EXISTS idx_store_daily_reports_edge ON store_daily_reports(edge_server_id);
+CREATE INDEX IF NOT EXISTS idx_store_daily_reports_store ON store_daily_reports(store_id);
 
 CREATE TABLE IF NOT EXISTS store_daily_report_tax_breakdown (
     id           BIGSERIAL PRIMARY KEY,
@@ -493,7 +451,7 @@ CREATE TABLE IF NOT EXISTS store_daily_report_tax_breakdown (
     net_amount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     tax_amount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     gross_amount DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    order_count  INTEGER NOT NULL DEFAULT 0
+    order_count  BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_store_dr_tax_report ON store_daily_report_tax_breakdown(report_id);
@@ -503,36 +461,43 @@ CREATE TABLE IF NOT EXISTS store_daily_report_payment_breakdown (
     report_id BIGINT NOT NULL REFERENCES store_daily_reports(id) ON DELETE CASCADE,
     method    TEXT NOT NULL,
     amount    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    count     INTEGER NOT NULL DEFAULT 0
+    count     BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_store_dr_payment_report ON store_daily_report_payment_breakdown(report_id);
 
--- ── Store Info ──
-
-CREATE TABLE IF NOT EXISTS store_info (
-    id                   BIGSERIAL PRIMARY KEY,
-    edge_server_id       BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
-    name                 TEXT NOT NULL DEFAULT '',
-    address              TEXT NOT NULL DEFAULT '',
-    nif                  TEXT NOT NULL DEFAULT '',
-    logo_url             TEXT,
-    phone                TEXT,
-    email                TEXT,
-    website              TEXT,
-    business_day_cutoff  TEXT NOT NULL DEFAULT '00:00',
-    created_at           BIGINT,
-    updated_at           BIGINT NOT NULL,
-    UNIQUE (edge_server_id)
+CREATE TABLE store_daily_report_shift_breakdown (
+    id               BIGSERIAL PRIMARY KEY,
+    report_id        BIGINT NOT NULL REFERENCES store_daily_reports(id) ON DELETE CASCADE,
+    shift_source_id  BIGINT NOT NULL,
+    operator_id      BIGINT NOT NULL,
+    operator_name    TEXT NOT NULL,
+    status           TEXT NOT NULL,
+    start_time       BIGINT NOT NULL,
+    end_time         BIGINT,
+    starting_cash    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    expected_cash    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    actual_cash      DOUBLE PRECISION,
+    cash_variance    DOUBLE PRECISION,
+    abnormal_close   BOOLEAN NOT NULL DEFAULT FALSE,
+    total_orders     BIGINT NOT NULL DEFAULT 0,
+    completed_orders BIGINT NOT NULL DEFAULT 0,
+    void_orders      BIGINT NOT NULL DEFAULT 0,
+    total_sales      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_paid       DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    void_amount      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_tax        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_discount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_surcharge  DOUBLE PRECISION NOT NULL DEFAULT 0.0
 );
 
-CREATE INDEX IF NOT EXISTS idx_store_info_edge ON store_info(edge_server_id);
+CREATE INDEX idx_store_shift_breakdown_report ON store_daily_report_shift_breakdown(report_id);
 
 -- ── Commands ──
 
 CREATE TABLE IF NOT EXISTS store_commands (
     id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     tenant_id TEXT NOT NULL,
     command_type TEXT NOT NULL,
     payload JSONB NOT NULL,
@@ -543,14 +508,14 @@ CREATE TABLE IF NOT EXISTS store_commands (
 );
 
 CREATE INDEX IF NOT EXISTS idx_store_commands_pending
-    ON store_commands (edge_server_id, status) WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_store_commands_edge ON store_commands(edge_server_id);
+    ON store_commands (store_id, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_store_commands_store ON store_commands(store_id);
 
 -- ── Shifts ──
 
 CREATE TABLE IF NOT EXISTS store_shifts (
     id              BIGSERIAL PRIMARY KEY,
-    edge_server_id  BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id       BIGINT NOT NULL,
     operator_id     BIGINT NOT NULL,
     operator_name   TEXT NOT NULL,
@@ -566,29 +531,29 @@ CREATE TABLE IF NOT EXISTS store_shifts (
     note            TEXT,
     created_at      BIGINT,
     updated_at      BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id)
+    UNIQUE (store_id, source_id)
 );
-CREATE INDEX IF NOT EXISTS idx_store_shifts_edge ON store_shifts(edge_server_id);
-CREATE INDEX IF NOT EXISTS idx_store_shifts_status ON store_shifts(edge_server_id, status);
+CREATE INDEX IF NOT EXISTS idx_store_shifts_store ON store_shifts(store_id);
+CREATE INDEX IF NOT EXISTS idx_store_shifts_status ON store_shifts(store_id, status);
 
 -- ── Employees ──
 
 CREATE TABLE IF NOT EXISTS store_employees (
     id              BIGSERIAL PRIMARY KEY,
-    edge_server_id  BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id       BIGINT NOT NULL,
     username        TEXT NOT NULL,
     hash_pass       TEXT NOT NULL,
     name            TEXT NOT NULL DEFAULT '',
-    role_id         INTEGER NOT NULL,
+    role_id         BIGINT NOT NULL,
     is_system       BOOLEAN NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at      BIGINT NOT NULL DEFAULT 0,
+    created_at      BIGINT NOT NULL,
     updated_at      BIGINT NOT NULL,
-    UNIQUE (edge_server_id, source_id),
-    UNIQUE (edge_server_id, username)
+    UNIQUE (store_id, source_id),
+    UNIQUE (store_id, username)
 );
-CREATE INDEX IF NOT EXISTS idx_store_employees_edge ON store_employees(edge_server_id);
+CREATE INDEX IF NOT EXISTS idx_store_employees_store ON store_employees(store_id);
 
 -- ── Label Templates ──
 
@@ -602,7 +567,7 @@ CREATE TYPE label_field_alignment AS ENUM (
 
 CREATE TABLE store_label_templates (
     id              BIGSERIAL PRIMARY KEY,
-    edge_server_id  BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id       BIGINT NOT NULL DEFAULT 0,
     tenant_id       TEXT NOT NULL,
     name            TEXT NOT NULL,
@@ -620,10 +585,10 @@ CREATE TABLE store_label_templates (
     test_data       TEXT,
     created_at      BIGINT NOT NULL,
     updated_at      BIGINT NOT NULL,
-    UNIQUE(edge_server_id, source_id)
+    UNIQUE(store_id, source_id)
 );
 
-CREATE INDEX idx_store_label_templates_edge ON store_label_templates(edge_server_id);
+CREATE INDEX idx_store_label_templates_store ON store_label_templates(store_id);
 
 CREATE TABLE store_label_fields (
     id              BIGSERIAL PRIMARY KEY,
@@ -661,10 +626,23 @@ CREATE INDEX idx_store_label_fields_template ON store_label_fields(template_id);
 
 CREATE TABLE store_pending_ops (
     id BIGSERIAL PRIMARY KEY,
-    edge_server_id BIGINT NOT NULL REFERENCES edge_servers(id) ON DELETE CASCADE,
+    store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     op JSONB NOT NULL,
     changed_at BIGINT NOT NULL,
     created_at BIGINT NOT NULL
 );
 
-CREATE INDEX idx_pending_ops_edge ON store_pending_ops(edge_server_id);
+CREATE INDEX idx_pending_ops_store ON store_pending_ops(store_id);
+
+-- ── Tenant Images (S3 orphan tracking) ──
+
+CREATE TABLE tenant_images (
+    tenant_id   TEXT    NOT NULL REFERENCES tenants(id),
+    hash        TEXT    NOT NULL,
+    ref_count   INTEGER NOT NULL DEFAULT 0,
+    created_at  BIGINT  NOT NULL,
+    orphaned_at BIGINT,
+    PRIMARY KEY (tenant_id, hash)
+);
+
+CREATE INDEX idx_tenant_images_orphaned ON tenant_images (orphaned_at) WHERE orphaned_at IS NOT NULL;

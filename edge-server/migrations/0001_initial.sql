@@ -502,6 +502,33 @@ CREATE TABLE daily_report_payment_breakdown (
 );
 CREATE INDEX idx_payment_breakdown_report ON daily_report_payment_breakdown(report_id);
 
+-- Shift breakdowns: per-shift stats within daily report
+CREATE TABLE daily_report_shift_breakdown (
+    id              INTEGER PRIMARY KEY,
+    report_id       INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
+    shift_id        INTEGER NOT NULL REFERENCES shift(id),
+    operator_id     INTEGER NOT NULL,
+    operator_name   TEXT    NOT NULL,
+    status          TEXT    NOT NULL,
+    start_time      INTEGER NOT NULL,
+    end_time        INTEGER,
+    starting_cash   REAL    NOT NULL DEFAULT 0.0,
+    expected_cash   REAL    NOT NULL DEFAULT 0.0,
+    actual_cash     REAL,
+    cash_variance   REAL,
+    abnormal_close  INTEGER NOT NULL DEFAULT 0,
+    total_orders      INTEGER NOT NULL DEFAULT 0,
+    completed_orders  INTEGER NOT NULL DEFAULT 0,
+    void_orders       INTEGER NOT NULL DEFAULT 0,
+    total_sales       REAL NOT NULL DEFAULT 0.0,
+    total_paid        REAL NOT NULL DEFAULT 0.0,
+    void_amount       REAL NOT NULL DEFAULT 0.0,
+    total_tax         REAL NOT NULL DEFAULT 0.0,
+    total_discount    REAL NOT NULL DEFAULT 0.0,
+    total_surcharge   REAL NOT NULL DEFAULT 0.0
+);
+CREATE INDEX idx_shift_breakdown_report ON daily_report_shift_breakdown(report_id);
+
 -- ── System Issue ─────────────────────────────────────────────
 
 CREATE TABLE system_issue (
@@ -562,6 +589,8 @@ CREATE TABLE archived_order (
     prev_hash                       TEXT    NOT NULL,
     curr_hash                       TEXT    NOT NULL,
     order_key                       TEXT    NOT NULL DEFAULT '',
+    queue_number                    INTEGER,
+    shift_id                        INTEGER REFERENCES shift(id),
     cloud_synced                    INTEGER NOT NULL DEFAULT 0,
     created_at                      INTEGER NOT NULL
 );
@@ -571,6 +600,7 @@ CREATE INDEX idx_archived_order_status ON archived_order(status);
 CREATE INDEX idx_archived_order_end_time ON archived_order(end_time);
 CREATE INDEX idx_archived_order_hash ON archived_order(curr_hash);
 CREATE INDEX idx_archived_order_cloud_synced ON archived_order(cloud_synced);
+CREATE INDEX idx_archived_order_shift ON archived_order(shift_id);
 CREATE INDEX idx_archived_order_status_end ON archived_order(status, end_time);
 CREATE INDEX idx_archived_order_created ON archived_order(created_at);
 CREATE INDEX idx_archived_order_member ON archived_order(member_id);
