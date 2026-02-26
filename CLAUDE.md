@@ -46,6 +46,11 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 - **crab-cloud**: 云端统一服务 (租户管理 + PKI/认证 + 订阅校验 + Stripe + 数据同步)，EC2 + Docker Compose + Caddy 部署
 - **订单系统**: Event Sourcing + CQRS，redb 存储事件，SQLite 归档查询
 
+### 架构原则
+
+- **Server/Cloud 是权威**：所有业务逻辑和计算（定价、收据号、税务等）在 edge-server 或 crab-cloud 完成。Tauri 客户端只做展示，**禁止**在客户端添加计算库（如 rust_decimal）或复制业务逻辑
+- **功能独立**：不相关的功能不要合并到同一个 UI 组件（例如厨房小票和标签重打应该是独立 Modal，不是 Tab）
+
 ## 应用数据目录结构
 
 Tauri identifier: `com.craboss.redcoral`
@@ -191,7 +196,9 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 ## 提交规范
 
 - 提交前必须通过零警告零错误: `cargo clippy --workspace` + `cd red_coral && npx tsc --noEmit`
+- **跨 Rust + TypeScript 的变更，两边都必须验证编译**，不要假设一边不受影响
 - 只 stage 当前任务范围内的文件，不包含无关 crate/目录的变更
+- 先 `git diff --stat` 检查变更范围，用 `git add <specific-files>` 而非 `git add .`
 
 ## 版本管理
 
@@ -231,6 +238,8 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 - 设计意图明确时直接实现，不要过度提问或扩大范围
 - 方向已给出时优先行动，减少规划
 - UI 布局指令（按钮位置、网格列数、对齐方式）必须一次到位，实现前逐项核对约束
+- **遇到问题默认做正确的重设计**，不要做增量补丁绕过症状。"fix" = 修根因，不是贴创可贴
+- 每个 session 聚焦单一任务，不要主动扩大范围到用户未要求的事情
 
 ## 按需加载
 

@@ -12,8 +12,10 @@ interface ThumbnailProps {
 export const Thumbnail: React.FC<ThumbnailProps> = ({ hash, size = 40, className }) => {
   const token = useAuthStore(s => s.token);
   const [src, setSrc] = useState<string | null>(null);
+  const retried = React.useRef(false);
 
   useEffect(() => {
+    retried.current = false;
     if (!hash || !token) {
       setSrc(null);
       return;
@@ -23,6 +25,14 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ hash, size = 40, className
       .then(url => { if (!cancelled) setSrc(url); })
       .catch(() => { if (!cancelled) setSrc(null); });
     return () => { cancelled = true; };
+  }, [hash, token]);
+
+  const handleError = React.useCallback(() => {
+    if (retried.current || !hash || !token) return;
+    retried.current = true;
+    getImageUrl(token, hash)
+      .then(url => setSrc(url))
+      .catch(() => setSrc(null));
   }, [hash, token]);
 
   const style = { width: size, height: size, minWidth: size };
@@ -45,6 +55,7 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ hash, size = 40, className
       alt=""
       style={style}
       className={`rounded-lg object-cover ${className ?? ''}`}
+      onError={handleError}
     />
   );
 };

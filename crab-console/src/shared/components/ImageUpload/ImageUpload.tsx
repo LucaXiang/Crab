@@ -22,9 +22,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const retried = useRef(false);
 
   // Load existing image from hash → presigned S3 URL (usable directly as img src)
   useEffect(() => {
+    retried.current = false;
     if (!value || !token) {
       setPreviewUrl(null);
       return;
@@ -36,6 +38,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
       .catch(() => { if (!cancelled) setPreviewUrl(null); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
+  }, [value, token]);
+
+  const handleImgError = useCallback(() => {
+    if (retried.current || !value || !token) return;
+    retried.current = true;
+    getImageUrl(token, value)
+      .then(url => setPreviewUrl(url))
+      .catch(() => setPreviewUrl(null));
   }, [value, token]);
 
   const handleFile = useCallback(async (file: File) => {
@@ -101,6 +111,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
             src={previewUrl}
             alt=""
             className="w-full h-40 object-cover rounded-xl border border-gray-200"
+            onError={handleImgError}
           />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
             <button
