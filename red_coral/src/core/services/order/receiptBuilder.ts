@@ -130,33 +130,46 @@ export function buildReceiptData(
   // 价格规则（整单聚合）
   const rule_adjustments = aggregateRuleAdjustments(order);
 
-  // PVP = original_price（菜单原价），IMPORTE = line_total（最终行合计）
+  // PVP = 规格价格 + 属性价格 + 手动折扣（不含规则调整）
+  // IMPORTE = PVP × 数量
   const items: ReceiptItem[] = order.items
     .filter((item) => !item._removed && !item.is_comped)
-    .map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-      price: item.original_price > 0 ? item.original_price : item.price,
-      total: item.line_total,
-      tax_rate: item.tax_rate / 100, // 21 -> 0.21
-      discount_percent: item.manual_discount_percent ?? null,
-      original_price: item.original_price > 0 && item.original_price !== item.price
-        ? item.original_price : null,
-      selected_options: item.selected_options
-        ? item.selected_options
-            .filter((opt) => opt.show_on_receipt)
-            .map((opt) => ({
-              attribute_name: opt.attribute_name,
-              option_name: opt.option_name,
-              receipt_name: opt.receipt_name ?? null,
-              price_modifier: opt.price_modifier ?? 0,
-              show_on_receipt: opt.show_on_receipt,
-            }))
-        : null,
-      spec_name: item.selected_specification?.receipt_name
-        || item.selected_specification?.name
-        || null,
-    }));
+    .map((item) => {
+      const basePrice = item.original_price > 0 ? item.original_price : item.price;
+      const optionsTotal = item.selected_options
+        ? item.selected_options.reduce((sum, opt) => Currency.add(sum, opt.price_modifier ?? 0).toNumber(), 0)
+        : 0;
+      const priceBeforeDiscount = Currency.add(basePrice, optionsTotal).toNumber();
+      const discountPct = item.manual_discount_percent ?? 0;
+      const pvp = discountPct > 0
+        ? Currency.mul(priceBeforeDiscount, Currency.div(Currency.sub(100, discountPct), 100).toNumber()).toNumber()
+        : priceBeforeDiscount;
+      const importe = Currency.mul(pvp, item.quantity).toNumber();
+
+      return {
+        name: item.name,
+        quantity: item.quantity,
+        price: pvp,
+        total: importe,
+        tax_rate: item.tax_rate / 100, // 21 -> 0.21
+        discount_percent: item.manual_discount_percent ?? null,
+        original_price: discountPct > 0 ? priceBeforeDiscount : null,
+        selected_options: item.selected_options
+          ? item.selected_options
+              .filter((opt) => opt.show_on_receipt)
+              .map((opt) => ({
+                attribute_name: opt.attribute_name,
+                option_name: opt.option_name,
+                receipt_name: opt.receipt_name ?? null,
+                price_modifier: opt.price_modifier ?? 0,
+                show_on_receipt: opt.show_on_receipt,
+              }))
+          : null,
+        spec_name: item.selected_specification?.receipt_name
+          || item.selected_specification?.name
+          || null,
+      };
+    });
 
   return {
     order_id: order.receipt_number,
@@ -241,28 +254,41 @@ export function buildArchivedReceiptData(
       amount: Currency.abs(entry.totalAmount).toNumber(),
     }));
 
-  // PVP = 原价
+  // PVP = 规格价格 + 属性价格 + 手动折扣（不含规则调整）
+  // IMPORTE = PVP × 数量
   const items: ReceiptItem[] = order.items
     .filter((item) => !item.is_comped)
-    .map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-      total: item.line_total,
-      tax_rate: item.tax_rate / 100,
-      discount_percent: null,
-      original_price: item.discount_amount > 0 ? item.price : null,
-      selected_options: item.selected_options.length > 0
-        ? item.selected_options.map((opt) => ({
-            attribute_name: opt.attribute_name,
-            option_name: opt.option_name,
-            receipt_name: null,
-            price_modifier: opt.price_modifier ?? 0,
-            show_on_receipt: true,
-          }))
-        : null,
-      spec_name: item.spec_name,
-    }));
+    .map((item) => {
+      const optionsTotal = item.selected_options.reduce(
+        (sum, opt) => Currency.add(sum, opt.price_modifier ?? 0).toNumber(), 0,
+      );
+      const priceBeforeDiscount = Currency.add(item.price, optionsTotal).toNumber();
+      const hasDiscount = item.discount_amount > 0;
+      const pvp = hasDiscount
+        ? Currency.sub(priceBeforeDiscount, Currency.div(item.discount_amount, item.quantity).toNumber()).toNumber()
+        : priceBeforeDiscount;
+      const importe = Currency.mul(pvp, item.quantity).toNumber();
+
+      return {
+        name: item.name,
+        quantity: item.quantity,
+        price: pvp,
+        total: importe,
+        tax_rate: item.tax_rate / 100,
+        discount_percent: null,
+        original_price: hasDiscount ? priceBeforeDiscount : null,
+        selected_options: item.selected_options.length > 0
+          ? item.selected_options.map((opt) => ({
+              attribute_name: opt.attribute_name,
+              option_name: opt.option_name,
+              receipt_name: null,
+              price_modifier: opt.price_modifier ?? 0,
+              show_on_receipt: true,
+            }))
+          : null,
+        spec_name: item.spec_name,
+      };
+    });
 
   const voidReason = order.void_type === 'CANCELLED' ? 'ANULADO'
     : order.void_type === 'LOSS_SETTLED' ? 'PÉRDIDA'

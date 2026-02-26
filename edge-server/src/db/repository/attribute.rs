@@ -52,7 +52,7 @@ pub async fn create(
     let is_multi_select = data.is_multi_select.unwrap_or(false);
     let display_order = data.display_order.unwrap_or(0);
     let show_on_receipt = data.show_on_receipt.unwrap_or(false);
-    let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(false);
+    let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(true);
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
     sqlx::query(
         "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10)",

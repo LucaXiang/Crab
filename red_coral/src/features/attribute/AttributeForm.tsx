@@ -30,7 +30,7 @@ const mapToFormData = (attr: Attribute | null): AttributeFormData => {
       maxSelections: null,
       displayOrder: 0,
       showOnReceipt: false,
-      showOnKitchenPrint: false,
+      showOnKitchenPrint: true,
       kitchenPrintName: '',
     };
   }

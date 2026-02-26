@@ -40,17 +40,17 @@ impl KitchenTicketRenderer {
 
         for (category_name, items) in &grouped {
             if show_categories {
+                let cat_qty: i32 = items.iter().map(|i| i.quantity).sum();
+                b.sep_single();
                 b.bold();
-                b.line(category_name);
+                b.double_size();
+                b.line(&format!("{} ({})", category_name, cat_qty));
+                b.reset_size();
                 b.bold_off();
             }
 
             for item in items {
                 self.render_item(&mut b, item);
-            }
-
-            if show_categories {
-                b.newline();
             }
         }
 
@@ -154,7 +154,7 @@ impl KitchenTicketRenderer {
 
         let line = format!("{}{}", qty_prefix, name_part);
 
-        b.double_height();
+        b.double_size();
         b.line(&line);
         b.reset_size();
 

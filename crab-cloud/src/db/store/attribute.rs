@@ -317,7 +317,7 @@ pub async fn create_attribute_direct(
     let is_multi_select = data.is_multi_select.unwrap_or(false);
     let display_order = data.display_order.unwrap_or(0);
     let show_on_receipt = data.show_on_receipt.unwrap_or(false);
-    let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(false);
+    let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(true);
     let default_ids_json = data
         .default_option_ids
         .as_ref()
