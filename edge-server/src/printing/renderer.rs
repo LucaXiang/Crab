@@ -222,7 +222,7 @@ impl KitchenTicketRenderer {
             b.left();
         }
 
-        b.feed(5);
+        b.feed(3);
         b.cut();
     }
 }
@@ -288,7 +288,7 @@ mod tests {
                         spec_name: Some("Grande".to_string()),
                         quantity: 2,
                         index: None,
-                        options: vec!["Sin azúcar".to_string()],
+                        options: vec!["Azúcar: Sin azúcar".to_string()],
                         label_options: vec![],
                         note: Some("Extra caliente".to_string()),
                         kitchen_destinations: vec!["kitchen-1".to_string()],
@@ -321,7 +321,7 @@ mod tests {
                         spec_name: Some("大".to_string()),
                         quantity: 2,
                         index: None,
-                        options: vec!["微辣".to_string()],
+                        options: vec!["辣度: 微辣".to_string()],
                         label_options: vec!["微辣".to_string()],
                         note: Some("不要花生".to_string()),
                         kitchen_destinations: vec!["kitchen-1".to_string()],
@@ -357,79 +357,6 @@ mod tests {
         let order = create_test_order();
         let data = renderer.render(&order);
         assert!(data.len() > 100);
-    }
-
-    /// Strip ESC/POS control sequences, keep ASCII text
-    fn strip_escpos(data: &[u8]) -> String {
-        let mut out = String::new();
-        let mut i = 0;
-        while i < data.len() {
-            match data[i] {
-                0x1B => {
-                    i += 1;
-                    if i < data.len() {
-                        match data[i] {
-                            b'!' | b'-' => {
-                                i += 2;
-                            }
-                            _ => {
-                                i += 1;
-                            }
-                        }
-                    }
-                }
-                0x1D => {
-                    i += 1;
-                    if i < data.len() {
-                        match data[i] {
-                            b'V' => {
-                                i += 2;
-                            }
-                            _ => {
-                                i += 1;
-                            }
-                        }
-                    }
-                }
-                0x0A => {
-                    out.push('\n');
-                    i += 1;
-                }
-                b if b >= 0x20 && b < 0x7F => {
-                    out.push(b as char);
-                    i += 1;
-                }
-                _ => {
-                    // GBK double-byte: replace with placeholder
-                    if data[i] >= 0x81 && data[i] <= 0xFE && i + 1 < data.len() {
-                        out.push_str("##"); // 2-byte char placeholder
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-        }
-        out
-    }
-
-    #[test]
-    fn test_render_visual_single() {
-        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
-        let order = create_test_order();
-        let data = renderer.render(&order);
-        let text = strip_escpos(&data);
-        eprintln!("\n{:=<48}\n{}\n{:=<48}", "", text, "");
-    }
-
-    #[test]
-    fn test_render_visual_multi() {
-        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
-        let mut order = create_multi_category_order();
-        order.print_count = 1;
-        let data = renderer.render(&order);
-        let text = strip_escpos(&data);
-        eprintln!("\n{:=<48}\n{}\n{:=<48}", "", text, "");
     }
 
     #[test]
