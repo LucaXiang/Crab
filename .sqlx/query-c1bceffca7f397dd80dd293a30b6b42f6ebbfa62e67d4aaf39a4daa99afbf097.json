@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE system_state SET last_order_id = ?1, last_chain_hash = ?2, order_count = order_count + 1, updated_at = ?3 WHERE id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "c1bceffca7f397dd80dd293a30b6b42f6ebbfa62e67d4aaf39a4daa99afbf097"
+}

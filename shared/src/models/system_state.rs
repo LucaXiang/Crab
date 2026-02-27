@@ -9,7 +9,7 @@ pub struct SystemState {
     pub id: i64,
     pub genesis_hash: Option<String>,
     pub last_order_id: Option<String>,
-    pub last_order_hash: Option<String>,
+    pub last_chain_hash: Option<String>,
     pub synced_up_to_id: Option<String>,
     pub synced_up_to_hash: Option<String>,
     pub last_sync_time: Option<i64>,
@@ -23,7 +23,7 @@ pub struct SystemState {
 pub struct SystemStateUpdate {
     pub genesis_hash: Option<String>,
     pub last_order_id: Option<String>,
-    pub last_order_hash: Option<String>,
+    pub last_chain_hash: Option<String>,
     pub synced_up_to_id: Option<String>,
     pub synced_up_to_hash: Option<String>,
     pub last_sync_time: Option<i64>,

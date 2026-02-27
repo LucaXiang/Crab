@@ -366,7 +366,7 @@ pub async fn build_order_detail_sync(
         TaxDesglose,
     };
 
-    // 1. Query archived_order (reuse OrderRow + add hash/key fields)
+    // 1. Query archived_order JOIN chain_entry for hash data
     #[derive(sqlx::FromRow)]
     struct SyncOrderRow {
         order_key: String,
@@ -403,14 +403,16 @@ pub async fn build_order_detail_sync(
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
-        "SELECT order_key, receipt_number, status, total_amount, tax, end_time, \
-         prev_hash, curr_hash, created_at, zone_name, table_name, is_retail, guest_count, \
-         original_total, subtotal, paid_amount, discount_amount, surcharge_amount, \
-         comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, \
-         order_rule_discount_amount, order_rule_surcharge_amount, start_time, \
-         operator_name, void_type, loss_reason, loss_amount, void_note, member_name, \
-         cloud_synced \
-         FROM archived_order WHERE id = ?",
+        "SELECT ao.order_key, ao.receipt_number, ao.status, ao.total_amount, ao.tax, ao.end_time, \
+         ce.prev_hash, ce.curr_hash, ao.created_at, ao.zone_name, ao.table_name, ao.is_retail, ao.guest_count, \
+         ao.original_total, ao.subtotal, ao.paid_amount, ao.discount_amount, ao.surcharge_amount, \
+         ao.comp_total_amount, ao.order_manual_discount_amount, ao.order_manual_surcharge_amount, \
+         ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
+         ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, ao.member_name, \
+         ao.cloud_synced \
+         FROM archived_order ao \
+         JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
+         WHERE ao.id = ?",
     )
     .bind(order_pk)
     .fetch_optional(pool)
