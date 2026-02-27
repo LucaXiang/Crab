@@ -34,6 +34,8 @@ pub enum SyncResource {
     ArchivedOrder,
     /// Order sync events (edge-internal, for live order push to cloud)
     OrderSync,
+    /// Credit notes (edge → cloud only)
+    CreditNote,
     /// Role resource (client-visible for sync status)
     Role,
 }
@@ -108,6 +110,7 @@ impl SyncResource {
             Self::Member => "member",
             Self::MarketingGroup => "marketing_group",
             Self::ArchivedOrder => "archived_order",
+            Self::CreditNote => "credit_note",
             Self::OrderSync => "order_sync",
             Self::Role => "role",
         }
@@ -318,6 +321,41 @@ pub struct OrderPaymentSync {
     pub amount: f64,
     pub timestamp: i64,
     pub cancelled: bool,
+}
+
+// ── Credit Note sync types ──
+
+/// 退款凭证同步载荷（edge→cloud 推送）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreditNoteSync {
+    pub credit_note_number: String,
+    pub original_order_key: String,
+    pub original_receipt: String,
+    pub subtotal_credit: f64,
+    pub tax_credit: f64,
+    pub total_credit: f64,
+    pub refund_method: String,
+    pub reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    pub operator_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorizer_name: Option<String>,
+    pub prev_hash: String,
+    pub curr_hash: String,
+    pub created_at: i64,
+    pub items: Vec<CreditNoteItemSync>,
+}
+
+/// 退款明细行同步载荷
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreditNoteItemSync {
+    pub item_name: String,
+    pub quantity: i64,
+    pub unit_price: f64,
+    pub line_credit: f64,
+    pub tax_rate: i64,
+    pub tax_credit: f64,
 }
 
 // ── Tenant API response types ──

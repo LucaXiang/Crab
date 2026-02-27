@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { OrderSummary, OrderDetailResponse } from '@/core/types/order';
+import type { OrderSummary, OrderDetailResponse, CreditNoteSummary } from '@/core/types/order';
 
 export function getOrders(
   token: string,
@@ -19,4 +19,12 @@ export function getOrderDetail(
   orderKey: string,
 ): Promise<OrderDetailResponse> {
   return request('GET', `/api/tenant/stores/${storeId}/orders/${orderKey}/detail`, undefined, token);
+}
+
+export function getCreditNotes(
+  token: string,
+  storeId: number,
+  orderKey: string,
+): Promise<CreditNoteSummary[]> {
+  return request('GET', `/api/tenant/stores/${storeId}/orders/${orderKey}/credit-notes`, undefined, token);
 }

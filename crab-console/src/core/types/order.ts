@@ -87,3 +87,12 @@ export interface OrderDetailResponse {
   detail: OrderDetailPayload;
   desglose: TaxDesglose[];
 }
+
+export interface CreditNoteSummary {
+  credit_note_number: string;
+  total_credit: number;
+  refund_method: string;
+  reason: string;
+  operator_name: string;
+  created_at: number;
+}

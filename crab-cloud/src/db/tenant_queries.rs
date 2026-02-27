@@ -938,3 +938,36 @@ pub async fn get_store_entity_id(
             .await?;
     Ok(row.map(|r| r.0))
 }
+
+/// Credit note summary for order detail view
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct CreditNoteSummary {
+    pub credit_note_number: String,
+    pub total_credit: f64,
+    pub refund_method: String,
+    pub reason: String,
+    pub operator_name: String,
+    pub created_at: i64,
+}
+
+pub async fn list_credit_notes_by_order(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    order_key: &str,
+) -> Result<Vec<CreditNoteSummary>, BoxError> {
+    let rows: Vec<CreditNoteSummary> = sqlx::query_as(
+        r#"
+        SELECT credit_note_number, total_credit, refund_method, reason, operator_name, created_at
+        FROM store_credit_notes
+        WHERE store_id = $1 AND tenant_id = $2 AND original_order_key = $3
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(order_key)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}

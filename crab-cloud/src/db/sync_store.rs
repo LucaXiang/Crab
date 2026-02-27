@@ -235,8 +235,72 @@ pub async fn upsert_resource(
             )
             .await
         }
+        SyncResource::CreditNote => upsert_credit_note(pool, store_id, tenant_id, item, now).await,
         other => Err(format!("Unhandled resource type: {other}").into()),
     }
+}
+
+/// Upsert credit note — summary columns + detail JSONB.
+async fn upsert_credit_note(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    item: &CloudSyncItem,
+    now: i64,
+) -> Result<(), BoxError> {
+    use shared::cloud::CreditNoteSync;
+
+    let cn: CreditNoteSync = serde_json::from_value(item.data.clone())?;
+    let detail_json = serde_json::to_value(&cn)?;
+    let source_id: i64 = item.resource_id.parse()?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO store_credit_notes (
+            store_id, tenant_id, source_id, credit_note_number,
+            original_order_key, original_receipt,
+            subtotal_credit, tax_credit, total_credit,
+            refund_method, reason, note,
+            operator_name, authorizer_name,
+            prev_hash, curr_hash, created_at,
+            detail, version, synced_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        ON CONFLICT (tenant_id, store_id, source_id)
+        DO UPDATE SET credit_note_number = EXCLUDED.credit_note_number,
+                      total_credit = EXCLUDED.total_credit,
+                      prev_hash = EXCLUDED.prev_hash,
+                      curr_hash = EXCLUDED.curr_hash,
+                      detail = EXCLUDED.detail,
+                      version = EXCLUDED.version,
+                      synced_at = EXCLUDED.synced_at
+        WHERE store_credit_notes.version <= EXCLUDED.version
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(source_id)
+    .bind(&cn.credit_note_number)
+    .bind(&cn.original_order_key)
+    .bind(&cn.original_receipt)
+    .bind(cn.subtotal_credit)
+    .bind(cn.tax_credit)
+    .bind(cn.total_credit)
+    .bind(&cn.refund_method)
+    .bind(&cn.reason)
+    .bind(&cn.note)
+    .bind(&cn.operator_name)
+    .bind(&cn.authorizer_name)
+    .bind(&cn.prev_hash)
+    .bind(&cn.curr_hash)
+    .bind(cn.created_at)
+    .bind(&detail_json)
+    .bind(version_to_i64(item.version))
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 /// Upsert archived order — single table with summary columns + detail JSONB.

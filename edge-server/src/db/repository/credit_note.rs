@@ -133,3 +133,111 @@ pub async fn mark_synced(pool: &SqlitePool, id: i64) -> RepoResult<()> {
         .await?;
     Ok(())
 }
+
+/// Mark multiple credit notes as synced to cloud.
+pub async fn mark_synced_batch(pool: &SqlitePool, ids: &[i64]) -> RepoResult<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!("UPDATE credit_note SET cloud_synced = 1 WHERE id IN ({placeholders})");
+    let mut query = sqlx::query(&sql);
+    for id in ids {
+        query = query.bind(id);
+    }
+    query.execute(pool).await?;
+    Ok(())
+}
+
+/// List credit note IDs not yet synced to cloud (ordered by id for chain consistency).
+pub async fn list_unsynced_ids(pool: &SqlitePool, limit: i64) -> RepoResult<Vec<i64>> {
+    let rows = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM credit_note WHERE cloud_synced = 0 ORDER BY id LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// Build CreditNoteSync payload for cloud sync.
+pub async fn build_sync(
+    pool: &SqlitePool,
+    cn_id: i64,
+) -> RepoResult<shared::cloud::CreditNoteSync> {
+    use shared::cloud::{CreditNoteItemSync, CreditNoteSync};
+
+    // Join credit_note with archived_order (for order_key) and chain_entry (for hashes)
+    #[derive(sqlx::FromRow)]
+    struct CnRow {
+        credit_note_number: String,
+        original_receipt: String,
+        subtotal_credit: f64,
+        tax_credit: f64,
+        total_credit: f64,
+        refund_method: String,
+        reason: String,
+        note: Option<String>,
+        operator_name: String,
+        authorizer_name: Option<String>,
+        created_at: i64,
+        order_key: String,
+        prev_hash: String,
+        curr_hash: String,
+    }
+
+    let row = sqlx::query_as::<_, CnRow>(
+        "SELECT cn.credit_note_number, cn.original_receipt, \
+         cn.subtotal_credit, cn.tax_credit, cn.total_credit, \
+         cn.refund_method, cn.reason, cn.note, \
+         cn.operator_name, cn.authorizer_name, cn.created_at, \
+         ao.order_key, \
+         ce.prev_hash, ce.curr_hash \
+         FROM credit_note cn \
+         JOIN archived_order ao ON ao.id = cn.original_order_pk \
+         JOIN chain_entry ce ON ce.entry_type = 'CREDIT_NOTE' AND ce.entry_pk = cn.id \
+         WHERE cn.id = ?",
+    )
+    .bind(cn_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| RepoError::Database(format!("Credit note {cn_id} not found for sync")))?;
+
+    // Fetch items
+    let items = sqlx::query_as::<_, CreditNoteItem>(
+        "SELECT id, credit_note_id, original_instance_id, item_name, \
+         quantity, unit_price, line_credit, tax_rate, tax_credit \
+         FROM credit_note_item WHERE credit_note_id = ? ORDER BY id",
+    )
+    .bind(cn_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(CreditNoteSync {
+        credit_note_number: row.credit_note_number,
+        original_order_key: row.order_key,
+        original_receipt: row.original_receipt,
+        subtotal_credit: row.subtotal_credit,
+        tax_credit: row.tax_credit,
+        total_credit: row.total_credit,
+        refund_method: row.refund_method,
+        reason: row.reason,
+        note: row.note,
+        operator_name: row.operator_name,
+        authorizer_name: row.authorizer_name,
+        prev_hash: row.prev_hash,
+        curr_hash: row.curr_hash,
+        created_at: row.created_at,
+        items: items
+            .into_iter()
+            .map(|i| CreditNoteItemSync {
+                item_name: i.item_name,
+                quantity: i.quantity,
+                unit_price: i.unit_price,
+                line_credit: i.line_credit,
+                tax_rate: i.tax_rate,
+                tax_credit: i.tax_credit,
+            })
+            .collect(),
+    })
+}

@@ -7,13 +7,14 @@ import {
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getOrders, getOrderDetail } from '@/infrastructure/api/orders';
+import { getOrders, getOrderDetail, getCreditNotes } from '@/infrastructure/api/orders';
 import { ApiError } from '@/infrastructure/api/client';
 import { formatCurrency } from '@/utils/format';
 import { Spinner } from '@/presentation/components/ui/Spinner';
 import { TimelineCard } from '@/shared/components/Timeline';
 import type { TimelineEvent } from '@/shared/components/Timeline';
-import type { OrderSummary, OrderDetailResponse, OrderItem, OrderPayment, OrderEvent } from '@/core/types/order';
+import { Undo2 } from 'lucide-react';
+import type { OrderSummary, OrderDetailResponse, OrderItem, OrderPayment, OrderEvent, CreditNoteSummary } from '@/core/types/order';
 
 const ACCENT_COLORS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4',
@@ -46,6 +47,7 @@ export const OrdersScreen: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<OrderDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [creditNotes, setCreditNotes] = useState<CreditNoteSummary[]>([]);
 
   const loadPage = useCallback(async (page: number, reset: boolean) => {
     if (!token) return;
@@ -98,11 +100,15 @@ export const OrdersScreen: React.FC = () => {
     let cancelled = false;
     (async () => {
       setDetailLoading(true);
+      setCreditNotes([]);
       try {
-        const res = await getOrderDetail(token, storeId, selectedId);
-        if (!cancelled) setDetail(res);
+        const [res, notes] = await Promise.all([
+          getOrderDetail(token, storeId, selectedId),
+          getCreditNotes(token, storeId, selectedId).catch(() => [] as CreditNoteSummary[]),
+        ]);
+        if (!cancelled) { setDetail(res); setCreditNotes(notes); }
       } catch {
-        if (!cancelled) setDetail(null);
+        if (!cancelled) { setDetail(null); setCreditNotes([]); }
       } finally {
         if (!cancelled) setDetailLoading(false);
       }
@@ -214,7 +220,7 @@ export const OrdersScreen: React.FC = () => {
               <Spinner className="w-10 h-10 text-primary-500" />
             </div>
           ) : detail ? (
-            <OrderDetail detail={detail} orderKey={selectedId ?? ''} receiptNumber={selectedReceiptNumber} t={t} />
+            <OrderDetail detail={detail} orderKey={selectedId ?? ''} receiptNumber={selectedReceiptNumber} creditNotes={creditNotes} t={t} />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-300">
               <Receipt className="w-16 h-16 mb-4 opacity-50" />
@@ -330,7 +336,7 @@ export const OrdersScreen: React.FC = () => {
               {detailLoading ? (
                 <div className="flex items-center justify-center py-12"><Spinner className="w-8 h-8 text-primary-500" /></div>
               ) : detail ? (
-                <MobileOrderDetail detail={detail} orderKey={selectedId} receiptNumber={selectedReceiptNumber} t={t} />
+                <MobileOrderDetail detail={detail} orderKey={selectedId} receiptNumber={selectedReceiptNumber} creditNotes={creditNotes} t={t} />
               ) : (
                 <div className="text-center text-slate-400 py-8">{t('orders.empty')}</div>
               )}
@@ -350,8 +356,9 @@ const OrderDetail: React.FC<{
   detail: OrderDetailResponse;
   orderKey: string;
   receiptNumber: string;
+  creditNotes: CreditNoteSummary[];
   t: (key: string) => string;
-}> = ({ detail, orderKey, receiptNumber, t }) => {
+}> = ({ detail, orderKey, receiptNumber, creditNotes, t }) => {
   const d = detail.detail;
   const isVoid = d.void_type != null;
   const timelineEvents = useMemo(() => toTimelineEvents(d.events ?? []), [d.events]);
@@ -371,6 +378,7 @@ const OrderDetail: React.FC<{
         <div className="lg:col-span-2 space-y-4">
           <ItemsCard items={d.items} categoryColorMap={categoryColorMap} detail={detail} t={t} />
           <PaymentsCard payments={d.payments} t={t} />
+          {creditNotes.length > 0 && <CreditNotesCard creditNotes={creditNotes} t={t} />}
           {detail.desglose.length > 0 && <TaxCard desglose={detail.desglose} t={t} />}
         </div>
         <div className="lg:col-span-1">
@@ -389,8 +397,9 @@ const MobileOrderDetail: React.FC<{
   detail: OrderDetailResponse;
   orderKey: string;
   receiptNumber: string;
+  creditNotes: CreditNoteSummary[];
   t: (key: string) => string;
-}> = ({ detail, receiptNumber, t }) => {
+}> = ({ detail, receiptNumber, creditNotes, t }) => {
   const d = detail.detail;
   const isVoid = d.void_type != null;
   const timelineEvents = useMemo(() => toTimelineEvents(d.events ?? []), [d.events]);
@@ -495,6 +504,30 @@ const MobileOrderDetail: React.FC<{
           </div>
         )}
       </div>
+
+      {/* Credit notes */}
+      {creditNotes.length > 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Undo2 className="w-3.5 h-3.5" />
+            {t('orders.credit_notes')} ({creditNotes.length})
+          </h3>
+          <div className="space-y-2">
+            {creditNotes.map((cn) => (
+              <div key={cn.credit_note_number} className="flex items-center justify-between text-sm">
+                <div>
+                  <span className="font-mono text-xs text-slate-500">{cn.credit_note_number}</span>
+                  <span className="text-slate-400 mx-1">·</span>
+                  <span className="text-slate-600 capitalize">{cn.refund_method.toLowerCase()}</span>
+                  <span className="text-slate-400 mx-1">·</span>
+                  <span className="text-slate-500">{cn.reason}</span>
+                </div>
+                <span className="font-bold text-red-500">-{formatCurrency(cn.total_credit)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tax breakdown */}
       {detail.desglose.length > 0 && (
@@ -652,6 +685,39 @@ const PaymentsCard: React.FC<{ payments: OrderPayment[]; t: (key: string) => str
       ) : (
         payments.map((payment, i) => <PaymentRow key={i} payment={payment} t={t} />)
       )}
+    </div>
+  </div>
+);
+
+const CreditNotesCard: React.FC<{ creditNotes: CreditNoteSummary[]; t: (key: string) => string }> = ({ creditNotes, t }) => (
+  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 font-bold text-slate-700">
+      <Undo2 className="w-[18px] h-[18px]" />
+      <span>{t('orders.credit_notes')}</span>
+      <span className="ml-auto text-xs font-medium text-slate-400">{creditNotes.length}</span>
+    </div>
+    <div className="divide-y divide-slate-100">
+      {creditNotes.map((cn) => (
+        <div key={cn.credit_note_number} className="px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-red-100 text-red-600">
+              <Undo2 size={16} />
+            </div>
+            <div>
+              <div className="font-medium text-slate-800 flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-xs">{cn.credit_note_number}</span>
+                <span className="capitalize">{cn.refund_method.toLowerCase()}</span>
+              </div>
+              <div className="text-xs text-slate-400 flex items-center gap-2">
+                <span>{cn.reason}</span>
+                <span>· {cn.operator_name}</span>
+                <span>· {new Date(cn.created_at).toLocaleString([], { hour12: false })}</span>
+              </div>
+            </div>
+          </div>
+          <div className="font-bold text-red-500 shrink-0 pl-4">-{formatCurrency(cn.total_credit)}</div>
+        </div>
+      ))}
     </div>
   </div>
 );

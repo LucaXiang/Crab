@@ -136,7 +136,8 @@
     "void_note": "Nota",
     "loss_amount": "Pérdida",
     "member": "Miembro",
-    "cancelled_payment": "Cancelado"
+    "cancelled_payment": "Cancelado",
+    "credit_notes": "Notas de crédito"
   },
   "stats": {
     "title": "Estadísticas",

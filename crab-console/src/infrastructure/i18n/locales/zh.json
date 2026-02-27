@@ -136,7 +136,8 @@
     "void_note": "备注",
     "loss_amount": "损失",
     "member": "会员",
-    "cancelled_payment": "已取消"
+    "cancelled_payment": "已取消",
+    "credit_notes": "退款单"
   },
   "stats": {
     "title": "统计",

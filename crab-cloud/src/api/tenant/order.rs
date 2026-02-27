@@ -158,3 +158,26 @@ pub async fn get_order_detail(
         desglose: detail_sync.desglose,
     }))
 }
+
+/// GET /api/tenant/stores/:id/orders/:order_key/credit-notes
+pub async fn list_credit_notes(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, order_key)): Path<(i64, String)>,
+) -> ApiResult<Vec<tenant_queries::CreditNoteSummary>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let notes = tenant_queries::list_credit_notes_by_order(
+        &state.pool,
+        store_id,
+        &identity.tenant_id,
+        &order_key,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Credit notes query error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    Ok(Json(notes))
+}
