@@ -23,6 +23,8 @@ pub enum ArchiveError {
     HashChain(String),
     #[error("Conversion error: {0}")]
     Conversion(String),
+    #[error("Validation error: {0}")]
+    Validation(String),
 }
 
 pub type ArchiveResult<T> = Result<T, ArchiveError>;
@@ -34,6 +36,7 @@ impl From<ArchiveError> for shared::error::AppError {
             ArchiveError::Database(msg) => AppError::database(msg),
             ArchiveError::HashChain(msg) => AppError::internal(msg),
             ArchiveError::Conversion(msg) => AppError::internal(msg),
+            ArchiveError::Validation(msg) => AppError::validation(msg),
         }
     }
 }
@@ -172,6 +175,11 @@ impl OrderArchiveService {
             bad_archive_dir,
             tz,
         }
+    }
+
+    /// Get the hash chain lock (shared with CreditNoteService to serialize all chain updates)
+    pub fn hash_chain_lock(&self) -> &Arc<Mutex<()>> {
+        &self.hash_chain_lock
     }
 
     /// Generate the next receipt number atomically

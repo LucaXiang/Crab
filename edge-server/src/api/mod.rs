@@ -58,6 +58,9 @@ pub mod data_transfer;
 // Archive (归档验证)
 pub mod archive_verify;
 
+// Credit Notes (退款凭证)
+pub mod credit_notes;
+
 // Audit (审计日志)
 pub mod audit_log;
 

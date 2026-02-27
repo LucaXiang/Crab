@@ -6,6 +6,7 @@
 
 pub mod attribute;
 pub mod category;
+pub mod credit_note;
 pub mod daily_report;
 pub mod dining_table;
 pub mod employee;
@@ -29,6 +30,7 @@ pub mod zone;
 // Re-exports
 pub use attribute::*;
 pub use category::*;
+pub use credit_note::*;
 pub use daily_report::*;
 pub use dining_table::*;
 pub use employee::*;

@@ -20,6 +20,7 @@ pub mod zone;
 pub mod price_rule;
 
 // Orders
+pub mod credit_note;
 pub mod order;
 
 // Payments

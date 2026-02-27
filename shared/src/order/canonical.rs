@@ -1048,6 +1048,27 @@ pub fn compute_order_chain_hash(
     format!("{:x}", Sha256::digest(&buf))
 }
 
+/// Compute the chain hash for a credit note entry.
+///
+/// Hash = SHA256(prev_hash || credit_note_number || original_receipt || total_credit)
+/// All strings are length-prefixed for unambiguous boundary separation.
+pub fn compute_credit_note_chain_hash(
+    prev_hash: &str,
+    credit_note_number: &str,
+    original_receipt: &str,
+    total_credit: f64,
+) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut buf = Vec::with_capacity(256);
+    write_str(&mut buf, prev_hash);
+    write_str(&mut buf, credit_note_number);
+    write_str(&mut buf, original_receipt);
+    write_f64(&mut buf, total_credit);
+
+    format!("{:x}", Sha256::digest(&buf))
+}
+
 /// Compute the event hash for tamper-proof verification.
 ///
 /// Hash = SHA256(canonical_bytes(OrderEvent))

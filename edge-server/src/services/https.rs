@@ -64,6 +64,8 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::statistics::router())
         // Archive (归档验证)
         .merge(crate::api::archive_verify::router())
+        // Credit Notes (退款凭证)
+        .merge(crate::api::credit_notes::router())
         // Audit (审计日志)
         .merge(crate::api::audit_log::router())
         // System Issues (系统问题)
