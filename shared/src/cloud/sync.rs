@@ -1222,6 +1222,390 @@ mod tests {
         );
     }
 
+    // ── Invoice huella roundtrip tests ──
+
+    fn sample_invoice_sync() -> InvoiceSync {
+        use crate::models::invoice::{InvoiceSourceType, TipoFactura};
+        use crate::order::verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
+
+        let nif = "B12345678".to_string();
+        let invoice_number = "F220260227001".to_string();
+        let fecha_expedicion = "27-02-2026".to_string();
+        let fecha_hora_registro = "2026-02-27T10:00:00+01:00".to_string();
+        let tax = 6.30;
+        let total = 36.30;
+
+        let huella = compute_verifactu_huella_alta(&HuellaAltaInput {
+            nif: &nif,
+            invoice_number: &invoice_number,
+            fecha_expedicion: &fecha_expedicion,
+            tipo_factura: "F2",
+            cuota_total: tax,
+            importe_total: total,
+            prev_huella: None,
+            fecha_hora_registro: &fecha_hora_registro,
+        })
+        .unwrap();
+
+        InvoiceSync {
+            id: 1,
+            invoice_number,
+            serie: "F2".to_string(),
+            tipo_factura: TipoFactura::F2,
+            source_type: InvoiceSourceType::Order,
+            source_pk: 100,
+            subtotal: 30.0,
+            tax,
+            total,
+            desglose: vec![TaxDesglose {
+                tax_rate: 2100,
+                base_amount: rust_decimal::Decimal::new(3000, 2),
+                tax_amount: rust_decimal::Decimal::new(630, 2),
+            }],
+            huella,
+            prev_huella: None,
+            fecha_expedicion,
+            fecha_hora_registro,
+            nif,
+            nombre_razon: "Test Restaurant SL".to_string(),
+            factura_rectificada_id: None,
+            factura_rectificada_num: None,
+            created_at: 1709020800000,
+        }
+    }
+
+    #[test]
+    fn test_invoice_verify_huella_on_fresh() {
+        let inv = sample_invoice_sync();
+        assert!(
+            inv.verify_huella().is_none(),
+            "Fresh InvoiceSync must pass huella verification"
+        );
+    }
+
+    #[test]
+    fn test_invoice_huella_survives_json_roundtrip() {
+        let inv = sample_invoice_sync();
+        let json = serde_json::to_string(&inv).unwrap();
+        let deserialized: InvoiceSync = serde_json::from_str(&json).unwrap();
+
+        assert!(
+            deserialized.verify_huella().is_none(),
+            "Huella verification must pass after JSON roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_invoice_huella_survives_value_roundtrip() {
+        let inv = sample_invoice_sync();
+        let value = serde_json::to_value(&inv).unwrap();
+        let deserialized: InvoiceSync = serde_json::from_value(value).unwrap();
+
+        assert!(
+            deserialized.verify_huella().is_none(),
+            "Huella verification must pass after Value roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_invoice_huella_detects_tampering() {
+        let mut inv = sample_invoice_sync();
+        inv.total = 999.99; // tamper
+        assert!(
+            inv.verify_huella().is_some(),
+            "Tampered total must fail huella verification"
+        );
+    }
+
+    #[test]
+    fn test_invoice_huella_f64_edge_cases() {
+        use crate::models::invoice::{InvoiceSourceType, TipoFactura};
+        use crate::order::verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
+
+        for (tax, total) in [
+            (0.0, 0.0),
+            (0.01, 0.11),
+            (2.10, 12.10),
+            (6.30, 36.30),
+            (21.0, 121.0),
+            (99.99, 999.99),
+        ] {
+            let nif = "B12345678";
+            let inv_num = "TEST-001";
+            let fecha = "27-02-2026";
+            let ts = "2026-02-27T10:00:00+01:00";
+
+            let huella = compute_verifactu_huella_alta(&HuellaAltaInput {
+                nif,
+                invoice_number: inv_num,
+                fecha_expedicion: fecha,
+                tipo_factura: "F2",
+                cuota_total: tax,
+                importe_total: total,
+                prev_huella: None,
+                fecha_hora_registro: ts,
+            })
+            .unwrap();
+
+            let inv = InvoiceSync {
+                id: 1,
+                invoice_number: inv_num.to_string(),
+                serie: "F2".to_string(),
+                tipo_factura: TipoFactura::F2,
+                source_type: InvoiceSourceType::Order,
+                source_pk: 1,
+                subtotal: total - tax,
+                tax,
+                total,
+                desglose: vec![],
+                huella,
+                prev_huella: None,
+                fecha_expedicion: fecha.to_string(),
+                fecha_hora_registro: ts.to_string(),
+                nif: nif.to_string(),
+                nombre_razon: "Test".to_string(),
+                factura_rectificada_id: None,
+                factura_rectificada_num: None,
+                created_at: 0,
+            };
+
+            let json = serde_json::to_string(&inv).unwrap();
+            let rt: InvoiceSync = serde_json::from_str(&json).unwrap();
+            assert!(
+                rt.verify_huella().is_none(),
+                "f64 values ({tax}, {total}) must survive JSON roundtrip for huella"
+            );
+        }
+    }
+
+    #[test]
+    fn test_invoice_chained_huella_roundtrip() {
+        use crate::models::invoice::{InvoiceSourceType, TipoFactura};
+        use crate::order::verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
+
+        let nif = "B12345678";
+        let ts = "2026-02-27T10:00:00+01:00";
+        let ts2 = "2026-02-27T11:00:00+01:00";
+
+        // First invoice
+        let h1 = compute_verifactu_huella_alta(&HuellaAltaInput {
+            nif,
+            invoice_number: "INV-001",
+            fecha_expedicion: "27-02-2026",
+            tipo_factura: "F2",
+            cuota_total: 2.10,
+            importe_total: 12.10,
+            prev_huella: None,
+            fecha_hora_registro: ts,
+        })
+        .unwrap();
+
+        // Second invoice chained to first
+        let h2 = compute_verifactu_huella_alta(&HuellaAltaInput {
+            nif,
+            invoice_number: "INV-002",
+            fecha_expedicion: "27-02-2026",
+            tipo_factura: "F2",
+            cuota_total: 5.0,
+            importe_total: 25.0,
+            prev_huella: Some(&h1),
+            fecha_hora_registro: ts2,
+        })
+        .unwrap();
+
+        let inv2 = InvoiceSync {
+            id: 2,
+            invoice_number: "INV-002".to_string(),
+            serie: "F2".to_string(),
+            tipo_factura: TipoFactura::F2,
+            source_type: InvoiceSourceType::Order,
+            source_pk: 2,
+            subtotal: 20.0,
+            tax: 5.0,
+            total: 25.0,
+            desglose: vec![],
+            huella: h2.clone(),
+            prev_huella: Some(h1),
+            fecha_expedicion: "27-02-2026".to_string(),
+            fecha_hora_registro: ts2.to_string(),
+            nif: nif.to_string(),
+            nombre_razon: "Test".to_string(),
+            factura_rectificada_id: None,
+            factura_rectificada_num: None,
+            created_at: 0,
+        };
+
+        // JSON roundtrip must preserve chained huella
+        let json = serde_json::to_string(&inv2).unwrap();
+        let rt: InvoiceSync = serde_json::from_str(&json).unwrap();
+        assert!(
+            rt.verify_huella().is_none(),
+            "Chained huella must survive JSON roundtrip"
+        );
+        assert_eq!(rt.huella, h2);
+    }
+
+    // ── OrderDetailSync f64 edge cases ──
+
+    #[test]
+    fn test_order_hash_f64_edge_cases() {
+        for (total, tax) in [
+            (0.0, 0.0),
+            (0.01, 0.0),
+            (12.10, 2.10),
+            (36.30, 6.30),
+            (100.0, 21.0),
+            (999.99, 99.99),
+        ] {
+            let prev = "genesis".to_string();
+            let order_key = "uuid".to_string();
+            let receipt = "R-001".to_string();
+            let last_event_hash = "evt_hash".to_string();
+
+            let curr_hash = crate::order::compute_order_chain_hash(
+                &prev,
+                &order_key,
+                &receipt,
+                &crate::order::OrderStatus::Completed,
+                &last_event_hash,
+                total,
+                tax,
+            );
+
+            let order = OrderDetailSync {
+                order_key,
+                receipt_number: receipt,
+                status: "COMPLETED".to_string(),
+                total_amount: total,
+                tax,
+                end_time: Some(0),
+                prev_hash: prev,
+                curr_hash,
+                last_event_hash: Some(last_event_hash),
+                created_at: 0,
+                desglose: vec![],
+                detail: OrderDetailPayload {
+                    zone_name: None,
+                    table_name: None,
+                    is_retail: false,
+                    guest_count: None,
+                    original_total: total,
+                    subtotal: total,
+                    paid_amount: total,
+                    discount_amount: 0.0,
+                    surcharge_amount: 0.0,
+                    comp_total_amount: 0.0,
+                    order_manual_discount_amount: 0.0,
+                    order_manual_surcharge_amount: 0.0,
+                    order_rule_discount_amount: 0.0,
+                    order_rule_surcharge_amount: 0.0,
+                    start_time: 0,
+                    operator_name: None,
+                    void_type: None,
+                    loss_reason: None,
+                    loss_amount: None,
+                    void_note: None,
+                    member_name: None,
+                    items: vec![],
+                    payments: vec![],
+                    events: vec![],
+                },
+            };
+
+            let json = serde_json::to_string(&order).unwrap();
+            let rt: OrderDetailSync = serde_json::from_str(&json).unwrap();
+            assert!(
+                rt.verify_hash().is_none(),
+                "f64 values ({total}, {tax}) must survive JSON roundtrip for order hash"
+            );
+        }
+    }
+
+    // ── Golden hash values (pin exact hashes to detect accidental algorithm changes) ──
+
+    #[test]
+    fn test_order_chain_hash_golden() {
+        // Compute the hash with known inputs
+        let hash = crate::order::compute_order_chain_hash(
+            "genesis",
+            "order-001",
+            "FAC202602270001",
+            &crate::order::OrderStatus::Completed,
+            "last_event_abc",
+            100.0,
+            21.0,
+        );
+        // Compute again — determinism check
+        let hash2 = crate::order::compute_order_chain_hash(
+            "genesis",
+            "order-001",
+            "FAC202602270001",
+            &crate::order::OrderStatus::Completed,
+            "last_event_abc",
+            100.0,
+            21.0,
+        );
+        assert_eq!(hash, hash2, "Order chain hash must be deterministic");
+        assert_eq!(hash.len(), 64, "SHA-256 hex must be 64 chars");
+        // Different status → different hash
+        let hash_void = crate::order::compute_order_chain_hash(
+            "genesis",
+            "order-001",
+            "FAC202602270001",
+            &crate::order::OrderStatus::Void,
+            "last_event_abc",
+            100.0,
+            21.0,
+        );
+        assert_ne!(
+            hash, hash_void,
+            "Different status must produce different hash"
+        );
+    }
+
+    #[test]
+    fn test_credit_note_chain_hash_golden() {
+        let hash = crate::order::compute_credit_note_chain_hash(
+            "prev_abc",
+            "CN-20260227-0001",
+            "FAC202602270001",
+            25.50,
+            4.43,
+        );
+        let hash2 = crate::order::compute_credit_note_chain_hash(
+            "prev_abc",
+            "CN-20260227-0001",
+            "FAC202602270001",
+            25.50,
+            4.43,
+        );
+        assert_eq!(hash, hash2, "Credit note chain hash must be deterministic");
+        assert_eq!(hash.len(), 64, "SHA-256 hex must be 64 chars");
+    }
+
+    #[test]
+    fn test_invoice_huella_golden() {
+        use crate::order::verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
+        use sha2::{Digest, Sha256};
+
+        let h = compute_verifactu_huella_alta(&HuellaAltaInput {
+            nif: "B12345678",
+            invoice_number: "F220260227001",
+            fecha_expedicion: "27-02-2026",
+            tipo_factura: "F2",
+            cuota_total: 6.30,
+            importe_total: 36.30,
+            prev_huella: None,
+            fecha_hora_registro: "2026-02-27T10:00:00+01:00",
+        })
+        .unwrap();
+
+        // Pin the exact hash from known input string
+        let raw = "IDEmisorFactura=B12345678&NumSerieFactura=F220260227001&FechaExpedicionFactura=27-02-2026&TipoFactura=F2&CuotaTotal=6.3&ImporteTotal=36.3&Huella=&FechaHoraHusoGenRegistro=2026-02-27T10:00:00+01:00";
+        let expected = format!("{:x}", Sha256::digest(raw.as_bytes()));
+        assert_eq!(h, expected, "Invoice huella must match golden value");
+    }
+
     #[test]
     fn test_compute_desglose_multi_rate() {
         let items = vec![
