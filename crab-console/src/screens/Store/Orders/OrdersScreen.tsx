@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Clock, ChevronRight, Receipt, Calendar, CreditCard, Coins,
@@ -66,12 +66,31 @@ export const OrdersScreen: React.FC = () => {
     })();
   }, [loadPage]);
 
-  // Auto-select first order (desktop only)
+  // Fix 2: prevent mobile bottom sheet from reopening after user dismisses
+  const userDismissed = useRef(false);
+
+  // Reset dismiss flag when orders list changes (new data loaded)
   useEffect(() => {
-    if (orders.length > 0 && !selectedId) {
+    userDismissed.current = false;
+  }, [orders]);
+
+  // Auto-select first order (skip if user explicitly dismissed on mobile)
+  useEffect(() => {
+    if (orders.length > 0 && !selectedId && !userDismissed.current) {
       setSelectedId(orders[0].source_id);
     }
   }, [orders, selectedId]);
+
+  const selectedOrder = useMemo(
+    () => orders.find(o => o.source_id === selectedId),
+    [orders, selectedId],
+  );
+  const selectedReceiptNumber = selectedOrder?.receipt_number ?? selectedId?.slice(0, 8) ?? '';
+
+  const handleMobileClose = () => {
+    userDismissed.current = true;
+    setSelectedId(null);
+  };
 
   // Load detail when selection changes
   useEffect(() => {
@@ -108,7 +127,7 @@ export const OrdersScreen: React.FC = () => {
       {/* ── Desktop: split pane ── */}
       <div className="hidden md:flex h-full overflow-hidden">
         {/* Left sidebar: order list */}
-        <div className="w-80 lg:w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div className="w-1/3 min-w-[280px] max-w-[384px] bg-white border-r border-slate-200 flex flex-col shrink-0">
           <div className="p-4 border-b border-slate-100 shrink-0">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
               <Clock className="w-5 h-5 text-primary-500" />
@@ -189,13 +208,13 @@ export const OrdersScreen: React.FC = () => {
         </div>
 
         {/* Right: order detail */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-6" style={{ scrollbarGutter: 'stable' }}>
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-3 sm:p-4 lg:p-6" style={{ scrollbarGutter: 'stable' }}>
           {detailLoading ? (
             <div className="h-full flex items-center justify-center">
               <Spinner className="w-10 h-10 text-primary-500" />
             </div>
           ) : detail ? (
-            <OrderDetail detail={detail} orderKey={selectedId ?? ''} t={t} />
+            <OrderDetail detail={detail} orderKey={selectedId ?? ''} receiptNumber={selectedReceiptNumber} t={t} />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-300">
               <Receipt className="w-16 h-16 mb-4 opacity-50" />
@@ -293,7 +312,7 @@ export const OrdersScreen: React.FC = () => {
       {selectedId && (
         <div
           className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
-          onClick={() => setSelectedId(null)}
+          onClick={handleMobileClose}
         >
           <div
             className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto"
@@ -302,8 +321,8 @@ export const OrdersScreen: React.FC = () => {
           >
             {/* Modal header */}
             <div className="sticky top-0 z-10 px-5 py-3 border-b border-slate-100 bg-white/95 backdrop-blur flex items-center justify-between">
-              <span className="text-lg font-bold text-slate-900">{selectedId.slice(0, 8)}</span>
-              <button type="button" className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer" onClick={() => setSelectedId(null)}>
+              <span className="text-lg font-bold text-slate-900">{selectedReceiptNumber}</span>
+              <button type="button" className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer" onClick={handleMobileClose}>
                 <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
@@ -311,7 +330,7 @@ export const OrdersScreen: React.FC = () => {
               {detailLoading ? (
                 <div className="flex items-center justify-center py-12"><Spinner className="w-8 h-8 text-primary-500" /></div>
               ) : detail ? (
-                <MobileOrderDetail detail={detail} orderKey={selectedId} t={t} />
+                <MobileOrderDetail detail={detail} orderKey={selectedId} receiptNumber={selectedReceiptNumber} t={t} />
               ) : (
                 <div className="text-center text-slate-400 py-8">{t('orders.empty')}</div>
               )}
@@ -330,8 +349,9 @@ export const OrdersScreen: React.FC = () => {
 const OrderDetail: React.FC<{
   detail: OrderDetailResponse;
   orderKey: string;
+  receiptNumber: string;
   t: (key: string) => string;
-}> = ({ detail, orderKey, t }) => {
+}> = ({ detail, orderKey, receiptNumber, t }) => {
   const d = detail.detail;
   const isVoid = d.void_type != null;
   const timelineEvents = useMemo(() => toTimelineEvents(d.events ?? []), [d.events]);
@@ -345,7 +365,7 @@ const OrderDetail: React.FC<{
 
   return (
     <div className="max-w-6xl mx-auto space-y-4">
-      <OrderHeader detail={detail} orderKey={orderKey} isVoid={isVoid} t={t} />
+      <OrderHeader detail={detail} receiptNumber={receiptNumber} isVoid={isVoid} t={t} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
@@ -368,8 +388,9 @@ const OrderDetail: React.FC<{
 const MobileOrderDetail: React.FC<{
   detail: OrderDetailResponse;
   orderKey: string;
+  receiptNumber: string;
   t: (key: string) => string;
-}> = ({ detail, orderKey, t }) => {
+}> = ({ detail, receiptNumber, t }) => {
   const d = detail.detail;
   const isVoid = d.void_type != null;
   const timelineEvents = useMemo(() => toTimelineEvents(d.events ?? []), [d.events]);
@@ -381,7 +402,7 @@ const MobileOrderDetail: React.FC<{
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-lg font-bold ${isVoid ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{orderKey}</span>
+            <span className={`text-lg font-bold ${isVoid ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{receiptNumber}</span>
             {isVoid && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded uppercase">{t('orders.voided')}</span>}
           </div>
           <div className="flex flex-wrap gap-3 text-xs text-slate-500">
@@ -519,17 +540,17 @@ const MobileOrderDetail: React.FC<{
 
 const OrderHeader: React.FC<{
   detail: OrderDetailResponse;
-  orderKey: string;
+  receiptNumber: string;
   isVoid: boolean;
   t: (key: string) => string;
-}> = ({ detail, orderKey, isVoid, t }) => {
+}> = ({ detail, receiptNumber, isVoid, t }) => {
   const d = detail.detail;
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex justify-between items-start">
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <h1 className={`text-2xl font-bold ${isVoid ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
-            {orderKey}
+          <h1 className={`text-xl md:text-2xl font-bold ${isVoid ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+            {receiptNumber}
           </h1>
           {isVoid && (
             <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded uppercase">
@@ -580,7 +601,7 @@ const OrderHeader: React.FC<{
       </div>
       <div className="text-right shrink-0 pl-6">
         <p className="text-sm text-slate-400 uppercase font-bold tracking-wider mb-1">{t('orders.total')}</p>
-        <p className={`text-3xl font-bold ${isVoid ? 'text-slate-400 line-through' : 'text-primary-500'}`}>
+        <p className={`text-2xl md:text-3xl font-bold ${isVoid ? 'text-slate-400 line-through' : 'text-primary-500'}`}>
           {formatCurrency(d.paid_amount)}
         </p>
       </div>
@@ -644,7 +665,7 @@ const TaxCard: React.FC<{ desglose: OrderDetailResponse['desglose']; t: (key: st
       {desglose.map((row, i) => (
         <div key={i} className="px-4 py-3 flex justify-between items-center text-sm">
           <span className="text-slate-700 font-medium">{row.tax_rate}%</span>
-          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+          <div className="flex flex-row gap-4 sm:gap-6 shrink-0">
             <div className="text-right">
               <p className="text-[10px] text-slate-400 uppercase">{t('orders.tax_base')}</p>
               <p className="text-slate-600">{formatCurrency(row.base_amount)}</p>
