@@ -46,10 +46,56 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 - **crab-cloud**: 云端统一服务 (租户管理 + PKI/认证 + 订阅校验 + Stripe + 数据同步)，EC2 + Docker Compose + Caddy 部署
 - **订单系统**: Event Sourcing + CQRS，redb 存储事件，SQLite 归档查询
 
+### 订单层架构（Order Layer）
+
+**三层结构**：
+
+```
+redb (活跃订单)                    ← Event Sourcing 运行时
+  │ 完成/作废/合并
+  ▼
+SQLite archived_order              ← 归档层 (只读业务数据)
+  + archived_order_event           ← 事件级 hash 链 (prev_hash/curr_hash)
+  + credit_note / credit_note_item ← 追加式退款凭证
+  │
+chain_entry (统一 hash 链索引)     ← 唯一的链真相，ORDER + CREDIT_NOTE 交错
+  │ CloudWorker 按 chain_entry.id 顺序同步
+  ▼
+crab-cloud PostgreSQL              ← 云端存储 + hash 再验证
+```
+
+**hash chain 设计**：
+- `chain_entry` 是唯一的 hash 链，ORDER 和 CREDIT_NOTE 共享同一条链
+- `system_state.last_chain_hash` 是链尾指针，每次追加在同一事务内原子更新
+- `hash_chain_lock` (Mutex) 序列化所有链写入，防 TOCTOU
+- Hash 计算: `shared::order::canonical` 提供确定性二进制序列化 (`CanonicalHash` trait)，与 serde 解耦
+- `write_f64` 规范化 `-0.0` → `0.0`，保证 JSON roundtrip 稳定性
+- 云端反序列化后通过 `verify_hash()` 重新计算 hash 对比，不匹配则 warn（不拒绝）
+
+**编号体系**：
+- `receipt_number`: `FAC{YYYYMMDD}{10000+N}`，全局单调递增计数器 (`system_state.order_count`)
+- `credit_note_number`: `CN-{YYYYMMDD}-{NNNN}`，按日计数
+- **未来发票号 (Verifactu)**：`{Serie}-{YYYYMMDD}-{NNNN}`，每终端独立 Serie，离线本地分配 + 上线后补报
+
+**Verifactu 对接预设计**：
+- `chain_entry.entry_type` 映射: `ORDER` → Alta, `CREDIT_NOTE` → Rectificativa, `ORDER_VOID` (预留) → Anulación
+- `OrderDetailSync.desglose` 已包含 `TaxDesglose` (BaseImponible + CuotaRepercutida)
+- 发票号带日期段天然隔离，防计数器重置后撞号
+- 离线签发: 本地已知 NIF/发票号/日期/金额，QR 可离线生成，在线后批量上报
+
+**关键文件**：
+- `shared/src/order/canonical.rs` — hash 计算函数
+- `edge-server/src/archiving/service.rs` — 归档服务 + receipt_number 生成
+- `edge-server/src/archiving/credit_note.rs` — 退款凭证服务
+- `edge-server/src/cloud/worker.rs` — CloudWorker 同步
+- `shared/src/cloud/sync.rs` — 同步协议类型 + verify_hash()
+
 ### 架构原则
 
 - **Server/Cloud 是权威**：所有业务逻辑和计算（定价、收据号、税务等）在 edge-server 或 crab-cloud 完成。Tauri 客户端只做展示，**禁止**在客户端添加计算库（如 rust_decimal）或复制业务逻辑
 - **功能独立**：不相关的功能不要合并到同一个 UI 组件（例如厨房小票和标签重打应该是独立 Modal，不是 Tab）
+- **订单不可变**：archived_order 和 archived_order_event 永远只读，所有修正通过追加 credit_note 实现
+- **防超退**：退款总额不超过原始订单总额，通过 `SUM(credit_note.total_credit)` 实时校验
 
 ## 应用数据目录结构
 

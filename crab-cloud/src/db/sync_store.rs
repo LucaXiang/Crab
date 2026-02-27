@@ -254,11 +254,12 @@ async fn upsert_credit_note(
     let source_id: i64 = item.resource_id.parse()?;
 
     // Verify hash chain integrity after deserialization
-    if !cn.verify_hash() {
+    if let Some(recomputed) = cn.verify_hash() {
         tracing::warn!(
             credit_note_number = %cn.credit_note_number,
             source_id,
-            expected = %cn.curr_hash,
+            stored = %cn.curr_hash,
+            recomputed,
             "Credit note hash verification failed after deserialization"
         );
     }
@@ -328,11 +329,14 @@ async fn upsert_archived_order(
 
     // Verify hash chain integrity after deserialization
     // If last_event_hash is None (pre-upgrade data), skip silently
-    if !detail_sync.verify_hash() && detail_sync.last_event_hash.is_some() {
+    if let Some(recomputed) = detail_sync.verify_hash()
+        && detail_sync.last_event_hash.is_some()
+    {
         tracing::warn!(
             order_key = %detail_sync.order_key,
             receipt = %detail_sync.receipt_number,
-            expected = %detail_sync.curr_hash,
+            stored = %detail_sync.curr_hash,
+            recomputed,
             "Order hash verification failed after deserialization"
         );
     }

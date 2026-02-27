@@ -364,34 +364,36 @@ pub struct CreditNoteItemSync {
 // ── Hash verification ──
 
 impl CreditNoteSync {
-    /// Recompute the chain hash from payload fields and verify it matches `curr_hash`.
-    ///
-    /// This proves the hash is stable through JSON serialization/deserialization.
-    pub fn verify_hash(&self) -> bool {
+    /// Recompute the chain hash and return `Some(recomputed)` on mismatch, `None` if ok.
+    pub fn verify_hash(&self) -> Option<String> {
         let recomputed = crate::order::compute_credit_note_chain_hash(
             &self.prev_hash,
             &self.credit_note_number,
             &self.original_receipt,
             self.total_credit,
         );
-        recomputed == self.curr_hash
+        if recomputed == self.curr_hash {
+            None
+        } else {
+            Some(recomputed)
+        }
     }
 }
 
 impl OrderDetailSync {
-    /// Recompute the chain hash from payload fields and verify it matches `curr_hash`.
+    /// Recompute the chain hash and return `Some(recomputed)` on mismatch, `None` if ok.
     ///
-    /// Requires `last_event_hash` to be present (added for verification support).
-    pub fn verify_hash(&self) -> bool {
+    /// Returns `Some("")` if `last_event_hash` is missing or status is unrecognized.
+    pub fn verify_hash(&self) -> Option<String> {
         let Some(ref last_event_hash) = self.last_event_hash else {
-            return false;
+            return Some(String::new());
         };
         let status: crate::order::OrderStatus = match self.status.as_str() {
             "COMPLETED" => crate::order::OrderStatus::Completed,
             "VOID" => crate::order::OrderStatus::Void,
             "MERGED" => crate::order::OrderStatus::Merged,
             "ACTIVE" => crate::order::OrderStatus::Active,
-            _ => return false,
+            _ => return Some(String::new()),
         };
         let recomputed = crate::order::compute_order_chain_hash(
             &self.prev_hash,
@@ -400,7 +402,11 @@ impl OrderDetailSync {
             &status,
             last_event_hash,
         );
-        recomputed == self.curr_hash
+        if recomputed == self.curr_hash {
+            None
+        } else {
+            Some(recomputed)
+        }
     }
 }
 
@@ -506,7 +512,7 @@ mod tests {
     fn test_credit_note_verify_hash_on_fresh() {
         let cn = sample_credit_note_sync();
         assert!(
-            cn.verify_hash(),
+            cn.verify_hash().is_none(),
             "Fresh CreditNoteSync must pass hash verification"
         );
     }
@@ -522,7 +528,7 @@ mod tests {
             "CreditNoteSync must be identical after JSON roundtrip"
         );
         assert!(
-            deserialized.verify_hash(),
+            deserialized.verify_hash().is_none(),
             "Hash verification must pass after JSON roundtrip"
         );
     }
@@ -538,7 +544,7 @@ mod tests {
             "CreditNoteSync must be identical after Value roundtrip"
         );
         assert!(
-            deserialized.verify_hash(),
+            deserialized.verify_hash().is_none(),
             "Hash verification must pass after Value roundtrip"
         );
     }
@@ -548,7 +554,7 @@ mod tests {
         let mut cn = sample_credit_note_sync();
         cn.total_credit = 99.99; // tamper
         assert!(
-            !cn.verify_hash(),
+            cn.verify_hash().is_some(),
             "Tampered total_credit must fail hash verification"
         );
     }
@@ -585,7 +591,7 @@ mod tests {
             let json = serde_json::to_string(&cn).unwrap();
             let rt: CreditNoteSync = serde_json::from_str(&json).unwrap();
             assert!(
-                rt.verify_hash(),
+                rt.verify_hash().is_none(),
                 "f64 value {total} must survive JSON roundtrip for hash verification"
             );
         }
@@ -650,7 +656,7 @@ mod tests {
         };
 
         assert!(
-            order.verify_hash(),
+            order.verify_hash().is_none(),
             "Fresh OrderDetailSync must pass hash verification"
         );
 
@@ -658,7 +664,7 @@ mod tests {
         let json = serde_json::to_string(&order).unwrap();
         let rt: OrderDetailSync = serde_json::from_str(&json).unwrap();
         assert!(
-            rt.verify_hash(),
+            rt.verify_hash().is_none(),
             "OrderDetailSync hash must survive JSON roundtrip"
         );
     }
@@ -705,7 +711,7 @@ mod tests {
             },
         };
         assert!(
-            !order.verify_hash(),
+            order.verify_hash().is_some(),
             "Missing last_event_hash must fail verification"
         );
     }
