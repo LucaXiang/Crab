@@ -298,7 +298,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   margin: 1,
                   errorCorrectionLevel: 'M'
                 });
-                test_data[field.data_source || field.name] = dataUri;
+                test_data[field.data_source || field.field_id] = dataUri;
               } else if (normalizedType === 'barcode') {
                 const JsBarcode = (await import('jsbarcode')).default;
                 // Generate barcode on Canvas (converts to PNG for backend compatibility)
@@ -311,7 +311,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   height: 80
                 });
                 const dataUri = canvas.toDataURL('image/png');
-                test_data[field.data_source || field.name] = dataUri;
+                test_data[field.data_source || field.field_id] = dataUri;
               }
             } catch (genError) {
               logger.warn(`Failed to generate ${source_type} for field`, { component: 'LabelEditor', fieldId: field.field_id, detail: String(genError) });
@@ -329,7 +329,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             try {
               // Check if it's already a data URI
               if (resolvedPath.startsWith('data:')) {
-                test_data[field.data_source || field.name] = resolvedPath;
+                test_data[field.data_source || field.field_id] = resolvedPath;
               } else if (resolvedPath.startsWith('http://') || resolvedPath.startsWith('https://')) {
                 // URL: fetch and convert to Base64
                 const response = await fetch(resolvedPath);
@@ -339,7 +339,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   reader.onloadend = () => resolve(reader.result as string);
                   reader.readAsDataURL(blob);
                 });
-                test_data[field.data_source || field.name] = dataUri;
+                test_data[field.data_source || field.field_id] = dataUri;
               } else {
                 // Local file path: use Tauri's convertFileSrc and fetch
                 const { convertFileSrc } = await import('@tauri-apps/api/core');
@@ -351,7 +351,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   reader.onloadend = () => resolve(reader.result as string);
                   reader.readAsDataURL(blob);
                 });
-                test_data[field.data_source || field.name] = dataUri;
+                test_data[field.data_source || field.field_id] = dataUri;
               }
             } catch (loadError) {
               logger.warn('Failed to load image for field', { component: 'LabelEditor', fieldId: field.field_id, path: resolvedPath, detail: String(loadError) });
@@ -400,9 +400,9 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   const renderLayerInfo = (field: LabelField) => {
       switch (field.field_type) {
           case 'text': return field.template || field.name;
-          case 'image': return field.data_source || field.name;
-          case 'barcode': return field.data_source || field.name;
-          case 'qrcode': return field.data_source || field.name;
+          case 'image': return field.data_source || field.field_id;
+          case 'barcode': return field.data_source || field.field_id;
+          case 'qrcode': return field.data_source || field.field_id;
           case 'separator': return t("settings.label.horizontal_line");
           default: return '';
       }

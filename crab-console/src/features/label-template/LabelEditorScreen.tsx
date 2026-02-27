@@ -190,7 +190,6 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         height: 80,
         font_size: 12,
         maintain_aspect_ratio: true,
-        data_key: '',
         source_type: 'image',
         data_source: '',
         visible: true,
@@ -287,7 +286,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
       case LabelFieldType.Image:
       case LabelFieldType.Barcode:
       case LabelFieldType.Qrcode:
-        return field.data_key || field.name;
+        return field.data_source || field.name;
       case LabelFieldType.Separator:
         return t('settings.label.horizontal_line');
       default:

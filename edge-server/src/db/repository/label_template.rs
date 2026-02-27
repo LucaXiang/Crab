@@ -61,15 +61,15 @@ pub async fn create(
     assigned_id: Option<i64>,
     data: LabelTemplateCreate,
 ) -> RepoResult<LabelTemplate> {
-    // If this is set as default, unset other defaults first
-    if data.is_default {
-        sqlx::query!("UPDATE label_template SET is_default = 0 WHERE is_default = 1")
-            .execute(pool)
-            .await?;
-    }
-
     let now = shared::util::now_millis();
     let mut tx = pool.begin().await?;
+
+    // If this is set as default, unset other defaults first (inside transaction)
+    if data.is_default {
+        sqlx::query!("UPDATE label_template SET is_default = 0 WHERE is_default = 1")
+            .execute(&mut *tx)
+            .await?;
+    }
 
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
     sqlx::query(
@@ -250,10 +250,10 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     let _ = super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await;
 
     // Soft delete
-    sqlx::query!("UPDATE label_template SET is_active = 0 WHERE id = ?", id)
+    let result = sqlx::query!("UPDATE label_template SET is_active = 0 WHERE id = ?", id)
         .execute(pool)
         .await?;
-    Ok(true)
+    Ok(result.rows_affected() > 0)
 }
 
 pub async fn hard_delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {

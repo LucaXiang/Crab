@@ -76,8 +76,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
             if (field._pending_blob_url && source_type === 'image') {
               src = field._pending_blob_url;
             } else {
-              let content = field.template || field.data_key || '';
-              content = content.replace(/\{(\w+)\}/g, (_, key) =>
+              let content = field.template || field.data_source || '';
+              content = content.replace(/\{(\w+)\}/g, (_match: string, key: string) =>
                 test_dataObj[key] !== undefined ? String(test_dataObj[key]) : `{${key}}`,
               );
 

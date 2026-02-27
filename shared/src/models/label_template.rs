@@ -96,9 +96,13 @@ impl LabelField {
     }
 
     /// Resolve the data key for image/barcode/qrcode fields.
-    /// Uses `data_source` as the canonical key.
+    /// Uses `data_source` as the canonical key, falls back to `field_id`.
     pub fn resolve_image_data_key(&self) -> String {
-        self.data_source.clone()
+        if self.data_source.is_empty() {
+            self.field_id.clone()
+        } else {
+            self.data_source.clone()
+        }
     }
 }
 

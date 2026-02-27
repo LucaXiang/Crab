@@ -63,8 +63,8 @@ export interface LabelTemplate {
   fields: LabelField[];
   is_default: boolean;
   is_active: boolean;
-  created_at: number;
-  updated_at: number;
+  created_at?: number;
+  updated_at?: number;
   // UI-specific properties
   width_mm?: number;
   height_mm?: number;
@@ -86,21 +86,27 @@ export interface CreateLabelTemplateParams {
   fields?: LabelField[];
   is_default?: boolean;
   is_active?: boolean;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
 }
 
 /**
  * Update label template params
  */
 export interface UpdateLabelTemplateParams extends Partial<CreateLabelTemplateParams> {
-  id: string;
+  id: number;
 }
 
 /**
  * Label print job
  */
 export interface LabelPrintJob {
-  id: string;
-  template_id: string;
+  id: number;
+  template_id: number;
   data: Record<string, unknown>;
   quantity: number;
   status: 'pending' | 'printing' | 'completed' | 'failed';

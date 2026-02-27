@@ -23,6 +23,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const retried = useRef(false);
+  const blobUrlRef = useRef<string | null>(null);
 
   // Load existing image from hash → presigned S3 URL (usable directly as img src)
   useEffect(() => {
@@ -64,7 +65,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
     try {
       const hash = await uploadImage(token, file);
       // Show local preview immediately (no S3 round-trip needed)
-      setPreviewUrl(URL.createObjectURL(file));
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      const blobUrl = URL.createObjectURL(file);
+      blobUrlRef.current = blobUrl;
+      setPreviewUrl(blobUrl);
       onChange(hash);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.error_generic'));
@@ -87,10 +91,21 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, class
   }, [handleFile]);
 
   const handleClear = useCallback(() => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
     setPreviewUrl(null);
     onChange('');
     setError('');
   }, [onChange]);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    };
+  }, []);
 
   const showPreview = previewUrl && !loading;
 

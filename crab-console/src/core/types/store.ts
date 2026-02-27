@@ -397,7 +397,6 @@ export interface LabelField {
   visible: boolean;
   label?: string;
   template?: string;
-  data_key?: string;
   source_type?: LabelImageSourceType;
   maintain_aspect_ratio?: boolean;
   /** Temporary blob URL for pending image upload (editor only, not persisted) */
@@ -446,7 +445,6 @@ export interface LabelFieldInput {
   format?: string;
   visible?: boolean;
   template?: string;
-  data_key?: string;
   source_type?: LabelImageSourceType;
   maintain_aspect_ratio?: boolean;
   style?: string;
@@ -596,4 +594,17 @@ export interface StoreOpResult {
   created_id?: number;
   data?: unknown;
   error?: string;
+}
+
+// ── Device ──
+
+export interface DeviceRecord {
+  entity_id: string;
+  device_id: string;
+  device_type: 'server' | 'client';
+  status: string;
+  activated_at: number;
+  deactivated_at: number | null;
+  replaced_by: string | null;
+  last_refreshed_at: number | null;
 }
