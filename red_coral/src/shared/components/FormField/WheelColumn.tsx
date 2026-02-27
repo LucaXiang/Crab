@@ -74,7 +74,7 @@ export const WheelColumn: React.FC<WheelColumnProps> = React.memo(({ items, sele
         {/* Scrollable container with CSS snap */}
         <div
           ref={containerRef}
-          className="absolute inset-0 overflow-y-auto select-none scrollbar-hide"
+          className="absolute inset-0 overflow-y-auto select-none scrollbar-hide z-[15]"
           onScroll={handleScroll}
           style={{
             scrollSnapType: 'y mandatory',
