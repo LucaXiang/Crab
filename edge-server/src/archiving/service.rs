@@ -678,40 +678,37 @@ impl OrderArchiveService {
         prev_hash: &str,
         last_event_hash: &str,
     ) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(prev_hash.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(snapshot.order_id.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(snapshot.receipt_number.as_bytes());
-        hasher.update(b"\x00");
-        // SAFETY: OrderStatus derives Serialize with no custom impl — serde_json cannot fail
-        let status_str = serde_json::to_string(&snapshot.status)
-            .expect("derive(Serialize) enum serialization is infallible");
-        hasher.update(status_str.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(last_event_hash.as_bytes());
-        format!("{:x}", hasher.finalize())
+        use shared::order::CanonicalHash;
+
+        let mut buf = Vec::with_capacity(256);
+        buf.extend_from_slice(prev_hash.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(snapshot.order_id.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(snapshot.receipt_number.as_bytes());
+        buf.push(0x00);
+        snapshot.status.canonical_bytes(&mut buf);
+        buf.push(0x00);
+        buf.extend_from_slice(last_event_hash.as_bytes());
+
+        format!("{:x}", Sha256::digest(&buf))
     }
 
     /// Compute event hash including payload for tamper-proofing
     fn compute_event_hash(&self, event: &OrderEvent) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(event.event_id.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(event.order_id.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(event.sequence.to_le_bytes());
-        // SAFETY: OrderEventType derives Serialize with no custom impl — infallible
-        let event_type_str = serde_json::to_string(&event.event_type)
-            .expect("derive(Serialize) enum serialization is infallible");
-        hasher.update(event_type_str.as_bytes());
-        hasher.update(b"\x00");
-        // SAFETY: EventPayload derives Serialize with no custom impl — infallible
-        let payload_json = serde_json::to_string(&event.payload)
-            .expect("derive(Serialize) enum serialization is infallible");
-        hasher.update(payload_json.as_bytes());
-        format!("{:x}", hasher.finalize())
+        use shared::order::CanonicalHash;
+
+        let mut buf = Vec::with_capacity(512);
+        buf.extend_from_slice(event.event_id.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(event.order_id.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(&event.sequence.to_le_bytes());
+        event.event_type.canonical_bytes(&mut buf);
+        buf.push(0x00);
+        event.payload.canonical_bytes(&mut buf);
+
+        format!("{:x}", Sha256::digest(&buf))
     }
 
     // ========================================================================
@@ -1021,33 +1018,36 @@ mod tests {
         prev_hash: &str,
         last_event_hash: &str,
     ) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(prev_hash.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(snapshot.order_id.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(snapshot.receipt_number.as_bytes());
-        hasher.update(b"\x00");
-        let status_str = serde_json::to_string(&snapshot.status).unwrap_or_default();
-        hasher.update(status_str.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(last_event_hash.as_bytes());
-        format!("{:x}", hasher.finalize())
+        use shared::order::CanonicalHash;
+
+        let mut buf = Vec::with_capacity(256);
+        buf.extend_from_slice(prev_hash.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(snapshot.order_id.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(snapshot.receipt_number.as_bytes());
+        buf.push(0x00);
+        snapshot.status.canonical_bytes(&mut buf);
+        buf.push(0x00);
+        buf.extend_from_slice(last_event_hash.as_bytes());
+
+        format!("{:x}", Sha256::digest(&buf))
     }
 
     fn compute_event_hash_standalone(event: &shared::order::OrderEvent) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(event.event_id.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(event.order_id.as_bytes());
-        hasher.update(b"\x00");
-        hasher.update(event.sequence.to_le_bytes());
-        let event_type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
-        hasher.update(event_type_str.as_bytes());
-        hasher.update(b"\x00");
-        let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
-        hasher.update(payload_json.as_bytes());
-        format!("{:x}", hasher.finalize())
+        use shared::order::CanonicalHash;
+
+        let mut buf = Vec::with_capacity(512);
+        buf.extend_from_slice(event.event_id.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(event.order_id.as_bytes());
+        buf.push(0x00);
+        buf.extend_from_slice(&event.sequence.to_le_bytes());
+        event.event_type.canonical_bytes(&mut buf);
+        buf.push(0x00);
+        event.payload.canonical_bytes(&mut buf);
+
+        format!("{:x}", Sha256::digest(&buf))
     }
 
     // ========================================================================
