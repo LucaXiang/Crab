@@ -147,10 +147,18 @@ impl OrdersManager {
     }
 
     /// Set the archive service for SQLite integration
-    pub fn set_archive_service(&mut self, pool: sqlx::SqlitePool, data_dir: &std::path::Path) {
+    pub fn set_archive_service(
+        &mut self,
+        pool: sqlx::SqlitePool,
+        data_dir: &std::path::Path,
+        invoice_service: Option<crate::archiving::InvoiceService>,
+    ) {
         self.pool = Some(pool.clone());
         self.archive_service = Some(crate::archiving::OrderArchiveService::new(
-            pool, self.tz, data_dir, None,
+            pool,
+            self.tz,
+            data_dir,
+            invoice_service,
         ));
     }
 

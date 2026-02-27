@@ -163,7 +163,10 @@ impl ErrorCode {
             | Self::ClientDisconnected
             | Self::ImageProcessingFailed
             | Self::FileStorageFailed
-            | Self::StorageCorrupted => StatusCode::INTERNAL_SERVER_ERROR,
+            | Self::StorageCorrupted
+            | Self::ArchiveHashChainError
+            | Self::InvoiceNumberError
+            | Self::InvoiceConversionError => StatusCode::INTERNAL_SERVER_ERROR,
 
             // ==================== 502 Bad Gateway ====================
             Self::PaymentSetupFailed => StatusCode::BAD_GATEWAY,

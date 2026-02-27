@@ -298,6 +298,14 @@ pub enum ErrorCode {
     /// Client disconnected
     ClientDisconnected = 9301,
 
+    // ==================== 93xx: Archive / Invoice ====================
+    /// Archive hash chain integrity violation
+    ArchiveHashChainError = 9302,
+    /// Invoice number allocation failed (counter error)
+    InvoiceNumberError = 9303,
+    /// Invoice amount conversion error (non-finite f64)
+    InvoiceConversionError = 9304,
+
     // ==================== 94xx: Storage ====================
     /// Storage full (disk space insufficient)
     StorageFull = 9401,
@@ -472,6 +480,11 @@ impl ErrorCode {
             ErrorCode::PrintLabelDisabled => "Label printing is not enabled",
             ErrorCode::PrintDestinationNotConfigured => "No print destination configured",
             ErrorCode::ClientDisconnected => "Client disconnected",
+
+            // Archive / Invoice
+            ErrorCode::ArchiveHashChainError => "Archive hash chain integrity error",
+            ErrorCode::InvoiceNumberError => "Invoice number allocation failed",
+            ErrorCode::InvoiceConversionError => "Invoice amount conversion error",
 
             // Storage
             ErrorCode::StorageFull => "Storage full (disk space insufficient)",
@@ -651,6 +664,9 @@ impl TryFrom<u16> for ErrorCode {
             9206 => Ok(ErrorCode::PrintLabelDisabled),
             9207 => Ok(ErrorCode::PrintDestinationNotConfigured),
             9301 => Ok(ErrorCode::ClientDisconnected),
+            9302 => Ok(ErrorCode::ArchiveHashChainError),
+            9303 => Ok(ErrorCode::InvoiceNumberError),
+            9304 => Ok(ErrorCode::InvoiceConversionError),
 
             // Storage
             9401 => Ok(ErrorCode::StorageFull),
@@ -988,11 +1004,11 @@ mod tests {
             9001, 9002, 9003, 9004, 9005, // 9xxx System
             9101, 9102, 9103, // 91xx Bridge
             9201, 9202, 9203, 9204, 9205, 9206, 9207, // 92xx Printer
-            9301, // 93xx Client
-            9401, 9402, 9403, 9404, // 94xx Storage (15)
+            9301, 9302, 9303, 9304, // 93xx Client + Archive/Invoice
+            9401, 9402, 9403, 9404, // 94xx Storage
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 128;
+        const EXPECTED_VARIANT_COUNT: usize = 131;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

@@ -21,7 +21,7 @@ fn credit_note_service(state: &ServerState) -> Result<CreditNoteService, AppErro
         state.pool.clone(),
         state.config.timezone,
         archive_service.hash_chain_lock().clone(),
-        None,
+        archive_service.invoice_service().cloned(),
     ))
 }
 

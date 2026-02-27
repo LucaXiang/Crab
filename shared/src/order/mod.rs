@@ -25,4 +25,4 @@ pub use command::{OrderCommand, OrderCommandPayload};
 pub use event::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};
 pub use types::*;
-pub use verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
+pub use verifactu::{HuellaAltaInput, HuellaError, compute_verifactu_huella_alta};

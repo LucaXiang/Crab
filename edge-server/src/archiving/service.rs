@@ -25,24 +25,51 @@ pub enum ArchiveError {
     Conversion(String),
     #[error("Validation error: {0}")]
     Validation(String),
+    #[error("Invoice number error: {0}")]
+    InvoiceNumber(String),
+    #[error("Invoice conversion error: {0}")]
+    InvoiceConversion(String),
 }
 
 pub type ArchiveResult<T> = Result<T, ArchiveError>;
 
 impl From<ArchiveError> for shared::error::AppError {
     fn from(err: ArchiveError) -> Self {
-        use shared::error::AppError;
+        use shared::error::{AppError, ErrorCode};
+        let msg = err.to_string();
         match err {
-            ArchiveError::Database(msg) => AppError::database(msg),
-            ArchiveError::HashChain(msg) => AppError::internal(msg),
-            ArchiveError::Conversion(msg) => AppError::internal(msg),
-            ArchiveError::Validation(msg) => AppError::validation(msg),
+            ArchiveError::Database(_) => AppError::with_message(ErrorCode::DatabaseError, msg),
+            ArchiveError::HashChain(_) => {
+                AppError::with_message(ErrorCode::ArchiveHashChainError, msg)
+            }
+            ArchiveError::Conversion(_) => {
+                AppError::with_message(ErrorCode::InvoiceConversionError, msg)
+            }
+            ArchiveError::Validation(_) => AppError::with_message(ErrorCode::ValidationFailed, msg),
+            ArchiveError::InvoiceNumber(_) => {
+                AppError::with_message(ErrorCode::InvoiceNumberError, msg)
+            }
+            ArchiveError::InvoiceConversion(_) => {
+                AppError::with_message(ErrorCode::InvoiceConversionError, msg)
+            }
         }
     }
 }
 
 impl From<sqlx::Error> for ArchiveError {
     fn from(err: sqlx::Error) -> Self {
+        ArchiveError::Database(err.to_string())
+    }
+}
+
+impl From<shared::order::verifactu::HuellaError> for ArchiveError {
+    fn from(err: shared::order::verifactu::HuellaError) -> Self {
+        ArchiveError::InvoiceConversion(err.to_string())
+    }
+}
+
+impl From<crate::db::repository::RepoError> for ArchiveError {
+    fn from(err: crate::db::repository::RepoError) -> Self {
         ArchiveError::Database(err.to_string())
     }
 }
@@ -188,6 +215,11 @@ impl OrderArchiveService {
     /// Get the hash chain lock (shared with CreditNoteService to serialize all chain updates)
     pub fn hash_chain_lock(&self) -> &Arc<Mutex<()>> {
         &self.hash_chain_lock
+    }
+
+    /// Get the invoice service (shared with CreditNoteService for R5 invoices)
+    pub fn invoice_service(&self) -> Option<&super::invoice::InvoiceService> {
+        self.invoice_service.as_ref()
     }
 
     /// Generate the next receipt number atomically
@@ -711,7 +743,7 @@ impl OrderArchiveService {
                 .create_order_invoice(
                     &mut tx,
                     order_pk,
-                    snapshot.subtotal + snapshot.total_discount - snapshot.total_surcharge,
+                    snapshot.total - snapshot.tax, // BaseImponible = total - tax
                     snapshot.tax,
                     snapshot.total,
                     &desglose,
@@ -777,14 +809,27 @@ impl OrderArchiveService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        Ok(rows
-            .into_iter()
-            .map(|r| shared::cloud::sync::TaxDesglose {
-                tax_rate: r.tax_rate as i32,
-                base_amount: Decimal::try_from(r.base_amount).unwrap_or_default(),
-                tax_amount: Decimal::try_from(r.tax_amount).unwrap_or_default(),
+        rows.into_iter()
+            .map(|r| {
+                let base_amount = Decimal::try_from(r.base_amount).map_err(|e| {
+                    ArchiveError::InvoiceConversion(format!(
+                        "desglose base_amount f64→Decimal: {e} (value={})",
+                        r.base_amount
+                    ))
+                })?;
+                let tax_amount = Decimal::try_from(r.tax_amount).map_err(|e| {
+                    ArchiveError::InvoiceConversion(format!(
+                        "desglose tax_amount f64→Decimal: {e} (value={})",
+                        r.tax_amount
+                    ))
+                })?;
+                Ok(shared::cloud::sync::TaxDesglose {
+                    tax_rate: r.tax_rate as i32,
+                    base_amount,
+                    tax_amount,
+                })
             })
-            .collect())
+            .collect()
     }
 
     // ========================================================================
@@ -916,7 +961,7 @@ impl OrderArchiveService {
     async fn verify_order_events(&self, order_pk: i64) -> ArchiveResult<OrderVerification> {
         // 获取订单信息和 chain_entry hash
         let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
-            "SELECT ao.receipt_number, ao.order_key, ce.prev_hash, ce.curr_hash \
+            "SELECT ao.id, ao.receipt_number, ao.order_key, ce.prev_hash, ce.curr_hash \
              FROM archived_order ao \
              JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
              WHERE ao.id = ?",
@@ -1447,5 +1492,98 @@ mod tests {
         let json = serde_json::to_string(&brk).unwrap();
         assert!(json.contains("\"expected_prev_hash\":\"hash_of_order_2\""));
         assert!(json.contains("\"actual_prev_hash\":\"tampered_hash\""));
+    }
+
+    // ========================================================================
+    // ArchiveError → AppError mapping tests
+    // ========================================================================
+
+    #[test]
+    fn archive_error_database_maps_to_database_error_code() {
+        let err = ArchiveError::Database("connection lost".to_string());
+        let app_err: shared::error::AppError = err.into();
+        assert_eq!(app_err.code, shared::error::ErrorCode::DatabaseError);
+        assert!(app_err.message.contains("connection lost"));
+    }
+
+    #[test]
+    fn archive_error_hash_chain_maps_to_archive_hash_chain_error_code() {
+        let err = ArchiveError::HashChain("broken at entry 5".to_string());
+        let app_err: shared::error::AppError = err.into();
+        assert_eq!(
+            app_err.code,
+            shared::error::ErrorCode::ArchiveHashChainError
+        );
+        assert!(app_err.message.contains("broken at entry 5"));
+    }
+
+    #[test]
+    fn archive_error_conversion_maps_to_invoice_conversion_error_code() {
+        let err = ArchiveError::Conversion("bad format".to_string());
+        let app_err: shared::error::AppError = err.into();
+        assert_eq!(
+            app_err.code,
+            shared::error::ErrorCode::InvoiceConversionError
+        );
+    }
+
+    #[test]
+    fn archive_error_validation_maps_to_validation_failed() {
+        let err = ArchiveError::Validation("missing field".to_string());
+        let app_err: shared::error::AppError = err.into();
+        assert_eq!(app_err.code, shared::error::ErrorCode::ValidationFailed);
+    }
+
+    #[test]
+    fn archive_error_invoice_number_maps_to_invoice_number_error_code() {
+        let err = ArchiveError::InvoiceNumber("duplicate number".to_string());
+        let app_err: shared::error::AppError = err.into();
+        assert_eq!(app_err.code, shared::error::ErrorCode::InvoiceNumberError);
+        assert!(app_err.message.contains("duplicate number"));
+    }
+
+    #[test]
+    fn archive_error_invoice_conversion_maps_to_invoice_conversion_error_code() {
+        let err = ArchiveError::InvoiceConversion("non-finite value".to_string());
+        let app_err: shared::error::AppError = err.into();
+        assert_eq!(
+            app_err.code,
+            shared::error::ErrorCode::InvoiceConversionError
+        );
+        assert!(app_err.message.contains("non-finite value"));
+    }
+
+    #[test]
+    fn archive_error_display_preserves_original_message() {
+        let err = ArchiveError::Database("timeout after 30s".to_string());
+        let display = format!("{err}");
+        assert!(display.contains("timeout after 30s"));
+        assert!(display.contains("Database"));
+    }
+
+    // ========================================================================
+    // From<HuellaError> / From<sqlx::Error> → ArchiveError
+    // ========================================================================
+
+    #[test]
+    fn huella_error_converts_to_archive_invoice_conversion() {
+        let huella_err = shared::order::verifactu::HuellaError("NaN in cuota".to_string());
+        let archive_err: ArchiveError = huella_err.into();
+        match archive_err {
+            ArchiveError::InvoiceConversion(msg) => assert!(msg.contains("NaN in cuota")),
+            other => panic!("expected InvoiceConversion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn huella_error_chain_to_app_error_preserves_detail() {
+        let huella_err = shared::order::verifactu::HuellaError("non-finite f64".to_string());
+        let archive_err: ArchiveError = huella_err.into();
+        let app_err: shared::error::AppError = archive_err.into();
+        assert_eq!(
+            app_err.code,
+            shared::error::ErrorCode::InvoiceConversionError
+        );
+        assert!(app_err.message.contains("non-finite f64"));
     }
 }

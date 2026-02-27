@@ -257,12 +257,22 @@ impl CreditNoteService {
                     },
                 )
                 .into_iter()
-                .map(|(rate, (base, tax))| shared::cloud::sync::TaxDesglose {
-                    tax_rate: rate as i32,
-                    base_amount: rust_decimal::Decimal::try_from(base).unwrap_or_default(),
-                    tax_amount: rust_decimal::Decimal::try_from(tax).unwrap_or_default(),
+                .map(|(rate, (base, tax))| {
+                    Ok(shared::cloud::sync::TaxDesglose {
+                        tax_rate: rate as i32,
+                        base_amount: rust_decimal::Decimal::try_from(base).map_err(|e| {
+                            ArchiveError::InvoiceConversion(format!(
+                                "cn desglose base f64→Decimal: {e}"
+                            ))
+                        })?,
+                        tax_amount: rust_decimal::Decimal::try_from(tax).map_err(|e| {
+                            ArchiveError::InvoiceConversion(format!(
+                                "cn desglose tax f64→Decimal: {e}"
+                            ))
+                        })?,
+                    })
                 })
-                .collect();
+                .collect::<ArchiveResult<Vec<_>>>()?;
 
             inv_svc
                 .create_credit_note_invoice(

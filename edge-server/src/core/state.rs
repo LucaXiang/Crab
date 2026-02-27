@@ -232,10 +232,32 @@ impl ServerState {
                 ))
             })?;
         orders_manager.set_catalog_service(catalog_service.clone());
-        orders_manager.set_archive_service(pool.clone(), &config.data_dir());
+
+        // Initialize InvoiceService from store_info (Verifactu)
+        let store_info = crate::db::repository::store_info::get(&pool)
+            .await
+            .ok()
+            .flatten();
+        let invoice_service = if let Some(ref info) = store_info {
+            if !info.nif.is_empty() {
+                Some(crate::archiving::InvoiceService::new(
+                    config.timezone,
+                    store_number,
+                    info.nif.clone(),
+                    info.name.clone(),
+                ))
+            } else {
+                tracing::warn!("StoreInfo.nif is empty, Verifactu invoicing disabled");
+                None
+            }
+        } else {
+            tracing::info!("No StoreInfo found, Verifactu invoicing disabled");
+            None
+        };
+        orders_manager.set_archive_service(pool.clone(), &config.data_dir(), invoice_service);
 
         // Initialize business_day_cutoff from store_info
-        if let Ok(Some(info)) = crate::db::repository::store_info::get(&pool).await {
+        if let Some(ref info) = store_info {
             orders_manager.update_business_day_cutoff(&info.business_day_cutoff);
         }
 
