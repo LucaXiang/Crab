@@ -21,6 +21,7 @@ pub mod price_rule;
 
 // Orders
 pub mod credit_note;
+pub mod invoice;
 pub mod order;
 
 // Payments
