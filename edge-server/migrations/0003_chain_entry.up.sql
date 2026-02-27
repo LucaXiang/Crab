@@ -14,7 +14,7 @@ CREATE TABLE chain_entry (
 
 CREATE INDEX idx_chain_entry_created ON chain_entry(created_at);
 CREATE INDEX idx_chain_entry_type ON chain_entry(entry_type);
-CREATE INDEX idx_chain_entry_entry ON chain_entry(entry_type, entry_pk);
+CREATE UNIQUE INDEX idx_chain_entry_entry ON chain_entry(entry_type, entry_pk);
 
 -- 2. Migrate existing hash data from archived_order into chain_entry
 INSERT INTO chain_entry (entry_type, entry_pk, prev_hash, curr_hash, created_at)

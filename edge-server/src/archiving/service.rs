@@ -114,17 +114,18 @@ pub struct ChainBreak {
 /// Chain entry row used for chain verification (from chain_entry table)
 #[derive(Debug, sqlx::FromRow)]
 struct VerifyChainRow {
-    #[allow(dead_code)]
-    id: i64,
     entry_type: String,
     entry_pk: i64,
     prev_hash: String,
     curr_hash: String,
+    /// LEFT JOIN from archived_order — only present for ORDER entries
+    receipt_number: Option<String>,
 }
 
 /// Order info joined with chain_entry hash data for single-order verification
 #[derive(Debug, sqlx::FromRow)]
 struct VerifyOrderRow {
+    id: i64,
     receipt_number: String,
     order_key: String,
     prev_hash: String,
@@ -677,9 +678,10 @@ impl OrderArchiveService {
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 5f. Update system_state.last_chain_hash
-        sqlx::query("UPDATE system_state SET last_chain_hash = ?1, updated_at = ?2 WHERE id = 1")
+        sqlx::query("UPDATE system_state SET last_chain_hash = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&order_hash)
             .bind(now)
+            .bind(1_i64)
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
@@ -718,9 +720,9 @@ impl OrderArchiveService {
 
     /// 验证单个订单的事件哈希链完整性
     pub async fn verify_order(&self, receipt_number: &str) -> ArchiveResult<OrderVerification> {
-        // 1. 查询订单 + chain_entry 中的 hash
+        // 1. 查询订单 PK（用于委托给 verify_order_events）
         let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
-            "SELECT ao.receipt_number, ao.order_key, ce.prev_hash, ce.curr_hash \
+            "SELECT ao.id, ao.receipt_number, ao.order_key, ce.prev_hash, ce.curr_hash \
              FROM archived_order ao \
              JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
              WHERE ao.receipt_number = ?",
@@ -731,55 +733,8 @@ impl OrderArchiveService {
         .map_err(|e| ArchiveError::Database(e.to_string()))?
         .ok_or_else(|| ArchiveError::Database(format!("Order not found: {}", receipt_number)))?;
 
-        // 2. 查询该订单的所有事件（按 seq 排序）
-        let order_pk: i64 =
-            sqlx::query_scalar::<_, i64>("SELECT id FROM archived_order WHERE receipt_number = ?")
-                .bind(receipt_number)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        let events: Vec<VerifyEventRow> = sqlx::query_as::<_, VerifyEventRow>(
-            "SELECT id, event_type, prev_hash, curr_hash \
-             FROM archived_order_event WHERE order_pk = ? ORDER BY seq",
-        )
-        .bind(order_pk)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        // 3. 验证事件链连续性
-        let mut invalid_events = Vec::new();
-        let mut events_chain_valid = true;
-
-        for (i, event) in events.iter().enumerate() {
-            let expected_prev = if i == 0 {
-                "order_start".to_string()
-            } else {
-                events[i - 1].curr_hash.clone()
-            };
-
-            if event.prev_hash != expected_prev {
-                events_chain_valid = false;
-                invalid_events.push(EventVerification {
-                    event_id: event.id.to_string(),
-                    event_type: event.event_type.clone(),
-                    expected_prev_hash: expected_prev,
-                    actual_prev_hash: event.prev_hash.clone(),
-                    valid: false,
-                });
-            }
-        }
-
-        Ok(OrderVerification {
-            receipt_number: order.receipt_number,
-            order_id: order.order_key,
-            prev_hash: order.prev_hash,
-            curr_hash: order.curr_hash,
-            events_chain_valid,
-            event_count: events.len(),
-            invalid_events,
-        })
+        // 2. 委托事件链验证
+        self.verify_order_events(order.id).await
     }
 
     /// 验证指定时间范围内所有 chain_entry 的哈希链连续性
@@ -792,12 +747,14 @@ impl OrderArchiveService {
         start: i64,
         end: i64,
     ) -> ArchiveResult<DailyChainVerification> {
-        // 1. 查询当天所有 chain_entry，按 id 排序（绝对链顺序）
+        // 1. 查询当天所有 chain_entry（LEFT JOIN archived_order 取 receipt_number），按 id 排序
         let entries: Vec<VerifyChainRow> = sqlx::query_as::<_, VerifyChainRow>(
-            "SELECT id, entry_type, entry_pk, prev_hash, curr_hash \
-             FROM chain_entry \
-             WHERE created_at >= ?1 AND created_at < ?2 \
-             ORDER BY id ASC",
+            "SELECT ce.entry_type, ce.entry_pk, ce.prev_hash, ce.curr_hash, \
+                    ao.receipt_number \
+             FROM chain_entry ce \
+             LEFT JOIN archived_order ao ON ao.id = ce.entry_pk AND ce.entry_type = 'ORDER' \
+             WHERE ce.created_at >= ?1 AND ce.created_at < ?2 \
+             ORDER BY ce.id ASC",
         )
         .bind(start)
         .bind(end)
@@ -805,7 +762,7 @@ impl OrderArchiveService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        let total_orders = entries.len();
+        let total_entries = entries.len();
 
         // 2. 查询范围之前最后一条 chain_entry 的 curr_hash
         let prev_day_hash: Option<String> = sqlx::query_scalar::<_, String>(
@@ -837,19 +794,11 @@ impl OrderArchiveService {
         for entry in &entries {
             verified_orders += 1;
 
-            // 获取 receipt_number 用于报告（仅 ORDER 类型有）
-            let label = if entry.entry_type == "ORDER" {
-                let rn: Option<String> = sqlx::query_scalar::<_, String>(
-                    "SELECT receipt_number FROM archived_order WHERE id = ?",
-                )
-                .bind(entry.entry_pk)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-                rn.unwrap_or_else(|| format!("{}:{}", entry.entry_type, entry.entry_pk))
-            } else {
-                format!("{}:{}", entry.entry_type, entry.entry_pk)
-            };
+            // receipt_number 已通过 LEFT JOIN 预取
+            let label = entry
+                .receipt_number
+                .clone()
+                .unwrap_or_else(|| format!("{}:{}", entry.entry_type, entry.entry_pk));
 
             if entry.prev_hash != expected_prev {
                 chain_intact = false;
@@ -881,7 +830,7 @@ impl OrderArchiveService {
 
         Ok(DailyChainVerification {
             date: date.to_string(),
-            total_orders,
+            total_orders: total_entries,
             verified_orders,
             chain_intact,
             chain_resets,
@@ -1220,11 +1169,11 @@ mod tests {
         for i in 0..count {
             let curr = format!("order_hash_{}", i);
             entries.push(VerifyChainRow {
-                id: i as i64,
                 entry_type: "ORDER".to_string(),
                 entry_pk: (i + 1) as i64,
                 prev_hash: prev,
                 curr_hash: curr.clone(),
+                receipt_number: Some(format!("R{:03}", i + 1)),
             });
             prev = curr;
         }
