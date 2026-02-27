@@ -36,6 +36,8 @@ pub enum SyncResource {
     OrderSync,
     /// Credit notes (edge → cloud only)
     CreditNote,
+    /// Verifactu invoices (edge → cloud only)
+    Invoice,
     /// Role resource (client-visible for sync status)
     Role,
 }
@@ -111,6 +113,7 @@ impl SyncResource {
             Self::MarketingGroup => "marketing_group",
             Self::ArchivedOrder => "archived_order",
             Self::CreditNote => "credit_note",
+            Self::Invoice => "invoice",
             Self::OrderSync => "order_sync",
             Self::Role => "role",
         }
@@ -359,6 +362,31 @@ pub struct CreditNoteItemSync {
     pub line_credit: f64,
     pub tax_rate: i64,
     pub tax_credit: f64,
+}
+
+// ── Invoice sync types ──
+
+/// Invoice data synced to cloud for Verifactu AEAT submission
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InvoiceSync {
+    pub id: i64,
+    pub invoice_number: String,
+    pub serie: String,
+    pub tipo_factura: String,
+    pub source_type: String,
+    pub source_pk: i64,
+    pub subtotal: f64,
+    pub tax: f64,
+    pub total: f64,
+    pub desglose: Vec<TaxDesglose>,
+    pub huella: String,
+    pub prev_huella: Option<String>,
+    pub fecha_expedicion: String,
+    pub nif: String,
+    pub nombre_razon: String,
+    pub factura_rectificada_id: Option<i64>,
+    pub factura_rectificada_num: Option<String>,
+    pub created_at: i64,
 }
 
 // ── Hash verification ──
