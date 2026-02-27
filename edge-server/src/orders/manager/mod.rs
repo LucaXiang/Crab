@@ -150,7 +150,7 @@ impl OrdersManager {
     pub fn set_archive_service(&mut self, pool: sqlx::SqlitePool, data_dir: &std::path::Path) {
         self.pool = Some(pool.clone());
         self.archive_service = Some(crate::archiving::OrderArchiveService::new(
-            pool, self.tz, data_dir,
+            pool, self.tz, data_dir, None,
         ));
     }
 

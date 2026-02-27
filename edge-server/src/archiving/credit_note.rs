@@ -21,14 +21,22 @@ pub struct CreditNoteService {
     hash_chain_lock: Arc<Mutex<()>>,
     /// 业务时区 (用于退款凭证编号日期)
     tz: chrono_tz::Tz,
+    /// Optional Verifactu invoice service (R5 invoices for credit notes)
+    invoice_service: Option<super::invoice::InvoiceService>,
 }
 
 impl CreditNoteService {
-    pub fn new(pool: SqlitePool, tz: chrono_tz::Tz, hash_chain_lock: Arc<Mutex<()>>) -> Self {
+    pub fn new(
+        pool: SqlitePool,
+        tz: chrono_tz::Tz,
+        hash_chain_lock: Arc<Mutex<()>>,
+        invoice_service: Option<super::invoice::InvoiceService>,
+    ) -> Self {
         Self {
             pool,
             hash_chain_lock,
             tz,
+            invoice_service,
         }
     }
 
@@ -233,6 +241,41 @@ impl CreditNoteService {
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        // 9e. Create Verifactu R5 invoice
+        if let Some(ref inv_svc) = self.invoice_service {
+            // Build desglose from cn_items (aggregate by tax_rate using BTreeMap)
+            let desglose: Vec<_> = cn_items
+                .iter()
+                .fold(
+                    std::collections::BTreeMap::<i64, (f64, f64)>::new(),
+                    |mut map, item| {
+                        let entry = map.entry(item.tax_rate).or_insert((0.0, 0.0));
+                        entry.0 += item.line_credit;
+                        entry.1 += item.tax_credit;
+                        map
+                    },
+                )
+                .into_iter()
+                .map(|(rate, (base, tax))| shared::cloud::sync::TaxDesglose {
+                    tax_rate: rate as i32,
+                    base_amount: rust_decimal::Decimal::try_from(base).unwrap_or_default(),
+                    tax_amount: rust_decimal::Decimal::try_from(tax).unwrap_or_default(),
+                })
+                .collect();
+
+            inv_svc
+                .create_credit_note_invoice(
+                    &mut tx,
+                    cn_pk,
+                    request.original_order_pk,
+                    subtotal_credit,
+                    tax_credit,
+                    total_credit,
+                    &desglose,
+                )
+                .await?;
+        }
 
         tx.commit()
             .await

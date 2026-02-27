@@ -162,10 +162,17 @@ pub struct OrderArchiveService {
     bad_archive_dir: PathBuf,
     /// 业务时区 (用于收据编号日期)
     tz: chrono_tz::Tz,
+    /// Optional Verifactu invoice service (F2 invoices for completed orders)
+    invoice_service: Option<super::invoice::InvoiceService>,
 }
 
 impl OrderArchiveService {
-    pub fn new(pool: SqlitePool, tz: chrono_tz::Tz, data_dir: &std::path::Path) -> Self {
+    pub fn new(
+        pool: SqlitePool,
+        tz: chrono_tz::Tz,
+        data_dir: &std::path::Path,
+        invoice_service: Option<super::invoice::InvoiceService>,
+    ) -> Self {
         let bad_archive_dir = data_dir.join("bad_archives");
 
         Self {
@@ -174,6 +181,7 @@ impl OrderArchiveService {
             hash_chain_lock: Arc::new(Mutex::new(())),
             bad_archive_dir,
             tz,
+            invoice_service,
         }
     }
 
@@ -694,6 +702,23 @@ impl OrderArchiveService {
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
+        // 5g. Create Verifactu F2 invoice if applicable
+        if let Some(ref inv_svc) = self.invoice_service
+            && snapshot.status == OrderStatus::Completed
+        {
+            let desglose = self.compute_desglose_from_items(&mut tx, order_pk).await?;
+            inv_svc
+                .create_order_invoice(
+                    &mut tx,
+                    order_pk,
+                    snapshot.subtotal + snapshot.total_discount - snapshot.total_surcharge,
+                    snapshot.tax,
+                    snapshot.total,
+                    &desglose,
+                )
+                .await?;
+        }
+
         tx.commit()
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
@@ -722,6 +747,44 @@ impl OrderArchiveService {
     /// Compute event hash including payload for tamper-proofing
     fn compute_event_hash(&self, event: &OrderEvent) -> String {
         shared::order::compute_event_chain_hash(event)
+    }
+
+    /// Compute tax desglose (breakdown) from archived order items.
+    ///
+    /// Groups items by tax_rate and sums base_amount (line_total - tax) and tax_amount.
+    async fn compute_desglose_from_items(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+        order_pk: i64,
+    ) -> ArchiveResult<Vec<shared::cloud::sync::TaxDesglose>> {
+        #[derive(Debug, sqlx::FromRow)]
+        struct DesgloseItemRow {
+            tax_rate: i64,
+            base_amount: f64,
+            tax_amount: f64,
+        }
+
+        let rows = sqlx::query_as::<_, DesgloseItemRow>(
+            "SELECT tax_rate, \
+                    SUM(line_total - tax) as base_amount, \
+                    SUM(tax) as tax_amount \
+             FROM archived_order_item \
+             WHERE order_pk = ? \
+             GROUP BY tax_rate",
+        )
+        .bind(order_pk)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| shared::cloud::sync::TaxDesglose {
+                tax_rate: r.tax_rate as i32,
+                base_amount: Decimal::try_from(r.base_amount).unwrap_or_default(),
+                tax_amount: Decimal::try_from(r.tax_amount).unwrap_or_default(),
+            })
+            .collect())
     }
 
     // ========================================================================

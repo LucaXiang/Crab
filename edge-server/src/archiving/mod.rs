@@ -6,11 +6,13 @@
 //! - **verify**: VerifyScheduler (启动补扫 + 每日定时验证)
 
 pub mod credit_note;
+pub mod invoice;
 pub mod service;
 pub mod verify;
 pub mod worker;
 
 pub use credit_note::CreditNoteService;
+pub use invoice::InvoiceService;
 pub use service::{
     ArchiveError, ArchiveResult, ChainBreak, ChainReset, DailyChainVerification, EventVerification,
     OrderArchiveService, OrderVerification,
