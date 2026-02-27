@@ -45,10 +45,11 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 - **red_coral**: Tauri POS 前端，双模式运行 — Server 模式内嵌 edge-server (LocalClient)，Client 模式 mTLS 远程连接 (RemoteClient)
 - **crab-cloud**: 云端统一服务 (租户管理 + PKI/认证 + 订阅校验 + Stripe + 数据同步)，EC2 + Docker Compose + Caddy 部署
 - **订单系统**: Event Sourcing + CQRS，redb 存储事件，SQLite 归档查询
+- **发票系统 (Verifactu)**: 西班牙 AEAT 电子发票合规，Edge 本地生成 → Cloud 同步 → AEAT 提交
 
 ### 订单层架构（Order Layer）
 
-**三层结构**：
+**四层结构**：
 
 ```
 redb (活跃订单)                    ← Event Sourcing 运行时
@@ -57,11 +58,13 @@ redb (活跃订单)                    ← Event Sourcing 运行时
 SQLite archived_order              ← 归档层 (只读业务数据)
   + archived_order_event           ← 事件级 hash 链 (prev_hash/curr_hash)
   + credit_note / credit_note_item ← 追加式退款凭证
+  + invoice                        ← Verifactu 发票 (F2 销售 / R5 更正)
   │
 chain_entry (统一 hash 链索引)     ← 唯一的链真相，ORDER + CREDIT_NOTE 交错
   │ CloudWorker 按 chain_entry.id 顺序同步
   ▼
-crab-cloud PostgreSQL              ← 云端存储 + hash 再验证
+crab-cloud PostgreSQL              ← 云端存储 + hash 再验证 + AEAT 状态跟踪
+  + store_invoices                 ← 发票同步 (huella 验证后入库)
 ```
 
 **hash chain 设计**：
@@ -72,27 +75,35 @@ crab-cloud PostgreSQL              ← 云端存储 + hash 再验证
 - `write_f64` 规范化 `-0.0` → `0.0`，保证 JSON roundtrip 稳定性
 - 云端反序列化后通过 `verify_hash()` 重新计算 hash 对比，不匹配则 warn（不拒绝）
 
+**发票 huella 链 (Verifactu)**：
+- 发票独立于 chain_entry，有自己的 huella 链 (`system_state.last_huella`)
+- Huella 按 AEAT 规范: SHA-256 of `"IDEmisorFactura=NIF&NumSerieFactura=NUM&FechaExpedicionFactura=DATE&TipoFactura=TYPE&CuotaTotal=TAX&ImporteTotal=TOTAL&Huella=PREV&FechaHoraHuellaRegistro=TIMESTAMP"`
+- `InvoiceService` 在归档/退款时自动创建 F2/R5 发票
+- Cloud 端 `InvoiceSync::verify_huella()` 验证 huella 一致性后才入库
+
 **编号体系**：
 - `receipt_number`: `FAC{YYYYMMDD}{10000+N}`，全局单调递增计数器 (`system_state.order_count`)
 - `credit_note_number`: `CN-{YYYYMMDD}-{NNNN}`，按日计数
-- **未来发票号 (Verifactu)**：`{Serie}-{YYYYMMDD}-{NNNN}`，每终端独立 Serie，离线本地分配 + 上线后补报
+- `invoice_number`: `{Serie}{YYYYMMDD}{NNNN}`，每终端独立 Serie，本地分配
 
-**Verifactu 对接预设计**：
-- `chain_entry.entry_type` 映射: `ORDER` → Alta, `CREDIT_NOTE` → Rectificativa, `ORDER_VOID` (预留) → Anulación
-- `OrderDetailSync.desglose` 已包含 `TaxDesglose` (BaseImponible + CuotaRepercutida)
-- 发票号带日期段天然隔离，防计数器重置后撞号
-- 离线签发: 本地已知 NIF/发票号/日期/金额，QR 可离线生成，在线后批量上报
+**AEAT 状态流转**：
+- `PENDING` → Cloud 接收 → `SUBMITTED` → AEAT 响应 → `ACCEPTED` / `REJECTED`
+- Cloud→Edge 通过 `StoreOp::UpdateInvoiceAeatStatus` WebSocket 回推状态
 
 **关键文件**：
 - `shared/src/order/canonical.rs` — hash 计算函数
+- `shared/src/models/invoice.rs` — Invoice 模型 + AeatStatus + TipoFactura
+- `shared/src/cloud/sync.rs` — InvoiceSync + verify_huella()
 - `edge-server/src/archiving/service.rs` — 归档服务 + receipt_number 生成
 - `edge-server/src/archiving/credit_note.rs` — 退款凭证服务
-- `edge-server/src/cloud/worker.rs` — CloudWorker 同步
-- `shared/src/cloud/sync.rs` — 同步协议类型 + verify_hash()
+- `edge-server/src/archiving/invoice.rs` — 发票创建 (F2/R5)
+- `edge-server/src/db/repository/invoice.rs` — 发票 CRUD + 同步查询
+- `edge-server/src/cloud/worker.rs` — CloudWorker 同步 (含发票)
+- `crab-cloud/src/db/sync_store.rs` — 云端同步入库 + huella 验证
 
 ### 架构原则
 
-- **Server/Cloud 是权威**：所有业务逻辑和计算（定价、收据号、税务等）在 edge-server 或 crab-cloud 完成。Tauri 客户端只做展示，**禁止**在客户端添加计算库（如 rust_decimal）或复制业务逻辑
+- **Server/Cloud 是权威**：所有业务逻辑和计算（定价、收据号、税务、发票/huella 等）在 edge-server 或 crab-cloud 完成。Tauri 客户端只做展示，**禁止**在客户端添加计算库（如 rust_decimal）或复制业务逻辑
 - **功能独立**：不相关的功能不要合并到同一个 UI 组件（例如厨房小票和标签重打应该是独立 Modal，不是 Tab）
 - **订单不可变**：archived_order 和 archived_order_event 永远只读，所有修正通过追加 credit_note 实现
 - **防超退**：退款总额不超过原始订单总额，通过 `SUM(credit_note.total_credit)` 实时校验
@@ -205,7 +216,7 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 ### 安全要求
 
 - **全栈 HTTPS**: 所有 auth_url 强制 `https://`，无 `danger_accept_invalid_certs`
-- **P12 安全**: 客户电子签名 (P12+密码) 经 AES-256-GCM 加密后存 PG，加密密钥 (MasterKey) 存 AWS Secrets Manager，密码不入日志
+- **P12 安全**: 客户电子签名 (P12+密码) 经 AES-256-GCM 加密后存 PG，加密密钥 (MasterKey) 存 AWS Secrets Manager，密码不入日志。上传时自动提取 NIF 并同步到 edge `store_info.nif`
 - **mTLS**: edge-server ↔ crab-cloud 通过 8443 端口双向 TLS
 - **私钥文件**: 写入私钥/凭据文件必须使用 `crab_cert::write_secret_file()` (Unix 下 0o600 权限)
 

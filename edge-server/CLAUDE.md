@@ -72,8 +72,10 @@ src/
 │   └── storage.rs      # redb 持久化 (events, snapshots, queues)
 ├── archiving/      # 归档系统 (从 orders/ 拆分)
 │   ├── service.rs      # OrderArchiveService (归档到 SQLite, 哈希链)
-│   ├── worker.rs       # ArchiveWorker (队列处理, 并发10, 重试3次)
-│   └── verify.rs       # VerifyScheduler (启动补扫 + 每日定时验证)
+│   ├── worker.rs       # ArchiveWorker (队列处理, 并发50, 重试3次)
+│   ├── verify.rs       # VerifyScheduler (启动补扫 + 每日定时验证)
+│   ├── credit_note.rs  # CreditNoteService (退款凭证, chain_entry)
+│   └── invoice.rs      # InvoiceService (Verifactu F2/R5 发票, huella 链)
 ├── order_money/    # 金额计算 (从 orders/ 拆分)
 │   ├── mod.rs          # 精确 Decimal 算术 (rust_decimal)
 │   └── tests.rs        # 金额计算测试
@@ -96,9 +98,9 @@ src/
 │   ├── types.rs        # AuditAction, AuditEntry
 │   └── worker.rs       # AuditWorker (异步写入)
 ├── cloud/          # Cloud 通信与双向操作
-│   ├── worker.rs          # CloudSyncWorker (定期同步到 cloud)
+│   ├── worker.rs          # CloudSyncWorker (归档+信用单+发票 同步到 cloud)
 │   ├── service.rs         # CloudService (HTTP 客户端)
-│   ├── rpc_executor.rs    # RPC executor (执行 cloud 推送的 StoreOp)
+│   ├── rpc_executor.rs    # RPC executor (执行 cloud 推送的 StoreOp, 含 UpdateInvoiceAeatStatus)
 │   └── ops/               # StoreOp 执行器 (按资源分文件)
 │       ├── mod.rs
 │       ├── catalog.rs         # Product/Category/Tag CRUD
@@ -187,10 +189,25 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 
 ### 归档系统
 
-- **OrderArchiveService**: 归档到 SQLite
+- **OrderArchiveService**: 归档到 SQLite，触发 InvoiceService 创建 F2 发票
 - **ArchiveWorker**: 队列处理，并发 50，重试 3 次，指数退避 5s→60s
 - **VerifyScheduler**: SHA256 哈希链验证，启动补扫 + business_day_cutoff 定时
 - **Dead Letter Queue**: 永久失败的归档任务隔离
+- **CreditNoteService**: 退款凭证，追加到 chain_entry 哈希链，触发 InvoiceService 创建 R5 发票
+- **InvoiceService**: Verifactu 发票创建，维护独立 huella 链 (`system_state.last_huella`)
+
+### 发票系统 (Verifactu)
+
+- **InvoiceService** (`archiving/invoice.rs`): 在归档/退款时自动创建发票
+  - `create_order_invoice()` → F2 (销售发票)，归档完成后调用
+  - `create_credit_note_invoice()` → R5 (更正发票)，退款完成后调用
+- **Invoice Repository** (`db/repository/invoice.rs`):
+  - `insert()` — 写入发票 + 自增计数器
+  - `find_by_order()` — 按订单查询发票
+  - `list_unsynced_ids()` / `build_sync()` — 云端同步
+  - `update_aeat_status()` — AEAT 状态回写
+- **Huella 链**: 独立于 chain_entry，`system_state.last_huella` 是链尾指针
+- **Desglose**: 税务明细从归档的 `TaxDesglose` 映射到发票的 `InvoiceDesglose`
 
 ### 价格规则引擎
 
@@ -241,11 +258,14 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 
 ### Cloud 双向操作
 
-**Edge → Cloud**: `CloudSyncWorker` 定期将本地资源变更同步到 cloud（POST /api/edge/sync）
+**Edge → Cloud**: `CloudSyncWorker` 定期同步:
+- 归档订单 (chain_entry ORDER)
+- 信用单 (chain_entry CREDIT_NOTE)
+- 发票 (invoice 表，按 synced_at 过滤)
 
 **Cloud → Edge**: Cloud Console CRUD 操作通过 WebSocket 推送 `StoreOp` 到 edge
 - `rpc_executor.rs`: 接收 `StoreOp` 枚举，分发到对应的 `cloud/ops/` handler
-- `StoreOp` 支持: Create/Update/Delete 所有门店资源（Product, Category, Tag, Attribute, Employee, Zone, Table, PriceRule, LabelTemplate）
+- `StoreOp` 支持: Create/Update/Delete 所有门店资源 + `UpdateInvoiceAeatStatus`（AEAT 状态回推）
 - 执行后通过 MessageBus 广播 sync 消息到已连接的 POS 客户端
 
 ## 错误处理原则

@@ -43,14 +43,16 @@ src/
 │   ├── price_rule.rs   # PriceRule + RuleType/ProductScope/AdjustmentType
 │   ├── print_destination.rs # PrintDestination
 │   ├── label_template.rs   # LabelTemplate
+│   ├── invoice.rs      # Invoice + TipoFactura (F2/R5) + AeatStatus
+│   ├── credit_note.rs  # CreditNote + CreditNoteItem
 │   └── sync.rs         # SyncPayload + SyncStatus
 ├── message/        # 消息总线协议
 │   ├── mod.rs          # Message<T>, EventType, BusMessage
 │   └── payload.rs      # Notification, ServerCommand, SyncPayload, Response
 ├── cloud/          # Cloud 通信协议
 │   ├── mod.rs         # StoreDetailResponse, StoreOpResult, StoreOpData
-│   ├── store_op.rs    # StoreOp 枚举 (Cloud→Edge 双向 CRUD 操作)
-│   ├── sync.rs        # CloudSyncPayload, SyncResource 枚举
+│   ├── store_op.rs    # StoreOp 枚举 (Cloud→Edge 双向 CRUD + UpdateInvoiceAeatStatus)
+│   ├── sync.rs        # CloudSyncPayload, SyncResource, InvoiceSync (huella 验证)
 │   └── ws.rs          # WebSocket 消息类型
 ├── activation.rs   # 激活协议 (ActivationResponse, SignedBinding, SubscriptionInfo)
 ├── app_state.rs    # 应用状态 (HealthStatus, ActivationProgress, SubscriptionBlocked)
@@ -142,6 +144,14 @@ src/
 **SubscriptionStatus**: Inactive, Active, PastDue, Expired, Canceled, Unpaid
 **PlanType**: Basic (1店), Pro (3店), Enterprise (无限)
 **SignedBinding**: 硬件绑定 + 时钟篡改检测 (±1小时/30天)
+
+### 发票 (Verifactu)
+
+- **Invoice**: 发票记录 (id, order_id, invoice_number, tipo_factura, desglose, huella 等)
+- **TipoFactura**: F2 (销售发票) / R5 (更正发票)
+- **AeatStatus**: PENDING / SUBMITTED / ACCEPTED / REJECTED
+- **InvoiceSync**: 发票同步载体，含 `verify_huella()` 方法重算 SHA-256 验证完整性
+- **Huella 输入**: `IDEmisorFactura + NumSerieFactura + FechaExpedicionFactura + TipoFactura + CuotaTotal + ImporteTotal + Huella(prev) + FechaHoraHuellaRegistro`
 
 ### 应用状态
 

@@ -42,6 +42,9 @@ src/
 │   │   │   ├── api/            # API 模型 (Product, Category 等，与 Rust 对齐)
 │   │   │   ├── print/          # 打印/标签类型
 │   │   │   ├── orderEvent.ts   # 事件溯源类型 (Command, Event, Snapshot)
+│   │   │   ├── archivedOrder.ts # 归档订单详情类型
+│   │   │   ├── creditNote.ts   # 信用单类型
+│   │   │   ├── invoice.ts      # Verifactu 发票类型 (TipoFactura, AeatStatus)
 │   │   │   └── appState.ts     # 应用状态机
 │   │   └── validators.ts       # Zod 校验
 │   ├── hooks/                  # 核心逻辑 hooks
@@ -100,7 +103,7 @@ src/
 │   ├── Activate/           # 设备激活
 │   ├── Statistics/         # 销售统计 (Dashboard, SalesReport, DailyReport)
 │   ├── Settings/           # 管理设置 (商品、分类、打印机、语言等)
-│   ├── History/            # 订单历史 (归档查看 + Timeline)
+│   ├── History/            # 订单历史 (归档查看 + Timeline + 信用单 + 发票)
 │   ├── TableSelection/     # 桌台/客数选择
 │   ├── Checkout/           # 结账支付 (多支付方式, 拆单, components/, payment/)
 │   ├── TenantSelect/       # 多租户选择

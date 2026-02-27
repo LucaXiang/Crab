@@ -34,3 +34,5 @@ TypeScript (前端) <-> Rust (后端) 类型必须完全匹配：
 | **离线优先** | 边缘节点必须支持完全离线运行 |
 | **RBAC 双层防御** | 前端 PermissionGate + 后端 `require_permission()` 中间件 |
 | **mTLS 安全** | 生产环境必须启用双向 TLS (TLS 1.3 + aws-lc-rs) |
+| **数据完整性** | 订单归档/信用单通过 chain_entry SHA-256 哈希链保证不可篡改；发票通过独立 huella 链 (AEAT 规范) 保证完整性 |
+| **Verifactu 合规** | 发票 huella 按 AEAT 规范 SHA-256 计算，Cloud 验证后入库。F2=销售，R5=更正 |
