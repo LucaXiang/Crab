@@ -239,6 +239,11 @@ pub async fn run() {
             commands::fetch_order_list,
             commands::fetch_member_order_history,
             commands::fetch_order_detail,
+            // Credit Note commands
+            commands::create_credit_note,
+            commands::fetch_credit_note_detail,
+            commands::fetch_credit_notes_by_order,
+            commands::fetch_refundable_info,
             // Order Event Sourcing commands
             commands::order_execute_command,
             commands::order_execute,

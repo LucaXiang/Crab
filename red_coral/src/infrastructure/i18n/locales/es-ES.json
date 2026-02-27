@@ -2745,5 +2745,32 @@
     "restart": "Reiniciar",
     "error": "Error al verificar actualizaciones",
     "later": "Más tarde"
+  },
+  "credit_note": {
+    "title": "Notas de crédito",
+    "empty": "Sin notas de crédito",
+    "created": "Nota de crédito creada",
+    "remaining": "Saldo reembolsable",
+    "action": {
+      "create": "Reembolso",
+      "confirm_refund": "Confirmar reembolso"
+    },
+    "method": {
+      "cash": "Efectivo",
+      "card": "Tarjeta"
+    },
+    "modal": {
+      "title": "Crear nota de crédito",
+      "select_items": "Seleccionar artículos",
+      "refund_method": "Método de reembolso",
+      "reason": "Motivo",
+      "reason_placeholder": "Ingrese el motivo del reembolso",
+      "note": "Nota",
+      "note_placeholder": "Información adicional (opcional)",
+      "total_refund": "Total a reembolsar"
+    },
+    "error": {
+      "over_refund": "El monto excede el saldo reembolsable"
+    }
   }
 }

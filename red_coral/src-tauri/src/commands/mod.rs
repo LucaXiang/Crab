@@ -5,6 +5,7 @@
 pub mod api;
 pub mod auth;
 pub mod backup;
+pub mod credit_notes;
 pub mod data;
 pub mod health;
 pub mod image;
@@ -22,6 +23,7 @@ pub mod tenant;
 pub use api::*;
 pub use auth::*;
 pub use backup::*;
+pub use credit_notes::*;
 pub use data::*;
 pub use health::*;
 pub use image::*;

@@ -237,6 +237,18 @@ impl CreditNoteService {
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
+        // 10. Cash refund: deduct from open shift's expected_cash
+        if request.refund_method == "CASH"
+            && let Err(e) =
+                crate::db::repository::shift::add_cash_payment(&self.pool, -total_credit).await
+        {
+            tracing::warn!(
+                credit_note_number = %cn_number,
+                error = %e,
+                "Failed to deduct cash refund from shift"
+            );
+        }
+
         tracing::info!(
             credit_note_number = %cn_number,
             original_receipt = %order.receipt_number,

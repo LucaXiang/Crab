@@ -16,6 +16,9 @@ export * from './api';
 // Archived order types (for history view)
 export * from './archivedOrder';
 
+// Credit note types (退款凭证)
+export * from './creditNote';
+
 // Print and label types
 export * from './print';
 

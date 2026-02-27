@@ -12,6 +12,7 @@ import { TimelineList } from '@/shared/components/TimelineList';
 import { calculateItemSink } from '@/utils/itemSorting';
 import { KitchenReprintModal } from '@/screens/Checkout/KitchenReprintModal';
 import { LabelReprintModal } from '@/screens/Checkout/LabelReprintModal';
+import { CreditNoteSection } from './CreditNoteSection';
 
 interface HistoryDetailProps {
   order?: ArchivedOrderDetail;
@@ -336,6 +337,9 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               )}
             </div>
           </div>
+
+          {/* Credit Notes (退款记录) */}
+          <CreditNoteSection order={order} />
         </div>
 
         {/* Timeline */}

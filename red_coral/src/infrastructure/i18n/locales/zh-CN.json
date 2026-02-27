@@ -2745,5 +2745,32 @@
     "restart": "重启",
     "error": "更新检查失败",
     "later": "稍后"
+  },
+  "credit_note": {
+    "title": "退款记录",
+    "empty": "暂无退款记录",
+    "created": "退款凭证已创建",
+    "remaining": "可退余额",
+    "action": {
+      "create": "退款",
+      "confirm_refund": "确认退款"
+    },
+    "method": {
+      "cash": "现金",
+      "card": "刷卡"
+    },
+    "modal": {
+      "title": "创建退款凭证",
+      "select_items": "选择退款商品",
+      "refund_method": "退款方式",
+      "reason": "退款原因",
+      "reason_placeholder": "请输入退款原因",
+      "note": "备注",
+      "note_placeholder": "补充说明（可选）",
+      "total_refund": "退款合计"
+    },
+    "error": {
+      "over_refund": "退款金额超过可退余额"
+    }
   }
 }

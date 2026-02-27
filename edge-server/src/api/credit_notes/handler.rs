@@ -71,6 +71,22 @@ pub async fn list_by_order(
     Ok(Json(notes))
 }
 
+/// GET /api/credit-notes/:id/receipt - 获取退款凭证小票 ESC/POS 字节
+pub async fn get_receipt(
+    State(state): State<ServerState>,
+    Path(id): Path<i64>,
+) -> AppResult<Vec<u8>> {
+    let service = credit_note_service(&state)?;
+    let detail = service
+        .get_detail(id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Credit note {} not found", id)))?;
+
+    let renderer = crate::printing::CreditNoteReceiptRenderer::new(48, state.config.timezone);
+    let bytes = renderer.render(&detail);
+    Ok(bytes)
+}
+
 /// GET /api/credit-notes/refundable/:order_pk - 获取可退金额信息
 pub async fn get_refundable_info(
     State(state): State<ServerState>,
