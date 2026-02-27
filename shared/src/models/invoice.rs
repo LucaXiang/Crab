@@ -74,15 +74,52 @@ impl AeatStatus {
     }
 }
 
-/// Verifactu invoice entity (SQLite row)
+impl std::str::FromStr for InvoiceSourceType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "ORDER" => Ok(Self::Order),
+            "CREDIT_NOTE" => Ok(Self::CreditNote),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for InvoiceSourceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for AeatStatus {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "PENDING" => Ok(Self::Pending),
+            "SUBMITTED" => Ok(Self::Submitted),
+            "ACCEPTED" => Ok(Self::Accepted),
+            "REJECTED" => Ok(Self::Rejected),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for AeatStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Verifactu invoice entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct Invoice {
     pub id: i64,
     pub invoice_number: String,
     pub serie: String,
-    pub tipo_factura: String,
-    pub source_type: String,
+    pub tipo_factura: TipoFactura,
+    pub source_type: InvoiceSourceType,
     pub source_pk: i64,
 
     // Amounts
@@ -105,7 +142,7 @@ pub struct Invoice {
 
     // Sync / status
     pub cloud_synced: bool,
-    pub aeat_status: String,
+    pub aeat_status: AeatStatus,
 
     pub created_at: i64,
 }
