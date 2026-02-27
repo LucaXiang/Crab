@@ -227,6 +227,9 @@ pub struct OrderDetailSync {
     pub end_time: Option<i64>,
     pub prev_hash: String,
     pub curr_hash: String,
+    /// Hash of the last event in the order's event chain (for hash re-verification)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_event_hash: Option<String>,
     pub created_at: i64,
     /// VeriFactu 税率分拆
     pub desglose: Vec<TaxDesglose>,
@@ -326,7 +329,7 @@ pub struct OrderPaymentSync {
 // ── Credit Note sync types ──
 
 /// 退款凭证同步载荷（edge→cloud 推送）
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreditNoteSync {
     pub credit_note_number: String,
     pub original_order_key: String,
@@ -348,7 +351,7 @@ pub struct CreditNoteSync {
 }
 
 /// 退款明细行同步载荷
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreditNoteItemSync {
     pub item_name: String,
     pub quantity: i64,
@@ -356,6 +359,49 @@ pub struct CreditNoteItemSync {
     pub line_credit: f64,
     pub tax_rate: i64,
     pub tax_credit: f64,
+}
+
+// ── Hash verification ──
+
+impl CreditNoteSync {
+    /// Recompute the chain hash from payload fields and verify it matches `curr_hash`.
+    ///
+    /// This proves the hash is stable through JSON serialization/deserialization.
+    pub fn verify_hash(&self) -> bool {
+        let recomputed = crate::order::compute_credit_note_chain_hash(
+            &self.prev_hash,
+            &self.credit_note_number,
+            &self.original_receipt,
+            self.total_credit,
+        );
+        recomputed == self.curr_hash
+    }
+}
+
+impl OrderDetailSync {
+    /// Recompute the chain hash from payload fields and verify it matches `curr_hash`.
+    ///
+    /// Requires `last_event_hash` to be present (added for verification support).
+    pub fn verify_hash(&self) -> bool {
+        let Some(ref last_event_hash) = self.last_event_hash else {
+            return false;
+        };
+        let status: crate::order::OrderStatus = match self.status.as_str() {
+            "COMPLETED" => crate::order::OrderStatus::Completed,
+            "VOID" => crate::order::OrderStatus::Void,
+            "MERGED" => crate::order::OrderStatus::Merged,
+            "ACTIVE" => crate::order::OrderStatus::Active,
+            _ => return false,
+        };
+        let recomputed = crate::order::compute_order_chain_hash(
+            &self.prev_hash,
+            &self.order_key,
+            &self.receipt_number,
+            &status,
+            last_event_hash,
+        );
+        recomputed == self.curr_hash
+    }
 }
 
 // ── Tenant API response types ──
@@ -400,6 +446,271 @@ pub struct StoreDetailResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Credit note hash roundtrip tests ──
+
+    fn sample_credit_note_sync() -> CreditNoteSync {
+        let prev_hash = "genesis".to_string();
+        let cn_number = "CN-20260227-0001".to_string();
+        let original_receipt = "R-20260227-001".to_string();
+        let total_credit = 25.50_f64;
+
+        let curr_hash = crate::order::compute_credit_note_chain_hash(
+            &prev_hash,
+            &cn_number,
+            &original_receipt,
+            total_credit,
+        );
+
+        CreditNoteSync {
+            credit_note_number: cn_number,
+            original_order_key: "uuid-order-001".to_string(),
+            original_receipt,
+            subtotal_credit: 21.07,
+            tax_credit: 4.43,
+            total_credit,
+            refund_method: "CASH".to_string(),
+            reason: "Customer request".to_string(),
+            note: Some("partial refund".to_string()),
+            operator_name: "Admin".to_string(),
+            authorizer_name: None,
+            prev_hash,
+            curr_hash,
+            created_at: 1709020800000,
+            items: vec![CreditNoteItemSync {
+                item_name: "Paella".to_string(),
+                quantity: 1,
+                unit_price: 21.07,
+                line_credit: 21.07,
+                tax_rate: 2100,
+                tax_credit: 4.43,
+            }],
+        }
+    }
+
+    #[test]
+    fn test_credit_note_hash_golden_value() {
+        let hash = crate::order::compute_credit_note_chain_hash(
+            "genesis",
+            "CN-20260227-0001",
+            "R-20260227-001",
+            25.50,
+        );
+        assert_eq!(
+            hash, "b2f665af472506476943730b0b08530d8b128ba2bd325c52fbc8210de32fc1a1",
+            "Credit note chain golden hash changed! This breaks chain integrity."
+        );
+    }
+
+    #[test]
+    fn test_credit_note_verify_hash_on_fresh() {
+        let cn = sample_credit_note_sync();
+        assert!(
+            cn.verify_hash(),
+            "Fresh CreditNoteSync must pass hash verification"
+        );
+    }
+
+    #[test]
+    fn test_credit_note_hash_survives_json_roundtrip() {
+        let cn = sample_credit_note_sync();
+        let json = serde_json::to_string(&cn).unwrap();
+        let deserialized: CreditNoteSync = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(
+            cn, deserialized,
+            "CreditNoteSync must be identical after JSON roundtrip"
+        );
+        assert!(
+            deserialized.verify_hash(),
+            "Hash verification must pass after JSON roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_credit_note_hash_survives_value_roundtrip() {
+        let cn = sample_credit_note_sync();
+        let value = serde_json::to_value(&cn).unwrap();
+        let deserialized: CreditNoteSync = serde_json::from_value(value).unwrap();
+
+        assert_eq!(
+            cn, deserialized,
+            "CreditNoteSync must be identical after Value roundtrip"
+        );
+        assert!(
+            deserialized.verify_hash(),
+            "Hash verification must pass after Value roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_credit_note_hash_detects_tampering() {
+        let mut cn = sample_credit_note_sync();
+        cn.total_credit = 99.99; // tamper
+        assert!(
+            !cn.verify_hash(),
+            "Tampered total_credit must fail hash verification"
+        );
+    }
+
+    #[test]
+    fn test_credit_note_f64_edge_cases() {
+        // Test that f64 values with various decimal places roundtrip correctly
+        for total in [0.0, 0.01, 0.1, 1.0, 9.99, 100.0, 12345.67, 0.005] {
+            let prev = "test_prev".to_string();
+            let cn_num = "CN-TEST-0001".to_string();
+            let receipt = "R-TEST-001".to_string();
+
+            let hash =
+                crate::order::compute_credit_note_chain_hash(&prev, &cn_num, &receipt, total);
+
+            let cn = CreditNoteSync {
+                credit_note_number: cn_num,
+                original_order_key: "uuid".to_string(),
+                original_receipt: receipt,
+                subtotal_credit: total,
+                tax_credit: 0.0,
+                total_credit: total,
+                refund_method: "CASH".to_string(),
+                reason: "test".to_string(),
+                note: None,
+                operator_name: "op".to_string(),
+                authorizer_name: None,
+                prev_hash: prev,
+                curr_hash: hash,
+                created_at: 0,
+                items: vec![],
+            };
+
+            let json = serde_json::to_string(&cn).unwrap();
+            let rt: CreditNoteSync = serde_json::from_str(&json).unwrap();
+            assert!(
+                rt.verify_hash(),
+                "f64 value {total} must survive JSON roundtrip for hash verification"
+            );
+        }
+    }
+
+    // ── Order hash roundtrip tests ──
+
+    #[test]
+    fn test_order_verify_hash() {
+        let prev_hash = "genesis".to_string();
+        let order_key = "uuid-order-001".to_string();
+        let receipt = "R-20260227-001".to_string();
+        let status_str = "COMPLETED".to_string();
+        let last_event_hash = "event_hash_abc123".to_string();
+
+        let curr_hash = crate::order::compute_order_chain_hash(
+            &prev_hash,
+            &order_key,
+            &receipt,
+            &crate::order::OrderStatus::Completed,
+            &last_event_hash,
+        );
+
+        let order = OrderDetailSync {
+            order_key,
+            receipt_number: receipt,
+            status: status_str,
+            total_amount: 100.0,
+            tax: 21.0,
+            end_time: Some(1709020800000),
+            prev_hash,
+            curr_hash,
+            last_event_hash: Some(last_event_hash),
+            created_at: 1709020800000,
+            desglose: vec![],
+            detail: OrderDetailPayload {
+                zone_name: None,
+                table_name: None,
+                is_retail: false,
+                guest_count: None,
+                original_total: 100.0,
+                subtotal: 100.0,
+                paid_amount: 100.0,
+                discount_amount: 0.0,
+                surcharge_amount: 0.0,
+                comp_total_amount: 0.0,
+                order_manual_discount_amount: 0.0,
+                order_manual_surcharge_amount: 0.0,
+                order_rule_discount_amount: 0.0,
+                order_rule_surcharge_amount: 0.0,
+                start_time: 1709020800000,
+                operator_name: None,
+                void_type: None,
+                loss_reason: None,
+                loss_amount: None,
+                void_note: None,
+                member_name: None,
+                items: vec![],
+                payments: vec![],
+                events: vec![],
+            },
+        };
+
+        assert!(
+            order.verify_hash(),
+            "Fresh OrderDetailSync must pass hash verification"
+        );
+
+        // JSON roundtrip
+        let json = serde_json::to_string(&order).unwrap();
+        let rt: OrderDetailSync = serde_json::from_str(&json).unwrap();
+        assert!(
+            rt.verify_hash(),
+            "OrderDetailSync hash must survive JSON roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_order_verify_hash_without_last_event_hash() {
+        let order = OrderDetailSync {
+            order_key: "uuid".to_string(),
+            receipt_number: "R-001".to_string(),
+            status: "COMPLETED".to_string(),
+            total_amount: 0.0,
+            tax: 0.0,
+            end_time: None,
+            prev_hash: "genesis".to_string(),
+            curr_hash: "some_hash".to_string(),
+            last_event_hash: None, // missing
+            created_at: 0,
+            desglose: vec![],
+            detail: OrderDetailPayload {
+                zone_name: None,
+                table_name: None,
+                is_retail: false,
+                guest_count: None,
+                original_total: 0.0,
+                subtotal: 0.0,
+                paid_amount: 0.0,
+                discount_amount: 0.0,
+                surcharge_amount: 0.0,
+                comp_total_amount: 0.0,
+                order_manual_discount_amount: 0.0,
+                order_manual_surcharge_amount: 0.0,
+                order_rule_discount_amount: 0.0,
+                order_rule_surcharge_amount: 0.0,
+                start_time: 0,
+                operator_name: None,
+                void_type: None,
+                loss_reason: None,
+                loss_amount: None,
+                void_note: None,
+                member_name: None,
+                items: vec![],
+                payments: vec![],
+                events: vec![],
+            },
+        };
+        assert!(
+            !order.verify_hash(),
+            "Missing last_event_hash must fail verification"
+        );
+    }
+
+    // ── Existing tests ──
 
     #[test]
     fn test_cloud_sync_batch_serialization() {

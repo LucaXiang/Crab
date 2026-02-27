@@ -547,6 +547,14 @@ pub async fn build_order_detail_sync(
     )
     .collect();
 
+    // 3b. Query last event hash (for cloud-side hash re-verification)
+    let last_event_hash: Option<String> = sqlx::query_scalar::<_, String>(
+        "SELECT curr_hash FROM archived_order_event WHERE order_pk = ? ORDER BY seq DESC LIMIT 1",
+    )
+    .bind(order_pk)
+    .fetch_optional(pool)
+    .await?;
+
     // 4. Query payments
     let payments: Vec<OrderPaymentSync> = sqlx::query_as::<_, (i32, String, f64, i64, bool)>(
         "SELECT seq, method, amount, time, cancelled \
@@ -601,6 +609,7 @@ pub async fn build_order_detail_sync(
         end_time: order.end_time,
         prev_hash: order.prev_hash,
         curr_hash: order.curr_hash,
+        last_event_hash,
         created_at: order.created_at,
         desglose,
         detail: OrderDetailPayload {

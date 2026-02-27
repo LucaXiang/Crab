@@ -251,8 +251,19 @@ async fn upsert_credit_note(
     use shared::cloud::CreditNoteSync;
 
     let cn: CreditNoteSync = serde_json::from_value(item.data.clone())?;
-    let detail_json = serde_json::to_value(&cn)?;
     let source_id: i64 = item.resource_id.parse()?;
+
+    // Verify hash chain integrity after deserialization
+    if !cn.verify_hash() {
+        tracing::warn!(
+            credit_note_number = %cn.credit_note_number,
+            source_id,
+            expected = %cn.curr_hash,
+            "Credit note hash verification failed after deserialization"
+        );
+    }
+
+    let detail_json = serde_json::to_value(&cn)?;
 
     sqlx::query(
         r#"
@@ -314,6 +325,18 @@ async fn upsert_archived_order(
     use shared::cloud::OrderDetailSync;
 
     let detail_sync: OrderDetailSync = serde_json::from_value(item.data.clone())?;
+
+    // Verify hash chain integrity after deserialization
+    // If last_event_hash is None (pre-upgrade data), skip silently
+    if !detail_sync.verify_hash() && detail_sync.last_event_hash.is_some() {
+        tracing::warn!(
+            order_key = %detail_sync.order_key,
+            receipt = %detail_sync.receipt_number,
+            expected = %detail_sync.curr_hash,
+            "Order hash verification failed after deserialization"
+        );
+    }
+
     let desglose_json = serde_json::to_value(&detail_sync.desglose)?;
     let detail_json = serde_json::to_value(&detail_sync.detail)?;
 
@@ -322,11 +345,11 @@ async fn upsert_archived_order(
         INSERT INTO store_archived_orders (
             store_id, tenant_id, source_id, order_key,
             receipt_number, status, end_time, total, tax,
-            prev_hash, curr_hash, desglose,
+            prev_hash, curr_hash, last_event_hash, desglose,
             guest_count, discount_amount, void_type, loss_amount, start_time,
             detail, version, synced_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         ON CONFLICT (tenant_id, store_id, order_key)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -335,6 +358,7 @@ async fn upsert_archived_order(
                       tax = EXCLUDED.tax,
                       prev_hash = EXCLUDED.prev_hash,
                       curr_hash = EXCLUDED.curr_hash,
+                      last_event_hash = EXCLUDED.last_event_hash,
                       desglose = EXCLUDED.desglose,
                       guest_count = EXCLUDED.guest_count,
                       discount_amount = EXCLUDED.discount_amount,
@@ -358,6 +382,7 @@ async fn upsert_archived_order(
     .bind(detail_sync.tax)
     .bind(&detail_sync.prev_hash)
     .bind(&detail_sync.curr_hash)
+    .bind(&detail_sync.last_event_hash)
     .bind(&desglose_json)
     .bind(detail_sync.detail.guest_count)
     .bind(detail_sync.detail.discount_amount)
