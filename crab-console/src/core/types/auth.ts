@@ -22,5 +22,10 @@ export interface P12Info {
   has_p12: boolean;
   fingerprint: string | null;
   subject: string | null;
+  serial_number: string | null;
+  organization: string | null;
+  issuer: string | null;
+  country: string | null;
+  not_before: number | null;
   expires_at: number | null;
 }

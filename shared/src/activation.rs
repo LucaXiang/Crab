@@ -277,6 +277,21 @@ pub struct P12Info {
     /// 证书主体 (CN)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
+    /// 税号/NIF (OID 2.5.4.5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub serial_number: Option<String>,
+    /// 公司名称
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organization: Option<String>,
+    /// 签发机构 (如 FNMT-RCM)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+    /// 国家代码 (ES)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    /// 证书生效时间 (Unix millis)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_before: Option<i64>,
     /// 证书过期时间 (Unix millis)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,

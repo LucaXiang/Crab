@@ -177,9 +177,21 @@ export const SettingsScreen: React.FC = () => {
       {/* P12 */}
       {p12?.has_p12 && (
         <Section icon={Lock} title={t('onboard.p12_uploaded')}>
-          <div className="text-sm space-y-1">
-            {p12.subject && <p><span className="text-slate-500">{t('onboard.p12_subject')}:</span> <span className="text-slate-900 font-medium">{p12.subject}</span></p>}
-            {p12.expires_at && <p><span className="text-slate-500">{t('onboard.p12_expires')}:</span> <span className="text-slate-900">{new Date(p12.expires_at).toLocaleDateString()}</span></p>}
+          <div className="text-sm space-y-2">
+            {p12.subject && <P12Row label={t('onboard.p12_subject')} value={p12.subject} bold />}
+            {p12.serial_number && <P12Row label={t('onboard.p12_nif')} value={p12.serial_number} />}
+            {p12.organization && <P12Row label={t('onboard.p12_organization')} value={p12.organization} />}
+            {p12.issuer && <P12Row label={t('onboard.p12_issuer')} value={p12.issuer} />}
+            {(p12.not_before || p12.expires_at) && (
+              <P12Row
+                label={t('onboard.p12_validity')}
+                value={[
+                  p12.not_before ? new Date(p12.not_before).toLocaleDateString() : '?',
+                  p12.expires_at ? new Date(p12.expires_at).toLocaleDateString() : '?',
+                ].join(' — ')}
+              />
+            )}
+            {p12.fingerprint && <P12Row label={t('onboard.p12_fingerprint')} value={p12.fingerprint.length > 20 ? `${p12.fingerprint.slice(0, 8)}...${p12.fingerprint.slice(-8)}` : p12.fingerprint} mono />}
           </div>
         </Section>
       )}
@@ -195,6 +207,13 @@ const Section: React.FC<{ icon: React.FC<{ className?: string }>; title: string;
     </div>
     {children}
   </div>
+);
+
+const P12Row: React.FC<{ label: string; value: string; bold?: boolean; mono?: boolean }> = ({ label, value, bold, mono }) => (
+  <p>
+    <span className="text-slate-500">{label}:</span>{' '}
+    <span className={`text-slate-900 ${bold ? 'font-medium' : ''} ${mono ? 'font-mono text-xs break-all' : ''}`}>{value}</span>
+  </p>
 );
 
 const Field: React.FC<{ label: string; value: string; disabled?: boolean }> = ({ label, value, disabled }) => (
