@@ -135,6 +135,12 @@ interface AuthData {
   mode: LoginMode;
 }
 
+export interface StoreSlot {
+  id: number;
+  alias: string;
+  store_number: number;
+}
+
 export interface QuotaInfo {
   max_slots: number;
   active_count: number;
@@ -167,7 +173,7 @@ export interface TenantVerifyData {
   subscription_status: SubscriptionStatus;
   plan: PlanType;
   server_slots_remaining: number;
-  client_slots_remaining: number;
+  stores: StoreSlot[];
   has_active_server: boolean;
   has_active_client: boolean;
   has_p12: boolean;
@@ -198,8 +204,8 @@ interface BridgeStore {
 
   // Tenant Actions
   verifyTenant: (username: string, password: string) => Promise<TenantVerifyData>;
-  activateServerTenant: (replaceEntityId?: string) => Promise<ActivationResult>;
-  activateClientTenant: (replaceEntityId?: string) => Promise<ActivationResult>;
+  activateServerTenant: (storeId?: number) => Promise<ActivationResult>;
+  activateClientTenant: () => Promise<ActivationResult>;
   deactivateCurrentMode: () => Promise<void>;
   exitTenant: () => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
@@ -341,11 +347,11 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateServerTenant: async (replaceEntityId?) => {
+      activateServerTenant: async (storeId?) => {
         try {
           set({ isLoading: true, error: null });
           const result = await invokeApi<ActivationResult>('activate_server_tenant', {
-            replaceEntityId: replaceEntityId ?? null,
+            storeId: storeId ?? null,
           });
           await get().fetchAppState();
           return result;
@@ -357,12 +363,10 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      activateClientTenant: async (replaceEntityId?) => {
+      activateClientTenant: async () => {
         try {
           set({ isLoading: true, error: null });
-          const result = await invokeApi<ActivationResult>('activate_client_tenant', {
-            replaceEntityId: replaceEntityId ?? null,
-          });
+          const result = await invokeApi<ActivationResult>('activate_client_tenant');
           await get().fetchAppState();
           return result;
         } catch (error: unknown) {

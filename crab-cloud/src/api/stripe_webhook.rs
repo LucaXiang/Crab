@@ -152,8 +152,7 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
         id: subscription_id,
         tenant_id: &tenant.id,
         plan,
-        max_edge_servers: quota.max_edge_servers,
-        max_clients: quota.max_clients,
+        max_stores: quota.max_stores,
         current_period_end: None, // set by subscription.updated events
         now,
     };

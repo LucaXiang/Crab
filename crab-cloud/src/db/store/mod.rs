@@ -8,6 +8,7 @@ pub mod attribute;
 pub mod category;
 pub mod daily_report;
 pub mod data_transfer;
+pub mod devices;
 pub mod dining_table;
 pub mod employee;
 pub mod label_template;

@@ -34,8 +34,7 @@ pub struct SubscriptionInfo {
     pub id: String,
     pub status: String,
     pub plan: String,
-    pub max_edge_servers: i32,
-    pub max_clients: i32,
+    pub max_stores: i32,
     pub current_period_end: Option<i64>,
     pub cancel_at_period_end: bool,
     pub billing_interval: Option<String>,
@@ -47,7 +46,7 @@ pub async fn get_subscription(
     tenant_id: &str,
 ) -> Result<Option<SubscriptionInfo>, BoxError> {
     let row: Option<SubscriptionInfo> = sqlx::query_as(
-        "SELECT id, status, plan, max_edge_servers, max_clients, current_period_end, cancel_at_period_end, billing_interval, created_at FROM subscriptions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1",
+        "SELECT id, status, plan, max_stores, current_period_end, cancel_at_period_end, billing_interval, created_at FROM subscriptions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1",
     )
     .bind(tenant_id)
     .fetch_optional(pool)
@@ -71,15 +70,16 @@ pub struct StoreSummary {
     pub device_id: String,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,
+    pub status: String,
 }
 
 pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
         SELECT id, entity_id, alias, name, address, phone, nif, email, website,
-               business_day_cutoff, device_id, last_sync_at, registered_at
+               business_day_cutoff, device_id, last_sync_at, registered_at, status
         FROM stores
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1 AND status = 'active'
         ORDER BY registered_at DESC
         "#,
     )
@@ -879,6 +879,59 @@ pub async fn verify_store_ownership(
 ) -> Result<Option<i64>, BoxError> {
     let row: Option<(i64,)> =
         sqlx::query_as("SELECT id FROM stores WHERE id = $1 AND tenant_id = $2")
+            .bind(store_id)
+            .bind(tenant_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(row.map(|r| r.0))
+}
+
+/// Soft-delete a store and deactivate its associated server activation
+pub async fn soft_delete_store(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    now: i64,
+) -> Result<(), BoxError> {
+    let mut tx = pool.begin().await?;
+
+    // 获取 entity_id
+    let entity: Option<(String,)> = sqlx::query_as(
+        "SELECT entity_id FROM stores WHERE id = $1 AND tenant_id = $2 AND status = 'active'",
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let entity_id = entity.ok_or("Store not found")?.0;
+
+    // 软删除门店
+    sqlx::query("UPDATE stores SET status = 'deleted', deleted_at = $1 WHERE id = $2")
+        .bind(now)
+        .bind(store_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // 停用关联 server activation
+    sqlx::query("UPDATE activations SET status = 'deactivated', deactivated_at = $1 WHERE entity_id = $2 AND status = 'active'")
+        .bind(now)
+        .bind(&entity_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Get entity_id for a store
+pub async fn get_store_entity_id(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+) -> Result<Option<String>, BoxError> {
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT entity_id FROM stores WHERE id = $1 AND tenant_id = $2")
             .bind(store_id)
             .bind(tenant_id)
             .fetch_optional(pool)

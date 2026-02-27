@@ -85,10 +85,8 @@ pub enum ErrorCode {
     LicenseExpired = 3005,
     /// Subscription blocked (canceled or unpaid)
     SubscriptionBlocked = 3006,
-    /// Device limit reached (quota full, need to replace an existing device)
-    DeviceLimitReached = 3007,
-    /// Client limit reached (quota full, need to replace an existing client)
-    ClientLimitReached = 3008,
+    /// Store limit reached (quota full, need to replace an existing store)
+    StoreLimitReached = 3007,
     /// Tenant credentials invalid (wrong username/password)
     TenantCredentialsInvalid = 3009,
     /// Feature not available in current subscription plan
@@ -361,8 +359,7 @@ impl ErrorCode {
             ErrorCode::CertificateInvalid => "Certificate is invalid",
             ErrorCode::LicenseExpired => "License has expired",
             ErrorCode::SubscriptionBlocked => "Subscription is blocked",
-            ErrorCode::DeviceLimitReached => "Device limit reached",
-            ErrorCode::ClientLimitReached => "Client limit reached",
+            ErrorCode::StoreLimitReached => "Store limit reached",
             ErrorCode::TenantCredentialsInvalid => "Invalid tenant username or password",
             ErrorCode::FeatureNotAvailable => "Feature not available in current subscription plan",
             ErrorCode::TenantNoSubscription => "No active subscription",
@@ -543,8 +540,7 @@ impl TryFrom<u16> for ErrorCode {
             3004 => Ok(ErrorCode::CertificateInvalid),
             3005 => Ok(ErrorCode::LicenseExpired),
             3006 => Ok(ErrorCode::SubscriptionBlocked),
-            3007 => Ok(ErrorCode::DeviceLimitReached),
-            3008 => Ok(ErrorCode::ClientLimitReached),
+            3007 => Ok(ErrorCode::StoreLimitReached),
             3009 => Ok(ErrorCode::TenantCredentialsInvalid),
             3010 => Ok(ErrorCode::FeatureNotAvailable),
             3011 => Ok(ErrorCode::TenantNoSubscription),
@@ -712,8 +708,7 @@ mod tests {
         assert_eq!(ErrorCode::ActivationFailed.code(), 3003);
         assert_eq!(ErrorCode::CertificateInvalid.code(), 3004);
         assert_eq!(ErrorCode::LicenseExpired.code(), 3005);
-        assert_eq!(ErrorCode::DeviceLimitReached.code(), 3007);
-        assert_eq!(ErrorCode::ClientLimitReached.code(), 3008);
+        assert_eq!(ErrorCode::StoreLimitReached.code(), 3007);
         assert_eq!(ErrorCode::TenantCredentialsInvalid.code(), 3009);
         assert_eq!(ErrorCode::TenantNoSubscription.code(), 3011);
         assert_eq!(ErrorCode::AuthServerError.code(), 3012);
@@ -969,9 +964,9 @@ mod tests {
             0, 1, 2, 3, 4, 5, 6, 7, 8, // 0xxx General (9)
             1001, 1002, 1003, 1004, 1005, 1006, 1007, // 1xxx Auth (7)
             2001, 2002, 2003, 2004, 2005, // 2xxx Permission (5)
-            3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, // 3xxx Tenant
+            3001, 3002, 3003, 3004, 3005, 3006, 3007, 3009, 3010, // 3xxx Tenant
             3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, 3023, 3024,
-            3025, 3026, 3027, 3028, // P12 errors (28)
+            3025, 3026, 3027, 3028, // P12 errors (27)
             4001, 4002, 4003, 4004, 4005, 4006, 4007, // 4xxx Order (7)
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
@@ -997,7 +992,7 @@ mod tests {
             9401, 9402, 9403, 9404, // 94xx Storage (15)
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 129;
+        const EXPECTED_VARIANT_COUNT: usize = 128;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

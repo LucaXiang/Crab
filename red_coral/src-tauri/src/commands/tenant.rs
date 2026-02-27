@@ -24,19 +24,16 @@ pub struct P12UploadResult {
 #[tauri::command]
 pub async fn activate_server_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    replace_entity_id: Option<String>,
+    store_id: Option<i64>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
-    match bridge
-        .handle_activation_with_replace(replace_entity_id.as_deref())
-        .await
-    {
+    match bridge.handle_activation_with_replace(store_id).await {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
             tenant_id,
             subscription_status,
             quota_info: None,
         })),
         Err(crate::core::bridge::BridgeError::Tenant(
-            crate::core::tenant_manager::TenantError::DeviceLimitReached(quota_info),
+            crate::core::tenant_manager::TenantError::StoreLimitReached(quota_info),
         )) => {
             let mut details = std::collections::HashMap::new();
             details.insert(
@@ -44,8 +41,8 @@ pub async fn activate_server_tenant(
                 serde_json::to_value(&quota_info).unwrap_or_default(),
             );
             Ok(ApiResponse {
-                code: Some(ErrorCode::DeviceLimitReached.code()),
-                message: ErrorCode::DeviceLimitReached.message().to_string(),
+                code: Some(ErrorCode::StoreLimitReached.code()),
+                message: ErrorCode::StoreLimitReached.message().to_string(),
                 data: None,
                 details: Some(details),
             })
@@ -61,32 +58,13 @@ pub async fn activate_server_tenant(
 #[tauri::command]
 pub async fn activate_client_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-    replace_entity_id: Option<String>,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
-    match bridge
-        .handle_client_activation_with_replace(replace_entity_id.as_deref())
-        .await
-    {
+    match bridge.handle_client_activation().await {
         Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
             tenant_id,
             subscription_status,
             quota_info: None,
         })),
-        Err(crate::core::bridge::BridgeError::Tenant(
-            crate::core::tenant_manager::TenantError::ClientLimitReached(quota_info),
-        )) => {
-            let mut details = std::collections::HashMap::new();
-            details.insert(
-                "quota_info".to_string(),
-                serde_json::to_value(&quota_info).unwrap_or_default(),
-            );
-            Ok(ApiResponse {
-                code: Some(ErrorCode::ClientLimitReached.code()),
-                message: ErrorCode::ClientLimitReached.message().to_string(),
-                data: None,
-                details: Some(details),
-            })
-        }
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

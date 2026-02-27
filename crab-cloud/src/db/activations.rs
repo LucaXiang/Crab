@@ -13,17 +13,6 @@ pub struct Activation {
     pub last_refreshed_at: Option<i64>,
 }
 
-/// 统计租户活跃设备数
-pub async fn count_active(pool: &PgPool, tenant_id: &str) -> Result<i64, sqlx::Error> {
-    let row: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM activations WHERE tenant_id = $1 AND status = 'active'",
-    )
-    .bind(tenant_id)
-    .fetch_one(pool)
-    .await?;
-    Ok(row.0)
-}
-
 /// 获取租户激活 advisory lock (防止并发激活超配额)
 ///
 /// 使用 hashtext(tenant_id) 作为 lock key，保证同一租户串行激活。
@@ -37,20 +26,6 @@ pub async fn acquire_activation_lock(
         .execute(&mut **tx)
         .await?;
     Ok(())
-}
-
-/// 在事务内统计活跃设备数 (配合 advisory lock 使用)
-pub async fn count_active_in_tx(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant_id: &str,
-) -> Result<i64, sqlx::Error> {
-    let row: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM activations WHERE tenant_id = $1 AND status = 'active'",
-    )
-    .bind(tenant_id)
-    .fetch_one(&mut **tx)
-    .await?;
-    Ok(row.0)
 }
 
 /// 在事务内插入激活记录 (配合 advisory lock 使用)

@@ -4,13 +4,13 @@ import { Save, Copy, Check, MapPin, Phone, Mail, Globe, Clock, FileText, Fingerp
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getStores, updateStore } from '@/infrastructure/api/stores';
+import { getStores, updateStore, deleteStore, getStoreDevices } from '@/infrastructure/api/stores';
 import { getStoreInfo, updateStoreInfo } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { apiErrorMessage } from '@/infrastructure/i18n';
 import { Spinner } from '@/presentation/components/ui/Spinner';
 import { ImageUpload } from '@/shared/components/ImageUpload';
-import type { StoreDetail } from '@/core/types/store';
+import type { StoreDetail, DeviceRecord } from '@/core/types/store';
 
 export const StoreSettingsScreen: React.FC = () => {
   const { t } = useI18n();
@@ -35,6 +35,12 @@ export const StoreSettingsScreen: React.FC = () => {
     website: '',
     business_day_cutoff: '',
   });
+
+  const [devices, setDevices] = useState<DeviceRecord[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -65,7 +71,32 @@ export const StoreSettingsScreen: React.FC = () => {
         setLoading(false);
       }
     })();
+
+    // 并行加载设备列表（静默失败，设备列表是辅助信息）
+    setDevicesLoading(true);
+    getStoreDevices(token, storeId)
+      .then(data => setDevices(data))
+      .catch(() => { /* 静默失败 */ })
+      .finally(() => setDevicesLoading(false));
   }, [token, storeId, clearAuth, navigate]);
+
+  const handleDeleteStore = async () => {
+    if (!token) return;
+    setDeleting(true);
+    try {
+      await deleteStore(token, storeId);
+      navigate('/stores');
+    } catch (e: unknown) {
+      if (e instanceof ApiError) {
+        setError(apiErrorMessage(t, e.code, e.message, e.status));
+      } else {
+        setError(t('auth.error_generic'));
+      }
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!token) return;
@@ -153,6 +184,83 @@ export const StoreSettingsScreen: React.FC = () => {
           <span className={`text-sm font-medium ${msg.ok ? 'text-emerald-600' : 'text-red-500'}`}>{msg.text}</span>
         )}
       </div>
+
+      {/* Devices Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">设备</h3>
+        {devicesLoading ? (
+          <p className="text-gray-500 text-sm">加载中...</p>
+        ) : devices.length === 0 ? (
+          <p className="text-gray-500 text-sm">暂无设备记录</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {devices.map((d) => (
+              <div key={d.entity_id} className="py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    d.device_type === 'server' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                  }`}>
+                    {d.device_type === 'server' ? 'Server' : 'Client'}
+                  </span>
+                  <span className="font-mono text-sm text-gray-600">{d.device_id.slice(0, 8)}</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    d.status === 'active' ? 'bg-green-100 text-green-800' :
+                    d.status === 'replaced' ? 'bg-gray-100 text-gray-500' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {d.status}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {new Date(d.activated_at).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-white rounded-lg shadow-sm border border-red-200 p-6">
+        <h3 className="text-lg font-semibold text-red-600 mb-2">危险区域</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          删除门店后，所有关联设备将被停用。门店数据将在 30 天后彻底删除。
+        </p>
+        {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium"
+        >
+          删除门店
+        </button>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">确认删除</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              确定要删除门店 <strong>{form.alias}</strong> 吗？所有关联设备将被停用，数据将在 30 天后彻底删除。此操作不可撤销。
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDeleteStore}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? '删除中...' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

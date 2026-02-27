@@ -64,8 +64,7 @@ impl ErrorCode {
             | Self::ActivationFailed
             | Self::CertificateInvalid
             | Self::LicenseExpired
-            | Self::DeviceLimitReached
-            | Self::ClientLimitReached
+            | Self::StoreLimitReached
             | Self::ResourceLimitExceeded
             | Self::TenantNoSubscription
             | Self::SubscriptionBlocked

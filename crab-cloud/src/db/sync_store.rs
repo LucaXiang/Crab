@@ -29,8 +29,8 @@ pub async fn ensure_store(
         r#"
         INSERT INTO stores (id, entity_id, tenant_id, device_id, registered_at, store_number, alias)
         VALUES ($1, $2, $3, $4, $5,
-                (SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3),
-                'Store' || LPAD((SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3)::TEXT, 2, '0'))
+                (SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3 AND status = 'active'),
+                'Store' || LPAD((SELECT COALESCE(MAX(store_number), 0) + 1 FROM stores WHERE tenant_id = $3 AND status = 'active')::TEXT, 2, '0'))
         ON CONFLICT (entity_id, tenant_id) DO UPDATE SET device_id = EXCLUDED.device_id
         RETURNING id
         "#,
@@ -404,4 +404,22 @@ async fn delete_resource(
         }
         other => Err(format!("Cannot delete resource type: {other}").into()),
     }
+}
+
+/// 将已有门店绑定到新的 entity_id/device_id
+pub async fn rebind_store(
+    pool: &PgPool,
+    store_id: i64,
+    entity_id: &str,
+    device_id: &str,
+) -> Result<(), BoxError> {
+    sqlx::query(
+        "UPDATE stores SET entity_id = $1, device_id = $2 WHERE id = $3 AND status = 'active'",
+    )
+    .bind(entity_id)
+    .bind(device_id)
+    .bind(store_id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }

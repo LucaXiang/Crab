@@ -118,7 +118,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
 
     // Check subscription quota
     let sub: Option<(i32,)> = match sqlx::query_as(
-        "SELECT max_edge_servers FROM subscriptions WHERE tenant_id = $1 AND status = 'active'",
+        "SELECT max_stores FROM subscriptions WHERE tenant_id = $1 AND status = 'active'",
     )
     .bind(&identity.tenant_id)
     .fetch_optional(pool)
@@ -131,7 +131,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
         }
     };
 
-    let Some((max_edge_servers,)) = sub else {
+    let Some((max_stores,)) = sub else {
         return Some(ErrorCode::TenantNoSubscription);
     };
 
@@ -162,14 +162,14 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
         Err(_) => false,
     };
 
-    if !already_registered && current_count >= max_edge_servers as i64 {
+    if !already_registered && current_count >= max_stores as i64 {
         tracing::warn!(
             tenant_id = %identity.tenant_id,
             current = current_count,
-            max = max_edge_servers,
-            "Edge server quota exceeded"
+            max = max_stores,
+            "Store quota exceeded"
         );
-        return Some(ErrorCode::DeviceLimitReached);
+        return Some(ErrorCode::StoreLimitReached);
     }
 
     None

@@ -16,6 +16,8 @@ pub struct ActivateRequest {
     pub token: String,
     pub device_id: String,
     pub replace_entity_id: Option<String>,
+    /// 指定门店 = 替换设备
+    pub store_id: Option<i64>,
 }
 
 pub async fn activate(
@@ -64,7 +66,7 @@ pub async fn activate(
     let sub_status = parse_subscription_status(&sub.status);
 
     let plan = parse_plan_type(&sub.plan);
-    let max_edge_servers = sub.max_edge_servers;
+    let max_stores = sub.max_stores;
 
     let existing = match activations::find_by_device(&state.pool, &tenant.id, &req.device_id).await
     {
@@ -160,7 +162,7 @@ pub async fn activate(
         expires_at: sub.current_period_end,
         features: sub.features.clone(),
         max_stores: plan.max_stores() as u32,
-        max_clients: sub.max_clients as u32,
+        max_clients: 0,
         cancel_at_period_end: sub.cancel_at_period_end,
         billing_interval: sub.billing_interval.clone(),
         signature_valid_until,
@@ -198,16 +200,40 @@ pub async fn activate(
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 
-    if !is_reactivation && max_edge_servers > 0 {
-        let active_count = match activations::count_active_in_tx(&mut tx, &tenant.id).await {
-            Ok(n) => n,
-            Err(e) => {
-                tracing::error!(error = %e, "Database error counting active devices");
-                return Json(fail(ErrorCode::InternalError, "Internal error"));
-            }
-        };
+    // 如果指定了 store_id（替换门店设备）
+    if let Some(store_id) = req.store_id {
+        let old_entity = sqlx::query_as::<_, (String,)>(
+            "SELECT entity_id FROM stores WHERE id = $1 AND tenant_id = $2 AND status = 'active'",
+        )
+        .bind(store_id)
+        .bind(&tenant.id)
+        .fetch_optional(&mut *tx)
+        .await;
 
-        if active_count >= max_edge_servers as i64 {
+        match old_entity {
+            Ok(Some((old_eid,))) => {
+                if old_eid != entity_id {
+                    activations::mark_replaced_in_tx(&mut tx, &old_eid, &entity_id)
+                        .await
+                        .ok();
+                }
+            }
+            _ => {
+                return Json(fail(ErrorCode::ValidationFailed, "Invalid store_id"));
+            }
+        }
+    } else if !is_reactivation && max_stores > 0 {
+        // 配额检查: 基于 stores 数量
+        let active_store_count: i64 = sqlx::query_as::<_, (i64,)>(
+            "SELECT COUNT(*) FROM stores WHERE tenant_id = $1 AND status = 'active'",
+        )
+        .bind(&tenant.id)
+        .fetch_one(&mut *tx)
+        .await
+        .map(|r| r.0)
+        .unwrap_or(0);
+
+        if active_store_count >= max_stores as i64 {
             if let Some(ref replace_id) = req.replace_entity_id {
                 let replace_target = activations::find_by_entity(&state.pool, replace_id).await;
                 match replace_target {
@@ -247,12 +273,12 @@ pub async fn activate(
 
                 return Json(ActivationResponse {
                     success: false,
-                    error: Some("device_limit_reached".to_string()),
-                    error_code: Some(ErrorCode::DeviceLimitReached),
+                    error: Some("store_limit_reached".to_string()),
+                    error_code: Some(ErrorCode::StoreLimitReached),
                     data: None,
                     quota_info: Some(QuotaInfo {
-                        max_slots: max_edge_servers as u32,
-                        active_count: active_count as u32,
+                        max_slots: max_stores as u32,
+                        active_count: active_store_count as u32,
                         active_devices,
                     }),
                 });
@@ -278,13 +304,22 @@ pub async fn activate(
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
 
-    // Ensure store record exists (first activation creates it)
     let now = shared::util::now_millis();
-    if let Err(e) =
-        sync_store::ensure_store(&state.pool, &entity_id, &tenant.id, &req.device_id, now).await
-    {
-        tracing::error!(error = %e, "Failed to ensure store record");
-        return Json(fail(ErrorCode::InternalError, "Internal error"));
+    if let Some(store_id) = req.store_id {
+        // 替换: rebind 而不是 ensure
+        if let Err(e) =
+            sync_store::rebind_store(&state.pool, store_id, &entity_id, &req.device_id).await
+        {
+            tracing::error!(error = %e, "Failed to rebind store");
+        }
+    } else {
+        // 新建: ensure_store
+        if let Err(e) =
+            sync_store::ensure_store(&state.pool, &entity_id, &tenant.id, &req.device_id, now).await
+        {
+            tracing::error!(error = %e, "Failed to ensure store record");
+            return Json(fail(ErrorCode::InternalError, "Internal error"));
+        }
     }
 
     // Query store_number for this edge-server

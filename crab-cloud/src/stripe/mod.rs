@@ -5,28 +5,15 @@ use sha2::Sha256;
 
 /// Plan -> quota mapping
 pub struct PlanQuota {
-    pub max_edge_servers: i32,
-    pub max_clients: i32,
+    pub max_stores: i32,
 }
 
 pub fn plan_quota(plan: &str) -> PlanQuota {
     match plan {
-        "basic" | "basic_yearly" => PlanQuota {
-            max_edge_servers: 1,
-            max_clients: 5,
-        },
-        "pro" | "pro_yearly" => PlanQuota {
-            max_edge_servers: 3,
-            max_clients: 10,
-        },
-        "enterprise" => PlanQuota {
-            max_edge_servers: 10,
-            max_clients: 50,
-        },
-        _ => PlanQuota {
-            max_edge_servers: 1,
-            max_clients: 5,
-        },
+        "basic" | "basic_yearly" => PlanQuota { max_stores: 1 },
+        "pro" | "pro_yearly" => PlanQuota { max_stores: 3 },
+        "enterprise" => PlanQuota { max_stores: 10 },
+        _ => PlanQuota { max_stores: 1 },
     }
 }
 

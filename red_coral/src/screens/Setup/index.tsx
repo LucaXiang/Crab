@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Server, Wifi, AlertCircle, ChevronRight, Settings, Power, Shield,
-  Monitor, RefreshCw, ExternalLink, UserCheck, ShieldAlert, LogOut,
+  RefreshCw, ExternalLink, UserCheck, ShieldAlert, LogOut,
   Upload, FileKey, Lock, Eye, EyeOff, CheckCircle,
 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -10,10 +10,9 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
-import type { QuotaInfo, ActiveDevice, TenantVerifyData } from '@/core/stores/bridge';
+import type { TenantVerifyData } from '@/core/stores/bridge';
 import type { SubscriptionStatus } from '@/core/domain/types/appState';
 import { ApiError } from '@/infrastructure/api/tauri-client';
-import { ErrorCode } from '@/generated/error-codes';
 import { logger } from '@/utils/logger';
 import { useI18n } from '@/hooks/useI18n';
 import { MAX_NAME_LEN, MAX_PASSWORD_LEN, MAX_URL_LEN, MAX_SHORT_TEXT_LEN } from '@/shared/constants/validation';
@@ -21,24 +20,13 @@ import { MAX_NAME_LEN, MAX_PASSWORD_LEN, MAX_URL_LEN, MAX_SHORT_TEXT_LEN } from 
 const REGISTER_URL = 'https://redcoral.app/register';
 const PRICING_URL = 'https://redcoral.app/#pricing';
 
-type SetupStep = 'credentials' | 'subscription_blocked' | 'p12_blocked' | 'mode' | 'configure' | 'complete';
+type SetupStep = 'credentials' | 'subscription_blocked' | 'p12_blocked' | 'mode' | 'select_store' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
 
 const BLOCKED_STATUSES = ['inactive', 'expired', 'canceled', 'unpaid'];
 
 const DEFAULT_HTTP_PORT = 9625;
 const DEFAULT_MESSAGE_PORT = 9626;
-
-function formatTimestamp(ts: number): string {
-  if (!ts) return '-';
-  return new Date(ts).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export const SetupScreen: React.FC = () => {
   const { t } = useI18n();
@@ -72,8 +60,7 @@ export const SetupScreen: React.FC = () => {
 
   // Activation state
   const [activationError, setActivationError] = useState('');
-  const [quotaInfo, setQuotaInfo] = useState<QuotaInfo | null>(null);
-  const [replacingId, setReplacingId] = useState<string | null>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   // 跟踪已成功激活的模式，避免切换模式时重复激活产生孤立 entity
   const [activatedMode, setActivatedMode] = useState<ModeChoice>(null);
 
@@ -227,7 +214,11 @@ export const SetupScreen: React.FC = () => {
     setConfigError('');
     setActivationError('');
     useBridgeStore.setState({ error: null });
-    setStep('configure');
+    if (mode === 'server') {
+      setStep('select_store');
+    } else {
+      setStep('configure');
+    }
   };
 
   // Step 3: Configure + activate + start
@@ -235,19 +226,27 @@ export const SetupScreen: React.FC = () => {
     e.preventDefault();
     setConfigError('');
     setActivationError('');
-    setQuotaInfo(null);
     useBridgeStore.setState({ error: null });
 
     try {
       // 如果当前模式已激活（激活成功但启动失败的重试场景），跳过激活直接启动
       if (activatedMode !== modeChoice) {
-        const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
-        const result = await activateFn();
+        if (modeChoice === 'server') {
+          const result = await activateServerTenant(selectedStoreId ?? undefined);
 
-        if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
-          setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
-          setStep('subscription_blocked');
-          return;
+          if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
+            setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
+            setStep('subscription_blocked');
+            return;
+          }
+        } else {
+          const result = await activateClientTenant();
+
+          if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
+            setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
+            setStep('subscription_blocked');
+            return;
+          }
         }
         setActivatedMode(modeChoice);
       }
@@ -263,54 +262,12 @@ export const SetupScreen: React.FC = () => {
 
       setStep('complete');
     } catch (err: unknown) {
-      const limitCode = modeChoice === 'server'
-        ? ErrorCode.DeviceLimitReached
-        : ErrorCode.ClientLimitReached;
-
-      if (err instanceof ApiError && err.code === limitCode) {
-        const qi = err.details?.quota_info as QuotaInfo | undefined;
-        if (qi) {
-          setQuotaInfo(qi);
-          return;
-        }
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      setConfigError(msg);
-    }
-  };
-
-  const handleReplace = async (device: ActiveDevice) => {
-    setReplacingId(device.entity_id);
-    setActivationError('');
-    setConfigError('');
-
-    try {
-      const activateFn = modeChoice === 'server' ? activateServerTenant : activateClientTenant;
-      const result = await activateFn(device.entity_id);
-      setQuotaInfo(null);
-      setActivatedMode(modeChoice);
-
-      if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
-        setTenantInfo((prev) => prev ? { ...prev, subscription_status: result.subscription_status as SubscriptionStatus } : prev);
-        setStep('subscription_blocked');
+      if (err instanceof ApiError && err.code === 3007) {
+        setConfigError('门店数量已达上限，请返回选择已有门店进行替换');
         return;
       }
-
-      // Configure + start after replacement
-      if (modeChoice === 'server') {
-        await updateServerConfig(DEFAULT_HTTP_PORT, DEFAULT_MESSAGE_PORT);
-        await startServerMode();
-      } else if (modeChoice === 'client') {
-        await updateClientConfig(edgeUrl, messageAddr);
-        await startClientMode(edgeUrl, messageAddr);
-      }
-
-      setStep('complete');
-    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setConfigError(msg);
-    } finally {
-      setReplacingId(null);
     }
   };
 
@@ -352,108 +309,6 @@ export const SetupScreen: React.FC = () => {
     t('setup.step.complete'),
   ];
   const stepKeys: SetupStep[] = ['credentials', 'mode', 'configure', 'complete'];
-
-  // ==================== Quota Replacement UI ====================
-  const limitKey = isServer ? 'auth.activate.device_limit' : 'auth.activate.client_limit';
-
-  if (quotaInfo) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center p-8 bg-gray-50">
-        <button
-          onClick={handleCloseApp}
-          className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-          title={t('common.dialog.close_app')}
-        >
-          <Power size={24} />
-        </button>
-
-        <div className="w-full max-w-lg mx-auto space-y-6">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-500/10 rounded-2xl mb-4">
-              <Monitor className="text-amber-500" size={32} />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {t(`${limitKey}.title`)}
-            </h1>
-            <p className="text-gray-500">
-              {t(`${limitKey}.description`, {
-                max: String(quotaInfo.max_slots),
-                count: String(quotaInfo.active_count),
-              })}
-            </p>
-          </div>
-
-          {(activationError || configError) && (
-            <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl border border-red-100">
-              <AlertCircle size={20} className="shrink-0" />
-              <span className="text-sm font-medium">{activationError || configError}</span>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {quotaInfo.active_devices.map((device) => (
-              <div
-                key={device.entity_id}
-                className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-4"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-gray-900 truncate text-sm">
-                    {device.entity_id}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-                    <div>
-                      {t(`${limitKey}.device_id`)}: {device.device_id.slice(0, 12)}...
-                    </div>
-                    <div>
-                      {t(`${limitKey}.activated_at`)}: {formatTimestamp(device.activated_at)}
-                    </div>
-                    {device.last_refreshed_at && (
-                      <div>
-                        {t(`${limitKey}.last_refreshed`)}: {formatTimestamp(device.last_refreshed_at)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleReplace(device)}
-                  disabled={replacingId !== null}
-                  className="shrink-0 px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
-                >
-                  {replacingId === device.entity_id ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <RefreshCw size={14} />
-                  )}
-                  <span>
-                    {replacingId === device.entity_id
-                      ? t(`${limitKey}.replacing`)
-                      : t(`${limitKey}.button_replace`)}
-                  </span>
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => openUrl(PRICING_URL)}
-            disabled={replacingId !== null}
-            className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <ExternalLink size={18} />
-            {t(`${limitKey}.button_upgrade`)}
-          </button>
-
-          <button
-            onClick={() => setQuotaInfo(null)}
-            disabled={replacingId !== null}
-            className="w-full py-3 text-gray-600 font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {t(`${limitKey}.button_cancel`)}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // ==================== Step: Subscription Blocked ====================
   const renderSubscriptionBlockedStep = () => {
@@ -792,11 +647,6 @@ export const SetupScreen: React.FC = () => {
             </div>
           </div>
           <p className="text-gray-600 text-sm mb-4">{t('setup.client_mode.description')}</p>
-          {tenantInfo && (
-            <p className="text-xs text-gray-400 mb-2">
-              {t('setup.slots_remaining', { count: String(tenantInfo.client_slots_remaining) })}
-            </p>
-          )}
           <div className="flex items-center text-blue-500 text-sm font-medium">
             <span>{t('setup.client_mode.select')}</span>
             <ChevronRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
@@ -890,7 +740,7 @@ export const SetupScreen: React.FC = () => {
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => { setStep('mode'); setConfigError(''); useBridgeStore.setState({ error: null }); }}
+            onClick={() => { setStep(isServer ? 'select_store' : 'mode'); setConfigError(''); useBridgeStore.setState({ error: null }); }}
             disabled={isLoading}
             className="px-6 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
           >
@@ -962,8 +812,9 @@ export const SetupScreen: React.FC = () => {
         {/* Progress indicator */}
         {(() => {
           // subscription_blocked / p12_blocked 在视觉上等同于 credentials→mode 之间
+          // select_store 在视觉上等同于 configure
           const isBlocked = step === 'subscription_blocked' || step === 'p12_blocked';
-          const visualStep = isBlocked ? 'mode' : step;
+          const visualStep = isBlocked ? 'mode' : step === 'select_store' ? 'configure' : step;
           const visualIndex = stepKeys.indexOf(visualStep);
 
           return (
@@ -1012,6 +863,49 @@ export const SetupScreen: React.FC = () => {
         {step === 'subscription_blocked' && renderSubscriptionBlockedStep()}
         {step === 'p12_blocked' && renderP12BlockedStep()}
         {step === 'mode' && renderModeStep()}
+        {step === 'select_store' && tenantInfo && (
+          <div className="max-w-md mx-auto space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">选择门店</h2>
+            <p className="text-sm text-gray-600">
+              选择要绑定到此设备的门店，或创建新门店。
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => { setSelectedStoreId(null); setStep('configure'); }}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                  selectedStoreId === null ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-gray-900">新建门店</div>
+                <div className="text-sm text-gray-500">创建一个新的门店并绑定到此设备</div>
+              </button>
+              {tenantInfo.stores.map((store) => (
+                <button
+                  key={store.id}
+                  onClick={() => { setSelectedStoreId(store.id); setStep('configure'); }}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                    selectedStoreId === store.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-medium text-gray-900">{store.alias}</div>
+                  <div className="text-sm text-gray-500">门店编号: {String(store.store_number).padStart(2, '0')}</div>
+                </button>
+              ))}
+            </div>
+            {tenantInfo.server_slots_remaining === 0 && selectedStoreId === null && (
+              <p className="text-sm text-amber-600">
+                门店数量已达上限，请选择一个已有门店进行替换。
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => { setStep('mode'); setSelectedStoreId(null); }}
+              className="px-6 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              {t('setup.button_back')}
+            </button>
+          </div>
+        )}
         {step === 'configure' && renderConfigureStep()}
         {step === 'complete' && renderCompleteStep()}
       </div>

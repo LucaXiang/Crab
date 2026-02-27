@@ -125,8 +125,7 @@ fn tenant_error_to_code(err: &super::tenant_manager::TenantError) -> ErrorCode {
         TenantError::NoSubscription(_) => ErrorCode::TenantNoSubscription,
         TenantError::AuthServerError(_) => ErrorCode::AuthServerError,
         TenantError::AuthFailed(_) => ErrorCode::ActivationFailed,
-        TenantError::DeviceLimitReached(_) => ErrorCode::DeviceLimitReached,
-        TenantError::ClientLimitReached(_) => ErrorCode::ClientLimitReached,
+        TenantError::StoreLimitReached(_) => ErrorCode::StoreLimitReached,
         TenantError::OfflineNotAvailable(_) => ErrorCode::NotAuthenticated,
         TenantError::SessionCache(_) | TenantError::Io(_) => ErrorCode::InternalError,
     }

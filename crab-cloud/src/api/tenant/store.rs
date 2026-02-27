@@ -98,3 +98,49 @@ pub async fn update_store(
 
     Ok(Json(info))
 }
+
+/// DELETE /api/tenant/stores/:id
+pub async fn delete_store(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<()> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let now = shared::util::now_millis();
+    tenant_queries::soft_delete_store(&state.pool, store_id, &identity.tenant_id, now)
+        .await
+        .map_err(|e| {
+            tracing::error!("Delete store error: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
+
+    Ok(Json(()))
+}
+
+/// GET /api/tenant/stores/:id/devices
+pub async fn list_devices(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<Vec<store::devices::DeviceRecord>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let entity_id = tenant_queries::get_store_entity_id(&state.pool, store_id, &identity.tenant_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Get store entity_id error: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?
+        .ok_or_else(|| AppError::with_message(ErrorCode::NotFound, "Store not found"))?;
+
+    let devices =
+        store::devices::list_devices_for_store(&state.pool, &entity_id, &identity.tenant_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("List devices error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
+
+    Ok(Json(devices))
+}

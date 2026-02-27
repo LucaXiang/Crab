@@ -52,11 +52,8 @@ pub enum TenantError {
     #[error("Activation failed: {0}")]
     AuthFailed(String),
 
-    #[error("Device limit reached")]
-    DeviceLimitReached(shared::activation::QuotaInfo),
-
-    #[error("Client limit reached")]
-    ClientLimitReached(shared::activation::QuotaInfo),
+    #[error("Store limit reached")]
+    StoreLimitReached(shared::activation::QuotaInfo),
 
     #[error("Offline login not available for user: {0}")]
     OfflineNotAvailable(String),
@@ -257,7 +254,7 @@ impl TenantManager {
         &mut self,
         auth_url: &str,
         token: &str,
-        replace_entity_id: Option<&str>,
+        store_id: Option<i64>,
     ) -> Result<(String, String), TenantError> {
         // 1. 生成 Hardware ID
         let device_id = crab_cert::generate_hardware_id();
@@ -268,8 +265,8 @@ impl TenantManager {
             "token": token,
             "device_id": device_id,
         });
-        if let Some(replace_id) = replace_entity_id {
-            body["replace_entity_id"] = serde_json::json!(replace_id);
+        if let Some(sid) = store_id {
+            body["store_id"] = serde_json::json!(sid);
         }
 
         let client = reqwest::Client::new();
@@ -301,9 +298,9 @@ impl TenantManager {
             let code = resp_data
                 .error_code
                 .unwrap_or(shared::error::ErrorCode::InternalError);
-            if code == shared::error::ErrorCode::DeviceLimitReached {
+            if code == shared::error::ErrorCode::StoreLimitReached {
                 if let Some(quota_info) = resp_data.quota_info {
-                    return Err(TenantError::DeviceLimitReached(quota_info));
+                    return Err(TenantError::StoreLimitReached(quota_info));
                 }
             }
             return Err(classify_auth_error_code(code));
@@ -387,20 +384,16 @@ impl TenantManager {
         &mut self,
         auth_url: &str,
         token: &str,
-        replace_entity_id: Option<&str>,
     ) -> Result<(String, String), TenantError> {
         // 1. 生成 Hardware ID
         let device_id = crab_cert::generate_hardware_id();
         tracing::info!("Activating client with device ID: {}", device_id);
 
         // 2. 调用 Auth Server 客户端激活接口
-        let mut body = serde_json::json!({
+        let body = serde_json::json!({
             "token": token,
             "device_id": device_id,
         });
-        if let Some(replace_id) = replace_entity_id {
-            body["replace_entity_id"] = serde_json::json!(replace_id);
-        }
 
         let client = reqwest::Client::new();
         let resp = client
@@ -431,11 +424,6 @@ impl TenantManager {
             let code = resp_data
                 .error_code
                 .unwrap_or(shared::error::ErrorCode::InternalError);
-            if code == shared::error::ErrorCode::ClientLimitReached {
-                if let Some(quota_info) = resp_data.quota_info {
-                    return Err(TenantError::ClientLimitReached(quota_info));
-                }
-            }
             return Err(classify_auth_error_code(code));
         }
 

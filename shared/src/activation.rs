@@ -530,14 +530,22 @@ pub struct TenantVerifyData {
     pub plan: PlanType,
     /// 剩余可用 Server 配额
     pub server_slots_remaining: i32,
-    /// 剩余可用 Client 配额
-    pub client_slots_remaining: i32,
     /// 当前设备是否已有 Server 激活
     pub has_active_server: bool,
     /// 当前设备是否已有 Client 激活
     pub has_active_client: bool,
     /// 租户是否已上传 P12 电子签名证书
     pub has_p12: bool,
+    /// 当前活跃门店列表
+    pub stores: Vec<StoreSlot>,
+}
+
+/// Setup 流程中展示的门店选项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoreSlot {
+    pub id: i64,
+    pub alias: String,
+    pub store_number: u32,
 }
 
 /// Token 刷新请求

@@ -54,29 +54,40 @@ pub async fn verify_tenant(
         }
     };
 
-    let active_servers = activations::count_active(&state.pool, &tenant.id)
-        .await
-        .unwrap_or(0);
-    let active_clients = client_connections::count_active(&state.pool, &tenant.id)
-        .await
-        .unwrap_or(0);
+    let active_store_count = sqlx::query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM stores WHERE tenant_id = $1 AND status = 'active'",
+    )
+    .bind(&tenant.id)
+    .fetch_one(&state.pool)
+    .await
+    .map(|r| r.0)
+    .unwrap_or(0);
 
-    let (server_slots_remaining, client_slots_remaining) = match &sub {
+    let server_slots_remaining = match &sub {
         Some(s) => {
-            let sr = if s.max_edge_servers > 0 {
-                (s.max_edge_servers as i64 - active_servers).max(0) as i32
+            if s.max_stores > 0 {
+                (s.max_stores as i64 - active_store_count).max(0) as i32
             } else {
                 -1
-            };
-            let cr = if s.max_clients > 0 {
-                (s.max_clients as i64 - active_clients).max(0) as i32
-            } else {
-                -1
-            };
-            (sr, cr)
+            }
         }
-        None => (0, 0),
+        None => 0,
     };
+
+    let stores: Vec<shared::activation::StoreSlot> = sqlx::query_as::<_, (i64, String, i32)>(
+        "SELECT id, alias, store_number FROM stores WHERE tenant_id = $1 AND status = 'active' ORDER BY store_number",
+    )
+    .bind(&tenant.id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(id, alias, sn)| shared::activation::StoreSlot {
+        id,
+        alias,
+        store_number: sn as u32,
+    })
+    .collect();
 
     let has_active_server = activations::find_by_device(&state.pool, &tenant.id, &req.device_id)
         .await
@@ -151,10 +162,10 @@ pub async fn verify_tenant(
             subscription_status,
             plan,
             server_slots_remaining,
-            client_slots_remaining,
             has_active_server,
             has_active_client,
             has_p12,
+            stores,
         }),
     })
 }

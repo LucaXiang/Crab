@@ -27,34 +27,6 @@ pub async fn acquire_activation_lock(
     Ok(())
 }
 
-/// 统计租户活跃 Client 数
-pub async fn count_active(pool: &PgPool, tenant_id: &str) -> Result<i64, sqlx::Error> {
-    let row: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM client_connections WHERE tenant_id = $1 AND status = 'active'",
-    )
-    .bind(tenant_id)
-    .fetch_one(pool)
-    .await?;
-    Ok(row.0)
-}
-
-/// 获取租户所有活跃 Client
-pub async fn list_active(
-    pool: &PgPool,
-    tenant_id: &str,
-) -> Result<Vec<ClientConnection>, sqlx::Error> {
-    sqlx::query_as::<_, ClientConnection>(
-        "SELECT entity_id, tenant_id, device_id, fingerprint, status,
-            activated_at, last_refreshed_at
-            FROM client_connections
-            WHERE tenant_id = $1 AND status = 'active'
-            ORDER BY activated_at",
-    )
-    .bind(tenant_id)
-    .fetch_all(pool)
-    .await
-}
-
 /// 按 tenant_id + device_id 查找
 pub async fn find_by_device(
     pool: &PgPool,
@@ -89,20 +61,6 @@ pub async fn find_by_entity(
     .await
 }
 
-/// 在事务内统计活跃 Client 数 (配合 advisory lock 使用)
-pub async fn count_active_in_tx(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant_id: &str,
-) -> Result<i64, sqlx::Error> {
-    let row: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM client_connections WHERE tenant_id = $1 AND status = 'active'",
-    )
-    .bind(tenant_id)
-    .fetch_one(&mut **tx)
-    .await?;
-    Ok(row.0)
-}
-
 /// 在事务内插入 Client 连接记录 (配合 advisory lock 使用)
 pub async fn insert_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -129,27 +87,7 @@ pub async fn insert_in_tx(
     Ok(())
 }
 
-/// 在事务内标记 Client 为 replaced
-pub async fn mark_replaced_in_tx(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    old_entity_id: &str,
-    new_entity_id: &str,
-) -> Result<bool, sqlx::Error> {
-    let now = shared::util::now_millis();
-    let result = sqlx::query(
-        "UPDATE client_connections
-            SET status = 'replaced', deactivated_at = $1, replaced_by = $2
-            WHERE entity_id = $3 AND status = 'active'",
-    )
-    .bind(now)
-    .bind(new_entity_id)
-    .bind(old_entity_id)
-    .execute(&mut **tx)
-    .await?;
-    Ok(result.rows_affected() > 0)
-}
-
-/// 注销客户端连接 (释放配额)
+/// 注销客户端连接
 pub async fn deactivate(pool: &PgPool, entity_id: &str) -> Result<bool, sqlx::Error> {
     let now = shared::util::now_millis();
     let result = sqlx::query(

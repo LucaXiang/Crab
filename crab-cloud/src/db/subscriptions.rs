@@ -4,25 +4,23 @@ pub struct CreateSubscription<'a> {
     pub id: &'a str,
     pub tenant_id: &'a str,
     pub plan: &'a str,
-    pub max_edge_servers: i32,
-    pub max_clients: i32,
+    pub max_stores: i32,
     pub current_period_end: Option<i64>,
     pub now: i64,
 }
 
 pub async fn create(pool: &PgPool, sub: &CreateSubscription<'_>) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO subscriptions (id, tenant_id, status, plan, max_edge_servers, max_clients, current_period_end, created_at)
-         VALUES ($1, $2, 'active', $3, $4, $5, $6, $7)
+        "INSERT INTO subscriptions (id, tenant_id, status, plan, max_stores, current_period_end, created_at)
+         VALUES ($1, $2, 'active', $3, $4, $5, $6)
          ON CONFLICT (id) DO UPDATE SET
-            status = 'active', plan = $3, max_edge_servers = $4,
-            max_clients = $5, current_period_end = $6",
+            status = 'active', plan = $3, max_stores = $4,
+            current_period_end = $5",
     )
     .bind(sub.id)
     .bind(sub.tenant_id)
     .bind(sub.plan)
-    .bind(sub.max_edge_servers)
-    .bind(sub.max_clients)
+    .bind(sub.max_stores)
     .bind(sub.current_period_end)
     .bind(sub.now)
     .execute(pool)
@@ -89,8 +87,7 @@ pub struct Subscription {
     pub tenant_id: String,
     pub status: String,
     pub plan: String,
-    pub max_edge_servers: i32,
-    pub max_clients: i32,
+    pub max_stores: i32,
     pub features: Vec<String>,
     pub current_period_end: Option<i64>,
     pub cancel_at_period_end: bool,
@@ -107,7 +104,7 @@ pub async fn get_latest_subscription(
     tenant_id: &str,
 ) -> Result<Option<Subscription>, sqlx::Error> {
     sqlx::query_as::<_, Subscription>(
-        "SELECT id, tenant_id, status, plan, max_edge_servers, max_clients,
+        "SELECT id, tenant_id, status, plan, max_stores,
             features, current_period_end, cancel_at_period_end, billing_interval
             FROM subscriptions
             WHERE tenant_id = $1
