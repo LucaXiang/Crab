@@ -19,7 +19,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cloud::service::CloudService;
 use crate::core::state::ServerState;
-use crate::db::repository::{credit_note, order};
+use crate::db::repository::{credit_note, invoice, order};
 
 /// Debounce window for batching changes
 const DEBOUNCE_MS: u64 = 500;
@@ -144,16 +144,8 @@ impl CloudWorker {
             return;
         }
 
-        // 3. Archived order catch-up sync via HTTP (request-response, strong consistency)
-        if let Err(e) = self.sync_archived_orders_http().await {
-            tracing::error!("Archived order catch-up sync failed: {e}");
-            // Non-fatal, continue with live sync
-        }
-
-        // 3b. Credit note catch-up sync via HTTP
-        if let Err(e) = self.sync_credit_notes_http().await {
-            tracing::error!("Credit note catch-up sync failed: {e}");
-        }
+        // 3. Catch-up sync via HTTP (archived orders + credit notes + invoices)
+        self.sync_archives_http("catch-up").await;
 
         // 4. 订阅 MessageBus（在推送活跃订单之前，确保推送期间的事件不丢失）
         let mut broadcast_rx = self.state.message_bus().subscribe();
@@ -205,24 +197,14 @@ impl CloudWorker {
                     }
                 }
 
-                // Periodic archived order sync via HTTP (5 min interval, fallback scan)
+                // Periodic archive sync via HTTP (5 min interval, fallback scan)
                 _ = archived_order_sync_interval.tick() => {
-                    if let Err(e) = self.sync_archived_orders_http().await {
-                        tracing::warn!("Periodic archived order sync failed: {e}");
-                    }
-                    if let Err(e) = self.sync_credit_notes_http().await {
-                        tracing::warn!("Periodic credit note sync failed: {e}");
-                    }
+                    self.sync_archives_http("periodic").await;
                 }
 
-                // Immediate push on archive completion (push + periodic scan design)
+                // Immediate push on archive completion
                 _ = self.state.archive_notify.notified() => {
-                    if let Err(e) = self.sync_archived_orders_http().await {
-                        tracing::warn!("Archive-triggered sync failed: {e}");
-                    }
-                    if let Err(e) = self.sync_credit_notes_http().await {
-                        tracing::warn!("Archive-triggered credit note sync failed: {e}");
-                    }
+                    self.sync_archives_http("archive-triggered").await;
                 }
 
                 // MessageBus broadcast → buffer for debounce (products, categories, etc.)
@@ -513,6 +495,20 @@ impl CloudWorker {
 
     /// Catch-up sync for unsynced archived orders via HTTP POST (strong consistency).
     ///
+    /// Sync all archive resources (orders, credit notes, invoices) via HTTP.
+    /// Each resource syncs independently — one failure does not block others.
+    async fn sync_archives_http(&mut self, trigger: &str) {
+        if let Err(e) = self.sync_archived_orders_http().await {
+            tracing::warn!("{trigger}: archived order sync failed: {e}");
+        }
+        if let Err(e) = self.sync_credit_notes_http().await {
+            tracing::warn!("{trigger}: credit note sync failed: {e}");
+        }
+        if let Err(e) = self.sync_invoices_http().await {
+            tracing::warn!("{trigger}: invoice sync failed: {e}");
+        }
+    }
+
     /// **严格有序**: 按 id 顺序处理，遇到构建失败计数，连续失败 3 次则跳过该订单。
     /// **强一致**: HTTP request-response — cloud 确认 accepted 后才标记 cloud_synced = 1。
     /// Hash 链要求上游订单必须先到达 cloud，否则链验证会断裂。
@@ -752,6 +748,120 @@ impl CloudWorker {
                 batch_size = batch_count,
                 accepted = response.accepted,
                 "Credit notes synced and confirmed via HTTP"
+            );
+
+            if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Sync unsynced Verifactu invoices (F2/R5) to cloud via HTTP batch.
+    async fn sync_invoices_http(&mut self) -> Result<(), crate::utils::AppError> {
+        let binding = self.get_binding().await?;
+
+        loop {
+            let ids = invoice::list_unsynced_ids(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
+                .await
+                .map_err(|e| {
+                    crate::utils::AppError::internal(format!("List unsynced invoices: {e}"))
+                })?;
+
+            if ids.is_empty() {
+                break;
+            }
+
+            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
+            let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
+            let mut skipped_ids: Vec<i64> = Vec::new();
+
+            for &id in &ids {
+                match invoice::build_sync(&self.state.pool, id).await {
+                    Ok(inv_sync) => {
+                        let data = match serde_json::to_value(&inv_sync) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::error!(
+                                    invoice_id = id,
+                                    "Failed to serialize InvoiceSync, skipping: {e}"
+                                );
+                                skipped_ids.push(id);
+                                continue;
+                            }
+                        };
+                        items.push(CloudSyncItem {
+                            resource: SyncResource::Invoice,
+                            version: id as u64,
+                            action: shared::cloud::SyncAction::Upsert,
+                            resource_id: id.to_string(),
+                            data,
+                        });
+                        synced_ids.push(id);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            invoice_id = id,
+                            "Failed to build InvoiceSync, skipping: {e}"
+                        );
+                        skipped_ids.push(id);
+                    }
+                }
+            }
+
+            // Mark permanently failed invoices as synced to unblock the queue
+            if !skipped_ids.is_empty() {
+                tracing::warn!(
+                    count = skipped_ids.len(),
+                    ids = ?skipped_ids,
+                    "Skipped unbuildable invoices, marking as synced"
+                );
+                if let Err(e) = invoice::mark_synced(&self.state.pool, &skipped_ids).await {
+                    tracing::error!("Failed to mark skipped invoices as synced: {e}");
+                }
+            }
+
+            if items.is_empty() {
+                if skipped_ids.is_empty() {
+                    break;
+                }
+                continue;
+            }
+
+            let batch_count = items.len();
+            let batch = CloudSyncBatch {
+                edge_id: self.cloud_service.edge_id().to_string(),
+                items,
+                sent_at: shared::util::now_millis(),
+            };
+
+            let response = self
+                .cloud_service
+                .push_batch(batch, &binding)
+                .await
+                .map_err(|e| {
+                    crate::utils::AppError::internal(format!("HTTP sync invoices: {e}"))
+                })?;
+
+            if response.rejected > 0 {
+                tracing::warn!(
+                    accepted = response.accepted,
+                    rejected = response.rejected,
+                    "Invoice sync has rejections, stopping catch-up"
+                );
+                break;
+            }
+
+            if let Err(e) = invoice::mark_synced(&self.state.pool, &synced_ids).await {
+                tracing::error!("Failed to mark invoices as cloud_synced, stopping catch-up: {e}");
+                break;
+            }
+
+            tracing::info!(
+                batch_size = batch_count,
+                accepted = response.accepted,
+                "Invoices synced and confirmed via HTTP"
             );
 
             if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {

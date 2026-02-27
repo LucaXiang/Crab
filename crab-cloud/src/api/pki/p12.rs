@@ -141,6 +141,23 @@ pub async fn upload_p12(
     // P12 已存入数据库，清零内存中的密码
     p12_password.zeroize();
 
+    // Auto-populate NIF from P12 certificate into all stores of this tenant.
+    // P12 binds to tenant at upload time — NIF is immutable thereafter.
+    if let Some(nif) = cert_info.tax_id() {
+        if let Err(e) =
+            sqlx::query("UPDATE stores SET nif = $1, updated_at = $2 WHERE tenant_id = $3")
+                .bind(nif)
+                .bind(shared::util::now_millis())
+                .bind(&tenant.id)
+                .execute(&state.pool)
+                .await
+        {
+            tracing::error!(tenant_id = %tenant.id, "Failed to set NIF from P12: {e}");
+        } else {
+            tracing::info!(tenant_id = %tenant.id, nif, "NIF auto-populated from P12 certificate");
+        }
+    }
+
     tracing::info!(
         tenant_id = %tenant.id,
         fingerprint = %cert_info.fingerprint,

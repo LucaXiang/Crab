@@ -19,6 +19,9 @@ export * from './archivedOrder';
 // Credit note types (退款凭证)
 export * from './creditNote';
 
+// Invoice types (Verifactu 发票)
+export * from './invoice';
+
 // Print and label types
 export * from './print';
 

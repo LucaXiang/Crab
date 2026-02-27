@@ -227,6 +227,39 @@ pub async fn execute_catalog_op(
             hash,
         } => provisioning::ensure_image(state, presigned_url, hash),
 
+        // ── Invoice AEAT status (cloud→edge) ──
+        StoreOp::UpdateInvoiceAeatStatus {
+            invoice_number,
+            aeat_status,
+            aeat_csv: _,
+        } => {
+            use crate::db::repository::invoice;
+            use shared::models::invoice::AeatStatus;
+
+            let status = match aeat_status.parse::<AeatStatus>() {
+                Ok(s) => s,
+                Err(_) => {
+                    tracing::warn!(invoice_number, aeat_status, "Invalid AEAT status string");
+                    return StoreOpResult::err(format!("Invalid aeat_status: {aeat_status}"));
+                }
+            };
+
+            match invoice::update_aeat_status(&state.pool, invoice_number, status).await {
+                Ok(true) => {
+                    tracing::info!(invoice_number, %status, "AEAT status updated");
+                    StoreOpResult::ok()
+                }
+                Ok(false) => {
+                    tracing::warn!(invoice_number, "Invoice not found for AEAT status update");
+                    StoreOpResult::err(format!("Invoice not found: {invoice_number}"))
+                }
+                Err(e) => {
+                    tracing::error!(invoice_number, "Failed to update AEAT status: {e}");
+                    StoreOpResult::err(e.to_string())
+                }
+            }
+        }
+
         // ── Full Sync (initial provisioning) ──
         StoreOp::FullSync { snapshot } => provisioning::apply_full_sync(state, snapshot).await,
     }

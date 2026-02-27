@@ -13,6 +13,7 @@ import { calculateItemSink } from '@/utils/itemSorting';
 import { KitchenReprintModal } from '@/screens/Checkout/KitchenReprintModal';
 import { LabelReprintModal } from '@/screens/Checkout/LabelReprintModal';
 import { CreditNoteSection } from './CreditNoteSection';
+import { InvoiceSection } from './InvoiceSection';
 
 interface HistoryDetailProps {
   order?: ArchivedOrderDetail;
@@ -340,6 +341,9 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
 
           {/* Credit Notes (退款记录) */}
           <CreditNoteSection order={order} />
+
+          {/* Invoices (Verifactu 发票) */}
+          <InvoiceSection order={order} />
         </div>
 
         {/* Timeline */}

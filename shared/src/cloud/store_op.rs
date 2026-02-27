@@ -205,6 +205,16 @@ pub enum StoreOp {
         /// SHA256 content hash
         hash: String,
     },
+
+    // ── Invoice (Verifactu AEAT status, cloud→edge) ──
+    UpdateInvoiceAeatStatus {
+        invoice_number: String,
+        /// "SUBMITTED" | "ACCEPTED" | "REJECTED"
+        aeat_status: String,
+        /// CSV code from AEAT acceptance
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        aeat_csv: Option<String>,
+    },
 }
 
 impl StoreOp {

@@ -2746,6 +2746,16 @@
     "error": "更新检查失败",
     "later": "稍后"
   },
+  "invoice": {
+    "title": "发票",
+    "rectifies": "更正",
+    "aeat_status": {
+      "PENDING": "待提交",
+      "SUBMITTED": "已提交",
+      "ACCEPTED": "已接受",
+      "REJECTED": "被拒绝"
+    }
+  },
   "credit_note": {
     "title": "退款记录",
     "empty": "暂无退款记录",

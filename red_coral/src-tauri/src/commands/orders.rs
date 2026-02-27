@@ -118,6 +118,21 @@ pub async fn fetch_member_order_history(
     }
 }
 
+/// Fetch invoices linked to an order (F2 + R5)
+#[tauri::command]
+pub async fn fetch_order_invoices(
+    bridge: State<'_, Arc<ClientBridge>>,
+    order_pk: i64,
+) -> Result<ApiResponse<serde_json::Value>, String> {
+    match bridge
+        .get::<serde_json::Value>(&format!("/api/orders/{}/invoices", order_pk))
+        .await
+    {
+        Ok(invoices) => Ok(ApiResponse::success(invoices)),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+    }
+}
+
 /// Fetch archived order detail by ID (graph model)
 /// Uses serde_json::Value to transparently pass through all fields from edge-server
 #[tauri::command]

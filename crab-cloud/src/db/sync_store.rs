@@ -236,6 +236,7 @@ pub async fn upsert_resource(
             .await
         }
         SyncResource::CreditNote => upsert_credit_note(pool, store_id, tenant_id, item, now).await,
+        SyncResource::Invoice => upsert_invoice(pool, store_id, tenant_id, item, now).await,
         other => Err(format!("Unhandled resource type: {other}").into()),
     }
 }
@@ -497,6 +498,89 @@ async fn delete_resource(
         }
         other => Err(format!("Cannot delete resource type: {other}").into()),
     }
+}
+
+/// Upsert Verifactu invoice — summary columns + detail JSONB.
+/// Cloud never modifies invoice content (edge is authoritative for creation).
+/// Cloud only updates aeat_status/aeat_csv after AEAT submission (separate path).
+async fn upsert_invoice(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    item: &CloudSyncItem,
+    now: i64,
+) -> Result<(), BoxError> {
+    use shared::cloud::sync::InvoiceSync;
+
+    let inv: InvoiceSync = serde_json::from_value(item.data.clone())?;
+    let source_id: i64 = item.resource_id.parse()?;
+
+    // Verify huella integrity before storing
+    if let Some(mismatch) = inv.verify_huella() {
+        tracing::warn!(
+            invoice_number = %inv.invoice_number,
+            "Huella verification failed on invoice sync: {mismatch}"
+        );
+        return Err(format!(
+            "huella verification failed for {}: {mismatch}",
+            inv.invoice_number
+        )
+        .into());
+    }
+
+    let detail_json = serde_json::to_value(&inv)?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO store_invoices (
+            store_id, tenant_id, source_id, invoice_number, serie,
+            tipo_factura, source_type, source_pk,
+            subtotal, tax, total,
+            huella, prev_huella, fecha_expedicion,
+            nif, nombre_razon,
+            factura_rectificada_id, factura_rectificada_num,
+            aeat_status, created_at,
+            detail, version, synced_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        ON CONFLICT (tenant_id, store_id, source_id)
+        DO UPDATE SET invoice_number = EXCLUDED.invoice_number,
+                      total = EXCLUDED.total,
+                      huella = EXCLUDED.huella,
+                      prev_huella = EXCLUDED.prev_huella,
+                      detail = EXCLUDED.detail,
+                      version = EXCLUDED.version,
+                      synced_at = EXCLUDED.synced_at
+        WHERE store_invoices.version <= EXCLUDED.version
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(source_id)
+    .bind(&inv.invoice_number)
+    .bind(&inv.serie)
+    .bind(inv.tipo_factura.as_str())
+    .bind(inv.source_type.as_str())
+    .bind(inv.source_pk)
+    .bind(inv.subtotal)
+    .bind(inv.tax)
+    .bind(inv.total)
+    .bind(&inv.huella)
+    .bind(&inv.prev_huella)
+    .bind(&inv.fecha_expedicion)
+    .bind(&inv.nif)
+    .bind(&inv.nombre_razon)
+    .bind(inv.factura_rectificada_id)
+    .bind(&inv.factura_rectificada_num)
+    .bind("PENDING")
+    .bind(inv.created_at)
+    .bind(&detail_json)
+    .bind(version_to_i64(item.version))
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 /// 将已有门店绑定到新的 entity_id/device_id

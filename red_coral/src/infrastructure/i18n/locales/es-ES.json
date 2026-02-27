@@ -2746,6 +2746,16 @@
     "error": "Error al verificar actualizaciones",
     "later": "Más tarde"
   },
+  "invoice": {
+    "title": "Facturas",
+    "rectifies": "Rectifica",
+    "aeat_status": {
+      "PENDING": "Pendiente",
+      "SUBMITTED": "Enviada",
+      "ACCEPTED": "Aceptada",
+      "REJECTED": "Rechazada"
+    }
+  },
   "credit_note": {
     "title": "Notas de crédito",
     "empty": "Sin notas de crédito",

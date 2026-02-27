@@ -12,6 +12,7 @@ CREATE TABLE invoice (
     huella          TEXT NOT NULL,
     prev_huella     TEXT,
     fecha_expedicion TEXT NOT NULL,
+    fecha_hora_registro TEXT NOT NULL DEFAULT '',
     nif             TEXT NOT NULL,
     nombre_razon    TEXT NOT NULL,
     factura_rectificada_id  INTEGER,

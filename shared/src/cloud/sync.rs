@@ -382,11 +382,43 @@ pub struct InvoiceSync {
     pub huella: String,
     pub prev_huella: Option<String>,
     pub fecha_expedicion: String,
+    /// RFC 3339 timestamp used in huella computation
+    pub fecha_hora_registro: String,
     pub nif: String,
     pub nombre_razon: String,
     pub factura_rectificada_id: Option<i64>,
     pub factura_rectificada_num: Option<String>,
     pub created_at: i64,
+}
+
+impl InvoiceSync {
+    /// Recompute huella and return `Some(recomputed)` on mismatch, `None` if ok.
+    pub fn verify_huella(&self) -> Option<String> {
+        use crate::order::verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
+
+        let input = HuellaAltaInput {
+            nif: &self.nif,
+            invoice_number: &self.invoice_number,
+            fecha_expedicion: &self.fecha_expedicion,
+            tipo_factura: self.tipo_factura.as_str(),
+            cuota_total: self.tax,
+            importe_total: self.total,
+            prev_huella: self.prev_huella.as_deref(),
+            fecha_hora_registro: &self.fecha_hora_registro,
+        };
+
+        match compute_verifactu_huella_alta(&input) {
+            Ok(recomputed) if recomputed == self.huella => None,
+            Ok(recomputed) => Some(recomputed),
+            Err(e) => {
+                tracing::warn!(
+                    invoice = %self.invoice_number,
+                    "Huella verification computation error: {e}"
+                );
+                Some(format!("computation_error: {e}"))
+            }
+        }
+    }
 }
 
 // ── Hash verification ──

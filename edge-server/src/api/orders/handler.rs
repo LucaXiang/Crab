@@ -229,6 +229,24 @@ pub async fn get_by_id(
 }
 
 // =========================================================================
+// Order Invoices (F2 + R5)
+// =========================================================================
+
+/// Get invoices linked to an order (F2 for the order + R5 for its credit notes)
+pub async fn get_order_invoices(
+    State(state): State<ServerState>,
+    Path(order_pk): Path<i64>,
+) -> AppResult<Json<Vec<shared::models::invoice::Invoice>>> {
+    use crate::db::repository::invoice;
+
+    let invoices = invoice::find_by_order(&state.pool, order_pk)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    Ok(Json(invoices))
+}
+
+// =========================================================================
 // Order History (Archived)
 // =========================================================================
 

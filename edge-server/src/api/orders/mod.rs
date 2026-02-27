@@ -25,4 +25,6 @@ fn routes() -> Router<ServerState> {
         )
         // Order detail (archived)
         .route("/{id}", get(handler::get_by_id))
+        // Invoices linked to an order (F2 + R5)
+        .route("/{id}/invoices", get(handler::get_order_invoices))
 }

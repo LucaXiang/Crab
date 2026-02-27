@@ -28,6 +28,7 @@ struct InvoiceRow {
     huella: String,
     prev_huella: Option<String>,
     fecha_expedicion: String,
+    fecha_hora_registro: String,
     nif: String,
     nombre_razon: String,
     factura_rectificada_id: Option<i64>,
@@ -52,6 +53,7 @@ impl InvoiceRow {
             huella: self.huella,
             prev_huella: self.prev_huella,
             fecha_expedicion: self.fecha_expedicion,
+            fecha_hora_registro: self.fecha_hora_registro,
             nif: self.nif,
             nombre_razon: self.nombre_razon,
             factura_rectificada_id: self.factura_rectificada_id,
@@ -76,7 +78,8 @@ struct CounterRow {
 const INVOICE_COLUMNS: &str = "\
     id, invoice_number, serie, tipo_factura, source_type, source_pk, \
     subtotal, tax, total, huella, prev_huella, fecha_expedicion, \
-    nif, nombre_razon, factura_rectificada_id, factura_rectificada_num, \
+    fecha_hora_registro, nif, nombre_razon, \
+    factura_rectificada_id, factura_rectificada_num, \
     cloud_synced, aeat_status, created_at";
 
 // ---------------------------------------------------------------------------
@@ -94,9 +97,10 @@ pub async fn insert(
         "INSERT INTO invoice \
          (id, invoice_number, serie, tipo_factura, source_type, source_pk, \
           subtotal, tax, total, huella, prev_huella, fecha_expedicion, \
-          nif, nombre_razon, factura_rectificada_id, factura_rectificada_num, \
+          fecha_hora_registro, nif, nombre_razon, \
+          factura_rectificada_id, factura_rectificada_num, \
           cloud_synced, aeat_status, created_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
     )
     .bind(id)
     .bind(&invoice.invoice_number)
@@ -110,6 +114,7 @@ pub async fn insert(
     .bind(&invoice.huella)
     .bind(&invoice.prev_huella)
     .bind(&invoice.fecha_expedicion)
+    .bind(&invoice.fecha_hora_registro)
     .bind(&invoice.nif)
     .bind(&invoice.nombre_razon)
     .bind(invoice.factura_rectificada_id)
@@ -264,4 +269,118 @@ pub async fn find_order_invoice(
     .await?;
 
     Ok(row.map(InvoiceRow::into_invoice))
+}
+
+/// Get an invoice by ID.
+pub async fn get_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Invoice>> {
+    let row = sqlx::query_as::<_, InvoiceRow>(&format!(
+        "SELECT {INVOICE_COLUMNS} FROM invoice WHERE id = ?"
+    ))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(InvoiceRow::into_invoice))
+}
+
+/// List invoice IDs not yet synced to cloud (ordered by id for chain consistency).
+pub async fn list_unsynced_ids(pool: &SqlitePool, limit: i64) -> RepoResult<Vec<i64>> {
+    let rows = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM invoice WHERE cloud_synced = 0 ORDER BY id LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// Build InvoiceSync payload for cloud sync.
+pub async fn build_sync(
+    pool: &SqlitePool,
+    invoice_id: i64,
+) -> RepoResult<shared::cloud::sync::InvoiceSync> {
+    use rust_decimal::Decimal;
+    use shared::cloud::sync::{InvoiceSync, TaxDesglose};
+
+    let invoice = get_by_id(pool, invoice_id)
+        .await?
+        .ok_or_else(|| super::RepoError::NotFound(format!("invoice {invoice_id}")))?;
+
+    let desglose_rows = get_desglose(pool, invoice_id).await?;
+    let desglose: Vec<TaxDesglose> = desglose_rows
+        .into_iter()
+        .map(|d| {
+            let base_amount = Decimal::try_from(d.base_amount).map_err(|e| {
+                super::RepoError::Database(format!(
+                    "desglose base_amount f64→Decimal: {e} (value={})",
+                    d.base_amount
+                ))
+            })?;
+            let tax_amount = Decimal::try_from(d.tax_amount).map_err(|e| {
+                super::RepoError::Database(format!(
+                    "desglose tax_amount f64→Decimal: {e} (value={})",
+                    d.tax_amount
+                ))
+            })?;
+            Ok(TaxDesglose {
+                tax_rate: d.tax_rate as i32,
+                base_amount,
+                tax_amount,
+            })
+        })
+        .collect::<RepoResult<Vec<_>>>()?;
+
+    Ok(InvoiceSync {
+        id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        serie: invoice.serie,
+        tipo_factura: invoice.tipo_factura,
+        source_type: invoice.source_type,
+        source_pk: invoice.source_pk,
+        subtotal: invoice.subtotal,
+        tax: invoice.tax,
+        total: invoice.total,
+        desglose,
+        huella: invoice.huella,
+        prev_huella: invoice.prev_huella,
+        fecha_expedicion: invoice.fecha_expedicion,
+        fecha_hora_registro: invoice.fecha_hora_registro,
+        nif: invoice.nif,
+        nombre_razon: invoice.nombre_razon,
+        factura_rectificada_id: invoice.factura_rectificada_id,
+        factura_rectificada_num: invoice.factura_rectificada_num,
+        created_at: invoice.created_at,
+    })
+}
+
+/// Update the AEAT status of an invoice (cloud→edge callback).
+/// Cloud is authoritative for aeat_status; edge stores only the status string.
+pub async fn update_aeat_status(
+    pool: &SqlitePool,
+    invoice_number: &str,
+    aeat_status: AeatStatus,
+) -> RepoResult<bool> {
+    let result = sqlx::query("UPDATE invoice SET aeat_status = ?1 WHERE invoice_number = ?2")
+        .bind(aeat_status.as_str())
+        .bind(invoice_number)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Find all invoices linked to a given order (F2 for the order + R5 for its credit notes).
+pub async fn find_by_order(pool: &SqlitePool, order_pk: i64) -> RepoResult<Vec<Invoice>> {
+    // Get direct F2 invoice + any R5 invoices whose source is a credit_note of this order
+    let rows = sqlx::query_as::<_, InvoiceRow>(&format!(
+        "SELECT {INVOICE_COLUMNS} FROM invoice \
+         WHERE (source_type = 'ORDER' AND source_pk = ?1) \
+            OR (source_type = 'CREDIT_NOTE' AND source_pk IN \
+                (SELECT id FROM credit_note WHERE original_order_pk = ?1)) \
+         ORDER BY id"
+    ))
+    .bind(order_pk)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(InvoiceRow::into_invoice).collect())
 }

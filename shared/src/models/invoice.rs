@@ -54,7 +54,7 @@ impl InvoiceSourceType {
 }
 
 /// AEAT submission status
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AeatStatus {
     Pending,
@@ -133,6 +133,8 @@ pub struct Invoice {
 
     // Issuer info
     pub fecha_expedicion: String,
+    /// RFC 3339 timestamp used in huella computation
+    pub fecha_hora_registro: String,
     pub nif: String,
     pub nombre_razon: String,
 

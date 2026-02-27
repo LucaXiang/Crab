@@ -239,6 +239,7 @@ pub async fn run() {
             commands::fetch_order_list,
             commands::fetch_member_order_history,
             commands::fetch_order_detail,
+            commands::fetch_order_invoices,
             // Credit Note commands
             commands::create_credit_note,
             commands::fetch_credit_note_detail,
