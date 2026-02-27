@@ -12,6 +12,7 @@ pub mod command;
 pub mod event;
 pub mod snapshot;
 pub mod types;
+pub mod verifactu;
 
 // Re-exports
 pub use applied_mg_rule::AppliedMgRule;
@@ -24,3 +25,4 @@ pub use command::{OrderCommand, OrderCommandPayload};
 pub use event::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};
 pub use types::*;
+pub use verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
