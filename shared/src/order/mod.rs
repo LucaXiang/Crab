@@ -16,7 +16,7 @@ pub mod types;
 // Re-exports
 pub use applied_mg_rule::AppliedMgRule;
 pub use applied_rule::AppliedRule;
-pub use canonical::CanonicalHash;
+pub use canonical::{CanonicalHash, compute_event_chain_hash, compute_order_chain_hash};
 pub use command::{OrderCommand, OrderCommandPayload};
 pub use event::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};

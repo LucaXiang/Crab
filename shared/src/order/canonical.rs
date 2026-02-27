@@ -28,55 +28,57 @@ pub trait CanonicalHash {
 // ============================================================================
 
 #[inline]
-pub(crate) fn write_sep(buf: &mut Vec<u8>) {
+pub fn write_sep(buf: &mut Vec<u8>) {
     buf.push(0x00);
 }
 
 #[inline]
-pub(crate) fn write_i64(buf: &mut Vec<u8>, v: i64) {
+pub fn write_i64(buf: &mut Vec<u8>, v: i64) {
     buf.extend_from_slice(&v.to_le_bytes());
 }
 
 #[inline]
-#[allow(dead_code)]
-pub(crate) fn write_u64(buf: &mut Vec<u8>, v: u64) {
+pub fn write_i32(buf: &mut Vec<u8>, v: i32) {
     buf.extend_from_slice(&v.to_le_bytes());
 }
 
 #[inline]
-pub(crate) fn write_i32(buf: &mut Vec<u8>, v: i32) {
+pub fn write_u32(buf: &mut Vec<u8>, v: u32) {
     buf.extend_from_slice(&v.to_le_bytes());
 }
 
 #[inline]
-pub(crate) fn write_u32(buf: &mut Vec<u8>, v: u32) {
+pub fn write_u64(buf: &mut Vec<u8>, v: u64) {
     buf.extend_from_slice(&v.to_le_bytes());
 }
 
 #[inline]
-pub(crate) fn write_f64(buf: &mut Vec<u8>, v: f64) {
-    buf.extend_from_slice(&v.to_bits().to_le_bytes());
+pub fn write_f64(buf: &mut Vec<u8>, v: f64) {
+    // Normalize -0.0 to 0.0 to ensure JSON roundtrip stability
+    // (serde_json serializes -0.0 as "0" which deserializes to 0.0)
+    let normalized = if v == 0.0 { 0.0_f64 } else { v };
+    buf.extend_from_slice(&normalized.to_bits().to_le_bytes());
 }
 
 #[inline]
-pub(crate) fn write_bool(buf: &mut Vec<u8>, v: bool) {
+pub fn write_bool(buf: &mut Vec<u8>, v: bool) {
     buf.push(if v { 0x01 } else { 0x00 });
 }
 
 #[inline]
-pub(crate) fn write_str(buf: &mut Vec<u8>, s: &str) {
+pub fn write_str(buf: &mut Vec<u8>, s: &str) {
     let bytes = s.as_bytes();
     buf.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
     buf.extend_from_slice(bytes);
 }
 
 #[inline]
-pub(crate) fn write_tag(buf: &mut Vec<u8>, tag: &[u8]) {
+pub fn write_tag(buf: &mut Vec<u8>, tag: &[u8]) {
     buf.extend_from_slice(tag);
 }
 
 #[inline]
-pub(crate) fn write_opt<T: CanonicalHash>(buf: &mut Vec<u8>, opt: &Option<T>) {
+pub fn write_opt<T: CanonicalHash>(buf: &mut Vec<u8>, opt: &Option<T>) {
     match opt {
         None => buf.push(0x00),
         Some(v) => {
@@ -87,7 +89,7 @@ pub(crate) fn write_opt<T: CanonicalHash>(buf: &mut Vec<u8>, opt: &Option<T>) {
 }
 
 #[inline]
-pub(crate) fn write_opt_i64(buf: &mut Vec<u8>, opt: Option<i64>) {
+pub fn write_opt_i64(buf: &mut Vec<u8>, opt: Option<i64>) {
     match opt {
         None => buf.push(0x00),
         Some(v) => {
@@ -98,7 +100,7 @@ pub(crate) fn write_opt_i64(buf: &mut Vec<u8>, opt: Option<i64>) {
 }
 
 #[inline]
-pub(crate) fn write_opt_i32(buf: &mut Vec<u8>, opt: Option<i32>) {
+pub fn write_opt_i32(buf: &mut Vec<u8>, opt: Option<i32>) {
     match opt {
         None => buf.push(0x00),
         Some(v) => {
@@ -109,7 +111,7 @@ pub(crate) fn write_opt_i32(buf: &mut Vec<u8>, opt: Option<i32>) {
 }
 
 #[inline]
-pub(crate) fn write_opt_u32(buf: &mut Vec<u8>, opt: Option<u32>) {
+pub fn write_opt_u32(buf: &mut Vec<u8>, opt: Option<u32>) {
     match opt {
         None => buf.push(0x00),
         Some(v) => {
@@ -120,7 +122,7 @@ pub(crate) fn write_opt_u32(buf: &mut Vec<u8>, opt: Option<u32>) {
 }
 
 #[inline]
-pub(crate) fn write_opt_f64(buf: &mut Vec<u8>, opt: Option<f64>) {
+pub fn write_opt_f64(buf: &mut Vec<u8>, opt: Option<f64>) {
     match opt {
         None => buf.push(0x00),
         Some(v) => {
@@ -131,7 +133,7 @@ pub(crate) fn write_opt_f64(buf: &mut Vec<u8>, opt: Option<f64>) {
 }
 
 #[inline]
-pub(crate) fn write_opt_str(buf: &mut Vec<u8>, opt: &Option<String>) {
+pub fn write_opt_str(buf: &mut Vec<u8>, opt: &Option<String>) {
     match opt {
         None => buf.push(0x00),
         Some(s) => {
@@ -142,7 +144,7 @@ pub(crate) fn write_opt_str(buf: &mut Vec<u8>, opt: &Option<String>) {
 }
 
 #[inline]
-pub(crate) fn write_opt_bool(buf: &mut Vec<u8>, opt: Option<bool>) {
+pub fn write_opt_bool(buf: &mut Vec<u8>, opt: Option<bool>) {
     match opt {
         None => buf.push(0x00),
         Some(v) => {
@@ -153,7 +155,7 @@ pub(crate) fn write_opt_bool(buf: &mut Vec<u8>, opt: Option<bool>) {
 }
 
 #[inline]
-pub(crate) fn write_vec<T: CanonicalHash>(buf: &mut Vec<u8>, items: &[T]) {
+pub fn write_vec<T: CanonicalHash>(buf: &mut Vec<u8>, items: &[T]) {
     write_u32(buf, items.len() as u32);
     for item in items {
         item.canonical_bytes(buf);
@@ -161,7 +163,7 @@ pub(crate) fn write_vec<T: CanonicalHash>(buf: &mut Vec<u8>, items: &[T]) {
 }
 
 #[inline]
-pub(crate) fn write_opt_vec<T: CanonicalHash>(buf: &mut Vec<u8>, opt: &Option<Vec<T>>) {
+pub fn write_opt_vec<T: CanonicalHash>(buf: &mut Vec<u8>, opt: &Option<Vec<T>>) {
     match opt {
         None => buf.push(0x00),
         Some(items) => {
@@ -172,10 +174,7 @@ pub(crate) fn write_opt_vec<T: CanonicalHash>(buf: &mut Vec<u8>, opt: &Option<Ve
 }
 
 #[inline]
-pub(crate) fn write_btreemap_str_i32(
-    buf: &mut Vec<u8>,
-    map: &std::collections::BTreeMap<String, i32>,
-) {
+pub fn write_btreemap_str_i32(buf: &mut Vec<u8>, map: &std::collections::BTreeMap<String, i32>) {
     write_u32(buf, map.len() as u32);
     // BTreeMap iterates in key order — deterministic
     for (k, v) in map {
@@ -1007,6 +1006,60 @@ impl CanonicalHash for EventPayload {
 }
 
 // ============================================================================
+// OrderEvent canonical hash — includes ALL event metadata fields
+// ============================================================================
+
+impl CanonicalHash for super::event::OrderEvent {
+    fn canonical_bytes(&self, buf: &mut Vec<u8>) {
+        write_str(buf, &self.event_id);
+        write_str(buf, &self.order_id);
+        write_u64(buf, self.sequence);
+        write_i64(buf, self.timestamp);
+        write_i64(buf, self.operator_id);
+        write_str(buf, &self.operator_name);
+        write_str(buf, &self.command_id);
+        write_opt_i64(buf, self.client_timestamp);
+        self.event_type.canonical_bytes(buf);
+        write_sep(buf);
+        self.payload.canonical_bytes(buf);
+    }
+}
+
+/// Compute the order chain hash linking orders together.
+///
+/// Hash = SHA256(prev_hash || order_id || receipt_number || status || last_event_hash)
+/// All strings are length-prefixed for unambiguous boundary separation.
+pub fn compute_order_chain_hash(
+    prev_hash: &str,
+    order_id: &str,
+    receipt_number: &str,
+    status: &OrderStatus,
+    last_event_hash: &str,
+) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut buf = Vec::with_capacity(256);
+    write_str(&mut buf, prev_hash);
+    write_str(&mut buf, order_id);
+    write_str(&mut buf, receipt_number);
+    status.canonical_bytes(&mut buf);
+    write_str(&mut buf, last_event_hash);
+
+    format!("{:x}", Sha256::digest(&buf))
+}
+
+/// Compute the event hash for tamper-proof verification.
+///
+/// Hash = SHA256(canonical_bytes(OrderEvent))
+pub fn compute_event_chain_hash(event: &super::event::OrderEvent) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut buf = Vec::with_capacity(512);
+    event.canonical_bytes(&mut buf);
+    format!("{:x}", Sha256::digest(&buf))
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -1113,7 +1166,7 @@ mod tests {
     }
 
     // ========================================================================
-    // Helper: build all 26 EventPayload variants with full data
+    // Helper: build all 29 EventPayload variants with full data
     // ========================================================================
 
     fn build_all_test_variants() -> Vec<(&'static str, EventPayload)> {
@@ -1496,7 +1549,7 @@ mod tests {
     }
 
     // ========================================================================
-    // A. Roundtrip tests for all 26 variants
+    // A. Roundtrip tests for all 29 variants
     // ========================================================================
 
     fn assert_roundtrip_stable(name: &str, payload: &EventPayload) {
@@ -1557,9 +1610,8 @@ mod tests {
 
     #[test]
     fn test_f64_zero_vs_negative_zero() {
-        // 0.0 and -0.0 have different bit patterns (sign bit differs).
-        // Our canonical encoding uses to_bits(), so they WILL produce different hashes.
-        // This is correct and intentional — they are distinct IEEE 754 values.
+        // -0.0 is normalized to 0.0 in write_f64 to ensure JSON roundtrip stability
+        // (serde_json serializes -0.0 as "0" which deserializes to 0.0)
         let p_pos = EventPayload::PaymentAdded {
             payment_id: "p1".to_string(),
             method: "cash".to_string(),
@@ -1576,11 +1628,32 @@ mod tests {
             change: None,
             note: None,
         };
-        // Verify they produce different hashes (because to_bits() differs)
-        assert_ne!(
+        // After normalization, 0.0 and -0.0 produce the same hash
+        assert_eq!(
             canonical_sha256(&p_pos),
             canonical_sha256(&p_neg),
-            "0.0 and -0.0 must produce different hashes (different bit patterns)"
+            "0.0 and -0.0 must produce equal hashes (normalization ensures JSON roundtrip stability)"
+        );
+    }
+
+    #[test]
+    fn test_f64_negative_zero_json_roundtrip() {
+        // Verify that -0.0 survives JSON roundtrip (serde_json normalizes it to 0.0)
+        let payload = EventPayload::PaymentAdded {
+            payment_id: "p1".to_string(),
+            method: "cash".to_string(),
+            amount: -0.0,
+            tendered: None,
+            change: None,
+            note: None,
+        };
+        let hash_before = canonical_sha256(&payload);
+        let json = serde_json::to_string(&payload).unwrap();
+        let roundtripped: EventPayload = serde_json::from_str(&json).unwrap();
+        let hash_after = canonical_sha256(&roundtripped);
+        assert_eq!(
+            hash_before, hash_after,
+            "-0.0 must produce stable hash after JSON roundtrip"
         );
     }
 
@@ -1709,22 +1782,10 @@ mod tests {
         };
 
         let hash = canonical_sha256(&payload);
-        // Record golden value
         assert_eq!(
-            hash,
-            canonical_sha256(&payload),
-            "Golden hash must be deterministic"
+            hash, "a7474f8ed97d2a411866852e77d590cc9e850f7501721af899f952f134f4d586",
+            "Golden hash mismatch — canonical encoding changed!"
         );
-        // Fix golden value on first run
-        let golden = "ab0dc1f90e58214e7bcb5e3e8d117c0e03e40e2e6a44e6a18bde3e3d3e1e0c26";
-        // Compute actual and pin it
-        let actual = canonical_sha256(&payload);
-        if actual != golden {
-            // Print for updating golden value
-            eprintln!("OrderCompleted golden hash: {}", actual);
-        }
-        // Always assert determinism
-        assert_eq!(canonical_sha256(&payload), actual);
     }
 
     #[test]
@@ -1739,10 +1800,10 @@ mod tests {
         };
 
         let hash = canonical_sha256(&payload);
-        // Verify determinism
-        assert_eq!(hash, canonical_sha256(&payload));
-        // Verify roundtrip preserves hash
-        assert_roundtrip_stable("golden-PaymentAdded", &payload);
+        assert_eq!(
+            hash, "7c88ca889bc1417441aa802f39ec69c1c3fd3240313376502acb5a37b4d3a3f1",
+            "Golden hash mismatch — canonical encoding changed!"
+        );
     }
 
     #[test]
@@ -1778,8 +1839,10 @@ mod tests {
         };
 
         let hash = canonical_sha256(&payload);
-        assert_eq!(hash, canonical_sha256(&payload));
-        assert_roundtrip_stable("golden-ItemsAdded", &payload);
+        assert_eq!(
+            hash, "464c24c4f2d4b684b7ae3139df97b6abcaac8e79658b72b073fc5e412dd2fe1d",
+            "Golden hash mismatch — canonical encoding changed!"
+        );
     }
 
     #[test]
@@ -1794,8 +1857,10 @@ mod tests {
         };
 
         let hash = canonical_sha256(&payload);
-        assert_eq!(hash, canonical_sha256(&payload));
-        assert_roundtrip_stable("golden-OrderVoided", &payload);
+        assert_eq!(
+            hash, "f732e83f09712b4b392a396df2894e296561909a4f44cd71dfbaa4ba6ebfe439",
+            "Golden hash mismatch — canonical encoding changed!"
+        );
     }
 
     // ========================================================================
@@ -2046,5 +2111,186 @@ mod tests {
             );
         }
         assert_eq!(hashes.len(), 4);
+    }
+
+    // ========================================================================
+    // E. OrderEvent hash tests
+    // ========================================================================
+
+    fn make_test_event(
+        payload: EventPayload,
+        event_type: OrderEventType,
+    ) -> crate::order::event::OrderEvent {
+        crate::order::event::OrderEvent {
+            event_id: "evt-001".to_string(),
+            sequence: 1,
+            order_id: "ord-001".to_string(),
+            timestamp: 1700000000000,
+            client_timestamp: Some(1699999999000),
+            operator_id: 42,
+            operator_name: "Camarero".to_string(),
+            command_id: "cmd-001".to_string(),
+            event_type,
+            payload,
+        }
+    }
+
+    #[test]
+    fn test_order_event_canonical_deterministic() {
+        let event = make_test_event(
+            EventPayload::TableOpened {
+                table_id: Some(1),
+                table_name: Some("Mesa 1".to_string()),
+                zone_id: Some(10),
+                zone_name: Some("Terraza".to_string()),
+                guest_count: 4,
+                is_retail: false,
+                queue_number: None,
+                receipt_number: "R-001".to_string(),
+            },
+            OrderEventType::TableOpened,
+        );
+
+        let h1 = canonical_sha256(&event);
+        let h2 = canonical_sha256(&event);
+        assert_eq!(h1, h2, "Same event must produce identical hashes");
+    }
+
+    #[test]
+    fn test_order_event_different_metadata_different_hash() {
+        let event1 = make_test_event(
+            EventPayload::OrderNoteAdded {
+                note: "hello".to_string(),
+                previous_note: None,
+            },
+            OrderEventType::OrderNoteAdded,
+        );
+        let mut event2 = event1.clone();
+        event2.operator_id = 99; // different operator
+
+        assert_ne!(
+            canonical_sha256(&event1),
+            canonical_sha256(&event2),
+            "Different operator_id must produce different hashes"
+        );
+    }
+
+    #[test]
+    fn test_order_event_json_roundtrip() {
+        let event = make_test_event(
+            EventPayload::PaymentAdded {
+                payment_id: "pay-1".to_string(),
+                method: "cash".to_string(),
+                amount: 50.0,
+                tendered: Some(60.0),
+                change: Some(10.0),
+                note: None,
+            },
+            OrderEventType::PaymentAdded,
+        );
+
+        let hash_before = canonical_sha256(&event);
+        let json = serde_json::to_string(&event).unwrap();
+        let restored: crate::order::event::OrderEvent = serde_json::from_str(&json).unwrap();
+        let hash_after = canonical_sha256(&restored);
+        assert_eq!(
+            hash_before, hash_after,
+            "OrderEvent hash must survive JSON roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_order_event_golden_hash() {
+        let event = make_test_event(
+            EventPayload::TableOpened {
+                table_id: Some(1),
+                table_name: Some("Mesa 1".to_string()),
+                zone_id: Some(10),
+                zone_name: Some("Terraza".to_string()),
+                guest_count: 4,
+                is_retail: false,
+                queue_number: None,
+                receipt_number: "R-20240101-001".to_string(),
+            },
+            OrderEventType::TableOpened,
+        );
+
+        let hash = canonical_sha256(&event);
+        assert_eq!(
+            hash,
+            compute_event_chain_hash(&event),
+            "canonical_sha256 must match compute_event_chain_hash"
+        );
+        // Pin the golden value
+        assert_eq!(
+            hash, "9e7df918610c8f7f82993a99bebc2cf1980241a4c06b0406a32e12b8e6497b4a",
+            "OrderEvent golden hash changed — canonical encoding broke!"
+        );
+    }
+
+    #[test]
+    fn test_compute_order_chain_hash_deterministic() {
+        let h1 = compute_order_chain_hash(
+            "prev",
+            "ord-1",
+            "R-001",
+            &OrderStatus::Completed,
+            "last_evt",
+        );
+        let h2 = compute_order_chain_hash(
+            "prev",
+            "ord-1",
+            "R-001",
+            &OrderStatus::Completed,
+            "last_evt",
+        );
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_compute_order_chain_hash_golden() {
+        let hash = compute_order_chain_hash(
+            "genesis",
+            "ord-001",
+            "R-20240101-001",
+            &OrderStatus::Completed,
+            "abc123def456",
+        );
+        assert_eq!(
+            hash, "874db73ebf9940495ba91f7bef1fb2fed4016e26655cadbfceb58054734906fa",
+            "Order chain golden hash changed!"
+        );
+    }
+
+    #[test]
+    fn test_compute_order_chain_hash_different_status() {
+        let h_completed =
+            compute_order_chain_hash("prev", "ord-1", "R-001", &OrderStatus::Completed, "last");
+        let h_voided =
+            compute_order_chain_hash("prev", "ord-1", "R-001", &OrderStatus::Void, "last");
+        assert_ne!(
+            h_completed, h_voided,
+            "Different status must produce different hash"
+        );
+    }
+
+    #[test]
+    fn test_order_event_client_timestamp_none_vs_some() {
+        let mut event1 = make_test_event(
+            EventPayload::OrderNoteAdded {
+                note: "test".to_string(),
+                previous_note: None,
+            },
+            OrderEventType::OrderNoteAdded,
+        );
+        let mut event2 = event1.clone();
+        event1.client_timestamp = None;
+        event2.client_timestamp = Some(0);
+
+        assert_ne!(
+            canonical_sha256(&event1),
+            canonical_sha256(&event2),
+            "client_timestamp None vs Some(0) must differ"
+        );
     }
 }

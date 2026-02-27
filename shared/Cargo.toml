@@ -38,11 +38,11 @@ tracing.workspace = true
 # Decimal
 rust_decimal = { workspace = true, features = ["serde-with-float"] }
 
+# Hashing (canonical hash chain)
+sha2.workspace = true
+
 # Database (optional, feature-gated)
 sqlx = { workspace = true, features = ["derive"], optional = true }
-
-[dev-dependencies]
-sha2.workspace = true
 
 [features]
 db = ["sqlx"]

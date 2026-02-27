@@ -8,7 +8,6 @@ use crate::db::repository::system_state;
 use crate::order_money::{to_decimal, to_f64};
 use rust_decimal::Decimal;
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use sqlx::SqlitePool;
 use std::path::PathBuf;
@@ -678,37 +677,18 @@ impl OrderArchiveService {
         prev_hash: &str,
         last_event_hash: &str,
     ) -> String {
-        use shared::order::CanonicalHash;
-
-        let mut buf = Vec::with_capacity(256);
-        buf.extend_from_slice(prev_hash.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(snapshot.order_id.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(snapshot.receipt_number.as_bytes());
-        buf.push(0x00);
-        snapshot.status.canonical_bytes(&mut buf);
-        buf.push(0x00);
-        buf.extend_from_slice(last_event_hash.as_bytes());
-
-        format!("{:x}", Sha256::digest(&buf))
+        shared::order::compute_order_chain_hash(
+            prev_hash,
+            &snapshot.order_id,
+            &snapshot.receipt_number,
+            &snapshot.status,
+            last_event_hash,
+        )
     }
 
     /// Compute event hash including payload for tamper-proofing
     fn compute_event_hash(&self, event: &OrderEvent) -> String {
-        use shared::order::CanonicalHash;
-
-        let mut buf = Vec::with_capacity(512);
-        buf.extend_from_slice(event.event_id.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(event.order_id.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(&event.sequence.to_le_bytes());
-        event.event_type.canonical_bytes(&mut buf);
-        buf.push(0x00);
-        event.payload.canonical_bytes(&mut buf);
-
-        format!("{:x}", Sha256::digest(&buf))
+        shared::order::compute_event_chain_hash(event)
     }
 
     // ========================================================================
@@ -1018,36 +998,17 @@ mod tests {
         prev_hash: &str,
         last_event_hash: &str,
     ) -> String {
-        use shared::order::CanonicalHash;
-
-        let mut buf = Vec::with_capacity(256);
-        buf.extend_from_slice(prev_hash.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(snapshot.order_id.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(snapshot.receipt_number.as_bytes());
-        buf.push(0x00);
-        snapshot.status.canonical_bytes(&mut buf);
-        buf.push(0x00);
-        buf.extend_from_slice(last_event_hash.as_bytes());
-
-        format!("{:x}", Sha256::digest(&buf))
+        shared::order::compute_order_chain_hash(
+            prev_hash,
+            &snapshot.order_id,
+            &snapshot.receipt_number,
+            &snapshot.status,
+            last_event_hash,
+        )
     }
 
     fn compute_event_hash_standalone(event: &shared::order::OrderEvent) -> String {
-        use shared::order::CanonicalHash;
-
-        let mut buf = Vec::with_capacity(512);
-        buf.extend_from_slice(event.event_id.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(event.order_id.as_bytes());
-        buf.push(0x00);
-        buf.extend_from_slice(&event.sequence.to_le_bytes());
-        event.event_type.canonical_bytes(&mut buf);
-        buf.push(0x00);
-        event.payload.canonical_bytes(&mut buf);
-
-        format!("{:x}", Sha256::digest(&buf))
+        shared::order::compute_event_chain_hash(event)
     }
 
     // ========================================================================
