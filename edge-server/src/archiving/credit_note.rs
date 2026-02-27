@@ -152,6 +152,7 @@ impl CreditNoteService {
             &cn_number,
             &order.receipt_number,
             total_credit,
+            tax_credit,
         );
 
         // 9. Begin transaction — all writes atomic

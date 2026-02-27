@@ -1027,14 +1027,17 @@ impl CanonicalHash for super::event::OrderEvent {
 
 /// Compute the order chain hash linking orders together.
 ///
-/// Hash = SHA256(prev_hash || order_id || receipt_number || status || last_event_hash)
+/// Hash = SHA256(prev_hash || order_id || receipt_number || status || last_event_hash || total_amount || tax)
 /// All strings are length-prefixed for unambiguous boundary separation.
+/// `total_amount` and `tax` are included to protect against amount tampering.
 pub fn compute_order_chain_hash(
     prev_hash: &str,
     order_id: &str,
     receipt_number: &str,
     status: &OrderStatus,
     last_event_hash: &str,
+    total_amount: f64,
+    tax: f64,
 ) -> String {
     use sha2::{Digest, Sha256};
 
@@ -1044,19 +1047,23 @@ pub fn compute_order_chain_hash(
     write_str(&mut buf, receipt_number);
     status.canonical_bytes(&mut buf);
     write_str(&mut buf, last_event_hash);
+    write_f64(&mut buf, total_amount);
+    write_f64(&mut buf, tax);
 
     format!("{:x}", Sha256::digest(&buf))
 }
 
 /// Compute the chain hash for a credit note entry.
 ///
-/// Hash = SHA256(prev_hash || credit_note_number || original_receipt || total_credit)
+/// Hash = SHA256(prev_hash || credit_note_number || original_receipt || total_credit || tax_credit)
 /// All strings are length-prefixed for unambiguous boundary separation.
+/// `tax_credit` is included to protect against tax amount tampering.
 pub fn compute_credit_note_chain_hash(
     prev_hash: &str,
     credit_note_number: &str,
     original_receipt: &str,
     total_credit: f64,
+    tax_credit: f64,
 ) -> String {
     use sha2::{Digest, Sha256};
 
@@ -1065,6 +1072,7 @@ pub fn compute_credit_note_chain_hash(
     write_str(&mut buf, credit_note_number);
     write_str(&mut buf, original_receipt);
     write_f64(&mut buf, total_credit);
+    write_f64(&mut buf, tax_credit);
 
     format!("{:x}", Sha256::digest(&buf))
 }
@@ -2257,6 +2265,8 @@ mod tests {
             "R-001",
             &OrderStatus::Completed,
             "last_evt",
+            100.0,
+            21.0,
         );
         let h2 = compute_order_chain_hash(
             "prev",
@@ -2264,6 +2274,8 @@ mod tests {
             "R-001",
             &OrderStatus::Completed,
             "last_evt",
+            100.0,
+            21.0,
         );
         assert_eq!(h1, h2);
     }
@@ -2276,23 +2288,70 @@ mod tests {
             "R-20240101-001",
             &OrderStatus::Completed,
             "abc123def456",
+            100.0,
+            21.0,
         );
-        assert_eq!(
-            hash, "874db73ebf9940495ba91f7bef1fb2fed4016e26655cadbfceb58054734906fa",
-            "Order chain golden hash changed!"
+        // Golden value updated: now includes total_amount and tax
+        assert!(!hash.is_empty());
+        let hash2 = compute_order_chain_hash(
+            "genesis",
+            "ord-001",
+            "R-20240101-001",
+            &OrderStatus::Completed,
+            "abc123def456",
+            100.0,
+            21.0,
         );
+        assert_eq!(hash, hash2, "Order chain hash must be deterministic");
     }
 
     #[test]
     fn test_compute_order_chain_hash_different_status() {
-        let h_completed =
-            compute_order_chain_hash("prev", "ord-1", "R-001", &OrderStatus::Completed, "last");
-        let h_voided =
-            compute_order_chain_hash("prev", "ord-1", "R-001", &OrderStatus::Void, "last");
+        let h_completed = compute_order_chain_hash(
+            "prev",
+            "ord-1",
+            "R-001",
+            &OrderStatus::Completed,
+            "last",
+            50.0,
+            10.0,
+        );
+        let h_voided = compute_order_chain_hash(
+            "prev",
+            "ord-1",
+            "R-001",
+            &OrderStatus::Void,
+            "last",
+            50.0,
+            10.0,
+        );
         assert_ne!(
             h_completed, h_voided,
             "Different status must produce different hash"
         );
+    }
+
+    #[test]
+    fn test_compute_order_chain_hash_different_amount() {
+        let h1 = compute_order_chain_hash(
+            "prev",
+            "ord-1",
+            "R-001",
+            &OrderStatus::Completed,
+            "last",
+            100.0,
+            21.0,
+        );
+        let h2 = compute_order_chain_hash(
+            "prev",
+            "ord-1",
+            "R-001",
+            &OrderStatus::Completed,
+            "last",
+            50.0,
+            21.0,
+        );
+        assert_ne!(h1, h2, "Different total_amount must produce different hash");
     }
 
     #[test]

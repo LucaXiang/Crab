@@ -714,6 +714,8 @@ impl OrderArchiveService {
             &snapshot.receipt_number,
             &snapshot.status,
             last_event_hash,
+            snapshot.total,
+            snapshot.tax,
         )
     }
 
@@ -1061,6 +1063,8 @@ mod tests {
             &snapshot.receipt_number,
             &snapshot.status,
             last_event_hash,
+            snapshot.total,
+            snapshot.tax,
         )
     }
 

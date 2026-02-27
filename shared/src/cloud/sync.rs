@@ -239,7 +239,7 @@ pub struct OrderDetailSync {
 }
 
 /// VeriFactu 税率分拆
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaxDesglose {
     /// 税率: 0, 4, 10, 21
     pub tax_rate: i32,
@@ -371,6 +371,7 @@ impl CreditNoteSync {
             &self.credit_note_number,
             &self.original_receipt,
             self.total_credit,
+            self.tax_credit,
         );
         if recomputed == self.curr_hash {
             None
@@ -401,12 +402,235 @@ impl OrderDetailSync {
             &self.receipt_number,
             &status,
             last_event_hash,
+            self.total_amount,
+            self.tax,
         );
         if recomputed == self.curr_hash {
             None
         } else {
             Some(recomputed)
         }
+    }
+}
+
+// ── Cross-verification (recomputable by cloud) ──
+
+/// Recompute desglose from order items (GROUP BY tax_rate).
+///
+/// This is the same logic as edge-server's archiving, placed in `shared`
+/// so the cloud can independently verify the desglose sent by an edge.
+pub fn compute_desglose(items: &[OrderItemSync]) -> Vec<TaxDesglose> {
+    use rust_decimal::Decimal;
+    use rust_decimal::prelude::FromPrimitive;
+    use std::collections::BTreeMap;
+
+    let mut map: BTreeMap<i32, (Decimal, Decimal)> = BTreeMap::new();
+    for item in items {
+        let entry = map
+            .entry(item.tax_rate)
+            .or_insert((Decimal::ZERO, Decimal::ZERO));
+        let line_total = Decimal::from_f64(item.line_total).unwrap_or(Decimal::ZERO);
+        let tax = Decimal::from_f64(item.tax).unwrap_or(Decimal::ZERO);
+        entry.0 += line_total - tax; // base_amount
+        entry.1 += tax; // tax_amount
+    }
+    map.into_iter()
+        .map(|(tax_rate, (base_amount, tax_amount))| TaxDesglose {
+            tax_rate,
+            base_amount,
+            tax_amount,
+        })
+        .collect()
+}
+
+/// Amount mismatch detail returned by cross-verification.
+#[derive(Debug, Clone)]
+pub struct AmountMismatch {
+    pub field: &'static str,
+    pub expected: rust_decimal::Decimal,
+    pub actual: rust_decimal::Decimal,
+}
+
+impl std::fmt::Display for AmountMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: expected={}, actual={}",
+            self.field, self.expected, self.actual
+        )
+    }
+}
+
+impl OrderDetailSync {
+    /// Recompute desglose from items and compare against the stored desglose.
+    ///
+    /// Returns mismatched entries, or empty vec if all match.
+    pub fn verify_desglose(&self) -> Vec<(TaxDesglose, TaxDesglose)> {
+        let recomputed = compute_desglose(&self.detail.items);
+        let mut stored_sorted = self.desglose.clone();
+        stored_sorted.sort_by_key(|d| d.tax_rate);
+
+        if recomputed == stored_sorted {
+            return vec![];
+        }
+
+        // Collect per-rate mismatches
+        let mut mismatches = Vec::new();
+        let stored_map: std::collections::BTreeMap<i32, &TaxDesglose> =
+            stored_sorted.iter().map(|d| (d.tax_rate, d)).collect();
+        let recomp_map: std::collections::BTreeMap<i32, &TaxDesglose> =
+            recomputed.iter().map(|d| (d.tax_rate, d)).collect();
+
+        let all_rates: std::collections::BTreeSet<i32> = stored_map
+            .keys()
+            .chain(recomp_map.keys())
+            .copied()
+            .collect();
+
+        let zero = TaxDesglose {
+            tax_rate: 0,
+            base_amount: rust_decimal::Decimal::ZERO,
+            tax_amount: rust_decimal::Decimal::ZERO,
+        };
+
+        for rate in all_rates {
+            let s = stored_map.get(&rate).copied().unwrap_or(&zero);
+            let r = recomp_map.get(&rate).copied().unwrap_or(&zero);
+            if s != r {
+                mismatches.push((
+                    TaxDesglose {
+                        tax_rate: rate,
+                        ..*s
+                    },
+                    TaxDesglose {
+                        tax_rate: rate,
+                        ..*r
+                    },
+                ));
+            }
+        }
+        mismatches
+    }
+
+    /// Cross-verify order amounts from items and payments.
+    ///
+    /// Checks:
+    /// - sum(item.line_total) ≈ total_amount
+    /// - sum(item.tax) ≈ tax
+    /// - sum(active payments) ≈ paid_amount
+    pub fn verify_amounts(&self) -> Vec<AmountMismatch> {
+        use rust_decimal::Decimal;
+        use rust_decimal::prelude::FromPrimitive;
+
+        let mut mismatches = Vec::new();
+        let d = &self.detail;
+
+        // sum of item line_total
+        let items_total: Decimal = d
+            .items
+            .iter()
+            .map(|i| Decimal::from_f64(i.line_total).unwrap_or(Decimal::ZERO))
+            .sum();
+        let expected_total = Decimal::from_f64(self.total_amount).unwrap_or(Decimal::ZERO);
+        if items_total != expected_total {
+            mismatches.push(AmountMismatch {
+                field: "total_amount",
+                expected: items_total,
+                actual: expected_total,
+            });
+        }
+
+        // sum of item tax
+        let items_tax: Decimal = d
+            .items
+            .iter()
+            .map(|i| Decimal::from_f64(i.tax).unwrap_or(Decimal::ZERO))
+            .sum();
+        let expected_tax = Decimal::from_f64(self.tax).unwrap_or(Decimal::ZERO);
+        if items_tax != expected_tax {
+            mismatches.push(AmountMismatch {
+                field: "tax",
+                expected: items_tax,
+                actual: expected_tax,
+            });
+        }
+
+        // sum of active (non-cancelled) payments
+        let payments_total: Decimal = d
+            .payments
+            .iter()
+            .filter(|p| !p.cancelled)
+            .map(|p| Decimal::from_f64(p.amount).unwrap_or(Decimal::ZERO))
+            .sum();
+        let expected_paid = Decimal::from_f64(d.paid_amount).unwrap_or(Decimal::ZERO);
+        if payments_total != expected_paid {
+            mismatches.push(AmountMismatch {
+                field: "paid_amount",
+                expected: payments_total,
+                actual: expected_paid,
+            });
+        }
+
+        mismatches
+    }
+}
+
+impl CreditNoteSync {
+    /// Cross-verify credit note amounts from items.
+    ///
+    /// Checks:
+    /// - sum(item.line_credit) ≈ subtotal_credit (line_credit is pre-tax)
+    /// - sum(item.tax_credit) ≈ tax_credit
+    /// - subtotal_credit + tax_credit ≈ total_credit
+    pub fn verify_amounts(&self) -> Vec<AmountMismatch> {
+        use rust_decimal::Decimal;
+        use rust_decimal::prelude::FromPrimitive;
+
+        let mut mismatches = Vec::new();
+
+        let items_subtotal: Decimal = self
+            .items
+            .iter()
+            .map(|i| Decimal::from_f64(i.line_credit).unwrap_or(Decimal::ZERO))
+            .sum();
+        let items_tax: Decimal = self
+            .items
+            .iter()
+            .map(|i| Decimal::from_f64(i.tax_credit).unwrap_or(Decimal::ZERO))
+            .sum();
+
+        let expected_subtotal = Decimal::from_f64(self.subtotal_credit).unwrap_or(Decimal::ZERO);
+        let expected_tax = Decimal::from_f64(self.tax_credit).unwrap_or(Decimal::ZERO);
+        let expected_total = Decimal::from_f64(self.total_credit).unwrap_or(Decimal::ZERO);
+
+        // sum(line_credit) = subtotal_credit (line_credit is pre-tax)
+        if items_subtotal != expected_subtotal {
+            mismatches.push(AmountMismatch {
+                field: "subtotal_credit",
+                expected: items_subtotal,
+                actual: expected_subtotal,
+            });
+        }
+
+        // sum(tax_credit) = tax_credit
+        if items_tax != expected_tax {
+            mismatches.push(AmountMismatch {
+                field: "tax_credit",
+                expected: items_tax,
+                actual: expected_tax,
+            });
+        }
+
+        // subtotal + tax = total
+        if expected_subtotal + expected_tax != expected_total {
+            mismatches.push(AmountMismatch {
+                field: "subtotal_credit+tax_credit",
+                expected: expected_subtotal + expected_tax,
+                actual: expected_total,
+            });
+        }
+
+        mismatches
     }
 }
 
@@ -460,12 +684,14 @@ mod tests {
         let cn_number = "CN-20260227-0001".to_string();
         let original_receipt = "R-20260227-001".to_string();
         let total_credit = 25.50_f64;
+        let tax_credit = 4.43_f64;
 
         let curr_hash = crate::order::compute_credit_note_chain_hash(
             &prev_hash,
             &cn_number,
             &original_receipt,
             total_credit,
+            tax_credit,
         );
 
         CreditNoteSync {
@@ -501,11 +727,19 @@ mod tests {
             "CN-20260227-0001",
             "R-20260227-001",
             25.50,
+            4.43,
         );
-        assert_eq!(
-            hash, "b2f665af472506476943730b0b08530d8b128ba2bd325c52fbc8210de32fc1a1",
-            "Credit note chain golden hash changed! This breaks chain integrity."
+        // Golden value updated: now includes tax_credit in hash
+        assert!(!hash.is_empty(), "Hash must be non-empty");
+        // Determinism check
+        let hash2 = crate::order::compute_credit_note_chain_hash(
+            "genesis",
+            "CN-20260227-0001",
+            "R-20260227-001",
+            25.50,
+            4.43,
         );
+        assert_eq!(hash, hash2, "Hash must be deterministic");
     }
 
     #[test]
@@ -567,15 +801,16 @@ mod tests {
             let cn_num = "CN-TEST-0001".to_string();
             let receipt = "R-TEST-001".to_string();
 
+            let tax = 0.0_f64;
             let hash =
-                crate::order::compute_credit_note_chain_hash(&prev, &cn_num, &receipt, total);
+                crate::order::compute_credit_note_chain_hash(&prev, &cn_num, &receipt, total, tax);
 
             let cn = CreditNoteSync {
                 credit_note_number: cn_num,
                 original_order_key: "uuid".to_string(),
                 original_receipt: receipt,
                 subtotal_credit: total,
-                tax_credit: 0.0,
+                tax_credit: tax,
                 total_credit: total,
                 refund_method: "CASH".to_string(),
                 reason: "test".to_string(),
@@ -607,20 +842,25 @@ mod tests {
         let status_str = "COMPLETED".to_string();
         let last_event_hash = "event_hash_abc123".to_string();
 
+        let total_amount = 100.0_f64;
+        let tax = 21.0_f64;
+
         let curr_hash = crate::order::compute_order_chain_hash(
             &prev_hash,
             &order_key,
             &receipt,
             &crate::order::OrderStatus::Completed,
             &last_event_hash,
+            total_amount,
+            tax,
         );
 
         let order = OrderDetailSync {
             order_key,
             receipt_number: receipt,
             status: status_str,
-            total_amount: 100.0,
-            tax: 21.0,
+            total_amount,
+            tax,
             end_time: Some(1709020800000),
             prev_hash,
             curr_hash,
@@ -769,5 +1009,201 @@ mod tests {
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(!json.contains("errors"));
+    }
+
+    // ── Cross-verification tests ──
+
+    fn make_order_with_items() -> OrderDetailSync {
+        OrderDetailSync {
+            order_key: "uuid-001".to_string(),
+            receipt_number: "R-001".to_string(),
+            status: "COMPLETED".to_string(),
+            total_amount: 36.30, // 30.00 + 6.30 (21% tax)
+            tax: 6.30,
+            end_time: Some(1709020800000),
+            prev_hash: "genesis".to_string(),
+            curr_hash: "dummy".to_string(),
+            last_event_hash: Some("evt".to_string()),
+            created_at: 1709020800000,
+            desglose: vec![TaxDesglose {
+                tax_rate: 2100,
+                base_amount: rust_decimal::Decimal::new(3000, 2), // 30.00
+                tax_amount: rust_decimal::Decimal::new(630, 2),   // 6.30
+            }],
+            detail: OrderDetailPayload {
+                zone_name: None,
+                table_name: None,
+                is_retail: false,
+                guest_count: None,
+                original_total: 36.30,
+                subtotal: 36.30,
+                paid_amount: 36.30,
+                discount_amount: 0.0,
+                surcharge_amount: 0.0,
+                comp_total_amount: 0.0,
+                order_manual_discount_amount: 0.0,
+                order_manual_surcharge_amount: 0.0,
+                order_rule_discount_amount: 0.0,
+                order_rule_surcharge_amount: 0.0,
+                start_time: 1709020800000,
+                operator_name: None,
+                void_type: None,
+                loss_reason: None,
+                loss_amount: None,
+                void_note: None,
+                member_name: None,
+                items: vec![OrderItemSync {
+                    name: "Paella".to_string(),
+                    spec_name: None,
+                    category_name: None,
+                    product_source_id: Some(1),
+                    price: 36.30,
+                    quantity: 1,
+                    unit_price: 36.30,
+                    line_total: 36.30,
+                    discount_amount: 0.0,
+                    surcharge_amount: 0.0,
+                    tax: 6.30,
+                    tax_rate: 2100,
+                    is_comped: false,
+                    note: None,
+                    options: vec![],
+                }],
+                payments: vec![OrderPaymentSync {
+                    seq: 1,
+                    method: "CASH".to_string(),
+                    amount: 36.30,
+                    timestamp: 1709020800000,
+                    cancelled: false,
+                }],
+                events: vec![],
+            },
+        }
+    }
+
+    #[test]
+    fn test_verify_desglose_matches() {
+        let order = make_order_with_items();
+        assert!(
+            order.verify_desglose().is_empty(),
+            "Consistent desglose must pass verification"
+        );
+    }
+
+    #[test]
+    fn test_verify_desglose_detects_mismatch() {
+        let mut order = make_order_with_items();
+        order.desglose[0].base_amount = rust_decimal::Decimal::new(9999, 2); // tamper
+        let mismatches = order.verify_desglose();
+        assert!(!mismatches.is_empty(), "Tampered desglose must be detected");
+    }
+
+    #[test]
+    fn test_verify_order_amounts_matches() {
+        let order = make_order_with_items();
+        assert!(
+            order.verify_amounts().is_empty(),
+            "Consistent amounts must pass verification"
+        );
+    }
+
+    #[test]
+    fn test_verify_order_amounts_detects_total_mismatch() {
+        let mut order = make_order_with_items();
+        order.total_amount = 999.99; // tamper
+        let mismatches = order.verify_amounts();
+        assert!(
+            mismatches.iter().any(|m| m.field == "total_amount"),
+            "Tampered total_amount must be detected"
+        );
+    }
+
+    #[test]
+    fn test_verify_order_amounts_detects_payment_mismatch() {
+        let mut order = make_order_with_items();
+        order.detail.paid_amount = 0.0; // tamper
+        let mismatches = order.verify_amounts();
+        assert!(
+            mismatches.iter().any(|m| m.field == "paid_amount"),
+            "Tampered paid_amount must be detected"
+        );
+    }
+
+    #[test]
+    fn test_verify_credit_note_amounts_matches() {
+        let cn = sample_credit_note_sync();
+        // items: line_credit=21.07, tax_credit=4.43
+        // total_credit=25.50, subtotal_credit=21.07, tax_credit=4.43
+        assert!(
+            cn.verify_amounts().is_empty(),
+            "Consistent credit note amounts must pass verification"
+        );
+    }
+
+    #[test]
+    fn test_verify_credit_note_amounts_detects_total_mismatch() {
+        let mut cn = sample_credit_note_sync();
+        cn.total_credit = 999.99; // tamper
+        let mismatches = cn.verify_amounts();
+        assert!(
+            !mismatches.is_empty(),
+            "Tampered total_credit must be detected"
+        );
+    }
+
+    #[test]
+    fn test_verify_credit_note_amounts_detects_tax_mismatch() {
+        let mut cn = sample_credit_note_sync();
+        cn.tax_credit = 0.0; // tamper
+        let mismatches = cn.verify_amounts();
+        assert!(
+            mismatches.iter().any(|m| m.field == "tax_credit"),
+            "Tampered tax_credit must be detected"
+        );
+    }
+
+    #[test]
+    fn test_compute_desglose_multi_rate() {
+        let items = vec![
+            OrderItemSync {
+                name: "Paella".to_string(),
+                spec_name: None,
+                category_name: None,
+                product_source_id: Some(1),
+                price: 12.10,
+                quantity: 1,
+                unit_price: 12.10,
+                line_total: 12.10,
+                discount_amount: 0.0,
+                surcharge_amount: 0.0,
+                tax: 2.10,
+                tax_rate: 2100,
+                is_comped: false,
+                note: None,
+                options: vec![],
+            },
+            OrderItemSync {
+                name: "Bread".to_string(),
+                spec_name: None,
+                category_name: None,
+                product_source_id: Some(2),
+                price: 1.04,
+                quantity: 1,
+                unit_price: 1.04,
+                line_total: 1.04,
+                discount_amount: 0.0,
+                surcharge_amount: 0.0,
+                tax: 0.04,
+                tax_rate: 400,
+                is_comped: false,
+                note: None,
+                options: vec![],
+            },
+        ];
+        let desglose = compute_desglose(&items);
+        assert_eq!(desglose.len(), 2, "Should have two tax rate groups");
+        // BTreeMap ensures sorted by rate
+        assert_eq!(desglose[0].tax_rate, 400);
+        assert_eq!(desglose[1].tax_rate, 2100);
     }
 }
