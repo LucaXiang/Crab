@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     device_id TEXT NOT NULL,
     expires_at BIGINT NOT NULL,
-    created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
+    user_agent TEXT NOT NULL DEFAULT '',
+    ip_address TEXT NOT NULL DEFAULT '',
+    created_at BIGINT NOT NULL DEFAULT 0,
     revoked BOOLEAN NOT NULL DEFAULT FALSE
 );
 
@@ -404,6 +406,7 @@ CREATE TABLE IF NOT EXISTS store_archived_orders (
     start_time BIGINT,
     prev_hash TEXT,
     curr_hash TEXT,
+    last_event_hash TEXT,
     version BIGINT NOT NULL DEFAULT 0,
     detail JSONB,
     synced_at BIGINT NOT NULL
@@ -647,3 +650,79 @@ CREATE TABLE tenant_images (
 );
 
 CREATE INDEX idx_tenant_images_orphaned ON tenant_images (orphaned_at) WHERE orphaned_at IS NOT NULL;
+
+-- ── Credit Notes (synced from edge) ──
+
+CREATE TABLE IF NOT EXISTS store_credit_notes (
+    id BIGSERIAL PRIMARY KEY,
+    store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL,
+    source_id BIGINT NOT NULL,
+    credit_note_number TEXT NOT NULL,
+    original_order_key TEXT NOT NULL,
+    original_receipt TEXT NOT NULL,
+    subtotal_credit DOUBLE PRECISION NOT NULL,
+    tax_credit DOUBLE PRECISION NOT NULL,
+    total_credit DOUBLE PRECISION NOT NULL,
+    refund_method TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    note TEXT,
+    operator_name TEXT NOT NULL,
+    authorizer_name TEXT,
+    prev_hash TEXT NOT NULL,
+    curr_hash TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    detail JSONB,
+    version BIGINT NOT NULL DEFAULT 0,
+    synced_at BIGINT NOT NULL
+);
+
+CREATE UNIQUE INDEX uq_store_credit_notes_source
+    ON store_credit_notes (tenant_id, store_id, source_id);
+CREATE INDEX idx_store_credit_notes_order
+    ON store_credit_notes (tenant_id, store_id, original_order_key);
+CREATE INDEX idx_store_credit_notes_tenant
+    ON store_credit_notes (tenant_id, created_at DESC);
+
+-- ── Verifactu Invoices (synced from edge) ──
+
+CREATE TABLE IF NOT EXISTS store_invoices (
+    id BIGSERIAL PRIMARY KEY,
+    store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL,
+    source_id BIGINT NOT NULL,
+    invoice_number TEXT NOT NULL,
+    serie TEXT NOT NULL,
+    tipo_factura TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_pk BIGINT NOT NULL,
+    subtotal DOUBLE PRECISION NOT NULL,
+    tax DOUBLE PRECISION NOT NULL,
+    total DOUBLE PRECISION NOT NULL,
+    huella TEXT NOT NULL,
+    prev_huella TEXT,
+    fecha_expedicion TEXT NOT NULL,
+    nif TEXT NOT NULL,
+    nombre_razon TEXT NOT NULL,
+    factura_rectificada_id BIGINT,
+    factura_rectificada_num TEXT,
+    aeat_status TEXT NOT NULL DEFAULT 'PENDING',
+    aeat_csv TEXT,
+    aeat_submitted_at BIGINT,
+    aeat_response_at BIGINT,
+    created_at BIGINT NOT NULL,
+    detail JSONB,
+    version BIGINT NOT NULL DEFAULT 0,
+    synced_at BIGINT NOT NULL
+);
+
+CREATE UNIQUE INDEX uq_store_invoices_source
+    ON store_invoices (tenant_id, store_id, source_id);
+CREATE UNIQUE INDEX uq_store_invoices_number
+    ON store_invoices (store_id, invoice_number);
+CREATE INDEX idx_store_invoices_tenant
+    ON store_invoices (tenant_id, created_at DESC);
+CREATE INDEX idx_store_invoices_aeat_pending
+    ON store_invoices (aeat_status) WHERE aeat_status != 'ACCEPTED';
+CREATE INDEX idx_store_invoices_order
+    ON store_invoices (store_id, source_type, source_pk);

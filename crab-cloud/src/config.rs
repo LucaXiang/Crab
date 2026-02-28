@@ -47,6 +47,8 @@ pub struct Config {
     pub stripe_basic_yearly_price_id: String,
     /// Stripe Price ID for Pro plan (yearly)
     pub stripe_pro_yearly_price_id: String,
+    /// Secrets Manager key prefix (default: "crab", dev: "crab-dev")
+    pub secrets_prefix: String,
 }
 
 impl Config {
@@ -115,6 +117,7 @@ impl Config {
                 .unwrap_or_else(|_| "price_basic_yearly_placeholder".into()),
             stripe_pro_yearly_price_id: std::env::var("STRIPE_PRO_YEARLY_PRICE_ID")
                 .unwrap_or_else(|_| "price_pro_yearly_placeholder".into()),
+            secrets_prefix: std::env::var("SECRETS_PREFIX").unwrap_or_else(|_| "crab".into()),
         })
     }
 }

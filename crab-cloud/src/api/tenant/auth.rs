@@ -1,6 +1,8 @@
 //! Authentication endpoints: login, forgot-password, reset-password
 
-use axum::{Json, extract::State};
+use axum::Json;
+use axum::extract::State;
+use http::HeaderMap;
 use serde::Deserialize;
 use shared::error::{AppError, ErrorCode};
 
@@ -9,6 +11,30 @@ use crate::state::AppState;
 use crate::util::{generate_code, hash_password, verify_password};
 
 use super::ApiResult;
+
+pub fn extract_client_info(headers: &HeaderMap) -> (String, String) {
+    let ua = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_owned();
+    // Caddy sets X-Real-IP; fallback to X-Forwarded-For
+    let ip = headers
+        .get("x-real-ip")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            headers
+                .get("x-forwarded-for")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.rsplit(',').next())
+                .map(|s| s.trim().to_owned())
+                .filter(|s| !s.is_empty())
+        })
+        .unwrap_or_default();
+    (ua, ip)
+}
 
 /// POST /api/tenant/login
 #[derive(Deserialize)]
@@ -27,6 +53,7 @@ pub struct LoginResponse {
 
 pub async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<LoginRequest>,
 ) -> ApiResult<LoginResponse> {
     let email = req.email.trim().to_lowercase();
@@ -54,12 +81,20 @@ pub async fn login(
                 AppError::new(ErrorCode::InternalError)
             })?;
 
-    let refresh_token = db::refresh_tokens::create(&state.pool, &tenant.id, "console")
-        .await
-        .map_err(|e| {
-            tracing::error!("Refresh token creation failed: {e}");
-            AppError::new(ErrorCode::InternalError)
-        })?;
+    let device_id = format!("console-{}", uuid::Uuid::new_v4());
+    let (user_agent, ip_address) = extract_client_info(&headers);
+    let refresh_token = db::refresh_tokens::create(
+        &state.pool,
+        &tenant.id,
+        &device_id,
+        &user_agent,
+        &ip_address,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Refresh token creation failed: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
 
     let now = shared::util::now_millis();
     let _ = db::audit::log(&state.pool, &tenant.id, "login", None, None, now).await;

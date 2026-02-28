@@ -72,6 +72,8 @@ pub struct AppState {
     pub live_orders: LiveOrderHub,
     /// Console WS connections per tenant (tenant_id → count)
     pub console_connections: Arc<DashMap<String, AtomicUsize>>,
+    /// Environment: development | staging | production
+    pub environment: String,
 }
 
 impl AppState {
@@ -95,9 +97,15 @@ impl AppState {
             config.email_from.clone(),
         );
 
-        let master_key = Arc::new(MasterKey::from_secrets_manager(&sm_client).await?);
+        let master_key =
+            Arc::new(MasterKey::from_secrets_manager(&sm_client, &config.secrets_prefix).await?);
 
-        let ca_store = CaStore::new(sm_client, pool.clone(), master_key.clone());
+        let ca_store = CaStore::new(
+            sm_client,
+            pool.clone(),
+            master_key.clone(),
+            config.secrets_prefix.clone(),
+        );
 
         // Verify Root CA is accessible (warm cache)
         ca_store.get_or_create_root_ca().await?;
@@ -149,6 +157,7 @@ impl AppState {
             edges: EdgeConnections::new(),
             live_orders: LiveOrderHub::new(),
             console_connections: Arc::new(DashMap::new()),
+            environment: config.environment.clone(),
         })
     }
 }
@@ -163,6 +172,8 @@ pub struct CaStore {
     sm: SmClient,
     pool: PgPool,
     master_key: Arc<MasterKey>,
+    /// Secrets Manager key prefix (e.g. "crab" or "crab-dev")
+    secrets_prefix: String,
     /// Root CA in-process cache (cert + key, never changes after creation)
     root_ca_cache: std::sync::Arc<OnceCell<CaSecret>>,
     /// Tenant CA in-process cache (tenant_id → CaSecret, never changes after creation)
@@ -181,12 +192,18 @@ struct CaSecret {
 }
 
 impl CaStore {
-    pub fn new(sm: SmClient, pool: PgPool, master_key: Arc<MasterKey>) -> Self {
+    pub fn new(
+        sm: SmClient,
+        pool: PgPool,
+        master_key: Arc<MasterKey>,
+        secrets_prefix: String,
+    ) -> Self {
         Self {
             tenant_ca_negative: Arc::new(DashMap::new()),
             sm,
             pool,
             master_key,
+            secrets_prefix,
             root_ca_cache: std::sync::Arc::new(OnceCell::new()),
             tenant_ca_cache: Arc::new(DashMap::new()),
         }
@@ -339,7 +356,8 @@ impl CaStore {
 
     /// Root CA 初始化（从 Secrets Manager 读取或创建）
     async fn init_root_ca(&self) -> Result<CaSecret, BoxError> {
-        match self.read_secret("crab/root-ca").await? {
+        let secret_name = format!("{}/root-ca", self.secrets_prefix);
+        match self.read_secret(&secret_name).await? {
             Some(s) => Ok(s),
             None => {
                 let ca = CertificateAuthority::new_root(CaProfile::root("Crab Root CA"))?;
@@ -347,7 +365,7 @@ impl CaStore {
                     cert_pem: ca.cert_pem().to_string(),
                     key_pem: ca.key_pem(),
                 };
-                self.create_secret("crab/root-ca", &s).await?;
+                self.create_secret(&secret_name, &s).await?;
                 Ok(s)
             }
         }

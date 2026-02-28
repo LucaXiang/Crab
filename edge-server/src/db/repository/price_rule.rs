@@ -4,6 +4,15 @@ use super::{RepoError, RepoResult};
 use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, ZONE_SCOPE_ALL};
 use sqlx::SqlitePool;
 
+pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<PriceRule>> {
+    let rules = sqlx::query_as::<_, PriceRule>(
+        "SELECT id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule ORDER BY created_at DESC",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rules)
+}
+
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<PriceRule>> {
     let rules = sqlx::query_as::<_, PriceRule>(
         "SELECT id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, COALESCE(active_days, 'null') as active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 ORDER BY created_at DESC",

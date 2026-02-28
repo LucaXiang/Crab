@@ -1,26 +1,11 @@
-//! Catalog data transfer types + import logic
+//! Catalog data transfer import logic
 //!
-//! Uses `shared::models` types for ZIP format compatibility with edge-server.
+//! Uses `shared::models::CatalogExport` for ZIP format compatibility with edge-server.
 
-use serde::{Deserialize, Serialize};
-use shared::models::{Attribute, AttributeBinding, Category, ProductFull, Tag};
+pub use shared::models::CatalogExport;
 use sqlx::PgPool;
 
 use super::BoxError;
-
-/// Catalog export payload — the content of `catalog.json` inside the ZIP.
-///
-/// Uses `shared::models` types so the format matches edge-server exactly.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CatalogExport {
-    pub version: u32,
-    pub exported_at: i64,
-    pub tags: Vec<Tag>,
-    pub categories: Vec<Category>,
-    pub products: Vec<ProductFull>,
-    pub attributes: Vec<Attribute>,
-    pub attribute_bindings: Vec<AttributeBinding>,
-}
 
 /// Delete all catalog data for a store and re-insert from the export.
 ///
@@ -95,6 +80,21 @@ pub async fn import_catalog(
         .await?;
 
     sqlx::query("DELETE FROM store_tags WHERE store_id = $1")
+        .bind(store_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM store_price_rules WHERE store_id = $1")
+        .bind(store_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM store_dining_tables WHERE store_id = $1")
+        .bind(store_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM store_zones WHERE store_id = $1")
         .bind(store_id)
         .execute(&mut *tx)
         .await?;
@@ -303,6 +303,93 @@ pub async fn import_catalog(
         .bind(binding.is_required)
         .bind(binding.display_order)
         .bind(&default_ids_json)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // ── INSERT zones ──
+    for z in &catalog.zones {
+        sqlx::query(
+            r#"INSERT INTO store_zones (store_id, source_id, name, description, is_active, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)"#,
+        )
+        .bind(store_id)
+        .bind(z.id)
+        .bind(&z.name)
+        .bind(&z.description)
+        .bind(z.is_active)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // ── INSERT dining_tables (after zones, FK → zone_source_id) ──
+    for dt in &catalog.dining_tables {
+        sqlx::query(
+            r#"INSERT INTO store_dining_tables (store_id, source_id, name, zone_source_id, capacity, is_active, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+        )
+        .bind(store_id)
+        .bind(dt.id)
+        .bind(&dt.name)
+        .bind(dt.zone_id)
+        .bind(dt.capacity)
+        .bind(dt.is_active)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // ── INSERT price_rules ──
+    for pr in &catalog.price_rules {
+        let active_days_mask: Option<i32> = pr
+            .active_days
+            .as_ref()
+            .map(|days| days.iter().fold(0i32, |mask, &day| mask | (1 << day)));
+        let rule_type_str = serde_json::to_value(&pr.rule_type)
+            .ok()
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_default();
+        let product_scope_str = serde_json::to_value(&pr.product_scope)
+            .ok()
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_default();
+        let adjustment_type_str = serde_json::to_value(&pr.adjustment_type)
+            .ok()
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_default();
+
+        sqlx::query(
+            r#"INSERT INTO store_price_rules (
+                store_id, source_id, name, receipt_name, description,
+                rule_type, product_scope, target_id, zone_scope,
+                adjustment_type, adjustment_value, is_stackable, is_exclusive,
+                valid_from, valid_until, active_days, active_start_time, active_end_time,
+                is_active, created_by, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)"#,
+        )
+        .bind(store_id)
+        .bind(pr.id)
+        .bind(&pr.name)
+        .bind(&pr.receipt_name)
+        .bind(&pr.description)
+        .bind(&rule_type_str)
+        .bind(&product_scope_str)
+        .bind(pr.target_id)
+        .bind(&pr.zone_scope)
+        .bind(&adjustment_type_str)
+        .bind(pr.adjustment_value)
+        .bind(pr.is_stackable)
+        .bind(pr.is_exclusive)
+        .bind(pr.valid_from)
+        .bind(pr.valid_until)
+        .bind(active_days_mask)
+        .bind(&pr.active_start_time)
+        .bind(&pr.active_end_time)
+        .bind(pr.is_active)
+        .bind(pr.created_by)
+        .bind(pr.created_at)
+        .bind(now)
         .execute(&mut *tx)
         .await?;
     }

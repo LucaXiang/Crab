@@ -132,19 +132,19 @@ pub async fn verify_tenant(
         }
     };
 
-    let refresh_token = match refresh_tokens::create(&state.pool, &tenant.id, &req.device_id).await
-    {
-        Ok(t) => t,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to create refresh token");
-            return Json(TenantVerifyResponse {
-                success: false,
-                error: Some("Internal error".to_string()),
-                error_code: Some(ErrorCode::InternalError),
-                data: None,
-            });
-        }
-    };
+    let refresh_token =
+        match refresh_tokens::create(&state.pool, &tenant.id, &req.device_id, "", "").await {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to create refresh token");
+                return Json(TenantVerifyResponse {
+                    success: false,
+                    error: Some("Internal error".to_string()),
+                    error_code: Some(ErrorCode::InternalError),
+                    data: None,
+                });
+            }
+        };
 
     let has_p12 = p12::get_p12_info(&state.pool, &tenant.id)
         .await

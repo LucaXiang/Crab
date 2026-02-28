@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS store_invoices;
+DROP TABLE IF EXISTS store_credit_notes;
 DROP TABLE IF EXISTS tenant_images;
 DROP TABLE IF EXISTS store_pending_ops;
 DROP TABLE IF EXISTS store_label_fields;

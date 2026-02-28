@@ -18,6 +18,10 @@
 	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://cloud.redcoral.app wss://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
 }
 
+(csp_dev_console) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://dev-cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://dev-cloud.redcoral.app wss://dev-cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+}
+
 redcoral.app {
 	import security_headers
 	import csp_portal
@@ -73,6 +77,35 @@ console.redcoral.app {
 	header @static Cache-Control "public, max-age=3600"
 }
 
+dev-console.redcoral.app {
+	import security_headers
+	import csp_dev_console
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+		format json
+	}
+	root * /srv/dev-console
+	file_server
+	try_files {path} {path}.html {path}/index.html /200.html
+	encode gzip
+
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@html path /index.html /200.html
+	header @html Cache-Control "no-cache"
+
+	@static {
+		not path /assets/*
+		not path /index.html
+		not path /200.html
+	}
+	header @static Cache-Control "public, max-age=3600"
+}
+
 cloud.redcoral.app {
 	import security_headers
 	log {
@@ -83,6 +116,20 @@ cloud.redcoral.app {
 		format json
 	}
 	reverse_proxy crab-cloud:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+dev-cloud.redcoral.app {
+	import security_headers
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+		format json
+	}
+	reverse_proxy dev-cloud:8081 {
 		header_up X-Real-IP {remote_host}
 	}
 }

@@ -7,6 +7,7 @@ mod auth;
 mod billing;
 mod command;
 mod order;
+mod session;
 mod store;
 
 use shared::error::{AppError, ErrorCode};
@@ -35,7 +36,7 @@ pub async fn verify_store(
 }
 
 // Re-export all handlers for route registration
-pub use auth::{forgot_password, login, reset_password};
+pub use auth::{extract_client_info, forgot_password, login, reset_password};
 
 pub use account::{
     change_email, change_password, confirm_email_change, get_profile, update_profile,
@@ -54,3 +55,5 @@ pub use command::{create_command, list_commands};
 pub use billing::{billing_portal, create_checkout};
 
 pub use audit::audit_log;
+
+pub use session::{list_sessions, revoke_session};

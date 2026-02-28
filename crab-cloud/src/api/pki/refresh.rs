@@ -1,18 +1,23 @@
 use axum::Json;
 use axum::extract::State;
+use http::HeaderMap;
 use shared::activation::{TokenRefreshRequest, TokenRefreshResponse};
 use shared::error::{AppError, ErrorCode};
 
+use crate::api::tenant::extract_client_info;
 use crate::auth::tenant_auth;
 use crate::db::{refresh_tokens, tenants};
 use crate::state::AppState;
 
 pub async fn refresh_token(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<TokenRefreshRequest>,
 ) -> Result<Json<TokenRefreshResponse>, AppError> {
+    let (user_agent, ip_address) = extract_client_info(&headers);
+
     let (tenant_id, _device_id, new_refresh_token) =
-        refresh_tokens::rotate(&state.pool, &req.refresh_token)
+        refresh_tokens::rotate(&state.pool, &req.refresh_token, &user_agent, &ip_address)
             .await
             .map_err(|e| {
                 tracing::error!(error = %e, "Database error during token refresh");

@@ -29,10 +29,11 @@ impl MasterKey {
     /// Load or create master key from AWS Secrets Manager
     pub async fn from_secrets_manager(
         sm: &aws_sdk_secretsmanager::Client,
+        secrets_prefix: &str,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let secret_name = "crab/master-key";
+        let secret_name = format!("{secrets_prefix}/master-key");
 
-        match sm.get_secret_value().secret_id(secret_name).send().await {
+        match sm.get_secret_value().secret_id(&secret_name).send().await {
             Ok(output) => {
                 let b64 = output
                     .secret_string()

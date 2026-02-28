@@ -9,31 +9,16 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::header;
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
 use shared::cloud::SyncResource;
 use shared::message::SyncChangeType;
+use sqlx;
 use zip::write::FileOptions;
 use zip::{ZipArchive, ZipWriter};
 
 use crate::core::ServerState;
-use crate::db::repository::{attribute, tag};
+use crate::db::repository::{attribute, dining_table, price_rule, tag, zone};
 use crate::utils::AppError;
-use shared::models::{Attribute, AttributeBinding, Category, ProductFull, Tag};
-
-// =============================================================================
-// Export types
-// =============================================================================
-
-#[derive(Serialize, Deserialize)]
-struct CatalogExport {
-    pub version: u32,
-    pub exported_at: i64,
-    pub tags: Vec<Tag>,
-    pub categories: Vec<Category>,
-    pub products: Vec<ProductFull>,
-    pub attributes: Vec<Attribute>,
-    pub attribute_bindings: Vec<AttributeBinding>,
-}
+use shared::models::{AttributeBinding, CatalogExport, validate_catalog};
 
 // =============================================================================
 // HTTP handlers (delegate to core functions)
@@ -82,6 +67,15 @@ pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError>
     let all_bindings = attribute::find_all_bindings(&state.pool)
         .await
         .map_err(AppError::from)?;
+    let price_rules = price_rule::find_all_with_inactive(&state.pool)
+        .await
+        .map_err(AppError::from)?;
+    let zones = zone::find_all_with_inactive(&state.pool)
+        .await
+        .map_err(AppError::from)?;
+    let dining_tables = dining_table::find_all_with_inactive(&state.pool)
+        .await
+        .map_err(AppError::from)?;
 
     // Filter bindings: only include those referencing exported entities + attributes
     let exported_category_ids: std::collections::HashSet<i64> =
@@ -111,6 +105,9 @@ pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError>
         products,
         attributes,
         attribute_bindings: bindings,
+        price_rules,
+        zones,
+        dining_tables,
     };
 
     let catalog_json =
@@ -196,6 +193,10 @@ pub(super) async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<
         }
     }
 
+    // Validate referential integrity before touching the database
+    validate_catalog(&catalog)
+        .map_err(|e| AppError::validation(format!("Catalog validation failed: {e}")))?;
+
     // Import data within a transaction
     import_catalog_data(state, &catalog).await?;
 
@@ -214,49 +215,14 @@ pub(super) async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<
 }
 
 // =============================================================================
-// SQL import logic
+// SQL import logic — full replacement (DELETE ALL + INSERT ALL)
 // =============================================================================
 
-use std::collections::HashMap;
-
-/// ID 重映射表: old_id → new_id (snowflake)
-struct IdRemap {
-    tags: HashMap<i64, i64>,
-    categories: HashMap<i64, i64>,
-    products: HashMap<i64, i64>,
-    specs: HashMap<i64, i64>,
-    attributes: HashMap<i64, i64>,
-    options: HashMap<i64, i64>,
-}
-
-impl IdRemap {
-    fn new() -> Self {
-        Self {
-            tags: HashMap::new(),
-            categories: HashMap::new(),
-            products: HashMap::new(),
-            specs: HashMap::new(),
-            attributes: HashMap::new(),
-            options: HashMap::new(),
-        }
-    }
-
-    /// 按 name 查找已存在记录的 ID，否则生成新 snowflake ID
-    fn get_or_create(map: &mut HashMap<i64, i64>, old_id: i64, existing_id: Option<i64>) -> i64 {
-        if let Some(&mapped) = map.get(&old_id) {
-            return mapped;
-        }
-        let new_id = existing_id.unwrap_or_else(shared::util::snowflake_id);
-        map.insert(old_id, new_id);
-        new_id
-    }
-}
-
-/// Import catalog data: incremental merge with snowflake ID remapping.
+/// Import catalog data: full replacement within a single transaction.
 ///
-/// - 按 name 匹配已有记录 → 复用其 ID (upsert)
-/// - 新记录 → 生成 snowflake ID
-/// - 所有 FK 引用通过 IdRemap 转换
+/// 1. DELETE all catalog data (reverse FK order, CASCADE handles children)
+/// 2. INSERT all exported data with original IDs
+/// 3. Attribute default_option_ids back-filled after options exist
 async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Result<(), AppError> {
     let mut tx = state
         .pool
@@ -264,25 +230,46 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let mut remap = IdRemap::new();
+    // ── DELETE (reverse FK order; CASCADE handles junction/child tables) ──
+    sqlx::query("DELETE FROM price_rule")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM dining_table")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM zone")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM attribute_binding")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM attribute")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM product")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM category")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    sqlx::query("DELETE FROM tag")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
-    // === Tags: match by name ===
+    // ── INSERT tags ──
     for tag in &catalog.tags {
-        let existing: Option<(i64,)> = sqlx::query_as("SELECT id FROM tag WHERE name = ?")
-            .bind(&tag.name)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| AppError::database(e.to_string()))?;
-
-        let new_id = IdRemap::get_or_create(&mut remap.tags, tag.id, existing.map(|r| r.0));
-
         sqlx::query(
-            "INSERT INTO tag (id, name, color, display_order, is_active, is_system)
-             VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET name=excluded.name, color=excluded.color,
-                display_order=excluded.display_order, is_active=excluded.is_active",
+            "INSERT INTO tag (id, name, color, display_order, is_active, is_system) VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .bind(new_id)
+        .bind(tag.id)
         .bind(&tag.name)
         .bind(&tag.color)
         .bind(tag.display_order)
@@ -293,26 +280,13 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .map_err(|e| AppError::database(e.to_string()))?;
     }
 
-    // === Categories: match by name ===
+    // ── INSERT categories ──
     for cat in &catalog.categories {
-        let existing: Option<(i64,)> = sqlx::query_as("SELECT id FROM category WHERE name = ?")
-            .bind(&cat.name)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| AppError::database(e.to_string()))?;
-
-        let new_id = IdRemap::get_or_create(&mut remap.categories, cat.id, existing.map(|r| r.0));
-
         sqlx::query(
-            "INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET name=excluded.name, sort_order=excluded.sort_order,
-                is_kitchen_print_enabled=excluded.is_kitchen_print_enabled,
-                is_label_print_enabled=excluded.is_label_print_enabled,
-                is_active=excluded.is_active, is_virtual=excluded.is_virtual,
-                match_mode=excluded.match_mode, is_display=excluded.is_display",
+            "INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(new_id)
+        .bind(cat.id)
         .bind(&cat.name)
         .bind(cat.sort_order)
         .bind(cat.is_kitchen_print_enabled)
@@ -325,73 +299,45 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-        // Category print destinations
-        let mut seen = std::collections::HashSet::new();
-        for dest_id in cat
-            .kitchen_print_destinations
-            .iter()
-            .chain(cat.label_print_destinations.iter())
-        {
-            if seen.insert(dest_id) {
-                sqlx::query(
-                    "INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)",
-                )
-                .bind(new_id)
+        // Category → print_destination (kitchen + label share the same junction table)
+        for dest_id in &cat.kitchen_print_destinations {
+            sqlx::query("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)")
+                .bind(cat.id)
                 .bind(dest_id)
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| AppError::database(e.to_string()))?;
-            }
         }
-
-        // Category tags (remap tag IDs)
-        for old_tag_id in &cat.tag_ids {
-            if let Some(&new_tag_id) = remap.tags.get(old_tag_id) {
-                sqlx::query(
-                    "INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)",
-                )
-                .bind(new_id)
-                .bind(new_tag_id)
+        for dest_id in &cat.label_print_destinations {
+            sqlx::query("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)")
+                .bind(cat.id)
+                .bind(dest_id)
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| AppError::database(e.to_string()))?;
-            }
+        }
+
+        // Category → tag
+        for tag_id in &cat.tag_ids {
+            sqlx::query("INSERT INTO category_tag (category_id, tag_id) VALUES (?, ?)")
+                .bind(cat.id)
+                .bind(tag_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| AppError::database(e.to_string()))?;
         }
     }
 
-    // === Products: match by name + category ===
+    // ── INSERT products ──
     for product in &catalog.products {
-        let new_cat_id = remap
-            .categories
-            .get(&product.category_id)
-            .copied()
-            .unwrap_or(product.category_id);
-
-        let existing: Option<(i64,)> =
-            sqlx::query_as("SELECT id FROM product WHERE name = ? AND category_id = ?")
-                .bind(&product.name)
-                .bind(new_cat_id)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(|e| AppError::database(e.to_string()))?;
-
-        let new_id = IdRemap::get_or_create(&mut remap.products, product.id, existing.map(|r| r.0));
-
         sqlx::query(
-            "INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET name=excluded.name, image=excluded.image,
-                category_id=excluded.category_id, sort_order=excluded.sort_order,
-                tax_rate=excluded.tax_rate, receipt_name=excluded.receipt_name,
-                kitchen_print_name=excluded.kitchen_print_name,
-                is_kitchen_print_enabled=excluded.is_kitchen_print_enabled,
-                is_label_print_enabled=excluded.is_label_print_enabled,
-                is_active=excluded.is_active, external_id=excluded.external_id",
+            "INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(new_id)
+        .bind(product.id)
         .bind(&product.name)
         .bind(&product.image)
-        .bind(new_cat_id)
+        .bind(product.category_id)
         .bind(product.sort_order)
         .bind(product.tax_rate)
         .bind(&product.receipt_name)
@@ -404,29 +350,14 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-        // Product specs: match by name + product
+        // Product specs
         for spec in &product.specs {
-            let existing_spec: Option<(i64,)> =
-                sqlx::query_as("SELECT id FROM product_spec WHERE product_id = ? AND name = ?")
-                    .bind(new_id)
-                    .bind(&spec.name)
-                    .fetch_optional(&mut *tx)
-                    .await
-                    .map_err(|e| AppError::database(e.to_string()))?;
-
-            let new_spec_id =
-                IdRemap::get_or_create(&mut remap.specs, spec.id, existing_spec.map(|r| r.0));
-
             sqlx::query(
-                "INSERT INTO product_spec (id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price,
-                    display_order=excluded.display_order, is_default=excluded.is_default,
-                    is_active=excluded.is_active, receipt_name=excluded.receipt_name,
-                    is_root=excluded.is_root",
+                "INSERT INTO product_spec (id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
-            .bind(new_spec_id)
-            .bind(new_id)
+            .bind(spec.id)
+            .bind(product.id)
             .bind(&spec.name)
             .bind(spec.price)
             .bind(spec.display_order)
@@ -439,42 +370,24 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
             .map_err(|e| AppError::database(e.to_string()))?;
         }
 
-        // Product tags (remap)
+        // Product → tag
         for tag in &product.tags {
-            if let Some(&new_tag_id) = remap.tags.get(&tag.id) {
-                sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
-                    .bind(new_id)
-                    .bind(new_tag_id)
-                    .execute(&mut *tx)
-                    .await
-                    .map_err(|e| AppError::database(e.to_string()))?;
-            }
+            sqlx::query("INSERT INTO product_tag (product_id, tag_id) VALUES (?, ?)")
+                .bind(product.id)
+                .bind(tag.id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| AppError::database(e.to_string()))?;
         }
     }
 
-    // === Attributes: match by name ===
-    // Phase 1: Insert attributes + options (populate remap.options)
+    // ── INSERT attributes (without default_option_ids first) ──
     for attr in &catalog.attributes {
-        let existing: Option<(i64,)> = sqlx::query_as("SELECT id FROM attribute WHERE name = ?")
-            .bind(&attr.name)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| AppError::database(e.to_string()))?;
-
-        let new_id = IdRemap::get_or_create(&mut remap.attributes, attr.id, existing.map(|r| r.0));
-
-        // Insert attribute without default_option_ids first (options not yet remapped)
         sqlx::query(
-            "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name)
-             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET name=excluded.name, is_multi_select=excluded.is_multi_select,
-                max_selections=excluded.max_selections,
-                display_order=excluded.display_order, is_active=excluded.is_active,
-                show_on_receipt=excluded.show_on_receipt, receipt_name=excluded.receipt_name,
-                show_on_kitchen_print=excluded.show_on_kitchen_print,
-                kitchen_print_name=excluded.kitchen_print_name",
+            "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) \
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(new_id)
+        .bind(attr.id)
         .bind(&attr.name)
         .bind(attr.is_multi_select)
         .bind(attr.max_selections)
@@ -488,30 +401,14 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-        // Attribute options: match by name + attribute
+        // Attribute options
         for opt in &attr.options {
-            let existing_opt: Option<(i64,)> = sqlx::query_as(
-                "SELECT id FROM attribute_option WHERE attribute_id = ? AND name = ?",
-            )
-            .bind(new_id)
-            .bind(&opt.name)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| AppError::database(e.to_string()))?;
-
-            let new_opt_id =
-                IdRemap::get_or_create(&mut remap.options, opt.id, existing_opt.map(|r| r.0));
-
             sqlx::query(
-                "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(id) DO UPDATE SET name=excluded.name, price_modifier=excluded.price_modifier,
-                    display_order=excluded.display_order, is_active=excluded.is_active,
-                    receipt_name=excluded.receipt_name, kitchen_print_name=excluded.kitchen_print_name,
-                    enable_quantity=excluded.enable_quantity, max_quantity=excluded.max_quantity",
+                "INSERT INTO attribute_option (id, attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
-            .bind(new_opt_id)
-            .bind(new_id)
+            .bind(opt.id)
+            .bind(attr.id)
             .bind(&opt.name)
             .bind(opt.price_modifier)
             .bind(opt.display_order)
@@ -526,83 +423,97 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         }
     }
 
-    // Phase 2: Back-fill attribute default_option_ids with remapped option IDs
+    // Back-fill attribute default_option_ids (options now exist)
     for attr in &catalog.attributes {
-        if let Some(ref old_ids) = attr.default_option_ids {
-            let new_attr_id = remap.attributes[&attr.id];
-            let remapped: Vec<i64> = old_ids
-                .iter()
-                .filter_map(|old| remap.options.get(old).copied())
-                .collect();
-            let json = serde_json::to_string(&remapped).unwrap_or_else(|_| "null".to_string());
+        if let Some(ref ids) = attr.default_option_ids {
+            let json = serde_json::to_string(ids).unwrap_or_else(|_| "null".to_string());
             sqlx::query("UPDATE attribute SET default_option_ids = ? WHERE id = ?")
                 .bind(&json)
-                .bind(new_attr_id)
+                .bind(attr.id)
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| AppError::database(e.to_string()))?;
         }
     }
 
-    // === Attribute bindings: remap all FK references ===
-    for binding in &catalog.attribute_bindings {
-        // Remap owner_id based on owner_type
-        let new_owner_id = match binding.owner_type.as_str() {
-            "product" => remap.products.get(&binding.owner_id).copied(),
-            "category" => remap.categories.get(&binding.owner_id).copied(),
-            _ => None,
-        };
-        let new_attr_id = remap.attributes.get(&binding.attribute_id).copied();
+    // ── INSERT zones ──
+    for z in &catalog.zones {
+        sqlx::query("INSERT INTO zone (id, name, description, is_active) VALUES (?, ?, ?, ?)")
+            .bind(z.id)
+            .bind(&z.name)
+            .bind(&z.description)
+            .bind(z.is_active)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::database(e.to_string()))?;
+    }
 
-        // Skip bindings with unmapped references
-        let (Some(owner_id), Some(attr_id)) = (new_owner_id, new_attr_id) else {
-            tracing::warn!(
-                owner_type = %binding.owner_type,
-                owner_id = binding.owner_id,
-                attribute_id = binding.attribute_id,
-                owner_mapped = new_owner_id.is_some(),
-                attr_mapped = new_attr_id.is_some(),
-                "Skipping attribute binding: unmapped reference"
-            );
-            continue;
-        };
+    // ── INSERT dining_tables (after zones, FK → zone_id) ──
+    for dt in &catalog.dining_tables {
+        sqlx::query(
+            "INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(dt.id)
+        .bind(&dt.name)
+        .bind(dt.zone_id)
+        .bind(dt.capacity)
+        .bind(dt.is_active)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+    }
 
-        let new_id = shared::util::snowflake_id();
-
-        // Remap default_option_ids to new option IDs
-        let remapped_default_opts: Option<Vec<i64>> =
-            binding.default_option_ids.as_ref().map(|ids| {
-                ids.iter()
-                    .filter_map(|old| remap.options.get(old).copied())
-                    .collect()
-            });
-        let default_option_ids_json = remapped_default_opts
+    // ── INSERT price_rules ──
+    for pr in &catalog.price_rules {
+        let active_days_json = pr
+            .active_days
             .as_ref()
             .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "null".to_string()));
 
-        // Skip if binding already exists
-        let existing: Option<(i64,)> = sqlx::query_as(
-            "SELECT id FROM attribute_binding WHERE owner_type = ? AND owner_id = ? AND attribute_id = ?",
+        sqlx::query(
+            "INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
         )
-        .bind(&binding.owner_type)
-        .bind(owner_id)
-        .bind(attr_id)
-        .fetch_optional(&mut *tx)
+        .bind(pr.id)
+        .bind(&pr.name)
+        .bind(&pr.receipt_name)
+        .bind(&pr.description)
+        .bind(&pr.rule_type)
+        .bind(&pr.product_scope)
+        .bind(pr.target_id)
+        .bind(&pr.zone_scope)
+        .bind(&pr.adjustment_type)
+        .bind(pr.adjustment_value)
+        .bind(pr.is_stackable)
+        .bind(pr.is_exclusive)
+        .bind(pr.valid_from)
+        .bind(pr.valid_until)
+        .bind(&active_days_json)
+        .bind(&pr.active_start_time)
+        .bind(&pr.active_end_time)
+        .bind(pr.is_active)
+        .bind(pr.created_by)
+        .bind(pr.created_at)
+        .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
+    }
 
-        let binding_id = existing.map(|r| r.0).unwrap_or(new_id);
+    // ── INSERT attribute bindings ──
+    for binding in &catalog.attribute_bindings {
+        let default_option_ids_json = binding
+            .default_option_ids
+            .as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "null".to_string()));
 
         sqlx::query(
-            "INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET is_required=excluded.is_required,
-                display_order=excluded.display_order, default_option_ids=excluded.default_option_ids",
+            "INSERT INTO attribute_binding (id, owner_type, owner_id, attribute_id, is_required, display_order, default_option_ids) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(binding_id)
+        .bind(binding.id)
         .bind(&binding.owner_type)
-        .bind(owner_id)
-        .bind(attr_id)
+        .bind(binding.owner_id)
+        .bind(binding.attribute_id)
         .bind(binding.is_required)
         .bind(binding.display_order)
         .bind(&default_option_ids_json)
@@ -673,6 +584,51 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                     SyncChangeType::Updated,
                     &a.id.to_string(),
                     Some(a),
+                    false,
+                )
+                .await;
+        }
+    }
+
+    // Zones
+    if let Ok(zones) = zone::find_all_with_inactive(&state.pool).await {
+        for z in &zones {
+            state
+                .broadcast_sync(
+                    SyncResource::Zone,
+                    SyncChangeType::Updated,
+                    &z.id.to_string(),
+                    Some(z),
+                    false,
+                )
+                .await;
+        }
+    }
+
+    // Dining tables
+    if let Ok(tables) = dining_table::find_all_with_inactive(&state.pool).await {
+        for dt in &tables {
+            state
+                .broadcast_sync(
+                    SyncResource::DiningTable,
+                    SyncChangeType::Updated,
+                    &dt.id.to_string(),
+                    Some(dt),
+                    false,
+                )
+                .await;
+        }
+    }
+
+    // Price rules
+    if let Ok(rules) = price_rule::find_all_with_inactive(&state.pool).await {
+        for pr in &rules {
+            state
+                .broadcast_sync(
+                    SyncResource::PriceRule,
+                    SyncChangeType::Updated,
+                    &pr.id.to_string(),
+                    Some(pr),
                     false,
                 )
                 .await;

@@ -438,12 +438,15 @@ pub struct StoreOverview {
     pub voided_amount: f64,
     pub loss_orders: i64,
     pub loss_amount: f64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
     pub revenue_trend: Vec<RevenueTrendPoint>,
     pub tax_breakdown: Vec<TaxBreakdownEntry>,
     pub payment_breakdown: Vec<PaymentBreakdownEntry>,
     pub top_products: Vec<TopProductEntry>,
     pub category_sales: Vec<CategorySaleEntry>,
     pub tag_sales: Vec<TagSaleEntry>,
+    pub refund_method_breakdown: Vec<RefundMethodEntry>,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -486,6 +489,13 @@ pub struct TagSaleEntry {
     pub color: Option<String>,
     pub revenue: f64,
     pub quantity: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct RefundMethodEntry {
+    pub method: String,
+    pub amount: f64,
+    pub count: i64,
 }
 
 /// Compute store overview for a single store
@@ -580,6 +590,8 @@ async fn get_overview(
         top_products_r,
         category_sales_r,
         tag_sales_r,
+        refund_agg_r,
+        refund_method_r,
     ) = tokio::join!(
         // 2. Revenue trend (by hour of day)
         sqlx::query_as::<_, RevenueTrendPoint>(
@@ -727,6 +739,43 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
+        // 8. Refund aggregation from store_credit_notes
+        sqlx::query_as::<_, (i64, f64)>(
+            r#"
+            SELECT
+                COUNT(*),
+                COALESCE(SUM(total_credit), 0)::DOUBLE PRECISION
+            FROM store_credit_notes
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR store_id = $2)
+                AND created_at >= $3 AND created_at < $4
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_one(pool),
+        // 9. Refund method breakdown
+        sqlx::query_as::<_, RefundMethodEntry>(
+            r#"
+            SELECT
+                refund_method AS method,
+                COALESCE(SUM(total_credit), 0)::DOUBLE PRECISION AS amount,
+                COUNT(*) AS count
+            FROM store_credit_notes
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR store_id = $2)
+                AND created_at >= $3 AND created_at < $4
+            GROUP BY refund_method
+            ORDER BY amount DESC
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
     );
 
     let revenue_trend = revenue_trend_r?;
@@ -735,6 +784,8 @@ async fn get_overview(
     let top_products = top_products_r.unwrap_or_default();
     let category_sales = category_sales_r.unwrap_or_default();
     let tag_sales = tag_sales_r.unwrap_or_default();
+    let (refund_count, refund_amount) = refund_agg_r.unwrap_or((0, 0.0));
+    let refund_method_breakdown = refund_method_r.unwrap_or_default();
 
     Ok(StoreOverview {
         revenue,
@@ -749,12 +800,15 @@ async fn get_overview(
         voided_amount,
         loss_orders,
         loss_amount,
+        refund_count,
+        refund_amount,
         revenue_trend,
         tax_breakdown,
         payment_breakdown,
         top_products,
         category_sales,
         tag_sales,
+        refund_method_breakdown,
     })
 }
 

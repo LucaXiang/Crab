@@ -28,6 +28,8 @@ pub mod system_state;
 pub mod tag;
 pub mod zone;
 
+pub mod catalog_export;
+
 // Re-exports
 pub use attribute::*;
 pub use category::*;
@@ -52,3 +54,5 @@ pub use system_issue::*;
 pub use system_state::*;
 pub use tag::*;
 pub use zone::*;
+
+pub use catalog_export::{CatalogExport, validate_catalog};

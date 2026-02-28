@@ -63,7 +63,7 @@ impl RateLimiter {
 }
 
 /// Extract client IP: X-Real-IP (Caddy sets from remote_host), then X-Forwarded-For last entry, then peer address.
-fn extract_ip(request: &Request) -> String {
+pub fn extract_ip(request: &Request) -> String {
     // Caddy sets X-Real-IP to the direct client IP (not spoofable by client)
     if let Some(real_ip) = request.headers().get("x-real-ip")
         && let Ok(ip) = real_ip.to_str()

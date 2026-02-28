@@ -48,6 +48,11 @@ pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
+    // Block registration in non-production environments (dev uses seeded accounts)
+    if state.environment != "production" {
+        return Err(AppError::new(ErrorCode::PermissionDenied));
+    }
+
     let email = req.email.trim().to_lowercase();
 
     // Validate

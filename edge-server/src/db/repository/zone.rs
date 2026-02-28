@@ -5,6 +5,15 @@ use shared::error::ErrorCode;
 use shared::models::{Zone, ZoneCreate, ZoneUpdate};
 use sqlx::SqlitePool;
 
+pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Zone>> {
+    let zones = sqlx::query_as::<_, Zone>(
+        "SELECT id, name, description, is_active FROM zone ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(zones)
+}
+
 pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Zone>> {
     let zones = sqlx::query_as::<_, Zone>(
         "SELECT id, name, description, is_active FROM zone WHERE is_active = 1 ORDER BY name",

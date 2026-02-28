@@ -99,6 +99,8 @@ pub fn public_router(state: AppState) -> Router {
         .route("/api/tenant/billing-portal", post(tenant::billing_portal))
         .route("/api/tenant/create-checkout", post(tenant::create_checkout))
         .route("/api/tenant/audit-log", get(tenant::audit_log))
+        .route("/api/tenant/sessions", get(tenant::list_sessions))
+        .route("/api/tenant/sessions/revoke", post(tenant::revoke_session))
         .route(
             "/api/tenant/stores/{id}/commands",
             post(tenant::create_command).get(tenant::list_commands),
@@ -290,8 +292,10 @@ pub fn public_router(state: AppState) -> Router {
             "https://redcoral.app".parse().unwrap(),
             "https://www.redcoral.app".parse().unwrap(),
             "https://console.redcoral.app".parse().unwrap(),
-            "http://localhost:5173".parse().unwrap(), // dev
-            "http://localhost:5174".parse().unwrap(), // dev console
+            "https://dev-console.redcoral.app".parse().unwrap(),
+            "http://localhost:5173".parse().unwrap(), // dev portal
+            "http://localhost:5174".parse().unwrap(), // dev alt
+            "http://localhost:5180".parse().unwrap(), // dev console
         ]))
         .allow_methods([
             http::Method::GET,

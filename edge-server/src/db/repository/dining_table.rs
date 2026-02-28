@@ -13,6 +13,15 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<DiningTable>> {
     Ok(tables)
 }
 
+pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<DiningTable>> {
+    let tables = sqlx::query_as::<_, DiningTable>(
+        "SELECT id, name, zone_id, capacity, is_active FROM dining_table ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(tables)
+}
+
 pub async fn find_by_zone(pool: &SqlitePool, zone_id: i64) -> RepoResult<Vec<DiningTable>> {
     let tables = sqlx::query_as::<_, DiningTable>(
         "SELECT id, name, zone_id, capacity, is_active FROM dining_table WHERE zone_id = ? AND is_active = 1 ORDER BY name",

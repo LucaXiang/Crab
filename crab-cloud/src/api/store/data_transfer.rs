@@ -21,7 +21,8 @@ use shared::models::category::CategoryCreate;
 use shared::models::product::{ProductCreate, ProductSpecInput};
 use shared::models::tag::TagCreate;
 use shared::models::{
-    Attribute, AttributeBinding, AttributeOption, Category, ProductFull, ProductSpec, Tag,
+    Attribute, AttributeBinding, AttributeOption, Category, DiningTable, PriceRule, ProductFull,
+    ProductSpec, Tag, Zone, validate_catalog,
 };
 use zip::ZipArchive;
 use zip::write::FileOptions;
@@ -55,6 +56,15 @@ pub async fn export_catalog(
         .await
         .map_err(internal)?;
     let store_bindings = store::list_all_bindings(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    let zones: Vec<Zone> = store::list_zones(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    let dining_tables: Vec<DiningTable> = store::list_tables(&state.pool, store_id)
+        .await
+        .map_err(internal)?;
+    let price_rules: Vec<PriceRule> = store::list_price_rules(&state.pool, store_id)
         .await
         .map_err(internal)?;
 
@@ -199,6 +209,9 @@ pub async fn export_catalog(
         products,
         attributes,
         attribute_bindings,
+        price_rules,
+        zones,
+        dining_tables,
     };
 
     let catalog_json =
@@ -256,6 +269,10 @@ pub async fn import_catalog(
         serde_json::from_slice(&json_bytes)
             .map_err(|e| AppError::validation(format!("Invalid catalog.json: {e}")))?
     };
+
+    // Validate referential integrity before touching the database
+    validate_catalog(&catalog)
+        .map_err(|e| AppError::validation(format!("Catalog validation failed: {e}")))?;
 
     // Import within transaction
     store::data_transfer::import_catalog(&state.pool, store_id, &catalog)
