@@ -48,7 +48,9 @@ pub use analytics::{
     get_report_detail, get_stats, get_store_overview, get_store_red_flags, get_tenant_overview,
 };
 
-pub use order::{get_order_detail, list_credit_notes, list_orders};
+pub use order::{
+    get_credit_note_detail, get_order_detail, list_chain_entries, list_credit_notes, list_orders,
+};
 
 pub use command::{create_command, list_commands};
 

@@ -112,10 +112,10 @@ pub async fn list_orders(
     let rows: Vec<ArchivedOrderSummary> = if let Some(status) = status_filter {
         sqlx::query_as(
             r#"
-            SELECT id, source_id, receipt_number, status, end_time, total, synced_at
-            FROM store_archived_orders
-            WHERE store_id = $1 AND tenant_id = $2 AND status = $3
-            ORDER BY end_time DESC NULLS LAST
+            SELECT o.id, o.source_id, o.receipt_number, o.status, o.end_time, o.total, o.synced_at
+            FROM store_archived_orders o
+            WHERE o.store_id = $1 AND o.tenant_id = $2 AND o.status = $3
+            ORDER BY o.end_time DESC NULLS LAST
             LIMIT $4 OFFSET $5
             "#,
         )
@@ -129,10 +129,10 @@ pub async fn list_orders(
     } else {
         sqlx::query_as(
             r#"
-            SELECT id, source_id, receipt_number, status, end_time, total, synced_at
-            FROM store_archived_orders
-            WHERE store_id = $1 AND tenant_id = $2
-            ORDER BY end_time DESC NULLS LAST
+            SELECT o.id, o.source_id, o.receipt_number, o.status, o.end_time, o.total, o.synced_at
+            FROM store_archived_orders o
+            WHERE o.store_id = $1 AND o.tenant_id = $2
+            ORDER BY o.end_time DESC NULLS LAST
             LIMIT $3 OFFSET $4
             "#,
         )
@@ -144,6 +144,110 @@ pub async fn list_orders(
         .await?
     };
     Ok(rows)
+}
+
+/// Unified chain entry item (orders + credit notes in one timeline)
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct ChainEntryItem {
+    pub entry_type: String,
+    pub entry_key: String,
+    pub display_number: String,
+    pub status: String,
+    pub amount: Option<f64>,
+    pub created_at: i64,
+    pub original_order_key: Option<String>,
+    pub original_receipt: Option<String>,
+}
+
+pub async fn list_chain_entries(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    limit: i32,
+    offset: i32,
+) -> Result<Vec<ChainEntryItem>, BoxError> {
+    let rows: Vec<ChainEntryItem> = sqlx::query_as(
+        r#"
+        (
+            SELECT
+                'ORDER'::TEXT AS entry_type,
+                o.order_key AS entry_key,
+                COALESCE(o.receipt_number, o.order_key) AS display_number,
+                o.status,
+                o.total AS amount,
+                COALESCE(o.end_time, o.synced_at) AS created_at,
+                NULL::TEXT AS original_order_key,
+                NULL::TEXT AS original_receipt
+            FROM store_archived_orders o
+            WHERE o.store_id = $1 AND o.tenant_id = $2
+        )
+        UNION ALL
+        (
+            SELECT
+                'CREDIT_NOTE'::TEXT AS entry_type,
+                cn.source_id::TEXT AS entry_key,
+                cn.credit_note_number AS display_number,
+                'REFUND'::TEXT AS status,
+                cn.total_credit AS amount,
+                cn.created_at,
+                cn.original_order_key,
+                cn.original_receipt
+            FROM store_credit_notes cn
+            WHERE cn.store_id = $1 AND cn.tenant_id = $2
+        )
+        ORDER BY created_at DESC
+        LIMIT $3 OFFSET $4
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// Credit note detail (from JSONB detail column)
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct CreditNoteDetail {
+    pub source_id: i64,
+    pub credit_note_number: String,
+    pub original_order_key: String,
+    pub original_receipt: String,
+    pub subtotal_credit: f64,
+    pub tax_credit: f64,
+    pub total_credit: f64,
+    pub refund_method: String,
+    pub reason: String,
+    pub note: Option<String>,
+    pub operator_name: String,
+    pub authorizer_name: Option<String>,
+    pub created_at: i64,
+    pub detail: Option<serde_json::Value>,
+}
+
+pub async fn get_credit_note_detail(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: &str,
+    source_id: &str,
+) -> Result<Option<CreditNoteDetail>, BoxError> {
+    let row = sqlx::query_as::<_, CreditNoteDetail>(
+        r#"
+        SELECT source_id, credit_note_number, original_order_key, original_receipt,
+               subtotal_credit, tax_credit, total_credit, refund_method, reason, note,
+               operator_name, authorizer_name, created_at, detail
+        FROM store_credit_notes
+        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3::BIGINT
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(source_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
 }
 
 /// Daily report entry for Console stats
@@ -447,6 +551,7 @@ pub struct StoreOverview {
     pub category_sales: Vec<CategorySaleEntry>,
     pub tag_sales: Vec<TagSaleEntry>,
     pub refund_method_breakdown: Vec<RefundMethodEntry>,
+    pub daily_trend: Vec<DailyTrendPoint>,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -496,6 +601,13 @@ pub struct RefundMethodEntry {
     pub method: String,
     pub amount: f64,
     pub count: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct DailyTrendPoint {
+    pub date: String,
+    pub revenue: f64,
+    pub orders: i64,
 }
 
 /// Compute store overview for a single store
@@ -583,6 +695,9 @@ async fn get_overview(
     };
 
     // 2-7. Run all independent queries concurrently
+    // Determine if range spans multiple days (> 24h)
+    let multi_day = (to - from) > 86_400_000;
+
     let (
         revenue_trend_r,
         tax_breakdown_r,
@@ -592,6 +707,7 @@ async fn get_overview(
         tag_sales_r,
         refund_agg_r,
         refund_method_r,
+        daily_trend_r,
     ) = tokio::join!(
         // 2. Revenue trend (by hour of day)
         sqlx::query_as::<_, RevenueTrendPoint>(
@@ -776,6 +892,36 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
+        // 10. Daily trend from store_daily_reports (respects business_day_cutoff)
+        // Use epoch ms directly in SQL: convert to date at DB level, ±1 day buffer
+        // to handle timezone differences between client and server
+        async {
+            if !multi_day {
+                return Ok::<Vec<DailyTrendPoint>, sqlx::Error>(vec![]);
+            }
+            sqlx::query_as::<_, DailyTrendPoint>(
+                r#"
+                SELECT
+                    dr.business_date AS date,
+                    COALESCE(SUM(dr.total_sales), 0)::DOUBLE PRECISION AS revenue,
+                    COALESCE(SUM(dr.completed_orders), 0)::BIGINT AS orders
+                FROM store_daily_reports dr
+                JOIN stores s ON s.id = dr.store_id
+                WHERE s.tenant_id = $1
+                    AND ($2::BIGINT IS NULL OR dr.store_id = $2)
+                    AND dr.business_date >= TO_CHAR(TO_TIMESTAMP(($3::BIGINT - 86400000) / 1000.0), 'YYYY-MM-DD')
+                    AND dr.business_date <= TO_CHAR(TO_TIMESTAMP(($4::BIGINT + 86400000) / 1000.0), 'YYYY-MM-DD')
+                GROUP BY dr.business_date
+                ORDER BY dr.business_date
+                "#,
+            )
+            .bind(tenant_id)
+            .bind(store_id)
+            .bind(from)
+            .bind(to)
+            .fetch_all(pool)
+            .await
+        },
     );
 
     let revenue_trend = revenue_trend_r?;
@@ -786,6 +932,7 @@ async fn get_overview(
     let tag_sales = tag_sales_r.unwrap_or_default();
     let (refund_count, refund_amount) = refund_agg_r.unwrap_or((0, 0.0));
     let refund_method_breakdown = refund_method_r.unwrap_or_default();
+    let daily_trend = daily_trend_r.unwrap_or_default();
 
     Ok(StoreOverview {
         revenue,
@@ -809,6 +956,7 @@ async fn get_overview(
         category_sales,
         tag_sales,
         refund_method_breakdown,
+        daily_trend,
     })
 }
 
@@ -996,6 +1144,7 @@ pub async fn get_store_entity_id(
 /// Credit note summary for order detail view
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct CreditNoteSummary {
+    pub source_id: i64,
     pub credit_note_number: String,
     pub total_credit: f64,
     pub refund_method: String,
@@ -1012,7 +1161,7 @@ pub async fn list_credit_notes_by_order(
 ) -> Result<Vec<CreditNoteSummary>, BoxError> {
     let rows: Vec<CreditNoteSummary> = sqlx::query_as(
         r#"
-        SELECT credit_note_number, total_credit, refund_method, reason, operator_name, created_at
+        SELECT source_id, credit_note_number, total_credit, refund_method, reason, operator_name, created_at
         FROM store_credit_notes
         WHERE store_id = $1 AND tenant_id = $2 AND original_order_key = $3
         ORDER BY created_at DESC

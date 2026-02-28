@@ -181,3 +181,67 @@ pub async fn list_credit_notes(
 
     Ok(Json(notes))
 }
+
+/// GET /api/tenant/stores/:id/chain-entries
+#[derive(Deserialize)]
+pub struct ChainEntriesQuery {
+    pub page: Option<i32>,
+    pub per_page: Option<i32>,
+}
+
+pub async fn list_chain_entries(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Query(query): Query<ChainEntriesQuery>,
+) -> ApiResult<Vec<tenant_queries::ChainEntryItem>> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let per_page = query.per_page.unwrap_or(20).min(100);
+    let page = query.page.unwrap_or(1).max(1);
+    let offset = (page - 1) * per_page;
+
+    let entries = tenant_queries::list_chain_entries(
+        &state.pool,
+        store_id,
+        &identity.tenant_id,
+        per_page,
+        offset,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Chain entries query error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    Ok(Json(entries))
+}
+
+/// GET /api/tenant/stores/:id/credit-notes/:source_id
+pub async fn get_credit_note_detail(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, source_id)): Path<(i64, String)>,
+) -> ApiResult<tenant_queries::CreditNoteDetail> {
+    verify_store(&state, store_id, &identity.tenant_id).await?;
+
+    let detail = tenant_queries::get_credit_note_detail(
+        &state.pool,
+        store_id,
+        &identity.tenant_id,
+        &source_id,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Credit note detail query error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    match detail {
+        Some(d) => Ok(Json(d)),
+        None => Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Credit note not found",
+        )),
+    }
+}

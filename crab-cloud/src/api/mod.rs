@@ -83,6 +83,14 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/orders/{order_key}/credit-notes",
             get(tenant::list_credit_notes),
         )
+        .route(
+            "/api/tenant/stores/{id}/chain-entries",
+            get(tenant::list_chain_entries),
+        )
+        .route(
+            "/api/tenant/stores/{id}/credit-notes/{source_id}",
+            get(tenant::get_credit_note_detail),
+        )
         .route("/api/tenant/stores/{id}/stats", get(tenant::get_stats))
         .route(
             "/api/tenant/stores/{id}/overview",
