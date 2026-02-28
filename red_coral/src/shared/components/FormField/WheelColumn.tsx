@@ -29,6 +29,8 @@ export const WheelColumn: React.FC<WheelColumnProps> = React.memo(({ items, sele
   useEffect(() => {
     const el = containerRef.current;
     if (!el || selectedIndex < 0) return;
+    // Cancel pending user-scroll handler before programmatic scroll
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
     isUserScroll.current = false;
     el.scrollTop = selectedIndex * ITEM_HEIGHT;
     requestAnimationFrame(() => { isUserScroll.current = true; });
