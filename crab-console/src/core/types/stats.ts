@@ -69,6 +69,23 @@ export interface StoreOverview {
   tag_sales: TagSale[];
   refund_method_breakdown: RefundMethodBreakdown[];
   daily_trend: DailyTrendPoint[];
+  service_type_breakdown: ServiceTypeEntry[];
+  zone_sales: ZoneSaleEntry[];
+  total_surcharge: number;
+  avg_items_per_order: number;
+}
+
+export interface ServiceTypeEntry {
+  service_type: string;
+  revenue: number;
+  orders: number;
+}
+
+export interface ZoneSaleEntry {
+  zone_name: string;
+  revenue: number;
+  orders: number;
+  guests: number;
 }
 
 export interface DailyReportEntry {

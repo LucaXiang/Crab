@@ -546,6 +546,10 @@ pub struct StoreOverview {
     pub tag_sales: Vec<TagSaleEntry>,
     pub refund_method_breakdown: Vec<RefundMethodEntry>,
     pub daily_trend: Vec<DailyTrendPoint>,
+    pub service_type_breakdown: Vec<ServiceTypeEntry>,
+    pub zone_sales: Vec<ZoneSaleEntry>,
+    pub total_surcharge: f64,
+    pub avg_items_per_order: f64,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -602,6 +606,21 @@ pub struct DailyTrendPoint {
     pub date: String,
     pub revenue: f64,
     pub orders: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct ServiceTypeEntry {
+    pub service_type: String,
+    pub revenue: f64,
+    pub orders: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct ZoneSaleEntry {
+    pub zone_name: String,
+    pub revenue: f64,
+    pub orders: i64,
+    pub guests: i64,
 }
 
 /// Compute store overview for a single store
@@ -702,6 +721,10 @@ async fn get_overview(
         refund_agg_r,
         refund_method_r,
         daily_trend_r,
+        service_type_r,
+        zone_sales_r,
+        surcharge_r,
+        avg_items_r,
     ) = tokio::join!(
         // 2. Revenue trend (by hour of day)
         sqlx::query_as::<_, RevenueTrendPoint>(
@@ -915,6 +938,90 @@ async fn get_overview(
             .fetch_all(pool)
             .await
         },
+        // 11. Service type breakdown from detail JSONB
+        sqlx::query_as::<_, ServiceTypeEntry>(
+            r#"
+            SELECT
+                COALESCE(detail->>'service_type', 'DineIn') AS service_type,
+                COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
+                COUNT(*) AS orders
+            FROM store_archived_orders
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR store_id = $2)
+                AND end_time >= $3 AND end_time < $4
+                AND status = 'COMPLETED'
+            GROUP BY service_type
+            ORDER BY revenue DESC
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 12. Zone sales from detail JSONB
+        sqlx::query_as::<_, ZoneSaleEntry>(
+            r#"
+            SELECT
+                COALESCE(detail->>'zone_name', '') AS zone_name,
+                COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
+                COUNT(*) AS orders,
+                COALESCE(SUM(guest_count), 0)::BIGINT AS guests
+            FROM store_archived_orders
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR store_id = $2)
+                AND end_time >= $3 AND end_time < $4
+                AND status = 'COMPLETED'
+                AND detail->>'zone_name' IS NOT NULL
+                AND detail->>'zone_name' != ''
+            GROUP BY zone_name
+            ORDER BY revenue DESC
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
+        // 13. Total surcharge from detail JSONB
+        sqlx::query_as::<_, (f64,)>(
+            r#"
+            SELECT
+                COALESCE(SUM(
+                    COALESCE((detail->>'order_manual_surcharge_amount')::DOUBLE PRECISION, 0) +
+                    COALESCE((detail->>'order_rule_surcharge_amount')::DOUBLE PRECISION, 0)
+                ), 0)::DOUBLE PRECISION
+            FROM store_archived_orders
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR store_id = $2)
+                AND end_time >= $3 AND end_time < $4
+                AND status = 'COMPLETED'
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_one(pool),
+        // 14. Average items per order from detail JSONB
+        sqlx::query_as::<_, (f64,)>(
+            r#"
+            SELECT
+                COALESCE(AVG(jsonb_array_length(detail->'items')), 0)::DOUBLE PRECISION
+            FROM store_archived_orders
+            WHERE tenant_id = $1
+                AND ($2::BIGINT IS NULL OR store_id = $2)
+                AND end_time >= $3 AND end_time < $4
+                AND status = 'COMPLETED'
+                AND detail IS NOT NULL
+                AND detail->'items' IS NOT NULL
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_one(pool),
     );
 
     let revenue_trend = revenue_trend_r?;
@@ -926,6 +1033,10 @@ async fn get_overview(
     let (refund_count, refund_amount) = refund_agg_r.unwrap_or((0, 0.0));
     let refund_method_breakdown = refund_method_r.unwrap_or_default();
     let daily_trend = daily_trend_r.unwrap_or_default();
+    let service_type_breakdown = service_type_r.unwrap_or_default();
+    let zone_sales = zone_sales_r.unwrap_or_default();
+    let total_surcharge = surcharge_r.map(|(v,)| v).unwrap_or(0.0);
+    let avg_items_per_order = avg_items_r.map(|(v,)| v).unwrap_or(0.0);
 
     Ok(StoreOverview {
         revenue,
@@ -950,6 +1061,10 @@ async fn get_overview(
         tag_sales,
         refund_method_breakdown,
         daily_trend,
+        service_type_breakdown,
+        zone_sales,
+        total_surcharge,
+        avg_items_per_order,
     })
 }
 

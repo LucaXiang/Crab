@@ -2,7 +2,7 @@ import React from 'react';
 import {
   BarChart3, DollarSign, ShoppingBag, Users, TrendingUp,
   CreditCard, Banknote, Clock, XCircle, AlertTriangle, Tag, Award, Receipt, RotateCcw,
-  ArrowUpRight, ArrowDownRight,
+  ArrowUpRight, ArrowDownRight, UtensilsCrossed, Map as MapIcon, Plus, Hash,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -105,9 +105,13 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('stats.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
       </div>
 
-      {/* KPI Row 4 — Tax */}
+      {/* KPI Row 4 — Tax, Surcharge & Items */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('stats.total_tax')} delta={prev ? pctChange(overview.total_tax, prev.total_tax) : undefined} />
+        {overview.total_surcharge > 0 && (
+          <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('stats.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />
+        )}
+        <KpiCard icon={Hash} bg="bg-violet-100" color="text-violet-600" value={overview.avg_items_per_order > 0 ? overview.avg_items_per_order.toFixed(1) : '-'} label={t('stats.avg_items_per_order')} delta={prev ? pctChange(overview.avg_items_per_order, prev.avg_items_per_order) : undefined} />
       </div>
 
       {/* Daily Revenue Trend — for cross-day ranges */}
@@ -270,6 +274,96 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
           </div>
         )}
       </div>
+
+      {/* Service Type & Zone Sales */}
+      {(overview.service_type_breakdown.length > 1 || overview.zone_sales.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {overview.service_type_breakdown.length > 1 && (() => {
+            const totalSvcOrders = overview.service_type_breakdown.reduce((sum, s) => sum + s.orders, 0);
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <UtensilsCrossed className="w-5 h-5 text-slate-400" />
+                  <h3 className="font-bold text-slate-900">{t('stats.service_type_breakdown')}</h3>
+                </div>
+                <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
+                  <div className="w-36 h-36 shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={overview.service_type_breakdown}
+                          dataKey="orders"
+                          nameKey="service_type"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={30}
+                          outerRadius={60}
+                          paddingAngle={2}
+                        >
+                          {overview.service_type_breakdown.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    {overview.service_type_breakdown.map((st, i) => {
+                      const pct = totalSvcOrders > 0 ? ((st.orders / totalSvcOrders) * 100).toFixed(1) : '0';
+                      return (
+                        <div key={st.service_type} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                            <span className="text-slate-700 truncate">{t(`stats.svc_${st.service_type.toLowerCase()}`) || st.service_type}</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 ml-2">
+                            <span className="text-xs text-slate-400">{pct}% · {st.orders}</span>
+                            <span className="font-semibold text-slate-900 w-20 text-right">{formatCurrency(st.revenue)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {overview.zone_sales.length > 0 && (() => {
+            const totalZoneRev = overview.zone_sales.reduce((sum, z) => sum + z.revenue, 0);
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <MapIcon className="w-5 h-5 text-slate-400" />
+                  <h3 className="font-bold text-slate-900">{t('stats.zone_sales')}</h3>
+                </div>
+                <div className="space-y-3">
+                  {overview.zone_sales.map((zone, i) => {
+                    const pct = totalZoneRev > 0 ? (zone.revenue / totalZoneRev) * 100 : 0;
+                    return (
+                      <div key={zone.zone_name}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                            <span className="text-slate-700">{zone.zone_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400">{zone.orders} · {zone.guests}p</span>
+                            <span className="font-semibold text-slate-900">{formatCurrency(zone.revenue)}</span>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Refund Method Breakdown */}
       {overview.refund_method_breakdown.length > 0 && (
