@@ -28,7 +28,7 @@ impl ClientBridge {
                     ..
                 } = &command.payload
                 {
-                    Some((order_id.clone(), *target_zone_id))
+                    Some((*order_id, *target_zone_id))
                 } else {
                     None
                 };
@@ -41,7 +41,7 @@ impl ClientBridge {
                 if response.success {
                     // OpenTable 成功后加载并缓存价格规则
                     if let Some((zone_id, is_retail)) = open_table_info {
-                        if let Some(ref order_id) = response.order_id {
+                        if let Some(order_id) = response.order_id {
                             let rules =
                                 edge_server::orders::actions::open_table::load_matching_rules(
                                     &server_state.pool,
@@ -62,14 +62,14 @@ impl ClientBridge {
                     }
 
                     // MoveOrder 成功后：用新区域重新加载规则
-                    if let Some((ref order_id, ref target_zone_id)) = move_order_info {
+                    if let Some((order_id, target_zone_id)) = move_order_info {
                         if let Ok(Some(snapshot)) =
                             server_state.orders_manager().get_snapshot(order_id)
                         {
                             let rules =
                                 edge_server::orders::actions::open_table::load_matching_rules(
                                     &server_state.pool,
-                                    *target_zone_id,
+                                    target_zone_id,
                                     snapshot.is_retail,
                                 )
                                 .await;
@@ -194,8 +194,8 @@ impl ClientBridge {
                             // Extract CommandResponse from data if present
                             if let Some(data) = response_payload.data {
                                 let cmd_response: CommandResponse = serde_json::from_value(data)
-                                    .unwrap_or_else(|_| CommandResponse {
-                                        command_id: command.command_id.clone(),
+                                    .unwrap_or(CommandResponse {
+                                        command_id: command.command_id,
                                         success: true,
                                         order_id: None,
                                         error: None,
@@ -280,7 +280,7 @@ impl ClientBridge {
     /// Get a single order snapshot by ID
     pub async fn get_order_snapshot(
         &self,
-        order_id: &str,
+        order_id: i64,
     ) -> Result<Option<OrderSnapshot>, BridgeError> {
         let mode_guard = self.mode.read().await;
 
@@ -463,7 +463,7 @@ impl ClientBridge {
     /// Used to reconstruct full order history including timeline.
     pub async fn get_events_for_order(
         &self,
-        order_id: &str,
+        order_id: i64,
     ) -> Result<Vec<OrderEvent>, BridgeError> {
         let mode_guard = self.mode.read().await;
 

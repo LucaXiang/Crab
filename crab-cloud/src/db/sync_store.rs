@@ -6,9 +6,17 @@
 use std::collections::HashMap;
 
 use shared::cloud::{CloudSyncItem, SyncResource};
+use shared::models::store_info::StoreInfo;
 use sqlx::PgPool;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Side-effect produced by `upsert_resource` that callers should handle.
+pub enum SyncEffect {
+    None,
+    /// StoreInfo was upserted — callers should broadcast to consoles.
+    StoreInfoUpdated(Box<StoreInfo>),
+}
 
 /// Safely convert u64 version to i64 for PostgreSQL storage.
 /// Clamps to i64::MAX on overflow (practically unreachable).
@@ -20,7 +28,7 @@ fn version_to_i64(version: u64) -> i64 {
 pub async fn ensure_store(
     pool: &PgPool,
     entity_id: &str,
-    tenant_id: &str,
+    tenant_id: i64,
     device_id: &str,
     now: i64,
 ) -> Result<i64, BoxError> {
@@ -50,7 +58,7 @@ pub async fn ensure_store(
 pub async fn get_store_number(
     pool: &PgPool,
     entity_id: &str,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<u32, BoxError> {
     let row: (i32,) =
         sqlx::query_as("SELECT store_number FROM stores WHERE entity_id = $1 AND tenant_id = $2")
@@ -144,21 +152,24 @@ pub async fn get_cursors(pool: &PgPool, store_id: i64) -> Result<HashMap<String,
         .collect())
 }
 
-/// Upsert a resource based on its type
+/// Upsert a resource based on its type.
+///
+/// Returns `SyncEffect` so callers can handle side-effects (e.g. broadcasting StoreInfo changes).
 pub async fn upsert_resource(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     item: &CloudSyncItem,
     now: i64,
-) -> Result<(), BoxError> {
+) -> Result<SyncEffect, BoxError> {
     if item.action == shared::cloud::SyncAction::Delete {
-        return delete_resource(pool, store_id, item.resource, &item.resource_id).await;
+        delete_resource(pool, store_id, item.resource, item.resource_id).await?;
+        return Ok(SyncEffect::None);
     }
 
     match item.resource {
         SyncResource::Product => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_product_from_sync(
                 pool,
                 store_id,
@@ -167,10 +178,10 @@ pub async fn upsert_resource(
                 version_to_i64(item.version),
                 now,
             )
-            .await
+            .await?;
         }
         SyncResource::Category => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_category_from_sync(
                 pool,
                 store_id,
@@ -179,80 +190,97 @@ pub async fn upsert_resource(
                 version_to_i64(item.version),
                 now,
             )
-            .await
+            .await?;
         }
         SyncResource::ArchivedOrder => {
-            upsert_archived_order(pool, store_id, tenant_id, item, now).await
+            upsert_archived_order(pool, store_id, tenant_id, item, now).await?;
         }
         SyncResource::DailyReport => {
-            let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_daily_report_from_sync(pool, store_id, source_id, &item.data, now)
-                .await
+            let source_id = item.resource_id;
+            super::store::upsert_daily_report_from_sync(
+                pool, store_id, tenant_id, source_id, &item.data, now,
+            )
+            .await?;
         }
         SyncResource::StoreInfo => {
-            super::store::upsert_store_info_from_sync(pool, store_id, &item.data, now).await
+            let info =
+                super::store::upsert_store_info_from_sync(pool, store_id, &item.data, now).await?;
+            return Ok(SyncEffect::StoreInfoUpdated(Box::new(info)));
         }
         SyncResource::Shift => {
-            let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_shift_from_sync(pool, store_id, source_id, &item.data, now).await
+            let source_id = item.resource_id;
+            super::store::upsert_shift_from_sync(
+                pool, store_id, tenant_id, source_id, &item.data, now,
+            )
+            .await?;
         }
         SyncResource::Employee => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_employee_from_sync(pool, store_id, source_id, &item.data, now)
-                .await
+                .await?;
         }
         SyncResource::Tag => {
-            let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_tag_from_sync(pool, store_id, source_id, &item.data, now).await
+            let source_id = item.resource_id;
+            super::store::upsert_tag_from_sync(pool, store_id, source_id, &item.data, now).await?;
         }
         SyncResource::Attribute => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_attribute_from_sync(pool, store_id, source_id, &item.data, now)
-                .await
+                .await?;
         }
         SyncResource::AttributeBinding => {
-            let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_binding_from_sync(pool, store_id, source_id, &item.data, now).await
+            let source_id = item.resource_id;
+            super::store::upsert_binding_from_sync(pool, store_id, source_id, &item.data, now)
+                .await?;
         }
         SyncResource::PriceRule => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_price_rule_from_sync(pool, store_id, source_id, &item.data, now)
-                .await
+                .await?;
         }
         SyncResource::Zone => {
-            let source_id: i64 = item.resource_id.parse()?;
-            super::store::upsert_zone_from_sync(pool, store_id, source_id, &item.data, now).await
+            let source_id = item.resource_id;
+            super::store::upsert_zone_from_sync(pool, store_id, source_id, &item.data, now).await?;
         }
         SyncResource::DiningTable => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_dining_table_from_sync(pool, store_id, source_id, &item.data, now)
-                .await
+                .await?;
         }
         SyncResource::LabelTemplate => {
-            let source_id: i64 = item.resource_id.parse()?;
+            let source_id = item.resource_id;
             super::store::upsert_label_template_from_sync(
                 pool, store_id, tenant_id, source_id, &item.data, now,
             )
-            .await
+            .await?;
         }
-        SyncResource::CreditNote => upsert_credit_note(pool, store_id, tenant_id, item, now).await,
-        SyncResource::Invoice => upsert_invoice(pool, store_id, tenant_id, item, now).await,
-        other => Err(format!("Unhandled resource type: {other}").into()),
+        SyncResource::CreditNote => {
+            upsert_credit_note(pool, store_id, tenant_id, item, now).await?;
+        }
+        SyncResource::Invoice => {
+            upsert_invoice(pool, store_id, tenant_id, item, now).await?;
+        }
+        SyncResource::Anulacion => {
+            upsert_anulacion(pool, store_id, tenant_id, item, now).await?;
+        }
+        other => return Err(format!("Unhandled resource type: {other}").into()),
     }
+
+    Ok(SyncEffect::None)
 }
 
 /// Upsert credit note — summary columns + detail JSONB.
 async fn upsert_credit_note(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     item: &CloudSyncItem,
     now: i64,
 ) -> Result<(), BoxError> {
     use shared::cloud::CreditNoteSync;
 
     let cn: CreditNoteSync = serde_json::from_value(item.data.clone())?;
-    let source_id: i64 = item.resource_id.parse()?;
+    let source_id = item.resource_id;
 
     // Verify hash chain integrity after deserialization
     if let Some(recomputed) = cn.verify_hash() {
@@ -271,7 +299,7 @@ async fn upsert_credit_note(
         r#"
         INSERT INTO store_credit_notes (
             store_id, tenant_id, source_id, credit_note_number,
-            original_order_key, original_receipt,
+            original_order_id, original_receipt,
             subtotal_credit, tax_credit, total_credit,
             refund_method, reason, note,
             operator_name, authorizer_name,
@@ -294,7 +322,7 @@ async fn upsert_credit_note(
     .bind(tenant_id)
     .bind(source_id)
     .bind(&cn.credit_note_number)
-    .bind(&cn.original_order_key)
+    .bind(cn.original_order_id)
     .bind(&cn.original_receipt)
     .bind(cn.subtotal_credit)
     .bind(cn.tax_credit)
@@ -320,7 +348,7 @@ async fn upsert_credit_note(
 async fn upsert_archived_order(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     item: &CloudSyncItem,
     now: i64,
 ) -> Result<(), BoxError> {
@@ -334,7 +362,7 @@ async fn upsert_archived_order(
         && detail_sync.last_event_hash.is_some()
     {
         tracing::warn!(
-            order_key = %detail_sync.order_key,
+            order_id = %detail_sync.order_id,
             receipt = %detail_sync.receipt_number,
             stored = %detail_sync.curr_hash,
             recomputed,
@@ -348,14 +376,14 @@ async fn upsert_archived_order(
     sqlx::query(
         r#"
         INSERT INTO store_archived_orders (
-            store_id, tenant_id, source_id, order_key,
+            store_id, tenant_id, source_id, order_id,
             receipt_number, status, end_time, total, tax,
             prev_hash, curr_hash, last_event_hash, desglose,
             guest_count, discount_amount, void_type, loss_amount, start_time,
             detail, version, synced_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-        ON CONFLICT (tenant_id, store_id, order_key)
+        ON CONFLICT (tenant_id, store_id, order_id)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
                       end_time = EXCLUDED.end_time,
@@ -378,8 +406,8 @@ async fn upsert_archived_order(
     )
     .bind(store_id)
     .bind(tenant_id)
-    .bind(&item.resource_id)
-    .bind(&detail_sync.order_key)
+    .bind(item.resource_id)
+    .bind(detail_sync.order_id)
     .bind(&detail_sync.receipt_number)
     .bind(&detail_sync.status)
     .bind(detail_sync.end_time)
@@ -403,101 +431,133 @@ async fn upsert_archived_order(
     Ok(())
 }
 
+/// Map deletable SyncResource to its PostgreSQL table name.
+fn deletable_table(resource: SyncResource) -> Option<&'static str> {
+    match resource {
+        SyncResource::Product => Some("store_products"),
+        SyncResource::Category => Some("store_categories"),
+        SyncResource::DailyReport => Some("store_daily_reports"),
+        SyncResource::Shift => Some("store_shifts"),
+        SyncResource::Employee => Some("store_employees"),
+        SyncResource::Tag => Some("store_tags"),
+        SyncResource::Attribute => Some("store_attributes"),
+        SyncResource::AttributeBinding => Some("store_attribute_bindings"),
+        SyncResource::PriceRule => Some("store_price_rules"),
+        SyncResource::Zone => Some("store_zones"),
+        SyncResource::DiningTable => Some("store_dining_tables"),
+        SyncResource::LabelTemplate => Some("store_label_templates"),
+        _ => None,
+    }
+}
+
 async fn delete_resource(
     pool: &PgPool,
     store_id: i64,
     resource: SyncResource,
-    resource_id: &str,
+    resource_id: i64,
 ) -> Result<(), BoxError> {
-    let source_id: i64 = resource_id.parse()?;
+    let table = deletable_table(resource)
+        .ok_or_else(|| format!("Cannot delete resource type: {resource}"))?;
 
-    match resource {
-        SyncResource::Product => super::store::delete_product(pool, store_id, source_id).await,
-        SyncResource::Category => super::store::delete_category(pool, store_id, source_id).await,
-        SyncResource::DailyReport => {
-            sqlx::query("DELETE FROM store_daily_reports WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::Shift => {
-            sqlx::query("DELETE FROM store_shifts WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::Employee => {
-            sqlx::query("DELETE FROM store_employees WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::Tag => {
-            sqlx::query("DELETE FROM store_tags WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::Attribute => {
-            sqlx::query("DELETE FROM store_attributes WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::AttributeBinding => {
-            sqlx::query(
-                "DELETE FROM store_attribute_bindings WHERE store_id = $1 AND source_id = $2",
-            )
-            .bind(store_id)
-            .bind(source_id)
-            .execute(pool)
-            .await?;
-            Ok(())
-        }
-        SyncResource::PriceRule => {
-            sqlx::query("DELETE FROM store_price_rules WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::Zone => {
-            sqlx::query("DELETE FROM store_zones WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::DiningTable => {
-            sqlx::query("DELETE FROM store_dining_tables WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        SyncResource::LabelTemplate => {
-            sqlx::query("DELETE FROM store_label_templates WHERE store_id = $1 AND source_id = $2")
-                .bind(store_id)
-                .bind(source_id)
-                .execute(pool)
-                .await?;
-            Ok(())
-        }
-        other => Err(format!("Cannot delete resource type: {other}").into()),
+    // All deletable resources use the same (store_id, source_id) key pattern.
+    // FK CASCADE handles child rows (e.g. product specs, category tags).
+    let sql = format!("DELETE FROM {table} WHERE store_id = $1 AND source_id = $2");
+    sqlx::query(&sql)
+        .bind(store_id)
+        .bind(resource_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Upsert Verifactu anulación (RegistroFacturaBaja) — invoice voiding record.
+async fn upsert_anulacion(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: i64,
+    item: &CloudSyncItem,
+    now: i64,
+) -> Result<(), BoxError> {
+    use shared::cloud::sync::AnulacionSync;
+
+    let anu: AnulacionSync = serde_json::from_value(item.data.clone())?;
+    let source_id = item.resource_id;
+
+    // Verify chain hash integrity (warn only, consistent with order/credit_note)
+    if let Some(recomputed) = anu.verify_hash() {
+        tracing::warn!(
+            anulacion_number = %anu.anulacion_number,
+            stored = %anu.curr_hash,
+            recomputed = %recomputed,
+            "Chain hash verification failed on anulacion sync"
+        );
     }
+
+    // Verify huella integrity before storing
+    if let Some(mismatch) = anu.verify_huella() {
+        tracing::warn!(
+            anulacion_number = %anu.anulacion_number,
+            "Huella verification failed on anulacion sync: {mismatch}"
+        );
+        return Err(format!(
+            "huella verification failed for anulacion {}: {mismatch}",
+            anu.anulacion_number
+        )
+        .into());
+    }
+
+    let detail_json = serde_json::to_value(&anu)?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO store_anulaciones (
+            store_id, tenant_id, source_id, anulacion_number, serie,
+            original_invoice_id, original_invoice_number, original_order_id,
+            huella, prev_huella, fecha_expedicion, fecha_hora_registro,
+            nif, nombre_razon, reason, note, operator_id, operator_name,
+            prev_hash, curr_hash,
+            detail, aeat_status, version, created_at, synced_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+        ON CONFLICT (tenant_id, store_id, source_id)
+        DO UPDATE SET anulacion_number = EXCLUDED.anulacion_number,
+                      huella = EXCLUDED.huella,
+                      prev_huella = EXCLUDED.prev_huella,
+                      detail = EXCLUDED.detail,
+                      version = EXCLUDED.version,
+                      synced_at = EXCLUDED.synced_at
+        WHERE store_anulaciones.version <= EXCLUDED.version
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(source_id)
+    .bind(&anu.anulacion_number)
+    .bind(&anu.serie)
+    .bind(anu.original_invoice_id)
+    .bind(&anu.original_invoice_number)
+    .bind(anu.original_order_pk)
+    .bind(&anu.huella)
+    .bind(&anu.prev_huella)
+    .bind(&anu.fecha_expedicion)
+    .bind(&anu.fecha_hora_registro)
+    .bind(&anu.nif)
+    .bind(&anu.nombre_razon)
+    .bind(&anu.reason)
+    .bind(&anu.note)
+    .bind(anu.operator_id)
+    .bind(&anu.operator_name)
+    .bind(&anu.prev_hash)
+    .bind(&anu.curr_hash)
+    .bind(&detail_json)
+    .bind("PENDING")
+    .bind(version_to_i64(item.version))
+    .bind(anu.created_at)
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 /// Upsert Verifactu invoice — summary columns + detail JSONB.
@@ -506,14 +566,14 @@ async fn delete_resource(
 async fn upsert_invoice(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     item: &CloudSyncItem,
     now: i64,
 ) -> Result<(), BoxError> {
     use shared::cloud::sync::InvoiceSync;
 
     let inv: InvoiceSync = serde_json::from_value(item.data.clone())?;
-    let source_id: i64 = item.resource_id.parse()?;
+    let source_id = item.resource_id;
 
     // Verify huella integrity before storing
     if let Some(mismatch) = inv.verify_huella() {
@@ -539,10 +599,12 @@ async fn upsert_invoice(
             huella, prev_huella, fecha_expedicion,
             nif, nombre_razon,
             factura_rectificada_id, factura_rectificada_num,
+            factura_sustituida_id, factura_sustituida_num,
+            customer_nif, customer_nombre, customer_address, customer_email, customer_phone,
             aeat_status, created_at,
             detail, version, synced_at
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
         ON CONFLICT (tenant_id, store_id, source_id)
         DO UPDATE SET invoice_number = EXCLUDED.invoice_number,
                       total = EXCLUDED.total,
@@ -572,6 +634,13 @@ async fn upsert_invoice(
     .bind(&inv.nombre_razon)
     .bind(inv.factura_rectificada_id)
     .bind(&inv.factura_rectificada_num)
+    .bind(inv.factura_sustituida_id)
+    .bind(&inv.factura_sustituida_num)
+    .bind(&inv.customer_nif)
+    .bind(&inv.customer_nombre)
+    .bind(&inv.customer_address)
+    .bind(&inv.customer_email)
+    .bind(&inv.customer_phone)
     .bind("PENDING")
     .bind(inv.created_at)
     .bind(&detail_json)
@@ -599,4 +668,57 @@ pub async fn rebind_store(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_to_i64_normal() {
+        assert_eq!(version_to_i64(0), 0);
+        assert_eq!(version_to_i64(1), 1);
+        assert_eq!(version_to_i64(i64::MAX as u64), i64::MAX);
+    }
+
+    #[test]
+    fn version_to_i64_overflow_clamps() {
+        assert_eq!(version_to_i64(u64::MAX), i64::MAX);
+        assert_eq!(version_to_i64(i64::MAX as u64 + 1), i64::MAX);
+    }
+
+    #[test]
+    fn deletable_table_covers_all_simple_resources() {
+        let expected = [
+            (SyncResource::Product, "store_products"),
+            (SyncResource::Category, "store_categories"),
+            (SyncResource::DailyReport, "store_daily_reports"),
+            (SyncResource::Shift, "store_shifts"),
+            (SyncResource::Employee, "store_employees"),
+            (SyncResource::Tag, "store_tags"),
+            (SyncResource::Attribute, "store_attributes"),
+            (SyncResource::AttributeBinding, "store_attribute_bindings"),
+            (SyncResource::PriceRule, "store_price_rules"),
+            (SyncResource::Zone, "store_zones"),
+            (SyncResource::DiningTable, "store_dining_tables"),
+            (SyncResource::LabelTemplate, "store_label_templates"),
+        ];
+        for (resource, table) in expected {
+            assert_eq!(
+                deletable_table(resource),
+                Some(table),
+                "Missing mapping for {resource}"
+            );
+        }
+    }
+
+    #[test]
+    fn deletable_table_returns_none_for_non_deletable() {
+        // Chain resources and complex types should NOT be deletable
+        assert!(deletable_table(SyncResource::ArchivedOrder).is_none());
+        assert!(deletable_table(SyncResource::CreditNote).is_none());
+        assert!(deletable_table(SyncResource::Invoice).is_none());
+        assert!(deletable_table(SyncResource::Anulacion).is_none());
+        assert!(deletable_table(SyncResource::StoreInfo).is_none());
+    }
 }

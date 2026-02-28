@@ -11,8 +11,8 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, Split
 /// CancelPayment action
 #[derive(Debug, Clone)]
 pub struct CancelPaymentAction {
-    pub order_id: String,
-    pub payment_id: String,
+    pub order_id: i64,
+    pub payment_id: i64,
     pub reason: Option<String>,
     pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
@@ -29,16 +29,16 @@ impl CommandHandler for CancelPaymentAction {
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status - must be Active
         match snapshot.status {
-            OrderStatus::Active => {} // OK - continue with cancellation
+            OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(
@@ -56,7 +56,7 @@ impl CommandHandler for CancelPaymentAction {
             .payments
             .iter()
             .find(|p| p.payment_id == self.payment_id && !p.cancelled)
-            .ok_or_else(|| OrderError::PaymentNotFound(self.payment_id.clone()))?;
+            .ok_or(OrderError::PaymentNotFound(self.payment_id))?;
 
         // 5. Check if this is an AA payment that would zero-out AA shares
         let is_aa_zero_out = if let (Some(SplitType::AaSplit), Some(shares)) =
@@ -84,14 +84,14 @@ impl CommandHandler for CancelPaymentAction {
 
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::PaymentCancelled,
             EventPayload::PaymentCancelled {
-                payment_id: self.payment_id.clone(),
+                payment_id: self.payment_id,
                 method: payment.method.clone(),
                 amount: payment.amount,
                 reason: self.reason.clone(),
@@ -107,10 +107,10 @@ impl CommandHandler for CancelPaymentAction {
             let seq2 = ctx.next_sequence();
             let cancel_event = OrderEvent::new(
                 seq2,
-                self.order_id.clone(),
+                self.order_id,
                 metadata.operator_id,
                 metadata.operator_name.clone(),
-                metadata.command_id.clone(),
+                metadata.command_id,
                 Some(metadata.timestamp),
                 OrderEventType::AaSplitCancelled,
                 EventPayload::AaSplitCancelled { total_shares },
@@ -129,18 +129,26 @@ mod tests {
     use crate::orders::traits::CommandContext;
     use shared::order::{OrderSnapshot, PaymentRecord};
 
+    const ORDER_1: i64 = 1001;
+    const PAYMENT_1: i64 = 2001;
+    const PAYMENT_2: i64 = 2002;
+    const AA_PAY_1: i64 = 3001;
+    const AA_PAY_2: i64 = 3002;
+    const AMT_PAY_1: i64 = 4001;
+    const AMT_PAY_2: i64 = 4002;
+
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
     }
 
-    fn create_payment_record(payment_id: &str, method: &str, amount: f64) -> PaymentRecord {
+    fn create_payment_record(payment_id: i64, method: &str, amount: f64) -> PaymentRecord {
         PaymentRecord {
-            payment_id: payment_id.to_string(),
+            payment_id,
             method: method.to_string(),
             amount,
             tendered: None,
@@ -158,25 +166,23 @@ mod tests {
     #[test]
     fn test_cancel_payment_generates_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        // Create and store an active order with a payment
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "CARD", 50.0));
+            .push(create_payment_record(PAYMENT_1, "CARD", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "payment-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: PAYMENT_1,
             reason: Some("Customer changed mind".to_string()),
             authorizer_id: Some(1),
             authorizer_name: Some("Manager".to_string()),
@@ -187,7 +193,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, ORDER_1);
         assert_eq!(event.event_type, OrderEventType::PaymentCancelled);
 
         if let EventPayload::PaymentCancelled {
@@ -199,7 +205,7 @@ mod tests {
             authorizer_name,
         } = &event.payload
         {
-            assert_eq!(payment_id, "payment-1");
+            assert_eq!(*payment_id, PAYMENT_1);
             assert_eq!(method, "CARD");
             assert_eq!(*amount, 50.0);
             assert_eq!(*reason, Some("Customer changed mind".to_string()));
@@ -213,24 +219,23 @@ mod tests {
     #[test]
     fn test_cancel_payment_without_reason() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "CASH", 50.0));
+            .push(create_payment_record(PAYMENT_1, "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "payment-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: PAYMENT_1,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -258,24 +263,23 @@ mod tests {
     #[test]
     fn test_cancel_payment_nonexistent_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "CASH", 50.0));
+            .push(create_payment_record(PAYMENT_1, "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "nonexistent".to_string(),
+            order_id: ORDER_1,
+            payment_id: 9999,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -283,21 +287,19 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
-
         assert!(matches!(result, Err(OrderError::PaymentNotFound(_))));
     }
 
     #[test]
     fn test_cancel_already_cancelled_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
-        snapshot.paid_amount = 0.0; // Already cancelled, so paid_amount is 0
-        let mut payment = create_payment_record("payment-1", "CASH", 50.0);
+        snapshot.paid_amount = 0.0;
+        let mut payment = create_payment_record(PAYMENT_1, "CASH", 50.0);
         payment.cancelled = true;
         payment.cancel_reason = Some("Previous cancellation".to_string());
         snapshot.payments.push(payment);
@@ -307,8 +309,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "payment-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: PAYMENT_1,
             reason: Some("Try again".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -316,32 +318,29 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
-
-        // Should fail because payment is already cancelled
         assert!(matches!(result, Err(OrderError::PaymentNotFound(_))));
     }
 
     #[test]
     fn test_cancel_payment_on_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Completed;
         snapshot.total = 100.0;
         snapshot.paid_amount = 100.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "CASH", 100.0));
+            .push(create_payment_record(PAYMENT_1, "CASH", 100.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "payment-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: PAYMENT_1,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -349,29 +348,27 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
-
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
     #[test]
     fn test_cancel_payment_on_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Void;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "CASH", 50.0));
+            .push(create_payment_record(PAYMENT_1, "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "payment-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: PAYMENT_1,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -379,21 +376,19 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
-
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
     #[test]
     fn test_cancel_payment_on_nonexistent_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "nonexistent".to_string(),
-            payment_id: "payment-1".to_string(),
+            order_id: 9999,
+            payment_id: PAYMENT_1,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -401,35 +396,32 @@ mod tests {
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
-
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
     #[test]
     fn test_cancel_specific_payment_from_multiple() {
         let storage = OrderStorage::open_in_memory().unwrap();
-
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 80.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "CARD", 30.0));
+            .push(create_payment_record(PAYMENT_1, "CARD", 30.0));
         snapshot
             .payments
-            .push(create_payment_record("payment-2", "CASH", 50.0));
+            .push(create_payment_record(PAYMENT_2, "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        // Cancel the second payment
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "payment-2".to_string(),
+            order_id: ORDER_1,
+            payment_id: PAYMENT_2,
             reason: Some("Wrong amount".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -446,7 +438,7 @@ mod tests {
             ..
         } = &events[0].payload
         {
-            assert_eq!(payment_id, "payment-2");
+            assert_eq!(*payment_id, PAYMENT_2);
             assert_eq!(method, "CASH");
             assert_eq!(*amount, 50.0);
         } else {
@@ -454,16 +446,9 @@ mod tests {
         }
     }
 
-    // ========== AA cancel rollback tests ==========
-
-    fn create_aa_payment(
-        payment_id: &str,
-        method: &str,
-        amount: f64,
-        shares: i32,
-    ) -> PaymentRecord {
+    fn create_aa_payment(payment_id: i64, method: &str, amount: f64, shares: i32) -> PaymentRecord {
         PaymentRecord {
-            payment_id: payment_id.to_string(),
+            payment_id,
             method: method.to_string(),
             amount,
             tendered: None,
@@ -478,9 +463,9 @@ mod tests {
         }
     }
 
-    fn create_amount_split_payment(payment_id: &str, method: &str, amount: f64) -> PaymentRecord {
+    fn create_amount_split_payment(payment_id: i64, method: &str, amount: f64) -> PaymentRecord {
         PaymentRecord {
-            payment_id: payment_id.to_string(),
+            payment_id,
             method: method.to_string(),
             amount,
             tendered: None,
@@ -495,13 +480,12 @@ mod tests {
         }
     }
 
-    /// 2 AA payments, cancel 1 → still 1 active → NO AaSplitCancelled event
     #[test]
     fn test_cancel_one_of_two_aa_payments_stays_active() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 90.0;
         snapshot.paid_amount = 60.0;
@@ -509,18 +493,18 @@ mod tests {
         snapshot.aa_paid_shares = 2;
         snapshot
             .payments
-            .push(create_aa_payment("aa-pay-1", "CASH", 30.0, 1));
+            .push(create_aa_payment(AA_PAY_1, "CASH", 30.0, 1));
         snapshot
             .payments
-            .push(create_aa_payment("aa-pay-2", "CARD", 30.0, 1));
+            .push(create_aa_payment(AA_PAY_2, "CARD", 30.0, 1));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "aa-pay-2".to_string(),
+            order_id: ORDER_1,
+            payment_id: AA_PAY_2,
             reason: Some("Wrong card".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -528,30 +512,25 @@ mod tests {
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
-
-        // Only PaymentCancelled, NO AaSplitCancelled (still 1 active AA payment)
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::PaymentCancelled);
     }
 
-    /// 2 AA payments, cancel both → zero-out → produces AaSplitCancelled
     #[test]
     fn test_cancel_all_aa_payments_produces_aa_cancelled() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 90.0;
         snapshot.paid_amount = 30.0;
         snapshot.aa_total_shares = Some(3);
         snapshot.aa_paid_shares = 1;
-        // Only one active AA payment left
         snapshot
             .payments
-            .push(create_aa_payment("aa-pay-1", "CASH", 30.0, 1));
-        // Second one was already cancelled
-        let mut cancelled_pay = create_aa_payment("aa-pay-2", "CARD", 30.0, 1);
+            .push(create_aa_payment(AA_PAY_1, "CASH", 30.0, 1));
+        let mut cancelled_pay = create_aa_payment(AA_PAY_2, "CARD", 30.0, 1);
         cancelled_pay.cancelled = true;
         snapshot.payments.push(cancelled_pay);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -560,8 +539,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "aa-pay-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: AA_PAY_1,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -569,8 +548,6 @@ mod tests {
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
-
-        // PaymentCancelled + AaSplitCancelled (all AA shares gone)
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].event_type, OrderEventType::PaymentCancelled);
         assert_eq!(events[1].event_type, OrderEventType::AaSplitCancelled);
@@ -582,33 +559,30 @@ mod tests {
         }
     }
 
-    /// Cancel amount split payment: has_amount_split flag relies on applier;
-    /// Action just produces PaymentCancelled event.
     #[test]
     fn test_cancel_amount_split_payment_produces_event() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(ORDER_1);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 40.0;
         snapshot.has_amount_split = true;
         snapshot
             .payments
-            .push(create_amount_split_payment("amt-pay-1", "CASH", 20.0));
+            .push(create_amount_split_payment(AMT_PAY_1, "CASH", 20.0));
         snapshot
             .payments
-            .push(create_amount_split_payment("amt-pay-2", "CARD", 20.0));
+            .push(create_amount_split_payment(AMT_PAY_2, "CARD", 20.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        // Cancel one of two amount split payments
         let action = CancelPaymentAction {
-            order_id: "order-1".to_string(),
-            payment_id: "amt-pay-1".to_string(),
+            order_id: ORDER_1,
+            payment_id: AMT_PAY_1,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -616,7 +590,6 @@ mod tests {
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
-
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, OrderEventType::PaymentCancelled);
     }

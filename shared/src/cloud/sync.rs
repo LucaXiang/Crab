@@ -38,6 +38,8 @@ pub enum SyncResource {
     CreditNote,
     /// Verifactu invoices (edge → cloud only)
     Invoice,
+    /// Invoice anulaciones (edge → cloud only)
+    Anulacion,
     /// Role resource (client-visible for sync status)
     Role,
 }
@@ -115,6 +117,7 @@ impl SyncResource {
             Self::CreditNote => "credit_note",
             Self::Invoice => "invoice",
             Self::OrderSync => "order_sync",
+            Self::Anulacion => "anulacion",
             Self::Role => "role",
         }
     }
@@ -187,7 +190,7 @@ pub struct CloudSyncItem {
     /// Action
     pub action: SyncAction,
     /// Resource ID (source ID on the edge-server)
-    pub resource_id: String,
+    pub resource_id: i64,
     /// Full resource data as JSON
     pub data: serde_json::Value,
 }
@@ -210,7 +213,7 @@ pub struct CloudSyncError {
     /// Index of the item in the batch
     pub index: u32,
     /// Resource ID that failed
-    pub resource_id: String,
+    pub resource_id: i64,
     /// Error message
     pub message: String,
 }
@@ -221,8 +224,8 @@ pub struct CloudSyncError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderDetailSync {
     // ── 摘要层（永久保存） ──
-    /// UUID (OrderSnapshot.order_id)，全局唯一
-    pub order_key: String,
+    /// Order ID (snowflake i64)
+    pub order_id: i64,
     pub receipt_number: String,
     pub status: String,
     pub total_amount: f64,
@@ -335,7 +338,7 @@ pub struct OrderPaymentSync {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreditNoteSync {
     pub credit_note_number: String,
-    pub original_order_key: String,
+    pub original_order_id: i64,
     pub original_receipt: String,
     pub subtotal_credit: f64,
     pub tax_credit: f64,
@@ -388,6 +391,20 @@ pub struct InvoiceSync {
     pub nombre_razon: String,
     pub factura_rectificada_id: Option<i64>,
     pub factura_rectificada_num: Option<String>,
+    #[serde(default)]
+    pub factura_sustituida_id: Option<i64>,
+    #[serde(default)]
+    pub factura_sustituida_num: Option<String>,
+    #[serde(default)]
+    pub customer_nif: Option<String>,
+    #[serde(default)]
+    pub customer_nombre: Option<String>,
+    #[serde(default)]
+    pub customer_address: Option<String>,
+    #[serde(default)]
+    pub customer_email: Option<String>,
+    #[serde(default)]
+    pub customer_phone: Option<String>,
     pub created_at: i64,
 }
 
@@ -421,6 +438,72 @@ impl InvoiceSync {
     }
 }
 
+// ── Anulación sync types ──
+
+/// Anulación data synced to cloud for Verifactu AEAT submission
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnulacionSync {
+    pub id: i64,
+    pub anulacion_number: String,
+    pub serie: String,
+    pub original_invoice_id: i64,
+    pub original_invoice_number: String,
+    pub huella: String,
+    pub prev_huella: Option<String>,
+    pub fecha_expedicion: String,
+    pub fecha_hora_registro: String,
+    pub nif: String,
+    pub nombre_razon: String,
+    pub original_order_pk: i64,
+    pub reason: String,
+    pub note: Option<String>,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub prev_hash: String,
+    pub curr_hash: String,
+    pub created_at: i64,
+}
+
+impl AnulacionSync {
+    /// Recompute the chain hash and return `Some(recomputed)` on mismatch, `None` if ok.
+    pub fn verify_hash(&self) -> Option<String> {
+        let recomputed = crate::order::compute_anulacion_chain_hash(
+            &self.prev_hash,
+            &self.anulacion_number,
+            &self.original_invoice_number,
+            self.original_order_pk,
+            &self.reason,
+            self.created_at,
+            &self.operator_name,
+        );
+        if recomputed == self.curr_hash {
+            None
+        } else {
+            Some(recomputed)
+        }
+    }
+
+    /// Recompute huella and return `Some(recomputed)` on mismatch, `None` if ok.
+    pub fn verify_huella(&self) -> Option<String> {
+        use crate::order::verifactu::{HuellaBajaInput, compute_verifactu_huella_baja};
+
+        let input = HuellaBajaInput {
+            nif: &self.nif,
+            invoice_number: &self.original_invoice_number,
+            fecha_expedicion: &self.fecha_expedicion,
+            prev_huella: self.prev_huella.as_deref(),
+            fecha_hora_registro: &self.fecha_hora_registro,
+        };
+
+        let recomputed = compute_verifactu_huella_baja(&input);
+        if recomputed == self.huella {
+            None
+        } else {
+            Some(recomputed)
+        }
+    }
+}
+
 // ── Hash verification ──
 
 impl CreditNoteSync {
@@ -432,6 +515,9 @@ impl CreditNoteSync {
             &self.original_receipt,
             self.total_credit,
             self.tax_credit,
+            self.created_at,
+            &self.operator_name,
+            &self.refund_method,
         );
         if recomputed == self.curr_hash {
             None
@@ -458,7 +544,7 @@ impl OrderDetailSync {
         };
         let recomputed = crate::order::compute_order_chain_hash(
             &self.prev_hash,
-            &self.order_key,
+            self.order_id,
             &self.receipt_number,
             &status,
             last_event_hash,
@@ -696,7 +782,7 @@ impl CreditNoteSync {
 
 // ── Tenant API response types ──
 
-/// GET /api/tenant/stores/:id/orders/:order_key/detail response
+/// GET /api/tenant/stores/:id/orders/:order_id/detail response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderDetailResponse {
     /// "cache" or "edge"
@@ -745,6 +831,9 @@ mod tests {
         let original_receipt = "R-20260227-001".to_string();
         let total_credit = 25.50_f64;
         let tax_credit = 4.43_f64;
+        let created_at = 1709020800000_i64;
+        let operator_name = "Admin".to_string();
+        let refund_method = "CASH".to_string();
 
         let curr_hash = crate::order::compute_credit_note_chain_hash(
             &prev_hash,
@@ -752,23 +841,26 @@ mod tests {
             &original_receipt,
             total_credit,
             tax_credit,
+            created_at,
+            &operator_name,
+            &refund_method,
         );
 
         CreditNoteSync {
             credit_note_number: cn_number,
-            original_order_key: "uuid-order-001".to_string(),
+            original_order_id: 100001,
             original_receipt,
             subtotal_credit: 21.07,
             tax_credit: 4.43,
             total_credit,
-            refund_method: "CASH".to_string(),
+            refund_method,
             reason: "Customer request".to_string(),
             note: Some("partial refund".to_string()),
-            operator_name: "Admin".to_string(),
+            operator_name,
             authorizer_name: None,
             prev_hash,
             curr_hash,
-            created_at: 1709020800000,
+            created_at,
             items: vec![CreditNoteItemSync {
                 item_name: "Paella".to_string(),
                 quantity: 1,
@@ -788,8 +880,10 @@ mod tests {
             "R-20260227-001",
             25.50,
             4.43,
+            1709020800000,
+            "Admin",
+            "CASH",
         );
-        // Golden value updated: now includes tax_credit in hash
         assert!(!hash.is_empty(), "Hash must be non-empty");
         // Determinism check
         let hash2 = crate::order::compute_credit_note_chain_hash(
@@ -798,6 +892,9 @@ mod tests {
             "R-20260227-001",
             25.50,
             4.43,
+            1709020800000,
+            "Admin",
+            "CASH",
         );
         assert_eq!(hash, hash2, "Hash must be deterministic");
     }
@@ -862,24 +959,28 @@ mod tests {
             let receipt = "R-TEST-001".to_string();
 
             let tax = 0.0_f64;
-            let hash =
-                crate::order::compute_credit_note_chain_hash(&prev, &cn_num, &receipt, total, tax);
+            let created_at = 0_i64;
+            let operator = "op";
+            let method = "CASH";
+            let hash = crate::order::compute_credit_note_chain_hash(
+                &prev, &cn_num, &receipt, total, tax, created_at, operator, method,
+            );
 
             let cn = CreditNoteSync {
                 credit_note_number: cn_num,
-                original_order_key: "uuid".to_string(),
+                original_order_id: 100002,
                 original_receipt: receipt,
                 subtotal_credit: total,
                 tax_credit: tax,
                 total_credit: total,
-                refund_method: "CASH".to_string(),
+                refund_method: method.to_string(),
                 reason: "test".to_string(),
                 note: None,
-                operator_name: "op".to_string(),
+                operator_name: operator.to_string(),
                 authorizer_name: None,
                 prev_hash: prev,
                 curr_hash: hash,
-                created_at: 0,
+                created_at,
                 items: vec![],
             };
 
@@ -897,7 +998,7 @@ mod tests {
     #[test]
     fn test_order_verify_hash() {
         let prev_hash = "genesis".to_string();
-        let order_key = "uuid-order-001".to_string();
+        let order_id: i64 = 100001;
         let receipt = "R-20260227-001".to_string();
         let status_str = "COMPLETED".to_string();
         let last_event_hash = "event_hash_abc123".to_string();
@@ -907,7 +1008,7 @@ mod tests {
 
         let curr_hash = crate::order::compute_order_chain_hash(
             &prev_hash,
-            &order_key,
+            order_id,
             &receipt,
             &crate::order::OrderStatus::Completed,
             &last_event_hash,
@@ -916,7 +1017,7 @@ mod tests {
         );
 
         let order = OrderDetailSync {
-            order_key,
+            order_id,
             receipt_number: receipt,
             status: status_str,
             total_amount,
@@ -972,7 +1073,7 @@ mod tests {
     #[test]
     fn test_order_verify_hash_without_last_event_hash() {
         let order = OrderDetailSync {
-            order_key: "uuid".to_string(),
+            order_id: 100004,
             receipt_number: "R-001".to_string(),
             status: "COMPLETED".to_string(),
             total_amount: 0.0,
@@ -1026,7 +1127,7 @@ mod tests {
                 resource: SyncResource::Product,
                 version: 1,
                 action: SyncAction::Upsert,
-                resource_id: "42".to_string(),
+                resource_id: 42,
                 data: serde_json::json!({"name": "Test Product", "price": 9.99}),
             }],
             sent_at: 1700000000000,
@@ -1047,7 +1148,7 @@ mod tests {
             rejected: 1,
             errors: vec![CloudSyncError {
                 index: 3,
-                resource_id: "99".to_string(),
+                resource_id: 99,
                 message: "Invalid data".to_string(),
             }],
         };
@@ -1075,7 +1176,7 @@ mod tests {
 
     fn make_order_with_items() -> OrderDetailSync {
         OrderDetailSync {
-            order_key: "uuid-001".to_string(),
+            order_id: 100003,
             receipt_number: "R-001".to_string(),
             status: "COMPLETED".to_string(),
             total_amount: 36.30, // 30.00 + 6.30 (21% tax)
@@ -1270,6 +1371,13 @@ mod tests {
             nombre_razon: "Test Restaurant SL".to_string(),
             factura_rectificada_id: None,
             factura_rectificada_num: None,
+            factura_sustituida_id: None,
+            factura_sustituida_num: None,
+            customer_nif: None,
+            customer_nombre: None,
+            customer_address: None,
+            customer_email: None,
+            customer_phone: None,
             created_at: 1709020800000,
         }
     }
@@ -1366,6 +1474,13 @@ mod tests {
                 nombre_razon: "Test".to_string(),
                 factura_rectificada_id: None,
                 factura_rectificada_num: None,
+                factura_sustituida_id: None,
+                factura_sustituida_num: None,
+                customer_nif: None,
+                customer_nombre: None,
+                customer_address: None,
+                customer_email: None,
+                customer_phone: None,
                 created_at: 0,
             };
 
@@ -1432,6 +1547,13 @@ mod tests {
             nombre_razon: "Test".to_string(),
             factura_rectificada_id: None,
             factura_rectificada_num: None,
+            factura_sustituida_id: None,
+            factura_sustituida_num: None,
+            customer_nif: None,
+            customer_nombre: None,
+            customer_address: None,
+            customer_email: None,
+            customer_phone: None,
             created_at: 0,
         };
 
@@ -1458,13 +1580,13 @@ mod tests {
             (999.99, 99.99),
         ] {
             let prev = "genesis".to_string();
-            let order_key = "uuid".to_string();
+            let order_id: i64 = 100005;
             let receipt = "R-001".to_string();
             let last_event_hash = "evt_hash".to_string();
 
             let curr_hash = crate::order::compute_order_chain_hash(
                 &prev,
-                &order_key,
+                order_id,
                 &receipt,
                 &crate::order::OrderStatus::Completed,
                 &last_event_hash,
@@ -1473,7 +1595,7 @@ mod tests {
             );
 
             let order = OrderDetailSync {
-                order_key,
+                order_id,
                 receipt_number: receipt,
                 status: "COMPLETED".to_string(),
                 total_amount: total,
@@ -1528,7 +1650,7 @@ mod tests {
         // Compute the hash with known inputs
         let hash = crate::order::compute_order_chain_hash(
             "genesis",
-            "order-001",
+            100001,
             "FAC202602270001",
             &crate::order::OrderStatus::Completed,
             "last_event_abc",
@@ -1538,7 +1660,7 @@ mod tests {
         // Compute again — determinism check
         let hash2 = crate::order::compute_order_chain_hash(
             "genesis",
-            "order-001",
+            100001,
             "FAC202602270001",
             &crate::order::OrderStatus::Completed,
             "last_event_abc",
@@ -1550,7 +1672,7 @@ mod tests {
         // Different status → different hash
         let hash_void = crate::order::compute_order_chain_hash(
             "genesis",
-            "order-001",
+            100001,
             "FAC202602270001",
             &crate::order::OrderStatus::Void,
             "last_event_abc",
@@ -1571,6 +1693,9 @@ mod tests {
             "FAC202602270001",
             25.50,
             4.43,
+            1709020800000,
+            "Admin",
+            "CASH",
         );
         let hash2 = crate::order::compute_credit_note_chain_hash(
             "prev_abc",
@@ -1578,6 +1703,9 @@ mod tests {
             "FAC202602270001",
             25.50,
             4.43,
+            1709020800000,
+            "Admin",
+            "CASH",
         );
         assert_eq!(hash, hash2, "Credit note chain hash must be deterministic");
         assert_eq!(hash.len(), 64, "SHA-256 hex must be 64 chars");
@@ -1649,5 +1777,220 @@ mod tests {
         // BTreeMap ensures sorted by rate
         assert_eq!(desglose[0].tax_rate, 400);
         assert_eq!(desglose[1].tax_rate, 2100);
+    }
+
+    // ── Anulación hash + huella roundtrip tests ──
+
+    fn sample_anulacion_sync() -> AnulacionSync {
+        use crate::order::verifactu::{HuellaBajaInput, compute_verifactu_huella_baja};
+
+        let prev_hash = "genesis".to_string();
+        let anulacion_number = "ANU-20260227-0001".to_string();
+        let original_invoice_number = "F220260227001".to_string();
+        let original_order_pk: i64 = 100001;
+        let reason = "QUALITY".to_string();
+        let created_at = 1709020800000_i64;
+        let operator_name = "Admin".to_string();
+
+        let curr_hash = crate::order::compute_anulacion_chain_hash(
+            &prev_hash,
+            &anulacion_number,
+            &original_invoice_number,
+            original_order_pk,
+            &reason,
+            created_at,
+            &operator_name,
+        );
+
+        let nif = "B12345678".to_string();
+        let fecha_expedicion = "27-02-2026".to_string();
+        let fecha_hora_registro = "2026-02-27T10:00:00+01:00".to_string();
+
+        let huella = compute_verifactu_huella_baja(&HuellaBajaInput {
+            nif: &nif,
+            invoice_number: &original_invoice_number,
+            fecha_expedicion: &fecha_expedicion,
+            prev_huella: None,
+            fecha_hora_registro: &fecha_hora_registro,
+        });
+
+        AnulacionSync {
+            id: 1,
+            anulacion_number,
+            serie: "ANU".to_string(),
+            original_invoice_id: 1,
+            original_invoice_number,
+            huella,
+            prev_huella: None,
+            fecha_expedicion,
+            fecha_hora_registro,
+            nif,
+            nombre_razon: "Test Restaurant SL".to_string(),
+            original_order_pk,
+            reason,
+            note: Some("defective product".to_string()),
+            operator_id: 1,
+            operator_name,
+            prev_hash,
+            curr_hash,
+            created_at,
+        }
+    }
+
+    #[test]
+    fn test_anulacion_verify_hash_on_fresh() {
+        let anu = sample_anulacion_sync();
+        assert!(
+            anu.verify_hash().is_none(),
+            "Fresh AnulacionSync must pass hash verification"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_verify_huella_on_fresh() {
+        let anu = sample_anulacion_sync();
+        assert!(
+            anu.verify_huella().is_none(),
+            "Fresh AnulacionSync must pass huella verification"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_hash_survives_json_roundtrip() {
+        let anu = sample_anulacion_sync();
+        let json = serde_json::to_string(&anu).unwrap();
+        let deserialized: AnulacionSync = serde_json::from_str(&json).unwrap();
+
+        assert!(
+            deserialized.verify_hash().is_none(),
+            "Hash verification must pass after JSON roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_huella_survives_json_roundtrip() {
+        let anu = sample_anulacion_sync();
+        let json = serde_json::to_string(&anu).unwrap();
+        let deserialized: AnulacionSync = serde_json::from_str(&json).unwrap();
+
+        assert!(
+            deserialized.verify_huella().is_none(),
+            "Huella verification must pass after JSON roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_hash_survives_value_roundtrip() {
+        let anu = sample_anulacion_sync();
+        let value = serde_json::to_value(&anu).unwrap();
+        let deserialized: AnulacionSync = serde_json::from_value(value).unwrap();
+
+        assert!(
+            deserialized.verify_hash().is_none(),
+            "Hash verification must pass after Value roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_huella_survives_value_roundtrip() {
+        let anu = sample_anulacion_sync();
+        let value = serde_json::to_value(&anu).unwrap();
+        let deserialized: AnulacionSync = serde_json::from_value(value).unwrap();
+
+        assert!(
+            deserialized.verify_huella().is_none(),
+            "Huella verification must pass after Value roundtrip"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_hash_detects_tampering() {
+        let mut anu = sample_anulacion_sync();
+        anu.reason = "TAMPERED".to_string();
+        assert!(
+            anu.verify_hash().is_some(),
+            "Tampered reason must fail hash verification"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_huella_detects_tampering() {
+        let mut anu = sample_anulacion_sync();
+        anu.nif = "X99999999".to_string();
+        assert!(
+            anu.verify_huella().is_some(),
+            "Tampered nif must fail huella verification"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_chained_huella_roundtrip() {
+        use crate::order::verifactu::{
+            HuellaAltaInput, HuellaBajaInput, compute_verifactu_huella_alta,
+            compute_verifactu_huella_baja,
+        };
+
+        let nif = "B12345678";
+        let ts1 = "2026-02-27T10:00:00+01:00";
+        let ts2 = "2026-02-27T11:00:00+01:00";
+
+        // First: an invoice (alta) creates a huella
+        let h_alta = compute_verifactu_huella_alta(&HuellaAltaInput {
+            nif,
+            invoice_number: "INV-001",
+            fecha_expedicion: "27-02-2026",
+            tipo_factura: "F2",
+            cuota_total: 6.30,
+            importe_total: 36.30,
+            prev_huella: None,
+            fecha_hora_registro: ts1,
+        })
+        .unwrap();
+
+        // Second: anulación (baja) chains to the alta huella
+        let h_baja = compute_verifactu_huella_baja(&HuellaBajaInput {
+            nif,
+            invoice_number: "INV-001",
+            fecha_expedicion: "27-02-2026",
+            prev_huella: Some(&h_alta),
+            fecha_hora_registro: ts2,
+        });
+
+        let anu = AnulacionSync {
+            id: 2,
+            anulacion_number: "ANU-002".to_string(),
+            serie: "ANU".to_string(),
+            original_invoice_id: 1,
+            original_invoice_number: "INV-001".to_string(),
+            huella: h_baja.clone(),
+            prev_huella: Some(h_alta),
+            fecha_expedicion: "27-02-2026".to_string(),
+            fecha_hora_registro: ts2.to_string(),
+            nif: nif.to_string(),
+            nombre_razon: "Test".to_string(),
+            original_order_pk: 100,
+            reason: "QUALITY".to_string(),
+            note: None,
+            operator_id: 1,
+            operator_name: "Admin".to_string(),
+            prev_hash: "prev".to_string(),
+            curr_hash: crate::order::compute_anulacion_chain_hash(
+                "prev", "ANU-002", "INV-001", 100, "QUALITY", 0, "Admin",
+            ),
+            created_at: 0,
+        };
+
+        // JSON roundtrip must preserve chained huella
+        let json = serde_json::to_string(&anu).unwrap();
+        let rt: AnulacionSync = serde_json::from_str(&json).unwrap();
+        assert!(
+            rt.verify_huella().is_none(),
+            "Chained huella must survive JSON roundtrip"
+        );
+        assert!(
+            rt.verify_hash().is_none(),
+            "Chain hash must survive JSON roundtrip"
+        );
+        assert_eq!(rt.huella, h_baja);
     }
 }

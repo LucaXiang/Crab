@@ -15,19 +15,19 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum OrderError {
     #[error("Order not found: {0}")]
-    OrderNotFound(String),
+    OrderNotFound(i64),
 
     #[error("Order already completed: {0}")]
-    OrderAlreadyCompleted(String),
+    OrderAlreadyCompleted(i64),
 
     #[error("Order already voided: {0}")]
-    OrderAlreadyVoided(String),
+    OrderAlreadyVoided(i64),
 
     #[error("Item not found: {0}")]
     ItemNotFound(String),
 
     #[error("Payment not found: {0}")]
-    PaymentNotFound(String),
+    PaymentNotFound(i64),
 
     #[error("Insufficient quantity")]
     InsufficientQuantity,
@@ -51,7 +51,7 @@ pub enum OrderError {
 /// Command metadata extracted from OrderCommand
 #[derive(Debug, Clone)]
 pub struct CommandMetadata {
-    pub command_id: String,
+    pub command_id: i64,
     pub operator_id: i64,
     pub operator_name: String,
     pub timestamp: i64,
@@ -66,7 +66,7 @@ pub struct CommandMetadata {
 pub struct CommandContext<'a> {
     txn: &'a WriteTransaction,
     storage: &'a OrderStorage,
-    snapshot_cache: HashMap<String, OrderSnapshot>,
+    snapshot_cache: HashMap<i64, OrderSnapshot>,
     next_sequence: u64,
 }
 
@@ -85,8 +85,8 @@ impl<'a> CommandContext<'a> {
     }
 
     /// Load a snapshot, using cache if available
-    pub fn load_snapshot(&mut self, order_id: &str) -> Result<OrderSnapshot, OrderError> {
-        if let Some(snapshot) = self.snapshot_cache.get(order_id) {
+    pub fn load_snapshot(&mut self, order_id: i64) -> Result<OrderSnapshot, OrderError> {
+        if let Some(snapshot) = self.snapshot_cache.get(&order_id) {
             return Ok(snapshot.clone());
         }
 
@@ -94,24 +94,22 @@ impl<'a> CommandContext<'a> {
             .storage
             .get_snapshot_txn(self.txn, order_id)
             .map_err(|e| OrderError::Storage(e.to_string()))?
-            .ok_or_else(|| OrderError::OrderNotFound(order_id.to_string()))?;
+            .ok_or(OrderError::OrderNotFound(order_id))?;
 
-        self.snapshot_cache
-            .insert(order_id.to_string(), snapshot.clone());
+        self.snapshot_cache.insert(order_id, snapshot.clone());
         Ok(snapshot)
     }
 
     /// Create a new snapshot and add to cache
-    pub fn create_snapshot(&mut self, order_id: String) -> OrderSnapshot {
-        let snapshot = OrderSnapshot::new(order_id.clone());
+    pub fn create_snapshot(&mut self, order_id: i64) -> OrderSnapshot {
+        let snapshot = OrderSnapshot::new(order_id);
         self.snapshot_cache.insert(order_id, snapshot.clone());
         snapshot
     }
 
     /// Save a snapshot to the cache (actual persistence happens in manager)
     pub fn save_snapshot(&mut self, snapshot: OrderSnapshot) {
-        self.snapshot_cache
-            .insert(snapshot.order_id.clone(), snapshot);
+        self.snapshot_cache.insert(snapshot.order_id, snapshot);
     }
 
     /// Get all modified snapshots for persistence
@@ -132,7 +130,7 @@ impl<'a> CommandContext<'a> {
     /// Check if a table is occupied by an active order
     ///
     /// Returns the order_id if the table is occupied.
-    pub fn find_active_order_for_table(&self, table_id: i64) -> Result<Option<String>, OrderError> {
+    pub fn find_active_order_for_table(&self, table_id: i64) -> Result<Option<i64>, OrderError> {
         self.storage
             .find_active_order_for_table_txn(self.txn, table_id)
             .map_err(|e| OrderError::Storage(e.to_string()))
