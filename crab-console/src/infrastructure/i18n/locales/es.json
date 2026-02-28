@@ -78,7 +78,8 @@
     "download_desc": "Descarga la última versión para Windows.",
     "download_windows": "Descargar",
     "welcome": "Bienvenido",
-    "system_operational": "Sistema operativo"
+    "system_operational": "Sistema operativo",
+    "sync_warning": "Algunos locales no se han sincronizado en más de 24 horas"
   },
   "store": {
     "title": "Local",
@@ -98,7 +99,18 @@
     "business_day_cutoff": "Cierre del día comercial",
     "save": "Guardar cambios",
     "saving": "Guardando...",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "devices": "Dispositivos",
+    "devices_loading": "Cargando...",
+    "no_devices": "Sin registros de dispositivos",
+    "device_type_server": "Servidor",
+    "device_type_client": "Cliente",
+    "danger_zone": "Zona peligrosa",
+    "danger_zone_desc": "Al eliminar el local, todos los dispositivos asociados se desactivarán. Los datos se eliminarán definitivamente en 30 días.",
+    "delete_store": "Eliminar local",
+    "confirm_delete": "Confirmar eliminación",
+    "confirm_delete_desc": "¿Seguro que quieres eliminar el local \"{alias}\"? Todos los dispositivos asociados se desactivarán y los datos se eliminarán en 30 días. Esta acción no se puede deshacer.",
+    "deleting": "Eliminando..."
   },
   "orders": {
     "title": "Pedidos",
@@ -111,6 +123,9 @@
     "void": "Anulados",
     "merged": "Fusionados",
     "empty": "No hay pedidos.",
+    "no_results": "No se encontraron pedidos que coincidan.",
+    "select_order": "Selecciona un pedido para ver detalles",
+    "no_more": "No hay más pedidos",
     "load_more": "Cargar más",
     "detail": "Detalle del pedido",
     "items": "Artículos",
@@ -171,6 +186,10 @@
     "today": "Hoy",
     "average_order": "Ticket medio",
     "revenue_trend": "Tendencia de ingresos",
+    "daily_revenue_trend": "Tendencia de ingresos diarios",
+    "line_today": "Hoy",
+    "line_yesterday": "Ayer",
+    "line_last_week": "Mismo día semana pasada",
     "orders_label": "pedidos",
     "top_products": "Productos más vendidos",
     "category_sales": "Ventas por categoría",
@@ -179,7 +198,13 @@
     "avg_dining_time": "Tiempo medio",
     "loss_orders": "Pérdidas",
     "summary": "Resumen",
-    "tag_sales": "Ventas por etiqueta"
+    "tag_sales": "Ventas por etiqueta",
+    "yesterday": "Ayer",
+    "this_week": "Esta semana",
+    "this_month": "Este mes",
+    "custom_range": "Personalizado",
+    "refunds": "Devoluciones",
+    "refund_methods": "Métodos de devolución"
   },
   "reports": {
     "abnormal_close": "Cierre anormal",
@@ -270,7 +295,8 @@
     "new": "Nueva etiqueta",
     "edit": "Editar etiqueta",
     "color": "Color",
-    "system": "Sistema"
+    "system": "Sistema",
+    "system_readonly": "Las etiquetas del sistema no se pueden editar."
   },
   "zones": {
     "title": "Zonas",
@@ -639,6 +665,8 @@
     "p12_uploading": "Subiendo...",
     "p12_success": "Certificado subido correctamente.",
     "p12_skip_info": "Este paso es obligatorio para cumplir con la normativa fiscal española.",
+    "p12_binding_warning": "El certificado no se puede cambiar tras la vinculación",
+    "p12_binding_warning_desc": "El NIF del certificado quedará vinculado permanentemente a tu cuenta. Una vez completado el pago, no se podrá cambiar el certificado. Si cambias de entidad, deberás registrar una nueva cuenta.",
     "p12_uploaded": "Certificado subido",
     "p12_subject": "Titular",
     "p12_nif": "NIF",
@@ -649,6 +677,8 @@
     "p12_expires": "Válido hasta",
     "p12_continue": "Continuar",
     "p12_change": "Cambiar certificado",
+    "p12_expiring_soon": "Certificado a punto de caducar",
+    "p12_expired": "Certificado caducado",
     "step_certificate": "Certificado",
     "step_plan": "Plan"
   },
@@ -663,7 +693,10 @@
       "total": "Total",
       "yes": "Sí",
       "no": "No",
-      "active": "activos"
+      "active": "activos",
+      "from": "Desde",
+      "to": "Hasta",
+      "apply": "Aplicar"
     },
     "selection": {
       "selected": "Seleccionados",
@@ -753,7 +786,11 @@
     "import_success": "Catálogo importado correctamente. Los cambios se sincronizarán con el terminal.",
     "warning_title": "Importante",
     "warning1": "La importación reemplazará TODOS los datos del catálogo existentes de este local.",
-    "warning2": "El terminal recibirá una sincronización completa después de la importación."
+    "warning2": "El terminal recibirá una sincronización completa después de la importación.",
+    "import_confirm_title": "Confirmar importación",
+    "import_confirm_desc": "La importación reemplazará todos los datos del catálogo de este local. Esta acción no se puede deshacer. ¿Continuar?",
+    "export_error": "Error al exportar",
+    "import_error": "Error al importar"
   },
   "error": {
     "title": "Error",
@@ -814,6 +851,9 @@
     "3026": "El archivo P12 no contiene certificado.",
     "3027": "La cadena de certificados no se ha podido verificar. El archivo puede estar dañado.",
     "3028": "El certificado raíz no está reconocido por la AEAT. Solo se aceptan certificados de CAs españolas autorizadas (FNMT, ACCV, Izenpe, Firmaprofesional).",
+    "3029": "El NIF del nuevo certificado no coincide con el certificado vinculado. Si cambias de entidad, debes registrar una nueva cuenta.",
+    "3030": "El certificado ha caducado. Sube un certificado válido.",
+    "3031": "El certificado aún no es válido. Comprueba la fecha de inicio de validez.",
 
     "6001": "Producto no encontrado.",
     "6002": "Precio de producto no válido.",

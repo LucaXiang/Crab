@@ -187,11 +187,11 @@ export const StoreSettingsScreen: React.FC = () => {
 
       {/* Devices Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">设备</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('store.devices')}</h3>
         {devicesLoading ? (
-          <p className="text-gray-500 text-sm">加载中...</p>
+          <p className="text-gray-500 text-sm">{t('store.devices_loading')}</p>
         ) : devices.length === 0 ? (
-          <p className="text-gray-500 text-sm">暂无设备记录</p>
+          <p className="text-gray-500 text-sm">{t('store.no_devices')}</p>
         ) : (
           <div className="divide-y divide-gray-100">
             {devices.map((d) => (
@@ -200,7 +200,7 @@ export const StoreSettingsScreen: React.FC = () => {
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                     d.device_type === 'server' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
                   }`}>
-                    {d.device_type === 'server' ? 'Server' : 'Client'}
+                    {d.device_type === 'server' ? t('store.device_type_server') : t('store.device_type_client')}
                   </span>
                   <span className="font-mono text-sm text-gray-600">{d.device_id.slice(0, 8)}</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
@@ -222,16 +222,16 @@ export const StoreSettingsScreen: React.FC = () => {
 
       {/* Danger Zone */}
       <div className="bg-white rounded-lg shadow-sm border border-red-200 p-6">
-        <h3 className="text-lg font-semibold text-red-600 mb-2">危险区域</h3>
+        <h3 className="text-lg font-semibold text-red-600 mb-2">{t('store.danger_zone')}</h3>
         <p className="text-sm text-gray-600 mb-4">
-          删除门店后，所有关联设备将被停用。门店数据将在 30 天后彻底删除。
+          {t('store.danger_zone_desc')}
         </p>
         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
         <button
           onClick={() => setShowDeleteConfirm(true)}
           className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium"
         >
-          删除门店
+          {t('store.delete_store')}
         </button>
       </div>
 
@@ -239,23 +239,23 @@ export const StoreSettingsScreen: React.FC = () => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">确认删除</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('store.confirm_delete')}</h3>
             <p className="text-sm text-gray-600 mb-4">
-              确定要删除门店 <strong>{form.alias}</strong> 吗？所有关联设备将被停用，数据将在 30 天后彻底删除。此操作不可撤销。
+              {t('store.confirm_delete_desc').replace('{alias}', form.alias)}
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
-                取消
+                {t('common.action.cancel')}
               </button>
               <button
                 onClick={handleDeleteStore}
                 disabled={deleting}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
               >
-                {deleting ? '删除中...' : '确认删除'}
+                {deleting ? t('store.deleting') : t('store.confirm_delete')}
               </button>
             </div>
           </div>

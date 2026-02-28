@@ -78,7 +78,8 @@
     "download_desc": "下载最新 Windows 版本。",
     "download_windows": "下载",
     "welcome": "欢迎",
-    "system_operational": "系统运行正常"
+    "system_operational": "系统运行正常",
+    "sync_warning": "部分门店同步已超过 24 小时"
   },
   "store": {
     "title": "门店",
@@ -98,7 +99,18 @@
     "business_day_cutoff": "营业日分界时间",
     "save": "保存更改",
     "saving": "正在保存...",
-    "saved": "已保存"
+    "saved": "已保存",
+    "devices": "设备",
+    "devices_loading": "加载中...",
+    "no_devices": "暂无设备记录",
+    "device_type_server": "服务端",
+    "device_type_client": "客户端",
+    "danger_zone": "危险区域",
+    "danger_zone_desc": "删除门店后，所有关联设备将被停用。门店数据将在 30 天后彻底删除。",
+    "delete_store": "删除门店",
+    "confirm_delete": "确认删除",
+    "confirm_delete_desc": "确定要删除门店 \"{alias}\" 吗？所有关联设备将被停用，数据将在 30 天后彻底删除。此操作不可撤销。",
+    "deleting": "删除中..."
   },
   "orders": {
     "title": "订单",
@@ -111,6 +123,9 @@
     "void": "已作废",
     "merged": "已合并",
     "empty": "暂无订单。",
+    "no_results": "没有符合条件的订单。",
+    "select_order": "选择一个订单查看详情",
+    "no_more": "没有更多订单",
     "load_more": "加载更多",
     "detail": "订单详情",
     "items": "商品",
@@ -171,6 +186,10 @@
     "today": "今日",
     "average_order": "客单价",
     "revenue_trend": "营收趋势",
+    "daily_revenue_trend": "每日营业额趋势",
+    "line_today": "今日",
+    "line_yesterday": "昨天",
+    "line_last_week": "上周同日",
     "orders_label": "单",
     "top_products": "热销商品",
     "category_sales": "分类销售",
@@ -179,7 +198,13 @@
     "avg_dining_time": "平均用餐时间",
     "loss_orders": "损失订单",
     "summary": "数据概览",
-    "tag_sales": "标签销售"
+    "tag_sales": "标签销售",
+    "yesterday": "昨天",
+    "this_week": "本周",
+    "this_month": "本月",
+    "custom_range": "自定义",
+    "refunds": "退款",
+    "refund_methods": "退款方式明细"
   },
   "reports": {
     "abnormal_close": "异常收班",
@@ -270,7 +295,8 @@
     "new": "新建标签",
     "edit": "编辑标签",
     "color": "颜色",
-    "system": "系统"
+    "system": "系统",
+    "system_readonly": "系统标签不可编辑。"
   },
   "zones": {
     "title": "区域",
@@ -639,6 +665,8 @@
     "p12_uploading": "上传中...",
     "p12_success": "证书上传成功。",
     "p12_skip_info": "此步骤为西班牙税务合规要求，必须完成。",
+    "p12_binding_warning": "证书绑定后不可更换",
+    "p12_binding_warning_desc": "证书中的税号 (NIF) 将与你的账户永久绑定。完成支付后，该证书无法更改。如需变更经营主体，请注册新账户。",
     "p12_uploaded": "证书已上传",
     "p12_subject": "持有人",
     "p12_nif": "税号 (NIF)",
@@ -649,6 +677,8 @@
     "p12_expires": "有效期至",
     "p12_continue": "继续",
     "p12_change": "更换证书",
+    "p12_expiring_soon": "证书即将过期",
+    "p12_expired": "证书已过期",
     "step_certificate": "证书",
     "step_plan": "方案"
   },
@@ -663,7 +693,10 @@
       "total": "共计",
       "yes": "是",
       "no": "否",
-      "active": "活跃"
+      "active": "活跃",
+      "from": "开始",
+      "to": "结束",
+      "apply": "确定"
     },
     "selection": {
       "selected": "已选择",
@@ -753,7 +786,11 @@
     "import_success": "目录导入成功，变更将同步到终端。",
     "warning_title": "注意",
     "warning1": "导入将替换该门店的全部目录数据。",
-    "warning2": "导入后终端将收到全量同步。"
+    "warning2": "导入后终端将收到全量同步。",
+    "import_confirm_title": "确认导入",
+    "import_confirm_desc": "导入将替换该门店的全部目录数据，此操作不可撤销。确定继续？",
+    "export_error": "导出失败",
+    "import_error": "导入失败"
   },
   "error": {
     "title": "错误",
@@ -814,6 +851,9 @@
     "3026": "P12 文件不含证书。",
     "3027": "证书链验证失败，文件可能已损坏。",
     "3028": "证书根 CA 未被 AEAT 认可，仅接受西班牙授权 CA 签发的证书（FNMT、ACCV、Izenpe、Firmaprofesional）。",
+    "3029": "新证书的税号 (NIF) 与已绑定证书不一致。如需变更经营主体，请注册新账户。",
+    "3030": "该证书已过期，请上传有效期内的证书。",
+    "3031": "该证书尚未生效，请检查证书的生效日期。",
 
     "6001": "商品不存在。",
     "6002": "商品价格无效。",

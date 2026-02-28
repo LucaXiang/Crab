@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LiveOrderSnapshot, ConsoleMessage, ConnectionState } from '@/core/types/live';
 
-const WS_BASE = 'wss://cloud.redcoral.app';
+const WS_BASE = import.meta.env.VITE_WS_BASE || 'wss://cloud.redcoral.app';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 

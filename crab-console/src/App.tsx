@@ -42,8 +42,9 @@ export const App: React.FC = () => (
     </Route>
 
     <Route path="/stores/:id" element={<ProtectedRoute><StoreLayout /></ProtectedRoute>}>
-      <Route index element={<StoreSettingsScreen />} />
+      <Route index element={<Navigate to="overview" replace />} />
       <Route path="overview" element={<StoreOverviewScreen />} />
+      <Route path="settings" element={<StoreSettingsScreen />} />
       <Route path="live" element={<LiveOrdersScreen />} />
       <Route path="orders" element={<OrdersScreen />} />
       <Route path="reports" element={<ReportsScreen />} />

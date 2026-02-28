@@ -63,6 +63,7 @@ export const OrdersScreen: React.FC = () => {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      setCurrentPage(1);
       await loadPage(1, true);
       setLoading(false);
     })();
@@ -71,10 +72,10 @@ export const OrdersScreen: React.FC = () => {
   // Fix 2: prevent mobile bottom sheet from reopening after user dismisses
   const userDismissed = useRef(false);
 
-  // Reset dismiss flag when orders list changes (new data loaded)
+  // Reset dismiss flag only on full reload (store change), not on append
   useEffect(() => {
     userDismissed.current = false;
-  }, [orders]);
+  }, [storeId]);
 
   // Auto-select first order (skip if user explicitly dismissed on mobile)
   useEffect(() => {
@@ -159,7 +160,7 @@ export const OrdersScreen: React.FC = () => {
             )}
             {filteredOrders.length === 0 && !loading ? (
               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400 gap-4">
-                <span className="text-sm">{t('orders.empty')}</span>
+                <span className="text-sm">{search ? t('orders.no_results') : t('orders.empty')}</span>
               </div>
             ) : (
               <div className="divide-y divide-slate-50">
@@ -208,7 +209,7 @@ export const OrdersScreen: React.FC = () => {
               className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-default flex items-center gap-2 cursor-pointer"
             >
               {loadingMore ? <Spinner className="w-4 h-4" /> : null}
-              <span>{hasMore ? t('orders.load_more') : t('orders.empty')}</span>
+              <span>{hasMore ? t('orders.load_more') : t('orders.no_more')}</span>
             </button>
           </div>
         </div>
@@ -224,7 +225,7 @@ export const OrdersScreen: React.FC = () => {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-300">
               <Receipt className="w-16 h-16 mb-4 opacity-50" />
-              <p>{t('orders.empty')}</p>
+              <p>{t('orders.select_order')}</p>
             </div>
           )}
         </div>
@@ -261,7 +262,7 @@ export const OrdersScreen: React.FC = () => {
         ) : filteredOrders.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
             <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">{t('orders.empty')}</p>
+            <p className="text-slate-500 font-medium">{search ? t('orders.no_results') : t('orders.empty')}</p>
           </div>
         ) : (
           <div className="space-y-3 pb-20">
@@ -307,7 +308,7 @@ export const OrdersScreen: React.FC = () => {
                 className="w-full py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 disabled:cursor-default flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 {loadingMore ? <Spinner className="w-4 h-4" /> : null}
-                <span>{hasMore ? t('orders.load_more') : t('orders.empty')}</span>
+                <span>{hasMore ? t('orders.load_more') : t('orders.no_more')}</span>
               </button>
             </div>
           </div>

@@ -120,9 +120,9 @@ export const StoreLayout: React.FC = () => {
             </div>
           ))}
           <div className="pt-2 border-t border-slate-100 mt-2">
-            <Link to={`/stores/${storeId}`}
+            <Link to={`/stores/${storeId}/settings`}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === `/stores/${storeId}` ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                location.pathname === `/stores/${storeId}/settings` ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               <Settings className="w-4.5 h-4.5" />

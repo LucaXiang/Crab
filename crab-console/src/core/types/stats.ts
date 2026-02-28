@@ -34,6 +34,18 @@ export interface TagSale {
   quantity: number;
 }
 
+export interface RefundMethodBreakdown {
+  method: string;
+  amount: number;
+  count: number;
+}
+
+export interface DailyTrendPoint {
+  date: string;
+  revenue: number;
+  orders: number;
+}
+
 export interface StoreOverview {
   revenue: number;
   orders: number;
@@ -47,12 +59,16 @@ export interface StoreOverview {
   voided_amount: number;
   loss_orders: number;
   loss_amount: number;
+  refund_count: number;
+  refund_amount: number;
   revenue_trend: RevenueTrendPoint[];
   tax_breakdown: TaxBreakdownStat[];
   payment_breakdown: PaymentBreakdown[];
   top_products: TopProduct[];
   category_sales: CategorySale[];
   tag_sales: TagSale[];
+  refund_method_breakdown: RefundMethodBreakdown[];
+  daily_trend: DailyTrendPoint[];
 }
 
 export interface DailyReportEntry {

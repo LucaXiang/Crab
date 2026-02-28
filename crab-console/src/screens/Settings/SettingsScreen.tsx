@@ -175,26 +175,39 @@ export const SettingsScreen: React.FC = () => {
       </Section>
 
       {/* P12 */}
-      {p12?.has_p12 && (
-        <Section icon={Lock} title={t('onboard.p12_uploaded')}>
-          <div className="text-sm space-y-2">
-            {p12.subject && <P12Row label={t('onboard.p12_subject')} value={p12.subject} bold />}
-            {p12.serial_number && <P12Row label={t('onboard.p12_nif')} value={p12.serial_number} />}
-            {p12.organization && <P12Row label={t('onboard.p12_organization')} value={p12.organization} />}
-            {p12.issuer && <P12Row label={t('onboard.p12_issuer')} value={p12.issuer} />}
-            {(p12.not_before || p12.expires_at) && (
-              <P12Row
-                label={t('onboard.p12_validity')}
-                value={[
-                  p12.not_before ? new Date(p12.not_before).toLocaleDateString() : '?',
-                  p12.expires_at ? new Date(p12.expires_at).toLocaleDateString() : '?',
-                ].join(' — ')}
-              />
+      {p12?.has_p12 && (() => {
+        const daysUntilExpiry = p12.expires_at ? Math.floor((p12.expires_at - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+        const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+        const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 60;
+        return (
+          <Section icon={Lock} title={t('onboard.p12_uploaded')}>
+            {(isExpired || isExpiringSoon) && (
+              <div className={`mb-3 px-3 py-2 rounded-lg text-sm font-medium ${isExpired ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                {isExpired
+                  ? t('onboard.p12_expired')
+                  : `${t('onboard.p12_expiring_soon')} (${daysUntilExpiry}d)`
+                }
+              </div>
             )}
-            {p12.fingerprint && <P12Row label={t('onboard.p12_fingerprint')} value={p12.fingerprint.length > 20 ? `${p12.fingerprint.slice(0, 8)}...${p12.fingerprint.slice(-8)}` : p12.fingerprint} mono />}
-          </div>
-        </Section>
-      )}
+            <div className="text-sm space-y-2">
+              {p12.subject && <P12Row label={t('onboard.p12_subject')} value={p12.subject} bold />}
+              {p12.serial_number && <P12Row label={t('onboard.p12_nif')} value={p12.serial_number} />}
+              {p12.organization && <P12Row label={t('onboard.p12_organization')} value={p12.organization} />}
+              {p12.issuer && <P12Row label={t('onboard.p12_issuer')} value={p12.issuer} />}
+              {(p12.not_before || p12.expires_at) && (
+                <P12Row
+                  label={t('onboard.p12_validity')}
+                  value={[
+                    p12.not_before ? new Date(p12.not_before).toLocaleDateString() : '?',
+                    p12.expires_at ? new Date(p12.expires_at).toLocaleDateString() : '?',
+                  ].join(' — ')}
+                />
+              )}
+              {p12.fingerprint && <P12Row label={t('onboard.p12_fingerprint')} value={p12.fingerprint.length > 20 ? `${p12.fingerprint.slice(0, 8)}...${p12.fingerprint.slice(-8)}` : p12.fingerprint} mono />}
+            </div>
+          </Section>
+        );
+      })()}
     </div>
   );
 };

@@ -8,3 +8,5 @@ export { DeleteConfirmation } from './DeleteConfirmation';
 export { FilterBar } from './FilterBar';
 export { ImageUpload } from './ImageUpload';
 export { Thumbnail } from './Thumbnail';
+export { TimeRangeSelector, getPresetRange, getPreviousRange, getLastWeekSameDayRange } from './TimeRangeSelector';
+export type { TimeRange, TimeRangePreset } from './TimeRangeSelector';

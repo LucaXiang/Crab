@@ -541,7 +541,7 @@ export const ProductManagement: React.FC = () => {
                         className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         placeholder={t('settings.product.price')} step="0.01" min={0}
                       />
-                      <button type="button" onClick={() => removeSpec(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                      <button type="button" onClick={() => removeSpec(idx)} disabled={formSpecs.length <= 1} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                         <Trash2 size={14} />
                       </button>
                     </div>

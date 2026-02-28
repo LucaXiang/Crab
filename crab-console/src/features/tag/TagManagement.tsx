@@ -63,8 +63,9 @@ export const TagManagement: React.FC = () => {
     setPanel({ type: 'create' });
   };
 
+  const [systemMsg, setSystemMsg] = useState('');
   const openEdit = (item: StoreTag) => {
-    if (item.is_system) return;
+    if (item.is_system) { setSystemMsg(t('tags.system_readonly')); setTimeout(() => setSystemMsg(''), 3000); return; }
     setFormName(item.name); setFormColor(item.color || '#6366f1'); setFormDisplayOrder(item.display_order);
     setPanel({ type: 'edit', item });
   };
@@ -121,6 +122,7 @@ export const TagManagement: React.FC = () => {
           <Tag className="w-5 h-5 text-indigo-600" />
         </div>
         <h1 className="text-xl font-bold text-slate-900">{t('tags.title')}</h1>
+        {systemMsg && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md ml-auto">{systemMsg}</span>}
       </div>
 
       <div className="flex-1 min-h-0">

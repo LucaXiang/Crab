@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/core/stores/useAuthStore';
 
-export const API_BASE = 'https://cloud.redcoral.app';
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://cloud.redcoral.app';
 
 export class ApiError extends Error {
   status: number;

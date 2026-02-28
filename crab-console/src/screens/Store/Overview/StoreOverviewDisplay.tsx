@@ -1,11 +1,12 @@
 import React from 'react';
 import {
   BarChart3, DollarSign, ShoppingBag, Users, TrendingUp,
-  CreditCard, Banknote, Clock, XCircle, AlertTriangle, Tag, Award, Receipt,
+  CreditCard, Banknote, Clock, XCircle, AlertTriangle, Tag, Award, Receipt, RotateCcw,
+  ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, Legend, Line, ComposedChart,
 } from 'recharts';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/format';
@@ -15,17 +16,51 @@ const PIE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4
 
 interface Props {
   overview: StoreOverview;
+  previousOverview?: StoreOverview | null;
+  lastWeekOverview?: StoreOverview | null;
   showHeader?: boolean;
+  rangeLabel?: string;
 }
 
-export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = true }) => {
+/** Compute percentage change. Returns null if previous is 0 (no meaningful comparison). */
+function pctChange(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? null : null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+/** For "negative is better" metrics (voids, losses, refunds), invert the color logic. */
+type DeltaDirection = 'positive' | 'negative' | 'neutral';
+
+export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOverview, lastWeekOverview, showHeader = true, rangeLabel }) => {
   const { t } = useI18n();
+  const prev = previousOverview ?? null;
+  const lastWeek = lastWeekOverview ?? null;
 
   const totalCategorySales = overview.category_sales.reduce((sum, c) => sum + c.revenue, 0);
   const totalPayments = overview.payment_breakdown.reduce((sum, p) => sum + p.amount, 0);
 
-  const trendData = overview.revenue_trend.map(p => ({
-    hour: `${p.hour}:00`,
+  const hasDailyTrend = overview.daily_trend.length > 1;
+
+  // Build hourly trend data with comparison lines
+  const hourlyTrendData = (() => {
+    // Build a map of all 24 hours
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const currentMap = new Map(overview.revenue_trend.map(p => [p.hour, p]));
+    const prevMap = prev ? new Map(prev.revenue_trend.map(p => [p.hour, p])) : null;
+    const lwMap = lastWeek ? new Map(lastWeek.revenue_trend.map(p => [p.hour, p])) : null;
+
+    return hours.map(h => ({
+      hour: `${h}:00`,
+      revenue: currentMap.get(h)?.revenue ?? 0,
+      orders: currentMap.get(h)?.orders ?? 0,
+      ...(prevMap ? { prevRevenue: prevMap.get(h)?.revenue ?? 0 } : {}),
+      ...(lwMap ? { lwRevenue: lwMap.get(h)?.revenue ?? 0 } : {}),
+    }));
+  })();
+
+  // Daily trend data for cross-day ranges
+  const dailyTrendData = overview.daily_trend.map(p => ({
+    date: p.date.slice(5), // MM-DD
     revenue: p.revenue,
     orders: p.orders,
   }));
@@ -36,7 +71,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
         <div className="bg-white rounded-2xl border border-slate-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary-500" />
-            <span className="font-bold text-slate-900">{t('stats.today')}</span>
+            <span className="font-bold text-slate-900">{rangeLabel || t('stats.today')}</span>
           </div>
           <span className="text-sm text-slate-400">{new Date().toLocaleDateString()}</span>
         </div>
@@ -44,10 +79,10 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
 
       {/* KPI Row 1 — Primary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={DollarSign} bg="bg-primary-100" color="text-primary-600" value={formatCurrency(overview.revenue)} label={t('stats.total_sales')} accent />
-        <KpiCard icon={ShoppingBag} bg="bg-green-100" color="text-green-600" value={String(overview.orders)} label={t('stats.completed_orders')} />
-        <KpiCard icon={Users} bg="bg-blue-100" color="text-blue-600" value={String(overview.guests)} label={t('stats.guests')} />
-        <KpiCard icon={TrendingUp} bg="bg-purple-100" color="text-purple-600" value={formatCurrency(overview.average_order_value)} label={t('stats.average_order')} />
+        <KpiCard icon={DollarSign} bg="bg-primary-100" color="text-primary-600" value={formatCurrency(overview.revenue)} label={t('stats.total_sales')} accent delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
+        <KpiCard icon={ShoppingBag} bg="bg-green-100" color="text-green-600" value={String(overview.orders)} label={t('stats.completed_orders')} delta={prev ? pctChange(overview.orders, prev.orders) : undefined} />
+        <KpiCard icon={Users} bg="bg-blue-100" color="text-blue-600" value={String(overview.guests)} label={t('stats.guests')} delta={prev ? pctChange(overview.guests, prev.guests) : undefined} />
+        <KpiCard icon={TrendingUp} bg="bg-purple-100" color="text-purple-600" value={formatCurrency(overview.average_order_value)} label={t('stats.average_order')} delta={prev ? pctChange(overview.average_order_value, prev.average_order_value) : undefined} />
       </div>
 
       {/* KPI Row 2 — Secondary */}
@@ -58,27 +93,64 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
             <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${pb.method} (${pb.count})`} />
           );
         })}
-        <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} />
+        <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
         <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('stats.avg_dining_time')} />
       </div>
 
-      {/* KPI Row 3 — Losses & Discounts */}
+      {/* KPI Row 3 — Losses, Discounts & Refunds */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('stats.void_orders')} (${formatCurrency(overview.voided_amount)})`} />
-        <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('stats.loss_orders')} (${formatCurrency(overview.loss_amount)})`} />
-        <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('stats.total_discount')} />
-        <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('stats.total_tax')} />
+        <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('stats.void_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
+        <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('stats.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
+        <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('stats.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
+        <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('stats.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
       </div>
 
-      {/* Revenue Trend — recharts Area */}
-      {trendData.length > 0 && (
+      {/* KPI Row 4 — Tax */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('stats.total_tax')} delta={prev ? pctChange(overview.total_tax, prev.total_tax) : undefined} />
+      </div>
+
+      {/* Daily Revenue Trend — for cross-day ranges */}
+      {hasDailyTrend && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.daily_revenue_trend')}</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={dailyTrendData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorDailyRevenue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => formatCurrency(v)} />
+              <Tooltip
+                contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 13 }}
+                formatter={(value: number | undefined, name: string | undefined) => [
+                  name === 'revenue' ? formatCurrency(value ?? 0) : (value ?? 0),
+                  name === 'revenue' ? t('stats.total_sales') : t('stats.orders_label'),
+                ]}
+                labelFormatter={l => l}
+              />
+              <Area type="monotone" dataKey="revenue" stroke="#ef4444" strokeWidth={2} fill="url(#colorDailyRevenue)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Hourly Revenue Trend — with comparison lines */}
+      {overview.revenue_trend.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-slate-400" />
             <h3 className="font-bold text-slate-900">{t('stats.revenue_trend')}</h3>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+            <ComposedChart data={hourlyTrendData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
@@ -90,14 +162,31 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
               <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => formatCurrency(v)} />
               <Tooltip
                 contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 13 }}
-                formatter={(value: number | undefined, name: string | undefined) => [
-                  name === 'revenue' ? formatCurrency(value ?? 0) : (value ?? 0),
-                  name === 'revenue' ? t('stats.total_sales') : t('stats.orders_label'),
-                ]}
+                formatter={(value: number | undefined, name: string | undefined) => {
+                  const labels: Record<string, string> = {
+                    revenue: t('stats.line_today'),
+                    prevRevenue: t('stats.line_yesterday'),
+                    lwRevenue: t('stats.line_last_week'),
+                  };
+                  return [formatCurrency(value ?? 0), labels[name ?? ''] ?? name];
+                }}
                 labelFormatter={l => l}
               />
-              <Area type="monotone" dataKey="revenue" stroke="#ef4444" strokeWidth={2} fill="url(#colorRevenue)" />
-            </AreaChart>
+              <Legend
+                wrapperStyle={{ fontSize: 12 }}
+                formatter={(value: string) => {
+                  const labels: Record<string, string> = {
+                    revenue: t('stats.line_today'),
+                    prevRevenue: t('stats.line_yesterday'),
+                    lwRevenue: t('stats.line_last_week'),
+                  };
+                  return labels[value] ?? value;
+                }}
+              />
+              <Area type="monotone" dataKey="revenue" stroke="#ef4444" strokeWidth={2} fill="url(#colorRevenue)" name="revenue" />
+              {prev && <Line type="monotone" dataKey="prevRevenue" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="6 3" dot={false} name="prevRevenue" />}
+              {lastWeek && <Line type="monotone" dataKey="lwRevenue" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="3 3" dot={false} name="lwRevenue" />}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
@@ -181,6 +270,36 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, showHeader = t
           </div>
         )}
       </div>
+
+      {/* Refund Method Breakdown */}
+      {overview.refund_method_breakdown.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <RotateCcw className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.refund_methods')}</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('stats.method')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.count')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.amount')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.refund_method_breakdown.map((rm, i) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 text-slate-700 font-medium">{rm.method}</td>
+                    <td className="py-2 text-right text-slate-700">{rm.count}</td>
+                    <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(rm.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Tag Sales */}
       {overview.tag_sales.length > 0 && (
@@ -276,12 +395,34 @@ const KpiCard: React.FC<{
   value: string;
   label: string;
   accent?: boolean;
-}> = ({ icon: Icon, bg, color, value, label, accent }) => (
-  <div className={`bg-white rounded-xl border ${accent ? 'border-primary-200 ring-1 ring-primary-100' : 'border-slate-200'} p-4`}>
-    <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}>
-      <Icon className={`w-4 h-4 ${color}`} />
+  /** Percentage change vs previous period. undefined = no comparison data. null = no meaningful base. */
+  delta?: number | null;
+  /** If true, positive delta is bad (red) and negative is good (green). Used for losses/voids/refunds. */
+  invertDelta?: boolean;
+}> = ({ icon: Icon, bg, color, value, label, accent, delta, invertDelta }) => {
+  let deltaEl: React.ReactNode = null;
+  if (delta !== undefined && delta !== null) {
+    const isUp = delta > 0;
+    const isGood = invertDelta ? !isUp : isUp;
+    const DeltaIcon = isUp ? ArrowUpRight : ArrowDownRight;
+    deltaEl = (
+      <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isGood ? 'text-green-600' : 'text-red-500'}`}>
+        <DeltaIcon className="w-3 h-3" />
+        {Math.abs(delta).toFixed(1)}%
+      </span>
+    );
+  }
+
+  return (
+    <div className={`bg-white rounded-xl border ${accent ? 'border-primary-200 ring-1 ring-primary-100' : 'border-slate-200'} p-4`}>
+      <div className="flex items-start justify-between mb-2">
+        <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>
+          <Icon className={`w-4 h-4 ${color}`} />
+        </div>
+        {deltaEl}
+      </div>
+      <p className={`text-lg font-bold ${accent ? 'text-primary-600' : 'text-slate-900'}`}>{value}</p>
+      <p className="text-xs text-slate-400">{label}</p>
     </div>
-    <p className={`text-lg font-bold ${accent ? 'text-primary-600' : 'text-slate-900'}`}>{value}</p>
-    <p className="text-xs text-slate-400">{label}</p>
-  </div>
-);
+  );
+};

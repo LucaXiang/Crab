@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  DollarSign, ShoppingBag, Users, TrendingUp,
-  Download, Server, Clock, ArrowRight, Sparkles, CreditCard,
+  Download, Store, Clock, ArrowRight, Sparkles, CreditCard,
   AlertTriangle, XCircle, CheckCircle, Upload, ShieldCheck,
-  FileKey, MapPin, Phone,
+  FileKey, MapPin,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -16,6 +15,9 @@ import { ApiError } from '@/infrastructure/api/client';
 import { apiErrorMessage } from '@/infrastructure/i18n';
 import { formatCurrency, formatDate, timeAgo } from '@/utils/format';
 import { Spinner } from '@/presentation/components/ui/Spinner';
+import { TimeRangeSelector, getPresetRange, getPreviousRange, getLastWeekSameDayRange } from '@/shared/components';
+import type { TimeRange } from '@/shared/components';
+import { StoreOverviewDisplay } from '@/screens/Store/Overview/StoreOverviewDisplay';
 import type { StoreDetail } from '@/core/types/store';
 import type { StoreOverview } from '@/core/types/stats';
 
@@ -27,12 +29,6 @@ function isSafeStripeUrl(url: string): boolean {
   } catch { return false; }
 }
 
-function getTodayRange(): { from: number; to: number } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return { from: start.getTime(), to: now.getTime() + 60000 };
-}
-
 export const DashboardScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -42,10 +38,14 @@ export const DashboardScreen: React.FC = () => {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [stores, setStores] = useState<StoreDetail[]>([]);
   const [overview, setOverview] = useState<StoreOverview | null>(null);
+  const [previousOverview, setPreviousOverview] = useState<StoreOverview | null>(null);
+  const [lastWeekOverview, setLastWeekOverview] = useState<StoreOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overviewLoading, setOverviewLoading] = useState(false);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
+  const [timeRange, setTimeRange] = useState<TimeRange>(() => getPresetRange('today', t));
 
   // P12 onboarding
   const [onboardStep, setOnboardStep] = useState<'p12' | 'plan'>('p12');
@@ -60,7 +60,31 @@ export const DashboardScreen: React.FC = () => {
 
   const needsOnboarding = profile !== null && profile.profile.status === 'verified' && !profile.subscription;
   const isCanceled = profile !== null && profile.subscription?.status === 'canceled';
+  const isActive = profile !== null && profile.subscription && profile.subscription.status !== 'canceled';
 
+  // Fetch overview for given time range (current + previous + last week for comparison)
+  const fetchOverview = useCallback(async (range: TimeRange) => {
+    if (!token) return;
+    setOverviewLoading(true);
+    try {
+      const prevRange = getPreviousRange(range);
+      const lwRange = getLastWeekSameDayRange(range);
+      const [current, prev, lastWeek] = await Promise.all([
+        getTenantOverview(token, range.from, range.to),
+        getTenantOverview(token, prevRange.from, prevRange.to),
+        getTenantOverview(token, lwRange.from, lwRange.to),
+      ]);
+      setOverview(current);
+      setPreviousOverview(prev);
+      setLastWeekOverview(lastWeek);
+    } catch {
+      // Silently fail overview — profile/stores already loaded
+    } finally {
+      setOverviewLoading(false);
+    }
+  }, [token]);
+
+  // Initial load: profile + stores + overview
   useEffect(() => {
     if (!token) return;
     (async () => {
@@ -76,13 +100,18 @@ export const DashboardScreen: React.FC = () => {
         }
 
         if (profileRes.subscription && profileRes.subscription.status !== 'canceled') {
-          const { from, to } = getTodayRange();
-          const [storeList, ov] = await Promise.all([
+          const prevRange = getPreviousRange(timeRange);
+          const lwRange = getLastWeekSameDayRange(timeRange);
+          const [storeList, ov, prevOv, lwOv] = await Promise.all([
             getStores(token),
-            getTenantOverview(token, from, to),
+            getTenantOverview(token, timeRange.from, timeRange.to),
+            getTenantOverview(token, prevRange.from, prevRange.to),
+            getTenantOverview(token, lwRange.from, lwRange.to),
           ]);
           setStores(storeList);
           setOverview(ov);
+          setPreviousOverview(prevOv);
+          setLastWeekOverview(lwOv);
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -95,7 +124,13 @@ export const DashboardScreen: React.FC = () => {
         setLoading(false);
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, clearAuth, navigate, t]);
+
+  const handleRangeChange = (range: TimeRange) => {
+    setTimeRange(range);
+    if (isActive) fetchOverview(range);
+  };
 
   const handleBillingPortal = async () => {
     if (!token) return;
@@ -265,9 +300,9 @@ export const DashboardScreen: React.FC = () => {
     );
   }
 
-  // Normal dashboard with KPIs + stores
+  // Normal dashboard with time range selector + overview charts + stores
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 md:px-8 md:py-10 space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-6xl mx-auto px-4 py-6 md:px-8 md:py-10 space-y-6 animate-in fade-in duration-500">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2 shadow-sm">
           <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
@@ -275,41 +310,44 @@ export const DashboardScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Header & Welcome */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-            {t('dash.welcome')}, <span className="text-primary-600">{profile?.profile.email.split('@')[0]}</span>
-          </h1>
-          <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm md:text-base">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            {t('dash.system_operational')}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-slate-100 shadow-sm self-start md:self-auto">
-          <div className="px-3 py-1.5 bg-slate-50 rounded-lg text-xs font-medium text-slate-600">
-            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-          </div>
-          <div className="h-4 w-px bg-slate-200"></div>
-          <div className="px-2 text-xs font-semibold text-slate-900">
-            {t('stats.today_summary')}
+      {/* Header */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
+              {t('dash.welcome')}, <span className="text-primary-600">{profile?.profile.email.split('@')[0]}</span>
+            </h1>
+            <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              {t('dash.system_operational')}
+            </p>
           </div>
         </div>
+        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} />
       </div>
 
-      {/* Today's KPI summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={DollarSign} bg="bg-primary-100" color="text-primary-600" value={formatCurrency(overview?.revenue ?? 0)} label={t('stats.total_sales')} accent />
-        <KpiCard icon={ShoppingBag} bg="bg-green-100" color="text-green-600" value={String(overview?.orders ?? 0)} label={t('stats.completed_orders')} />
-        <KpiCard icon={Users} bg="bg-violet-100" color="text-violet-600" value={String(overview?.guests ?? 0)} label={t('stats.guests')} />
-        <KpiCard icon={TrendingUp} bg="bg-amber-100" color="text-amber-600" value={formatCurrency(overview?.average_order_value ?? 0)} label={t('stats.average_order')} />
-      </div>
+      {/* Overview charts (all stores combined) */}
+      {overviewLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Spinner className="w-8 h-8 text-primary-500" />
+        </div>
+      ) : overview ? (
+        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} />
+      ) : null}
+
+      {/* Sync warning */}
+      {stores.some(s => s.last_sync_at && (Date.now() - s.last_sync_at) > 24 * 60 * 60 * 1000) && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+          <span className="font-medium">{t('dash.sync_warning')}</span>
+        </div>
+      )}
 
       {/* Stores list */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Server className="w-5 h-5 text-slate-400" />
+            <Store className="w-5 h-5 text-slate-400" />
             {t('nav.stores')}
           </h2>
           {stores.length > 0 && (
@@ -318,12 +356,12 @@ export const DashboardScreen: React.FC = () => {
             </span>
           )}
         </div>
-        
+
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
           {stores.length === 0 ? (
             <div className="text-center py-12 px-6">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Server className="w-8 h-8 text-slate-300" />
+                <Store className="w-8 h-8 text-slate-300" />
               </div>
               <h3 className="text-slate-900 font-medium mb-1">{t('dash.no_stores')}</h3>
               <p className="text-sm text-slate-500 max-w-xs mx-auto">{t('dash.no_stores_hint')}</p>
@@ -338,7 +376,7 @@ export const DashboardScreen: React.FC = () => {
                 >
                   <div className="flex items-start sm:items-center gap-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner">
-                      <Server className="w-6 h-6 text-slate-500" />
+                      <Store className="w-6 h-6 text-slate-500" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -361,7 +399,7 @@ export const DashboardScreen: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between sm:justify-end gap-4 pl-[4rem] sm:pl-0">
                     <div className="text-right">
                       <p className="text-xs font-medium text-slate-500 mb-0.5">{t('dash.last_sync')}</p>
@@ -385,7 +423,7 @@ export const DashboardScreen: React.FC = () => {
       <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 md:p-8 shadow-xl shadow-slate-900/10">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-primary-500/20 rounded-full blur-3xl"></div>
-        
+
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-5">
             <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
@@ -410,23 +448,6 @@ export const DashboardScreen: React.FC = () => {
 };
 
 // --- Sub-components ---
-
-const KpiCard: React.FC<{
-  icon: React.FC<{ className?: string }>;
-  bg: string;
-  color: string;
-  value: string;
-  label: string;
-  accent?: boolean;
-}> = ({ icon: Icon, bg, color, value, label, accent }) => (
-  <div className={`bg-white rounded-xl border ${accent ? 'border-primary-200 ring-1 ring-primary-100' : 'border-slate-200'} p-4`}>
-    <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}>
-      <Icon className={`w-4 h-4 ${color}`} />
-    </div>
-    <p className={`text-lg font-bold ${accent ? 'text-primary-600' : 'text-slate-900'}`}>{value}</p>
-    <p className="text-xs text-slate-400">{label}</p>
-  </div>
-);
 
 const P12Step: React.FC<{
   t: (key: string) => string;
@@ -506,7 +527,11 @@ const P12Step: React.FC<{
           >
             {p12Uploading ? <><Spinner />{t('onboard.p12_uploading')}</> : <><Upload className="w-4 h-4" />{t('onboard.p12_upload')}</>}
           </button>
-          <p className="text-xs text-slate-400 text-center">{t('onboard.p12_skip_info')}</p>
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs font-semibold text-amber-800 mb-1">{t('onboard.p12_binding_warning')}</p>
+            <p className="text-xs text-amber-700 leading-relaxed">{t('onboard.p12_binding_warning_desc')}</p>
+          </div>
+          <p className="text-xs text-slate-400 text-center mt-2">{t('onboard.p12_skip_info')}</p>
         </div>
       )}
     </div>

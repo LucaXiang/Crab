@@ -78,7 +78,8 @@
     "download_desc": "Download the latest version for Windows.",
     "download_windows": "Download",
     "welcome": "Welcome",
-    "system_operational": "System operational"
+    "system_operational": "System operational",
+    "sync_warning": "Some stores haven't synced in over 24 hours"
   },
   "store": {
     "title": "Store",
@@ -98,7 +99,18 @@
     "business_day_cutoff": "Business Day Cutoff",
     "save": "Save Changes",
     "saving": "Saving...",
-    "saved": "Saved"
+    "saved": "Saved",
+    "devices": "Devices",
+    "devices_loading": "Loading...",
+    "no_devices": "No device records",
+    "device_type_server": "Server",
+    "device_type_client": "Client",
+    "danger_zone": "Danger Zone",
+    "danger_zone_desc": "Deleting this store will deactivate all associated devices. Store data will be permanently deleted after 30 days.",
+    "delete_store": "Delete Store",
+    "confirm_delete": "Confirm Deletion",
+    "confirm_delete_desc": "Are you sure you want to delete store \"{alias}\"? All associated devices will be deactivated and data will be permanently deleted after 30 days. This action cannot be undone.",
+    "deleting": "Deleting..."
   },
   "orders": {
     "title": "Orders",
@@ -111,6 +123,9 @@
     "void": "Void",
     "merged": "Merged",
     "empty": "No orders found.",
+    "no_results": "No matching orders found.",
+    "select_order": "Select an order to view details",
+    "no_more": "No more orders",
     "load_more": "Load more",
     "detail": "Order detail",
     "items": "Items",
@@ -171,6 +186,10 @@
     "today": "Today",
     "average_order": "Avg. order value",
     "revenue_trend": "Revenue trend",
+    "daily_revenue_trend": "Daily revenue trend",
+    "line_today": "Today",
+    "line_yesterday": "Yesterday",
+    "line_last_week": "Same day last week",
     "orders_label": "orders",
     "top_products": "Top products",
     "category_sales": "Sales by category",
@@ -179,7 +198,13 @@
     "avg_dining_time": "Avg. time",
     "loss_orders": "Losses",
     "summary": "Summary",
-    "tag_sales": "Sales by tag"
+    "tag_sales": "Sales by tag",
+    "yesterday": "Yesterday",
+    "this_week": "This week",
+    "this_month": "This month",
+    "custom_range": "Custom",
+    "refunds": "Refunds",
+    "refund_methods": "Refund methods"
   },
   "reports": {
     "abnormal_close": "Abnormal close",
@@ -270,7 +295,8 @@
     "new": "New tag",
     "edit": "Edit tag",
     "color": "Color",
-    "system": "System"
+    "system": "System",
+    "system_readonly": "System tags cannot be edited."
   },
   "zones": {
     "title": "Zones",
@@ -639,6 +665,8 @@
     "p12_uploading": "Uploading...",
     "p12_success": "Certificate uploaded successfully.",
     "p12_skip_info": "This step is required to comply with Spanish tax regulations.",
+    "p12_binding_warning": "Certificate cannot be changed after binding",
+    "p12_binding_warning_desc": "The NIF in this certificate will be permanently bound to your account. After completing payment, the certificate cannot be changed. If you change business entities, you must register a new account.",
     "p12_uploaded": "Certificate uploaded",
     "p12_subject": "Subject",
     "p12_nif": "Tax ID (NIF)",
@@ -649,6 +677,8 @@
     "p12_expires": "Valid until",
     "p12_continue": "Continue",
     "p12_change": "Change certificate",
+    "p12_expiring_soon": "Certificate expiring soon",
+    "p12_expired": "Certificate expired",
     "step_certificate": "Certificate",
     "step_plan": "Plan"
   },
@@ -663,7 +693,10 @@
       "total": "Total",
       "yes": "Yes",
       "no": "No",
-      "active": "active"
+      "active": "active",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply"
     },
     "selection": {
       "selected": "Selected",
@@ -753,7 +786,11 @@
     "import_success": "Catalog imported successfully. Changes will be synced to the terminal.",
     "warning_title": "Important",
     "warning1": "Importing will replace ALL existing catalog data for this store.",
-    "warning2": "The terminal will receive a full sync after import."
+    "warning2": "The terminal will receive a full sync after import.",
+    "import_confirm_title": "Confirm Import",
+    "import_confirm_desc": "Importing will replace all catalog data for this store. This action cannot be undone. Continue?",
+    "export_error": "Export failed",
+    "import_error": "Import failed"
   },
   "error": {
     "title": "Error",
@@ -814,6 +851,9 @@
     "3026": "P12 file contains no certificate.",
     "3027": "Certificate chain verification failed. The file may be corrupted.",
     "3028": "Certificate root CA not recognized by AEAT. Only certificates from authorized Spanish CAs are accepted (FNMT, ACCV, Izenpe, Firmaprofesional).",
+    "3029": "The new certificate's NIF does not match the existing bound certificate. To change business entities, you must register a new account.",
+    "3030": "This certificate has expired. Please upload a valid certificate.",
+    "3031": "This certificate is not yet valid. Please check the certificate's start date.",
 
     "6001": "Product not found.",
     "6002": "Invalid product price.",
