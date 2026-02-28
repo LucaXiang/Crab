@@ -27,6 +27,9 @@ impl EventApplier for OrderMovedApplier {
             snapshot.zone_id = *target_zone_id;
             snapshot.zone_name = target_zone_name.clone();
 
+            // Moving to a real table means it's no longer a retail order
+            snapshot.is_retail = false;
+
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -43,8 +46,8 @@ mod tests {
     use shared::order::types::ServiceType;
     use shared::order::{CartItemSnapshot, OrderEventType, OrderStatus};
 
-    fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_test_snapshot(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
@@ -54,7 +57,7 @@ mod tests {
     }
 
     fn create_order_moved_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         source_table_id: i64,
         source_table_name: &str,
@@ -76,7 +79,7 @@ mod tests {
     }
 
     fn create_order_moved_event_with_zone(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         source_table_id: i64,
         source_table_name: &str,
@@ -88,10 +91,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderMoved,
             EventPayload::OrderMoved {
@@ -110,11 +113,11 @@ mod tests {
 
     #[test]
     fn test_order_moved_updates_table_info() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert_eq!(snapshot.table_id, Some(1));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -125,12 +128,12 @@ mod tests {
 
     #[test]
     fn test_order_moved_updates_zone_info() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert_eq!(snapshot.zone_id, Some(1));
         assert_eq!(snapshot.zone_name, Some("Zone A".to_string()));
 
         let event = create_order_moved_event_with_zone(
-            "order-1",
+            1001,
             2,
             1,
             "Table 1",
@@ -151,11 +154,11 @@ mod tests {
 
     #[test]
     fn test_order_moved_clears_zone_when_none() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert_eq!(snapshot.zone_id, Some(1));
 
         // Move without zone info → zone should be cleared
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 3, "Table 3", vec![]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 3, "Table 3", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -166,10 +169,10 @@ mod tests {
 
     #[test]
     fn test_order_moved_updates_sequence() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.last_sequence = 5;
 
-        let event = create_order_moved_event("order-1", 10, 1, "Table 1", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 10, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -179,10 +182,10 @@ mod tests {
 
     #[test]
     fn test_order_moved_updates_timestamp() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "Table 2", vec![]);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMovedApplier;
@@ -194,10 +197,10 @@ mod tests {
 
     #[test]
     fn test_order_moved_updates_checksum() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -208,11 +211,11 @@ mod tests {
 
     #[test]
     fn test_order_moved_with_empty_source_table() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.table_id = None;
         snapshot.table_name = None;
 
-        let event = create_order_moved_event("order-1", 2, 0, "", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 2, 0, "", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -223,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_order_moved_preserves_items() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let item = CartItemSnapshot {
             id: 1,
             instance_id: "item-1".to_string(),
@@ -253,7 +256,7 @@ mod tests {
         };
         snapshot.items.push(item.clone());
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![item]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "Table 2", vec![item]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -265,10 +268,10 @@ mod tests {
 
     #[test]
     fn test_order_moved_preserves_status() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -278,17 +281,17 @@ mod tests {
 
     #[test]
     fn test_order_moved_wrong_event_type_is_noop() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let original_table_id = snapshot.table_id;
         let original_sequence = snapshot.last_sequence;
 
         // Create an event with wrong payload type
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -309,9 +312,9 @@ mod tests {
 
     #[test]
     fn test_order_moved_checksum_verifiable() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "Table 2", vec![]);
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -325,10 +328,10 @@ mod tests {
 
     #[test]
     fn test_order_moved_to_same_table() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
         let event = create_order_moved_event(
-            "order-1",
+            1001,
             2,
             1,
             "Table 1",
@@ -346,10 +349,24 @@ mod tests {
     }
 
     #[test]
-    fn test_order_moved_empty_target_table_name() {
-        let mut snapshot = create_test_snapshot("order-1");
+    fn test_order_moved_clears_is_retail() {
+        let mut snapshot = create_test_snapshot(1001);
+        snapshot.is_retail = true; // Retail order
 
-        let event = create_order_moved_event("order-1", 2, 1, "Table 1", 2, "", vec![]);
+        let event = create_order_moved_event(1001, 2, 0, "", 5, "Table 5", vec![]);
+
+        let applier = OrderMovedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Moving to a real table should clear is_retail
+        assert!(!snapshot.is_retail);
+    }
+
+    #[test]
+    fn test_order_moved_empty_target_table_name() {
+        let mut snapshot = create_test_snapshot(1001);
+
+        let event = create_order_moved_event(1001, 2, 1, "Table 1", 2, "", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
