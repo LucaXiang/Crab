@@ -8,6 +8,48 @@ export interface OrderSummary {
   synced_at: number;
 }
 
+export interface ChainEntryItem {
+  entry_type: 'ORDER' | 'CREDIT_NOTE';
+  entry_key: string;
+  display_number: string;
+  status: string;
+  amount: number | null;
+  created_at: number;
+  original_order_key: string | null;
+  original_receipt: string | null;
+}
+
+export interface CreditNoteDetailResponse {
+  source_id: number;
+  credit_note_number: string;
+  original_order_key: string;
+  original_receipt: string;
+  subtotal_credit: number;
+  tax_credit: number;
+  total_credit: number;
+  refund_method: string;
+  reason: string;
+  note: string | null;
+  operator_name: string;
+  authorizer_name: string | null;
+  created_at: number;
+  detail: CreditNoteDetailPayload | null;
+}
+
+export interface CreditNoteDetailPayload {
+  items: CreditNoteItem[];
+}
+
+export interface CreditNoteItem {
+  name: string;
+  spec_name: string | null;
+  quantity: number;
+  unit_price: number;
+  line_credit: number;
+  tax_credit: number;
+  tax_rate: number;
+}
+
 export interface OrderItemOption {
   attribute_name: string;
   option_name: string;
@@ -89,6 +131,7 @@ export interface OrderDetailResponse {
 }
 
 export interface CreditNoteSummary {
+  source_id: number;
   credit_note_number: string;
   total_credit: number;
   refund_method: string;

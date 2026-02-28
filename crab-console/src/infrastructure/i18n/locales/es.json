@@ -152,7 +152,22 @@
     "loss_amount": "Pérdida",
     "member": "Miembro",
     "cancelled_payment": "Cancelado",
-    "credit_notes": "Notas de crédito"
+    "credit_notes": "Notas de crédito",
+    "chain_entries": "Transacciones",
+    "credit_note": "Nota de crédito",
+    "credit_note_detail": "Detalle de nota de crédito",
+    "original_order": "Pedido original",
+    "jump_to_order": "Ver pedido original",
+    "refund_method": "Método de reembolso",
+    "reason": "Motivo",
+    "note": "Nota",
+    "authorizer": "Autorizador",
+    "refund_items": "Artículos reembolsados",
+    "subtotal_credit": "Subtotal crédito",
+    "tax_credit": "Impuesto crédito",
+    "total_credit": "Total crédito",
+    "vouchers": "Comprobantes",
+    "jump_to_detail": "Ver detalle"
   },
   "stats": {
     "title": "Estadísticas",

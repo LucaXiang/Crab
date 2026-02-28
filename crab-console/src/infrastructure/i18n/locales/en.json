@@ -152,7 +152,22 @@
     "loss_amount": "Loss",
     "member": "Member",
     "cancelled_payment": "Cancelled",
-    "credit_notes": "Credit Notes"
+    "credit_notes": "Credit Notes",
+    "chain_entries": "Transactions",
+    "credit_note": "Credit Note",
+    "credit_note_detail": "Credit Note Detail",
+    "original_order": "Original Order",
+    "jump_to_order": "View Original Order",
+    "refund_method": "Refund Method",
+    "reason": "Reason",
+    "note": "Note",
+    "authorizer": "Authorizer",
+    "refund_items": "Refund Items",
+    "subtotal_credit": "Subtotal Credit",
+    "tax_credit": "Tax Credit",
+    "total_credit": "Total Credit",
+    "vouchers": "Vouchers",
+    "jump_to_detail": "View Detail"
   },
   "stats": {
     "title": "Statistics",
