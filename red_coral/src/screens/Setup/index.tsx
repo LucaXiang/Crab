@@ -45,11 +45,10 @@ export const SetupScreen: React.FC = () => {
     error,
   } = useBridgeStore();
 
-  // If tenant is already verified (TenantReady), skip to mode selection.
-  // Credentials are only needed at activation time (configure step).
+  // Always start from credentials — we need tenantInfo (stores list, p12 status, etc.)
+  // even when TenantReady, since that state carries no data.
   const appState = useBridgeStore((s) => s.appState);
-  const isTenantReady = appState?.type === 'TenantReady';
-  const [step, setStep] = useState<SetupStep>(isTenantReady ? 'mode' : 'credentials');
+  const [step, setStep] = useState<SetupStep>('credentials');
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
 
   // Credentials state (暂存在前端，不缓存到后端)

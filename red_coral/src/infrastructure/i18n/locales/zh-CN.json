@@ -2342,7 +2342,9 @@
       "uploading": "正在上传...",
       "success": "证书上传成功！",
       "success_detail": "签发者: {{issuer}}, 主体: {{common_name}}",
-      "security_notice": "证书文件仅用于上传验证，不会在本地保留"
+      "security_notice": "证书文件仅用于上传验证，不会在本地保留",
+      "binding_warning": "证书绑定后不可更换",
+      "binding_warning_desc": "证书中的税号 (NIF) 将与你的账户永久绑定。完成支付后，该证书无法更改。如需变更经营主体，请注册新账户。"
     }
   },
   "fonts": {

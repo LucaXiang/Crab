@@ -106,6 +106,14 @@ impl AppConfig {
         };
         // 强制 HTTPS — P12 等敏感数据绝不能走明文
         config.auth_url = enforce_https(&config.auth_url);
+
+        // Debug 构建强制使用 dev 环境 URL，忽略 config.json 中缓存的生产地址
+        #[cfg(debug_assertions)]
+        {
+            config.auth_url = shared::DEFAULT_AUTH_SERVER_URL.to_string();
+            config.server_config.cloud_url = shared::DEFAULT_CLOUD_SYNC_URL.to_string();
+        }
+
         Ok(config)
     }
 
