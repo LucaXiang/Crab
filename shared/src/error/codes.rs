@@ -127,6 +127,12 @@ pub enum ErrorCode {
     P12ChainVerifyFailed = 3027,
     /// P12 root CA not recognized by AEAT (untrusted issuer)
     P12UntrustedCa = 3028,
+    /// P12 NIF (tax ID) does not match existing certificate
+    P12NifMismatch = 3029,
+    /// P12 certificate has expired
+    P12CertExpired = 3030,
+    /// P12 certificate is not yet valid (not_before in the future)
+    P12CertNotYetValid = 3031,
 
     // ==================== 4xxx: Order ====================
     /// Order not found
@@ -388,6 +394,9 @@ impl ErrorCode {
             ErrorCode::P12MissingCertificate => "P12 file contains no certificate",
             ErrorCode::P12ChainVerifyFailed => "Certificate chain verification failed",
             ErrorCode::P12UntrustedCa => "Certificate root CA not recognized by AEAT",
+            ErrorCode::P12NifMismatch => "P12 NIF does not match existing certificate",
+            ErrorCode::P12CertExpired => "P12 certificate has expired",
+            ErrorCode::P12CertNotYetValid => "P12 certificate is not yet valid",
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
@@ -574,6 +583,9 @@ impl TryFrom<u16> for ErrorCode {
             3026 => Ok(ErrorCode::P12MissingCertificate),
             3027 => Ok(ErrorCode::P12ChainVerifyFailed),
             3028 => Ok(ErrorCode::P12UntrustedCa),
+            3029 => Ok(ErrorCode::P12NifMismatch),
+            3030 => Ok(ErrorCode::P12CertExpired),
+            3031 => Ok(ErrorCode::P12CertNotYetValid),
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
@@ -982,7 +994,7 @@ mod tests {
             2001, 2002, 2003, 2004, 2005, // 2xxx Permission (5)
             3001, 3002, 3003, 3004, 3005, 3006, 3007, 3009, 3010, // 3xxx Tenant
             3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, 3023, 3024,
-            3025, 3026, 3027, 3028, // P12 errors (27)
+            3025, 3026, 3027, 3028, 3029, 3030, 3031, // P12 errors (30)
             4001, 4002, 4003, 4004, 4005, 4006, 4007, // 4xxx Order (7)
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
@@ -1008,7 +1020,7 @@ mod tests {
             9401, 9402, 9403, 9404, // 94xx Storage
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 131;
+        const EXPECTED_VARIANT_COUNT: usize = 134;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

@@ -140,6 +140,9 @@ impl ErrorCode {
             | Self::P12MissingCertificate
             | Self::P12ChainVerifyFailed
             | Self::P12UntrustedCa
+            | Self::P12NifMismatch
+            | Self::P12CertExpired
+            | Self::P12CertNotYetValid
             | Self::PaymentFailed
             | Self::PaymentRefundExceedsAmount => StatusCode::UNPROCESSABLE_ENTITY,
 

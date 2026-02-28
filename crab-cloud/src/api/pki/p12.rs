@@ -116,6 +116,74 @@ pub async fn upload_p12(
         "P12 validated: issued by trusted Spanish CA"
     );
 
+    let now_millis = shared::util::now_millis();
+
+    // Reject expired certificates
+    if cert_info.expires_at <= now_millis {
+        p12_password.zeroize();
+        tracing::warn!(tenant_id = %tenant.id, expires_at = cert_info.expires_at, "P12 certificate has expired");
+        return Json(serde_json::json!({
+            "success": false,
+            "error": ErrorCode::P12CertExpired.message(),
+            "error_code": ErrorCode::P12CertExpired
+        }));
+    }
+
+    // Reject certificates not yet valid (not_before in the future)
+    if cert_info.not_before > now_millis {
+        p12_password.zeroize();
+        tracing::warn!(tenant_id = %tenant.id, not_before = cert_info.not_before, "P12 certificate is not yet valid");
+        return Json(serde_json::json!({
+            "success": false,
+            "error": ErrorCode::P12CertNotYetValid.message(),
+            "error_code": ErrorCode::P12CertNotYetValid
+        }));
+    }
+
+    // NIF consistency: if tenant already has a P12, new cert NIF must match
+    let new_nif = cert_info.tax_id();
+    if let Some(new_nif) = &new_nif {
+        match p12::find_by_tenant(&state.pool, &tenant.id).await {
+            Ok(Some(existing)) => {
+                // Normalize existing serial_number the same way as tax_id():
+                // "IDCES-B12345678" → "B12345678", or raw 9-char NIF
+                let existing_nif = existing.serial_number.as_deref().and_then(|sn| {
+                    sn.strip_prefix("IDCES-")
+                        .or_else(|| sn.strip_prefix("VATES-"))
+                        .or(if sn.len() == 9 { Some(sn) } else { None })
+                });
+                if let Some(existing_nif) = existing_nif
+                    && !existing_nif.is_empty()
+                    && existing_nif != *new_nif
+                {
+                    p12_password.zeroize();
+                    tracing::warn!(
+                        tenant_id = %tenant.id,
+                        existing_nif = %existing_nif,
+                        new_nif = %new_nif,
+                        "P12 NIF mismatch: new certificate has different tax ID"
+                    );
+                    return Json(serde_json::json!({
+                        "success": false,
+                        "error": ErrorCode::P12NifMismatch.message(),
+                        "error_detail": format!("Existing NIF: {existing_nif}, new NIF: {new_nif}"),
+                        "error_code": ErrorCode::P12NifMismatch
+                    }));
+                }
+            }
+            Ok(None) => {} // First P12 upload, no consistency check needed
+            Err(e) => {
+                p12_password.zeroize();
+                tracing::error!(error = %e, "Database error checking existing P12");
+                return Json(serde_json::json!({
+                    "success": false,
+                    "error": "Internal error",
+                    "error_code": ErrorCode::InternalError
+                }));
+            }
+        }
+    }
+
     // Base64 编码 P12 数据，加密后存入 PostgreSQL
     let p12_base64 = base64::engine::general_purpose::STANDARD.encode(&p12_data);
 
