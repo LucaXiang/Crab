@@ -4,6 +4,7 @@
 //! Shares the same hash chain lock as OrderArchiveService to prevent TOCTOU races.
 
 use crate::db::repository::{credit_note as cn_repo, system_state};
+use crate::orders::OrdersManager;
 use shared::models::{
     CreateCreditNoteRequest, CreditNote, CreditNoteDetail, CreditNoteItem, RefundableInfo,
 };
@@ -19,8 +20,8 @@ pub struct CreditNoteService {
     pool: SqlitePool,
     /// Shared with OrderArchiveService — serializes all chain_entry writes
     hash_chain_lock: Arc<Mutex<()>>,
-    /// 业务时区 (用于退款凭证编号日期)
-    tz: chrono_tz::Tz,
+    /// OrdersManager for shared chain number generation
+    orders_manager: Arc<OrdersManager>,
     /// Optional Verifactu invoice service (R5 invoices for credit notes)
     invoice_service: Option<super::invoice::InvoiceService>,
 }
@@ -28,14 +29,14 @@ pub struct CreditNoteService {
 impl CreditNoteService {
     pub fn new(
         pool: SqlitePool,
-        tz: chrono_tz::Tz,
         hash_chain_lock: Arc<Mutex<()>>,
+        orders_manager: Arc<OrdersManager>,
         invoice_service: Option<super::invoice::InvoiceService>,
     ) -> Self {
         Self {
             pool,
             hash_chain_lock,
-            tz,
+            orders_manager,
             invoice_service,
         }
     }
@@ -143,7 +144,7 @@ impl CreditNoteService {
         }
 
         // 6. Generate credit note number
-        let cn_number = self.generate_credit_note_number().await?;
+        let cn_number = self.generate_credit_note_number()?;
 
         // 7. Get last chain hash
         let system_state = system_state::get_or_create(&self.pool)
@@ -355,20 +356,11 @@ impl CreditNoteService {
             .map_err(|e| ArchiveError::Database(e.to_string()))
     }
 
-    /// Generate credit note number: CN-YYYYMMDD-NNNN
-    async fn generate_credit_note_number(&self) -> ArchiveResult<String> {
-        let now = chrono::Utc::now().with_timezone(&self.tz);
-        let date_str = now.format("%Y%m%d").to_string();
-
-        // Count existing credit notes for today
-        let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM credit_note WHERE credit_note_number LIKE ?")
-                .bind(format!("CN-{}-%%", date_str))
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        Ok(format!("CN-{}-{:04}", date_str, count + 1))
+    /// Generate credit note number using the shared chain counter (same as receipt_number).
+    ///
+    /// Returns the same format as receipt_number: `{store_number:02}-{YYYYMMDD}-{daily_seq:04}`
+    fn generate_credit_note_number(&self) -> ArchiveResult<String> {
+        Ok(self.orders_manager.next_chain_number())
     }
 }
 

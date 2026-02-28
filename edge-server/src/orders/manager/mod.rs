@@ -162,11 +162,12 @@ impl OrdersManager {
         ));
     }
 
-    /// Generate next receipt number (crash-safe via redb)
+    /// Generate next chain number (crash-safe via redb)
     ///
+    /// Shared counter for both orders (receipt_number) and credit notes (credit_note_number).
     /// Format: `{store_number:02}-{YYYYMMDD}-{daily_seq:04}`
     /// Example: `01-20260226-0001`
-    fn next_receipt_number(&self) -> String {
+    pub fn next_chain_number(&self) -> String {
         let cutoff = *self.business_day_cutoff.read();
         let business_date = crate::utils::time::current_business_date(cutoff, self.tz);
         let date_str = business_date.format("%Y%m%d").to_string();
@@ -651,7 +652,7 @@ impl OrdersManager {
         // 3. Pre-generate receipt_number and queue_number for OpenTable
         let pre_generated_receipt = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable { .. } => {
-                let receipt = self.next_receipt_number();
+                let receipt = self.next_chain_number();
                 tracing::debug!(receipt_number = %receipt, "Pre-generated receipt number");
                 Some(receipt)
             }

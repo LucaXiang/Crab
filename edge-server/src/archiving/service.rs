@@ -224,8 +224,8 @@ impl OrderArchiveService {
 
     /// Generate the next receipt number atomically
     ///
-    /// Format: FAC{YYYYMMDD}{sequence}
-    /// Example: FAC2026012410001
+    /// Format: ORD{YYYYMMDD}{sequence}
+    /// Example: ORD2026012410001
     pub async fn generate_next_receipt_number(&self) -> ArchiveResult<String> {
         let next_num = system_state::get_next_order_number(&self.pool)
             .await
@@ -235,7 +235,7 @@ impl OrderArchiveService {
         let date_str = now.format("%Y%m%d").to_string();
         // Sequence starts at 10001 to match existing format
         let sequence = 10000 + next_num;
-        Ok(format!("FAC{}{}", date_str, sequence))
+        Ok(format!("ORD{}{}", date_str, sequence))
     }
 
     /// Archive a completed order with its events (with retry logic and concurrency limit)
@@ -1403,7 +1403,7 @@ mod tests {
             verified_orders: 6,
             chain_intact: false,
             chain_resets: vec![ChainReset {
-                receipt_number: "FAC2026012910004".to_string(),
+                receipt_number: "ORD2026012910004".to_string(),
                 prev_chain_hash: "ccc".to_string(),
             }],
             chain_breaks: vec![],
@@ -1428,7 +1428,7 @@ mod tests {
             chain_intact: false,
             chain_resets: vec![],
             chain_breaks: vec![ChainBreak {
-                receipt_number: "FAC2026012910003".to_string(),
+                receipt_number: "ORD2026012910003".to_string(),
                 expected_prev_hash: "bbb".to_string(),
                 actual_prev_hash: "tampered".to_string(),
             }],
@@ -1448,11 +1448,11 @@ mod tests {
             verified_orders: 10,
             chain_intact: false,
             chain_resets: vec![ChainReset {
-                receipt_number: "FAC2026012910005".to_string(),
+                receipt_number: "ORD2026012910005".to_string(),
                 prev_chain_hash: "ddd".to_string(),
             }],
             chain_breaks: vec![ChainBreak {
-                receipt_number: "FAC2026012910008".to_string(),
+                receipt_number: "ORD2026012910008".to_string(),
                 expected_prev_hash: "ggg".to_string(),
                 actual_prev_hash: "tampered".to_string(),
             }],
@@ -1466,7 +1466,7 @@ mod tests {
     #[test]
     fn test_order_verification_model() {
         let verification = OrderVerification {
-            receipt_number: "FAC2026012910001".to_string(),
+            receipt_number: "ORD2026012910001".to_string(),
             order_id: "order:abc123".to_string(),
             prev_hash: "genesis".to_string(),
             curr_hash: "some_hash".to_string(),
@@ -1484,7 +1484,7 @@ mod tests {
     #[test]
     fn test_chain_break_model() {
         let brk = ChainBreak {
-            receipt_number: "FAC2026012910003".to_string(),
+            receipt_number: "ORD2026012910003".to_string(),
             expected_prev_hash: "hash_of_order_2".to_string(),
             actual_prev_hash: "tampered_hash".to_string(),
         };

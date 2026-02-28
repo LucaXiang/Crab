@@ -19,8 +19,8 @@ fn credit_note_service(state: &ServerState) -> Result<CreditNoteService, AppErro
 
     Ok(CreditNoteService::new(
         state.pool.clone(),
-        state.config.timezone,
         archive_service.hash_chain_lock().clone(),
+        state.orders_manager.clone(),
         archive_service.invoice_service().cloned(),
     ))
 }
