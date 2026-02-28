@@ -169,3 +169,18 @@ export interface RedFlagsResponse {
   summary: RedFlagsSummary;
   operator_breakdown: OperatorRedFlags[];
 }
+
+export interface ShiftEntry {
+  source_id: number;
+  operator_id: number;
+  operator_name: string;
+  status: string;
+  start_time: number;
+  end_time: number | null;
+  starting_cash: number;
+  expected_cash: number;
+  actual_cash: number | null;
+  cash_variance: number | null;
+  abnormal_close: boolean;
+  note: string | null;
+}

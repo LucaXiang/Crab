@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeftRight, BarChart3, ChevronDown, ChevronLeft, FolderTree, Globe, Grid3x3, LogOut, Map, Menu,
+  ArrowLeftRight, BarChart3, ChevronDown, ChevronLeft, Clock, FolderTree, Globe, Grid3x3, LogOut, Map, Menu,
   Package, Percent, Radio, ScrollText, Settings, ShieldAlert, ShoppingBag, SlidersHorizontal, Tag, Tags,
   Users, X,
 } from 'lucide-react';
@@ -47,6 +47,7 @@ export const StoreLayout: React.FC = () => {
         { key: 'nav.live_orders', href: `/stores/${storeId}/live`, icon: Radio },
         { key: 'nav.orders', href: `/stores/${storeId}/orders`, icon: ShoppingBag },
         { key: 'nav.daily_report', href: `/stores/${storeId}/reports`, icon: ScrollText },
+        { key: 'nav.shifts', href: `/stores/${storeId}/shifts`, icon: Clock },
       ],
     },
     {

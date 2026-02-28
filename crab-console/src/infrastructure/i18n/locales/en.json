@@ -51,7 +51,8 @@
     "zones": "Zones",
     "tables": "Tables",
     "label_templates": "Label Templates",
-    "data_transfer": "Data Transfer"
+    "data_transfer": "Data Transfer",
+    "shifts": "Shifts"
   },
   "dash": {
     "title": "Dashboard",
@@ -946,5 +947,18 @@
     "500": "Internal server error. Please try again later.",
     "502": "Service temporarily unavailable. Please try again later.",
     "503": "Server is busy. Please try again later."
+  },
+  "shifts": {
+    "title": "Shift History",
+    "status": "Status",
+    "operator": "Operator",
+    "start": "Start",
+    "end": "End",
+    "duration": "Duration",
+    "starting_cash": "Starting Cash",
+    "expected_cash": "Expected Cash",
+    "actual_cash": "Actual Cash",
+    "variance": "Variance",
+    "no_data": "No shift records yet"
   }
 }

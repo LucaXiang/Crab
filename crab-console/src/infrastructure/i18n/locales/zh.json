@@ -51,7 +51,8 @@
     "zones": "区域",
     "tables": "餐桌",
     "label_templates": "标签模板",
-    "data_transfer": "数据导入导出"
+    "data_transfer": "数据导入导出",
+    "shifts": "班次"
   },
   "dash": {
     "title": "概览",
@@ -948,5 +949,18 @@
     "500": "服务器内部错误，请稍后重试。",
     "502": "服务暂时不可用，请稍后重试。",
     "503": "服务器繁忙，请稍后重试。"
+  },
+  "shifts": {
+    "title": "班次记录",
+    "status": "状态",
+    "operator": "操作员",
+    "start": "开始时间",
+    "end": "结束时间",
+    "duration": "时长",
+    "starting_cash": "初始现金",
+    "expected_cash": "预期现金",
+    "actual_cash": "实际现金",
+    "variance": "差异",
+    "no_data": "暂无班次记录"
   }
 }

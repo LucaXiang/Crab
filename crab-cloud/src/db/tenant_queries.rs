@@ -9,17 +9,14 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Tenant profile with subscription info
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct TenantProfile {
-    pub id: String,
+    pub id: i64,
     pub email: String,
     pub name: Option<String>,
     pub status: String,
     pub created_at: i64,
 }
 
-pub async fn get_profile(
-    pool: &PgPool,
-    tenant_id: &str,
-) -> Result<Option<TenantProfile>, BoxError> {
+pub async fn get_profile(pool: &PgPool, tenant_id: i64) -> Result<Option<TenantProfile>, BoxError> {
     let row: Option<TenantProfile> =
         sqlx::query_as("SELECT id, email, name, status, created_at FROM tenants WHERE id = $1")
             .bind(tenant_id)
@@ -43,7 +40,7 @@ pub struct SubscriptionInfo {
 
 pub async fn get_subscription(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<Option<SubscriptionInfo>, BoxError> {
     let row: Option<SubscriptionInfo> = sqlx::query_as(
         "SELECT id, status, plan, max_stores, current_period_end, cancel_at_period_end, billing_interval, created_at FROM subscriptions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1",
@@ -73,7 +70,7 @@ pub struct StoreSummary {
     pub status: String,
 }
 
-pub async fn list_stores(pool: &PgPool, tenant_id: &str) -> Result<Vec<StoreSummary>, BoxError> {
+pub async fn list_stores(pool: &PgPool, tenant_id: i64) -> Result<Vec<StoreSummary>, BoxError> {
     let rows: Vec<StoreSummary> = sqlx::query_as(
         r#"
         SELECT id, entity_id, alias, name, address, phone, nif, email, website,
@@ -104,7 +101,7 @@ pub struct ArchivedOrderSummary {
 pub async fn list_orders(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     status_filter: Option<&str>,
     limit: i32,
     offset: i32,
@@ -150,19 +147,19 @@ pub async fn list_orders(
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct ChainEntryItem {
     pub entry_type: String,
-    pub entry_key: String,
+    pub entry_id: i64,
     pub display_number: String,
     pub status: String,
     pub amount: Option<f64>,
     pub created_at: i64,
-    pub original_order_key: Option<String>,
+    pub original_order_id: Option<i64>,
     pub original_receipt: Option<String>,
 }
 
 pub async fn list_chain_entries(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     limit: i32,
     offset: i32,
 ) -> Result<Vec<ChainEntryItem>, BoxError> {
@@ -171,12 +168,12 @@ pub async fn list_chain_entries(
         (
             SELECT
                 'ORDER'::TEXT AS entry_type,
-                o.order_key AS entry_key,
-                COALESCE(o.receipt_number, o.order_key) AS display_number,
+                o.order_id AS entry_id,
+                COALESCE(o.receipt_number, CAST(o.order_id AS TEXT)) AS display_number,
                 o.status,
                 o.total AS amount,
                 COALESCE(o.end_time, o.synced_at) AS created_at,
-                NULL::TEXT AS original_order_key,
+                NULL::BIGINT AS original_order_id,
                 NULL::TEXT AS original_receipt
             FROM store_archived_orders o
             WHERE o.store_id = $1 AND o.tenant_id = $2
@@ -185,12 +182,12 @@ pub async fn list_chain_entries(
         (
             SELECT
                 'CREDIT_NOTE'::TEXT AS entry_type,
-                cn.source_id::TEXT AS entry_key,
+                cn.source_id AS entry_id,
                 cn.credit_note_number AS display_number,
                 'REFUND'::TEXT AS status,
                 cn.total_credit AS amount,
                 cn.created_at,
-                cn.original_order_key,
+                cn.original_order_id,
                 cn.original_receipt
             FROM store_credit_notes cn
             WHERE cn.store_id = $1 AND cn.tenant_id = $2
@@ -213,7 +210,7 @@ pub async fn list_chain_entries(
 pub struct CreditNoteDetail {
     pub source_id: i64,
     pub credit_note_number: String,
-    pub original_order_key: String,
+    pub original_order_id: i64,
     pub original_receipt: String,
     pub subtotal_credit: f64,
     pub tax_credit: f64,
@@ -230,16 +227,16 @@ pub struct CreditNoteDetail {
 pub async fn get_credit_note_detail(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
-    source_id: &str,
+    tenant_id: i64,
+    source_id: i64,
 ) -> Result<Option<CreditNoteDetail>, BoxError> {
     let row = sqlx::query_as::<_, CreditNoteDetail>(
         r#"
-        SELECT source_id, credit_note_number, original_order_key, original_receipt,
+        SELECT source_id, credit_note_number, original_order_id, original_receipt,
                subtotal_credit, tax_credit, total_credit, refund_method, reason, note,
                operator_name, authorizer_name, created_at, detail
         FROM store_credit_notes
-        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3::BIGINT
+        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3
         "#,
     )
     .bind(store_id)
@@ -271,7 +268,7 @@ pub struct DailyReportEntry {
 pub async fn list_daily_reports(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     from: Option<&str>,
     to: Option<&str>,
 ) -> Result<Vec<DailyReportEntry>, BoxError> {
@@ -281,9 +278,7 @@ pub async fn list_daily_reports(
                dr.total_sales, dr.total_paid, dr.total_unpaid, dr.void_amount,
                dr.total_tax, dr.total_discount, dr.total_surcharge, dr.updated_at
         FROM store_daily_reports dr
-        JOIN stores s ON s.id = dr.store_id
-        WHERE dr.store_id = $1
-            AND s.tenant_id = $2
+        WHERE dr.store_id = $1 AND dr.tenant_id = $2
             AND ($3::TEXT IS NULL OR dr.business_date >= $3)
             AND ($4::TEXT IS NULL OR dr.business_date <= $4)
         ORDER BY dr.business_date DESC
@@ -365,7 +360,7 @@ pub struct ShiftBreakdownDetail {
 pub async fn get_daily_report_detail(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     date: &str,
 ) -> Result<Option<DailyReportDetail>, BoxError> {
     // Main report
@@ -396,8 +391,7 @@ pub async fn get_daily_report_detail(
                dr.total_tax, dr.total_discount, dr.total_surcharge,
                dr.generated_at, dr.generated_by_id, dr.generated_by_name, dr.note
         FROM store_daily_reports dr
-        JOIN stores s ON s.id = dr.store_id
-        WHERE dr.store_id = $1 AND s.tenant_id = $2 AND dr.business_date = $3
+        WHERE dr.store_id = $1 AND dr.tenant_id = $2 AND dr.business_date = $3
         "#,
     )
     .bind(store_id)
@@ -480,20 +474,20 @@ pub async fn get_daily_report_detail(
 pub async fn get_order_detail(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
-    order_key: &str,
+    tenant_id: i64,
+    order_id: i64,
 ) -> Result<Option<serde_json::Value>, BoxError> {
     let row: Option<(serde_json::Value,)> = sqlx::query_as(
         r#"
         SELECT detail
         FROM store_archived_orders
-        WHERE store_id = $1 AND tenant_id = $2 AND order_key = $3
+        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
             AND detail IS NOT NULL
         "#,
     )
     .bind(store_id)
     .bind(tenant_id)
-    .bind(order_key)
+    .bind(order_id)
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|r| r.0))
@@ -503,19 +497,19 @@ pub async fn get_order_detail(
 pub async fn get_order_desglose(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
-    order_key: &str,
+    tenant_id: i64,
+    order_id: i64,
 ) -> Result<Vec<shared::cloud::TaxDesglose>, BoxError> {
     let row: Option<(serde_json::Value,)> = sqlx::query_as(
         r#"
         SELECT desglose
         FROM store_archived_orders
-        WHERE store_id = $1 AND tenant_id = $2 AND order_key = $3
+        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
         "#,
     )
     .bind(store_id)
     .bind(tenant_id)
-    .bind(order_key)
+    .bind(order_id)
     .fetch_optional(pool)
     .await?;
 
@@ -614,7 +608,7 @@ pub struct DailyTrendPoint {
 pub async fn get_store_overview(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     from: i64,
     to: i64,
 ) -> Result<StoreOverview, BoxError> {
@@ -624,7 +618,7 @@ pub async fn get_store_overview(
 /// Compute tenant-wide overview (all stores combined)
 pub async fn get_tenant_overview(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     from: i64,
     to: i64,
 ) -> Result<StoreOverview, BoxError> {
@@ -635,7 +629,7 @@ pub async fn get_tenant_overview(
 /// All queries enforce tenant_id isolation.
 async fn get_overview(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     store_id: Option<i64>,
     from: i64,
     to: i64,
@@ -906,8 +900,7 @@ async fn get_overview(
                     COALESCE(SUM(dr.total_sales), 0)::DOUBLE PRECISION AS revenue,
                     COALESCE(SUM(dr.completed_orders), 0)::BIGINT AS orders
                 FROM store_daily_reports dr
-                JOIN stores s ON s.id = dr.store_id
-                WHERE s.tenant_id = $1
+                WHERE dr.tenant_id = $1
                     AND ($2::BIGINT IS NULL OR dr.store_id = $2)
                     AND dr.business_date >= TO_CHAR(TO_TIMESTAMP(($3::BIGINT - 86400000) / 1000.0), 'YYYY-MM-DD')
                     AND dr.business_date <= TO_CHAR(TO_TIMESTAMP(($4::BIGINT + 86400000) / 1000.0), 'YYYY-MM-DD')
@@ -992,7 +985,7 @@ pub struct RedFlagsResponse {
 pub async fn get_red_flags(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     from: i64,
     to: i64,
 ) -> Result<RedFlagsResponse, BoxError> {
@@ -1020,8 +1013,8 @@ pub async fn get_red_flags(
         FROM store_archived_orders o
         CROSS JOIN jsonb_array_elements(o.detail->'events') AS e
         WHERE o.store_id = $1 AND o.tenant_id = $2
+            AND o.end_time >= $3 AND o.end_time < $4
             AND o.detail IS NOT NULL
-            AND (e->>'timestamp')::BIGINT >= $3 AND (e->>'timestamp')::BIGINT < $4
             AND e->>'event_type' IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
         GROUP BY operator_id, operator_name
         ORDER BY COUNT(*) DESC
@@ -1077,7 +1070,7 @@ pub async fn get_red_flags(
 pub async fn verify_store_ownership(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<Option<i64>, BoxError> {
     let row: Option<(i64,)> =
         sqlx::query_as("SELECT id FROM stores WHERE id = $1 AND tenant_id = $2")
@@ -1092,7 +1085,7 @@ pub async fn verify_store_ownership(
 pub async fn soft_delete_store(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     now: i64,
 ) -> Result<(), BoxError> {
     let mut tx = pool.begin().await?;
@@ -1130,7 +1123,7 @@ pub async fn soft_delete_store(
 pub async fn get_store_entity_id(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<Option<String>, BoxError> {
     let row: Option<(String,)> =
         sqlx::query_as("SELECT entity_id FROM stores WHERE id = $1 AND tenant_id = $2")
@@ -1156,20 +1149,62 @@ pub struct CreditNoteSummary {
 pub async fn list_credit_notes_by_order(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
-    order_key: &str,
+    tenant_id: i64,
+    order_id: i64,
 ) -> Result<Vec<CreditNoteSummary>, BoxError> {
     let rows: Vec<CreditNoteSummary> = sqlx::query_as(
         r#"
         SELECT source_id, credit_note_number, total_credit, refund_method, reason, operator_name, created_at
         FROM store_credit_notes
-        WHERE store_id = $1 AND tenant_id = $2 AND original_order_key = $3
+        WHERE store_id = $1 AND tenant_id = $2 AND original_order_id = $3
         ORDER BY created_at DESC
         "#,
     )
     .bind(store_id)
     .bind(tenant_id)
-    .bind(order_key)
+    .bind(order_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+// ── Shifts ──
+
+/// Shift entry returned to console
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct ShiftEntry {
+    pub source_id: i64,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub status: String,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub starting_cash: f64,
+    pub expected_cash: f64,
+    pub actual_cash: Option<f64>,
+    pub cash_variance: Option<f64>,
+    pub abnormal_close: bool,
+    pub note: Option<String>,
+}
+
+pub async fn list_shifts(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: i64,
+) -> Result<Vec<ShiftEntry>, BoxError> {
+    let rows: Vec<ShiftEntry> = sqlx::query_as(
+        r#"
+        SELECT source_id, operator_id, operator_name, status,
+               start_time, end_time, starting_cash, expected_cash,
+               actual_cash, cash_variance, abnormal_close, note
+        FROM store_shifts
+        WHERE store_id = $1 AND tenant_id = $2
+        ORDER BY start_time DESC
+        LIMIT 100
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
     .fetch_all(pool)
     .await?;
     Ok(rows)

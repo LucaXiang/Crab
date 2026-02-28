@@ -51,7 +51,8 @@
     "zones": "Zonas",
     "tables": "Mesas",
     "label_templates": "Plantillas de etiqueta",
-    "data_transfer": "Transferencia de datos"
+    "data_transfer": "Transferencia de datos",
+    "shifts": "Turnos"
   },
   "dash": {
     "title": "Resumen",
@@ -946,5 +947,18 @@
     "500": "Error interno del servidor. Inténtalo más tarde.",
     "502": "Servicio temporalmente no disponible. Inténtalo más tarde.",
     "503": "El servidor está ocupado. Inténtalo más tarde."
+  },
+  "shifts": {
+    "title": "Historial de turnos",
+    "status": "Estado",
+    "operator": "Operador",
+    "start": "Inicio",
+    "end": "Fin",
+    "duration": "Duración",
+    "starting_cash": "Efectivo inicial",
+    "expected_cash": "Efectivo esperado",
+    "actual_cash": "Efectivo real",
+    "variance": "Diferencia",
+    "no_data": "Sin registros de turnos"
   }
 }

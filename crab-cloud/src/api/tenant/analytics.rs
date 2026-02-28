@@ -26,12 +26,12 @@ pub async fn get_stats(
     Path(store_id): Path<i64>,
     Query(query): Query<StatsQuery>,
 ) -> ApiResult<Vec<tenant_queries::DailyReportEntry>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let reports = tenant_queries::list_daily_reports(
         &state.pool,
         store_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         query.from.as_deref(),
         query.to.as_deref(),
     )
@@ -57,7 +57,7 @@ pub async fn get_tenant_overview(
     Query(query): Query<OverviewQuery>,
 ) -> ApiResult<tenant_queries::StoreOverview> {
     let overview =
-        tenant_queries::get_tenant_overview(&state.pool, &identity.tenant_id, query.from, query.to)
+        tenant_queries::get_tenant_overview(&state.pool, identity.tenant_id, query.from, query.to)
             .await
             .map_err(|e| {
                 tracing::error!("Tenant overview query error: {e}");
@@ -74,12 +74,12 @@ pub async fn get_store_overview(
     Path(store_id): Path<i64>,
     Query(query): Query<OverviewQuery>,
 ) -> ApiResult<tenant_queries::StoreOverview> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let overview = tenant_queries::get_store_overview(
         &state.pool,
         store_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         query.from,
         query.to,
     )
@@ -99,12 +99,12 @@ pub async fn get_store_red_flags(
     Path(store_id): Path<i64>,
     Query(query): Query<OverviewQuery>,
 ) -> ApiResult<tenant_queries::RedFlagsResponse> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let red_flags = tenant_queries::get_red_flags(
         &state.pool,
         store_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         query.from,
         query.to,
     )
@@ -115,6 +115,24 @@ pub async fn get_store_red_flags(
     })?;
 
     Ok(Json(red_flags))
+}
+
+/// GET /api/tenant/stores/:id/shifts
+pub async fn list_shifts(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+) -> ApiResult<Vec<tenant_queries::ShiftEntry>> {
+    verify_store(&state, store_id, identity.tenant_id).await?;
+
+    let shifts = tenant_queries::list_shifts(&state.pool, store_id, identity.tenant_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Shifts query error: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
+
+    Ok(Json(shifts))
 }
 
 /// GET /api/tenant/stores/:id/reports/:date
@@ -130,10 +148,10 @@ pub async fn get_report_detail(
         ));
     }
 
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let detail =
-        tenant_queries::get_daily_report_detail(&state.pool, store_id, &identity.tenant_id, &date)
+        tenant_queries::get_daily_report_detail(&state.pool, store_id, identity.tenant_id, &date)
             .await
             .map_err(|e| {
                 tracing::error!("Report detail query error: {e}");

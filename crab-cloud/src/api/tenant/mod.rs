@@ -18,11 +18,7 @@ use crate::state::AppState;
 pub type ApiResult<T> = Result<axum::Json<T>, AppError>;
 
 /// Verify that a store belongs to the given tenant.
-pub async fn verify_store(
-    state: &AppState,
-    store_id: i64,
-    tenant_id: &str,
-) -> Result<(), AppError> {
+pub async fn verify_store(state: &AppState, store_id: i64, tenant_id: i64) -> Result<(), AppError> {
     tenant_queries::verify_store_ownership(&state.pool, store_id, tenant_id)
         .await
         .map_err(|e| {
@@ -46,6 +42,7 @@ pub use store::{delete_store, list_devices, list_stores, update_store};
 
 pub use analytics::{
     get_report_detail, get_stats, get_store_overview, get_store_red_flags, get_tenant_overview,
+    list_shifts,
 };
 
 pub use order::{

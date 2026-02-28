@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { StoreOverview, DailyReportEntry, RedFlagsResponse, DailyReportDetail } from '@/core/types/stats';
+import type { StoreOverview, DailyReportEntry, RedFlagsResponse, DailyReportDetail, ShiftEntry } from '@/core/types/stats';
 
 export function getTenantOverview(
   token: string,
@@ -45,4 +45,11 @@ export function getReportDetail(
   date: string,
 ): Promise<DailyReportDetail> {
   return request('GET', `/api/tenant/stores/${storeId}/reports/${date}`, undefined, token);
+}
+
+export function listShifts(
+  token: string,
+  storeId: number,
+): Promise<ShiftEntry[]> {
+  return request('GET', `/api/tenant/stores/${storeId}/shifts`, undefined, token);
 }

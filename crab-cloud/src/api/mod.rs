@@ -76,11 +76,11 @@ pub fn public_router(state: AppState) -> Router {
         .route("/api/tenant/stores/{id}/devices", get(tenant::list_devices))
         .route("/api/tenant/stores/{id}/orders", get(tenant::list_orders))
         .route(
-            "/api/tenant/stores/{id}/orders/{order_key}/detail",
+            "/api/tenant/stores/{id}/orders/{order_id}/detail",
             get(tenant::get_order_detail),
         )
         .route(
-            "/api/tenant/stores/{id}/orders/{order_key}/credit-notes",
+            "/api/tenant/stores/{id}/orders/{order_id}/credit-notes",
             get(tenant::list_credit_notes),
         )
         .route(
@@ -100,6 +100,7 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/red-flags",
             get(tenant::get_store_red_flags),
         )
+        .route("/api/tenant/stores/{id}/shifts", get(tenant::list_shifts))
         .route(
             "/api/tenant/stores/{id}/reports/{date}",
             get(tenant::get_report_detail),
