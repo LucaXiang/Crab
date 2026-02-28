@@ -19,10 +19,17 @@ pub mod util;
 /// Git commit hash (short), embedded at compile time by build.rs
 pub const GIT_HASH: &str = env!("GIT_HASH");
 
-/// Default cloud server URL (production, public HTTPS via Caddy)
+/// Default cloud server URL (public HTTPS via Caddy)
+/// debug = dev-cloud, release = production
+#[cfg(debug_assertions)]
+pub const DEFAULT_AUTH_SERVER_URL: &str = "https://dev-cloud.redcoral.app";
+#[cfg(not(debug_assertions))]
 pub const DEFAULT_AUTH_SERVER_URL: &str = "https://cloud.redcoral.app";
 
-/// Default cloud sync URL (production, mTLS direct connection on port 8443)
+/// Default cloud sync URL (mTLS direct connection)
+#[cfg(debug_assertions)]
+pub const DEFAULT_CLOUD_SYNC_URL: &str = "https://dev-cloud.redcoral.app:8444";
+#[cfg(not(debug_assertions))]
 pub const DEFAULT_CLOUD_SYNC_URL: &str = "https://sync.redcoral.app:8443";
 
 // Re-exports
