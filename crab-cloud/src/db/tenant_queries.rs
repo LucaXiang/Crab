@@ -90,7 +90,7 @@ pub async fn list_stores(pool: &PgPool, tenant_id: i64) -> Result<Vec<StoreSumma
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct ArchivedOrderSummary {
     pub id: i64,
-    pub source_id: String,
+    pub source_id: i64,
     pub receipt_number: Option<String>,
     pub status: String,
     pub end_time: Option<i64>,

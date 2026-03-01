@@ -10,9 +10,10 @@ export const AuthScreen: React.FC = () => {
 
   useEffect(() => {
     const token = searchParams.get('token');
-    const tenantId = searchParams.get('tenant_id');
+    const raw = searchParams.get('tenant_id');
 
-    if (token && tenantId) {
+    if (token != null && raw != null) {
+      const tenantId = Number(raw);
       setAuth(token, null, tenantId);
       navigate('/', { replace: true });
     } else {

@@ -100,12 +100,19 @@ pub async fn authenticate(
     username: &str,
     password: &str,
 ) -> Result<Option<Tenant>, sqlx::Error> {
-    // Support login by tenant_id (UUID) or email
-    let tenant: Option<Tenant> =
-        sqlx::query_as("SELECT * FROM tenants WHERE id = $1 OR email = $1")
+    // Support login by tenant_id (bigint) or email
+    let tenant: Option<Tenant> = if let Ok(id) = username.parse::<i64>() {
+        sqlx::query_as("SELECT * FROM tenants WHERE id = $1 OR email = $2")
+            .bind(id)
             .bind(username)
             .fetch_optional(pool)
-            .await?;
+            .await?
+    } else {
+        sqlx::query_as("SELECT * FROM tenants WHERE email = $1")
+            .bind(username)
+            .fetch_optional(pool)
+            .await?
+    };
 
     let Some(tenant) = tenant else {
         return Ok(None);

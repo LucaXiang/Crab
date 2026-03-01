@@ -434,7 +434,7 @@ pub async fn build_order_detail_sync(
         member_id: Option<i64>,
         member_name: Option<String>,
         service_type: Option<String>,
-        queue_number: Option<String>,
+        queue_number: Option<i32>,
         shift_id: Option<i64>,
         cloud_synced: bool,
     }
@@ -696,7 +696,7 @@ pub async fn build_order_detail_sync(
             member_id: order.member_id,
             member_name: order.member_name,
             service_type: order.service_type.and_then(|s| s.parse().ok()),
-            queue_number: order.queue_number,
+            queue_number: order.queue_number.map(|n| n.to_string()),
             shift_id: order.shift_id,
             items,
             payments,

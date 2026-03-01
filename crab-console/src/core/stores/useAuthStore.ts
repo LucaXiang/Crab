@@ -5,12 +5,12 @@ const STORAGE_KEY = 'redcoral-auth';
 interface AuthState {
   token: string | null;
   refreshToken: string | null;
-  tenantId: string | null;
+  tenantId: number | null;
 }
 
 interface AuthStore extends AuthState {
   isAuthenticated: boolean;
-  setAuth: (token: string, refreshToken: string | null, tenantId: string) => void;
+  setAuth: (token: string, refreshToken: string | null, tenantId: number) => void;
   updateTokens: (token: string, refreshToken: string) => void;
   clearAuth: () => void;
 }

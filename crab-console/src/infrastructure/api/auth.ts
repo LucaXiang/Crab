@@ -3,7 +3,7 @@ import { request, requestFormData } from './client';
 export interface LoginResponse {
   token: string;
   refresh_token: string;
-  tenant_id: string;
+  tenant_id: number;
 }
 
 
