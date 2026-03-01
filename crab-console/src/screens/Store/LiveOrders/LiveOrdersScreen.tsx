@@ -33,7 +33,7 @@ function statusBadge(status: string): string {
 function orderTitle(order: LiveOrderSnapshot): string {
   if (order.queue_number) return `#${order.queue_number}`;
   if (order.table_name) return order.table_name;
-  return order.order_id.slice(0, 8);
+  return String(order.order_id).slice(0, 8);
 }
 
 function toTimelineEvents(events: OrderEvent[]): TimelineEvent[] {

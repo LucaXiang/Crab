@@ -2,9 +2,16 @@
 //!
 //! All queries enforce tenant_id isolation.
 
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use sqlx::PgPool;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Convert Decimal to f64 for JSON serialization (NUMERIC → f64 boundary)
+fn d(d: Decimal) -> f64 {
+    d.to_f64().unwrap_or_default()
+}
 
 /// Tenant profile with subscription info
 #[derive(serde::Serialize, sqlx::FromRow)]
@@ -94,7 +101,7 @@ pub struct ArchivedOrderSummary {
     pub receipt_number: Option<String>,
     pub status: String,
     pub end_time: Option<i64>,
-    pub total: Option<f64>,
+    pub total: Option<Decimal>,
     pub synced_at: i64,
 }
 
@@ -150,7 +157,7 @@ pub struct ChainEntryItem {
     pub entry_id: i64,
     pub display_number: String,
     pub status: String,
-    pub amount: Option<f64>,
+    pub amount: Option<Decimal>,
     pub created_at: i64,
     pub original_order_id: Option<i64>,
     pub original_receipt: Option<String>,
@@ -199,7 +206,7 @@ pub async fn list_chain_entries(
                 a.source_id AS entry_id,
                 a.anulacion_number AS display_number,
                 'ANULADA'::TEXT AS status,
-                NULL::DOUBLE PRECISION AS amount,
+                NULL::NUMERIC AS amount,
                 a.created_at,
                 a.original_order_id,
                 (SELECT o.receipt_number FROM store_archived_orders o
@@ -243,9 +250,9 @@ pub struct CreditNoteDetail {
     pub credit_note_number: String,
     pub original_order_id: i64,
     pub original_receipt: String,
-    pub subtotal_credit: f64,
-    pub tax_credit: f64,
-    pub total_credit: f64,
+    pub subtotal_credit: Decimal,
+    pub tax_credit: Decimal,
+    pub total_credit: Decimal,
     pub refund_method: String,
     pub reason: String,
     pub note: Option<String>,
@@ -259,10 +266,10 @@ pub struct CreditNoteDetail {
 pub struct CreditNoteItemDetail {
     pub item_name: String,
     pub quantity: i32,
-    pub unit_price: f64,
-    pub line_credit: f64,
+    pub unit_price: Decimal,
+    pub line_credit: Decimal,
     pub tax_rate: i32,
-    pub tax_credit: f64,
+    pub tax_credit: Decimal,
 }
 
 pub async fn get_credit_note_detail(
@@ -278,9 +285,9 @@ pub async fn get_credit_note_detail(
         credit_note_number: String,
         original_order_id: i64,
         original_receipt: String,
-        subtotal_credit: f64,
-        tax_credit: f64,
-        total_credit: f64,
+        subtotal_credit: Decimal,
+        tax_credit: Decimal,
+        total_credit: Decimal,
         refund_method: String,
         reason: String,
         note: Option<String>,
@@ -385,9 +392,9 @@ pub struct UpgradeDetail {
     pub serie: String,
     pub tipo_factura: String,
     pub source_pk: i64,
-    pub subtotal: f64,
-    pub tax: f64,
-    pub total: f64,
+    pub subtotal: Decimal,
+    pub tax: Decimal,
+    pub total: Decimal,
     pub factura_sustituida_num: Option<String>,
     pub customer_nif: Option<String>,
     pub customer_nombre: Option<String>,
@@ -661,24 +668,24 @@ pub async fn get_order_detail(
         zone_name: Option<String>,
         table_name: Option<String>,
         is_retail: bool,
-        original_total: f64,
-        subtotal: f64,
-        paid_amount: f64,
-        surcharge_amount: f64,
-        comp_total_amount: f64,
-        order_manual_discount_amount: f64,
-        order_manual_surcharge_amount: f64,
-        order_rule_discount_amount: f64,
-        order_rule_surcharge_amount: f64,
+        original_total: Decimal,
+        subtotal: Decimal,
+        paid_amount: Decimal,
+        surcharge_amount: Decimal,
+        comp_total_amount: Decimal,
+        order_manual_discount_amount: Decimal,
+        order_manual_surcharge_amount: Decimal,
+        order_rule_discount_amount: Decimal,
+        order_rule_surcharge_amount: Decimal,
         operator_name: Option<String>,
         loss_reason: Option<String>,
         void_note: Option<String>,
         member_name: Option<String>,
         // from order header
         guest_count: Option<i32>,
-        discount_amount: f64,
+        discount_amount: Decimal,
         void_type: Option<String>,
-        loss_amount: Option<f64>,
+        loss_amount: Option<Decimal>,
     }
 
     let header = sqlx::query_as::<_, HeaderRow>(
@@ -713,13 +720,13 @@ pub async fn get_order_detail(
         spec_name: Option<String>,
         category_name: Option<String>,
         product_source_id: Option<i64>,
-        price: f64,
+        price: Decimal,
         quantity: i32,
-        unit_price: f64,
-        line_total: f64,
-        discount_amount: f64,
-        surcharge_amount: f64,
-        tax: f64,
+        unit_price: Decimal,
+        line_total: Decimal,
+        discount_amount: Decimal,
+        surcharge_amount: Decimal,
+        tax: Decimal,
         tax_rate: i32,
         is_comped: bool,
         note: Option<String>,
@@ -730,7 +737,7 @@ pub async fn get_order_detail(
         item_id: i64,
         attribute_name: String,
         option_name: String,
-        price: f64,
+        price: Decimal,
         quantity: i32,
     }
 
@@ -738,7 +745,7 @@ pub async fn get_order_detail(
     struct PaymentRow {
         seq: i32,
         method: String,
-        amount: f64,
+        amount: Decimal,
         timestamp: i64,
         cancelled: bool,
     }
@@ -814,7 +821,7 @@ pub async fn get_order_detail(
             .push(shared::cloud::OrderItemOptionSync {
                 attribute_name: o.attribute_name,
                 option_name: o.option_name,
-                price: o.price,
+                price: d(o.price),
                 quantity: o.quantity,
             });
     }
@@ -827,13 +834,13 @@ pub async fn get_order_detail(
             spec_name: i.spec_name,
             category_name: i.category_name,
             product_source_id: i.product_source_id,
-            price: i.price,
+            price: d(i.price),
             quantity: i.quantity,
-            unit_price: i.unit_price,
-            line_total: i.line_total,
-            discount_amount: i.discount_amount,
-            surcharge_amount: i.surcharge_amount,
-            tax: i.tax,
+            unit_price: d(i.unit_price),
+            line_total: d(i.line_total),
+            discount_amount: d(i.discount_amount),
+            surcharge_amount: d(i.surcharge_amount),
+            tax: d(i.tax),
             tax_rate: i.tax_rate,
             is_comped: i.is_comped,
             note: i.note,
@@ -846,7 +853,7 @@ pub async fn get_order_detail(
         .map(|p| shared::cloud::OrderPaymentSync {
             seq: p.seq,
             method: p.method,
-            amount: p.amount,
+            amount: d(p.amount),
             timestamp: p.timestamp,
             cancelled: p.cancelled,
             cancel_reason: None,
@@ -872,21 +879,21 @@ pub async fn get_order_detail(
         table_name: header.table_name,
         is_retail: header.is_retail,
         guest_count: header.guest_count,
-        original_total: header.original_total,
-        subtotal: header.subtotal,
-        paid_amount: header.paid_amount,
-        discount_amount: header.discount_amount,
-        surcharge_amount: header.surcharge_amount,
-        comp_total_amount: header.comp_total_amount,
-        order_manual_discount_amount: header.order_manual_discount_amount,
-        order_manual_surcharge_amount: header.order_manual_surcharge_amount,
-        order_rule_discount_amount: header.order_rule_discount_amount,
-        order_rule_surcharge_amount: header.order_rule_surcharge_amount,
+        original_total: d(header.original_total),
+        subtotal: d(header.subtotal),
+        paid_amount: d(header.paid_amount),
+        discount_amount: d(header.discount_amount),
+        surcharge_amount: d(header.surcharge_amount),
+        comp_total_amount: d(header.comp_total_amount),
+        order_manual_discount_amount: d(header.order_manual_discount_amount),
+        order_manual_surcharge_amount: d(header.order_manual_surcharge_amount),
+        order_rule_discount_amount: d(header.order_rule_discount_amount),
+        order_rule_surcharge_amount: d(header.order_rule_surcharge_amount),
         start_time: header.start_time.unwrap_or(0),
         operator_name: header.operator_name,
         void_type: header.void_type.and_then(|s| s.parse().ok()),
         loss_reason: header.loss_reason.and_then(|s| s.parse().ok()),
-        loss_amount: header.loss_amount,
+        loss_amount: header.loss_amount.map(d),
         void_note: header.void_note,
         member_name: header.member_name,
         service_type: None,
@@ -1671,7 +1678,7 @@ pub async fn get_store_entity_id(
 pub struct CreditNoteSummary {
     pub source_id: i64,
     pub credit_note_number: String,
-    pub total_credit: f64,
+    pub total_credit: Decimal,
     pub refund_method: String,
     pub reason: String,
     pub operator_name: String,

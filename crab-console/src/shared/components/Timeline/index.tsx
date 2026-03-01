@@ -86,7 +86,7 @@ const EVENT_CONFIG: Record<string, { icon: LucideIcon; color: string; titleKey: 
 
 export function renderEventDisplay(event: TimelineEvent, t: (k: string) => string): EventDisplay {
   const config = EVENT_CONFIG[event.event_type];
-  const p = event.payload;
+  const p = event.payload ?? {};
 
   if (!config) {
     return {
