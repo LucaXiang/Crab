@@ -153,6 +153,14 @@ Tauri identifier: `com.craboss.redcoral`
 **域名**: `cloud.redcoral.app` → Caddy → crab-cloud:8080
 **mTLS**: 端口 8443 直接暴露 (edge-server 双向 TLS 连接用)
 
+### 部署安全规则
+
+- **禁止** `docker-compose down && docker-compose up -d` — 这会重启所有服务（包括生产！）
+- **必须** 指定服务名: `docker-compose up -d dev-cloud` 只重启目标服务
+- **prod 和 dev 共用一个 docker-compose**，生产用固定 image tag，dev 用 `:latest`
+- **Console 部署必须指定 Vite mode**: `npx vite build --mode development` 用于 dev-console（读 `.env.development` → `dev-cloud.redcoral.app`），`npm run build` 默认 production（读 `.env.production` → `cloud.redcoral.app`）
+- **不要混淆部署目录**: portal → `/opt/crab/portal/`，console → `/opt/crab/console/`，dev-console → `/opt/crab/dev-console/`
+
 ### 完整部署流程
 
 ```bash
@@ -167,14 +175,30 @@ aws ecr get-login-password --region eu-south-2 | \
   docker login --username AWS --password-stdin 364453382269.dkr.ecr.eu-south-2.amazonaws.com
 docker pull 364453382269.dkr.ecr.eu-south-2.amazonaws.com/crab-cloud:latest
 
-# 4. 重启服务
+# 4. 重启服务 (只重启目标服务！)
 cd /opt/crab
-docker-compose down
-docker-compose up -d
+docker-compose up -d dev-cloud    # dev 环境
+# docker-compose up -d crab-cloud  # 生产环境 (谨慎!)
 
 # 5. 验证
-curl https://cloud.redcoral.app/health
+curl https://dev-cloud.redcoral.app/health
 # 期望: {"git_hash":"...","service":"crab-cloud","status":"ok","version":"..."}
+```
+
+### Console 部署
+
+```bash
+# dev-console (访问 dev-cloud)
+cd crab-console
+npx vite build --mode development    # 关键: --mode development
+cp build/index.html build/200.html
+scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/dev-console/
+
+# production console (访问 cloud.redcoral.app)
+cd crab-console
+npm run build
+cp build/index.html build/200.html
+scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/console/
 ```
 
 ### 清理数据库 (仅内测阶段)
@@ -231,10 +255,23 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 - 使用 `string` 格式的时间戳 (用 `i64` Unix 毫秒)
 - EventApplier 中执行 I/O 或副作用
 - 使用 `f64` 进行金额**算术运算** (用 `rust_decimal`，存储/传输/序列化用 `f64` 是允许的)
+
+### 金额类型跨层规则
+
+| 层 | 存储 | Rust 查询类型 | JSON 序列化 |
+|----|------|-------------|------------|
+| **edge-server (SQLite)** | `REAL` | `f64` | `f64` |
+| **crab-cloud (PostgreSQL)** | `NUMERIC(12,2)` | `rust_decimal::Decimal` | `f64` (via `serde-with-float`) |
+| **前端 (TypeScript)** | — | — | `number` |
+
+- crab-cloud 查询结构体金额字段**必须**用 `Decimal`，在构建 API 响应时通过 `d()` helper 转 `f64`
+- `rust_decimal` workspace feature 必须是 `serde-with-float`（序列化为 JSON 数字而非字符串）
 - 添加转换函数/兼容层/适配器来修复类型不匹配 (从源头修)
 - 使用 INTEGER cents 存储金额 (用 REAL/DOUBLE PRECISION，Rust 侧计算用 `rust_decimal`)
 - 使用 JSON TEXT 列存储嵌套对象 (用独立关联表)
 - 绕过 `shared::ErrorCode` 自造错误码或字符串错误 (所有错误必须通过 ErrorCode → AppError → ApiResponse 链路)
+- 在 crab-cloud (PG) 的查询结构体中用 `f64` 读取 `NUMERIC` 列 (sqlx 无法解码 PG NUMERIC → f64，必须用 `rust_decimal::Decimal`，在响应边界转 f64)
+- 用 `::float8` SQL cast 绕过类型不匹配 (属于打补丁，应从 Rust struct 类型修)
 
 ## 修复原则
 

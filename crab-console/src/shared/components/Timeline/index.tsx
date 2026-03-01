@@ -105,11 +105,11 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
   const tags: TimelineTag[] = [];
   let summary: string | undefined;
 
-  const addItemTag = (id: string | undefined) => {
-    if (id) tags.push({ text: `#${id.slice(-5)}`, type: 'item' });
+  const addItemTag = (id: string | number | undefined) => {
+    if (id != null) tags.push({ text: `#${String(id).slice(-5)}`, type: 'item' });
   };
-  const addPaymentTag = (id: string | undefined) => {
-    if (id) tags.push({ text: `#${id.slice(-5)}`, type: 'payment' });
+  const addPaymentTag = (id: string | number | undefined) => {
+    if (id != null) tags.push({ text: `#${String(id).slice(-5)}`, type: 'payment' });
   };
 
   switch (event.event_type) {
@@ -125,7 +125,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       const totalQty = items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0);
       if (totalQty > 0) summary = `${totalQty} items`;
       for (const item of items) {
-        const id = item.instance_id ? `#${item.instance_id.slice(-5)} ` : '';
+        const id = item.instance_id ? `#${String(item.instance_id).slice(-5)} ` : '';
         const mods: string[] = [];
         if (item.manual_discount_percent) mods.push(`-${item.manual_discount_percent}%`);
         details.push(`${id}${item.name} x${item.quantity}${mods.length ? ` (${mods.join(', ')})` : ''}`);
@@ -137,7 +137,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       addItemTag(p.source?.instance_id);
       const updatedResult = (p.results || []).find((r: { action: string; instance_id: string }) => r.action === 'UPDATED' || r.action === 'CREATED');
       if (updatedResult && updatedResult.instance_id !== p.source?.instance_id) {
-        tags.push({ text: `→ #${updatedResult.instance_id.slice(-5)}`, type: 'item' });
+        tags.push({ text: `→ #${String(updatedResult.instance_id).slice(-5)}`, type: 'item' });
       }
       const changes = p.changes || {};
       const prev = p.previous_values || {};
@@ -209,7 +209,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       if (p.item_name) summary = p.item_name;
       addItemTag(p.instance_id);
       if (p.restored_price != null) details.push(`${t('orders.subtotal')}: ${formatCurrency(p.restored_price)}`);
-      if (p.merged_into) details.push(`Merged → #${p.merged_into.slice(-5)}`);
+      if (p.merged_into) details.push(`Merged → #${String(p.merged_into).slice(-5)}`);
       if (p.authorizer_name) details.push(`${t('timeline.authorizer')}: ${p.authorizer_name}`);
       break;
     }
@@ -333,7 +333,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       addPaymentTag(p.payment_id);
       if (p.items) {
         for (const item of p.items) {
-          const id = item.instance_id ? `#${item.instance_id.slice(-5)} ` : '';
+          const id = item.instance_id ? `#${String(item.instance_id).slice(-5)} ` : '';
           details.push(`${id}${item.name} x${item.quantity}`);
         }
       }

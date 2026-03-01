@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Download, Store, Clock, ArrowRight, Sparkles, CreditCard,
   AlertTriangle, XCircle, CheckCircle, Upload, ShieldCheck,
-  FileKey, MapPin,
+  FileKey, MapPin, RefreshCw,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -20,6 +20,14 @@ import type { TimeRange } from '@/shared/components';
 import { StoreOverviewDisplay } from '@/screens/Store/Overview/StoreOverviewDisplay';
 import type { StoreDetail } from '@/core/types/store';
 import type { StoreOverview } from '@/core/types/stats';
+
+function formatUpdatedAt(ts: number, t: (k: string) => string): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 10) return t('stats.just_now');
+  if (diff < 60) return `${diff}s ${t('stats.ago')}`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ${t('stats.ago')}`;
+  return new Date(ts).toLocaleTimeString();
+}
 
 function isSafeStripeUrl(url: string): boolean {
   try {
@@ -46,6 +54,9 @@ export const DashboardScreen: React.FC = () => {
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
   const [timeRange, setTimeRange] = useState<TimeRange>(() => getPresetRange('today', t));
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [updatedLabel, setUpdatedLabel] = useState('');
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   // P12 onboarding
   const [onboardStep, setOnboardStep] = useState<'p12' | 'plan'>('p12');
@@ -77,6 +88,7 @@ export const DashboardScreen: React.FC = () => {
       setOverview(current);
       setPreviousOverview(prev);
       setLastWeekOverview(lastWeek);
+      setUpdatedAt(Date.now());
     } catch {
       // Silently fail overview — profile/stores already loaded
     } finally {
@@ -112,6 +124,7 @@ export const DashboardScreen: React.FC = () => {
           setOverview(ov);
           setPreviousOverview(prevOv);
           setLastWeekOverview(lwOv);
+          setUpdatedAt(Date.now());
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -127,10 +140,21 @@ export const DashboardScreen: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, clearAuth, navigate, t]);
 
+  // Update the relative time label every 10s
+  useEffect(() => {
+    if (updatedAt) setUpdatedLabel(formatUpdatedAt(updatedAt, t));
+    timerRef.current = setInterval(() => {
+      if (updatedAt) setUpdatedLabel(formatUpdatedAt(updatedAt, t));
+    }, 10_000);
+    return () => clearInterval(timerRef.current);
+  }, [updatedAt, t]);
+
   const handleRangeChange = (range: TimeRange) => {
     setTimeRange(range);
     if (isActive) fetchOverview(range);
   };
+
+  const handleRefresh = () => { fetchOverview(timeRange); };
 
   const handleBillingPortal = async () => {
     if (!token) return;
@@ -320,6 +344,20 @@ export const DashboardScreen: React.FC = () => {
             <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               {t('dash.system_operational')}
+              {updatedAt && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-xs text-slate-400">{updatedLabel}</span>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={overviewLoading}
+                    className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+                    title={t('stats.refresh')}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${overviewLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>
