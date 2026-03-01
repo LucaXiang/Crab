@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -11,6 +11,14 @@ import { TimeRangeSelector, getPresetRange, getPreviousRange, getLastWeekSameDay
 import type { TimeRange } from '@/shared/components';
 import type { StoreOverview } from '@/core/types/stats';
 import { StoreOverviewDisplay } from './StoreOverviewDisplay';
+
+function formatUpdatedAt(ts: number, t: (k: string) => string): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 10) return t('stats.just_now');
+  if (diff < 60) return `${diff}s ${t('stats.ago')}`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ${t('stats.ago')}`;
+  return new Date(ts).toLocaleTimeString();
+}
 
 export const StoreOverviewScreen: React.FC = () => {
   const { t } = useI18n();
@@ -25,6 +33,9 @@ export const StoreOverviewScreen: React.FC = () => {
   const [lastWeekOverview, setLastWeekOverview] = useState<StoreOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [updatedLabel, setUpdatedLabel] = useState('');
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const fetchData = useCallback(async (range: TimeRange) => {
     if (!token) return;
@@ -41,6 +52,7 @@ export const StoreOverviewScreen: React.FC = () => {
       setOverview(current);
       setPreviousOverview(prev);
       setLastWeekOverview(lastWeek);
+      setUpdatedAt(Date.now());
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); return; }
       setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
@@ -51,16 +63,42 @@ export const StoreOverviewScreen: React.FC = () => {
 
   useEffect(() => { fetchData(timeRange); }, [fetchData, timeRange]);
 
+  // Update the relative time label every 10s
+  useEffect(() => {
+    if (updatedAt) setUpdatedLabel(formatUpdatedAt(updatedAt, t));
+    timerRef.current = setInterval(() => {
+      if (updatedAt) setUpdatedLabel(formatUpdatedAt(updatedAt, t));
+    }, 10_000);
+    return () => clearInterval(timerRef.current);
+  }, [updatedAt, t]);
+
   const handleRangeChange = (range: TimeRange) => {
     setTimeRange(range);
   };
+
+  const handleRefresh = () => { fetchData(timeRange); };
 
   if (error) return <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8"><div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div></div>;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-4 md:space-y-6">
       <div className="flex flex-col gap-3">
-        <h1 className="text-lg md:text-xl font-bold text-slate-900">{t('stats.overview')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg md:text-xl font-bold text-slate-900">{t('stats.overview')}</h1>
+          {updatedAt && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span>{updatedLabel}</span>
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+                title={t('stats.refresh')}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          )}
+        </div>
         <TimeRangeSelector value={timeRange} onChange={handleRangeChange} />
       </div>
 

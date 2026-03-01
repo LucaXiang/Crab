@@ -243,7 +243,10 @@
     "this_month": "Este mes",
     "custom_range": "Personalizado",
     "refunds": "Devoluciones",
-    "refund_methods": "Métodos de devolución"
+    "refund_methods": "Métodos de devolución",
+    "just_now": "Recién actualizado",
+    "ago": "hace",
+    "refresh": "Actualizar datos"
   },
   "reports": {
     "abnormal_close": "Cierre anormal",

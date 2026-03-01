@@ -243,7 +243,10 @@
     "this_month": "This month",
     "custom_range": "Custom",
     "refunds": "Refunds",
-    "refund_methods": "Refund methods"
+    "refund_methods": "Refund methods",
+    "just_now": "Just updated",
+    "ago": "ago",
+    "refresh": "Refresh data"
   },
   "reports": {
     "abnormal_close": "Abnormal close",
