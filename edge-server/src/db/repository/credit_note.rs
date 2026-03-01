@@ -266,6 +266,7 @@ pub async fn build_sync(
         items: items
             .into_iter()
             .map(|i| CreditNoteItemSync {
+                original_instance_id: i.original_instance_id,
                 item_name: i.item_name,
                 quantity: i.quantity,
                 unit_price: i.unit_price,

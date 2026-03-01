@@ -143,7 +143,7 @@ pub async fn list_orders(
     Ok(rows)
 }
 
-/// Unified chain entry item (orders + credit notes in one timeline)
+/// Unified chain entry item (orders + credit notes + anulaciones + upgrades in one timeline)
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct ChainEntryItem {
     pub entry_type: String,
@@ -191,6 +191,37 @@ pub async fn list_chain_entries(
                 cn.original_receipt
             FROM store_credit_notes cn
             WHERE cn.store_id = $1 AND cn.tenant_id = $2
+        )
+        UNION ALL
+        (
+            SELECT
+                'ANULACION'::TEXT AS entry_type,
+                a.source_id AS entry_id,
+                a.anulacion_number AS display_number,
+                'ANULADA'::TEXT AS status,
+                NULL::DOUBLE PRECISION AS amount,
+                a.created_at,
+                a.original_order_id,
+                (SELECT o.receipt_number FROM store_archived_orders o
+                 WHERE o.store_id = a.store_id AND o.order_id = a.original_order_id
+                 LIMIT 1) AS original_receipt
+            FROM store_anulaciones a
+            WHERE a.store_id = $1 AND a.tenant_id = $2
+        )
+        UNION ALL
+        (
+            SELECT
+                'UPGRADE'::TEXT AS entry_type,
+                inv.source_id AS entry_id,
+                inv.invoice_number AS display_number,
+                'F3'::TEXT AS status,
+                inv.total AS amount,
+                inv.created_at,
+                inv.source_pk AS original_order_id,
+                NULL::TEXT AS original_receipt
+            FROM store_invoices inv
+            WHERE inv.store_id = $1 AND inv.tenant_id = $2
+              AND inv.tipo_factura = 'F3'
         )
         ORDER BY created_at DESC
         LIMIT $3 OFFSET $4
@@ -306,6 +337,90 @@ pub async fn get_credit_note_detail(
         created_at: header.created_at,
         items,
     }))
+}
+
+/// Anulacion detail
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct AnulacionDetail {
+    pub source_id: i64,
+    pub anulacion_number: String,
+    pub serie: String,
+    pub original_invoice_number: String,
+    pub original_order_id: i64,
+    pub reason: String,
+    pub note: Option<String>,
+    pub operator_name: String,
+    pub huella: String,
+    pub aeat_status: String,
+    pub created_at: i64,
+}
+
+pub async fn get_anulacion_detail(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: i64,
+    source_id: i64,
+) -> Result<Option<AnulacionDetail>, BoxError> {
+    let row: Option<AnulacionDetail> = sqlx::query_as(
+        r#"
+        SELECT source_id, anulacion_number, serie, original_invoice_number,
+               original_order_id, reason, note, operator_name, huella, aeat_status, created_at
+        FROM store_anulaciones
+        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(source_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
+}
+
+/// Upgrade (F3 invoice) detail
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct UpgradeDetail {
+    pub source_id: i64,
+    pub invoice_number: String,
+    pub serie: String,
+    pub tipo_factura: String,
+    pub source_pk: i64,
+    pub subtotal: f64,
+    pub tax: f64,
+    pub total: f64,
+    pub factura_sustituida_num: Option<String>,
+    pub customer_nif: Option<String>,
+    pub customer_nombre: Option<String>,
+    pub customer_address: Option<String>,
+    pub customer_email: Option<String>,
+    pub customer_phone: Option<String>,
+    pub huella: String,
+    pub aeat_status: String,
+    pub created_at: i64,
+}
+
+pub async fn get_upgrade_detail(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: i64,
+    source_id: i64,
+) -> Result<Option<UpgradeDetail>, BoxError> {
+    let row: Option<UpgradeDetail> = sqlx::query_as(
+        r#"
+        SELECT source_id, invoice_number, serie, tipo_factura, source_pk,
+               subtotal, tax, total, factura_sustituida_num,
+               customer_nif, customer_nombre, customer_address, customer_email, customer_phone,
+               huella, aeat_status, created_at
+        FROM store_invoices
+        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3 AND tipo_factura = 'F3'
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(source_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
 }
 
 /// Daily report entry for Console stats
@@ -734,6 +849,9 @@ pub async fn get_order_detail(
             amount: p.amount,
             timestamp: p.timestamp,
             cancelled: p.cancelled,
+            cancel_reason: None,
+            tendered: None,
+            change_amount: None,
         })
         .collect();
 
@@ -766,12 +884,16 @@ pub async fn get_order_detail(
         order_rule_surcharge_amount: header.order_rule_surcharge_amount,
         start_time: header.start_time.unwrap_or(0),
         operator_name: header.operator_name,
-        void_type: header.void_type,
-        loss_reason: header.loss_reason,
+        void_type: header.void_type.and_then(|s| s.parse().ok()),
+        loss_reason: header.loss_reason.and_then(|s| s.parse().ok()),
         loss_amount: header.loss_amount,
         void_note: header.void_note,
         member_name: header.member_name,
-        service_type: None, // not needed for Console detail view
+        service_type: None,
+        operator_id: None,
+        member_id: None,
+        queue_number: None,
+        shift_id: None,
         items,
         payments,
         events,

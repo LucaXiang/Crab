@@ -246,7 +246,7 @@ pub async fn build_sync(pool: &SqlitePool, anulacion_id: i64) -> RepoResult<Anul
         nif: anulacion.nif,
         nombre_razon: anulacion.nombre_razon,
         original_order_pk: anulacion.original_order_pk,
-        reason: anulacion.reason.as_str().to_string(),
+        reason: anulacion.reason,
         note: anulacion.note,
         operator_id: anulacion.operator_id,
         operator_name: anulacion.operator_name,

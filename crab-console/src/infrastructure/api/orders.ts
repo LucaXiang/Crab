@@ -5,6 +5,8 @@ import type {
   CreditNoteSummary,
   ChainEntryItem,
   CreditNoteDetailResponse,
+  AnulacionDetailResponse,
+  UpgradeDetailResponse,
 } from '@/core/types/order';
 
 export function getOrders(
@@ -22,17 +24,17 @@ export function getOrders(
 export function getOrderDetail(
   token: string,
   storeId: number,
-  orderKey: string,
+  orderId: number,
 ): Promise<OrderDetailResponse> {
-  return request('GET', `/api/tenant/stores/${storeId}/orders/${orderKey}/detail`, undefined, token);
+  return request('GET', `/api/tenant/stores/${storeId}/orders/${orderId}/detail`, undefined, token);
 }
 
 export function getCreditNotes(
   token: string,
   storeId: number,
-  orderKey: string,
+  orderId: number,
 ): Promise<CreditNoteSummary[]> {
-  return request('GET', `/api/tenant/stores/${storeId}/orders/${orderKey}/credit-notes`, undefined, token);
+  return request('GET', `/api/tenant/stores/${storeId}/orders/${orderId}/credit-notes`, undefined, token);
 }
 
 export function getChainEntries(
@@ -47,7 +49,23 @@ export function getChainEntries(
 export function getCreditNoteDetail(
   token: string,
   storeId: number,
-  sourceId: string,
+  sourceId: number,
 ): Promise<CreditNoteDetailResponse> {
   return request('GET', `/api/tenant/stores/${storeId}/credit-notes/${sourceId}`, undefined, token);
+}
+
+export function getAnulacionDetail(
+  token: string,
+  storeId: number,
+  sourceId: number,
+): Promise<AnulacionDetailResponse> {
+  return request('GET', `/api/tenant/stores/${storeId}/anulaciones/${sourceId}`, undefined, token);
+}
+
+export function getUpgradeDetail(
+  token: string,
+  storeId: number,
+  sourceId: number,
+): Promise<UpgradeDetailResponse> {
+  return request('GET', `/api/tenant/stores/${storeId}/upgrades/${sourceId}`, undefined, token);
 }

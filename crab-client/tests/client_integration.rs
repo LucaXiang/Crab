@@ -15,19 +15,14 @@ async fn test_credential_storage() {
     let storage = CredentialStorage::new(temp_dir.path(), "credential.json");
 
     // Test save and load
-    let credential = Credential::new(
-        "test-client".to_string(),
-        "tenant-1".to_string(),
-        "test-token".to_string(),
-        None,
-    );
+    let credential = Credential::new("test-client", 1001, "test-token", None);
 
     storage.save(&credential).unwrap();
     assert!(storage.exists());
 
     let loaded = storage.load().unwrap();
     assert_eq!(loaded.client_name, "test-client");
-    assert_eq!(loaded.tenant_id, "tenant-1");
+    assert_eq!(loaded.tenant_id, 1001);
     assert_eq!(loaded.token(), "test-token");
 
     // Test delete
@@ -39,7 +34,7 @@ async fn test_credential_storage() {
 #[tokio::test]
 async fn test_credential_is_expired() {
     // Credential without expiry
-    let cred1 = Credential::new("c", "t", "tok", None);
+    let cred1 = Credential::new("c", 1, "tok", None);
     assert!(!cred1.is_expired());
     assert!(cred1.is_valid());
 
@@ -49,7 +44,7 @@ async fn test_credential_is_expired() {
         .unwrap()
         .as_secs()
         + 3600;
-    let cred2 = Credential::new("c", "t", "tok", Some(future));
+    let cred2 = Credential::new("c", 1, "tok", Some(future));
     assert!(!cred2.is_expired());
     assert!(cred2.is_valid());
 
@@ -59,7 +54,7 @@ async fn test_credential_is_expired() {
         .unwrap()
         .as_secs()
         - 3600;
-    let cred3 = Credential::new("c", "t", "tok", Some(past));
+    let cred3 = Credential::new("c", 1, "tok", Some(past));
     assert!(cred3.is_expired());
     assert!(!cred3.is_valid());
 }

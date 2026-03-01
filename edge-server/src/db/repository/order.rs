@@ -425,13 +425,17 @@ pub async fn build_order_detail_sync(
         order_rule_discount_amount: f64,
         order_rule_surcharge_amount: f64,
         start_time: i64,
+        operator_id: Option<i64>,
         operator_name: Option<String>,
         void_type: Option<String>,
         loss_reason: Option<String>,
         loss_amount: Option<f64>,
         void_note: Option<String>,
+        member_id: Option<i64>,
         member_name: Option<String>,
         service_type: Option<String>,
+        queue_number: Option<String>,
+        shift_id: Option<i64>,
         cloud_synced: bool,
     }
 
@@ -441,8 +445,8 @@ pub async fn build_order_detail_sync(
          ao.original_total, ao.subtotal, ao.paid_amount, ao.discount_amount, ao.surcharge_amount, \
          ao.comp_total_amount, ao.order_manual_discount_amount, ao.order_manual_surcharge_amount, \
          ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
-         ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, ao.member_name, \
-         ao.service_type, ao.cloud_synced \
+         ao.operator_id, ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, \
+         ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -598,23 +602,36 @@ pub async fn build_order_detail_sync(
     .await?;
 
     // 4. Query payments
-    let payments: Vec<OrderPaymentSync> = sqlx::query_as::<_, (i32, String, f64, i64, bool)>(
-        "SELECT seq, method, amount, time, cancelled \
+    #[derive(sqlx::FromRow)]
+    struct SyncPaymentRow {
+        seq: i32,
+        method: String,
+        amount: f64,
+        time: i64,
+        cancelled: bool,
+        cancel_reason: Option<String>,
+        tendered: Option<f64>,
+        change_amount: Option<f64>,
+    }
+
+    let payments: Vec<OrderPaymentSync> = sqlx::query_as::<_, SyncPaymentRow>(
+        "SELECT seq, method, amount, time, cancelled, cancel_reason, tendered, change_amount \
          FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
     )
     .bind(order_pk)
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(
-        |(seq, method, amount, timestamp, cancelled)| OrderPaymentSync {
-            seq,
-            method,
-            amount,
-            timestamp,
-            cancelled,
-        },
-    )
+    .map(|p| OrderPaymentSync {
+        seq: p.seq,
+        method: p.method,
+        amount: p.amount,
+        timestamp: p.time,
+        cancelled: p.cancelled,
+        cancel_reason: p.cancel_reason,
+        tendered: p.tendered,
+        change_amount: p.change_amount,
+    })
     .collect();
 
     // 4. Aggregate desglose from items (GROUP BY tax_rate) using rust_decimal
@@ -670,13 +687,17 @@ pub async fn build_order_detail_sync(
             order_rule_discount_amount: order.order_rule_discount_amount,
             order_rule_surcharge_amount: order.order_rule_surcharge_amount,
             start_time: order.start_time,
+            operator_id: order.operator_id,
             operator_name: order.operator_name,
-            void_type: order.void_type,
-            loss_reason: order.loss_reason,
+            void_type: order.void_type.and_then(|s| s.parse().ok()),
+            loss_reason: order.loss_reason.and_then(|s| s.parse().ok()),
             loss_amount: order.loss_amount,
             void_note: order.void_note,
+            member_id: order.member_id,
             member_name: order.member_name,
-            service_type: order.service_type,
+            service_type: order.service_type.and_then(|s| s.parse().ok()),
+            queue_number: order.queue_number,
+            shift_id: order.shift_id,
             items,
             payments,
             events,

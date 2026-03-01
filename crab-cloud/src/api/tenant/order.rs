@@ -218,3 +218,53 @@ pub async fn get_credit_note_detail(
         )),
     }
 }
+
+/// GET /api/tenant/stores/:id/anulaciones/:source_id
+pub async fn get_anulacion_detail(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, source_id)): Path<(i64, i64)>,
+) -> ApiResult<tenant_queries::AnulacionDetail> {
+    verify_store(&state, store_id, identity.tenant_id).await?;
+
+    let detail =
+        tenant_queries::get_anulacion_detail(&state.pool, store_id, identity.tenant_id, source_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Anulacion detail query error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
+
+    match detail {
+        Some(d) => Ok(Json(d)),
+        None => Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Anulacion not found",
+        )),
+    }
+}
+
+/// GET /api/tenant/stores/:id/upgrades/:source_id
+pub async fn get_upgrade_detail(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path((store_id, source_id)): Path<(i64, i64)>,
+) -> ApiResult<tenant_queries::UpgradeDetail> {
+    verify_store(&state, store_id, identity.tenant_id).await?;
+
+    let detail =
+        tenant_queries::get_upgrade_detail(&state.pool, store_id, identity.tenant_id, source_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Upgrade detail query error: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
+
+    match detail {
+        Some(d) => Ok(Json(d)),
+        None => Err(AppError::with_message(
+            ErrorCode::NotFound,
+            "Upgrade invoice not found",
+        )),
+    }
+}

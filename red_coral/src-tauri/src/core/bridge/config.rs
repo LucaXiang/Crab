@@ -1,9 +1,47 @@
 //! Bridge configuration types
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use super::error::BridgeError;
 use super::types::ModeType;
+
+/// 从 JSON 文件加载数据，反序列化失败时备份损坏文件并返回默认值。
+///
+/// 确保 app 永远能启动 —— 任何本地缓存文件的损坏/不兼容都不阻止启动。
+pub fn resilient_load<T: Default + DeserializeOwned>(path: &Path) -> T {
+    if !path.exists() {
+        return T::default();
+    }
+
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(path = %path.display(), error = %e, "Failed to read cache file, using defaults");
+            return T::default();
+        }
+    };
+
+    match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %e,
+                "Corrupt/incompatible cache file, backing up and resetting"
+            );
+            // 备份损坏文件
+            let bak = path.with_extension("json.bak");
+            if let Err(bak_err) = std::fs::rename(path, &bak) {
+                tracing::warn!(error = %bak_err, "Failed to backup corrupt file");
+                // 至少尝试删除，避免下次启动再次触发
+                let _ = std::fs::remove_file(path);
+            }
+            T::default()
+        }
+    }
+}
 
 fn default_cloud_url() -> String {
     std::env::var("CRAB_CLOUD_URL").unwrap_or_else(|_| shared::DEFAULT_CLOUD_SYNC_URL.to_string())
@@ -97,13 +135,10 @@ impl Default for AppConfig {
 
 impl AppConfig {
     /// 从文件加载配置
+    ///
+    /// 反序列化失败时自动备份损坏文件并返回默认配置，确保 app 永远能启动。
     pub fn load(path: &std::path::Path) -> Result<Self, BridgeError> {
-        let mut config = if path.exists() {
-            let content = std::fs::read_to_string(path)?;
-            serde_json::from_str(&content).map_err(|e| BridgeError::Config(e.to_string()))?
-        } else {
-            Self::default()
-        };
+        let mut config: Self = resilient_load(path);
         // 强制 HTTPS — P12 等敏感数据绝不能走明文
         config.auth_url = enforce_https(&config.auth_url);
 

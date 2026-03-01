@@ -15,7 +15,7 @@ mod state;
 mod types;
 
 // Re-export public types
-pub use config::{AppConfig, ClientModeConfig, ServerModeConfig};
+pub use config::{resilient_load, AppConfig, ClientModeConfig, ServerModeConfig};
 pub use error::BridgeError;
 pub use types::{AppState, ModeInfo, ModeType};
 

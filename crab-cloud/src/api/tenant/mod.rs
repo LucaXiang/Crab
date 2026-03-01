@@ -46,7 +46,8 @@ pub use analytics::{
 };
 
 pub use order::{
-    get_credit_note_detail, get_order_detail, list_chain_entries, list_credit_notes, list_orders,
+    get_anulacion_detail, get_credit_note_detail, get_order_detail, get_upgrade_detail,
+    list_chain_entries, list_credit_notes, list_orders,
 };
 
 pub use command::{create_command, list_commands};

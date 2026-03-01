@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Clock, ChevronRight, Receipt, Calendar, CreditCard, Coins,
   Gift, Ban, ChevronDown, ChevronUp, Cloud, Wifi, X, Users,
-  ArrowLeft,
+  ArrowLeft, FileUp, FileText, User, Mail, Phone, MapPin,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getChainEntries, getOrderDetail, getCreditNotes, getCreditNoteDetail } from '@/infrastructure/api/orders';
+import {
+  getChainEntries, getOrderDetail, getCreditNotes, getCreditNoteDetail,
+  getAnulacionDetail, getUpgradeDetail,
+} from '@/infrastructure/api/orders';
 import { ApiError } from '@/infrastructure/api/client';
 import { formatCurrency } from '@/utils/format';
 import { Spinner } from '@/presentation/components/ui/Spinner';
@@ -16,13 +19,36 @@ import { TimelineCard } from '@/shared/components/Timeline';
 import type { TimelineEvent } from '@/shared/components/Timeline';
 import { Undo2 } from 'lucide-react';
 import type {
-  ChainEntryItem, OrderDetailResponse, OrderItem, OrderPayment, OrderEvent,
-  CreditNoteSummary, CreditNoteDetailResponse,
+  ChainEntryItem, ChainEntryType, OrderDetailResponse, OrderItem, OrderPayment, OrderEvent,
+  CreditNoteSummary, CreditNoteDetailResponse, AnulacionDetailResponse, UpgradeDetailResponse,
 } from '@/core/types/order';
 
-/** Format display number with type prefix: ORD 03-20260228-0018 / DEV 03-20260228-0019 */
-function formatChainNumber(displayNumber: string, entryType: 'ORDER' | 'CREDIT_NOTE'): string {
-  return entryType === 'CREDIT_NOTE' ? `DEV ${displayNumber}` : `ORD ${displayNumber}`;
+/** Format display number with type prefix */
+function formatChainNumber(displayNumber: string, entryType: ChainEntryType): string {
+  switch (entryType) {
+    case 'CREDIT_NOTE': return `DEV ${displayNumber}`;
+    case 'ANULACION': return `ANU ${displayNumber}`;
+    case 'UPGRADE': return `UPG ${displayNumber}`;
+    default: return `ORD ${displayNumber}`;
+  }
+}
+
+function formatRefundMethod(method: string, t: (key: string) => string): string {
+  switch (method) {
+    case 'CASH': return t('orders.method_cash');
+    case 'CARD': return t('orders.method_card');
+    default: return method;
+  }
+}
+
+function formatAeatStatus(status: string): { label: string; style: string } {
+  switch (status) {
+    case 'ACCEPTED': return { label: 'Aceptada', style: 'bg-green-100 text-green-700' };
+    case 'REJECTED': return { label: 'Rechazada', style: 'bg-red-100 text-red-700' };
+    case 'SUBMITTED': return { label: 'Enviada', style: 'bg-blue-100 text-blue-700' };
+    case 'PENDING': return { label: 'Pendiente', style: 'bg-yellow-100 text-yellow-700' };
+    default: return { label: status, style: 'bg-slate-100 text-slate-700' };
+  }
 }
 
 const ACCENT_COLORS = [
@@ -39,6 +65,8 @@ function toTimelineEvents(events: OrderEvent[]): TimelineEvent[] {
   }));
 }
 
+type Selection = { type: ChainEntryType; id: number; displayHint?: string };
+
 export const OrdersScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -53,14 +81,14 @@ export const OrdersScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
 
-  // Selection state: either an ORDER or a CREDIT_NOTE
-  // displayHint: carried from jump source when entry isn't in loaded pages
-  const [selected, setSelected] = useState<{ type: 'ORDER' | 'CREDIT_NOTE'; key: string; displayHint?: string } | null>(null);
+  const [selected, setSelected] = useState<Selection | null>(null);
 
   // Detail states
   const [orderDetail, setOrderDetail] = useState<OrderDetailResponse | null>(null);
   const [creditNotes, setCreditNotes] = useState<CreditNoteSummary[]>([]);
   const [cnDetail, setCnDetail] = useState<CreditNoteDetailResponse | null>(null);
+  const [anulacionDetail, setAnulacionDetail] = useState<AnulacionDetailResponse | null>(null);
+  const [upgradeDetail, setUpgradeDetail] = useState<UpgradeDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   const loadPage = useCallback(async (page: number, reset: boolean) => {
@@ -90,22 +118,24 @@ export const OrdersScreen: React.FC = () => {
   useEffect(() => {
     if (entries.length > 0 && !selected && !userDismissed.current) {
       const first = entries[0];
-      setSelected({ type: first.entry_type, key: first.entry_key });
+      setSelected({ type: first.entry_type, id: first.entry_id });
     }
   }, [entries, selected]);
 
   const selectedEntry = useMemo(
-    () => entries.find(e => selected && e.entry_key === selected.key && e.entry_type === selected.type),
+    () => entries.find(e => selected && e.entry_id === selected.id && e.entry_type === selected.type),
     [entries, selected],
   );
-  // Derive display number with type prefix: list entry > jump hint > loaded detail > raw key fallback
+  // Derive display number with type prefix
   const selectedDisplayNumber = useMemo(() => {
     const raw = selectedEntry?.display_number
       ?? selected?.displayHint
       ?? (selected?.type === 'CREDIT_NOTE' && cnDetail ? cnDetail.credit_note_number : null)
-      ?? selected?.key.slice(0, 8) ?? '';
+      ?? (selected?.type === 'ANULACION' && anulacionDetail ? anulacionDetail.anulacion_number : null)
+      ?? (selected?.type === 'UPGRADE' && upgradeDetail ? upgradeDetail.invoice_number : null)
+      ?? String(selected?.id ?? '').slice(0, 8);
     return selected ? formatChainNumber(raw, selected.type) : '';
-  }, [selectedEntry, selected, cnDetail]);
+  }, [selectedEntry, selected, cnDetail, anulacionDetail, upgradeDetail]);
 
   const handleMobileClose = () => {
     userDismissed.current = true;
@@ -113,17 +143,17 @@ export const OrdersScreen: React.FC = () => {
   };
 
   const handleSelect = (entry: ChainEntryItem) => {
-    setSelected({ type: entry.entry_type, key: entry.entry_key });
+    setSelected({ type: entry.entry_type, id: entry.entry_id });
   };
 
-  // Jump from credit note to its original order (carry receipt as display hint)
-  const handleJumpToOrder = (orderKey: string, receipt?: string) => {
-    setSelected({ type: 'ORDER', key: orderKey, displayHint: receipt });
+  // Jump to order (from credit note / anulacion)
+  const handleJumpToOrder = (orderId: number, receipt?: string) => {
+    setSelected({ type: 'ORDER', id: orderId, displayHint: receipt });
   };
 
-  // Jump from order's credit note card to credit note detail
-  const handleJumpToCreditNote = (sourceId: string, cnNumber?: string) => {
-    setSelected({ type: 'CREDIT_NOTE', key: sourceId, displayHint: cnNumber });
+  // Jump to credit note detail
+  const handleJumpToCreditNote = (sourceId: number, cnNumber?: string) => {
+    setSelected({ type: 'CREDIT_NOTE', id: sourceId, displayHint: cnNumber });
   };
 
   // Load detail when selection changes
@@ -135,19 +165,36 @@ export const OrdersScreen: React.FC = () => {
       setOrderDetail(null);
       setCreditNotes([]);
       setCnDetail(null);
+      setAnulacionDetail(null);
+      setUpgradeDetail(null);
       try {
-        if (selected.type === 'ORDER') {
-          const [res, notes] = await Promise.all([
-            getOrderDetail(token, storeId, selected.key),
-            getCreditNotes(token, storeId, selected.key).catch(() => [] as CreditNoteSummary[]),
-          ]);
-          if (!cancelled) { setOrderDetail(res); setCreditNotes(notes); }
-        } else {
-          const res = await getCreditNoteDetail(token, storeId, selected.key);
-          if (!cancelled) { setCnDetail(res); }
+        switch (selected.type) {
+          case 'ORDER': {
+            const [res, notes] = await Promise.all([
+              getOrderDetail(token, storeId, selected.id),
+              getCreditNotes(token, storeId, selected.id).catch(() => [] as CreditNoteSummary[]),
+            ]);
+            if (!cancelled) { setOrderDetail(res); setCreditNotes(notes); }
+            break;
+          }
+          case 'CREDIT_NOTE': {
+            const res = await getCreditNoteDetail(token, storeId, selected.id);
+            if (!cancelled) setCnDetail(res);
+            break;
+          }
+          case 'ANULACION': {
+            const res = await getAnulacionDetail(token, storeId, selected.id);
+            if (!cancelled) setAnulacionDetail(res);
+            break;
+          }
+          case 'UPGRADE': {
+            const res = await getUpgradeDetail(token, storeId, selected.id);
+            if (!cancelled) setUpgradeDetail(res);
+            break;
+          }
         }
       } catch {
-        if (!cancelled) { setOrderDetail(null); setCnDetail(null); }
+        if (!cancelled) { setOrderDetail(null); setCnDetail(null); setAnulacionDetail(null); setUpgradeDetail(null); }
       } finally {
         if (!cancelled) setDetailLoading(false);
       }
@@ -166,6 +213,85 @@ export const OrdersScreen: React.FC = () => {
   const filteredEntries = search
     ? entries.filter(e => formatChainNumber(e.display_number, e.entry_type).toLowerCase().includes(search.toLowerCase()))
     : entries;
+
+  const stats = useMemo(() => {
+    // Collect order IDs that have been voided via ANULACION
+    const anuladoOrderIds = new Set<number>();
+    for (const e of entries) {
+      if (e.entry_type === 'ANULACION' && e.original_order_id != null) {
+        anuladoOrderIds.add(e.original_order_id);
+      }
+    }
+
+    let sales = 0;
+    let refunds = 0;
+    let upgrades = 0;
+    let orderCount = 0;
+    let creditNoteCount = 0;
+    let anulacionCount = 0;
+    let upgradeCount = 0;
+    for (const e of entries) {
+      if (e.entry_type === 'ORDER' && e.amount != null && e.status !== 'VOID' && e.status !== 'MERGED') {
+        // Exclude orders that were voided by ANULACION
+        if (!anuladoOrderIds.has(e.entry_id)) {
+          sales += e.amount;
+          orderCount++;
+        }
+      } else if (e.entry_type === 'CREDIT_NOTE' && e.amount != null) {
+        refunds += e.amount;
+        creditNoteCount++;
+      } else if (e.entry_type === 'ANULACION') {
+        anulacionCount++;
+      } else if (e.entry_type === 'UPGRADE' && e.amount != null) {
+        upgrades += e.amount;
+        upgradeCount++;
+      }
+    }
+    return { sales, refunds, upgrades, net: sales - refunds, orderCount, creditNoteCount, anulacionCount, upgradeCount };
+  }, [entries]);
+
+  const renderDesktopDetail = () => {
+    if (detailLoading) {
+      return <div className="h-full flex items-center justify-center"><Spinner className="w-10 h-10 text-primary-500" /></div>;
+    }
+    if (selected?.type === 'ORDER' && orderDetail) {
+      return <OrderDetail detail={orderDetail} orderKey={selected.id} receiptNumber={selectedDisplayNumber} creditNotes={creditNotes} onJumpToCreditNote={handleJumpToCreditNote} t={t} />;
+    }
+    if (selected?.type === 'CREDIT_NOTE' && cnDetail) {
+      return <CreditNoteDetailView detail={cnDetail} onJumpToOrder={handleJumpToOrder} t={t} />;
+    }
+    if (selected?.type === 'ANULACION' && anulacionDetail) {
+      return <AnulacionDetailView detail={anulacionDetail} onJumpToOrder={handleJumpToOrder} t={t} />;
+    }
+    if (selected?.type === 'UPGRADE' && upgradeDetail) {
+      return <UpgradeDetailView detail={upgradeDetail} onJumpToOrder={handleJumpToOrder} t={t} />;
+    }
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-slate-300">
+        <Receipt className="w-16 h-16 mb-4 opacity-50" />
+        <p>{t('orders.select_order')}</p>
+      </div>
+    );
+  };
+
+  const renderMobileDetail = () => {
+    if (detailLoading) {
+      return <div className="flex items-center justify-center py-12"><Spinner className="w-8 h-8 text-primary-500" /></div>;
+    }
+    if (selected?.type === 'ORDER' && orderDetail) {
+      return <MobileOrderDetail detail={orderDetail} orderKey={selected.id} receiptNumber={selectedDisplayNumber} creditNotes={creditNotes} onJumpToCreditNote={handleJumpToCreditNote} t={t} />;
+    }
+    if (selected?.type === 'CREDIT_NOTE' && cnDetail) {
+      return <MobileCreditNoteDetail detail={cnDetail} onJumpToOrder={handleJumpToOrder} t={t} />;
+    }
+    if (selected?.type === 'ANULACION' && anulacionDetail) {
+      return <AnulacionDetailView detail={anulacionDetail} onJumpToOrder={handleJumpToOrder} t={t} />;
+    }
+    if (selected?.type === 'UPGRADE' && upgradeDetail) {
+      return <UpgradeDetailView detail={upgradeDetail} onJumpToOrder={handleJumpToOrder} t={t} />;
+    }
+    return <div className="text-center text-slate-400 py-8">{t('orders.empty')}</div>;
+  };
 
   return (
     <>
@@ -190,6 +316,38 @@ export const OrdersScreen: React.FC = () => {
             </div>
           </div>
 
+          {/* Stats bar */}
+          {entries.length > 0 && (
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0 space-y-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">{t('orders.sales')} ({stats.orderCount})</span>
+                  <span className="font-bold text-slate-800">{formatCurrency(stats.sales)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">{t('orders.refunds')} ({stats.creditNoteCount})</span>
+                  <span className="font-bold text-red-500">-{formatCurrency(stats.refunds)}</span>
+                </div>
+                {stats.anulacionCount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">{t('orders.anulacion')} ({stats.anulacionCount})</span>
+                    <span className="font-bold text-slate-500">{t('orders.voided')}</span>
+                  </div>
+                )}
+                {stats.upgradeCount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">{t('orders.upgrade')} ({stats.upgradeCount})</span>
+                    <span className="font-bold text-blue-600">{formatCurrency(stats.upgrades)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                <span className="text-xs font-medium text-slate-500">{t('orders.net')}</span>
+                <span className="text-sm font-bold text-primary-600">{formatCurrency(stats.net)}</span>
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto relative">
             {loading && (
               <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
@@ -204,9 +362,9 @@ export const OrdersScreen: React.FC = () => {
               <div className="divide-y divide-slate-50">
                 {filteredEntries.map(entry => (
                   <ChainEntryRow
-                    key={`${entry.entry_type}-${entry.entry_key}`}
+                    key={`${entry.entry_type}-${entry.entry_id}`}
                     entry={entry}
-                    isSelected={!!selected && selected.key === entry.entry_key && selected.type === entry.entry_type}
+                    isSelected={!!selected && selected.id === entry.entry_id && selected.type === entry.entry_type}
                     onClick={() => handleSelect(entry)}
                     t={t}
                   />
@@ -229,27 +387,7 @@ export const OrdersScreen: React.FC = () => {
 
         {/* Right: detail */}
         <div className="flex-1 overflow-y-auto bg-slate-50 p-3 sm:p-4 lg:p-6" style={{ scrollbarGutter: 'stable' }}>
-          {detailLoading ? (
-            <div className="h-full flex items-center justify-center">
-              <Spinner className="w-10 h-10 text-primary-500" />
-            </div>
-          ) : selected?.type === 'ORDER' && orderDetail ? (
-            <OrderDetail
-              detail={orderDetail}
-              orderKey={selected.key}
-              receiptNumber={selectedDisplayNumber}
-              creditNotes={creditNotes}
-              onJumpToCreditNote={handleJumpToCreditNote}
-              t={t}
-            />
-          ) : selected?.type === 'CREDIT_NOTE' && cnDetail ? (
-            <CreditNoteDetailView detail={cnDetail} onJumpToOrder={handleJumpToOrder} t={t} />
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300">
-              <Receipt className="w-16 h-16 mb-4 opacity-50" />
-              <p>{t('orders.select_order')}</p>
-            </div>
-          )}
+          {renderDesktopDetail()}
         </div>
       </div>
 
@@ -278,6 +416,38 @@ export const OrdersScreen: React.FC = () => {
           </div>
         </div>
 
+        {/* Mobile stats */}
+        {entries.length > 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">{t('orders.sales')} ({stats.orderCount})</span>
+                <span className="font-bold text-slate-800">{formatCurrency(stats.sales)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">{t('orders.refunds')} ({stats.creditNoteCount})</span>
+                <span className="font-bold text-red-500">-{formatCurrency(stats.refunds)}</span>
+              </div>
+              {stats.anulacionCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">{t('orders.anulacion')} ({stats.anulacionCount})</span>
+                  <span className="font-bold text-slate-500">{t('orders.voided')}</span>
+                </div>
+              )}
+              {stats.upgradeCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">{t('orders.upgrade')} ({stats.upgradeCount})</span>
+                  <span className="font-bold text-blue-600">{formatCurrency(stats.upgrades)}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <span className="text-sm font-medium text-slate-600">{t('orders.net')}</span>
+              <span className="text-lg font-bold text-primary-600">{formatCurrency(stats.net)}</span>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20"><Spinner className="w-8 h-8 text-primary-500" /></div>
         ) : filteredEntries.length === 0 ? (
@@ -289,7 +459,7 @@ export const OrdersScreen: React.FC = () => {
           <div className="space-y-3 pb-20">
             {filteredEntries.map(entry => (
               <MobileChainEntryCard
-                key={`${entry.entry_type}-${entry.entry_key}`}
+                key={`${entry.entry_type}-${entry.entry_id}`}
                 entry={entry}
                 onClick={() => handleSelect(entry)}
                 t={t}
@@ -328,22 +498,7 @@ export const OrdersScreen: React.FC = () => {
               </button>
             </div>
             <div className="p-4">
-              {detailLoading ? (
-                <div className="flex items-center justify-center py-12"><Spinner className="w-8 h-8 text-primary-500" /></div>
-              ) : selected.type === 'ORDER' && orderDetail ? (
-                <MobileOrderDetail
-                  detail={orderDetail}
-                  orderKey={selected.key}
-                  receiptNumber={selectedDisplayNumber}
-                  creditNotes={creditNotes}
-                  onJumpToCreditNote={handleJumpToCreditNote}
-                  t={t}
-                />
-              ) : selected.type === 'CREDIT_NOTE' && cnDetail ? (
-                <MobileCreditNoteDetail detail={cnDetail} onJumpToOrder={handleJumpToOrder} t={t} />
-              ) : (
-                <div className="text-center text-slate-400 py-8">{t('orders.empty')}</div>
-              )}
+              {renderMobileDetail()}
             </div>
           </div>
         </div>
@@ -356,56 +511,85 @@ export const OrdersScreen: React.FC = () => {
    Chain Entry Row (Desktop sidebar)
    ═══════════════════════════════════════════════════════════════════════ */
 
+function entryIcon(type: ChainEntryType) {
+  switch (type) {
+    case 'CREDIT_NOTE': return <Undo2 className="w-3.5 h-3.5 text-orange-500" />;
+    case 'ANULACION': return <Ban className="w-3.5 h-3.5 text-white" />;
+    case 'UPGRADE': return <FileUp className="w-3.5 h-3.5 text-blue-600" />;
+    default: return <Receipt className="w-3.5 h-3.5 text-slate-500" />;
+  }
+}
+
+function entryIconBg(type: ChainEntryType) {
+  switch (type) {
+    case 'CREDIT_NOTE': return 'bg-orange-100';
+    case 'ANULACION': return 'bg-slate-800';
+    case 'UPGRADE': return 'bg-blue-100';
+    default: return 'bg-slate-100';
+  }
+}
+
 const ChainEntryRow: React.FC<{
   entry: ChainEntryItem;
   isSelected: boolean;
   onClick: () => void;
   t: (key: string) => string;
 }> = ({ entry, isSelected, onClick, t }) => {
+  const isOrder = entry.entry_type === 'ORDER';
   const isCreditNote = entry.entry_type === 'CREDIT_NOTE';
+  const isAnulacion = entry.entry_type === 'ANULACION';
+  const isUpgrade = entry.entry_type === 'UPGRADE';
   const isVoid = entry.status === 'VOID';
   const isMerged = entry.status === 'MERGED';
 
-  const statusBadge = isCreditNote
-    ? 'bg-orange-100 text-orange-700'
+  const statusBadge = isAnulacion ? 'bg-slate-800 text-white'
+    : isUpgrade ? 'bg-blue-100 text-blue-700'
+    : isCreditNote ? 'bg-orange-100 text-orange-700'
     : isVoid ? 'bg-red-100 text-red-600'
     : isMerged ? 'bg-blue-100 text-blue-700'
     : 'bg-green-100 text-green-700';
 
-  const statusLabel = isCreditNote
-    ? t('orders.credit_note')
+  const statusLabel = isAnulacion ? t('orders.anulacion')
+    : isUpgrade ? t('orders.upgrade')
+    : isCreditNote ? t('orders.credit_note')
     : isVoid ? t('orders.void')
     : isMerged ? t('orders.merged')
     : t('orders.completed');
+
+  const icon = entryIcon(entry.entry_type);
 
   return (
     <button
       onClick={onClick}
       className={`w-full p-4 text-left transition-colors flex justify-between items-start group cursor-pointer ${isSelected ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
     >
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          {isCreditNote && <Undo2 className="w-3.5 h-3.5 text-orange-500" />}
-          <span className={`font-bold ${isSelected ? 'text-primary-600' : isCreditNote ? 'text-orange-700' : 'text-slate-800'}`}>
-            {formatChainNumber(entry.display_number, entry.entry_type)}
-          </span>
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${entryIconBg(entry.entry_type)}`}>
+          {icon}
         </div>
-        <div className="flex gap-2 text-[0.625rem] items-center mb-1">
-          <span className={`px-1.5 py-0.5 rounded-full font-bold ${statusBadge}`}>
-            {statusLabel}
-          </span>
-          {isCreditNote && entry.original_receipt && (
-            <span className="text-slate-400 font-mono text-[0.6rem]">
-              {entry.original_receipt}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`font-bold ${isSelected ? 'text-primary-600' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-slate-800' : isUpgrade ? 'text-blue-700' : 'text-slate-800'}`}>
+              {formatChainNumber(entry.display_number, entry.entry_type)}
             </span>
-          )}
-        </div>
-        <div className="text-xs text-slate-400 font-mono">
-          {new Date(entry.created_at).toLocaleString([], { hour12: false })}
+          </div>
+          <div className="flex gap-2 text-[0.625rem] items-center mb-1 flex-wrap">
+            <span className={`px-1.5 py-0.5 rounded-full font-bold ${statusBadge}`}>
+              {statusLabel}
+            </span>
+            {(isCreditNote || isAnulacion) && entry.original_receipt && (
+              <span className="text-slate-400 font-mono text-[0.6rem]">
+                ← {entry.original_receipt}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-slate-400 font-mono">
+            {new Date(entry.created_at).toLocaleString([], { hour12: false })}
+          </div>
         </div>
       </div>
-      <div className="text-right">
-        <div className={`font-bold ${isCreditNote ? 'text-red-500' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+      <div className="text-right shrink-0 pl-2">
+        <div className={`font-bold ${isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
           {entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </div>
         <ChevronRight className={`w-4 h-4 ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />
@@ -424,29 +608,41 @@ const MobileChainEntryCard: React.FC<{
   t: (key: string) => string;
 }> = ({ entry, onClick, t }) => {
   const isCreditNote = entry.entry_type === 'CREDIT_NOTE';
+  const isAnulacion = entry.entry_type === 'ANULACION';
+  const isUpgrade = entry.entry_type === 'UPGRADE';
   const isVoid = entry.status === 'VOID';
   const isMerged = entry.status === 'MERGED';
+
+  const borderStyle = isAnulacion ? 'bg-slate-50 border-slate-300'
+    : isUpgrade ? 'bg-blue-50/50 border-blue-200'
+    : isCreditNote ? 'bg-orange-50/50 border-orange-200'
+    : 'bg-white border-slate-200';
+
+  const statusLabel = isAnulacion ? t('orders.anulacion')
+    : isUpgrade ? t('orders.upgrade')
+    : isCreditNote ? t('orders.credit_note')
+    : isVoid ? t('orders.void')
+    : isMerged ? t('orders.merged')
+    : t('orders.completed');
+
+  const statusBadge = isAnulacion ? 'bg-slate-800 text-white'
+    : isUpgrade ? 'bg-blue-100 text-blue-700'
+    : isCreditNote ? 'bg-orange-100 text-orange-700'
+    : isVoid ? 'bg-red-100 text-red-600'
+    : isMerged ? 'bg-blue-100 text-blue-700'
+    : 'bg-green-100 text-green-700';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border p-4 w-full text-left transition-all active:scale-[0.98] active:bg-slate-50 shadow-sm ${
-        isCreditNote ? 'bg-orange-50/50 border-orange-200' : 'bg-white border-slate-200'
-      }`}
+      className={`rounded-xl border p-4 w-full text-left transition-all active:scale-[0.98] active:bg-slate-50 shadow-sm ${borderStyle}`}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          {isCreditNote && <Undo2 className="w-4 h-4 text-orange-500" />}
+          {entryIcon(entry.entry_type)}
           <span className="text-lg font-bold text-slate-900">{formatChainNumber(entry.display_number, entry.entry_type)}</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-            isCreditNote ? 'bg-orange-100 text-orange-700'
-            : isVoid ? 'bg-red-100 text-red-600'
-            : isMerged ? 'bg-blue-100 text-blue-700'
-            : 'bg-green-100 text-green-700'
-          }`}>
-            {isCreditNote ? t('orders.credit_note') : isVoid ? t('orders.void') : isMerged ? t('orders.merged') : t('orders.completed')}
-          </span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusBadge}`}>{statusLabel}</span>
         </div>
         <ChevronRight className="w-5 h-5 text-slate-300" />
       </div>
@@ -455,11 +651,11 @@ const MobileChainEntryCard: React.FC<{
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
           <Clock className="w-3.5 h-3.5" />
           {new Date(entry.created_at).toLocaleString([], { hour12: false })}
-          {isCreditNote && entry.original_receipt && (
-            <span className="text-slate-400 font-mono">{entry.original_receipt}</span>
+          {(isCreditNote || isAnulacion) && entry.original_receipt && (
+            <span className="text-slate-400 font-mono">← {entry.original_receipt}</span>
           )}
         </div>
-        <span className={`text-lg font-bold ${isCreditNote ? 'text-red-500' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+        <span className={`text-lg font-bold ${isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
           {entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </span>
       </div>
@@ -468,12 +664,187 @@ const MobileChainEntryCard: React.FC<{
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Anulacion Detail View
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const AnulacionDetailView: React.FC<{
+  detail: AnulacionDetailResponse;
+  onJumpToOrder: (orderId: number, receipt?: string) => void;
+  t: (key: string) => string;
+}> = ({ detail, onJumpToOrder, t }) => (
+  <div className="max-w-4xl mx-auto space-y-4">
+    {/* Header */}
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-300">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center">
+          <Ban className="text-white w-5 h-5" />
+        </div>
+        <h1 className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{detail.anulacion_number}</h1>
+        <span className="px-2 py-1 bg-slate-800 text-white text-xs font-bold rounded uppercase">
+          {t('orders.anulacion')}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
+        <span className="flex items-center gap-1.5">
+          <Calendar className="w-4 h-4" />
+          {new Date(detail.created_at).toLocaleDateString()}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Clock className="w-4 h-4" />
+          {new Date(detail.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+        </span>
+        {detail.operator_name && <span>{t('orders.operator')}: {detail.operator_name}</span>}
+      </div>
+
+      {/* Jump to original order */}
+      <button
+        type="button"
+        onClick={() => onJumpToOrder(detail.original_order_id)}
+        className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full cursor-pointer"
+      >
+        <FileText className="w-4 h-4 text-slate-400" />
+        <span className="text-slate-500">{t('orders.anulacion_original_invoice')}:</span>
+        <span className="font-mono font-bold">{detail.original_invoice_number}</span>
+        <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400" />
+      </button>
+    </div>
+
+    {/* Details */}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 font-bold text-slate-700">
+        <Ban className="w-[18px] h-[18px]" />
+        <span>{t('orders.anulacion_details')}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        <DetailRow label={t('orders.anulacion_serie')} value={detail.serie} />
+        <DetailRow label={t('orders.reason')} value={detail.reason} />
+        {detail.note && <DetailRow label={t('orders.note')} value={detail.note} />}
+        {(() => { const s = formatAeatStatus(detail.aeat_status); return (
+          <DetailRow label={t('orders.aeat_status')} value={
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.style}`}>{s.label}</span>
+          } />
+        ); })()}
+      </div>
+    </div>
+
+    {/* Huella */}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div className="text-xs font-bold text-slate-500 uppercase mb-2">Huella</div>
+      <div className="font-mono text-xs text-slate-600 break-all bg-slate-50 p-3 rounded-lg">{detail.huella}</div>
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Upgrade Detail View
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const UpgradeDetailView: React.FC<{
+  detail: UpgradeDetailResponse;
+  onJumpToOrder: (orderId: number, receipt?: string) => void;
+  t: (key: string) => string;
+}> = ({ detail, onJumpToOrder, t }) => (
+  <div className="max-w-4xl mx-auto space-y-4">
+    {/* Header */}
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-blue-200 flex justify-between items-start">
+      <div>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <FileUp className="text-blue-600 w-5 h-5" />
+          </div>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{detail.invoice_number}</h1>
+          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded uppercase">
+            {detail.tipo_factura}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="w-4 h-4" />
+            {new Date(detail.created_at).toLocaleDateString()}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Clock className="w-4 h-4" />
+            {new Date(detail.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+          </span>
+        </div>
+
+        {/* Original invoice */}
+        {detail.factura_sustituida_num && (
+          <button
+            type="button"
+            onClick={() => onJumpToOrder(detail.source_pk)}
+            className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-slate-400" />
+            <span className="text-slate-500">{t('orders.upgrade_original')}:</span>
+            <span className="font-mono font-bold">{detail.factura_sustituida_num}</span>
+            <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400" />
+          </button>
+        )}
+      </div>
+      <div className="text-right shrink-0 pl-6">
+        <p className="text-sm text-blue-400 uppercase font-bold tracking-wider mb-1">{t('orders.total')}</p>
+        <p className="text-2xl md:text-3xl font-bold text-blue-600">{formatCurrency(detail.total)}</p>
+      </div>
+    </div>
+
+    {/* Customer info */}
+    {detail.customer_nif && (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 font-bold text-slate-700">
+          <User className="w-[18px] h-[18px]" />
+          <span>{t('orders.upgrade_customer')}</span>
+        </div>
+        <div className="divide-y divide-slate-100">
+          <DetailRow label="NIF" value={detail.customer_nif} />
+          {detail.customer_nombre && <DetailRow label={t('orders.upgrade_nombre')} value={detail.customer_nombre} />}
+          {detail.customer_address && <DetailRow label={t('orders.upgrade_address')} value={
+            <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />{detail.customer_address}</span>
+          } />}
+          {detail.customer_email && <DetailRow label={t('orders.upgrade_email')} value={
+            <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />{detail.customer_email}</span>
+          } />}
+          {detail.customer_phone && <DetailRow label={t('orders.upgrade_phone')} value={
+            <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />{detail.customer_phone}</span>
+          } />}
+        </div>
+      </div>
+    )}
+
+    {/* Invoice details */}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 font-bold text-slate-700">
+        <FileUp className="w-[18px] h-[18px]" />
+        <span>{t('orders.upgrade_invoice_details')}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        <DetailRow label={t('orders.anulacion_serie')} value={detail.serie} />
+        <DetailRow label={t('orders.subtotal')} value={formatCurrency(detail.subtotal)} />
+        <DetailRow label={t('orders.tax_amount')} value={formatCurrency(detail.tax)} />
+        <DetailRow label={t('orders.total')} value={<span className="font-bold text-blue-600">{formatCurrency(detail.total)}</span>} />
+        {(() => { const s = formatAeatStatus(detail.aeat_status); return (
+          <DetailRow label={t('orders.aeat_status')} value={
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.style}`}>{s.label}</span>
+          } />
+        ); })()}
+      </div>
+    </div>
+
+    {/* Huella */}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div className="text-xs font-bold text-slate-500 uppercase mb-2">Huella</div>
+      <div className="font-mono text-xs text-slate-600 break-all bg-slate-50 p-3 rounded-lg">{detail.huella}</div>
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════
    Credit Note Detail View (Desktop)
    ═══════════════════════════════════════════════════════════════════════ */
 
 const CreditNoteDetailView: React.FC<{
   detail: CreditNoteDetailResponse;
-  onJumpToOrder: (orderKey: string, receipt?: string) => void;
+  onJumpToOrder: (orderId: number, receipt?: string) => void;
   t: (key: string) => string;
 }> = ({ detail, onJumpToOrder, t }) => {
   return (
@@ -503,7 +874,7 @@ const CreditNoteDetailView: React.FC<{
           {/* Jump to original order */}
           <button
             type="button"
-            onClick={() => onJumpToOrder(String(detail.original_order_id), detail.original_receipt)}
+            onClick={() => onJumpToOrder(detail.original_order_id, detail.original_receipt)}
             className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -521,7 +892,7 @@ const CreditNoteDetailView: React.FC<{
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-700">{t('orders.credit_note_detail')}</div>
           <div className="p-4 space-y-3">
-            <InfoRow label={t('orders.refund_method')} value={detail.refund_method} />
+            <InfoRow label={t('orders.refund_method')} value={formatRefundMethod(detail.refund_method, t)} />
             <InfoRow label={t('orders.reason')} value={detail.reason} />
             {detail.note && <InfoRow label={t('orders.note')} value={detail.note} />}
             <div className="border-t border-slate-100 pt-3 space-y-2">
@@ -571,7 +942,7 @@ const CreditNoteDetailView: React.FC<{
 
 const MobileCreditNoteDetail: React.FC<{
   detail: CreditNoteDetailResponse;
-  onJumpToOrder: (orderKey: string, receipt?: string) => void;
+  onJumpToOrder: (orderId: number, receipt?: string) => void;
   t: (key: string) => string;
 }> = ({ detail, onJumpToOrder, t }) => {
   return (
@@ -598,7 +969,7 @@ const MobileCreditNoteDetail: React.FC<{
       {/* Jump to original order */}
       <button
         type="button"
-        onClick={() => onJumpToOrder(String(detail.original_order_id), detail.original_receipt)}
+        onClick={() => onJumpToOrder(detail.original_order_id, detail.original_receipt)}
         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100 transition-colors cursor-pointer border border-primary-100"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -607,7 +978,7 @@ const MobileCreditNoteDetail: React.FC<{
 
       {/* Info */}
       <div className="border-t border-slate-100 pt-3 space-y-2 text-sm">
-        <InfoRow label={t('orders.refund_method')} value={detail.refund_method} />
+        <InfoRow label={t('orders.refund_method')} value={formatRefundMethod(detail.refund_method, t)} />
         <InfoRow label={t('orders.reason')} value={detail.reason} />
         {detail.note && <InfoRow label={t('orders.note')} value={detail.note} />}
         {detail.authorizer_name && <InfoRow label={t('orders.authorizer')} value={detail.authorizer_name} />}
@@ -650,10 +1021,10 @@ const MobileCreditNoteDetail: React.FC<{
 
 const OrderDetail: React.FC<{
   detail: OrderDetailResponse;
-  orderKey: string;
+  orderKey: number;
   receiptNumber: string;
   creditNotes: CreditNoteSummary[];
-  onJumpToCreditNote: (sourceId: string, cnNumber?: string) => void;
+  onJumpToCreditNote: (sourceId: number, cnNumber?: string) => void;
   t: (key: string) => string;
 }> = ({ detail, receiptNumber, creditNotes, onJumpToCreditNote, t }) => {
   const d = detail.detail;
@@ -692,10 +1063,10 @@ const OrderDetail: React.FC<{
 
 const MobileOrderDetail: React.FC<{
   detail: OrderDetailResponse;
-  orderKey: string;
+  orderKey: number;
   receiptNumber: string;
   creditNotes: CreditNoteSummary[];
-  onJumpToCreditNote: (sourceId: string, cnNumber?: string) => void;
+  onJumpToCreditNote: (sourceId: number, cnNumber?: string) => void;
   t: (key: string) => string;
 }> = ({ detail, receiptNumber, creditNotes, onJumpToCreditNote, t }) => {
   const d = detail.detail;
@@ -815,13 +1186,13 @@ const MobileOrderDetail: React.FC<{
               <button
                 key={cn.credit_note_number}
                 type="button"
-                onClick={() => onJumpToCreditNote(String(cn.source_id), cn.credit_note_number)}
+                onClick={() => onJumpToCreditNote(cn.source_id, cn.credit_note_number)}
                 className="w-full flex items-center justify-between text-sm p-2 rounded-lg hover:bg-orange-50 transition-colors cursor-pointer"
               >
                 <div>
                   <span className="font-mono text-xs text-orange-600">{cn.credit_note_number}</span>
                   <span className="text-slate-400 mx-1">·</span>
-                  <span className="text-slate-600 capitalize">{cn.refund_method.toLowerCase()}</span>
+                  <span className="text-slate-600">{formatRefundMethod(cn.refund_method, t)}</span>
                   <span className="text-slate-400 mx-1">·</span>
                   <span className="text-slate-500">{cn.reason}</span>
                 </div>
@@ -909,6 +1280,7 @@ const OrderHeader: React.FC<{
           </span>
           {d.zone_name && <span>{d.zone_name}{d.table_name ? ` · ${d.table_name}` : ''}</span>}
           {d.guest_count != null && d.guest_count > 0 && <span>{d.guest_count} {t('orders.guests')}</span>}
+          {d.member_name && <span className="flex items-center gap-1.5"><Users className="w-4 h-4" />{t('orders.member')}: {d.member_name}</span>}
         </div>
         <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
           {detail.source === 'cache'
@@ -923,6 +1295,12 @@ const OrderHeader: React.FC<{
               <p className="text-xs text-red-400 font-medium uppercase">{t('orders.voided')}</p>
               <p className="text-red-700 font-medium">{d.void_type}</p>
             </div>
+            {d.void_note && (
+              <div>
+                <p className="text-xs text-slate-400 font-medium uppercase">{t('orders.void_note')}</p>
+                <p className="text-slate-700">{d.void_note}</p>
+              </div>
+            )}
             {d.loss_reason && (
               <div>
                 <p className="text-xs text-slate-400 font-medium uppercase">{t('orders.void_reason')}</p>
@@ -997,7 +1375,7 @@ const PaymentsCard: React.FC<{ payments: OrderPayment[]; t: (key: string) => str
 
 const CreditNotesCard: React.FC<{
   creditNotes: CreditNoteSummary[];
-  onJumpToCreditNote: (sourceId: string, cnNumber?: string) => void;
+  onJumpToCreditNote: (sourceId: number, cnNumber?: string) => void;
   t: (key: string) => string;
 }> = ({ creditNotes, onJumpToCreditNote, t }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-orange-200 overflow-hidden">
@@ -1011,7 +1389,7 @@ const CreditNotesCard: React.FC<{
         <button
           key={cn.credit_note_number}
           type="button"
-          onClick={() => onJumpToCreditNote(String(cn.source_id), cn.credit_note_number)}
+          onClick={() => onJumpToCreditNote(cn.source_id, cn.credit_note_number)}
           className="w-full px-4 py-3 flex justify-between items-center hover:bg-orange-50/50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
@@ -1021,7 +1399,7 @@ const CreditNotesCard: React.FC<{
             <div className="text-left">
               <div className="font-medium text-slate-800 flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-xs">{cn.credit_note_number}</span>
-                <span className="capitalize">{cn.refund_method.toLowerCase()}</span>
+                <span>{formatRefundMethod(cn.refund_method, t)}</span>
               </div>
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <span>{cn.reason}</span>
@@ -1183,5 +1561,12 @@ const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
   <div className="flex justify-between text-sm">
     <span className="text-slate-500">{label}</span>
     <span className="text-slate-800 font-medium">{value}</span>
+  </div>
+);
+
+const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div className="px-4 py-3 flex justify-between items-center">
+    <span className="text-sm text-slate-500">{label}</span>
+    <span className="text-sm font-medium text-slate-800">{typeof value === 'string' ? value : value}</span>
   </div>
 );

@@ -113,17 +113,12 @@ impl SessionCache {
     }
 
     /// 从文件加载 SessionCache
-    pub fn load(tenant_path: &Path) -> Result<Self, SessionCacheError> {
+    ///
+    /// 反序列化失败时自动备份损坏文件并返回空缓存，确保 app 永远能启动。
+    pub fn load(tenant_path: &Path) -> Self {
         let file_path = tenant_path.join("auth/session.json");
-
-        let data = if file_path.exists() {
-            let content = std::fs::read_to_string(&file_path)?;
-            serde_json::from_str(&content)?
-        } else {
-            SessionCacheFile::default()
-        };
-
-        Ok(Self { file_path, data })
+        let data = super::bridge::resilient_load(&file_path);
+        Self { file_path, data }
     }
 
     /// 保存到文件
@@ -269,30 +264,46 @@ impl SessionCache {
     }
 
     /// 加载当前活动会话
-    pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, SessionCacheError> {
+    ///
+    /// 反序列化失败时自动备份损坏文件并返回 None，确保 app 永远能启动。
+    pub fn load_current_session(&self) -> Option<EmployeeSession> {
         let path = self.current_session_path();
 
         if !path.exists() {
-            return Ok(None);
+            return None;
         }
 
-        let content = std::fs::read_to_string(&path)?;
-        let session: EmployeeSession = serde_json::from_str(&content)?;
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(path = %path.display(), error = %e, "Failed to read current session");
+                return None;
+            }
+        };
+
+        let session: EmployeeSession = match serde_json::from_str(&content) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(path = %path.display(), error = %e, "Corrupt current session, removing");
+                let bak = path.with_extension("json.bak");
+                let _ = std::fs::rename(&path, &bak);
+                return None;
+            }
+        };
 
         // 检查 session 是否过期 (token expires_at, millis)
         let now = shared::util::now_millis();
 
         if let Some(expires_at) = session.expires_at {
             if now > expires_at {
-                // Token 过期，清除缓存
                 let _ = std::fs::remove_file(&path);
                 tracing::info!(username = %session.username, "Cached session expired, cleared");
-                return Ok(None);
+                return None;
             }
         }
 
         tracing::info!(username = %session.username, "Loaded cached session");
-        Ok(Some(session))
+        Some(session)
     }
 
     /// 清除当前活动会话

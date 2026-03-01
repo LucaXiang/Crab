@@ -2,6 +2,8 @@
 
 use super::AppliedRule;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 
 // ============================================================================
 // Constants
@@ -25,6 +27,35 @@ pub enum VoidType {
     LossSettled,
 }
 
+impl VoidType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cancelled => "CANCELLED",
+            Self::LossSettled => "LOSS_SETTLED",
+        }
+    }
+}
+
+impl fmt::Display for VoidType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cancelled => write!(f, "CANCELLED"),
+            Self::LossSettled => write!(f, "LOSS_SETTLED"),
+        }
+    }
+}
+
+impl FromStr for VoidType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "CANCELLED" => Ok(Self::Cancelled),
+            "LOSS_SETTLED" => Ok(Self::LossSettled),
+            _ => Err(format!("unknown VoidType: {s}")),
+        }
+    }
+}
+
 /// 损失原因（预设选项）
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -35,6 +66,38 @@ pub enum LossReason {
     RefusedToPay,
     /// 其他
     Other,
+}
+
+impl LossReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CustomerFled => "CUSTOMER_FLED",
+            Self::RefusedToPay => "REFUSED_TO_PAY",
+            Self::Other => "OTHER",
+        }
+    }
+}
+
+impl fmt::Display for LossReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CustomerFled => write!(f, "CUSTOMER_FLED"),
+            Self::RefusedToPay => write!(f, "REFUSED_TO_PAY"),
+            Self::Other => write!(f, "OTHER"),
+        }
+    }
+}
+
+impl FromStr for LossReason {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "CUSTOMER_FLED" => Ok(Self::CustomerFled),
+            "REFUSED_TO_PAY" => Ok(Self::RefusedToPay),
+            "OTHER" => Ok(Self::Other),
+            _ => Err(format!("unknown LossReason: {s}")),
+        }
+    }
 }
 
 // ============================================================================
@@ -50,6 +113,35 @@ pub enum ServiceType {
     DineIn,
     /// 外卖/打包
     Takeout,
+}
+
+impl ServiceType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::DineIn => "DINE_IN",
+            Self::Takeout => "TAKEOUT",
+        }
+    }
+}
+
+impl fmt::Display for ServiceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DineIn => write!(f, "DINE_IN"),
+            Self::Takeout => write!(f, "TAKEOUT"),
+        }
+    }
+}
+
+impl FromStr for ServiceType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "DINE_IN" | "DineIn" => Ok(Self::DineIn),
+            "TAKEOUT" | "Takeout" => Ok(Self::Takeout),
+            _ => Err(format!("unknown ServiceType: {s}")),
+        }
+    }
 }
 
 // ============================================================================
@@ -562,5 +654,83 @@ mod tests {
 
         assert_eq!(item.manual_discount_percent, Some(10.0));
         assert_eq!(item.rule_discount_amount, 5.0);
+    }
+
+    // ── VoidType ──
+
+    #[test]
+    fn void_type_as_str_roundtrip() {
+        assert_eq!(VoidType::Cancelled.as_str(), "CANCELLED");
+        assert_eq!(VoidType::LossSettled.as_str(), "LOSS_SETTLED");
+        assert_eq!(
+            "CANCELLED".parse::<VoidType>().unwrap(),
+            VoidType::Cancelled
+        );
+        assert_eq!(
+            "LOSS_SETTLED".parse::<VoidType>().unwrap(),
+            VoidType::LossSettled
+        );
+        assert!("INVALID".parse::<VoidType>().is_err());
+    }
+
+    #[test]
+    fn void_type_serde_roundtrip() {
+        let json = serde_json::to_string(&VoidType::LossSettled).unwrap();
+        assert_eq!(json, r#""LOSS_SETTLED""#);
+        let rt: VoidType = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt, VoidType::LossSettled);
+    }
+
+    // ── LossReason ──
+
+    #[test]
+    fn loss_reason_as_str_roundtrip() {
+        assert_eq!(LossReason::CustomerFled.as_str(), "CUSTOMER_FLED");
+        assert_eq!(LossReason::RefusedToPay.as_str(), "REFUSED_TO_PAY");
+        assert_eq!(LossReason::Other.as_str(), "OTHER");
+        assert_eq!(
+            "CUSTOMER_FLED".parse::<LossReason>().unwrap(),
+            LossReason::CustomerFled
+        );
+        assert_eq!(
+            "REFUSED_TO_PAY".parse::<LossReason>().unwrap(),
+            LossReason::RefusedToPay
+        );
+        assert_eq!("OTHER".parse::<LossReason>().unwrap(), LossReason::Other);
+        assert!("INVALID".parse::<LossReason>().is_err());
+    }
+
+    // ── ServiceType ──
+
+    #[test]
+    fn service_type_as_str_roundtrip() {
+        assert_eq!(ServiceType::DineIn.as_str(), "DINE_IN");
+        assert_eq!(ServiceType::Takeout.as_str(), "TAKEOUT");
+        assert_eq!(
+            "DINE_IN".parse::<ServiceType>().unwrap(),
+            ServiceType::DineIn
+        );
+        assert_eq!(
+            "TAKEOUT".parse::<ServiceType>().unwrap(),
+            ServiceType::Takeout
+        );
+        // Legacy format compatibility
+        assert_eq!(
+            "DineIn".parse::<ServiceType>().unwrap(),
+            ServiceType::DineIn
+        );
+        assert_eq!(
+            "Takeout".parse::<ServiceType>().unwrap(),
+            ServiceType::Takeout
+        );
+        assert!("INVALID".parse::<ServiceType>().is_err());
+    }
+
+    #[test]
+    fn service_type_serde_roundtrip() {
+        let json = serde_json::to_string(&ServiceType::Takeout).unwrap();
+        assert_eq!(json, r#""TAKEOUT""#);
+        let rt: ServiceType = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt, ServiceType::Takeout);
     }
 }

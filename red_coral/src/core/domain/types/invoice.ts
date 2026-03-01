@@ -5,10 +5,10 @@
  */
 
 /** Tipo de factura: F2 (simplified) or R5 (rectificativa) */
-export type TipoFactura = 'F2' | 'R5';
+export type TipoFactura = 'F2' | 'R5' | 'F3';
 
 /** Invoice source type */
-export type InvoiceSourceType = 'ORDER' | 'CREDIT_NOTE';
+export type InvoiceSourceType = 'ORDER' | 'CREDIT_NOTE' | 'UPGRADE';
 
 /** AEAT submission status */
 export type AeatStatus = 'PENDING' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';

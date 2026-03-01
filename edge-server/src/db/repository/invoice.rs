@@ -161,7 +161,7 @@ pub async fn insert(
 pub async fn insert_desglose(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     invoice_id: i64,
-    tax_rate: i64,
+    tax_rate: i32,
     base_amount: f64,
     tax_amount: f64,
 ) -> RepoResult<()> {
@@ -368,7 +368,7 @@ pub async fn build_sync(
                 ))
             })?;
             Ok(TaxDesglose {
-                tax_rate: d.tax_rate as i32,
+                tax_rate: d.tax_rate,
                 base_amount,
                 tax_amount,
             })

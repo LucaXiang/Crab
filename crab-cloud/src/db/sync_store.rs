@@ -357,6 +357,11 @@ async fn upsert_credit_note(
 
     if !cn.items.is_empty() {
         let cn_ids: Vec<i64> = cn.items.iter().map(|_| cn_id).collect();
+        let instance_ids: Vec<&str> = cn
+            .items
+            .iter()
+            .map(|i| i.original_instance_id.as_str())
+            .collect();
         let names: Vec<&str> = cn.items.iter().map(|i| i.item_name.as_str()).collect();
         let quantities: Vec<i64> = cn.items.iter().map(|i| i.quantity).collect();
         let unit_prices: Vec<f64> = cn.items.iter().map(|i| i.unit_price).collect();
@@ -367,12 +372,13 @@ async fn upsert_credit_note(
         sqlx::query(
             r#"
             INSERT INTO store_credit_note_items (
-                credit_note_id, item_name, quantity, unit_price, line_credit, tax_rate, tax_credit
+                credit_note_id, original_instance_id, item_name, quantity, unit_price, line_credit, tax_rate, tax_credit
             )
-            SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::bigint[], $4::float8[], $5::float8[], $6::bigint[], $7::float8[])
+            SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::bigint[], $5::float8[], $6::float8[], $7::bigint[], $8::float8[])
             "#,
         )
         .bind(&cn_ids)
+        .bind(&instance_ids)
         .bind(&names)
         .bind(&quantities)
         .bind(&unit_prices)
@@ -432,9 +438,10 @@ async fn upsert_archived_order(
             order_manual_discount_amount, order_manual_surcharge_amount,
             order_rule_discount_amount, order_rule_surcharge_amount,
             operator_name, loss_reason, void_note, member_name, service_type,
+            operator_id, member_id, queue_number, shift_id, created_at,
             version, synced_at
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41)
         ON CONFLICT (tenant_id, store_id, order_id)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -466,6 +473,10 @@ async fn upsert_archived_order(
                       void_note = EXCLUDED.void_note,
                       member_name = EXCLUDED.member_name,
                       service_type = EXCLUDED.service_type,
+                      operator_id = EXCLUDED.operator_id,
+                      member_id = EXCLUDED.member_id,
+                      queue_number = EXCLUDED.queue_number,
+                      shift_id = EXCLUDED.shift_id,
                       version = EXCLUDED.version,
                       synced_at = EXCLUDED.synced_at
         WHERE store_archived_orders.version <= EXCLUDED.version
@@ -486,7 +497,7 @@ async fn upsert_archived_order(
     .bind(&detail_sync.last_event_hash)      // $12
     .bind(d.guest_count)                     // $13
     .bind(d.discount_amount)                 // $14
-    .bind(&d.void_type)                      // $15
+    .bind(d.void_type.as_ref().map(|v| v.as_str())) // $15
     .bind(d.loss_amount)                     // $16
     .bind(d.start_time)                      // $17
     .bind(&d.zone_name)                      // $18
@@ -502,12 +513,17 @@ async fn upsert_archived_order(
     .bind(d.order_rule_discount_amount)      // $28
     .bind(d.order_rule_surcharge_amount)     // $29
     .bind(&d.operator_name)                  // $30
-    .bind(&d.loss_reason)                    // $31
+    .bind(d.loss_reason.as_ref().map(|v| v.as_str())) // $31
     .bind(&d.void_note)                      // $32
     .bind(&d.member_name)                    // $33
-    .bind(d.service_type.as_deref().unwrap_or("DineIn")) // $34
-    .bind(version_to_i64(item.version))      // $35
-    .bind(now)                               // $36
+    .bind(d.service_type.as_ref().map(|v| v.as_str())) // $34
+    .bind(d.operator_id)                     // $35
+    .bind(d.member_id)                       // $36
+    .bind(&d.queue_number)                   // $37
+    .bind(d.shift_id)                        // $38
+    .bind(detail_sync.created_at)            // $39
+    .bind(version_to_i64(item.version))      // $40
+    .bind(now)                               // $41
     .fetch_optional(&mut *tx)
     .await?;
 
@@ -633,11 +649,18 @@ async fn upsert_archived_order(
         let amounts: Vec<f64> = d.payments.iter().map(|p| p.amount).collect();
         let timestamps: Vec<i64> = d.payments.iter().map(|p| p.timestamp).collect();
         let cancelled: Vec<bool> = d.payments.iter().map(|p| p.cancelled).collect();
+        let cancel_reasons: Vec<Option<&str>> = d
+            .payments
+            .iter()
+            .map(|p| p.cancel_reason.as_deref())
+            .collect();
+        let tendereds: Vec<Option<f64>> = d.payments.iter().map(|p| p.tendered).collect();
+        let change_amounts: Vec<Option<f64>> = d.payments.iter().map(|p| p.change_amount).collect();
 
         sqlx::query(
             r#"
-            INSERT INTO store_order_payments (order_id, seq, method, amount, timestamp, cancelled)
-            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::text[], $4::float8[], $5::bigint[], $6::bool[])
+            INSERT INTO store_order_payments (order_id, seq, method, amount, timestamp, cancelled, cancel_reason, tendered, change_amount)
+            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::text[], $4::float8[], $5::bigint[], $6::bool[], $7::text[], $8::float8[], $9::float8[])
             "#,
         )
         .bind(&oids)
@@ -646,6 +669,9 @@ async fn upsert_archived_order(
         .bind(&amounts)
         .bind(&timestamps)
         .bind(&cancelled)
+        .bind(&cancel_reasons)
+        .bind(&tendereds)
+        .bind(&change_amounts)
         .execute(&mut *tx)
         .await?;
     }
@@ -820,7 +846,7 @@ async fn upsert_anulacion(
     .bind(&anu.fecha_hora_registro)
     .bind(&anu.nif)
     .bind(&anu.nombre_razon)
-    .bind(&anu.reason)
+    .bind(anu.reason.as_str())
     .bind(&anu.note)
     .bind(anu.operator_id)
     .bind(&anu.operator_name)

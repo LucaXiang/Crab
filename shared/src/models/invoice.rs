@@ -249,14 +249,30 @@ pub struct InvoiceAnulacion {
     pub created_at: i64,
 }
 
-/// Invoice tax breakdown line (desglose)
+/// Invoice tax breakdown line (desglose) — SQLite-specific struct.
+///
+/// Reads from SQLite `invoice_desglose` table with f64 values.
+/// Convert to `TaxDesglose` (Decimal) at the sync boundary via `into_tax_desglose()`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct InvoiceDesglose {
     pub id: i64,
     pub invoice_id: i64,
     /// Tax rate in basis points (e.g. 2100 = 21%)
-    pub tax_rate: i64,
+    pub tax_rate: i32,
     pub base_amount: f64,
     pub tax_amount: f64,
+}
+
+impl InvoiceDesglose {
+    /// Convert to `TaxDesglose` for cloud sync (f64 → Decimal).
+    pub fn into_tax_desglose(self) -> crate::cloud::sync::TaxDesglose {
+        use rust_decimal::Decimal;
+        use rust_decimal::prelude::FromPrimitive;
+        crate::cloud::sync::TaxDesglose {
+            tax_rate: self.tax_rate,
+            base_amount: Decimal::from_f64(self.base_amount).unwrap_or_default(),
+            tax_amount: Decimal::from_f64(self.tax_amount).unwrap_or_default(),
+        }
+    }
 }

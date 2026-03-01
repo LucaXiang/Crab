@@ -141,7 +141,7 @@ impl InvoiceService {
         for d in desglose {
             let base = decimal_to_f64(d.base_amount, "desglose.base_amount")?;
             let tax_amt = decimal_to_f64(d.tax_amount, "desglose.tax_amount")?;
-            inv_repo::insert_desglose(tx, invoice_id, i64::from(d.tax_rate), base, tax_amt).await?;
+            inv_repo::insert_desglose(tx, invoice_id, d.tax_rate, base, tax_amt).await?;
         }
 
         // Update system_state.last_huella within the same transaction
@@ -268,7 +268,7 @@ impl InvoiceService {
         for d in desglose {
             let base = decimal_to_f64(d.base_amount, "desglose.base_amount")?;
             let tax_amt = decimal_to_f64(d.tax_amount, "desglose.tax_amount")?;
-            inv_repo::insert_desglose(tx, invoice_id, i64::from(d.tax_rate), base, tax_amt).await?;
+            inv_repo::insert_desglose(tx, invoice_id, d.tax_rate, base, tax_amt).await?;
         }
 
         // Update system_state.last_huella within the same transaction

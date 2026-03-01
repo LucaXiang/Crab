@@ -8,15 +8,51 @@ export interface OrderSummary {
   synced_at: number;
 }
 
+export type ChainEntryType = 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE';
+
 export interface ChainEntryItem {
-  entry_type: 'ORDER' | 'CREDIT_NOTE';
-  entry_key: string;
+  entry_type: ChainEntryType;
+  entry_id: number;
   display_number: string;
   status: string;
   amount: number | null;
   created_at: number;
-  original_order_key: string | null;
+  original_order_id: number | null;
   original_receipt: string | null;
+}
+
+export interface AnulacionDetailResponse {
+  source_id: number;
+  anulacion_number: string;
+  serie: string;
+  original_invoice_number: string;
+  original_order_id: number;
+  reason: string;
+  note: string | null;
+  operator_name: string;
+  huella: string;
+  aeat_status: string;
+  created_at: number;
+}
+
+export interface UpgradeDetailResponse {
+  source_id: number;
+  invoice_number: string;
+  serie: string;
+  tipo_factura: string;
+  source_pk: number;
+  subtotal: number;
+  tax: number;
+  total: number;
+  factura_sustituida_num: string | null;
+  customer_nif: string | null;
+  customer_nombre: string | null;
+  customer_address: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  huella: string;
+  aeat_status: string;
+  created_at: number;
 }
 
 export interface CreditNoteDetailResponse {

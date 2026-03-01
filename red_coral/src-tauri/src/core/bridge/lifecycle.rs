@@ -277,7 +277,7 @@ impl ClientBridge {
 
         // 尝试加载缓存的员工会话
         let tenant_manager_read = self.tenant_manager.read().await;
-        let cached_session = tenant_manager_read.load_current_session().ok().flatten();
+        let cached_session = tenant_manager_read.load_current_session();
         drop(tenant_manager_read);
 
         let client_state = if let Some(session) = cached_session {
@@ -569,7 +569,7 @@ impl ClientBridge {
         // 尝试加载缓存的员工会话
         let cached_session = {
             let tm = self.tenant_manager.read().await;
-            tm.load_current_session().ok().flatten()
+            tm.load_current_session()
         };
 
         let client_state = if let Some(session) = cached_session {

@@ -21,7 +21,7 @@ export interface CreditNote {
   authorizer_id: number | null;
   authorizer_name: string | null;
   shift_id: number | null;
-  cloud_synced: number;
+  cloud_synced: boolean;
   created_at: number;
 }
 

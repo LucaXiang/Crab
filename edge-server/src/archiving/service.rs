@@ -804,7 +804,7 @@ impl OrderArchiveService {
     ) -> ArchiveResult<Vec<shared::cloud::sync::TaxDesglose>> {
         #[derive(Debug, sqlx::FromRow)]
         struct DesgloseItemRow {
-            tax_rate: i64,
+            tax_rate: i32,
             base_amount: f64,
             tax_amount: f64,
         }
@@ -837,7 +837,7 @@ impl OrderArchiveService {
                     ))
                 })?;
                 Ok(shared::cloud::sync::TaxDesglose {
-                    tax_rate: r.tax_rate as i32,
+                    tax_rate: r.tax_rate,
                     base_amount,
                     tax_amount,
                 })

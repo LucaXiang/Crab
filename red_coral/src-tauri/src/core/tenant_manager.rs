@@ -205,8 +205,8 @@ impl TenantManager {
         let paths = TenantPaths::new(&tenant_path);
         self.tenant_paths.insert(tenant_id, paths);
 
-        // 加载 SessionCache
-        let session_cache = SessionCache::load(&tenant_path)?;
+        // 加载 SessionCache（损坏时自动重置，不会阻止启动）
+        let session_cache = SessionCache::load(&tenant_path);
         self.session_caches.insert(tenant_id, session_cache);
 
         Ok(())
@@ -861,17 +861,12 @@ impl TenantManager {
     }
 
     /// 加载缓存的当前活动会话
-    pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, TenantError> {
-        let tenant_id = self.current_tenant.ok_or(TenantError::NoTenantSelected)?;
-
-        let cache = self
-            .session_caches
-            .get(&tenant_id)
-            .ok_or_else(|| TenantError::NotFound(tenant_id.to_string()))?;
-
-        cache
-            .load_current_session()
-            .map_err(TenantError::SessionCache)
+    ///
+    /// 反序列化失败时返回 None（SessionCache 内部已处理备份），确保 app 永远能启动。
+    pub fn load_current_session(&self) -> Option<EmployeeSession> {
+        let tenant_id = self.current_tenant?;
+        let cache = self.session_caches.get(&tenant_id)?;
+        cache.load_current_session()
     }
 
     /// 清除缓存的当前活动会话（同时清内存 + 磁盘）

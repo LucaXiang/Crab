@@ -5,6 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::invoice::AnulacionReason;
+use crate::order::types::{LossReason, ServiceType, VoidType};
+
 /// All syncable resource types across the system.
 ///
 /// Serializes to snake_case strings (e.g. `DiningTable` → `"dining_table"`).
@@ -284,14 +287,27 @@ pub struct OrderDetailPayload {
     pub order_rule_discount_amount: f64,
     pub order_rule_surcharge_amount: f64,
     pub start_time: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator_id: Option<i64>,
     pub operator_name: Option<String>,
-    pub void_type: Option<String>,
-    pub loss_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub void_type: Option<VoidType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_reason: Option<LossReason>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loss_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub void_note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub service_type: Option<String>,
+    pub service_type: Option<ServiceType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shift_id: Option<i64>,
     pub items: Vec<OrderItemSync>,
     pub payments: Vec<OrderPaymentSync>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -332,6 +348,12 @@ pub struct OrderPaymentSync {
     pub amount: f64,
     pub timestamp: i64,
     pub cancelled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cancel_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tendered: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change_amount: Option<f64>,
 }
 
 // ── Credit Note sync types ──
@@ -361,6 +383,7 @@ pub struct CreditNoteSync {
 /// 退款明细行同步载荷
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreditNoteItemSync {
+    pub original_instance_id: String,
     pub item_name: String,
     pub quantity: i64,
     pub unit_price: f64,
@@ -391,21 +414,23 @@ pub struct InvoiceSync {
     pub fecha_hora_registro: String,
     pub nif: String,
     pub nombre_razon: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factura_rectificada_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factura_rectificada_num: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factura_sustituida_id: Option<i64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factura_sustituida_num: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customer_nif: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customer_nombre: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customer_address: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customer_email: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customer_phone: Option<String>,
     pub created_at: i64,
 }
@@ -457,7 +482,7 @@ pub struct AnulacionSync {
     pub nif: String,
     pub nombre_razon: String,
     pub original_order_pk: i64,
-    pub reason: String,
+    pub reason: AnulacionReason,
     pub note: Option<String>,
     pub operator_id: i64,
     pub operator_name: String,
@@ -474,7 +499,7 @@ impl AnulacionSync {
             &self.anulacion_number,
             &self.original_invoice_number,
             self.original_order_pk,
-            &self.reason,
+            self.reason.as_str(),
             self.created_at,
             &self.operator_name,
         );
@@ -864,6 +889,7 @@ mod tests {
             curr_hash,
             created_at,
             items: vec![CreditNoteItemSync {
+                original_instance_id: "inst-001".to_string(),
                 item_name: "Paella".to_string(),
                 quantity: 1,
                 unit_price: 21.07,
@@ -1052,6 +1078,11 @@ mod tests {
                 loss_amount: None,
                 void_note: None,
                 member_name: None,
+                service_type: None,
+                operator_id: None,
+                member_id: None,
+                queue_number: None,
+                shift_id: None,
                 items: vec![],
                 payments: vec![],
                 events: vec![],
@@ -1108,6 +1139,11 @@ mod tests {
                 loss_amount: None,
                 void_note: None,
                 member_name: None,
+                service_type: None,
+                operator_id: None,
+                member_id: None,
+                queue_number: None,
+                shift_id: None,
                 items: vec![],
                 payments: vec![],
                 events: vec![],
@@ -1215,6 +1251,11 @@ mod tests {
                 loss_amount: None,
                 void_note: None,
                 member_name: None,
+                service_type: None,
+                operator_id: None,
+                member_id: None,
+                queue_number: None,
+                shift_id: None,
                 items: vec![OrderItemSync {
                     name: "Paella".to_string(),
                     spec_name: None,
@@ -1238,6 +1279,9 @@ mod tests {
                     amount: 36.30,
                     timestamp: 1709020800000,
                     cancelled: false,
+                    cancel_reason: None,
+                    tendered: None,
+                    change_amount: None,
                 }],
                 events: vec![],
             },
@@ -1630,6 +1674,11 @@ mod tests {
                     loss_amount: None,
                     void_note: None,
                     member_name: None,
+                    service_type: None,
+                    operator_id: None,
+                    member_id: None,
+                    queue_number: None,
+                    shift_id: None,
                     items: vec![],
                     payments: vec![],
                     events: vec![],
@@ -1790,7 +1839,8 @@ mod tests {
         let anulacion_number = "ANU-20260227-0001".to_string();
         let original_invoice_number = "F220260227001".to_string();
         let original_order_pk: i64 = 100001;
-        let reason = "QUALITY".to_string();
+        let reason = AnulacionReason::Other;
+        let reason_str = reason.as_str();
         let created_at = 1709020800000_i64;
         let operator_name = "Admin".to_string();
 
@@ -1799,7 +1849,7 @@ mod tests {
             &anulacion_number,
             &original_invoice_number,
             original_order_pk,
-            &reason,
+            reason_str,
             created_at,
             &operator_name,
         );
@@ -1908,7 +1958,7 @@ mod tests {
     #[test]
     fn test_anulacion_hash_detects_tampering() {
         let mut anu = sample_anulacion_sync();
-        anu.reason = "TAMPERED".to_string();
+        anu.reason = AnulacionReason::Duplicate;
         assert!(
             anu.verify_hash().is_some(),
             "Tampered reason must fail hash verification"
@@ -1971,13 +2021,13 @@ mod tests {
             nif: nif.to_string(),
             nombre_razon: "Test".to_string(),
             original_order_pk: 100,
-            reason: "QUALITY".to_string(),
+            reason: AnulacionReason::Other,
             note: None,
             operator_id: 1,
             operator_name: "Admin".to_string(),
             prev_hash: "prev".to_string(),
             curr_hash: crate::order::compute_anulacion_chain_hash(
-                "prev", "ANU-002", "INV-001", 100, "QUALITY", 0, "Admin",
+                "prev", "ANU-002", "INV-001", 100, "OTHER", 0, "Admin",
             ),
             created_at: 0,
         };
