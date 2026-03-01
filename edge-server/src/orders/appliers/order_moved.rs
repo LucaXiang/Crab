@@ -27,8 +27,10 @@ impl EventApplier for OrderMovedApplier {
             snapshot.zone_id = *target_zone_id;
             snapshot.zone_name = target_zone_name.clone();
 
-            // Moving to a real table means it's no longer a retail order
+            // Moving to a real table: clear all retail-specific fields
             snapshot.is_retail = false;
+            snapshot.service_type = None;
+            snapshot.queue_number = None;
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
@@ -349,17 +351,21 @@ mod tests {
     }
 
     #[test]
-    fn test_order_moved_clears_is_retail() {
+    fn test_order_moved_clears_retail_fields() {
         let mut snapshot = create_test_snapshot(1001);
-        snapshot.is_retail = true; // Retail order
+        snapshot.is_retail = true;
+        snapshot.service_type = Some(ServiceType::Takeout);
+        snapshot.queue_number = Some(42);
 
         let event = create_order_moved_event(1001, 2, 0, "", 5, "Table 5", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
 
-        // Moving to a real table should clear is_retail
+        // Moving to a table clears all retail-specific fields
         assert!(!snapshot.is_retail);
+        assert_eq!(snapshot.service_type, None);
+        assert_eq!(snapshot.queue_number, None);
     }
 
     #[test]
