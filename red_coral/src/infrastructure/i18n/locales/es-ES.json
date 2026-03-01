@@ -698,7 +698,9 @@
       "OTHER": "Otro"
     },
     "action": {
-      "reprint": "Reimprimir"
+      "reprint": "Reimprimir",
+      "print_group": "Imprimir",
+      "correction_group": "Corrección"
     },
     "info": {
       "select_order": "Seleccione pedido",
@@ -759,7 +761,26 @@
       "refunds": "Devoluciones",
       "orders": "Pedidos",
       "revenue": "Ingresos",
-      "customers": "Comensales"
+      "customers": "Comensales",
+      "total_tax": "Total impuestos",
+      "total_surcharge": "Total recargos",
+      "avg_items_per_order": "Artículos/pedido",
+      "daily_trend": "Tendencia diaria",
+      "payment_breakdown": "Métodos de pago",
+      "tax_breakdown": "Desglose impuestos",
+      "tax_rate": "Tipo",
+      "tax_base": "Base",
+      "tax_amount": "Cuota",
+      "service_type": "Tipo servicio",
+      "zone_sales": "Ventas por zona",
+      "refund_methods": "Métodos devolución",
+      "tag_sales": "Ventas por etiqueta",
+      "method": "Método",
+      "count": "Cantidad",
+      "amount": "Importe",
+      "line_today": "Hoy",
+      "line_yesterday": "Ayer",
+      "line_last_week": "Misma semana ant."
     },
     "status": {
       "completed": "Completado",
@@ -2210,6 +2231,13 @@
     "4005": "Pedido tiene pagos",
     "4006": "Plato no existe",
     "4007": "Pedido vacío",
+    "4008": "Pedido ya anulado, no se puede operar",
+    "4009": "Pedido no completado, no se puede operar",
+    "4010": "Pedido ya tiene factura F3 sustitutiva",
+    "4011": "Pedido sin factura F2, no se puede sustituir",
+    "4012": "El importe de devolución supera el disponible",
+    "4013": "Artículo no encontrado en el pedido original",
+    "4014": "Cantidad de devolución inválida",
     "5001": "Pago fallido",
     "5002": "Importe insuficiente",
     "5003": "Método pago inválido",
@@ -2282,6 +2310,7 @@
     "9401": "Sin espacio",
     "9402": "Sin memoria",
     "9403": "Datos corruptos",
+    "9305": "Verifactu no configurado (suba certificado P12)",
     "9404": "Sistema ocupado"
   },
   "subscription": {
@@ -2782,10 +2811,16 @@
       "select_items": "Seleccionar artículos",
       "refund_method": "Método de reembolso",
       "reason": "Motivo",
-      "reason_placeholder": "Ingrese el motivo del reembolso",
       "note": "Nota",
       "note_placeholder": "Información adicional (opcional)",
       "total_refund": "Total a reembolsar"
+    },
+    "reason": {
+      "CUSTOMER_REQUEST": "Solicitud del cliente",
+      "WRONG_ORDER": "Pedido incorrecto",
+      "QUALITY_ISSUE": "Problema de calidad",
+      "OVERCHARGE": "Cobro excesivo",
+      "OTHER": "Otro"
     },
     "error": {
       "over_refund": "El monto excede el saldo reembolsable"

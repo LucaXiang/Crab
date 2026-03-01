@@ -698,7 +698,9 @@
       "OTHER": "其他"
     },
     "action": {
-      "reprint": "重新打印"
+      "reprint": "重新打印",
+      "print_group": "打印",
+      "correction_group": "修正"
     },
     "info": {
       "select_order": "请选择要查看的订单",
@@ -759,7 +761,26 @@
       "refunds": "退款",
       "orders": "订单",
       "revenue": "营业额",
-      "customers": "客数"
+      "customers": "客数",
+      "total_tax": "税额合计",
+      "total_surcharge": "附加费合计",
+      "avg_items_per_order": "单均菜品数",
+      "daily_trend": "每日趋势",
+      "payment_breakdown": "支付方式",
+      "tax_breakdown": "税额明细",
+      "tax_rate": "税率",
+      "tax_base": "税基",
+      "tax_amount": "税额",
+      "service_type": "服务类型",
+      "zone_sales": "区域销售",
+      "refund_methods": "退款方式",
+      "tag_sales": "标签销售",
+      "method": "方式",
+      "count": "笔数",
+      "amount": "金额",
+      "line_today": "今天",
+      "line_yesterday": "昨天",
+      "line_last_week": "上周同日"
     },
     "status": {
       "completed": "已完成",
@@ -2210,6 +2231,13 @@
     "4005": "订单存在支付记录",
     "4006": "订单项不存在",
     "4007": "订单为空",
+    "4008": "订单已作废，无法操作",
+    "4009": "订单未完成，无法操作",
+    "4010": "订单已升级为正式发票",
+    "4011": "订单无 F2 发票，无法升级",
+    "4012": "退款金额超出剩余可退金额",
+    "4013": "退款项在原订单中不存在",
+    "4014": "退款数量无效",
     "5001": "支付失败",
     "5002": "支付金额不足",
     "5003": "无效的支付方式",
@@ -2282,6 +2310,7 @@
     "9401": "存储空间不足",
     "9402": "内存不足",
     "9403": "存储数据损坏",
+    "9305": "Verifactu 未配置（请先上传 P12 证书）",
     "9404": "系统繁忙，请稍后重试"
   },
   "subscription": {
@@ -2784,10 +2813,16 @@
       "select_items": "选择退款商品",
       "refund_method": "退款方式",
       "reason": "退款原因",
-      "reason_placeholder": "请输入退款原因",
       "note": "备注",
       "note_placeholder": "补充说明（可选）",
       "total_refund": "退款合计"
+    },
+    "reason": {
+      "CUSTOMER_REQUEST": "顾客要求",
+      "WRONG_ORDER": "下单错误",
+      "QUALITY_ISSUE": "质量问题",
+      "OVERCHARGE": "多收费",
+      "OTHER": "其他"
     },
     "error": {
       "over_refund": "退款金额超过可退余额"

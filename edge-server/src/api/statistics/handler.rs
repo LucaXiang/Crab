@@ -13,59 +13,108 @@ use crate::utils::time;
 use crate::utils::{AppError, AppResult};
 
 // ============================================================================
-// Response Types
+// Response Types — aligned with Console's StoreOverview
 // ============================================================================
 
-/// Overview statistics
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct OverviewStats {
+#[derive(Debug, Clone, Serialize)]
+pub struct StoreOverview {
     pub revenue: f64,
     pub orders: i32,
-    pub customers: i32,
+    pub guests: i32,
     pub average_order_value: f64,
-    pub cash_revenue: f64,
-    pub card_revenue: f64,
-    pub other_revenue: f64,
+    pub per_guest_spend: f64,
+    pub average_dining_minutes: f64,
+    pub total_tax: f64,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+    pub avg_items_per_order: f64,
     pub voided_orders: i32,
     pub voided_amount: f64,
     pub loss_orders: i32,
     pub loss_amount: f64,
-    pub total_discount: f64,
-    pub total_refunded: f64,
     pub refund_count: i32,
-    pub avg_guest_spend: f64,
-    pub avg_dining_time: Option<f64>,
-}
-
-/// Revenue trend data point
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RevenueTrendPoint {
-    pub time: String,
-    pub value: f64,
-}
-
-/// Category sales data
-#[derive(Debug, Clone, Serialize)]
-pub struct CategorySale {
-    pub name: String,
-    pub value: f64,
-    pub color: String,
-}
-
-/// Top product data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TopProduct {
-    pub name: String,
-    pub sales: i32,
-}
-
-/// Full statistics response
-#[derive(Debug, Clone, Serialize)]
-pub struct StatisticsResponse {
-    pub overview: OverviewStats,
+    pub refund_amount: f64,
     pub revenue_trend: Vec<RevenueTrendPoint>,
-    pub category_sales: Vec<CategorySale>,
-    pub top_products: Vec<TopProduct>,
+    pub daily_trend: Vec<DailyTrendPoint>,
+    pub payment_breakdown: Vec<PaymentBreakdownEntry>,
+    pub tax_breakdown: Vec<TaxBreakdownEntry>,
+    pub category_sales: Vec<CategorySaleEntry>,
+    pub top_products: Vec<TopProductEntry>,
+    pub tag_sales: Vec<TagSaleEntry>,
+    pub refund_method_breakdown: Vec<RefundMethodEntry>,
+    pub service_type_breakdown: Vec<ServiceTypeEntry>,
+    pub zone_sales: Vec<ZoneSaleEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RevenueTrendPoint {
+    pub hour: i32,
+    pub revenue: f64,
+    pub orders: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DailyTrendPoint {
+    pub date: String,
+    pub revenue: f64,
+    pub orders: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PaymentBreakdownEntry {
+    pub method: String,
+    pub amount: f64,
+    pub count: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TaxBreakdownEntry {
+    pub tax_rate: f64,
+    pub base_amount: f64,
+    pub tax_amount: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CategorySaleEntry {
+    pub name: String,
+    pub revenue: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TopProductEntry {
+    pub name: String,
+    pub quantity: i32,
+    pub revenue: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TagSaleEntry {
+    pub name: String,
+    pub color: Option<String>,
+    pub revenue: f64,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RefundMethodEntry {
+    pub method: String,
+    pub amount: f64,
+    pub count: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ServiceTypeEntry {
+    pub service_type: String,
+    pub revenue: f64,
+    pub orders: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ZoneSaleEntry {
+    pub zone_name: String,
+    pub revenue: f64,
+    pub orders: i32,
+    pub guests: i32,
 }
 
 /// Sales report item
@@ -97,11 +146,15 @@ pub struct SalesReportResponse {
 #[derive(Debug, Deserialize)]
 pub struct StatisticsQuery {
     #[serde(rename = "timeRange")]
-    pub time_range: String,
+    pub time_range: Option<String>,
     #[serde(rename = "startDate")]
     pub start_date: Option<String>,
     #[serde(rename = "endDate")]
     pub end_date: Option<String>,
+    /// Unix millis start (alternative to timeRange presets)
+    pub from: Option<i64>,
+    /// Unix millis end
+    pub to: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -195,22 +248,15 @@ fn calculate_time_range(
     }
 }
 
-/// Predefined colors for category chart
-const CATEGORY_COLORS: &[&str] = &[
-    "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16",
-    "#F97316", "#6366F1",
-];
-
 // ============================================================================
 // Handlers
 // ============================================================================
 
-/// GET /api/statistics - Get statistics overview
+/// GET /api/statistics - Get store overview statistics
 pub async fn get_statistics(
     State(state): State<ServerState>,
     Query(query): Query<StatisticsQuery>,
-) -> AppResult<Json<StatisticsResponse>> {
-    // Get business day cutoff from store info
+) -> AppResult<Json<StoreOverview>> {
     let cutoff = store_info::get(&state.pool)
         .await
         .ok()
@@ -218,26 +264,27 @@ pub async fn get_statistics(
         .map(|s| s.business_day_cutoff)
         .unwrap_or(0);
 
-    let (start_dt, end_dt) = calculate_time_range(
-        &query.time_range,
-        cutoff,
-        query.start_date.as_deref(),
-        query.end_date.as_deref(),
-        state.config.timezone,
-    );
+    // Support both from/to millis and timeRange presets
+    let (start_dt, end_dt) = if let (Some(from), Some(to)) = (query.from, query.to) {
+        (from, to)
+    } else {
+        let time_range = query.time_range.as_deref().unwrap_or("today");
+        calculate_time_range(
+            time_range,
+            cutoff,
+            query.start_date.as_deref(),
+            query.end_date.as_deref(),
+            state.config.timezone,
+        )
+    };
 
-    tracing::debug!(
-        time_range = %query.time_range,
-        start = %start_dt,
-        end = %end_dt,
-        cutoff = cutoff,
-        "Fetching statistics"
-    );
+    tracing::debug!(start = %start_dt, end = %end_dt, cutoff, "Fetching statistics");
 
     let pool = &state.pool;
 
-    // Overview: single aggregate query (was 7 separate queries)
-    let (revenue, total_orders, total_customers, voided_orders, voided_amount, loss_orders, loss_amount, total_discount, avg_dining_time): (f64, i32, i32, i32, f64, i32, f64, f64, Option<f64>) = sqlx::query_as(
+    // ── Overview aggregate ──
+    #[allow(clippy::type_complexity)]
+    let (revenue, total_orders, guests, voided_orders, voided_amount, loss_orders, loss_amount, total_discount, total_surcharge, total_tax, avg_dining_time): (f64, i32, i32, i32, f64, i32, f64, f64, f64, f64, Option<f64>) = sqlx::query_as(
         "SELECT \
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0.0 END), 0.0), \
             CAST(COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) AS INTEGER), \
@@ -247,6 +294,8 @@ pub async fn get_statistics(
             CAST(COUNT(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN 1 END) AS INTEGER), \
             COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0.0) ELSE 0.0 END), 0.0), \
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN discount_amount ELSE 0.0 END), 0.0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN surcharge_amount ELSE 0.0 END), 0.0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN tax ELSE 0.0 END), 0.0), \
             AVG(CASE WHEN status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL \
                 THEN CAST((end_time - start_time) AS REAL) / 60000.0 END) \
          FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
@@ -259,20 +308,52 @@ pub async fn get_statistics(
     } else {
         0.0
     };
-    let avg_guest_spend = if total_customers > 0 {
-        revenue / total_customers as f64
+    let per_guest_spend = if guests > 0 {
+        revenue / guests as f64
     } else {
         0.0
     };
 
-    // Payment breakdown: single query (was 2 separate queries)
-    let (cash_revenue, card_revenue): (f64, f64) = sqlx::query_as(
-        "SELECT \
-            COALESCE(SUM(CASE WHEN p.method = 'CASH' THEN p.amount ELSE 0.0 END), 0.0), \
-            COALESCE(SUM(CASE WHEN p.method = 'CARD' THEN p.amount ELSE 0.0 END), 0.0) \
+    // ── Avg items per order ──
+    let avg_items_per_order: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(AVG(cnt), 0.0) FROM (\
+            SELECT COUNT(*) AS cnt FROM archived_order_item i \
+            JOIN archived_order o ON i.order_pk = o.id \
+            WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+            GROUP BY o.id\
+        )",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0.0);
+
+    // ── Payment breakdown ──
+    let payment_breakdown: Vec<PaymentBreakdownEntry> = sqlx::query_as::<_, (String, f64, i32)>(
+        "SELECT p.method, COALESCE(SUM(p.amount), 0.0), CAST(COUNT(*) AS INTEGER) \
          FROM archived_order_payment p \
          JOIN archived_order o ON p.order_pk = o.id \
-         WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0",
+         WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0 \
+         GROUP BY p.method ORDER BY SUM(p.amount) DESC",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?
+    .into_iter()
+    .map(|(method, amount, count)| PaymentBreakdownEntry {
+        method,
+        amount,
+        count,
+    })
+    .collect();
+
+    // ── Refund totals + method breakdown ──
+    let (refund_amount, refund_count): (f64, i32) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total_credit), 0.0), CAST(COUNT(*) AS INTEGER) \
+         FROM credit_note WHERE created_at >= ?1 AND created_at < ?2",
     )
     .bind(start_dt)
     .bind(end_dt)
@@ -280,101 +361,207 @@ pub async fn get_statistics(
     .await
     .map_err(|e| AppError::database(e.to_string()))?;
 
-    let other_revenue = revenue - cash_revenue - card_revenue;
-
-    // Refund totals from credit_note
-    let (total_refunded, refund_count): (f64, i32) = sqlx::query_as(
-        "SELECT \
-            COALESCE(SUM(total_credit), 0.0), \
-            CAST(COUNT(*) AS INTEGER) \
-         FROM credit_note \
-         WHERE created_at >= ?1 AND created_at < ?2",
+    let refund_method_breakdown: Vec<RefundMethodEntry> = sqlx::query_as::<_, (String, f64, i32)>(
+        "SELECT refund_method, COALESCE(SUM(total_credit), 0.0), CAST(COUNT(*) AS INTEGER) \
+         FROM credit_note WHERE created_at >= ?1 AND created_at < ?2 \
+         GROUP BY refund_method ORDER BY SUM(total_credit) DESC",
     )
     .bind(start_dt)
     .bind(end_dt)
-    .fetch_one(pool)
+    .fetch_all(pool)
     .await
-    .map_err(|e| AppError::database(e.to_string()))?;
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(method, amount, count)| RefundMethodEntry {
+        method,
+        amount,
+        count,
+    })
+    .collect();
 
-    let overview = OverviewStats {
+    // ── Revenue trend (hourly) ──
+    let revenue_trend: Vec<RevenueTrendPoint> = sqlx::query_as::<_, (i32, f64, i64)>(
+        "SELECT CAST((end_time / 1000 / 3600) % 24 AS INTEGER) AS hour, \
+            COALESCE(SUM(total_amount), 0.0), COUNT(*) \
+         FROM archived_order \
+         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 \
+         GROUP BY hour ORDER BY hour",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?
+    .into_iter()
+    .map(|(hour, revenue, orders)| RevenueTrendPoint {
+        hour,
         revenue,
-        orders: total_orders,
-        customers: total_customers,
-        average_order_value,
-        cash_revenue,
-        card_revenue,
-        other_revenue,
-        voided_orders,
-        voided_amount,
-        loss_orders,
-        loss_amount,
-        total_discount,
-        total_refunded,
-        refund_count,
-        avg_guest_spend,
-        avg_dining_time,
-    };
+        orders,
+    })
+    .collect();
 
-    // Revenue trend
-    let revenue_trend = if query.time_range == "today" {
-        // Hourly trend
-        let rows: Vec<(String, f64)> = sqlx::query_as(
-            "SELECT PRINTF('%02d:00', (end_time / 1000 / 3600) % 24) AS time, COALESCE(SUM(total_amount), 0.0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
-        )
-        .bind(start_dt).bind(end_dt)
-        .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
-
-        rows.into_iter()
-            .map(|(t, v)| RevenueTrendPoint { time: t, value: v })
-            .collect()
-    } else {
-        // Daily trend
-        let rows: Vec<(String, f64)> = sqlx::query_as(
-            "SELECT STRFTIME('%m-%d', end_time / 1000, 'unixepoch') AS time, COALESCE(SUM(total_amount), 0.0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
-        )
-        .bind(start_dt).bind(end_dt)
-        .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
-
-        rows.into_iter()
-            .map(|(t, v)| RevenueTrendPoint { time: t, value: v })
-            .collect()
-    };
-
-    // Category sales from archived_order_item
-    let category_raw: Vec<(Option<String>, f64)> = sqlx::query_as(
-        "SELECT COALESCE(i.category_name, 'Unknown') AS name, COALESCE(SUM(i.line_total), 0.0) AS value FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY name ORDER BY value DESC LIMIT 10",
+    // ── Daily trend ──
+    let daily_trend: Vec<DailyTrendPoint> = sqlx::query_as::<_, (String, f64, i64)>(
+        "SELECT STRFTIME('%Y-%m-%d', end_time / 1000, 'unixepoch') AS date, \
+            COALESCE(SUM(total_amount), 0.0), COUNT(*) \
+         FROM archived_order \
+         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 \
+         GROUP BY date ORDER BY date",
     )
-    .bind(start_dt).bind(end_dt)
-    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?
+    .into_iter()
+    .map(|(date, revenue, orders)| DailyTrendPoint {
+        date,
+        revenue,
+        orders,
+    })
+    .collect();
 
-    let category_sales: Vec<CategorySale> = category_raw
-        .into_iter()
-        .enumerate()
-        .map(|(i, (name, value))| CategorySale {
-            name: name.unwrap_or_else(|| "Unknown".to_string()),
-            value,
-            color: CATEGORY_COLORS
-                .get(i % CATEGORY_COLORS.len())
-                .unwrap_or(&"#6B7280")
-                .to_string(),
-        })
-        .collect();
+    // ── Tax breakdown (from item-level tax_rate) ──
+    let tax_breakdown: Vec<TaxBreakdownEntry> = sqlx::query_as::<_, (f64, f64, f64)>(
+        "SELECT CAST(i.tax_rate AS REAL) AS rate, \
+            COALESCE(SUM(i.line_total - i.tax), 0.0) AS base, \
+            COALESCE(SUM(i.tax), 0.0) AS tax_amt \
+         FROM archived_order_item i \
+         JOIN archived_order o ON i.order_pk = o.id \
+         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         GROUP BY i.tax_rate ORDER BY rate",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(tax_rate, base_amount, tax_amount)| TaxBreakdownEntry {
+        tax_rate,
+        base_amount,
+        tax_amount,
+    })
+    .collect();
 
-    // Top products from archived_order_item
-    let top_products: Vec<TopProduct> = sqlx::query_as::<_, (String, i32)>(
-        "SELECT i.name, COALESCE(SUM(i.quantity), 0) AS sales FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY i.name ORDER BY sales DESC LIMIT 10",
+    // ── Category sales ──
+    let category_sales: Vec<CategorySaleEntry> = sqlx::query_as::<_, (String, f64)>(
+        "SELECT COALESCE(i.category_name, 'Unknown'), COALESCE(SUM(i.line_total), 0.0) \
+         FROM archived_order_item i \
+         JOIN archived_order o ON i.order_pk = o.id \
+         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         GROUP BY i.category_name ORDER BY SUM(i.line_total) DESC LIMIT 10",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?
+    .into_iter()
+    .map(|(name, revenue)| CategorySaleEntry { name, revenue })
+    .collect();
+
+    // ── Top products (with revenue) ──
+    let top_products: Vec<TopProductEntry> = sqlx::query_as::<_, (String, i32, f64)>(
+        "SELECT i.name, CAST(COALESCE(SUM(i.quantity), 0) AS INTEGER), COALESCE(SUM(i.line_total), 0.0) \
+         FROM archived_order_item i \
+         JOIN archived_order o ON i.order_pk = o.id \
+         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         GROUP BY i.name ORDER BY SUM(i.line_total) DESC LIMIT 10",
     )
     .bind(start_dt).bind(end_dt)
     .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
-    .map(|(name, sales)| TopProduct { name, sales })
+    .map(|(name, quantity, revenue)| TopProductEntry { name, quantity, revenue })
     .collect();
 
-    Ok(Json(StatisticsResponse {
-        overview,
+    // ── Tag sales (join through product_tag) ──
+    let tag_sales: Vec<TagSaleEntry> = sqlx::query_as::<_, (String, Option<String>, f64, i32)>(
+        "SELECT t.name, t.color, COALESCE(SUM(i.line_total), 0.0), CAST(COALESCE(SUM(i.quantity), 0) AS INTEGER) \
+         FROM archived_order_item i \
+         JOIN archived_order o ON i.order_pk = o.id \
+         JOIN product_tag pt ON CAST(i.spec AS INTEGER) = pt.product_id \
+         JOIN tag t ON pt.tag_id = t.id \
+         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         GROUP BY t.id ORDER BY SUM(i.line_total) DESC LIMIT 20",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_all(pool).await.unwrap_or_default()
+    .into_iter()
+    .map(|(name, color, revenue, quantity)| TagSaleEntry { name, color, revenue, quantity })
+    .collect();
+
+    // ── Service type breakdown ──
+    let service_type_breakdown: Vec<ServiceTypeEntry> = sqlx::query_as::<_, (String, f64, i32)>(
+        "SELECT COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'DineIn' END), \
+            COALESCE(SUM(total_amount), 0.0), CAST(COUNT(*) AS INTEGER) \
+         FROM archived_order \
+         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 \
+         GROUP BY COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'DineIn' END) \
+         ORDER BY SUM(total_amount) DESC",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(service_type, revenue, orders)| ServiceTypeEntry {
+        service_type,
+        revenue,
+        orders,
+    })
+    .collect();
+
+    // ── Zone sales ──
+    let zone_sales: Vec<ZoneSaleEntry> = sqlx::query_as::<_, (String, f64, i32, i32)>(
+        "SELECT COALESCE(zone_name, 'Unknown'), COALESCE(SUM(total_amount), 0.0), \
+            CAST(COUNT(*) AS INTEGER), CAST(COALESCE(SUM(guest_count), 0) AS INTEGER) \
+         FROM archived_order \
+         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 AND zone_name IS NOT NULL \
+         GROUP BY zone_name ORDER BY SUM(total_amount) DESC",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(zone_name, revenue, orders, guests)| ZoneSaleEntry {
+        zone_name,
+        revenue,
+        orders,
+        guests,
+    })
+    .collect();
+
+    Ok(Json(StoreOverview {
+        revenue,
+        orders: total_orders,
+        guests,
+        average_order_value,
+        per_guest_spend,
+        average_dining_minutes: avg_dining_time.unwrap_or(0.0),
+        total_tax,
+        total_discount,
+        total_surcharge,
+        avg_items_per_order,
+        voided_orders,
+        voided_amount,
+        loss_orders,
+        loss_amount,
+        refund_count,
+        refund_amount,
         revenue_trend,
+        daily_trend,
+        payment_breakdown,
+        tax_breakdown,
         category_sales,
         top_products,
+        tag_sales,
+        refund_method_breakdown,
+        service_type_breakdown,
+        zone_sales,
     }))
 }
 
@@ -383,7 +570,6 @@ pub async fn get_sales_report(
     State(state): State<ServerState>,
     Query(query): Query<SalesReportQuery>,
 ) -> AppResult<Json<SalesReportResponse>> {
-    // Get business day cutoff from store info
     let cutoff = store_info::get(&state.pool)
         .await
         .ok()

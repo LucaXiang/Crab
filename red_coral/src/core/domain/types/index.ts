@@ -95,42 +95,96 @@ export const Permission = {
 export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
 export type ActiveTab = 'overview' | 'sales' | 'daily_report' | 'audit_log';
 
-export interface OverviewStats {
+// ── StoreOverview — flat response aligned with edge-server ──
+
+export interface StoreOverview {
   revenue: number;
   orders: number;
-  customers: number;
+  guests: number;
   average_order_value: number;
-  cash_revenue: number;
-  card_revenue: number;
-  other_revenue: number;
+  per_guest_spend: number;
+  average_dining_minutes: number;
+  total_tax: number;
+  total_discount: number;
+  total_surcharge: number;
+  avg_items_per_order: number;
   voided_orders: number;
   voided_amount: number;
   loss_orders: number;
   loss_amount: number;
-  total_discount: number;
-  total_refunded: number;
   refund_count: number;
-  avg_guest_spend: number;
-  avg_dining_time?: number;
+  refund_amount: number;
+  revenue_trend: RevenueTrendPoint[];
+  daily_trend: DailyTrendPoint[];
+  payment_breakdown: PaymentBreakdownEntry[];
+  tax_breakdown: TaxBreakdownEntry[];
+  category_sales: CategorySaleEntry[];
+  top_products: TopProductEntry[];
+  tag_sales: TagSaleEntry[];
+  refund_method_breakdown: RefundMethodEntry[];
+  service_type_breakdown: ServiceTypeEntry[];
+  zone_sales: ZoneSaleEntry[];
 }
 
-// Matches Rust RevenueTrendPoint
 export interface RevenueTrendPoint {
-  time: string;
-  value: number;
+  hour: number;
+  revenue: number;
+  orders: number;
 }
 
-// Matches Rust CategorySale
-export interface CategorySale {
-  name: string;
-  value: number;
-  color: string;
+export interface DailyTrendPoint {
+  date: string;
+  revenue: number;
+  orders: number;
 }
 
-// Matches Rust TopProduct
-export interface TopProduct {
+export interface PaymentBreakdownEntry {
+  method: string;
+  amount: number;
+  count: number;
+}
+
+export interface TaxBreakdownEntry {
+  tax_rate: number;
+  base_amount: number;
+  tax_amount: number;
+}
+
+export interface CategorySaleEntry {
   name: string;
-  sales: number;
+  revenue: number;
+}
+
+export interface TopProductEntry {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+export interface TagSaleEntry {
+  name: string;
+  color: string | null;
+  revenue: number;
+  quantity: number;
+}
+
+export interface RefundMethodEntry {
+  method: string;
+  amount: number;
+  count: number;
+}
+
+export interface ServiceTypeEntry {
+  service_type: string;
+  revenue: number;
+  orders: number;
+}
+
+export interface ZoneSaleEntry {
+  zone_name: string;
+  revenue: number;
+  orders: number;
+  guests: number;
 }
 
 export interface SalesReportItem {
@@ -139,13 +193,6 @@ export interface SalesReportItem {
   date: string;
   total: number;
   status: string;
-}
-
-export interface StatisticsResponse {
-  overview: OverviewStats;
-  revenue_trend: RevenueTrendPoint[];
-  category_sales: CategorySale[];
-  top_products: TopProduct[];
 }
 
 export interface SalesReportResponse {
