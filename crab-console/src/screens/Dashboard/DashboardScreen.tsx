@@ -53,6 +53,7 @@ export const DashboardScreen: React.FC = () => {
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
+  const [cutoffHour, setCutoffHour] = useState(0);
   const [timeRange, setTimeRange] = useState<TimeRange>(() => getPresetRange('today', t));
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [updatedLabel, setUpdatedLabel] = useState('');
@@ -112,15 +113,35 @@ export const DashboardScreen: React.FC = () => {
         }
 
         if (profileRes.subscription && profileRes.subscription.status !== 'canceled') {
-          const prevRange = getPreviousRange(timeRange);
-          const lwRange = getLastWeekSameDayRange(timeRange);
-          const [storeList, ov, prevOv, lwOv] = await Promise.all([
-            getStores(token),
-            getTenantOverview(token, timeRange.from, timeRange.to),
-            getTenantOverview(token, prevRange.from, prevRange.to),
-            getTenantOverview(token, lwRange.from, lwRange.to),
-          ]);
+          const storeList = await getStores(token);
           setStores(storeList);
+
+          // Use the latest cutoff across all stores for cross-store aggregation
+          let effectiveCutoff = 0;
+          if (storeList.length > 0) {
+            const cutoffs = storeList
+              .map(s => {
+                const parsed = s.business_day_cutoff ? parseInt(s.business_day_cutoff.split(':')[0], 10) || 0 : 0;
+                return Math.min(Math.max(parsed, 0), 6); // clamp to 00:00-06:00
+              })
+              .filter(h => h > 0);
+            effectiveCutoff = cutoffs.length > 0 ? Math.max(...cutoffs) : 0;
+            if (effectiveCutoff > 0) setCutoffHour(effectiveCutoff);
+          }
+
+          // Recalculate time range with cutoff
+          const effectiveRange = effectiveCutoff > 0
+            ? getPresetRange('today', t, undefined, undefined, effectiveCutoff)
+            : timeRange;
+          if (effectiveCutoff > 0) setTimeRange(effectiveRange);
+
+          const prevRange2 = getPreviousRange(effectiveRange);
+          const lwRange2 = getLastWeekSameDayRange(effectiveRange);
+          const [ov, prevOv, lwOv] = await Promise.all([
+            getTenantOverview(token, effectiveRange.from, effectiveRange.to),
+            getTenantOverview(token, prevRange2.from, prevRange2.to),
+            getTenantOverview(token, lwRange2.from, lwRange2.to),
+          ]);
           setOverview(ov);
           setPreviousOverview(prevOv);
           setLastWeekOverview(lwOv);
@@ -361,7 +382,7 @@ export const DashboardScreen: React.FC = () => {
             </p>
           </div>
         </div>
-        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} />
+        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} cutoffHour={cutoffHour} />
       </div>
 
       {/* Overview charts (all stores combined) */}
@@ -370,7 +391,7 @@ export const DashboardScreen: React.FC = () => {
           <Spinner className="w-8 h-8 text-primary-500" />
         </div>
       ) : overview ? (
-        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} />
+        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} cutoffHour={cutoffHour} />
       ) : null}
 
       {/* Sync warning */}

@@ -21,6 +21,8 @@ interface Props {
   lastWeekOverview?: StoreOverview | null;
   showHeader?: boolean;
   rangeLabel?: string;
+  /** Business day cutoff hour for correct hourly trend ordering */
+  cutoffHour?: number;
 }
 
 /** Compute percentage change. Returns null if previous is 0 (no meaningful comparison). */
@@ -32,7 +34,7 @@ function pctChange(current: number, previous: number): number | null {
 /** For "negative is better" metrics (voids, losses, refunds), invert the color logic. */
 type DeltaDirection = 'positive' | 'negative' | 'neutral';
 
-export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOverview, lastWeekOverview, showHeader = true, rangeLabel }) => {
+export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOverview, lastWeekOverview, showHeader = true, rangeLabel, cutoffHour = 0 }) => {
   const { t } = useI18n();
   const prev = previousOverview ?? null;
   const lastWeek = lastWeekOverview ?? null;
@@ -42,13 +44,32 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 
   const hasDailyTrend = overview.daily_trend.length > 1;
 
-  // Build hourly trend data with comparison lines
+  // Build hourly trend data — ordered by business day (cutoffHour → 23 → 0 → cutoffHour-1)
   const hourlyTrendData = (() => {
-    // Build a map of all 24 hours
-    const hours = Array.from({ length: 24 }, (_, i) => i);
     const currentMap = new Map(overview.revenue_trend.map(p => [p.hour, p]));
     const prevMap = prev ? new Map(prev.revenue_trend.map(p => [p.hour, p])) : null;
     const lwMap = lastWeek ? new Map(lastWeek.revenue_trend.map(p => [p.hour, p])) : null;
+
+    // Collect all hours that have data in any series
+    const allHours = new Set<number>();
+    for (const p of overview.revenue_trend) allHours.add(p.hour);
+    if (prev) for (const p of prev.revenue_trend) allHours.add(p.hour);
+    if (lastWeek) for (const p of lastWeek.revenue_trend) allHours.add(p.hour);
+
+    if (allHours.size === 0) return [];
+
+    // Sort hours in business-day order: cutoffHour first, wrap at midnight
+    // e.g. cutoff=4 → [4,5,...,23,0,1,2,3], cutoff=0 → [0,1,...,23]
+    const toBizOrder = (h: number) => (h - cutoffHour + 24) % 24;
+    const sorted = [...allHours].sort((a, b) => toBizOrder(a) - toBizOrder(b));
+
+    // Fill gaps between min and max in business-day order
+    const firstBiz = toBizOrder(sorted[0]);
+    const lastBiz = toBizOrder(sorted[sorted.length - 1]);
+    const hours: number[] = [];
+    for (let i = firstBiz; i <= lastBiz; i++) {
+      hours.push((cutoffHour + i) % 24);
+    }
 
     return hours.map(h => ({
       hour: `${h}:00`,

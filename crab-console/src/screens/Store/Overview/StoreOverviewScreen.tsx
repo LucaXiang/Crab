@@ -5,6 +5,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getStoreOverview } from '@/infrastructure/api/stats';
+import { getStoreInfo } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { Spinner } from '@/presentation/components/ui/Spinner';
 import { TimeRangeSelector, getPresetRange, getPreviousRange, getLastWeekSameDayRange } from '@/shared/components';
@@ -27,6 +28,7 @@ export const StoreOverviewScreen: React.FC = () => {
   const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
+  const [cutoffHour, setCutoffHour] = useState(0);
   const [timeRange, setTimeRange] = useState<TimeRange>(() => getPresetRange('today', t));
   const [overview, setOverview] = useState<StoreOverview | null>(null);
   const [previousOverview, setPreviousOverview] = useState<StoreOverview | null>(null);
@@ -36,6 +38,7 @@ export const StoreOverviewScreen: React.FC = () => {
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [updatedLabel, setUpdatedLabel] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const cutoffLoaded = useRef(false);
 
   const fetchData = useCallback(async (range: TimeRange) => {
     if (!token) return;
@@ -60,6 +63,21 @@ export const StoreOverviewScreen: React.FC = () => {
       setLoading(false);
     }
   }, [token, storeId, clearAuth, navigate, t]);
+
+  // Fetch store info to get business_day_cutoff, then recalculate time range
+  useEffect(() => {
+    if (!token || cutoffLoaded.current) return;
+    cutoffLoaded.current = true;
+    getStoreInfo(token, storeId).then(info => {
+      const raw = info.business_day_cutoff; // e.g. "04:00"
+      const parsed = raw ? parseInt(raw.split(':')[0], 10) || 0 : 0;
+      const hour = Math.min(Math.max(parsed, 0), 6); // clamp to 00:00-06:00
+      if (hour > 0) {
+        setCutoffHour(hour);
+        setTimeRange(getPresetRange('today', t, undefined, undefined, hour));
+      }
+    }).catch(() => { /* ignore — use midnight fallback */ });
+  }, [token, storeId, t]);
 
   useEffect(() => { fetchData(timeRange); }, [fetchData, timeRange]);
 
@@ -99,7 +117,7 @@ export const StoreOverviewScreen: React.FC = () => {
             </div>
           )}
         </div>
-        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} />
+        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} cutoffHour={cutoffHour} />
       </div>
 
       {loading ? (
@@ -110,7 +128,7 @@ export const StoreOverviewScreen: React.FC = () => {
           <p className="text-sm text-slate-500">{t('stats.no_data')}</p>
         </div>
       ) : (
-        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} />
+        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} cutoffHour={cutoffHour} />
       )}
     </div>
   );
