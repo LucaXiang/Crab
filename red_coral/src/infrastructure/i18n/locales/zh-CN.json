@@ -107,7 +107,8 @@
       "retail_order_failed": "创建零售订单失败",
       "cash_drawer_failed": "打开钱箱失败: {message}",
       "not_implemented": "功能开发中",
-      "delete_success": "删除成功"
+      "delete_success": "删除成功",
+      "shutting_down": "正在关闭..."
     },
     "confirm_delete": "确定要删除「{name}」吗？此操作无法撤销。",
     "hint": {

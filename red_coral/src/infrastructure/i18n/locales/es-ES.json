@@ -107,7 +107,8 @@
       "order_load_failed": "Pedido creado pero error al cargar, reintente",
       "retail_order_failed": "Error al crear venta directa",
       "cash_drawer_failed": "Error al abrir cajón: {message}",
-      "not_implemented": "Función en desarrollo"
+      "not_implemented": "Función en desarrollo",
+      "shutting_down": "Cerrando..."
     },
     "confirm_delete": "¿Seguro que desea eliminar «{name}»? Esta acción no se puede deshacer.",
     "hint": {

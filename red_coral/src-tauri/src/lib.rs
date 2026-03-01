@@ -4,7 +4,10 @@
 //! - Server 模式: 本地运行 edge-server，使用 In-Process 通信
 //! - Client 模式: 连接远程 edge-server，使用 mTLS 通信
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use tauri::{Emitter, Manager};
 use tracing_appender::rolling;
 use tracing_subscriber::fmt::time::FormatTime;
@@ -333,32 +336,37 @@ pub async fn run() {
             commands::get_statistics,
             commands::get_sales_report,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Prevent the default close — we'll handle it after graceful shutdown
+                api.prevent_close();
+
+                let app = window.app_handle().clone();
+
+                // Guard: only run shutdown once (user may click X multiple times)
+                static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+                if SHUTTING_DOWN.swap(true, Ordering::SeqCst) {
+                    return; // Already shutting down
+                }
+
+                // Notify frontend to show the "shutting down" overlay
+                let _ = app.emit("app-shutting-down", ());
+
+                // Run graceful shutdown asynchronously so the UI stays responsive
+                tauri::async_runtime::spawn(async move {
+                    if let Some(bridge) = app.try_state::<Arc<ClientBridge>>() {
+                        let bridge = Arc::clone(&*bridge);
+                        if let Err(e) = bridge.stop(false).await {
+                            tracing::error!("Failed to stop bridge on exit: {}", e);
+                        } else {
+                            tracing::info!("Bridge stopped gracefully on app exit");
+                        }
+                    }
+                    app.exit(0);
+                });
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
-                // Graceful shutdown: stop the bridge so Server::cleanup() runs
-                // and audit.lock is removed (preventing false "abnormal shutdown" on next start)
-                if let Some(bridge) = app.try_state::<Arc<ClientBridge>>() {
-                    let bridge = Arc::clone(&*bridge);
-                    // Spawn a dedicated thread for shutdown to avoid
-                    // "Cannot start a runtime from within a runtime" panic
-                    // when Cmd+Q triggers Exit while the async runtime is still active.
-                    let _ = std::thread::spawn(move || {
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .build()
-                            .expect("shutdown runtime");
-                        rt.block_on(async move {
-                            if let Err(e) = bridge.stop(false).await {
-                                tracing::error!("Failed to stop bridge on exit: {}", e);
-                            } else {
-                                tracing::info!("Bridge stopped gracefully on app exit");
-                            }
-                        });
-                    })
-                    .join();
-                }
-            }
-        });
+        .run(|_app, _event| {});
 }

@@ -20,6 +20,7 @@ import { ShiftGuard } from '@/presentation/components/shift';
 import { SystemIssueDialog } from '@/presentation/components/modals/SystemIssueDialog';
 import { VirtualKeyboard } from '@/presentation/components/ui/VirtualKeyboard';
 import { UpdateNotification } from '@/presentation/components/UpdateNotification';
+import { ShutdownOverlay } from '@/presentation/components/ShutdownOverlay';
 import { useVirtualKeyboardStore } from '@/core/stores/ui';
 
 // Screens
@@ -387,6 +388,7 @@ const App: React.FC = () => {
         <PermissionEscalationProvider />
         <VirtualKeyboard />
         <SystemIssueDialog issue={currentIssue} onResolve={resolveIssue} />
+        <ShutdownOverlay />
 
         <Routes>
         {/* Setup Route (模式选择 → 激活 → 配置 → 完成) */}
