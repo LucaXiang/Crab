@@ -11,7 +11,7 @@ export { addItems, modifyItem, removeItem, compItem, uncompItem } from './items'
 export { cancelPayment, splitByItems, splitByAmount, startAaSplit, payAaSplit } from './payments';
 
 // Adjustments
-export { applyOrderDiscount, applyOrderSurcharge, toggleRuleSkip, moveOrder, mergeOrders, updateOrderInfo } from './adjustments';
+export { applyOrderDiscount, applyOrderSurcharge, addOrderNote, toggleRuleSkip, moveOrder, mergeOrders, updateOrderInfo } from './adjustments';
 
 // Members
 export { linkMember, unlinkMember, redeemStamp, cancelStampRedemption } from './members';

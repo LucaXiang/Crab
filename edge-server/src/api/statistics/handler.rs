@@ -370,7 +370,7 @@ pub async fn get_statistics(
     .bind(end_dt)
     .fetch_all(pool)
     .await
-    .unwrap_or_default()
+    .map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
     .map(|(method, amount, count)| RefundMethodEntry {
         method,
@@ -435,7 +435,7 @@ pub async fn get_statistics(
     .bind(end_dt)
     .fetch_all(pool)
     .await
-    .unwrap_or_default()
+    .map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
     .map(|(tax_rate, base_amount, tax_amount)| TaxBreakdownEntry {
         tax_rate,
@@ -486,7 +486,7 @@ pub async fn get_statistics(
          GROUP BY t.id ORDER BY SUM(i.line_total) DESC LIMIT 20",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_all(pool).await.unwrap_or_default()
+    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
     .map(|(name, color, revenue, quantity)| TagSaleEntry { name, color, revenue, quantity })
     .collect();
@@ -504,7 +504,7 @@ pub async fn get_statistics(
     .bind(end_dt)
     .fetch_all(pool)
     .await
-    .unwrap_or_default()
+    .map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
     .map(|(service_type, revenue, orders)| ServiceTypeEntry {
         service_type,
@@ -525,7 +525,7 @@ pub async fn get_statistics(
     .bind(end_dt)
     .fetch_all(pool)
     .await
-    .unwrap_or_default()
+    .map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
     .map(|(zone_name, revenue, orders, guests)| ZoneSaleEntry {
         zone_name,
@@ -612,7 +612,7 @@ pub async fn get_sales_report(
     )
     .bind(start_dt).bind(end_dt)
     .bind(page_size).bind(offset)
-    .fetch_all(pool).await.unwrap_or_default();
+    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
     Ok(Json(SalesReportResponse {
         items,

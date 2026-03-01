@@ -148,6 +148,101 @@ impl BackgroundTasks {
         });
     }
 
+    /// 注册并启动一个可自动重启的后台任务
+    ///
+    /// 如果任务 panic 或异常退出，会自动以指数退避重启 (1s → 2s → 4s → ... → 60s cap)。
+    /// 在 10 分钟窗口内最多重启 5 次，之后放弃并记录 ERROR。
+    ///
+    /// # 参数
+    ///
+    /// - `name`: 任务名称
+    /// - `kind`: 任务类型 (建议 Worker/Listener/Periodic)
+    /// - `factory`: 创建任务 future 的闭包 (每次重启都会调用)
+    pub fn spawn_restartable<F, Fut>(&mut self, name: &'static str, kind: TaskKind, factory: F)
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let shutdown = self.shutdown.clone();
+        let wrapped = async move {
+            const MAX_RESTARTS: u32 = 5;
+            const WINDOW_SECS: u64 = 600; // 10 minutes
+            const MAX_BACKOFF_SECS: u64 = 60;
+
+            let mut restart_count: u32 = 0;
+            let mut window_start = std::time::Instant::now();
+
+            loop {
+                let result: Result<(), Box<dyn std::any::Any + Send>> =
+                    AssertUnwindSafe(factory()).catch_unwind().await;
+
+                // Check if shutdown was requested
+                if shutdown.is_cancelled() {
+                    tracing::debug!(task = %name, "Task stopped (shutdown)");
+                    return;
+                }
+
+                match result {
+                    Ok(()) => {
+                        tracing::warn!(task = %name, kind = %kind, "Restartable task completed unexpectedly");
+                    }
+                    Err(panic_info) => {
+                        let panic_msg: String = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                            (*s).to_string()
+                        } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                            s.clone()
+                        } else {
+                            "Unknown panic".to_string()
+                        };
+                        tracing::error!(task = %name, kind = %kind, panic = %panic_msg, "Restartable task panicked");
+                    }
+                }
+
+                // Reset window if expired
+                if window_start.elapsed().as_secs() > WINDOW_SECS {
+                    restart_count = 0;
+                    window_start = std::time::Instant::now();
+                }
+
+                restart_count += 1;
+                if restart_count > MAX_RESTARTS {
+                    tracing::error!(
+                        task = %name,
+                        restarts = restart_count,
+                        "Task exceeded max restarts ({MAX_RESTARTS} in {WINDOW_SECS}s), giving up"
+                    );
+                    return;
+                }
+
+                let backoff_secs = (1u64 << (restart_count - 1)).min(MAX_BACKOFF_SECS);
+                tracing::warn!(
+                    task = %name,
+                    restart = restart_count,
+                    backoff_secs,
+                    "Restarting task after backoff"
+                );
+
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(backoff_secs)) => {}
+                    _ = shutdown.cancelled() => {
+                        tracing::debug!(task = %name, "Task restart cancelled (shutdown)");
+                        return;
+                    }
+                }
+            }
+        };
+
+        let handle = tokio::spawn(wrapped);
+        let abort_handle = handle.abort_handle();
+        tracing::debug!(task = %name, kind = %kind, "Registered restartable background task");
+        self.tasks.push(RegisteredTask {
+            name,
+            kind,
+            handle,
+            abort_handle,
+        });
+    }
+
     /// 获取已注册任务数量
     pub fn len(&self) -> usize {
         self.tasks.len()

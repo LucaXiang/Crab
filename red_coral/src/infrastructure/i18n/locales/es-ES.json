@@ -497,6 +497,12 @@
     },
     "table_order": "Pedido mesa",
     "retail_order": "Venta",
+    "order_note": {
+      "title": "Nota del pedido",
+      "placeholder": "Escribir nota (máx. 200 caracteres)",
+      "save": "Guardar nota",
+      "clear": "Borrar nota"
+    },
     "order_completed": "Pedido completado",
     "complete_order": "Cerrar pedido",
     "complete_order_confirm": "¿Confirmar cierre del pedido? El importe pagado ya cubre el total.",

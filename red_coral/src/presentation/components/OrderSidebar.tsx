@@ -1,6 +1,6 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
-import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp, Crown } from 'lucide-react';
+import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp, Crown, StickyNote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
@@ -34,13 +34,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const [editingItem, setEditingItem] = useState<{ item: CartItem; index: number } | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ index: number; item: CartItem; authorizer?: { id: number; name: string } } | null>(null);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
 
 
   // 直接从 store 获取 timeline（不依赖 order.timeline）
   const timeline = useOrderTimeline(order.order_id);
 
   const handleEditItem = React.useCallback((item: CartItem) => {
-    if (item.is_comped) return; // Comped items are locked
     const index = order.items.findIndex((i) =>
       i.instance_id ? i.instance_id === item.instance_id : i.id === item.id
     );
@@ -128,6 +129,12 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
               <span className="w-1 h-1 rounded-full bg-gray-300" />
               <span>{new Date(order.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
             </div>
+            {order.note && (
+              <div className="text-xs text-amber-600 mt-1 truncate max-w-[220px]" title={order.note}>
+                <StickyNote size={10} className="inline mr-1" />
+                {order.note}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -138,6 +145,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             >
               <ShoppingBag size={20} />
               <span className="text-base font-bold">{t('pos.quick_add.title')}</span>
+            </button>
+
+            <button
+              onClick={() => { setNoteText(order.note ?? ''); setShowNoteModal(true); }}
+              className={`p-2.5 rounded-lg transition-colors ${order.note ? 'bg-amber-100 hover:bg-amber-200 text-amber-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+              title={t('checkout.order_note.title')}
+            >
+              <StickyNote size={24} />
             </button>
 
             {onManage && !order.is_retail && (
@@ -333,6 +348,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       {editingItem && (
         <CartItemDetailModal
           item={editingItem.item}
+          orderId={order.order_id}
           onClose={() => setEditingItem(null)}
           onUpdate={(instanceId, updates, options) => {
             handleSaveItem(editingItem.index, updates, options);
@@ -351,6 +367,54 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         onClose={() => setPendingDelete(null)}
         onConfirm={handleConfirmDelete}
       />
+
+      {/* Order Note Modal */}
+      {showNoteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowNoteModal(false)}>
+          <div className="bg-white rounded-2xl w-[400px] p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">{t('checkout.order_note.title')}</h3>
+            <textarea
+              value={noteText}
+              onChange={e => setNoteText(e.target.value.slice(0, 200))}
+              placeholder={t('checkout.order_note.placeholder')}
+              className="w-full h-32 px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+              autoFocus
+              maxLength={200}
+            />
+            <div className="text-xs text-gray-400 text-right mt-1">{noteText.length}/200</div>
+            <div className="flex gap-3 mt-4">
+              {order.note && (
+                <button
+                  onClick={async () => {
+                    await orderOps.addOrderNote(order.order_id, '');
+                    setShowNoteModal(false);
+                  }}
+                  className="px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                >
+                  {t('checkout.order_note.clear')}
+                </button>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={() => setShowNoteModal(false)}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={async () => {
+                  await orderOps.addOrderNote(order.order_id, noteText.trim());
+                  setShowNoteModal(false);
+                }}
+                disabled={!noteText.trim() && !order.note}
+                className="px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 disabled:opacity-50 rounded-xl transition-colors"
+              >
+                {t('checkout.order_note.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

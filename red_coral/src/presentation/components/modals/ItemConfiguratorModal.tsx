@@ -44,6 +44,9 @@ interface ItemConfiguratorModalProps {
   onDelete?: (authorizer?: { id: number; name: string }) => void;
   showDelete?: boolean;
   readOnlyAttributes?: boolean;
+
+  // Comp shortcut (optional)
+  headerActions?: React.ReactNode;
 }
 
 export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
@@ -72,6 +75,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   showDelete = false,
   readOnlyAttributes = false,
   onBasePriceChange,
+  headerActions,
 }) => {
   const { t } = useI18n();
 
@@ -126,12 +130,15 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{title}</div>
             <h2 className="text-xl font-bold text-gray-800 line-clamp-1">{productName}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            {headerActions}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {/* Content - Two Column Layout */}

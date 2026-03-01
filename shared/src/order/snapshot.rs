@@ -290,6 +290,9 @@ impl OrderSnapshot {
     }
 
     /// Compute state checksum for drift detection (FNV-1a, 16-char hex).
+    ///
+    /// Mixes: items.len, each item's (instance_id, quantity, unit_price),
+    /// total, paid_amount, last_sequence, status.
     pub fn compute_checksum(&self) -> String {
         // FNV-1a: deterministic across Rust versions and platforms
         // (DefaultHasher uses randomly-seeded SipHash — NOT stable)
@@ -300,6 +303,15 @@ impl OrderSnapshot {
         };
 
         mix(self.items.len() as u64);
+        // Mix item-level content for stronger drift detection
+        for item in &self.items {
+            // Hash instance_id string bytes
+            for byte in item.instance_id.as_bytes() {
+                mix(*byte as u64);
+            }
+            mix(item.quantity as u64);
+            mix(item.unit_price.to_bits());
+        }
         mix(self.total.to_bits());
         mix(self.paid_amount.to_bits());
         mix(self.last_sequence);

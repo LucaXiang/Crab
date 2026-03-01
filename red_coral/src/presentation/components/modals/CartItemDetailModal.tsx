@@ -1,20 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, ProductSpec } from '@/core/domain/types';
+import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, ProductSpec, Permission } from '@/core/domain/types';
+import { Gift, Undo2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore } from '@/features/product';
+import { EscalatableGate } from '../auth/EscalatableGate';
 import { toast } from '../Toast';
 import { logger } from '@/utils/logger';
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
+import { compItem, uncompItem } from '@/core/stores/order/commands';
 
 interface CartItemDetailModalProps {
   item: CartItem;
+  orderId?: number;
   onClose: () => void;
   onUpdate: (instanceId: string, updates: Partial<CartItem>, authorizer?: { id: number; name: string }) => void;
   onRemove: (instanceId: string, authorizer?: { id: number; name: string }) => void;
   readOnlyAttributes?: boolean;
 }
 
-export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
+const COMP_REASONS = ['customer_complaint', 'item_defect', 'promotion', 'staff_error'] as const;
+
+export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, orderId, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
   const { t } = useI18n();
   const unpaidQuantity = item.unpaid_quantity;
   const [quantity, setQuantity] = useState(unpaidQuantity);
@@ -34,6 +40,33 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const [bindings, setBindings] = useState<ProductAttribute[]>([]);
   // Map of attributeId -> Map<optionId, quantity>
   const [selections, setSelections] = useState<Map<number, Map<string, number>>>(new Map());
+
+  // Comp shortcut state
+  const [showCompReasons, setShowCompReasons] = useState(false);
+
+  const handleComp = async (reason: string, authorizer: { id: number; name: string }) => {
+    if (orderId == null) return;
+    try {
+      await compItem(orderId, item.instance_id, item.unpaid_quantity, reason, authorizer);
+      toast.success(t('checkout.comp.badge'));
+      onClose();
+    } catch (err) {
+      logger.error('Comp item failed', err);
+      toast.error(String(err));
+    }
+  };
+
+  const handleUncomp = async (authorizer: { id: number; name: string }) => {
+    if (orderId == null) return;
+    try {
+      await uncompItem(orderId, item.instance_id, authorizer);
+      toast.success(t('checkout.comp.uncomp'));
+      onClose();
+    } catch (err) {
+      logger.error('Uncomp item failed', err);
+      toast.error(String(err));
+    }
+  };
 
   // Load attributes on mount
   useEffect(() => {
@@ -258,7 +291,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     : itemBasePrice;
   const currentPrice = localBasePrice !== null ? localBasePrice : specPrice;
 
-  return (
+  return (<>
     <ItemConfiguratorModal
       isOpen={true}
       onClose={onClose}
@@ -288,6 +321,73 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       hasMultiSpec={specifications.length > 1}
       selectedSpecId={selectedSpecId}
       onSpecificationSelect={handleSpecificationSelect}
+      headerActions={orderId != null ? (
+        <>
+          {item.is_comped ? (
+            <EscalatableGate
+              permission={Permission.ORDERS_COMP}
+              mode="intercept"
+              description={t('checkout.comp.uncomp_auth_required')}
+              onAuthorized={(user) => handleUncomp({ id: user.id, name: user.name })}
+            >
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                title={t('checkout.comp.uncomp')}
+              >
+                <Undo2 size={16} />
+                {t('checkout.comp.uncomp')}
+              </button>
+            </EscalatableGate>
+          ) : !showCompReasons ? (
+            <EscalatableGate
+              permission={Permission.ORDERS_COMP}
+              mode="intercept"
+              description={t('checkout.comp.auth_required')}
+              onAuthorized={() => setShowCompReasons(true)}
+            >
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                title={t('checkout.comp.title')}
+              >
+                <Gift size={16} />
+                {t('checkout.comp.badge')}
+              </button>
+            </EscalatableGate>
+          ) : null}
+        </>
+      ) : undefined}
     />
+    {showCompReasons && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[101]" onClick={() => setShowCompReasons(false)}>
+        <div className="bg-white rounded-2xl w-[360px] p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">{t('checkout.comp.title')}</h3>
+          <p className="text-sm text-gray-500 mb-4">{item.name} x{item.unpaid_quantity}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {COMP_REASONS.map(key => (
+              <EscalatableGate
+                key={key}
+                permission={Permission.ORDERS_COMP}
+                mode="intercept"
+                description={t('checkout.comp.auth_required')}
+                onAuthorized={(user) => handleComp(key, { id: user.id, name: user.name })}
+              >
+                <button
+                  className="p-3 rounded-xl border-2 border-gray-100 hover:border-emerald-300 hover:bg-emerald-50 text-sm font-medium text-gray-600 transition-all text-left"
+                >
+                  {t(`checkout.comp.preset.${key}`)}
+                </button>
+              </EscalatableGate>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowCompReasons(false)}
+            className="w-full mt-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+          >
+            {t('common.action.cancel')}
+          </button>
+        </div>
+      </div>
+    )}
+  </>
   );
 });

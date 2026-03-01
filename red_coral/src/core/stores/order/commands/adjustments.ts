@@ -124,6 +124,23 @@ export const mergeOrders = async (
  * Update order info (guest count, table name, etc.).
  * Note: receipt_number is immutable (set at OpenTable).
  */
+/**
+ * Add or update order note. Empty string clears the note.
+ */
+export const addOrderNote = async (
+  orderId: number,
+  note: string,
+): Promise<void> => {
+  const command = createCommand({
+    type: 'ADD_ORDER_NOTE',
+    order_id: orderId,
+    note,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Add order note');
+};
+
 export const updateOrderInfo = async (
   orderId: number,
   info: {
