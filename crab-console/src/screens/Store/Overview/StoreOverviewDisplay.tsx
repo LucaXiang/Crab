@@ -9,6 +9,7 @@ import {
   PieChart, Pie, Cell, Legend, Line, ComposedChart,
 } from 'recharts';
 import { useI18n } from '@/hooks/useI18n';
+import { tEnum } from '@/infrastructure/i18n';
 import { formatCurrency } from '@/utils/format';
 import type { StoreOverview } from '@/core/types/stats';
 
@@ -90,7 +91,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         {overview.payment_breakdown.slice(0, 2).map(pb => {
           const isCash = pb.method.toUpperCase() === 'CASH';
           return (
-            <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${pb.method} (${pb.count})`} />
+            <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${tEnum('common.paymentMethod', pb.method)} (${pb.count})`} />
           );
         })}
         <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
@@ -231,7 +232,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                     <div key={pb.method} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="text-slate-700 truncate">{pb.method}</span>
+                        <span className="text-slate-700 truncate">{tEnum('common.paymentMethod', pb.method)}</span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-2">
                         <span className="text-xs text-slate-400">{pct}%</span>
@@ -384,7 +385,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               <tbody>
                 {overview.refund_method_breakdown.map((rm, i) => (
                   <tr key={i} className="border-b border-slate-50 last:border-0">
-                    <td className="py-2 text-slate-700 font-medium">{rm.method}</td>
+                    <td className="py-2 text-slate-700 font-medium">{tEnum('common.paymentMethod', rm.method)}</td>
                     <td className="py-2 text-right text-slate-700">{rm.count}</td>
                     <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(rm.amount)}</td>
                   </tr>

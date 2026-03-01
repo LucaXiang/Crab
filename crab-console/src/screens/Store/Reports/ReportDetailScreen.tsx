@@ -5,6 +5,7 @@ import {
   Banknote, ShoppingBag, XCircle, Receipt,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { tEnum } from '@/infrastructure/i18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getReportDetail } from '@/infrastructure/api/stats';
@@ -229,7 +230,7 @@ export const ReportDetailScreen: React.FC = () => {
             <div className="space-y-1">
               {report.payment_breakdowns.map(pb => (
                 <div key={pb.method} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">{pb.method}</span>
+                  <span className="text-slate-600">{tEnum('common.paymentMethod', pb.method)}</span>
                   <span className="font-medium text-slate-900">{formatCurrency(pb.amount)} ({pb.count})</span>
                 </div>
               ))}

@@ -740,6 +740,10 @@
       "to": "To",
       "apply": "Apply"
     },
+    "paymentMethod": {
+      "CASH": "Cash",
+      "CARD": "Card"
+    },
     "selection": {
       "selected": "Selected",
       "showing": "Showing"

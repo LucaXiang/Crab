@@ -6,6 +6,7 @@ import {
   ArrowLeft, FileUp, FileText, User, Mail, Phone, MapPin,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { tEnum } from '@/infrastructure/i18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import {
@@ -33,12 +34,8 @@ function formatChainNumber(displayNumber: string, entryType: ChainEntryType): st
   }
 }
 
-function formatRefundMethod(method: string, t: (key: string) => string): string {
-  switch (method) {
-    case 'CASH': return t('orders.method_cash');
-    case 'CARD': return t('orders.method_card');
-    default: return method;
-  }
+function formatRefundMethod(method: string): string {
+  return tEnum('common.paymentMethod', method);
 }
 
 function formatAeatStatus(status: string): { label: string; style: string } {
@@ -892,7 +889,7 @@ const CreditNoteDetailView: React.FC<{
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-700">{t('orders.credit_note_detail')}</div>
           <div className="p-4 space-y-3">
-            <InfoRow label={t('orders.refund_method')} value={formatRefundMethod(detail.refund_method, t)} />
+            <InfoRow label={t('orders.refund_method')} value={formatRefundMethod(detail.refund_method)} />
             <InfoRow label={t('orders.reason')} value={detail.reason} />
             {detail.note && <InfoRow label={t('orders.note')} value={detail.note} />}
             <div className="border-t border-slate-100 pt-3 space-y-2">
@@ -978,7 +975,7 @@ const MobileCreditNoteDetail: React.FC<{
 
       {/* Info */}
       <div className="border-t border-slate-100 pt-3 space-y-2 text-sm">
-        <InfoRow label={t('orders.refund_method')} value={formatRefundMethod(detail.refund_method, t)} />
+        <InfoRow label={t('orders.refund_method')} value={formatRefundMethod(detail.refund_method)} />
         <InfoRow label={t('orders.reason')} value={detail.reason} />
         {detail.note && <InfoRow label={t('orders.note')} value={detail.note} />}
         {detail.authorizer_name && <InfoRow label={t('orders.authorizer')} value={detail.authorizer_name} />}
@@ -1164,7 +1161,7 @@ const MobileOrderDetail: React.FC<{
               <div key={i} className={`flex items-center justify-between text-sm ${payment.cancelled ? 'opacity-50' : ''}`}>
                 <div className="flex items-center gap-2">
                   <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-slate-700 capitalize">{payment.method}</span>
+                  <span className="text-slate-700">{tEnum('common.paymentMethod', payment.method)}</span>
                   {payment.cancelled && <span className="px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded font-medium">{t('orders.cancelled_payment')}</span>}
                 </div>
                 <span className={`font-medium ${payment.cancelled ? 'text-slate-400 line-through' : 'text-green-600'}`}>{formatCurrency(payment.amount)}</span>
@@ -1192,7 +1189,7 @@ const MobileOrderDetail: React.FC<{
                 <div>
                   <span className="font-mono text-xs text-orange-600">{cn.credit_note_number}</span>
                   <span className="text-slate-400 mx-1">·</span>
-                  <span className="text-slate-600">{formatRefundMethod(cn.refund_method, t)}</span>
+                  <span className="text-slate-600">{formatRefundMethod(cn.refund_method)}</span>
                   <span className="text-slate-400 mx-1">·</span>
                   <span className="text-slate-500">{cn.reason}</span>
                 </div>
@@ -1399,7 +1396,7 @@ const CreditNotesCard: React.FC<{
             <div className="text-left">
               <div className="font-medium text-slate-800 flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-xs">{cn.credit_note_number}</span>
-                <span>{formatRefundMethod(cn.refund_method, t)}</span>
+                <span>{formatRefundMethod(cn.refund_method)}</span>
               </div>
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <span>{cn.reason}</span>
@@ -1529,7 +1526,7 @@ const PaymentRow: React.FC<{ payment: OrderPayment; t: (k: string) => string }> 
         </div>
         <div>
           <div className="font-medium text-slate-800 flex items-center gap-2 flex-wrap">
-            <span className="capitalize">{payment.method}</span>
+            <span>{tEnum('common.paymentMethod', payment.method)}</span>
             {payment.cancelled && (
               <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
                 <Ban size={10} /> {t('orders.cancelled_payment')}

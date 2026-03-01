@@ -740,6 +740,10 @@
       "to": "Hasta",
       "apply": "Aplicar"
     },
+    "paymentMethod": {
+      "CASH": "Efectivo",
+      "CARD": "Tarjeta"
+    },
     "selection": {
       "selected": "Seleccionados",
       "showing": "Mostrando"

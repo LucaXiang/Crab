@@ -98,6 +98,13 @@ export function apiErrorMessage(
   return fallback;
 }
 
+/** Translate an enum-like value; returns the translated string or the raw value as fallback. */
+export function tEnum(prefix: string, value: string): string {
+  const key = `${prefix}.${value}`;
+  const result = translations[currentLocale][key] ?? translations[DEFAULT_LOCALE][key];
+  return result ?? value;
+}
+
 export const i18n = {
   getLocale,
   setLocale,

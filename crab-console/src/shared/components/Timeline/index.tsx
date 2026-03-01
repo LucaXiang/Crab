@@ -6,6 +6,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
+import { tEnum } from '@/infrastructure/i18n';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Types
@@ -214,7 +215,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       break;
     }
     case 'PAYMENT_ADDED': {
-      const method = p.method || 'unknown';
+      const method = tEnum('common.paymentMethod', p.method || 'unknown');
       title = `${t(config.titleKey)}: ${method}`;
       addPaymentTag(p.payment_id);
       if (p.amount != null) summary = `+${formatCurrency(p.amount)}`;
@@ -226,7 +227,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       break;
     }
     case 'PAYMENT_CANCELLED': {
-      const method = p.method || 'unknown';
+      const method = tEnum('common.paymentMethod', p.method || 'unknown');
       title = `${t(config.titleKey)}: ${method}`;
       addPaymentTag(p.payment_id);
       if (p.amount != null) summary = `-${formatCurrency(p.amount)}`;
@@ -239,7 +240,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       if (p.receipt_number) summary = `#${p.receipt_number}`;
       if (p.payment_summary) {
         for (const ps of p.payment_summary) {
-          details.push(`${ps.method}: ${formatCurrency(ps.amount)}`);
+          details.push(`${tEnum('common.paymentMethod', ps.method)}: ${formatCurrency(ps.amount)}`);
         }
       }
       break;
@@ -329,7 +330,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       break;
     }
     case 'ITEM_SPLIT': {
-      if (p.split_amount != null) summary = `${formatCurrency(p.split_amount)} · ${p.payment_method || ''}`;
+      if (p.split_amount != null) summary = `${formatCurrency(p.split_amount)} · ${p.payment_method ? tEnum('common.paymentMethod', p.payment_method) : ''}`;
       addPaymentTag(p.payment_id);
       if (p.items) {
         for (const item of p.items) {
@@ -340,7 +341,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       break;
     }
     case 'AMOUNT_SPLIT': {
-      if (p.split_amount != null) summary = `${formatCurrency(p.split_amount)} · ${p.payment_method || ''}`;
+      if (p.split_amount != null) summary = `${formatCurrency(p.split_amount)} · ${p.payment_method ? tEnum('common.paymentMethod', p.payment_method) : ''}`;
       addPaymentTag(p.payment_id);
       break;
     }
@@ -351,7 +352,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       break;
     }
     case 'AA_SPLIT_PAID': {
-      if (p.amount != null) summary = `${formatCurrency(p.amount)} · ${p.payment_method || ''}`;
+      if (p.amount != null) summary = `${formatCurrency(p.amount)} · ${p.payment_method ? tEnum('common.paymentMethod', p.payment_method) : ''}`;
       addPaymentTag(p.payment_id);
       if (p.progress_paid != null && p.progress_total != null) {
         details.push(`${p.progress_paid}/${p.progress_total}`);

@@ -4,6 +4,7 @@ import {
   X, CreditCard, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { tEnum } from '@/infrastructure/i18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { useLiveOrders } from '@/core/stores/useLiveOrdersStore';
@@ -287,7 +288,7 @@ const OrderDetailPanel: React.FC<{
                   <div key={payment.payment_id} className={`flex items-center justify-between text-sm ${payment.cancelled ? 'opacity-50' : ''}`}>
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-slate-700 capitalize">{payment.method}</span>
+                      <span className="text-slate-700">{tEnum('common.paymentMethod', payment.method)}</span>
                       {payment.cancelled && <span className="px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded font-medium">{t('live.cancelled')}</span>}
                     </div>
                     <span className={`font-medium ${payment.cancelled ? 'text-slate-400 line-through' : 'text-green-600'}`}>{formatCurrency(payment.amount)}</span>

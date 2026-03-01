@@ -742,6 +742,10 @@
       "to": "结束",
       "apply": "确定"
     },
+    "paymentMethod": {
+      "CASH": "现金",
+      "CARD": "银行卡"
+    },
     "selection": {
       "selected": "已选择",
       "showing": "显示"
