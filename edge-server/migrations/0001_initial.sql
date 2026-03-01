@@ -341,7 +341,7 @@ CREATE TABLE store_info (
     phone               TEXT,
     email               TEXT,
     website             TEXT,
-    business_day_cutoff TEXT    NOT NULL DEFAULT '00:00',
+    business_day_cutoff INTEGER NOT NULL DEFAULT 0,
     created_at          INTEGER,
     updated_at          INTEGER
 );

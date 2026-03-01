@@ -258,7 +258,7 @@ impl ServerState {
 
         // Initialize business_day_cutoff from store_info
         if let Some(ref info) = store_info {
-            orders_manager.update_business_day_cutoff(&info.business_day_cutoff);
+            orders_manager.update_business_day_cutoff(info.business_day_cutoff);
         }
 
         // Note: ArchiveWorker is started in start_background_tasks()

@@ -67,16 +67,13 @@ pub fn date_cutoff_millis(date: NaiveDate, cutoff: NaiveTime, tz: Tz) -> i64 {
         .unwrap_or_else(|| naive.and_utc().timestamp_millis())
 }
 
-/// 解析 cutoff 时间字符串 (HH:MM)，失败返回 00:00
-pub fn parse_cutoff(cutoff: &str) -> NaiveTime {
-    NaiveTime::parse_from_str(cutoff, "%H:%M").unwrap_or_else(|e| {
-        tracing::warn!(
-            "Failed to parse business_day_cutoff '{}': {}, falling back to 00:00",
-            cutoff,
-            e
-        );
-        NaiveTime::MIN
-    })
+/// 从分钟偏移量构造 NaiveTime (e.g. 210 → 03:30, 480 → 08:00)
+pub fn cutoff_to_time(minutes: i32) -> NaiveTime {
+    let clamped = minutes.clamp(0, 480);
+    let h = (clamped / 60) as u32;
+    let m = (clamped % 60) as u32;
+    // SAFETY: h ∈ [0,8], m ∈ [0,59], always valid
+    NaiveTime::from_hms_opt(h, m, 0).unwrap_or(NaiveTime::MIN)
 }
 
 /// 计算当前营业日起始日期 (业务时区)

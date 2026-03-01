@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS stores (
     email TEXT,
     website TEXT,
     logo_url TEXT,
-    business_day_cutoff TEXT DEFAULT '06:00',
+    business_day_cutoff INTEGER DEFAULT 0,
     last_sync_at BIGINT,
     registered_at BIGINT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',

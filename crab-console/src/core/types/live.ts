@@ -121,7 +121,7 @@ export interface StoreInfoSnapshot {
   phone: string | null;
   email: string | null;
   website: string | null;
-  business_day_cutoff: string;
+  business_day_cutoff: number;
   created_at: number | null;
   updated_at: number | null;
 }

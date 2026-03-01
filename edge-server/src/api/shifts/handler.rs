@@ -250,14 +250,14 @@ pub async fn heartbeat(
 /// 查询过期班次并广播 settlement_required 通知前端处理。
 pub async fn recover_stale(State(state): State<ServerState>) -> AppResult<Json<Vec<Shift>>> {
     let tz = state.config.timezone;
-    let cutoff_str = store_info::get(&state.pool)
+    let cutoff_minutes = store_info::get(&state.pool)
         .await
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "02:00".to_string());
+        .unwrap_or(0);
 
-    let cutoff = time::parse_cutoff(&cutoff_str);
+    let cutoff = time::cutoff_to_time(cutoff_minutes);
     let today = time::current_business_date(cutoff, tz);
     let business_day_start = time::date_cutoff_millis(today, cutoff, tz);
 

@@ -10,11 +10,11 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::repository::store_info;
-use crate::utils::AppResult;
 use crate::utils::validation::{
     MAX_ADDRESS_LEN, MAX_EMAIL_LEN, MAX_NAME_LEN, MAX_SHORT_TEXT_LEN, MAX_URL_LEN,
     validate_optional_text,
 };
+use crate::utils::{AppError, AppResult};
 use shared::message::SyncChangeType;
 use shared::models::{StoreInfo, StoreInfoUpdate};
 
@@ -29,11 +29,13 @@ fn validate_update(payload: &StoreInfoUpdate) -> AppResult<()> {
     validate_optional_text(&payload.phone, "phone", MAX_SHORT_TEXT_LEN)?;
     validate_optional_text(&payload.email, "email", MAX_EMAIL_LEN)?;
     validate_optional_text(&payload.website, "website", MAX_URL_LEN)?;
-    validate_optional_text(
-        &payload.business_day_cutoff,
-        "business_day_cutoff",
-        MAX_SHORT_TEXT_LEN,
-    )?;
+    if let Some(cutoff) = payload.business_day_cutoff
+        && !(0..=480).contains(&cutoff)
+    {
+        return Err(AppError::validation(
+            "business_day_cutoff must be between 0 and 480 (00:00-08:00)",
+        ));
+    }
     Ok(())
 }
 
@@ -80,7 +82,7 @@ pub async fn update(
     // 更新 OrdersManager 的 business_day_cutoff 缓存
     state
         .orders_manager
-        .update_business_day_cutoff(&store_info.business_day_cutoff);
+        .update_business_day_cutoff(store_info.business_day_cutoff);
 
     Ok(Json(store_info))
 }

@@ -16,7 +16,7 @@ export function updateStore(
     nif?: string;
     email?: string;
     website?: string;
-    business_day_cutoff?: string;
+    business_day_cutoff?: number;
   },
 ): Promise<void> {
   return request('PATCH', `/api/tenant/stores/${storeId}`, data, token);

@@ -40,18 +40,18 @@ pub async fn verify_daily_chain(
         .ok_or_else(|| AppError::internal("Archive service not available"))?;
 
     // 从 store_info 获取营业日分割时间
-    let cutoff = store_info::get(&state.pool)
+    let cutoff_minutes = store_info::get(&state.pool)
         .await
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "02:00".to_string());
+        .unwrap_or(0);
 
     // 营业日结束 = 下一天的 cutoff
     let parsed_date = time::parse_date(&date)?;
     let end_date = parsed_date + chrono::Duration::days(1);
 
-    let cutoff_time = time::parse_cutoff(&cutoff);
+    let cutoff_time = time::cutoff_to_time(cutoff_minutes);
     let tz = state.config.timezone;
     let start = time::date_cutoff_millis(parsed_date, cutoff_time, tz);
     let end = time::date_cutoff_millis(end_date, cutoff_time, tz);

@@ -21,8 +21,8 @@ interface Props {
   lastWeekOverview?: StoreOverview | null;
   showHeader?: boolean;
   rangeLabel?: string;
-  /** Business day cutoff hour for correct hourly trend ordering */
-  cutoffHour?: number;
+  /** Business day cutoff in minutes from midnight for correct hourly trend ordering */
+  cutoffMinutes?: number;
 }
 
 /** Compute percentage change. Returns null if previous is 0 (no meaningful comparison). */
@@ -34,7 +34,7 @@ function pctChange(current: number, previous: number): number | null {
 /** For "negative is better" metrics (voids, losses, refunds), invert the color logic. */
 type DeltaDirection = 'positive' | 'negative' | 'neutral';
 
-export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOverview, lastWeekOverview, showHeader = true, rangeLabel, cutoffHour = 0 }) => {
+export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOverview, lastWeekOverview, showHeader = true, rangeLabel, cutoffMinutes = 0 }) => {
   const { t } = useI18n();
   const prev = previousOverview ?? null;
   const lastWeek = lastWeekOverview ?? null;
@@ -59,7 +59,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
     if (allHours.size === 0) return [];
 
     // Sort hours in business-day order: cutoffHour first, wrap at midnight
-    // e.g. cutoff=4 → [4,5,...,23,0,1,2,3], cutoff=0 → [0,1,...,23]
+    const cutoffHour = Math.floor(cutoffMinutes / 60);
     const toBizOrder = (h: number) => (h - cutoffHour + 24) % 24;
     const sorted = [...allHours].sort((a, b) => toBizOrder(a) - toBizOrder(b));
 

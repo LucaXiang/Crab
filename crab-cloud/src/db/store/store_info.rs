@@ -36,7 +36,7 @@ pub async fn upsert_store_info_from_sync(
     .bind(&info.phone)
     .bind(&info.email)
     .bind(&info.website)
-    .bind(&info.business_day_cutoff)
+    .bind(info.business_day_cutoff)
     .bind(info.created_at)
     .bind(now)
     .execute(pool)
@@ -77,7 +77,7 @@ pub async fn update_store_info_direct(
     .bind(&data.phone)
     .bind(&data.email)
     .bind(&data.website)
-    .bind(&data.business_day_cutoff)
+    .bind(data.business_day_cutoff)
     .bind(now)
     .fetch_one(pool)
     .await?;

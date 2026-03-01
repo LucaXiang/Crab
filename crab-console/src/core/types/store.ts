@@ -8,7 +8,7 @@ export interface StoreDetail {
   nif?: string;
   email?: string;
   website?: string;
-  business_day_cutoff?: string;
+  business_day_cutoff?: number;
   device_id: string;
   is_online: boolean;
   last_sync_at: number | null;
@@ -560,7 +560,7 @@ export interface StoreInfo {
   nif: string | null;
   email: string | null;
   website: string | null;
-  business_day_cutoff: string | null;
+  business_day_cutoff: number | null;
   currency_code: string | null;
   currency_symbol: string | null;
   currency_decimal_places: number | null;
@@ -577,7 +577,7 @@ export interface StoreInfoUpdate {
   nif?: string;
   email?: string;
   website?: string;
-  business_day_cutoff?: string;
+  business_day_cutoff?: number;
   currency_code?: string;
   currency_symbol?: string;
   currency_decimal_places?: number;

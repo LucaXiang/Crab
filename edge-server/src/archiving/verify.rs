@@ -357,13 +357,13 @@ impl VerifyScheduler {
 
     /// 获取 business_day_cutoff (NaiveTime)
     async fn get_cutoff(&self) -> NaiveTime {
-        let cutoff_str = store_info::get(&self.pool)
+        let cutoff = store_info::get(&self.pool)
             .await
             .ok()
             .flatten()
             .map(|s| s.business_day_cutoff)
-            .unwrap_or_else(|| "02:00".to_string());
-        time::parse_cutoff(&cutoff_str)
+            .unwrap_or(0);
+        time::cutoff_to_time(cutoff)
     }
 
     /// 计算"昨天"的营业日

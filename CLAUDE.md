@@ -282,6 +282,7 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 **全栈统一错误码**：`shared::ErrorCode` (u16) 是唯一的错误标识，贯穿 Rust → JSON → TypeScript → i18n。
 
 - **Rust 端**: 所有 API 错误必须通过 `AppError` 返回，携带 `ErrorCode`。禁止直接返回裸 `StatusCode` 或自定义错误 JSON
+- **任何错误都必须分配 ErrorCode**：包括 validation 错误。禁止用 `AppError::validation("硬编码英文消息")` 直接返回字符串——必须新增对应的 `ErrorCode` variant，前端通过 `code` 做 i18n 翻译。`message` 字段仅作 fallback，不是国际化方案
 - **JSON 响应**: 统一格式 `{ "code": u16, "message": "...", "data": T?, "details": {}? }`，前端靠 `code` 做 i18n 查表，`message` 仅作 fallback
 - **前端 i18n**: 错误码 → `errorCode.<CODE>` 翻译 key，新增错误码时必须同步添加中/西/英翻译
 - **新增错误码流程**: `shared/src/error/codes.rs` 添加 variant → `http.rs` 映射 HTTP 状态码 → `TryFrom<u16>` + `message()` + variant count guard 同步更新 → 前端 i18n 翻译

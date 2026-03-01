@@ -70,7 +70,7 @@ pub struct StoreSummary {
     pub nif: Option<String>,
     pub email: Option<String>,
     pub website: Option<String>,
-    pub business_day_cutoff: Option<String>,
+    pub business_day_cutoff: Option<i32>,
     pub device_id: String,
     pub last_sync_at: Option<i64>,
     pub registered_at: i64,

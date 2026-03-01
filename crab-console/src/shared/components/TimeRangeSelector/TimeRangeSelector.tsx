@@ -14,13 +14,15 @@ export interface TimeRange {
 interface Props {
   value: TimeRange;
   onChange: (range: TimeRange) => void;
-  /** Business day cutoff hour (e.g. 4 for 04:00). Defaults to 0 (midnight). */
-  cutoffHour?: number;
+  /** Business day cutoff in minutes from midnight (0-480). Defaults to 0. */
+  cutoffMinutes?: number;
 }
 
-/** Start of business day: midnight + cutoff hours */
-function startOfBusinessDay(date: Date, cutoffHour: number): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), cutoffHour);
+/** Start of business day: midnight + cutoff minutes */
+function startOfBusinessDay(date: Date, cutoffMinutes: number): Date {
+  const h = Math.floor(cutoffMinutes / 60);
+  const m = cutoffMinutes % 60;
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, m, 0, 0);
   // If current time is before cutoff, the business day started yesterday
   if (date < d) d.setDate(d.getDate() - 1);
   return d;
@@ -53,33 +55,34 @@ function formatDateInput(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function getPresetRange(preset: TimeRangePreset, t: (key: string) => string, customFrom?: number, customTo?: number, cutoffHour = 0): TimeRange {
+export function getPresetRange(preset: TimeRangePreset, t: (key: string) => string, customFrom?: number, customTo?: number, cutoffMinutes = 0): TimeRange {
   const now = new Date();
-  const sod = cutoffHour > 0 ? startOfBusinessDay : (_d: Date) => startOfDay(_d);
+  const sod = cutoffMinutes > 0 ? startOfBusinessDay : (_d: Date) => startOfDay(_d);
+  const cutoffH = Math.floor(cutoffMinutes / 60);
+  const cutoffM = cutoffMinutes % 60;
 
   switch (preset) {
     case 'today':
-      return { from: sod(now, cutoffHour).getTime(), to: endOfNow(), preset, label: t('stats.today') };
+      return { from: sod(now, cutoffMinutes).getTime(), to: endOfNow(), preset, label: t('stats.today') };
     case 'yesterday': {
-      const todayStart = sod(now, cutoffHour);
+      const todayStart = sod(now, cutoffMinutes);
       const yesterdayStart = new Date(todayStart);
       yesterdayStart.setDate(yesterdayStart.getDate() - 1);
       return { from: yesterdayStart.getTime(), to: todayStart.getTime(), preset, label: t('stats.yesterday') };
     }
     case 'this_week': {
       const weekStart = startOfWeek(now);
-      // Apply cutoff to the week start day
-      weekStart.setHours(cutoffHour, 0, 0, 0);
+      weekStart.setHours(cutoffH, cutoffM, 0, 0);
       return { from: weekStart.getTime(), to: endOfNow(), preset, label: t('stats.this_week') };
     }
     case 'this_month': {
       const monthStart = startOfMonth(now);
-      monthStart.setHours(cutoffHour, 0, 0, 0);
+      monthStart.setHours(cutoffH, cutoffM, 0, 0);
       return { from: monthStart.getTime(), to: endOfNow(), preset, label: t('stats.this_month') };
     }
     case 'custom':
       return {
-        from: customFrom ?? sod(now, cutoffHour).getTime(),
+        from: customFrom ?? sod(now, cutoffMinutes).getTime(),
         to: customTo ?? endOfNow(),
         preset,
         label: t('stats.custom_range'),
@@ -135,7 +138,7 @@ export function getLastWeekSameDayRange(range: TimeRange): { from: number; to: n
 
 const PRESETS: TimeRangePreset[] = ['today', 'yesterday', 'this_week', 'this_month'];
 
-export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffHour = 0 }) => {
+export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinutes = 0 }) => {
   const { t } = useI18n();
   const [showCustom, setShowCustom] = useState(false);
   const customRef = useRef<HTMLDivElement>(null);
@@ -161,16 +164,18 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffHour
       return;
     }
     setShowCustom(false);
-    onChange(getPresetRange(preset, t, undefined, undefined, cutoffHour));
+    onChange(getPresetRange(preset, t, undefined, undefined, cutoffMinutes));
   };
 
   const handleCustomApply = () => {
+    const cutoffH = Math.floor(cutoffMinutes / 60);
+    const cutoffM = cutoffMinutes % 60;
     const from = new Date(customFrom);
-    from.setHours(cutoffHour, 0, 0, 0);
+    from.setHours(cutoffH, cutoffM, 0, 0);
     const toDate = new Date(customTo);
     toDate.setDate(toDate.getDate() + 1);
-    toDate.setHours(cutoffHour, 0, 0, 0);
-    onChange(getPresetRange('custom', t, from.getTime(), toDate.getTime(), cutoffHour));
+    toDate.setHours(cutoffH, cutoffM, 0, 0);
+    onChange(getPresetRange('custom', t, from.getTime(), toDate.getTime(), cutoffMinutes));
     setShowCustom(false);
   };
 

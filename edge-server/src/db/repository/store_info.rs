@@ -14,7 +14,7 @@ pub async fn get_or_create(pool: &SqlitePool) -> RepoResult<StoreInfo> {
     // Create singleton with defaults
     let now = shared::util::now_millis();
     sqlx::query!(
-        "INSERT INTO store_info (id, name, address, nif, business_day_cutoff, created_at, updated_at) VALUES (?, '', '', '', '02:00', ?, ?)",
+        "INSERT INTO store_info (id, name, address, nif, business_day_cutoff, created_at, updated_at) VALUES (?, '', '', '', 0, ?, ?)",
         SINGLETON_ID,
         now,
         now

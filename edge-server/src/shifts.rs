@@ -113,14 +113,14 @@ impl ShiftAutoCloseScheduler {
 
     /// 获取 cutoff 时间（每次从 DB 读取，支持动态修改）
     async fn get_cutoff_time(&self) -> NaiveTime {
-        let cutoff_str = store_info::get(&self.state.pool)
+        let cutoff = store_info::get(&self.state.pool)
             .await
             .ok()
             .flatten()
             .map(|s| s.business_day_cutoff)
-            .unwrap_or_else(|| "02:00".to_string());
+            .unwrap_or(0);
 
-        time::parse_cutoff(&cutoff_str)
+        time::cutoff_to_time(cutoff)
     }
 
     /// 计算距离下一次 cutoff 的 Duration

@@ -839,7 +839,7 @@ pub struct StoreDetailResponse {
     pub nif: Option<String>,
     pub email: Option<String>,
     pub website: Option<String>,
-    pub business_day_cutoff: Option<String>,
+    pub business_day_cutoff: Option<i32>,
     pub device_id: String,
     pub is_online: bool,
     pub last_sync_at: Option<i64>,

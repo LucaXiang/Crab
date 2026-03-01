@@ -176,8 +176,8 @@ impl OrdersManager {
     }
 
     /// Update the cached business_day_cutoff (called when store_info changes)
-    pub fn update_business_day_cutoff(&self, cutoff: &str) {
-        let parsed = crate::utils::time::parse_cutoff(cutoff);
+    pub fn update_business_day_cutoff(&self, cutoff: i32) {
+        let parsed = crate::utils::time::cutoff_to_time(cutoff);
         *self.business_day_cutoff.write() = parsed;
     }
 

@@ -53,7 +53,7 @@ export const DashboardScreen: React.FC = () => {
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
-  const [cutoffHour, setCutoffHour] = useState(0);
+  const [cutoffMinutes, setCutoffMinutes] = useState(0);
   const [timeRange, setTimeRange] = useState<TimeRange>(() => getPresetRange('today', t));
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [updatedLabel, setUpdatedLabel] = useState('');
@@ -120,13 +120,10 @@ export const DashboardScreen: React.FC = () => {
           let effectiveCutoff = 0;
           if (storeList.length > 0) {
             const cutoffs = storeList
-              .map(s => {
-                const parsed = s.business_day_cutoff ? parseInt(s.business_day_cutoff.split(':')[0], 10) || 0 : 0;
-                return Math.min(Math.max(parsed, 0), 6); // clamp to 00:00-06:00
-              })
-              .filter(h => h > 0);
+              .map(s => Math.min(Math.max(s.business_day_cutoff ?? 0, 0), 480))
+              .filter(m => m > 0);
             effectiveCutoff = cutoffs.length > 0 ? Math.max(...cutoffs) : 0;
-            if (effectiveCutoff > 0) setCutoffHour(effectiveCutoff);
+            if (effectiveCutoff > 0) setCutoffMinutes(effectiveCutoff);
           }
 
           // Recalculate time range with cutoff
@@ -382,7 +379,7 @@ export const DashboardScreen: React.FC = () => {
             </p>
           </div>
         </div>
-        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} cutoffHour={cutoffHour} />
+        <TimeRangeSelector value={timeRange} onChange={handleRangeChange} cutoffMinutes={cutoffMinutes} />
       </div>
 
       {/* Overview charts (all stores combined) */}
@@ -391,7 +388,7 @@ export const DashboardScreen: React.FC = () => {
           <Spinner className="w-8 h-8 text-primary-500" />
         </div>
       ) : overview ? (
-        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} cutoffHour={cutoffHour} />
+        <StoreOverviewDisplay overview={overview} previousOverview={previousOverview} lastWeekOverview={lastWeekOverview} showHeader={false} rangeLabel={timeRange.label} cutoffMinutes={cutoffMinutes} />
       ) : null}
 
       {/* Sync warning */}

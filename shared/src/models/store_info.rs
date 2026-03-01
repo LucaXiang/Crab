@@ -18,15 +18,11 @@ pub struct StoreInfo {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub website: Option<String>,
-    /// 营业日分界时间 (HH:MM 格式，如 "06:00")
-    #[serde(default = "default_cutoff")]
-    pub business_day_cutoff: String,
+    /// 营业日分界时间 — 从午夜 00:00 起的偏移分钟数 (0-480，即 00:00-08:00)
+    #[serde(default)]
+    pub business_day_cutoff: i32,
     pub created_at: Option<i64>,
     pub updated_at: Option<i64>,
-}
-
-fn default_cutoff() -> String {
-    "02:00".to_string()
 }
 
 /// Update store info payload
@@ -39,5 +35,5 @@ pub struct StoreInfoUpdate {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub website: Option<String>,
-    pub business_day_cutoff: Option<String>,
+    pub business_day_cutoff: Option<i32>,
 }

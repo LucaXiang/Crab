@@ -128,12 +128,12 @@ fn default_page() -> i32 {
 /// Returns (start_millis, end_millis) as Unix timestamp milliseconds
 fn calculate_time_range(
     time_range: &str,
-    cutoff: &str,
+    cutoff: i32,
     custom_start: Option<&str>,
     custom_end: Option<&str>,
     tz: chrono_tz::Tz,
 ) -> (i64, i64) {
-    let cutoff_time = time::parse_cutoff(cutoff);
+    let cutoff_time = time::cutoff_to_time(cutoff);
     let today = time::current_business_date(cutoff_time, tz);
 
     let cutoff_millis = |date| time::date_cutoff_millis(date, cutoff_time, tz);
@@ -216,11 +216,11 @@ pub async fn get_statistics(
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "02:00".to_string());
+        .unwrap_or(0);
 
     let (start_dt, end_dt) = calculate_time_range(
         &query.time_range,
-        &cutoff,
+        cutoff,
         query.start_date.as_deref(),
         query.end_date.as_deref(),
         state.config.timezone,
@@ -230,7 +230,7 @@ pub async fn get_statistics(
         time_range = %query.time_range,
         start = %start_dt,
         end = %end_dt,
-        cutoff = %cutoff,
+        cutoff = cutoff,
         "Fetching statistics"
     );
 
@@ -389,11 +389,11 @@ pub async fn get_sales_report(
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "02:00".to_string());
+        .unwrap_or(0);
 
     let (start_dt, end_dt) = calculate_time_range(
         &query.time_range,
-        &cutoff,
+        cutoff,
         query.start_date.as_deref(),
         query.end_date.as_deref(),
         state.config.timezone,

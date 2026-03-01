@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Copy, Check, MapPin, Phone, Mail, Globe, Clock, FileText, Fingerprint, CalendarDays } from 'lucide-react';
+import { Save, Copy, Check, MapPin, Phone, Mail, Globe, Clock, FileText, Fingerprint, CalendarDays, Monitor, Trash2, AlertTriangle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
@@ -35,7 +35,7 @@ export const StoreSettingsScreen: React.FC = () => {
     nif: '',
     email: '',
     website: '',
-    business_day_cutoff: '',
+    business_day_cutoff: 0,
   });
 
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
@@ -54,7 +54,7 @@ export const StoreSettingsScreen: React.FC = () => {
       nif: info.nif ?? prev.nif,
       email: info.email ?? prev.email,
       website: info.website ?? prev.website,
-      business_day_cutoff: info.business_day_cutoff ?? prev.business_day_cutoff,
+      business_day_cutoff: info.business_day_cutoff ?? prev.business_day_cutoff ?? 0,
     }));
     if (info.logo_url !== undefined) {
       setFormLogo(info.logo_url ?? '');
@@ -81,7 +81,7 @@ export const StoreSettingsScreen: React.FC = () => {
             nif: s.nif ?? '',
             email: s.email ?? '',
             website: s.website ?? '',
-            business_day_cutoff: s.business_day_cutoff ?? '',
+            business_day_cutoff: s.business_day_cutoff ?? 0,
           });
         }
         setFormLogo(info.logo ?? '');
@@ -132,7 +132,7 @@ export const StoreSettingsScreen: React.FC = () => {
     } finally { setSaving(false); }
   };
 
-  const update = (key: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+  const update = (key: keyof typeof form, value: string | number) => setForm(prev => ({ ...prev, [key]: value }));
 
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner className="w-8 h-8 text-primary-500" /></div>;
 
@@ -186,7 +186,23 @@ export const StoreSettingsScreen: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t('store.nif')} value={form.nif} onChange={v => update('nif', v)} icon={FileText} />
-          <Field label={t('store.business_day_cutoff')} value={form.business_day_cutoff} onChange={v => update('business_day_cutoff', v)} icon={Clock} placeholder="04:00" />
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              {t('store.business_day_cutoff')}
+            </label>
+            <div className="flex items-center gap-2">
+              <select
+                value={form.business_day_cutoff}
+                onChange={e => update('business_day_cutoff', Number(e.target.value))}
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+              >
+                {[0, 60, 120, 180, 210, 240, 300, 360, 420, 480].map(m => (
+                  <option key={m} value={m}>{`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -205,33 +221,36 @@ export const StoreSettingsScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Devices Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('store.devices')}</h3>
+      {/* Devices */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Monitor className="w-4.5 h-4.5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('store.devices')}</h3>
+        </div>
         {devicesLoading ? (
-          <p className="text-gray-500 text-sm">{t('store.devices_loading')}</p>
+          <p className="text-slate-400 text-sm">{t('store.devices_loading')}</p>
         ) : devices.length === 0 ? (
-          <p className="text-gray-500 text-sm">{t('store.no_devices')}</p>
+          <p className="text-slate-400 text-sm">{t('store.no_devices')}</p>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-slate-100">
             {devices.map((d) => (
               <div key={d.entity_id} className="py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    d.device_type === 'server' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                <div className="flex items-center gap-2.5">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                    d.device_type === 'server' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
                   }`}>
                     {d.device_type === 'server' ? t('store.device_type_server') : t('store.device_type_client')}
                   </span>
-                  <span className="font-mono text-sm text-gray-600">{d.device_id.slice(0, 8)}</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    d.status === 'active' ? 'bg-green-100 text-green-800' :
-                    d.status === 'replaced' ? 'bg-gray-100 text-gray-500' :
-                    'bg-red-100 text-red-800'
+                  <span className="font-mono text-sm text-slate-600">{d.device_id.slice(0, 8)}</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                    d.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
+                    d.status === 'replaced' ? 'bg-slate-100 text-slate-400' :
+                    'bg-red-50 text-red-600'
                   }`}>
                     {d.status}
                   </span>
                 </div>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-slate-400">
                   {new Date(d.activated_at).toLocaleDateString()}
                 </span>
               </div>
@@ -241,39 +260,41 @@ export const StoreSettingsScreen: React.FC = () => {
       </div>
 
       {/* Danger Zone */}
-      <div className="bg-white rounded-lg shadow-sm border border-red-200 p-6">
-        <h3 className="text-lg font-semibold text-red-600 mb-2">{t('store.danger_zone')}</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          {t('store.danger_zone_desc')}
-        </p>
+      <div className="bg-white rounded-2xl border border-red-200/60 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4.5 h-4.5 text-red-400" />
+          <h3 className="font-bold text-red-600">{t('store.danger_zone')}</h3>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">{t('store.danger_zone_desc')}</p>
         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
         <button
           onClick={() => setShowDeleteConfirm(true)}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium"
+          className="px-4 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 active:scale-[0.98] transition-all flex items-center gap-2"
         >
+          <Trash2 className="w-4 h-4" />
           {t('store.delete_store')}
         </button>
       </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('store.confirm_delete')}</h3>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">{t('store.confirm_delete')}</h3>
+            <p className="text-sm text-slate-500 mb-5">
               {t('store.confirm_delete_desc').replace('{alias}', form.alias)}
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
               >
                 {t('common.action.cancel')}
               </button>
               <button
                 onClick={handleDeleteStore}
                 disabled={deleting}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 {deleting ? t('store.deleting') : t('store.confirm_delete')}
               </button>
