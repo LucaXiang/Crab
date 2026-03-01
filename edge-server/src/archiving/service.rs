@@ -439,7 +439,7 @@ impl OrderArchiveService {
                 operator_id, operator_name, \
                 void_type, loss_reason, loss_amount, void_note, \
                 member_id, member_name, \
-                created_at, order_id, queue_number, shift_id\
+                created_at, order_id, queue_number, shift_id, service_type\
             ) VALUES (\
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
                 ?8, ?9, ?10, ?11, \
@@ -450,7 +450,7 @@ impl OrderArchiveService {
                 ?22, ?23, \
                 ?24, ?25, ?26, ?27, \
                 ?28, ?29, \
-                ?30, ?31, ?32, ?33\
+                ?30, ?31, ?32, ?33, ?34\
             )",
         )
         .bind(order_pk)
@@ -496,6 +496,12 @@ impl OrderArchiveService {
         .bind(snapshot.order_id)
         .bind(snapshot.queue_number.map(|q| q as i64))
         .bind(shift_id)
+        .bind(snapshot.service_type.as_ref().map(|st| {
+            serde_json::to_value(st)
+                .ok()
+                .and_then(|val| val.as_str().map(String::from))
+                .unwrap_or_default()
+        }))
         .execute(&mut *tx)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;

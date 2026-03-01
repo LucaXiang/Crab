@@ -431,6 +431,7 @@ pub async fn build_order_detail_sync(
         loss_amount: Option<f64>,
         void_note: Option<String>,
         member_name: Option<String>,
+        service_type: Option<String>,
         cloud_synced: bool,
     }
 
@@ -441,7 +442,7 @@ pub async fn build_order_detail_sync(
          ao.comp_total_amount, ao.order_manual_discount_amount, ao.order_manual_surcharge_amount, \
          ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
          ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, ao.member_name, \
-         ao.cloud_synced \
+         ao.service_type, ao.cloud_synced \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -675,6 +676,7 @@ pub async fn build_order_detail_sync(
             loss_amount: order.loss_amount,
             void_note: order.void_note,
             member_name: order.member_name,
+            service_type: order.service_type,
             items,
             payments,
             events,

@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 
-use rust_decimal::prelude::ToPrimitive;
 use shared::cloud::{CloudSyncItem, SyncResource};
 use shared::models::store_info::StoreInfo;
 use sqlx::PgPool;
@@ -294,8 +293,12 @@ async fn upsert_credit_note(
         );
     }
 
-    // Upsert header row (RETURNING id for child inserts)
-    let row: (i64,) = sqlx::query_as(
+    // Upsert header row (RETURNING id for child inserts).
+    // fetch_optional: if version is older than existing, PG skips the update and RETURNING
+    // returns no rows — we simply skip the sync item.
+    let mut tx = pool.begin().await?;
+
+    let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_credit_notes (
             store_id, tenant_id, source_id, credit_note_number,
@@ -337,14 +340,19 @@ async fn upsert_credit_note(
     .bind(cn.created_at)
     .bind(version_to_i64(item.version))
     .bind(now)
-    .fetch_one(pool)
+    .fetch_optional(&mut *tx)
     .await?;
-    let cn_id = row.0;
 
-    // Replace child items (delete + re-insert)
+    let Some((cn_id,)) = row else {
+        // Version already newer — skip this item
+        tx.commit().await?;
+        return Ok(());
+    };
+
+    // Replace child items (delete + re-insert) within same transaction
     sqlx::query("DELETE FROM store_credit_note_items WHERE credit_note_id = $1")
         .bind(cn_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
     if !cn.items.is_empty() {
@@ -371,10 +379,11 @@ async fn upsert_credit_note(
         .bind(&line_credits)
         .bind(&tax_rates)
         .bind(&tax_credits)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -405,8 +414,13 @@ async fn upsert_archived_order(
 
     let d = &detail_sync.detail;
 
-    // Upsert header row
-    let row: (i64,) = sqlx::query_as(
+    // All writes (header + children) in a single transaction for atomicity.
+    let mut tx = pool.begin().await?;
+
+    // Upsert header row.
+    // fetch_optional: if version is older than existing, PG skips the update and RETURNING
+    // returns no rows — we simply skip this sync item.
+    let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_archived_orders (
             store_id, tenant_id, source_id, order_id,
@@ -491,31 +505,36 @@ async fn upsert_archived_order(
     .bind(&d.loss_reason)                    // $31
     .bind(&d.void_note)                      // $32
     .bind(&d.member_name)                    // $33
-    .bind("DineIn")                          // $34 service_type (TODO: add to sync)
+    .bind(d.service_type.as_deref().unwrap_or("DineIn")) // $34
     .bind(version_to_i64(item.version))      // $35
     .bind(now)                               // $36
-    .fetch_one(pool)
+    .fetch_optional(&mut *tx)
     .await?;
-    let order_pk = row.0;
+
+    let Some((order_pk,)) = row else {
+        // Version already newer — skip this item
+        tx.commit().await?;
+        return Ok(());
+    };
 
     // ── Replace all child tables (delete + batch re-insert) ──
 
-    // Delete existing children
+    // Delete existing children (CASCADE would also work but explicit is clearer)
     sqlx::query("DELETE FROM store_order_items WHERE order_id = $1")
         .bind(order_pk)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM store_order_payments WHERE order_id = $1")
         .bind(order_pk)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM store_order_events WHERE order_id = $1")
         .bind(order_pk)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM store_order_desglose WHERE order_id = $1")
         .bind(order_pk)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
     // ── Items + Options ──
@@ -568,7 +587,7 @@ async fn upsert_archived_order(
         .bind(&tax_rates)
         .bind(&comped)
         .bind(&notes)
-        .fetch_all(pool)
+        .fetch_all(&mut *tx)
         .await?;
 
         // Insert item options (batch across all items)
@@ -601,7 +620,7 @@ async fn upsert_archived_order(
             .bind(&opt_option_names)
             .bind(&opt_prices)
             .bind(&opt_quantities)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
         }
     }
@@ -627,7 +646,7 @@ async fn upsert_archived_order(
         .bind(&amounts)
         .bind(&timestamps)
         .bind(&cancelled)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
@@ -658,7 +677,7 @@ async fn upsert_archived_order(
         .bind(&op_ids)
         .bind(&op_names)
         .bind(&data)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
@@ -666,21 +685,15 @@ async fn upsert_archived_order(
     if !detail_sync.desglose.is_empty() {
         let oids: Vec<i64> = detail_sync.desglose.iter().map(|_| order_pk).collect();
         let rates: Vec<i32> = detail_sync.desglose.iter().map(|d| d.tax_rate).collect();
-        let bases: Vec<f64> = detail_sync
-            .desglose
-            .iter()
-            .map(|d| d.base_amount.to_f64().unwrap_or(0.0))
-            .collect();
-        let tax_amts: Vec<f64> = detail_sync
-            .desglose
-            .iter()
-            .map(|d| d.tax_amount.to_f64().unwrap_or(0.0))
-            .collect();
+        let bases: Vec<rust_decimal::Decimal> =
+            detail_sync.desglose.iter().map(|d| d.base_amount).collect();
+        let tax_amts: Vec<rust_decimal::Decimal> =
+            detail_sync.desglose.iter().map(|d| d.tax_amount).collect();
 
         sqlx::query(
             r#"
             INSERT INTO store_order_desglose (order_id, tax_rate, base_amount, tax_amount)
-            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::float8[], $4::float8[])
+            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::numeric[], $4::numeric[])
             ON CONFLICT (order_id, tax_rate) DO UPDATE SET
                 base_amount = EXCLUDED.base_amount,
                 tax_amount = EXCLUDED.tax_amount
@@ -690,10 +703,11 @@ async fn upsert_archived_order(
         .bind(&rates)
         .bind(&bases)
         .bind(&tax_amts)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -850,7 +864,9 @@ async fn upsert_invoice(
         .into());
     }
 
-    let row: (i64,) = sqlx::query_as(
+    let mut tx = pool.begin().await?;
+
+    let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_invoices (
             store_id, tenant_id, source_id, invoice_number, serie,
@@ -905,44 +921,43 @@ async fn upsert_invoice(
     .bind(inv.created_at)
     .bind(version_to_i64(item.version))
     .bind(now)
-    .fetch_one(pool)
+    .fetch_optional(&mut *tx)
     .await?;
-    let invoice_id = row.0;
 
-    // Replace desglose child rows
+    let Some((invoice_id,)) = row else {
+        tx.commit().await?;
+        return Ok(());
+    };
+
+    // Replace desglose child rows within same transaction
     sqlx::query("DELETE FROM store_invoice_desglose WHERE invoice_id = $1")
         .bind(invoice_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
     if !inv.desglose.is_empty() {
         let inv_ids: Vec<i64> = inv.desglose.iter().map(|_| invoice_id).collect();
         let rates: Vec<i32> = inv.desglose.iter().map(|d| d.tax_rate).collect();
-        let bases: Vec<f64> = inv
-            .desglose
-            .iter()
-            .map(|d| d.base_amount.to_f64().unwrap_or(0.0))
-            .collect();
-        let tax_amts: Vec<f64> = inv
-            .desglose
-            .iter()
-            .map(|d| d.tax_amount.to_f64().unwrap_or(0.0))
-            .collect();
+        let bases: Vec<rust_decimal::Decimal> =
+            inv.desglose.iter().map(|d| d.base_amount).collect();
+        let tax_amts: Vec<rust_decimal::Decimal> =
+            inv.desglose.iter().map(|d| d.tax_amount).collect();
 
         sqlx::query(
             r#"
             INSERT INTO store_invoice_desglose (invoice_id, tax_rate, base_amount, tax_amount)
-            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::float8[], $4::float8[])
+            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::numeric[], $4::numeric[])
             "#,
         )
         .bind(&inv_ids)
         .bind(&rates)
         .bind(&bases)
         .bind(&tax_amts)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
+    tx.commit().await?;
     Ok(())
 }
 

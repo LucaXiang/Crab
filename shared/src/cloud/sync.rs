@@ -290,6 +290,8 @@ pub struct OrderDetailPayload {
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
     pub member_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_type: Option<String>,
     pub items: Vec<OrderItemSync>,
     pub payments: Vec<OrderPaymentSync>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

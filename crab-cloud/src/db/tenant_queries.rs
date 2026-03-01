@@ -771,13 +771,14 @@ pub async fn get_order_detail(
         loss_amount: header.loss_amount,
         void_note: header.void_note,
         member_name: header.member_name,
+        service_type: None, // not needed for Console detail view
         items,
         payments,
         events,
     }))
 }
 
-/// Get order desglose from store_order_desglose table
+/// Get order desglose from store_order_desglose table (NUMERIC columns → Decimal direct)
 pub async fn get_order_desglose(
     pool: &PgPool,
     store_id: i64,
@@ -787,8 +788,8 @@ pub async fn get_order_desglose(
     #[derive(sqlx::FromRow)]
     struct DesgloseRow {
         tax_rate: i32,
-        base_amount: f64,
-        tax_amount: f64,
+        base_amount: rust_decimal::Decimal,
+        tax_amount: rust_decimal::Decimal,
     }
 
     let rows = sqlx::query_as::<_, DesgloseRow>(
@@ -810,8 +811,8 @@ pub async fn get_order_desglose(
         .into_iter()
         .map(|r| shared::cloud::TaxDesglose {
             tax_rate: r.tax_rate,
-            base_amount: rust_decimal::Decimal::try_from(r.base_amount).unwrap_or_default(),
-            tax_amount: rust_decimal::Decimal::try_from(r.tax_amount).unwrap_or_default(),
+            base_amount: r.base_amount,
+            tax_amount: r.tax_amount,
         })
         .collect())
 }
