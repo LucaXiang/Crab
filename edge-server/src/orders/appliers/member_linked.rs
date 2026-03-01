@@ -57,7 +57,7 @@ mod tests {
     };
 
     fn create_member_linked_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         member_id: i64,
         member_name: &str,
@@ -67,10 +67,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::MemberLinked,
             EventPayload::MemberLinked {
@@ -115,11 +115,11 @@ mod tests {
 
     #[test]
     fn test_member_linked_sets_fields() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         assert!(snapshot.member_id.is_none());
         assert!(snapshot.marketing_group_id.is_none());
 
-        let event = create_member_linked_event("order-1", 2, 42, "Alice", 1, "VIP", vec![]);
+        let event = create_member_linked_event(1001, 2, 42, "Alice", 1, "VIP", vec![]);
         let applier = MemberLinkedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -132,13 +132,13 @@ mod tests {
 
     #[test]
     fn test_member_linked_replaces_existing() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(10);
         snapshot.member_name = Some("Bob".to_string());
         snapshot.marketing_group_id = Some(5);
         snapshot.marketing_group_name = Some("Regular".to_string());
 
-        let event = create_member_linked_event("order-1", 3, 42, "Alice", 1, "VIP", vec![]);
+        let event = create_member_linked_event(1001, 3, 42, "Alice", 1, "VIP", vec![]);
         let applier = MemberLinkedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_member_linked_applies_mg_discounts() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("inst-1", 100.0));
         snapshot.subtotal = 100.0;
         snapshot.total = 100.0;
@@ -169,8 +169,7 @@ mod tests {
             }],
         }];
 
-        let event =
-            create_member_linked_event("order-1", 2, 42, "Alice", 1, "VIP", mg_item_discounts);
+        let event = create_member_linked_event(1001, 2, 42, "Alice", 1, "VIP", mg_item_discounts);
         let applier = MemberLinkedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -184,10 +183,10 @@ mod tests {
 
     #[test]
     fn test_member_linked_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_member_linked_event("order-1", 1, 42, "Alice", 1, "VIP", vec![]);
+        let event = create_member_linked_event(1001, 1, 42, "Alice", 1, "VIP", vec![]);
         let applier = MemberLinkedApplier;
         applier.apply(&mut snapshot, &event);
 

@@ -18,7 +18,7 @@ pub async fn list_price_rules(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<shared::models::PriceRule>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let rules = store::list_price_rules(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,7 +31,7 @@ pub async fn create_price_rule(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::price_rule::PriceRuleCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) = store::create_price_rule_direct(&state.pool, store_id, &data)
         .await
@@ -43,6 +43,7 @@ pub async fn create_price_rule(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreatePriceRule {
             id: Some(source_id),
             data,
@@ -59,7 +60,7 @@ pub async fn update_price_rule(
     Path((store_id, rule_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::price_rule::PriceRuleUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::update_price_rule_direct(&state.pool, store_id, rule_id, &data)
         .await
@@ -71,6 +72,7 @@ pub async fn update_price_rule(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdatePriceRule { id: rule_id, data },
     )
     .await;
@@ -83,7 +85,7 @@ pub async fn delete_price_rule(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, rule_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_price_rule_direct(&state.pool, store_id, rule_id)
         .await
@@ -92,7 +94,13 @@ pub async fn delete_price_rule(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::DeletePriceRule { id: rule_id }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::DeletePriceRule { id: rule_id },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

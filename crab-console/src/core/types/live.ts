@@ -112,8 +112,23 @@ export interface LiveOrderSnapshot {
 
 export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
+export interface StoreInfoSnapshot {
+  id: number;
+  name: string;
+  address: string;
+  nif: string;
+  logo_url: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  business_day_cutoff: string;
+  created_at: number | null;
+  updated_at: number | null;
+}
+
 export type ConsoleMessage =
   | { type: 'Ready'; snapshots: LiveOrderSnapshot[]; online_edge_ids?: number[] }
   | { type: 'OrderUpdated'; snapshot: LiveOrderSnapshot }
   | { type: 'OrderRemoved'; order_id: string; store_id: number }
-  | { type: 'EdgeStatus'; store_id: number; online: boolean; cleared_order_ids?: string[] };
+  | { type: 'EdgeStatus'; store_id: number; online: boolean; cleared_order_ids?: string[] }
+  | { type: 'StoreInfoUpdated'; store_id: number; info: StoreInfoSnapshot };

@@ -206,7 +206,7 @@ export const POSScreen: React.FC = () => {
     setManageTableId(null);
   }, [setShowTableScreen]);
 
-  const handleNavigateCheckout = useCallback((tableId: string) => {
+  const handleNavigateCheckout = useCallback((tableId: number) => {
     handleCheckoutStart(tableId);
   }, [handleCheckoutStart]);
 

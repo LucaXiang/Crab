@@ -120,7 +120,7 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&s), false)
+        .broadcast_sync(RESOURCE, SyncChangeType::Created, s.id, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -157,7 +157,7 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Updated, &id_str, Some(&s), false)
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -194,7 +194,7 @@ pub async fn close(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Updated, &id_str, Some(&s), false)
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -229,7 +229,7 @@ pub async fn force_close(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Updated, &id_str, Some(&s), false)
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&s), false)
         .await;
 
     Ok(Json(s))
@@ -264,13 +264,11 @@ pub async fn recover_stale(State(state): State<ServerState>) -> AppResult<Json<V
     let stale = shift::find_stale_shifts(&state.pool, business_day_start).await?;
 
     for s in &stale {
-        let id = s.id.to_string();
-
         state
             .broadcast_sync(
                 RESOURCE,
                 SyncChangeType::SettlementRequired,
-                &id,
+                s.id,
                 Some(s),
                 false,
             )

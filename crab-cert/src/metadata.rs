@@ -6,7 +6,7 @@ use std::path::Path;
 #[derive(Debug, Clone)]
 pub struct CertMetadata {
     pub common_name: Option<String>,
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<i64>,
     pub device_id: Option<String>,
     pub client_name: Option<String>,
     pub serial_number: String,
@@ -42,7 +42,7 @@ impl CertMetadata {
             }
         }
 
-        let mut tenant_id = None;
+        let mut tenant_id: Option<i64> = None;
         let mut device_id = None;
         let mut client_name = None;
 
@@ -61,7 +61,7 @@ impl CertMetadata {
             // OID_CLIENT_NAME: 1.3.6.1.4.1.99999.5
 
             if oid.to_id_string() == "1.3.6.1.4.1.99999.1" {
-                tenant_id = decode_der_utf8_string(ext.value);
+                tenant_id = decode_der_utf8_string(ext.value).and_then(|s| s.parse::<i64>().ok());
             } else if oid.to_id_string() == "1.3.6.1.4.1.99999.2" {
                 device_id = decode_der_utf8_string(ext.value);
             } else if oid.to_id_string() == "1.3.6.1.4.1.99999.5" {

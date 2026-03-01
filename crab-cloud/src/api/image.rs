@@ -28,7 +28,7 @@ const JPEG_QUALITY: u8 = 85;
 const SUPPORTED_FORMATS: &[&str] = &["png", "jpg", "jpeg", "webp"];
 
 /// S3 key prefix for images
-fn s3_image_key(tenant_id: &str, hash: &str) -> String {
+fn s3_image_key(tenant_id: i64, hash: &str) -> String {
     format!("images/{tenant_id}/{hash}.jpg")
 }
 
@@ -152,7 +152,7 @@ pub async fn upload_image(
     let hash = hex::encode(hasher.finalize());
 
     // Upload to S3 (idempotent — same hash = same content)
-    let key = s3_image_key(&identity.tenant_id, &hash);
+    let key = s3_image_key(identity.tenant_id, &hash);
 
     state
         .s3
@@ -172,7 +172,7 @@ pub async fn upload_image(
     // Register in tenant_images index (ref_count starts at 0, incremented when product references it)
     if let Err(e) = crate::db::tenant_images::register(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         &hash,
         shared::util::now_millis(),
     )
@@ -182,7 +182,7 @@ pub async fn upload_image(
     }
 
     tracing::info!(
-        tenant_id = %identity.tenant_id,
+        tenant_id = identity.tenant_id,
         hash = %hash,
         "Product image uploaded to S3"
     );
@@ -203,7 +203,7 @@ pub async fn get_image_url(
             "Invalid image hash",
         ));
     }
-    let url = presigned_get_url(&state, &identity.tenant_id, &hash).await?;
+    let url = presigned_get_url(&state, identity.tenant_id, &hash).await?;
     Ok(Json(ImageUrlResponse { url }))
 }
 
@@ -216,7 +216,7 @@ pub struct ImageUrlResponse {
 /// Generate a presigned GET URL for an image in S3
 pub async fn presigned_get_url(
     state: &AppState,
-    tenant_id: &str,
+    tenant_id: i64,
     hash: &str,
 ) -> Result<String, AppError> {
     use aws_sdk_s3::presigning::PresigningConfig;
@@ -245,7 +245,7 @@ pub async fn presigned_get_url(
 }
 
 /// Delete an image from S3. Best-effort, logs errors.
-pub async fn delete_s3_image(state: &AppState, tenant_id: &str, hash: &str) {
+pub async fn delete_s3_image(state: &AppState, tenant_id: i64, hash: &str) {
     let key = s3_image_key(tenant_id, hash);
     if let Err(e) = state
         .s3
@@ -265,7 +265,7 @@ pub async fn delete_s3_image(state: &AppState, tenant_id: &str, hash: &str) {
 /// Purge all images for a tenant from S3 + tenant_images table.
 /// Used for tenant data cleanup after account cancellation.
 #[allow(dead_code)]
-pub async fn purge_tenant_images(state: &AppState, tenant_id: &str) {
+pub async fn purge_tenant_images(state: &AppState, tenant_id: i64) {
     // 1. Delete all records from tenant_images, get the hashes
     let hashes = match crate::db::tenant_images::delete_all_for_tenant(&state.pool, tenant_id).await
     {

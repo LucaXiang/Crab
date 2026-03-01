@@ -59,7 +59,7 @@ impl ClientBridge {
             mode,
             is_connected: final_is_connected,
             is_authenticated,
-            tenant_id: tenant_manager.current_tenant_id().map(|s| s.to_string()),
+            tenant_id: tenant_manager.current_tenant_id(),
             username: tenant_manager.current_session().map(|s| s.username.clone()),
         }
     }

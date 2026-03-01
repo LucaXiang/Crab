@@ -5,7 +5,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency, computePriceBreakdown } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
-import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp, Tag } from 'lucide-react';
+import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp, Tag, Hash, Undo2, FileUp } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { TimelineList } from '@/shared/components/TimelineList';
@@ -13,11 +13,19 @@ import { calculateItemSink } from '@/utils/itemSorting';
 import { KitchenReprintModal } from '@/screens/Checkout/KitchenReprintModal';
 import { LabelReprintModal } from '@/screens/Checkout/LabelReprintModal';
 import { CreditNoteSection } from './CreditNoteSection';
+import { RefundModal } from './RefundModal';
+import { AnulacionModal } from './AnulacionModal';
+import { UpgradeInvoiceModal } from './UpgradeInvoiceModal';
 import { InvoiceSection } from './InvoiceSection';
 
 interface HistoryDetailProps {
   order?: ArchivedOrderDetail;
   onReprint: () => void;
+  hashInfo?: { prev_hash: string; curr_hash: string };
+  onRefundCreated?: () => void;
+  onNavigateToCreditNote?: (creditNotePk: number) => void;
+  onAnulacionCreated?: () => void;
+  onUpgradeCreated?: () => void;
 }
 
 /**
@@ -38,23 +46,26 @@ function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): 
     : { type: eventType } as EventPayload;
 
   return {
-    event_id: String(event.event_id),
+    event_id: event.event_id,
     sequence: index,
-    order_id: '',
+    order_id: 0,
     timestamp: event.timestamp,
     operator_id: 0,
     operator_name: '',
-    command_id: '',
+    command_id: 0,
     event_type: eventType,
     payload,
   };
 }
 
-export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }) => {
+export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, hashInfo, onRefundCreated, onNavigateToCreditNote, onAnulacionCreated, onUpgradeCreated }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [showKitchenReprint, setShowKitchenReprint] = useState(false);
   const [showLabelReprint, setShowLabelReprint] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showAnulacionModal, setShowAnulacionModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const categories = useCategoryStore((s) => s.items);
   const categoriesLoaded = useCategoryStore((s) => s.isLoaded);
 
@@ -169,6 +180,16 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 {t('history.status.merged')}
               </span>
             )}
+            {order.is_anulada && (
+              <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase">
+                {t('anulacion.status.anulada')}
+              </span>
+            )}
+            {order.is_upgraded && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded uppercase">
+                {t('upgrade.status.upgraded')}
+              </span>
+            )}
             <EscalatableGate permission={Permission.SETTINGS_MANAGE}>
               <button
                 onClick={onReprint}
@@ -192,8 +213,47 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               <Tag size={16} />
               <span>{t('checkout.label_reprint.tab_label')}</span>
             </button>
+            {!isVoid && !isMerged && (
+              <>
+                <EscalatableGate permission={Permission.ORDERS_REFUND}>
+                  <button
+                    onClick={() => setShowRefundModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-300 rounded-lg shadow-sm text-sm font-medium text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors"
+                  >
+                    <Undo2 size={16} />
+                    <span>{t('credit_note.action.create')}</span>
+                  </button>
+                </EscalatableGate>
+                {!order.is_anulada && (
+                  <EscalatableGate permission={Permission.ORDERS_VOID}>
+                    <button
+                      onClick={() => setShowAnulacionModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 border border-gray-400 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                    >
+                      <Ban size={16} />
+                      <span>{t('anulacion.action.void')}</span>
+                    </button>
+                  </EscalatableGate>
+                )}
+                {!order.is_upgraded && (
+                  <EscalatableGate
+                    permission={Permission.SETTINGS_MANAGE}
+                    mode="intercept"
+                    description={t('upgrade.action.upgrade')}
+                    onAuthorized={() => setShowUpgradeModal(true)}
+                  >
+                    <button
+                      className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-300 rounded-lg shadow-sm text-sm font-medium text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                    >
+                      <FileUp size={16} />
+                      <span>{t('upgrade.action.upgrade')}</span>
+                    </button>
+                  </EscalatableGate>
+                )}
+              </>
+            )}
           </div>
-          <div className="flex gap-4 text-sm text-gray-500">
+          <div className="flex gap-4 text-sm text-gray-500 flex-wrap">
             {order.table_name && order.table_name !== 'RETAIL' && (
               <div className="flex items-center gap-1.5 font-medium text-gray-700">
                 <span>{t('history.info.table')}: {order.table_name}</span>
@@ -216,6 +276,14 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 {order.end_time ? new Date(order.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : t('common.label.none')}
               </span>
             </div>
+            {hashInfo && (
+              <div className="flex items-center gap-1.5 font-mono text-xs text-gray-400">
+                <Hash size={14} />
+                <span title={hashInfo.prev_hash}>{hashInfo.prev_hash ? hashInfo.prev_hash.slice(0, 8) + '…' : 'genesis'}</span>
+                <span className="text-gray-300">→</span>
+                <span title={hashInfo.curr_hash}>{hashInfo.curr_hash ? hashInfo.curr_hash.slice(0, 8) + '…' : '\u2014'}</span>
+              </div>
+            )}
           </div>
 
           {/* Void Information */}
@@ -322,6 +390,9 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             </div>
           </div>
 
+          {/* Credit Notes (退款记录) */}
+          <CreditNoteSection order={order} onRefundCreated={onRefundCreated} onNavigateToCreditNote={onNavigateToCreditNote} />
+
           {/* Payments */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2 font-bold text-gray-700">
@@ -338,9 +409,6 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               )}
             </div>
           </div>
-
-          {/* Credit Notes (退款记录) */}
-          <CreditNoteSection order={order} />
 
           {/* Invoices (Verifactu 发票) */}
           <InvoiceSection order={order} />
@@ -362,20 +430,51 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             )}
           </div>
         </div>
+
       </div>
 
       {order && (
         <>
           <KitchenReprintModal
             isOpen={showKitchenReprint}
-            orderId={order.order_key}
+            orderId={order.order_id}
             onClose={() => setShowKitchenReprint(false)}
           />
           <LabelReprintModal
             isOpen={showLabelReprint}
-            orderId={order.order_key}
+            orderId={order.order_id}
             onClose={() => setShowLabelReprint(false)}
           />
+          {showRefundModal && (
+            <RefundModal
+              order={order}
+              onClose={() => setShowRefundModal(false)}
+              onCreated={() => {
+                setShowRefundModal(false);
+                onRefundCreated?.();
+              }}
+            />
+          )}
+          {showAnulacionModal && (
+            <AnulacionModal
+              order={order}
+              onClose={() => setShowAnulacionModal(false)}
+              onCreated={() => {
+                setShowAnulacionModal(false);
+                onAnulacionCreated?.();
+              }}
+            />
+          )}
+          {showUpgradeModal && (
+            <UpgradeInvoiceModal
+              order={order}
+              onClose={() => setShowUpgradeModal(false)}
+              onCreated={() => {
+                setShowUpgradeModal(false);
+                onUpgradeCreated?.();
+              }}
+            />
+          )}
         </>
       )}
     </div>
@@ -554,7 +653,7 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
               )}
               {payment.payment_id && (
                 <span className="text-[0.625rem] text-emerald-600 bg-emerald-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                  #{payment.payment_id.slice(-5)}
+                  #{String(payment.payment_id).slice(-5)}
                 </span>
               )}
               {payment.cancelled && (

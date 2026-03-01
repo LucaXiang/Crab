@@ -84,7 +84,7 @@ export interface ArchivedOrderItem {
 export type SplitType = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'AA_SPLIT';
 
 export interface ArchivedPayment {
-  payment_id?: string | null;
+  payment_id?: number | null;
   method: string;
   amount: number;
   timestamp: number; // milliseconds
@@ -115,7 +115,6 @@ export type ArchivedLossReason = 'CUSTOMER_FLED' | 'REFUSED_TO_PAY' | 'OTHER';
 /** Full order detail (matches backend OrderDetail) */
 export interface ArchivedOrderDetail {
   order_id: number;
-  order_key: string;
   receipt_number: string;
   table_name: string | null;
   zone_name: string | null;
@@ -139,6 +138,8 @@ export interface ArchivedOrderDetail {
   void_type: ArchivedVoidType | null;
   loss_reason: ArchivedLossReason | null;
   loss_amount: number | null;
+  is_anulada: boolean;
+  is_upgraded: boolean;
   items: ArchivedOrderItem[];
   payments: ArchivedPayment[];
   timeline: ArchivedEvent[];

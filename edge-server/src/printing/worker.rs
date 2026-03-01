@@ -93,7 +93,7 @@ impl KitchenPrintWorker {
         );
 
         // Get full snapshot
-        let snapshot = match self.orders_manager.get_snapshot(&event.order_id) {
+        let snapshot = match self.orders_manager.get_snapshot(event.order_id) {
             Ok(Some(s)) => s,
             Ok(None) => {
                 tracing::warn!(order_id = %event.order_id, "Snapshot not found");
@@ -136,8 +136,8 @@ impl KitchenPrintWorker {
                 }
 
                 // 堂食模式：立即打印
-                self.execute_print(&kitchen_order_id, executor).await;
-                self.execute_label_print(&event.order_id, &kitchen_order_id, executor)
+                self.execute_print(kitchen_order_id, executor).await;
+                self.execute_label_print(event.order_id, kitchen_order_id, executor)
                     .await;
             }
             Ok(None) => {
@@ -161,7 +161,7 @@ impl KitchenPrintWorker {
         // 读取该订单所有 KitchenOrder
         let kitchen_orders = match self
             .kitchen_print_service
-            .get_kitchen_orders_for_order(&event.order_id)
+            .get_kitchen_orders_for_order(event.order_id)
         {
             Ok(orders) => orders,
             Err(e) => {
@@ -191,14 +191,14 @@ impl KitchenPrintWorker {
         );
 
         for ko in pending {
-            self.execute_print(&ko.id, executor).await;
-            self.execute_label_print(&event.order_id, &ko.id, executor)
+            self.execute_print(ko.id, executor).await;
+            self.execute_label_print(event.order_id, ko.id, executor)
                 .await;
         }
     }
 
     /// 执行厨房打印
-    async fn execute_print(&self, kitchen_order_id: &str, executor: &PrintExecutor) {
+    async fn execute_print(&self, kitchen_order_id: i64, executor: &PrintExecutor) {
         let order = match self
             .kitchen_print_service
             .get_kitchen_order(kitchen_order_id)
@@ -242,8 +242,8 @@ impl KitchenPrintWorker {
     #[cfg(windows)]
     async fn execute_label_print(
         &self,
-        order_id: &str,
-        kitchen_order_id: &str,
+        order_id: i64,
+        kitchen_order_id: i64,
         executor: &PrintExecutor,
     ) {
         use crate::db::repository::label_template;
@@ -313,8 +313,8 @@ impl KitchenPrintWorker {
     #[cfg(not(windows))]
     async fn execute_label_print(
         &self,
-        order_id: &str,
-        kitchen_order_id: &str,
+        order_id: i64,
+        kitchen_order_id: i64,
         executor: &PrintExecutor,
     ) {
         // 获取该 kitchen order 关联的标签记录

@@ -18,7 +18,7 @@ pub async fn list_attributes(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<store::StoreAttribute>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let attributes = store::list_attributes(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,7 +31,7 @@ pub async fn create_attribute(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::attribute::AttributeCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) = store::create_attribute_direct(&state.pool, store_id, &data)
         .await
@@ -43,6 +43,7 @@ pub async fn create_attribute(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateAttribute {
             id: Some(source_id),
             data,
@@ -59,7 +60,7 @@ pub async fn update_attribute(
     Path((store_id, attr_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::attribute::AttributeUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::update_attribute_direct(&state.pool, store_id, attr_id, &data)
         .await
@@ -71,6 +72,7 @@ pub async fn update_attribute(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdateAttribute { id: attr_id, data },
     )
     .await;
@@ -83,7 +85,7 @@ pub async fn delete_attribute(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, attr_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_attribute_direct(&state.pool, store_id, attr_id)
         .await
@@ -92,7 +94,13 @@ pub async fn delete_attribute(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::DeleteAttribute { id: attr_id }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::DeleteAttribute { id: attr_id },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }
@@ -105,7 +113,7 @@ pub async fn create_attribute_option(
     Path((store_id, attr_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::attribute::AttributeOptionCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let source_id = store::create_option_direct(&state.pool, store_id, attr_id, &data)
         .await
@@ -117,6 +125,7 @@ pub async fn create_attribute_option(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateAttributeOption {
             attribute_id: attr_id,
             id: Some(source_id),
@@ -134,7 +143,7 @@ pub async fn update_attribute_option(
     Path((store_id, _attr_id, option_id)): Path<(i64, i64, i64)>,
     Json(data): Json<shared::models::attribute::AttributeOptionUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::update_option_direct(&state.pool, store_id, option_id, &data)
         .await
@@ -146,6 +155,7 @@ pub async fn update_attribute_option(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdateAttributeOption {
             id: option_id,
             data,
@@ -161,7 +171,7 @@ pub async fn delete_attribute_option(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, _attr_id, option_id)): Path<(i64, i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_option_direct(&state.pool, store_id, option_id)
         .await
@@ -173,6 +183,7 @@ pub async fn delete_attribute_option(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::DeleteAttributeOption { id: option_id },
     )
     .await;
@@ -191,7 +202,7 @@ pub async fn batch_update_option_sort_order(
     Path((store_id, attr_id)): Path<(i64, i64)>,
     Json(req): Json<BatchOptionSortOrderRequest>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::batch_update_option_sort_order(&state.pool, store_id, &req.items)
         .await
@@ -203,6 +214,7 @@ pub async fn batch_update_option_sort_order(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::BatchUpdateOptionSortOrder {
             attribute_id: attr_id,
             items: req.items,
@@ -227,7 +239,7 @@ pub async fn list_bindings(
     Path(store_id): Path<i64>,
     Query(query): Query<ListBindingsQuery>,
 ) -> ApiResult<Vec<store::StoreBinding>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let bindings =
         store::list_bindings_by_owner(&state.pool, store_id, &query.owner_type, query.owner_id)
@@ -258,7 +270,7 @@ pub async fn bind_attribute(
     Path(store_id): Path<i64>,
     Json(req): Json<BindAttributeRequest>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let binding_id = store::bind_attribute_direct(
         &state.pool,
@@ -281,6 +293,7 @@ pub async fn bind_attribute(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::BindAttribute {
             owner: req.owner,
             attribute_id: req.attribute_id,
@@ -300,7 +313,7 @@ pub async fn unbind_attribute(
     Path(store_id): Path<i64>,
     Json(req): Json<UnbindAttributeRequest>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::unbind_attribute_direct(&state.pool, store_id, req.binding_id)
         .await
@@ -312,6 +325,7 @@ pub async fn unbind_attribute(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UnbindAttribute {
             binding_id: req.binding_id,
         },

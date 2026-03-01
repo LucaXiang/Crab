@@ -18,7 +18,7 @@ pub async fn list_zones(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<shared::models::zone::Zone>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let zones = store::list_zones(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,10 +31,10 @@ pub async fn create_zone(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::zone::ZoneCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) =
-        store::create_zone_direct(&state.pool, store_id, &identity.tenant_id, &data)
+        store::create_zone_direct(&state.pool, store_id, identity.tenant_id, &data)
             .await
             .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
@@ -44,6 +44,7 @@ pub async fn create_zone(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateZone {
             id: Some(source_id),
             data,
@@ -60,7 +61,7 @@ pub async fn update_zone(
     Path((store_id, zone_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::zone::ZoneUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let op_data = store::update_zone_direct(&state.pool, store_id, zone_id, &data)
         .await
@@ -69,7 +70,13 @@ pub async fn update_zone(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::UpdateZone { id: zone_id, data }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::UpdateZone { id: zone_id, data },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok().with_data(op_data)))
 }
@@ -79,7 +86,7 @@ pub async fn delete_zone(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, zone_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_zone_direct(&state.pool, store_id, zone_id)
         .await
@@ -88,7 +95,13 @@ pub async fn delete_zone(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::DeleteZone { id: zone_id }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::DeleteZone { id: zone_id },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

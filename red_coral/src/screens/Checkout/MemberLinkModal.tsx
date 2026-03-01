@@ -13,7 +13,7 @@ import type { MemberWithGroup } from '@/core/domain/types/api';
 
 interface MemberLinkModalProps {
   isOpen: boolean;
-  orderId: string;
+  orderId: number;
   onClose: () => void;
 }
 

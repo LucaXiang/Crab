@@ -526,14 +526,14 @@ impl ServerState {
         for order in &active_orders {
             if self
                 .orders_manager
-                .get_cached_rules(&order.order_id)
+                .get_cached_rules(order.order_id)
                 .is_none()
             {
                 // redb 中没有快照，从数据库回退加载
                 let rules = load_matching_rules(&self.pool, order.zone_id, order.is_retail).await;
 
                 if !rules.is_empty() {
-                    self.orders_manager.cache_rules(&order.order_id, rules);
+                    self.orders_manager.cache_rules(order.order_id, rules);
                     fallback_count += 1;
                 }
             }
@@ -632,12 +632,12 @@ impl ServerState {
                             break;
                         };
 
-                        let order_id = event.order_id.clone();
+                        let order_id = event.order_id;
                         let sequence = event.sequence;
                         let action = order_event_type_to_sync_change_type(&event.event_type);
 
                         // 获取快照，打包 event + snapshot 一起推送
-                        match orders_manager.get_snapshot(&order_id) {
+                        match orders_manager.get_snapshot(order_id) {
                             Ok(Some(snapshot)) => {
                                 let payload = SyncPayload {
                                     resource: SyncResource::OrderSync,
@@ -884,7 +884,7 @@ impl ServerState {
         &self,
         resource: SyncResource,
         action: SyncChangeType,
-        id: &str,
+        id: i64,
         data: Option<&T>,
         cloud_origin: bool,
     ) {
@@ -893,7 +893,7 @@ impl ServerState {
             resource,
             version,
             action,
-            id: id.to_string(),
+            id,
             data: data.and_then(|d| serde_json::to_value(d).ok()),
             cloud_origin,
         };

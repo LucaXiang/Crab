@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 当新餐厅签约时发生这种情况。
     // ============================================================================================
     println!("\n--- 步骤 2：配置 Tenant CA (美味蟹堡) ---");
-    let tenant_id = "tenant-tasty-crab-001";
+    let tenant_id: i64 = 1001;
 
     let tenant_profile = CaProfile {
         common_name: "Tasty Crab CA".to_string(), // 实际上可能包含 Tenant ID
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "127.0.0.1".to_string(),
             "192.168.1.100".to_string(),
         ],
-        Some(tenant_id.to_string()),
+        Some(tenant_id),
         server_hardware_id,
     );
     // server_profile.common_name = "edge-server".to_string(); // 已由 new_server 设置
@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- 步骤 4：签发 POS 客户端证书 ---");
     let mut client_profile = CertProfile::new_client(
         "pos-ipad-01",
-        Some(tenant_id.to_string()),
+        Some(tenant_id),
         Some("device-pos-01".to_string()),
         Some("iPad Front Desk".to_string()),
     );

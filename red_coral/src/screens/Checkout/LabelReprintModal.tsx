@@ -8,7 +8,7 @@ import type { LabelPrintRecord } from '@/core/domain/types/api';
 
 interface LabelReprintModalProps {
   isOpen: boolean;
-  orderId: string;
+  orderId: number;
   onClose: () => void;
 }
 
@@ -20,7 +20,7 @@ interface LabelGroup {
   specName: string | null;
   quantity: number;
   /** Take any record ID from this group for reprint API */
-  representativeId: string;
+  representativeId: number;
   totalPrintCount: number;
 }
 

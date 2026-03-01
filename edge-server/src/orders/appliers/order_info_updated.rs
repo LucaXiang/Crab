@@ -48,8 +48,8 @@ mod tests {
     use shared::order::types::ServiceType;
     use shared::order::{OrderEventType, OrderStatus};
 
-    fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_test_snapshot(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.guest_count = 2;
         snapshot.table_name = Some("Table 1".to_string());
@@ -58,7 +58,7 @@ mod tests {
     }
 
     fn create_order_info_updated_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         guest_count: Option<i32>,
         table_name: Option<String>,
@@ -66,10 +66,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderInfoUpdated,
             EventPayload::OrderInfoUpdated {
@@ -82,10 +82,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_guest_count_only() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let initial_guest_count = snapshot.guest_count;
 
-        let event = create_order_info_updated_event("order-1", 2, Some(6), None, None);
+        let event = create_order_info_updated_event(1001, 2, Some(6), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -100,10 +100,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_table_name_only() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
         let event =
-            create_order_info_updated_event("order-1", 2, None, Some("VIP Room".to_string()), None);
+            create_order_info_updated_event(1001, 2, None, Some("VIP Room".to_string()), None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -117,12 +117,12 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_receipt_number_only() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
         // receipt_number is immutable (set at OpenTable), not updatable via OrderInfoUpdated
         // This test is no longer valid - receipt_number cannot be updated
         // Keeping test but changing to test guest_count update instead
-        let event = create_order_info_updated_event("order-1", 2, Some(5), None, None);
+        let event = create_order_info_updated_event(1001, 2, Some(5), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -136,10 +136,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_is_pre_payment_only() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert!(!snapshot.is_pre_payment);
 
-        let event = create_order_info_updated_event("order-1", 2, None, None, Some(true));
+        let event = create_order_info_updated_event(1001, 2, None, None, Some(true));
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -153,10 +153,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_multiple_fields() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
         let event = create_order_info_updated_event(
-            "order-1",
+            1001,
             2,
             Some(8),
             Some("Private Dining".to_string()),
@@ -175,10 +175,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_updates_sequence() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.last_sequence = 5;
 
-        let event = create_order_info_updated_event("order-1", 10, Some(4), None, None);
+        let event = create_order_info_updated_event(1001, 10, Some(4), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -188,11 +188,11 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_updates_timestamp() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         // Set initial timestamp to a known different value
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_info_updated_event("order-1", 2, Some(4), None, None);
+        let event = create_order_info_updated_event(1001, 2, Some(4), None, None);
         let expected_timestamp = event.timestamp; // Server timestamp set at event creation
 
         let applier = OrderInfoUpdatedApplier;
@@ -206,10 +206,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_updates_checksum() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_info_updated_event("order-1", 2, Some(10), None, None);
+        let event = create_order_info_updated_event(1001, 2, Some(10), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -220,14 +220,14 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_no_fields_is_noop_for_data() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let original_guest_count = snapshot.guest_count;
         let original_table_name = snapshot.table_name.clone();
         let original_receipt_number = snapshot.receipt_number.clone();
         let original_is_pre_payment = snapshot.is_pre_payment;
 
         // Event with all None values (shouldn't happen in practice, but test the behavior)
-        let event = create_order_info_updated_event("order-1", 2, None, None, None);
+        let event = create_order_info_updated_event(1001, 2, None, None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -244,12 +244,12 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_overwrite_existing_values() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.receipt_number = "OLD-001".to_string(); // receipt_number is immutable
         snapshot.is_pre_payment = true;
 
         let event = create_order_info_updated_event(
-            "order-1",
+            1001,
             2,
             Some(1),
             Some("New Table".to_string()),
@@ -268,13 +268,13 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_partial_overwrite() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.receipt_number = "R-OLD".to_string(); // receipt_number is immutable
         snapshot.is_pre_payment = true;
 
         // Only update guest_count and table_name
         let event = create_order_info_updated_event(
-            "order-1",
+            1001,
             2,
             Some(5),
             Some("Updated Table".to_string()),
@@ -294,10 +294,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_checksum_verifiable() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
         let event = create_order_info_updated_event(
-            "order-1",
+            1001,
             2,
             Some(3),
             Some("Table 3".to_string()),
@@ -318,17 +318,17 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_wrong_event_type_is_noop() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let original_guest_count = snapshot.guest_count;
         let original_sequence = snapshot.last_sequence;
 
         // Create an event with wrong payload type (simulating a mismatch)
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -349,10 +349,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_set_is_pre_payment_false() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.is_pre_payment = true;
 
-        let event = create_order_info_updated_event("order-1", 2, None, None, Some(false));
+        let event = create_order_info_updated_event(1001, 2, None, None, Some(false));
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -362,10 +362,10 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_set_guest_count_to_one() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.guest_count = 10;
 
-        let event = create_order_info_updated_event("order-1", 2, Some(1), None, None);
+        let event = create_order_info_updated_event(1001, 2, Some(1), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -375,9 +375,9 @@ mod tests {
 
     #[test]
     fn test_order_info_updated_empty_string_table_name() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
-        let event = create_order_info_updated_event("order-1", 2, None, Some("".to_string()), None);
+        let event = create_order_info_updated_event(1001, 2, None, Some("".to_string()), None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);

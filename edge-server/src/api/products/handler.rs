@@ -182,7 +182,7 @@ pub async fn create(
         .broadcast_sync(
             RESOURCE_PRODUCT,
             SyncChangeType::Created,
-            &id_str,
+            product.id,
             Some(&product),
             false,
         )
@@ -248,7 +248,7 @@ pub async fn update(
         .broadcast_sync(
             RESOURCE_PRODUCT,
             SyncChangeType::Updated,
-            &id_str,
+            id,
             Some(&product),
             false,
         )
@@ -284,13 +284,7 @@ pub async fn delete(
     );
 
     state
-        .broadcast_sync::<()>(
-            RESOURCE_PRODUCT,
-            SyncChangeType::Deleted,
-            &id_str,
-            None,
-            false,
-        )
+        .broadcast_sync::<()>(RESOURCE_PRODUCT, SyncChangeType::Deleted, id, None, false)
         .await;
 
     Ok(Json(true))
@@ -352,7 +346,7 @@ pub async fn add_product_tag(
         .broadcast_sync(
             RESOURCE_PRODUCT,
             SyncChangeType::Updated,
-            &product_id_str,
+            product_id,
             Some(&product),
             false,
         )
@@ -389,7 +383,7 @@ pub async fn remove_product_tag(
         .broadcast_sync(
             RESOURCE_PRODUCT,
             SyncChangeType::Updated,
-            &product_id_str,
+            product_id,
             Some(&product),
             false,
         )
@@ -462,13 +456,7 @@ pub async fn batch_update_sort_order(
 
     // 广播同步通知
     state
-        .broadcast_sync::<()>(
-            RESOURCE_PRODUCT,
-            SyncChangeType::Updated,
-            "batch",
-            None,
-            false,
-        )
+        .broadcast_sync::<()>(RESOURCE_PRODUCT, SyncChangeType::Updated, 0, None, false)
         .await;
 
     Ok(Json(BatchUpdateResponse {

@@ -709,7 +709,7 @@ impl ClientBridge {
 
         let tenant_id = {
             let tm = self.tenant_manager.read().await;
-            tm.current_tenant_id().map(|s| s.to_string())
+            tm.current_tenant_id()
         };
 
         let Some(tenant_id) = tenant_id else {

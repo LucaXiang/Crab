@@ -50,7 +50,7 @@ pub enum NotificationCategory {
 pub enum ServerCommand {
     /// 激活边缘服务器（接收证书和元数据）
     Activate {
-        tenant_id: String,
+        tenant_id: i64,
         tenant_name: String,
         edge_id: String,
         edge_name: String,
@@ -179,7 +179,7 @@ pub struct SyncPayload {
     /// 变更类型
     pub action: SyncChangeType,
     /// 资源 ID (必填，每次 Sync 都应指定具体的实体 ID)
-    pub id: String,
+    pub id: i64,
     /// 资源数据 (可选，deleted 时为 None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,

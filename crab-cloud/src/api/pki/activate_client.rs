@@ -24,14 +24,19 @@ pub async fn activate_client(
     State(state): State<AppState>,
     Json(req): Json<ActivateClientRequest>,
 ) -> Json<ActivationResponse> {
-    let tenant_id = match tenant_auth::verify_token(&req.token, &state.jwt_secret) {
-        Ok(claims) => claims.sub,
+    let tenant_id: i64 = match tenant_auth::verify_token(&req.token, &state.jwt_secret) {
+        Ok(claims) => match claims.sub.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                return Json(fail(ErrorCode::TokenExpired, "Invalid token subject"));
+            }
+        },
         Err(_) => {
             return Json(fail(ErrorCode::TokenExpired, "Invalid or expired token"));
         }
     };
 
-    let tenant = match tenants::find_by_id(&state.pool, &tenant_id).await {
+    let tenant = match tenants::find_by_id(&state.pool, tenant_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
             return Json(fail(
@@ -48,7 +53,7 @@ pub async fn activate_client(
     // 获取最新订阅（不过滤 status）
     // 激活 = 证书签发 + 设备绑定，不应因订阅状态而拒绝。
     // 订阅检查由 edge-server 运行时处理。
-    let sub = match subscriptions::get_latest_subscription(&state.pool, &tenant.id).await {
+    let sub = match subscriptions::get_latest_subscription(&state.pool, tenant.id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             return Json(fail(
@@ -67,7 +72,7 @@ pub async fn activate_client(
     let plan = parse_plan_type(&sub.plan);
 
     let existing =
-        match client_connections::find_by_device(&state.pool, &tenant.id, &req.device_id).await {
+        match client_connections::find_by_device(&state.pool, tenant.id, &req.device_id).await {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(error = %e, "Database error checking existing client");
@@ -97,12 +102,12 @@ pub async fn activate_client(
 
     let tenant_ca = match state
         .ca_store
-        .get_or_create_tenant_ca(&tenant.id, &root_ca)
+        .get_or_create_tenant_ca(tenant.id, &root_ca)
         .await
     {
         Ok(ca) => ca,
         Err(e) => {
-            tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
+            tracing::error!(error = %e, tenant_id = tenant.id, "Tenant CA error");
             return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
@@ -110,7 +115,7 @@ pub async fn activate_client(
     // Client 证书只需要 ClientAuth EKU（POS 终端作为 mTLS 客户端连接 edge-server）
     let profile = CertProfile::new_client(
         &entity_id,
-        Some(tenant.id.clone()),
+        Some(tenant.id),
         Some(req.device_id.clone()),
         req.client_name.clone(),
     );
@@ -133,7 +138,7 @@ pub async fn activate_client(
 
     let binding = SignedBinding::new(
         &entity_id,
-        &tenant.id,
+        tenant.id,
         &req.device_id,
         &fingerprint,
         EntityType::Client,
@@ -149,7 +154,7 @@ pub async fn activate_client(
 
     let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
     let subscription_info = SubscriptionInfo {
-        tenant_id: tenant.id.clone(),
+        tenant_id: tenant.id,
         id: Some(sub.id.clone()),
         status: sub_status,
         plan,
@@ -163,7 +168,7 @@ pub async fn activate_client(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
-        p12: match p12::get_p12_info(&state.pool, &tenant.id).await {
+        p12: match p12::get_p12_info(&state.pool, tenant.id).await {
             Ok(info) => Some(info),
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");
@@ -190,7 +195,7 @@ pub async fn activate_client(
         }
     };
 
-    if let Err(e) = client_connections::acquire_activation_lock(&mut tx, &tenant.id).await {
+    if let Err(e) = client_connections::acquire_activation_lock(&mut tx, tenant.id).await {
         tracing::error!(error = %e, "Failed to acquire client activation lock");
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
@@ -198,7 +203,7 @@ pub async fn activate_client(
     if let Err(e) = client_connections::insert_in_tx(
         &mut tx,
         &entity_id,
-        &tenant.id,
+        tenant.id,
         &req.device_id,
         &fingerprint,
     )
@@ -215,7 +220,7 @@ pub async fn activate_client(
 
     tracing::info!(
         entity_id = %entity_id,
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         "Activated client"
     );
 

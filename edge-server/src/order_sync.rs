@@ -142,7 +142,7 @@ impl SyncService {
     }
 
     /// Verify snapshot integrity by rebuilding from events
-    pub fn verify_snapshot(&self, order_id: &str) -> Result<bool, ManagerError> {
+    pub fn verify_snapshot(&self, order_id: i64) -> Result<bool, ManagerError> {
         let stored = self.manager.get_snapshot(order_id)?;
 
         match self.manager.rebuild_snapshot(order_id) {
@@ -176,12 +176,12 @@ impl SyncService {
     }
 
     /// Verify all active order snapshots
-    pub fn verify_all_snapshots(&self) -> Result<Vec<(String, bool)>, ManagerError> {
+    pub fn verify_all_snapshots(&self) -> Result<Vec<(i64, bool)>, ManagerError> {
         let active_orders = self.manager.get_active_orders()?;
         let mut results = Vec::new();
 
         for order in active_orders {
-            let is_valid = self.verify_snapshot(&order.order_id)?;
+            let is_valid = self.verify_snapshot(order.order_id)?;
             results.push((order.order_id, is_valid));
         }
 
@@ -341,7 +341,7 @@ mod tests {
         let order_id = response.order_id.unwrap();
 
         // Verify snapshot
-        let is_valid = sync_service.verify_snapshot(&order_id).unwrap();
+        let is_valid = sync_service.verify_snapshot(order_id).unwrap();
         assert!(is_valid);
     }
 
@@ -357,14 +357,14 @@ mod tests {
 
         // Simulate receiving events
         let event1 = shared::order::OrderEvent {
-            event_id: "e1".to_string(),
+            event_id: 1001,
             sequence: 1,
-            order_id: "o1".to_string(),
+            order_id: 2001,
             timestamp: 0,
             client_timestamp: None,
             operator_id: 1,
             operator_name: "Op".to_string(),
-            command_id: "c1".to_string(),
+            command_id: 3001,
             event_type: shared::order::OrderEventType::TableOpened,
             payload: shared::order::EventPayload::TableOpened {
                 table_id: None,
@@ -384,14 +384,14 @@ mod tests {
 
         // Gap detected
         let event3 = shared::order::OrderEvent {
-            event_id: "e3".to_string(),
+            event_id: 1003,
             sequence: 3, // Gap from 1 to 3
-            order_id: "o1".to_string(),
+            order_id: 2001,
             timestamp: 0,
             client_timestamp: None,
             operator_id: 1,
             operator_name: "Op".to_string(),
-            command_id: "c3".to_string(),
+            command_id: 3003,
             event_type: shared::order::OrderEventType::TableOpened,
             payload: shared::order::EventPayload::TableOpened {
                 table_id: None,

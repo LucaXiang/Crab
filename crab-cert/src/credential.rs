@@ -26,7 +26,7 @@ pub struct Credential {
     /// Client/Server identifier.
     pub client_name: String,
     /// Tenant ID from Auth Server.
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// Auth Server token for certificate operations.
     pub token: String,
     /// Token expiration timestamp (Unix seconds).
@@ -51,13 +51,13 @@ impl Credential {
     /// Creates a new unsigned credential.
     pub fn new(
         client_name: impl Into<String>,
-        tenant_id: impl Into<String>,
+        tenant_id: i64,
         token: impl Into<String>,
         expires_at: Option<u64>,
     ) -> Self {
         Self {
             client_name: client_name.into(),
-            tenant_id: tenant_id.into(),
+            tenant_id,
             token: token.into(),
             expires_at,
             device_id: None,
@@ -361,10 +361,10 @@ mod tests {
 
     #[test]
     fn test_credential_creation() {
-        let cred = Credential::new("test-client", "tenant-123", "token-abc", None);
+        let cred = Credential::new("test-client", 123, "token-abc", None);
 
         assert_eq!(cred.client_name, "test-client");
-        assert_eq!(cred.tenant_id, "tenant-123");
+        assert_eq!(cred.tenant_id, 123);
         assert_eq!(cred.token(), "token-abc");
         assert!(!cred.is_expired());
         assert!(cred.is_valid());
@@ -373,8 +373,8 @@ mod tests {
 
     #[test]
     fn test_credential_with_device_id() {
-        let cred = Credential::new("test-client", "tenant-123", "token-abc", None)
-            .with_device_id("hw-12345");
+        let cred =
+            Credential::new("test-client", 123, "token-abc", None).with_device_id("hw-12345");
 
         assert_eq!(cred.device_id, Some("hw-12345".to_string()));
     }
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test_credential_expiration() {
         // No expiration
-        let cred1 = Credential::new("c", "t", "tok", None);
+        let cred1 = Credential::new("c", 1, "tok", None);
         assert!(!cred1.is_expired());
 
         // Future expiration
@@ -391,7 +391,7 @@ mod tests {
             .unwrap()
             .as_secs()
             + 3600;
-        let cred2 = Credential::new("c", "t", "tok", Some(future));
+        let cred2 = Credential::new("c", 1, "tok", Some(future));
         assert!(!cred2.is_expired());
 
         // Past expiration
@@ -400,7 +400,7 @@ mod tests {
             .unwrap()
             .as_secs()
             .saturating_sub(3600);
-        let cred3 = Credential::new("c", "t", "tok", Some(past));
+        let cred3 = Credential::new("c", 1, "tok", Some(past));
         assert!(cred3.is_expired());
     }
 
@@ -409,7 +409,7 @@ mod tests {
         // Create a test CA
         let ca = crate::ca::CertificateAuthority::new_root(CaProfile::root("Test CA")).unwrap();
 
-        let cred = Credential::new("test-client", "tenant-123", "token-abc", None)
+        let cred = Credential::new("test-client", 123, "token-abc", None)
             .with_device_id("hw-12345")
             .sign(&ca.key_pem())
             .unwrap();
@@ -431,7 +431,7 @@ mod tests {
             .as_secs()
             + 3600;
 
-        let cred = Credential::new("test-client", "tenant-123", "token-abc", Some(future))
+        let cred = Credential::new("test-client", 123, "token-abc", Some(future))
             .with_device_id("hw-12345")
             .sign(&ca.key_pem())
             .unwrap();
@@ -449,14 +449,14 @@ mod tests {
             .as_secs()
             .saturating_sub(3600);
 
-        let cred = Credential::new("c", "t", "tok", Some(past));
+        let cred = Credential::new("c", 1, "tok", Some(past));
         let result = cred.validate(None, None);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_credential_validation_device_mismatch() {
-        let cred = Credential::new("c", "t", "tok", None).with_device_id("hw-12345");
+        let cred = Credential::new("c", 1, "tok", None).with_device_id("hw-12345");
 
         let result = cred.validate(None, Some("hw-99999"));
         assert!(result.is_err());
@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn test_credential_validation_missing_device_id() {
-        let cred = Credential::new("c", "t", "tok", None);
+        let cred = Credential::new("c", 1, "tok", None);
         // No device_id set, but validation requires one
 
         let result = cred.validate(None, Some("hw-12345"));
@@ -478,7 +478,7 @@ mod tests {
         let ca2 = crate::ca::CertificateAuthority::new_root(CaProfile::root("CA 2")).unwrap();
 
         // Sign with CA1
-        let cred = Credential::new("c", "t", "tok", None)
+        let cred = Credential::new("c", 1, "tok", None)
             .sign(&ca1.key_pem())
             .unwrap();
 
@@ -492,8 +492,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let storage = CredentialStorage::new(temp_dir.path(), "credential.json");
 
-        let cred =
-            Credential::new("test-client", "tenant-1", "test-token", None).with_device_id("hw-001");
+        let cred = Credential::new("test-client", 1, "test-token", None).with_device_id("hw-001");
 
         // Save
         storage.save(&cred).unwrap();
@@ -502,7 +501,7 @@ mod tests {
         // Load
         let loaded = storage.load().unwrap();
         assert_eq!(loaded.client_name, "test-client");
-        assert_eq!(loaded.tenant_id, "tenant-1");
+        assert_eq!(loaded.tenant_id, 1);
         assert_eq!(loaded.token(), "test-token");
         assert_eq!(loaded.device_id, Some("hw-001".to_string()));
 
@@ -518,7 +517,7 @@ mod tests {
         let storage = CredentialStorage::new(temp_dir.path(), "credential.json");
         let ca = crate::ca::CertificateAuthority::new_root(CaProfile::root("Test CA")).unwrap();
 
-        let cred = Credential::new("test-client", "tenant-1", "test-token", None)
+        let cred = Credential::new("test-client", 1, "test-token", None)
             .with_device_id("hw-001")
             .sign(&ca.key_pem())
             .unwrap();

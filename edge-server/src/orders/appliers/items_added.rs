@@ -98,16 +98,16 @@ mod tests {
     }
 
     fn create_items_added_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         items: Vec<CartItemSnapshot>,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemsAdded,
             EventPayload::ItemsAdded { items },
@@ -116,11 +116,11 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_single_item() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.last_sequence = 0;
 
         let items = vec![create_test_item("item-1", "Product A", 10.0, 2)];
-        let event = create_items_added_event("order-1", 1, items);
+        let event = create_items_added_event(1001, 1, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -137,13 +137,13 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_multiple_items() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         let items = vec![
             create_test_item("item-1", "Product A", 10.0, 2),
             create_test_item("item-2", "Product B", 15.0, 1),
         ];
-        let event = create_items_added_event("order-1", 1, items);
+        let event = create_items_added_event(1001, 1, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_merges_same_instance_id() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         // Add initial item
         snapshot
@@ -167,7 +167,7 @@ mod tests {
 
         // Add same item again (same instance_id)
         let items = vec![create_test_item("item-1", "Product A", 10.0, 3)];
-        let event = create_items_added_event("order-1", 2, items);
+        let event = create_items_added_event(1001, 2, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_adds_different_items() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         // Add initial item
         snapshot
@@ -192,7 +192,7 @@ mod tests {
 
         // Add different item
         let items = vec![create_test_item("item-2", "Product B", 15.0, 1)];
-        let event = create_items_added_event("order-1", 2, items);
+        let event = create_items_added_event(1001, 2, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -204,13 +204,13 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_with_discount() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         let mut item = create_test_item("item-1", "Product A", 100.0, 1);
         item.manual_discount_percent = Some(20.0); // 20% discount
 
         let items = vec![item];
-        let event = create_items_added_event("order-1", 1, items);
+        let event = create_items_added_event(1001, 1, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -222,11 +222,11 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.last_sequence = 5;
 
         let items = vec![create_test_item("item-1", "Product A", 10.0, 1)];
-        let event = create_items_added_event("order-1", 6, items);
+        let event = create_items_added_event(1001, 6, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -236,11 +236,11 @@ mod tests {
 
     #[test]
     fn test_items_added_applier_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let initial_checksum = snapshot.state_checksum.clone();
 
         let items = vec![create_test_item("item-1", "Product A", 10.0, 1)];
-        let event = create_items_added_event("order-1", 1, items);
+        let event = create_items_added_event(1001, 1, items);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -251,10 +251,10 @@ mod tests {
 
     #[test]
     fn test_items_added_with_empty_items() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.last_sequence = 0;
 
-        let event = create_items_added_event("order-1", 1, vec![]);
+        let event = create_items_added_event(1001, 1, vec![]);
 
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -303,10 +303,10 @@ mod tests {
         }];
 
         // Create Event with this item
-        let event = create_items_added_event("order-1", 1, vec![item]);
+        let event = create_items_added_event(1001, 1, vec![item]);
 
         // Apply to empty snapshot (simulating replay after restart)
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let applier = ItemsAddedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -328,7 +328,7 @@ mod tests {
 
         // Simulate second replay (e.g., another restart)
         // Even if external product metadata changed, result should be identical
-        let mut snapshot2 = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot2 = OrderSnapshot::new(1001);
         applier.apply(&mut snapshot2, &event);
 
         // Checksum should be identical
@@ -342,7 +342,7 @@ mod tests {
         use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
         use shared::order::AppliedRule;
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         // Existing item with 10% discount rule
         let mut existing = create_test_item("item-1", "Product A", 90.0, 2);
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn test_merge_same_instance_id_same_pricing_merges() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", "Product A", 10.0, 2));
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_merge_same_instance_id_updates_pricing_to_latest() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         let mut existing = create_test_item("item-1", "Product A", 80.0, 1);
         existing.manual_discount_percent = Some(20.0);
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn test_merge_same_instance_id_comped_vs_normal() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         let mut existing = create_test_item("item-1", "Product A", 0.0, 1);
         existing.is_comped = true;
@@ -439,14 +439,14 @@ mod tests {
             create_test_item("item-1", "Product A", 10.50, 2),
             create_test_item("item-2", "Product B", 25.99, 1),
         ];
-        let event = create_items_added_event("order-1", 1, items);
+        let event = create_items_added_event(1001, 1, items);
 
         // Replay 10 times, all should produce same checksum
         let applier = ItemsAddedApplier;
         let mut checksums = Vec::new();
 
         for _ in 0..10 {
-            let mut snapshot = OrderSnapshot::new("order-1".to_string());
+            let mut snapshot = OrderSnapshot::new(1001);
             applier.apply(&mut snapshot, &event);
             checksums.push(snapshot.state_checksum);
         }

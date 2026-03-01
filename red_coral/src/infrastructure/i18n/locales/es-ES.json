@@ -755,6 +755,7 @@
       "voided_orders": "Anulados",
       "loss_orders": "Pérdidas",
       "total_discount": "Descuentos",
+      "refunds": "Devoluciones",
       "orders": "Pedidos",
       "revenue": "Ingresos",
       "customers": "Comensales"
@@ -1806,6 +1807,12 @@
       "orders_comp": "Invitar platos",
       "orders_refund": "Devoluciones",
       "orders_modify_price": "Modificar precios",
+      "orders_cancel_item": "Eliminar artículo",
+      "orders_link_member": "Vincular miembro",
+      "orders_redeem_stamp": "Canjear sellos",
+      "tables_transfer": "Transferir mesa",
+      "tables_merge_bill": "Unir cuentas",
+      "marketing_manage": "Marketing y miembros",
       "cash_drawer_open": "Abrir cajón",
       "group": {
         "modular": "Módulos",
@@ -2781,6 +2788,74 @@
     },
     "error": {
       "over_refund": "El monto excede el saldo reembolsable"
-    }
+    },
+    "subtotal": "Base imponible",
+    "tax": "Impuesto"
+  },
+  "chain_entry": {
+    "original_order": "Pedido original",
+    "hash_info": "Información de integridad",
+    "prev_hash": "Hash anterior",
+    "curr_hash": "Hash actual",
+    "order_not_in_view": "El pedido no está en la vista actual"
+  },
+  "anulacion": {
+    "title": "Anulación",
+    "status": {
+      "anulada": "Anulada"
+    },
+    "original_invoice": "Factura original",
+    "details": "Detalles de anulación",
+    "serie": "Serie",
+    "reason_label": "Motivo de anulación",
+    "reason": {
+      "TEST_ORDER": "Pedido de prueba",
+      "WRONG_CUSTOMER": "Cliente incorrecto",
+      "DUPLICATE": "Factura duplicada",
+      "OTHER": "Otro"
+    },
+    "aeat_status_label": "Estado AEAT",
+    "huella": "Huella digital",
+    "action": {
+      "void": "Anular factura"
+    },
+    "modal": {
+      "title": "Anular factura",
+      "warning": "Esta acción anulará la factura de este pedido. Esta acción es irreversible.",
+      "ineligible": "Este pedido no cumple los requisitos para anulación",
+      "note": "Nota (opcional)",
+      "note_placeholder": "Introduce una nota...",
+      "confirm": "Confirmar anulación"
+    },
+    "created": "Factura anulada correctamente"
+  },
+  "upgrade": {
+    "title": "Factura completa",
+    "status": {
+      "upgraded": "Actualizada"
+    },
+    "original_invoice": "Factura original",
+    "customer_info": "Datos del cliente",
+    "invoice_details": "Detalles de factura",
+    "field": {
+      "nombre": "Nombre / Razón social",
+      "nombre_placeholder": "Introduce el nombre o razón social",
+      "address": "Dirección",
+      "address_placeholder": "Introduce la dirección",
+      "email": "Email",
+      "phone": "Teléfono",
+      "serie": "Serie",
+      "subtotal": "Base imponible",
+      "tax": "IVA"
+    },
+    "action": {
+      "upgrade": "Factura completa"
+    },
+    "modal": {
+      "title": "Emitir factura completa (F3)",
+      "description": "Introduce los datos del cliente para emitir una factura completa (F3 Sustitutiva) que reemplaza la factura simplificada (F2).",
+      "submit": "Confirmar"
+    },
+    "success": "Factura completa F3 emitida correctamente"
   }
 }

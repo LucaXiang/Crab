@@ -128,7 +128,7 @@ fn build_mtls_http_client(paths: &TenantPaths) -> Result<reqwest::Client, Tenant
 /// 租户信息
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TenantInfo {
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub tenant_name: Option<String>,
     pub has_certificates: bool,
     pub last_used: Option<u64>,
@@ -143,11 +143,11 @@ pub struct TenantManager {
     /// 基础路径 (~/.red_coral/tenants)
     base_path: PathBuf,
     /// 当前活跃租户 ID
-    current_tenant: Option<String>,
+    current_tenant: Option<i64>,
     /// 各租户的路径管理器
-    tenant_paths: HashMap<String, TenantPaths>,
+    tenant_paths: HashMap<i64, TenantPaths>,
     /// 各租户的会话缓存
-    session_caches: HashMap<String, SessionCache>,
+    session_caches: HashMap<i64, SessionCache>,
     /// 当前员工会话
     current_session: Option<EmployeeSession>,
     /// 客户端名称 (设备标识)
@@ -184,7 +184,11 @@ impl TenantManager {
             let path = entry.path();
 
             if path.is_dir() {
-                if let Some(tenant_id) = path.file_name().and_then(|n| n.to_str()) {
+                if let Some(tenant_id) = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(|s| s.parse::<i64>().ok())
+                {
                     self.load_tenant(tenant_id)?;
                 }
             }
@@ -194,17 +198,16 @@ impl TenantManager {
     }
 
     /// 加载单个租户
-    fn load_tenant(&mut self, tenant_id: &str) -> Result<(), TenantError> {
-        let tenant_path = self.base_path.join(tenant_id);
+    fn load_tenant(&mut self, tenant_id: i64) -> Result<(), TenantError> {
+        let tenant_path = self.base_path.join(tenant_id.to_string());
 
         // 创建 TenantPaths
         let paths = TenantPaths::new(&tenant_path);
-        self.tenant_paths.insert(tenant_id.to_string(), paths);
+        self.tenant_paths.insert(tenant_id, paths);
 
         // 加载 SessionCache
         let session_cache = SessionCache::load(&tenant_path)?;
-        self.session_caches
-            .insert(tenant_id.to_string(), session_cache);
+        self.session_caches.insert(tenant_id, session_cache);
 
         Ok(())
     }
@@ -219,7 +222,7 @@ impl TenantManager {
                 // 从 credential.json 读取订阅状态
                 let subscription_status = Self::read_subscription_status(paths);
                 TenantInfo {
-                    tenant_id: tenant_id.clone(),
+                    tenant_id: *tenant_id,
                     tenant_name: None,
                     has_certificates: paths.is_server_activated(),
                     last_used: None,
@@ -230,8 +233,8 @@ impl TenantManager {
     }
 
     /// 获取指定租户的订阅状态
-    pub fn get_subscription_status(&self, tenant_id: &str) -> Option<String> {
-        let paths = self.tenant_paths.get(tenant_id)?;
+    pub fn get_subscription_status(&self, tenant_id: i64) -> Option<String> {
+        let paths = self.tenant_paths.get(&tenant_id)?;
         Self::read_subscription_status(paths)
     }
 
@@ -255,7 +258,7 @@ impl TenantManager {
         auth_url: &str,
         token: &str,
         store_id: Option<i64>,
-    ) -> Result<(String, String), TenantError> {
+    ) -> Result<(i64, String), TenantError> {
         // 1. 生成 Hardware ID
         let device_id = crab_cert::generate_hardware_id();
         tracing::info!("Activating device with ID: {}", device_id);
@@ -310,11 +313,11 @@ impl TenantManager {
             .data
             .ok_or_else(|| TenantError::AuthFailed("Missing activation data".to_string()))?;
 
-        let tenant_id = data.tenant_id.clone();
+        let tenant_id = data.tenant_id;
         let entity_id = data.entity_id.clone();
 
         // 4. 准备租户目录 (使用 TenantPaths)
-        let tenant_path = self.base_path.join(&tenant_id);
+        let tenant_path = self.base_path.join(tenant_id.to_string());
         let paths = TenantPaths::new(&tenant_path);
 
         // 创建所有必要的目录
@@ -361,10 +364,10 @@ impl TenantManager {
         );
 
         // 8. 更新内存状态 - 使用 TenantPaths
-        self.load_tenant(&tenant_id)?;
+        self.load_tenant(tenant_id)?;
 
         // 9. 自动切换
-        self.switch_tenant(&tenant_id)?;
+        self.switch_tenant(tenant_id)?;
 
         tracing::info!(tenant_id = %tenant_id, entity_id = %entity_id, "Device activated successfully");
 
@@ -384,7 +387,7 @@ impl TenantManager {
         &mut self,
         auth_url: &str,
         token: &str,
-    ) -> Result<(String, String), TenantError> {
+    ) -> Result<(i64, String), TenantError> {
         // 1. 生成 Hardware ID
         let device_id = crab_cert::generate_hardware_id();
         tracing::info!("Activating client with device ID: {}", device_id);
@@ -431,11 +434,11 @@ impl TenantManager {
             .data
             .ok_or_else(|| TenantError::AuthFailed("Missing activation data".to_string()))?;
 
-        let tenant_id = data.tenant_id.clone();
+        let tenant_id = data.tenant_id;
         let entity_id = data.entity_id.clone();
 
         // 4. 准备租户目录
-        let tenant_path = self.base_path.join(&tenant_id);
+        let tenant_path = self.base_path.join(tenant_id.to_string());
         let paths = TenantPaths::new(&tenant_path);
 
         // 5. 保存客户端证书到 {tenant}/certs/ (用于 mTLS Client Mode)
@@ -473,10 +476,10 @@ impl TenantManager {
         );
 
         // 7. 更新内存状态
-        self.load_tenant(&tenant_id)?;
+        self.load_tenant(tenant_id)?;
 
         // 8. 自动切换
-        self.switch_tenant(&tenant_id)?;
+        self.switch_tenant(tenant_id)?;
 
         tracing::info!(tenant_id = %tenant_id, entity_id = %entity_id, "Client activated successfully");
 
@@ -629,14 +632,14 @@ impl TenantManager {
     }
 
     /// 切换当前租户
-    pub fn switch_tenant(&mut self, tenant_id: &str) -> Result<(), TenantError> {
-        if !self.tenant_paths.contains_key(tenant_id) {
+    pub fn switch_tenant(&mut self, tenant_id: i64) -> Result<(), TenantError> {
+        if !self.tenant_paths.contains_key(&tenant_id) {
             return Err(TenantError::NotFound(tenant_id.to_string()));
         }
 
         // 清除当前会话
         self.current_session = None;
-        self.current_tenant = Some(tenant_id.to_string());
+        self.current_tenant = Some(tenant_id);
 
         tracing::info!(tenant_id = %tenant_id, "Switched to tenant");
 
@@ -650,19 +653,19 @@ impl TenantManager {
     }
 
     /// 移除租户 (删除本地证书和缓存)
-    pub fn remove_tenant(&mut self, tenant_id: &str) -> Result<(), TenantError> {
+    pub fn remove_tenant(&mut self, tenant_id: i64) -> Result<(), TenantError> {
         // 如果是当前租户，先清除
-        if self.current_tenant.as_deref() == Some(tenant_id) {
+        if self.current_tenant == Some(tenant_id) {
             self.current_tenant = None;
             self.current_session = None;
         }
 
         // 移除管理器
-        self.tenant_paths.remove(tenant_id);
-        self.session_caches.remove(tenant_id);
+        self.tenant_paths.remove(&tenant_id);
+        self.session_caches.remove(&tenant_id);
 
         // 删除文件
-        let tenant_path = self.base_path.join(tenant_id);
+        let tenant_path = self.base_path.join(tenant_id.to_string());
         if tenant_path.exists() {
             std::fs::remove_dir_all(&tenant_path)?;
         }
@@ -681,16 +684,12 @@ impl TenantManager {
         password: &str,
         edge_url: &str,
     ) -> Result<EmployeeSession, TenantError> {
-        let tenant_id = self
-            .current_tenant
-            .as_ref()
-            .ok_or(TenantError::NoTenantSelected)?
-            .clone();
+        let tenant_id = self.current_tenant.ok_or(TenantError::NoTenantSelected)?;
 
         let paths = self
             .tenant_paths
             .get(&tenant_id)
-            .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
+            .ok_or_else(|| TenantError::NotFound(tenant_id.to_string()))?;
 
         // 构建 mTLS HTTP 客户端
         let http_client = build_mtls_http_client(paths)?;
@@ -748,16 +747,12 @@ impl TenantManager {
         username: &str,
         password: &str,
     ) -> Result<EmployeeSession, TenantError> {
-        let tenant_id = self
-            .current_tenant
-            .as_ref()
-            .ok_or(TenantError::NoTenantSelected)?
-            .clone();
+        let tenant_id = self.current_tenant.ok_or(TenantError::NoTenantSelected)?;
 
         let cache = self
             .session_caches
             .get(&tenant_id)
-            .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
+            .ok_or_else(|| TenantError::NotFound(tenant_id.to_string()))?;
 
         // 验证离线凭据
         let session = cache.verify_offline_login(username, password)?;
@@ -803,8 +798,8 @@ impl TenantManager {
     }
 
     /// 获取当前租户ID
-    pub fn current_tenant_id(&self) -> Option<&str> {
-        self.current_tenant.as_deref()
+    pub fn current_tenant_id(&self) -> Option<i64> {
+        self.current_tenant
     }
 
     /// 获取当前员工会话
@@ -814,8 +809,8 @@ impl TenantManager {
 
     /// 检查是否有缓存的离线登录数据
     pub fn has_offline_cache(&self, username: &str) -> bool {
-        if let Some(tenant_id) = &self.current_tenant {
-            if let Some(cache) = self.session_caches.get(tenant_id) {
+        if let Some(tenant_id) = self.current_tenant {
+            if let Some(cache) = self.session_caches.get(&tenant_id) {
                 return cache.has_employee(username);
             }
         }
@@ -824,8 +819,8 @@ impl TenantManager {
 
     /// 获取当前租户的缓存员工列表
     pub fn list_cached_employees(&self) -> Vec<String> {
-        if let Some(tenant_id) = &self.current_tenant {
-            if let Some(cache) = self.session_caches.get(tenant_id) {
+        if let Some(tenant_id) = self.current_tenant {
+            if let Some(cache) = self.session_caches.get(&tenant_id) {
                 return cache.list_employees();
             }
         }
@@ -835,15 +830,13 @@ impl TenantManager {
     /// 获取当前租户的路径管理器
     pub fn current_paths(&self) -> Option<&TenantPaths> {
         self.current_tenant
-            .as_ref()
-            .and_then(|id| self.tenant_paths.get(id))
+            .and_then(|id| self.tenant_paths.get(&id))
     }
 
     /// 获取当前租户目录
     pub fn current_tenant_path(&self) -> Option<PathBuf> {
         self.current_tenant
-            .as_ref()
-            .map(|id| self.base_path.join(id))
+            .map(|id| self.base_path.join(id.to_string()))
     }
 
     /// 获取客户端名称
@@ -855,15 +848,12 @@ impl TenantManager {
 
     /// 保存当前活动会话到磁盘
     pub fn save_current_session(&self, session: &EmployeeSession) -> Result<(), TenantError> {
-        let tenant_id = self
-            .current_tenant
-            .as_ref()
-            .ok_or(TenantError::NoTenantSelected)?;
+        let tenant_id = self.current_tenant.ok_or(TenantError::NoTenantSelected)?;
 
         let cache = self
             .session_caches
-            .get(tenant_id)
-            .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
+            .get(&tenant_id)
+            .ok_or_else(|| TenantError::NotFound(tenant_id.to_string()))?;
 
         cache
             .save_current_session(session)
@@ -872,15 +862,12 @@ impl TenantManager {
 
     /// 加载缓存的当前活动会话
     pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, TenantError> {
-        let tenant_id = self
-            .current_tenant
-            .as_ref()
-            .ok_or(TenantError::NoTenantSelected)?;
+        let tenant_id = self.current_tenant.ok_or(TenantError::NoTenantSelected)?;
 
         let cache = self
             .session_caches
-            .get(tenant_id)
-            .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
+            .get(&tenant_id)
+            .ok_or_else(|| TenantError::NotFound(tenant_id.to_string()))?;
 
         cache
             .load_current_session()
@@ -890,8 +877,8 @@ impl TenantManager {
     /// 清除缓存的当前活动会话（同时清内存 + 磁盘）
     pub fn clear_current_session(&mut self) -> Result<(), TenantError> {
         self.current_session = None;
-        if let Some(tenant_id) = &self.current_tenant {
-            if let Some(cache) = self.session_caches.get(tenant_id) {
+        if let Some(tenant_id) = self.current_tenant {
+            if let Some(cache) = self.session_caches.get(&tenant_id) {
                 cache
                     .clear_current_session()
                     .map_err(TenantError::SessionCache)?;

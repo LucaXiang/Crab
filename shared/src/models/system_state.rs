@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 pub struct SystemState {
     pub id: i64,
     pub genesis_hash: Option<String>,
-    pub last_order_id: Option<String>,
+    pub last_order_id: Option<i64>,
     pub last_chain_hash: Option<String>,
-    pub synced_up_to_id: Option<String>,
+    pub synced_up_to_id: Option<i64>,
     pub synced_up_to_hash: Option<String>,
     pub last_sync_time: Option<i64>,
     pub order_count: i64,
@@ -23,9 +23,9 @@ pub struct SystemState {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SystemStateUpdate {
     pub genesis_hash: Option<String>,
-    pub last_order_id: Option<String>,
+    pub last_order_id: Option<i64>,
     pub last_chain_hash: Option<String>,
-    pub synced_up_to_id: Option<String>,
+    pub synced_up_to_id: Option<i64>,
     pub synced_up_to_hash: Option<String>,
     pub last_sync_time: Option<i64>,
     pub order_count: Option<i64>,
@@ -41,13 +41,13 @@ pub struct InitGenesisRequest {
 /// Update last order payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateLastOrderRequest {
-    pub order_id: String,
+    pub order_id: i64,
     pub order_hash: String,
 }
 
 /// Update sync state payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSyncStateRequest {
-    pub synced_up_to_id: String,
+    pub synced_up_to_id: i64,
     pub synced_up_to_hash: String,
 }

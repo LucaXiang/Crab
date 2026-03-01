@@ -43,6 +43,12 @@ export interface CreditNoteDetail extends CreditNote {
   items: CreditNoteItem[];
 }
 
+/** Per-item refunded quantity info (matches backend RefundedItemInfo) */
+export interface RefundedItemInfo {
+  instance_id: string;
+  refunded_quantity: number;
+}
+
 /** Refundable info for anti-over-refund (matches backend RefundableInfo) */
 export interface RefundableInfo {
   original_order_pk: number;
@@ -50,6 +56,7 @@ export interface RefundableInfo {
   original_total: number;
   already_refunded: number;
   remaining_refundable: number;
+  refunded_items: RefundedItemInfo[];
 }
 
 /** Request to create a credit note */

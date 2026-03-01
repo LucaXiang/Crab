@@ -10,7 +10,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// CancelStampRedemption action
 #[derive(Debug, Clone)]
 pub struct CancelStampRedemptionAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub stamp_activity_id: i64,
 }
 
@@ -20,16 +20,16 @@ impl CommandHandler for CancelStampRedemptionAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -71,10 +71,10 @@ impl CommandHandler for CancelStampRedemptionAction {
 
         let event = OrderEvent::new(
             ctx.next_sequence(),
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::StampRedemptionCancelled,
             EventPayload::StampRedemptionCancelled {
@@ -99,7 +99,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -141,7 +141,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot
@@ -159,7 +159,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelStampRedemptionAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
         };
 
@@ -189,7 +189,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -198,7 +198,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelStampRedemptionAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 999,
         };
 
@@ -211,7 +211,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -219,7 +219,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CancelStampRedemptionAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
         };
 

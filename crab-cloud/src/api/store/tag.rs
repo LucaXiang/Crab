@@ -18,7 +18,7 @@ pub async fn list_tags(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<store::StoreTag>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let tags = store::list_tags(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,7 +31,7 @@ pub async fn create_tag(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::tag::TagCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) = store::create_tag_direct(&state.pool, store_id, &data)
         .await
@@ -43,6 +43,7 @@ pub async fn create_tag(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateTag {
             id: Some(source_id),
             data,
@@ -59,7 +60,7 @@ pub async fn update_tag(
     Path((store_id, tag_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::tag::TagUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::update_tag_direct(&state.pool, store_id, tag_id, &data)
         .await
@@ -68,7 +69,13 @@ pub async fn update_tag(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::UpdateTag { id: tag_id, data }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::UpdateTag { id: tag_id, data },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }
@@ -78,7 +85,7 @@ pub async fn delete_tag(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, tag_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_tag_direct(&state.pool, store_id, tag_id)
         .await
@@ -87,7 +94,13 @@ pub async fn delete_tag(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::DeleteTag { id: tag_id }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::DeleteTag { id: tag_id },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

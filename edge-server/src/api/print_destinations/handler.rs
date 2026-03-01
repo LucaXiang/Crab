@@ -84,7 +84,13 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&item), false)
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            item.id,
+            Some(&item),
+            false,
+        )
         .await;
 
     // Auto-set as global default if none exists for this purpose
@@ -126,13 +132,7 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&item),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&item), false)
         .await;
 
     Ok(Json(item))
@@ -184,7 +184,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, id, None, false)
             .await;
 
         // Clean up global default if it referenced the deleted destination
@@ -305,7 +305,7 @@ async fn broadcast_print_config(
         .broadcast_sync(
             SyncResource::PrintConfig,
             SyncChangeType::Updated,
-            "default",
+            0,
             Some(&config),
             false,
         )

@@ -57,7 +57,7 @@ export type P12BlockedReason =
 
 export interface P12BlockedInfo {
   reason: P12BlockedReason;
-  tenant_id: string;
+  tenant_id: number;
   upload_url?: string;
   user_message: string;
 }
@@ -106,7 +106,7 @@ export interface ComponentsHealth {
 export interface DeviceInfo {
   device_id: string;
   entity_id?: string;
-  tenant_id?: string;
+  tenant_id?: number;
 }
 
 export interface HealthStatus {

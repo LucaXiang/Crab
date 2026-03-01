@@ -35,7 +35,7 @@ export const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
       icon: Coins,
       colorClass: 'bg-green-500',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
+      tags: payload.payment_id ? [{ text: `#${String(payload.payment_id).slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -64,7 +64,7 @@ export const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = 
       icon: Ban,
       colorClass: 'bg-red-400',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
+      tags: payload.payment_id ? [{ text: `#${String(payload.payment_id).slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };

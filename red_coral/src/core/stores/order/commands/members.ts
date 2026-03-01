@@ -10,7 +10,7 @@ import { sendCommand, ensureSuccess } from './sendCommand';
  * The backend will look up member info and apply MG discounts.
  */
 export const linkMember = async (
-  orderId: string,
+  orderId: number,
   memberId: number,
 ): Promise<void> => {
   const command = createCommand({
@@ -28,7 +28,7 @@ export const linkMember = async (
  * The backend will remove MG discounts and recalculate totals.
  */
 export const unlinkMember = async (
-  orderId: string,
+  orderId: number,
 ): Promise<void> => {
   const command = createCommand({
     type: 'UNLINK_MEMBER',
@@ -44,7 +44,7 @@ export const unlinkMember = async (
  * The backend will comp the appropriate item based on the activity's reward strategy.
  */
 export const redeemStamp = async (
-  orderId: string,
+  orderId: number,
   stampActivityId: number,
   productId?: number | null,
   compExistingInstanceId?: string | null,
@@ -66,7 +66,7 @@ export const redeemStamp = async (
  * Removes the reward item and allows re-redemption.
  */
 export const cancelStampRedemption = async (
-  orderId: string,
+  orderId: number,
   stampActivityId: number,
 ): Promise<void> => {
   const command = createCommand({

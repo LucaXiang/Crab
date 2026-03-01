@@ -23,7 +23,7 @@ const PRODUCT_REFRESH_DEBOUNCE_MS = 500;
 interface SyncPayload {
   resource: string;
   action: 'created' | 'updated' | 'deleted' | 'settlement_required';
-  id: string | number; // Backend sends String, parsed to number before applySync
+  id: number;
   version: number;
   data: unknown | null;
 }

@@ -2,10 +2,8 @@
 //!
 //! CRUD operations for Verifactu invoice, invoice_desglose, and invoice_counter in SQLite.
 
-use super::RepoResult;
-use shared::models::invoice::{
-    AeatStatus, Invoice, InvoiceDesglose, InvoiceSourceType, TipoFactura,
-};
+use super::{RepoError, RepoResult};
+use shared::models::invoice::{AeatStatus, Invoice, InvoiceDesglose};
 use shared::util::snowflake_id;
 use sqlx::SqlitePool;
 
@@ -33,19 +31,30 @@ struct InvoiceRow {
     nombre_razon: String,
     factura_rectificada_id: Option<i64>,
     factura_rectificada_num: Option<String>,
+    factura_sustituida_id: Option<i64>,
+    factura_sustituida_num: Option<String>,
+    customer_nif: Option<String>,
+    customer_nombre: Option<String>,
+    customer_address: Option<String>,
+    customer_email: Option<String>,
+    customer_phone: Option<String>,
     cloud_synced: bool,
     aeat_status: String,
     created_at: i64,
 }
 
 impl InvoiceRow {
-    fn into_invoice(self) -> Invoice {
-        Invoice {
+    fn into_invoice(self) -> RepoResult<Invoice> {
+        Ok(Invoice {
             id: self.id,
             invoice_number: self.invoice_number,
             serie: self.serie,
-            tipo_factura: self.tipo_factura.parse().unwrap_or(TipoFactura::F2),
-            source_type: self.source_type.parse().unwrap_or(InvoiceSourceType::Order),
+            tipo_factura: self.tipo_factura.parse().map_err(|_| {
+                RepoError::DataCorruption(format!("invalid tipo_factura: {}", self.tipo_factura))
+            })?,
+            source_type: self.source_type.parse().map_err(|_| {
+                RepoError::DataCorruption(format!("invalid source_type: {}", self.source_type))
+            })?,
             source_pk: self.source_pk,
             subtotal: self.subtotal,
             tax: self.tax,
@@ -58,10 +67,19 @@ impl InvoiceRow {
             nombre_razon: self.nombre_razon,
             factura_rectificada_id: self.factura_rectificada_id,
             factura_rectificada_num: self.factura_rectificada_num,
+            factura_sustituida_id: self.factura_sustituida_id,
+            factura_sustituida_num: self.factura_sustituida_num,
+            customer_nif: self.customer_nif,
+            customer_nombre: self.customer_nombre,
+            customer_address: self.customer_address,
+            customer_email: self.customer_email,
+            customer_phone: self.customer_phone,
             cloud_synced: self.cloud_synced,
-            aeat_status: self.aeat_status.parse().unwrap_or(AeatStatus::Pending),
+            aeat_status: self.aeat_status.parse().map_err(|_| {
+                RepoError::DataCorruption(format!("invalid aeat_status: {}", self.aeat_status))
+            })?,
             created_at: self.created_at,
-        }
+        })
     }
 }
 
@@ -80,6 +98,8 @@ const INVOICE_COLUMNS: &str = "\
     subtotal, tax, total, huella, prev_huella, fecha_expedicion, \
     fecha_hora_registro, nif, nombre_razon, \
     factura_rectificada_id, factura_rectificada_num, \
+    factura_sustituida_id, factura_sustituida_num, \
+    customer_nif, customer_nombre, customer_address, customer_email, customer_phone, \
     cloud_synced, aeat_status, created_at";
 
 // ---------------------------------------------------------------------------
@@ -99,8 +119,10 @@ pub async fn insert(
           subtotal, tax, total, huella, prev_huella, fecha_expedicion, \
           fecha_hora_registro, nif, nombre_razon, \
           factura_rectificada_id, factura_rectificada_num, \
+          factura_sustituida_id, factura_sustituida_num, \
+          customer_nif, customer_nombre, customer_address, customer_email, customer_phone, \
           cloud_synced, aeat_status, created_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
     )
     .bind(id)
     .bind(&invoice.invoice_number)
@@ -119,6 +141,13 @@ pub async fn insert(
     .bind(&invoice.nombre_razon)
     .bind(invoice.factura_rectificada_id)
     .bind(&invoice.factura_rectificada_num)
+    .bind(invoice.factura_sustituida_id)
+    .bind(&invoice.factura_sustituida_num)
+    .bind(&invoice.customer_nif)
+    .bind(&invoice.customer_nombre)
+    .bind(&invoice.customer_address)
+    .bind(&invoice.customer_email)
+    .bind(&invoice.customer_phone)
     .bind(invoice.cloud_synced)
     .bind(invoice.aeat_status.as_str())
     .bind(invoice.created_at)
@@ -224,7 +253,23 @@ pub async fn list_unsynced(pool: &SqlitePool, limit: i64) -> RepoResult<Vec<Invo
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.into_iter().map(InvoiceRow::into_invoice).collect())
+    rows.into_iter().map(InvoiceRow::into_invoice).collect()
+}
+
+/// Get tax breakdown lines for an invoice (within a transaction).
+pub async fn get_desglose_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    invoice_id: i64,
+) -> RepoResult<Vec<InvoiceDesglose>> {
+    let rows = sqlx::query_as::<_, InvoiceDesglose>(
+        "SELECT id, invoice_id, tax_rate, base_amount, tax_amount \
+         FROM invoice_desglose WHERE invoice_id = ? ORDER BY tax_rate",
+    )
+    .bind(invoice_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(rows)
 }
 
 /// Get tax breakdown lines for an invoice.
@@ -268,7 +313,7 @@ pub async fn find_order_invoice(
     .fetch_optional(&mut **tx)
     .await?;
 
-    Ok(row.map(InvoiceRow::into_invoice))
+    row.map(InvoiceRow::into_invoice).transpose()
 }
 
 /// Get an invoice by ID.
@@ -280,7 +325,7 @@ pub async fn get_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Invoice>
     .fetch_optional(pool)
     .await?;
 
-    Ok(row.map(InvoiceRow::into_invoice))
+    row.map(InvoiceRow::into_invoice).transpose()
 }
 
 /// List invoice IDs not yet synced to cloud (ordered by id for chain consistency).
@@ -349,6 +394,13 @@ pub async fn build_sync(
         nombre_razon: invoice.nombre_razon,
         factura_rectificada_id: invoice.factura_rectificada_id,
         factura_rectificada_num: invoice.factura_rectificada_num,
+        factura_sustituida_id: invoice.factura_sustituida_id,
+        factura_sustituida_num: invoice.factura_sustituida_num,
+        customer_nif: invoice.customer_nif,
+        customer_nombre: invoice.customer_nombre,
+        customer_address: invoice.customer_address,
+        customer_email: invoice.customer_email,
+        customer_phone: invoice.customer_phone,
         created_at: invoice.created_at,
     })
 }
@@ -382,5 +434,5 @@ pub async fn find_by_order(pool: &SqlitePool, order_pk: i64) -> RepoResult<Vec<I
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.into_iter().map(InvoiceRow::into_invoice).collect())
+    rows.into_iter().map(InvoiceRow::into_invoice).collect()
 }

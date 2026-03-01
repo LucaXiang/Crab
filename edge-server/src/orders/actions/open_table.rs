@@ -4,7 +4,6 @@
 
 use sqlx::SqlitePool;
 use tracing::debug;
-use uuid::Uuid;
 
 use crate::db::repository::price_rule;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
@@ -114,14 +113,14 @@ impl CommandHandler for OpenTableAction {
         }
 
         // 1. Generate new order ID
-        let order_id = Uuid::new_v4().to_string();
+        let order_id = shared::util::snowflake_id();
         debug!(order_id = %order_id, "Generated new order ID");
 
         // 2. Allocate sequence number
         let seq = ctx.next_sequence();
 
         // 3. Create snapshot with server-generated receipt_number
-        let mut snapshot = ctx.create_snapshot(order_id.clone());
+        let mut snapshot = ctx.create_snapshot(order_id);
         snapshot.table_id = self.table_id;
         snapshot.table_name = self.table_name.clone();
         snapshot.zone_id = self.zone_id;
@@ -145,10 +144,10 @@ impl CommandHandler for OpenTableAction {
         // 6. Create event with server-generated receipt_number
         let event = OrderEvent::new(
             seq,
-            order_id.clone(),
+            order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp), // Preserve client timestamp
             OrderEventType::TableOpened,
             EventPayload::TableOpened {
@@ -182,7 +181,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -221,12 +220,12 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an existing active order at table T1
-        let mut existing = OrderSnapshot::new("existing-order".to_string());
+        let mut existing = OrderSnapshot::new(999);
         existing.status = OrderStatus::Active;
         existing.table_id = Some(1);
         existing.table_name = Some("Table 1".to_string());
         storage.store_snapshot(&txn, &existing).unwrap();
-        storage.mark_order_active(&txn, "existing-order").unwrap();
+        storage.mark_order_active(&txn, 999).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);

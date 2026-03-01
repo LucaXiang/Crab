@@ -113,15 +113,6 @@ pub async fn upsert_category_from_sync(
     Ok(())
 }
 
-pub async fn delete_category(pool: &PgPool, store_id: i64, source_id: i64) -> Result<(), BoxError> {
-    sqlx::query("DELETE FROM store_categories WHERE store_id = $1 AND source_id = $2")
-        .bind(store_id)
-        .bind(source_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
 // ── Console Read Types ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

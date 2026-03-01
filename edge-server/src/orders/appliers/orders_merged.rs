@@ -97,8 +97,8 @@ mod tests {
     use shared::order::types::ServiceType;
     use shared::order::{CartItemSnapshot, OrderEventType};
 
-    fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_test_snapshot(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
@@ -136,7 +136,7 @@ mod tests {
     }
 
     fn create_order_merged_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         source_table_id: i64,
         source_table_name: &str,
@@ -158,7 +158,7 @@ mod tests {
     }
 
     fn create_order_merged_event_with_payments(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         source_table_id: i64,
         source_table_name: &str,
@@ -172,10 +172,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderMerged,
             EventPayload::OrderMerged {
@@ -195,17 +195,17 @@ mod tests {
     }
 
     fn create_order_merged_out_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         target_table_id: i64,
         target_table_name: &str,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderMergedOut,
             EventPayload::OrderMergedOut {
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_order_merged_adds_items() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         assert!(snapshot.items.is_empty());
 
         let items = vec![
@@ -230,7 +230,7 @@ mod tests {
             create_test_item("item-2", "Tea"),
         ];
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", items);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -244,14 +244,14 @@ mod tests {
 
     #[test]
     fn test_order_merged_appends_to_existing_items() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         snapshot
             .items
             .push(create_test_item("existing-1", "Existing Item"));
 
         let items = vec![create_test_item("merged-1", "Merged Item")];
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", items);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -263,9 +263,9 @@ mod tests {
 
     #[test]
     fn test_order_merged_empty_items() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![]);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -275,10 +275,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_updates_sequence() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         snapshot.last_sequence = 5;
 
-        let event = create_order_merged_event("target-1", 10, 2, "Table 2", vec![]);
+        let event = create_order_merged_event(2001, 10, 2, "Table 2", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -288,10 +288,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_updates_timestamp() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![]);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", vec![]);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMergedApplier;
@@ -302,11 +302,11 @@ mod tests {
 
     #[test]
     fn test_order_merged_updates_checksum() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         let initial_checksum = snapshot.state_checksum.clone();
 
         let items = vec![create_test_item("item-1", "Coffee")];
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", items);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -317,10 +317,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_preserves_status() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![]);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -331,11 +331,11 @@ mod tests {
 
     #[test]
     fn test_order_merged_preserves_table_info() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         snapshot.table_id = Some(10);
         snapshot.table_name = Some("Target Table".to_string());
 
-        let event = create_order_merged_event("target-1", 2, 20, "Source Table", vec![]);
+        let event = create_order_merged_event(2001, 2, 20, "Source Table", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -347,17 +347,17 @@ mod tests {
 
     #[test]
     fn test_order_merged_wrong_event_type_is_noop() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         let original_items_len = snapshot.items.len();
         let original_sequence = snapshot.last_sequence;
 
         // Create an event with wrong payload type
         let event = OrderEvent::new(
             2,
-            "target-1".to_string(),
+            2001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -380,10 +380,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_sets_status() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_merged_out_event("source-1", 2, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -393,10 +393,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_updates_sequence() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
         snapshot.last_sequence = 5;
 
-        let event = create_order_merged_out_event("source-1", 10, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 10, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -406,10 +406,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_updates_timestamp() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_merged_out_event("source-1", 2, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMergedOutApplier;
@@ -420,10 +420,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_updates_checksum() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_merged_out_event("source-1", 2, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -434,10 +434,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_preserves_items() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
         snapshot.items.push(create_test_item("item-1", "Coffee"));
 
-        let event = create_order_merged_out_event("source-1", 2, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -449,9 +449,9 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_preserves_table_info() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
 
-        let event = create_order_merged_out_event("source-1", 2, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -463,17 +463,17 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_wrong_event_type_is_noop() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
         let original_status = snapshot.status;
         let original_sequence = snapshot.last_sequence;
 
         // Create an event with wrong payload type
         let event = OrderEvent::new(
             2,
-            "source-1".to_string(),
+            3001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -494,9 +494,9 @@ mod tests {
 
     #[test]
     fn test_order_merged_out_checksum_verifiable() {
-        let mut snapshot = create_test_snapshot("source-1");
+        let mut snapshot = create_test_snapshot(3001);
 
-        let event = create_order_merged_out_event("source-1", 2, 2, "Table 2");
+        let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -510,10 +510,10 @@ mod tests {
 
     #[test]
     fn test_order_merged_checksum_verifiable() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
 
         let items = vec![create_test_item("item-1", "Coffee")];
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", items);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -527,14 +527,14 @@ mod tests {
 
     #[test]
     fn test_order_merged_transfers_payments() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         // Add existing items so recalculate_totals produces correct total
         let mut existing = create_test_item("existing-1", "Existing");
         existing.price = 20.0; // existing item worth 20
         snapshot.items.push(existing);
 
         let payment = shared::order::PaymentRecord {
-            payment_id: "pay-1".to_string(),
+            payment_id: 4001,
             method: "CASH".to_string(),
             amount: 5.0,
             tendered: None,
@@ -552,7 +552,7 @@ mod tests {
         paid_item_quantities.insert("item-src-1".to_string(), 1);
 
         let event = create_order_merged_event_with_payments(
-            "target-1",
+            2001,
             2,
             2,
             "Table 2",
@@ -572,7 +572,7 @@ mod tests {
         assert_eq!(snapshot.items.len(), 2);
         // Payments merged
         assert_eq!(snapshot.payments.len(), 1);
-        assert_eq!(snapshot.payments[0].payment_id, "pay-1");
+        assert_eq!(snapshot.payments[0].payment_id, 4001);
         assert_eq!(snapshot.payments[0].amount, 5.0);
         // Paid amount accumulated
         assert_eq!(snapshot.paid_amount, 5.0);
@@ -585,14 +585,14 @@ mod tests {
 
     #[test]
     fn test_order_merged_accumulates_existing_payments() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         // Add existing items so recalculate_totals produces correct total
         let mut existing = create_test_item("existing-1", "Existing");
         existing.price = 50.0; // item worth 50
         snapshot.items.push(existing);
         snapshot.paid_amount = 10.0;
         snapshot.payments.push(shared::order::PaymentRecord {
-            payment_id: "pay-target".to_string(),
+            payment_id: 4501,
             method: "CARD".to_string(),
             amount: 10.0,
             tendered: None,
@@ -607,7 +607,7 @@ mod tests {
         });
 
         let source_payment = shared::order::PaymentRecord {
-            payment_id: "pay-source".to_string(),
+            payment_id: 4502,
             method: "CASH".to_string(),
             amount: 8.0,
             tendered: None,
@@ -622,7 +622,7 @@ mod tests {
         };
 
         let event = create_order_merged_event_with_payments(
-            "target-1",
+            2001,
             2,
             2,
             "Table 2",
@@ -647,7 +647,7 @@ mod tests {
 
     #[test]
     fn test_order_merged_same_instance_id_different_pricing_merges_and_updates() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         // Target has item with 20% manual discount
         let mut target_item = create_test_item("item-1", "Coffee");
         target_item.price = 8.0;
@@ -658,7 +658,7 @@ mod tests {
         // Source has same item but no discount
         let source_item = create_test_item("item-1", "Coffee"); // price=10.0, no discount
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![source_item]);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", vec![source_item]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -678,13 +678,13 @@ mod tests {
 
     #[test]
     fn test_order_merged_same_instance_id_same_pricing_merges() {
-        let mut snapshot = create_test_snapshot("target-1");
+        let mut snapshot = create_test_snapshot(2001);
         snapshot.items.push(create_test_item("item-1", "Coffee")); // price=10, qty=1
 
         // Source has same item with same pricing
         let source_item = create_test_item("item-1", "Coffee"); // price=10, qty=1
 
-        let event = create_order_merged_event("target-1", 2, 2, "Table 2", vec![source_item]);
+        let event = create_order_merged_event(2001, 2, 2, "Table 2", vec![source_item]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);

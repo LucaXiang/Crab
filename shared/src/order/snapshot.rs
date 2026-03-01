@@ -25,8 +25,8 @@ pub enum OrderStatus {
 /// Order snapshot - computed from event stream
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrderSnapshot {
-    /// Order ID (assigned by server)
-    pub order_id: String,
+    /// Order ID (assigned by server, snowflake i64)
+    pub order_id: i64,
     /// Table ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_id: Option<i64>,
@@ -196,7 +196,7 @@ pub struct OrderSnapshot {
 
 impl OrderSnapshot {
     /// Create a new empty order
-    pub fn new(order_id: String) -> Self {
+    pub fn new(order_id: i64) -> Self {
         let now = crate::util::now_millis();
         let mut snapshot = Self {
             order_id,
@@ -322,7 +322,7 @@ impl OrderSnapshot {
 
 impl Default for OrderSnapshot {
     fn default() -> Self {
-        Self::new(String::new())
+        Self::new(0)
     }
 }
 
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_order_snapshot_rule_fields() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(100001);
         snapshot.order_rule_discount_amount = 10.0;
         snapshot.order_rule_surcharge_amount = 5.0;
         snapshot.order_manual_discount_percent = Some(5.0);
@@ -347,7 +347,7 @@ mod tests {
         use super::super::types::VoidType;
 
         // 1. Create an Active snapshot (void_type = None)
-        let snapshot = OrderSnapshot::new("test-void".to_string());
+        let snapshot = OrderSnapshot::new(100002);
         let json = serde_json::to_string(&snapshot).unwrap();
 
         // void_type should NOT be in the JSON (skip_serializing_if)
@@ -367,7 +367,7 @@ mod tests {
         assert_eq!(restored.void_type, None);
 
         // 3. Create a Void snapshot with void_type set
-        let mut void_snapshot = OrderSnapshot::new("test-void-2".to_string());
+        let mut void_snapshot = OrderSnapshot::new(100003);
         void_snapshot.status = OrderStatus::Void;
         void_snapshot.void_type = Some(VoidType::LossSettled);
 

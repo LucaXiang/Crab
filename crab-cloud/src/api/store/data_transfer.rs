@@ -41,7 +41,7 @@ pub async fn export_catalog(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let store_tags = store::list_tags(&state.pool, store_id)
         .await
@@ -252,7 +252,7 @@ pub async fn import_catalog(
     Path(store_id): Path<i64>,
     body: Bytes,
 ) -> Result<Json<StoreOpResult>, AppError> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     // Parse ZIP
     let cursor = Cursor::new(body.as_ref());
@@ -285,7 +285,13 @@ pub async fn import_catalog(
 
     // Build StoreSnapshot for FullSync push to edge
     let snapshot = build_snapshot(&catalog);
-    push_to_edge(&state, store_id, StoreOp::FullSync { snapshot }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::FullSync { snapshot },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

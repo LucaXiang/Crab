@@ -205,8 +205,8 @@ pub async fn list_chain_entries(
     Ok(rows)
 }
 
-/// Credit note detail (from JSONB detail column)
-#[derive(serde::Serialize, sqlx::FromRow)]
+/// Credit note detail with items
+#[derive(Debug, serde::Serialize)]
 pub struct CreditNoteDetail {
     pub source_id: i64,
     pub credit_note_number: String,
@@ -221,7 +221,17 @@ pub struct CreditNoteDetail {
     pub operator_name: String,
     pub authorizer_name: Option<String>,
     pub created_at: i64,
-    pub detail: Option<serde_json::Value>,
+    pub items: Vec<CreditNoteItemDetail>,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct CreditNoteItemDetail {
+    pub item_name: String,
+    pub quantity: i32,
+    pub unit_price: f64,
+    pub line_credit: f64,
+    pub tax_rate: i32,
+    pub tax_credit: f64,
 }
 
 pub async fn get_credit_note_detail(
@@ -230,11 +240,29 @@ pub async fn get_credit_note_detail(
     tenant_id: i64,
     source_id: i64,
 ) -> Result<Option<CreditNoteDetail>, BoxError> {
-    let row = sqlx::query_as::<_, CreditNoteDetail>(
+    #[derive(sqlx::FromRow)]
+    struct HeaderRow {
+        id: i64,
+        source_id: i64,
+        credit_note_number: String,
+        original_order_id: i64,
+        original_receipt: String,
+        subtotal_credit: f64,
+        tax_credit: f64,
+        total_credit: f64,
+        refund_method: String,
+        reason: String,
+        note: Option<String>,
+        operator_name: String,
+        authorizer_name: Option<String>,
+        created_at: i64,
+    }
+
+    let header = sqlx::query_as::<_, HeaderRow>(
         r#"
-        SELECT source_id, credit_note_number, original_order_id, original_receipt,
+        SELECT id, source_id, credit_note_number, original_order_id, original_receipt,
                subtotal_credit, tax_credit, total_credit, refund_method, reason, note,
-               operator_name, authorizer_name, created_at, detail
+               operator_name, authorizer_name, created_at
         FROM store_credit_notes
         WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3
         "#,
@@ -244,7 +272,40 @@ pub async fn get_credit_note_detail(
     .bind(source_id)
     .fetch_optional(pool)
     .await?;
-    Ok(row)
+
+    let header = match header {
+        Some(h) => h,
+        None => return Ok(None),
+    };
+
+    let items = sqlx::query_as::<_, CreditNoteItemDetail>(
+        r#"
+        SELECT item_name, quantity, unit_price, line_credit, tax_rate, tax_credit
+        FROM store_credit_note_items
+        WHERE credit_note_id = $1
+        ORDER BY id
+        "#,
+    )
+    .bind(header.id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(Some(CreditNoteDetail {
+        source_id: header.source_id,
+        credit_note_number: header.credit_note_number,
+        original_order_id: header.original_order_id,
+        original_receipt: header.original_receipt,
+        subtotal_credit: header.subtotal_credit,
+        tax_credit: header.tax_credit,
+        total_credit: header.total_credit,
+        refund_method: header.refund_method,
+        reason: header.reason,
+        note: header.note,
+        operator_name: header.operator_name,
+        authorizer_name: header.authorizer_name,
+        created_at: header.created_at,
+        items,
+    }))
 }
 
 /// Daily report entry for Console stats
@@ -470,19 +531,51 @@ pub async fn get_daily_report_detail(
     }))
 }
 
-/// Get order detail from store_archived_orders.detail JSONB column
+/// Get order detail by assembling from relational tables
 pub async fn get_order_detail(
     pool: &PgPool,
     store_id: i64,
     tenant_id: i64,
     order_id: i64,
-) -> Result<Option<serde_json::Value>, BoxError> {
-    let row: Option<(serde_json::Value,)> = sqlx::query_as(
+) -> Result<Option<shared::cloud::OrderDetailPayload>, BoxError> {
+    // 1. Header (promoted scalar columns)
+    #[derive(sqlx::FromRow)]
+    struct HeaderRow {
+        id: i64,
+        start_time: Option<i64>,
+        zone_name: Option<String>,
+        table_name: Option<String>,
+        is_retail: bool,
+        original_total: f64,
+        subtotal: f64,
+        paid_amount: f64,
+        surcharge_amount: f64,
+        comp_total_amount: f64,
+        order_manual_discount_amount: f64,
+        order_manual_surcharge_amount: f64,
+        order_rule_discount_amount: f64,
+        order_rule_surcharge_amount: f64,
+        operator_name: Option<String>,
+        loss_reason: Option<String>,
+        void_note: Option<String>,
+        member_name: Option<String>,
+        // from order header
+        guest_count: Option<i32>,
+        discount_amount: f64,
+        void_type: Option<String>,
+        loss_amount: Option<f64>,
+    }
+
+    let header = sqlx::query_as::<_, HeaderRow>(
         r#"
-        SELECT detail
+        SELECT id, start_time, zone_name, table_name, is_retail,
+               original_total, subtotal, paid_amount, surcharge_amount, comp_total_amount,
+               order_manual_discount_amount, order_manual_surcharge_amount,
+               order_rule_discount_amount, order_rule_surcharge_amount,
+               operator_name, loss_reason, void_note, member_name,
+               guest_count, discount_amount, void_type, loss_amount
         FROM store_archived_orders
         WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
-            AND detail IS NOT NULL
         "#,
     )
     .bind(store_id)
@@ -490,33 +583,237 @@ pub async fn get_order_detail(
     .bind(order_id)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(|r| r.0))
+
+    let header = match header {
+        Some(h) => h,
+        None => return Ok(None),
+    };
+    let order_pk = header.id;
+
+    // 2. Fetch children concurrently
+    #[derive(sqlx::FromRow)]
+    struct ItemRow {
+        id: i64,
+        name: String,
+        spec_name: Option<String>,
+        category_name: Option<String>,
+        product_source_id: Option<i64>,
+        price: f64,
+        quantity: i32,
+        unit_price: f64,
+        line_total: f64,
+        discount_amount: f64,
+        surcharge_amount: f64,
+        tax: f64,
+        tax_rate: i32,
+        is_comped: bool,
+        note: Option<String>,
+    }
+
+    #[derive(sqlx::FromRow)]
+    struct OptionRow {
+        item_id: i64,
+        attribute_name: String,
+        option_name: String,
+        price: f64,
+        quantity: i32,
+    }
+
+    #[derive(sqlx::FromRow)]
+    struct PaymentRow {
+        seq: i32,
+        method: String,
+        amount: f64,
+        timestamp: i64,
+        cancelled: bool,
+    }
+
+    #[derive(sqlx::FromRow)]
+    struct EventRow {
+        seq: i32,
+        event_type: String,
+        timestamp: i64,
+        operator_id: Option<i64>,
+        operator_name: Option<String>,
+        data: Option<String>,
+    }
+
+    let (items_r, options_r, payments_r, events_r) = tokio::join!(
+        sqlx::query_as::<_, ItemRow>(
+            r#"
+            SELECT id, name, spec_name, category_name, product_source_id,
+                   price, quantity, unit_price, line_total, discount_amount,
+                   surcharge_amount, tax, tax_rate, is_comped, note
+            FROM store_order_items
+            WHERE order_id = $1
+            ORDER BY id
+            "#,
+        )
+        .bind(order_pk)
+        .fetch_all(pool),
+        sqlx::query_as::<_, OptionRow>(
+            r#"
+            SELECT o.item_id, o.attribute_name, o.option_name, o.price, o.quantity
+            FROM store_order_item_options o
+            JOIN store_order_items i ON i.id = o.item_id
+            WHERE i.order_id = $1
+            ORDER BY o.id
+            "#,
+        )
+        .bind(order_pk)
+        .fetch_all(pool),
+        sqlx::query_as::<_, PaymentRow>(
+            r#"
+            SELECT seq, method, amount, timestamp, cancelled
+            FROM store_order_payments
+            WHERE order_id = $1
+            ORDER BY seq
+            "#,
+        )
+        .bind(order_pk)
+        .fetch_all(pool),
+        sqlx::query_as::<_, EventRow>(
+            r#"
+            SELECT seq, event_type, timestamp, operator_id, operator_name, data
+            FROM store_order_events
+            WHERE order_id = $1
+            ORDER BY seq
+            "#,
+        )
+        .bind(order_pk)
+        .fetch_all(pool),
+    );
+
+    let item_rows = items_r?;
+    let option_rows = options_r?;
+    let payments = payments_r?;
+    let event_rows = events_r?;
+
+    // Group options by item_id
+    let mut options_map: std::collections::HashMap<i64, Vec<shared::cloud::OrderItemOptionSync>> =
+        std::collections::HashMap::new();
+    for o in option_rows {
+        options_map
+            .entry(o.item_id)
+            .or_default()
+            .push(shared::cloud::OrderItemOptionSync {
+                attribute_name: o.attribute_name,
+                option_name: o.option_name,
+                price: o.price,
+                quantity: o.quantity,
+            });
+    }
+
+    // Assemble items with options
+    let items: Vec<shared::cloud::OrderItemSync> = item_rows
+        .into_iter()
+        .map(|i| shared::cloud::OrderItemSync {
+            name: i.name,
+            spec_name: i.spec_name,
+            category_name: i.category_name,
+            product_source_id: i.product_source_id,
+            price: i.price,
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+            line_total: i.line_total,
+            discount_amount: i.discount_amount,
+            surcharge_amount: i.surcharge_amount,
+            tax: i.tax,
+            tax_rate: i.tax_rate,
+            is_comped: i.is_comped,
+            note: i.note,
+            options: options_map.remove(&i.id).unwrap_or_default(),
+        })
+        .collect();
+
+    let payments: Vec<shared::cloud::OrderPaymentSync> = payments
+        .into_iter()
+        .map(|p| shared::cloud::OrderPaymentSync {
+            seq: p.seq,
+            method: p.method,
+            amount: p.amount,
+            timestamp: p.timestamp,
+            cancelled: p.cancelled,
+        })
+        .collect();
+
+    let events: Vec<shared::cloud::OrderEventSync> = event_rows
+        .into_iter()
+        .map(|e| shared::cloud::OrderEventSync {
+            seq: e.seq,
+            event_type: e.event_type,
+            timestamp: e.timestamp,
+            operator_id: e.operator_id,
+            operator_name: e.operator_name,
+            data: e.data,
+        })
+        .collect();
+
+    Ok(Some(shared::cloud::OrderDetailPayload {
+        zone_name: header.zone_name,
+        table_name: header.table_name,
+        is_retail: header.is_retail,
+        guest_count: header.guest_count,
+        original_total: header.original_total,
+        subtotal: header.subtotal,
+        paid_amount: header.paid_amount,
+        discount_amount: header.discount_amount,
+        surcharge_amount: header.surcharge_amount,
+        comp_total_amount: header.comp_total_amount,
+        order_manual_discount_amount: header.order_manual_discount_amount,
+        order_manual_surcharge_amount: header.order_manual_surcharge_amount,
+        order_rule_discount_amount: header.order_rule_discount_amount,
+        order_rule_surcharge_amount: header.order_rule_surcharge_amount,
+        start_time: header.start_time.unwrap_or(0),
+        operator_name: header.operator_name,
+        void_type: header.void_type,
+        loss_reason: header.loss_reason,
+        loss_amount: header.loss_amount,
+        void_note: header.void_note,
+        member_name: header.member_name,
+        items,
+        payments,
+        events,
+    }))
 }
 
-/// Get order desglose from store_archived_orders.desglose JSONB column
+/// Get order desglose from store_order_desglose table
 pub async fn get_order_desglose(
     pool: &PgPool,
     store_id: i64,
     tenant_id: i64,
     order_id: i64,
 ) -> Result<Vec<shared::cloud::TaxDesglose>, BoxError> {
-    let row: Option<(serde_json::Value,)> = sqlx::query_as(
+    #[derive(sqlx::FromRow)]
+    struct DesgloseRow {
+        tax_rate: i32,
+        base_amount: f64,
+        tax_amount: f64,
+    }
+
+    let rows = sqlx::query_as::<_, DesgloseRow>(
         r#"
-        SELECT desglose
-        FROM store_archived_orders
-        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
+        SELECT d.tax_rate, d.base_amount, d.tax_amount
+        FROM store_order_desglose d
+        JOIN store_archived_orders o ON o.id = d.order_id
+        WHERE o.store_id = $1 AND o.tenant_id = $2 AND o.order_id = $3
+        ORDER BY d.tax_rate
         "#,
     )
     .bind(store_id)
     .bind(tenant_id)
     .bind(order_id)
-    .fetch_optional(pool)
+    .fetch_all(pool)
     .await?;
 
-    match row {
-        Some((json,)) => Ok(serde_json::from_value(json)?),
-        None => Ok(vec![]),
-    }
+    Ok(rows
+        .into_iter()
+        .map(|r| shared::cloud::TaxDesglose {
+            tax_rate: r.tax_rate,
+            base_amount: rust_decimal::Decimal::try_from(r.base_amount).unwrap_or_default(),
+            tax_amount: rust_decimal::Decimal::try_from(r.tax_amount).unwrap_or_default(),
+        })
+        .collect())
 }
 
 // ── Store overview statistics ──
@@ -747,22 +1044,21 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 3. Tax breakdown from desglose JSONB
+        // 3. Tax breakdown from store_order_desglose
         sqlx::query_as::<_, TaxBreakdownEntry>(
             r#"
             SELECT
-                (d->>'tax_rate')::INTEGER AS tax_rate,
-                COALESCE(SUM((d->>'base_amount')::DOUBLE PRECISION), 0) AS base_amount,
-                COALESCE(SUM((d->>'tax_amount')::DOUBLE PRECISION), 0) AS tax_amount
-            FROM store_archived_orders,
-                 jsonb_array_elements(desglose) AS d
-            WHERE tenant_id = $1
-                AND ($2::BIGINT IS NULL OR store_id = $2)
-                AND end_time >= $3 AND end_time < $4
-                AND status = 'COMPLETED'
-                AND desglose IS NOT NULL AND jsonb_typeof(desglose) = 'array'
-            GROUP BY tax_rate
-            ORDER BY tax_rate
+                d.tax_rate,
+                COALESCE(SUM(d.base_amount), 0)::DOUBLE PRECISION AS base_amount,
+                COALESCE(SUM(d.tax_amount), 0)::DOUBLE PRECISION AS tax_amount
+            FROM store_order_desglose d
+            JOIN store_archived_orders o ON o.id = d.order_id
+            WHERE o.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR o.store_id = $2)
+                AND o.end_time >= $3 AND o.end_time < $4
+                AND o.status = 'COMPLETED'
+            GROUP BY d.tax_rate
+            ORDER BY d.tax_rate
             "#,
         )
         .bind(tenant_id)
@@ -770,22 +1066,21 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 4. Payment breakdown from detail JSONB
+        // 4. Payment breakdown from store_order_payments
         sqlx::query_as::<_, PaymentBreakdownEntry>(
             r#"
             SELECT
-                p->>'method' AS method,
-                COALESCE(SUM((p->>'amount')::DOUBLE PRECISION), 0) AS amount,
+                p.method,
+                COALESCE(SUM(p.amount), 0)::DOUBLE PRECISION AS amount,
                 COUNT(*) AS count
-            FROM store_archived_orders o
-            CROSS JOIN jsonb_array_elements(o.detail->'payments') AS p
+            FROM store_order_payments p
+            JOIN store_archived_orders o ON o.id = p.order_id
             WHERE o.tenant_id = $1
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
-                AND o.detail IS NOT NULL
-                AND (p->>'cancelled')::BOOLEAN IS NOT TRUE
-            GROUP BY method
+                AND p.cancelled IS NOT TRUE
+            GROUP BY p.method
             ORDER BY amount DESC
             "#,
         )
@@ -794,21 +1089,20 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 5. Top products from detail JSONB
+        // 5. Top products from store_order_items
         sqlx::query_as::<_, TopProductEntry>(
             r#"
             SELECT
-                i->>'name' AS name,
-                COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity,
-                COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
-            FROM store_archived_orders o
-            CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+                i.name,
+                COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity,
+                COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
+            FROM store_order_items i
+            JOIN store_archived_orders o ON o.id = i.order_id
             WHERE o.tenant_id = $1
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
-                AND o.detail IS NOT NULL
-            GROUP BY name
+            GROUP BY i.name
             ORDER BY quantity DESC
             LIMIT 10
             "#,
@@ -818,19 +1112,18 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 6. Category sales from detail JSONB
+        // 6. Category sales from store_order_items
         sqlx::query_as::<_, CategorySaleEntry>(
             r#"
             SELECT
-                COALESCE(i->>'category_name', 'Sin categoría') AS name,
-                COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue
-            FROM store_archived_orders o
-            CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
+                COALESCE(i.category_name, 'Sin categoría') AS name,
+                COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue
+            FROM store_order_items i
+            JOIN store_archived_orders o ON o.id = i.order_id
             WHERE o.tenant_id = $1
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
-                AND o.detail IS NOT NULL
             GROUP BY name
             ORDER BY revenue DESC
             LIMIT 10
@@ -841,17 +1134,17 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 7. Tag sales — JSONB items → store_products → store_product_tag → store_tags
+        // 7. Tag sales — store_order_items → store_products → store_product_tag → store_tags
         sqlx::query_as::<_, TagSaleEntry>(
             r#"
             SELECT
                 t.name,
                 t.color,
-                COALESCE(SUM((i->>'line_total')::DOUBLE PRECISION), 0) AS revenue,
-                COALESCE(SUM((i->>'quantity')::BIGINT), 0) AS quantity
-            FROM store_archived_orders o
-            CROSS JOIN jsonb_array_elements(o.detail->'items') AS i
-            JOIN store_products p ON p.source_id = (i->>'product_source_id')::BIGINT
+                COALESCE(SUM(i.line_total), 0)::DOUBLE PRECISION AS revenue,
+                COALESCE(SUM(i.quantity), 0)::BIGINT AS quantity
+            FROM store_order_items i
+            JOIN store_archived_orders o ON o.id = i.order_id
+            JOIN store_products p ON p.source_id = i.product_source_id
                 AND p.store_id = o.store_id
             JOIN store_product_tag pt ON pt.product_id = p.id
             JOIN store_tags t ON t.source_id = pt.tag_source_id
@@ -860,8 +1153,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
-                AND o.detail IS NOT NULL
-                AND i->>'product_source_id' IS NOT NULL
+                AND i.product_source_id IS NOT NULL
             GROUP BY t.name, t.color
             ORDER BY revenue DESC
             LIMIT 10
@@ -938,11 +1230,11 @@ async fn get_overview(
             .fetch_all(pool)
             .await
         },
-        // 11. Service type breakdown from detail JSONB
+        // 11. Service type breakdown from promoted column
         sqlx::query_as::<_, ServiceTypeEntry>(
             r#"
             SELECT
-                COALESCE(detail->>'service_type', 'DineIn') AS service_type,
+                service_type,
                 COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
                 COUNT(*) AS orders
             FROM store_archived_orders
@@ -959,11 +1251,11 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 12. Zone sales from detail JSONB
+        // 12. Zone sales from promoted column
         sqlx::query_as::<_, ZoneSaleEntry>(
             r#"
             SELECT
-                COALESCE(detail->>'zone_name', '') AS zone_name,
+                COALESCE(zone_name, '') AS zone_name,
                 COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
                 COUNT(*) AS orders,
                 COALESCE(SUM(guest_count), 0)::BIGINT AS guests
@@ -972,8 +1264,8 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
-                AND detail->>'zone_name' IS NOT NULL
-                AND detail->>'zone_name' != ''
+                AND zone_name IS NOT NULL
+                AND zone_name != ''
             GROUP BY zone_name
             ORDER BY revenue DESC
             "#,
@@ -983,13 +1275,13 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_all(pool),
-        // 13. Total surcharge from detail JSONB
+        // 13. Total surcharge from promoted columns
         sqlx::query_as::<_, (f64,)>(
             r#"
             SELECT
                 COALESCE(SUM(
-                    COALESCE((detail->>'order_manual_surcharge_amount')::DOUBLE PRECISION, 0) +
-                    COALESCE((detail->>'order_rule_surcharge_amount')::DOUBLE PRECISION, 0)
+                    COALESCE(order_manual_surcharge_amount, 0) +
+                    COALESCE(order_rule_surcharge_amount, 0)
                 ), 0)::DOUBLE PRECISION
             FROM store_archived_orders
             WHERE tenant_id = $1
@@ -1003,18 +1295,21 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_one(pool),
-        // 14. Average items per order from detail JSONB
+        // 14. Average items per order from store_order_items
         sqlx::query_as::<_, (f64,)>(
             r#"
             SELECT
-                COALESCE(AVG(jsonb_array_length(detail->'items')), 0)::DOUBLE PRECISION
-            FROM store_archived_orders
-            WHERE tenant_id = $1
-                AND ($2::BIGINT IS NULL OR store_id = $2)
-                AND end_time >= $3 AND end_time < $4
-                AND status = 'COMPLETED'
-                AND detail IS NOT NULL
-                AND detail->'items' IS NOT NULL
+                COALESCE(AVG(item_count), 0)::DOUBLE PRECISION
+            FROM (
+                SELECT COUNT(*) AS item_count
+                FROM store_order_items i
+                JOIN store_archived_orders o ON o.id = i.order_id
+                WHERE o.tenant_id = $1
+                    AND ($2::BIGINT IS NULL OR o.store_id = $2)
+                    AND o.end_time >= $3 AND o.end_time < $4
+                    AND o.status = 'COMPLETED'
+                GROUP BY o.id
+            ) sub
             "#,
         )
         .bind(tenant_id)
@@ -1118,20 +1413,19 @@ pub async fn get_red_flags(
     let rows: Vec<Row> = sqlx::query_as(
         r#"
         SELECT
-            (e->>'operator_id')::BIGINT AS operator_id,
-            e->>'operator_name' AS operator_name,
-            COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_REMOVED') AS item_removals,
-            COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_COMPED') AS item_comps,
-            COUNT(*) FILTER (WHERE e->>'event_type' = 'ORDER_VOIDED') AS order_voids,
-            COUNT(*) FILTER (WHERE e->>'event_type' = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
-            COUNT(*) FILTER (WHERE e->>'event_type' = 'ITEM_MODIFIED') AS price_modifications
-        FROM store_archived_orders o
-        CROSS JOIN jsonb_array_elements(o.detail->'events') AS e
+            e.operator_id,
+            e.operator_name,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_REMOVED') AS item_removals,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_COMPED') AS item_comps,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_VOIDED') AS order_voids,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_MODIFIED') AS price_modifications
+        FROM store_order_events e
+        JOIN store_archived_orders o ON o.id = e.order_id
         WHERE o.store_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
-            AND o.detail IS NOT NULL
-            AND e->>'event_type' IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
-        GROUP BY operator_id, operator_name
+            AND e.event_type IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
+        GROUP BY e.operator_id, e.operator_name
         ORDER BY COUNT(*) DESC
         "#,
     )

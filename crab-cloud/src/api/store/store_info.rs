@@ -19,7 +19,7 @@ pub async fn get_store_info(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Option<StoreInfo>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let info = store::get_store_info(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -32,7 +32,7 @@ pub async fn update_store_info(
     Path(store_id): Path<i64>,
     Json(data): Json<StoreInfoUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let info = store::update_store_info_direct(&state.pool, store_id, &data)
         .await
@@ -41,7 +41,18 @@ pub async fn update_store_info(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::UpdateStoreInfo { data }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::UpdateStoreInfo { data },
+    )
+    .await;
+
+    // Broadcast to all connected consoles for this tenant
+    state
+        .live_orders
+        .publish_store_info_updated(identity.tenant_id, store_id, info.clone());
 
     Ok(Json(
         StoreOpResult::ok().with_data(StoreOpData::StoreInfo(info)),

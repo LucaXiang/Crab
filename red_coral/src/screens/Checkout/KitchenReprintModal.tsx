@@ -8,7 +8,7 @@ import type { KitchenOrder } from '@/core/domain/types/api';
 
 interface KitchenReprintModalProps {
   isOpen: boolean;
-  orderId: string;
+  orderId: number;
   onClose: () => void;
 }
 
@@ -16,7 +16,7 @@ export const KitchenReprintModal: React.FC<KitchenReprintModalProps> = ({ isOpen
   const { t } = useI18n();
   const [kitchenOrders, setKitchenOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(false);
-  const [reprintingId, setReprintingId] = useState<string | null>(null);
+  const [reprintingId, setReprintingId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -35,7 +35,7 @@ export const KitchenReprintModal: React.FC<KitchenReprintModalProps> = ({ isOpen
     if (isOpen) fetchData();
   }, [isOpen, fetchData]);
 
-  const handleReprint = async (id: string) => {
+  const handleReprint = async (id: number) => {
     setReprintingId(id);
     try {
       const client = createTauriClient();

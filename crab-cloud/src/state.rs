@@ -71,7 +71,7 @@ pub struct AppState {
     pub edges: EdgeConnections,
     pub live_orders: LiveOrderHub,
     /// Console WS connections per tenant (tenant_id → count)
-    pub console_connections: Arc<DashMap<String, AtomicUsize>>,
+    pub console_connections: Arc<DashMap<i64, AtomicUsize>>,
     /// Environment: development | staging | production
     pub environment: String,
 }
@@ -80,8 +80,8 @@ impl AppState {
     /// Create a new AppState
     pub async fn new(config: &Config) -> Result<Self, BoxError> {
         let pool = sqlx::postgres::PgPoolOptions::new()
-            .max_connections(50)
-            .min_connections(2)
+            .max_connections(100)
+            .min_connections(5)
             .acquire_timeout(std::time::Duration::from_secs(5))
             .connect(&config.database_url)
             .await?;
@@ -107,27 +107,30 @@ impl AppState {
             config.secrets_prefix.clone(),
         );
 
-        // Verify Root CA is accessible (warm cache)
-        ca_store.get_or_create_root_ca().await?;
-        tracing::info!("Root CA ready");
-
-        // Load Root CA PEM for mTLS verification
-        let root_ca_pem = if let Some(ref pem) = config.root_ca_pem {
-            pem.clone()
-        } else {
-            match std::fs::read_to_string(&config.root_ca_path) {
-                Ok(pem) => pem,
-                Err(_) => {
-                    tracing::info!(
-                        "Root CA file not found at {}, loading from Secrets Manager",
-                        config.root_ca_path
-                    );
-                    ca_store
-                        .get_or_create_root_ca()
-                        .await?
-                        .cert_pem()
-                        .to_string()
+        // Root CA: online → Secrets Manager (source of truth), offline → local file cache
+        let root_ca_pem = match ca_store.get_or_create_root_ca().await {
+            Ok(ca) => {
+                let pem = ca.cert_pem().to_string();
+                // Cache to local file for offline fallback
+                if let Err(e) = std::fs::write(&config.root_ca_path, &pem) {
+                    tracing::warn!("Failed to cache Root CA to {}: {e}", config.root_ca_path);
                 }
+                tracing::info!(
+                    "Root CA ready (Secrets Manager → cached to {})",
+                    config.root_ca_path
+                );
+                pem
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Secrets Manager unavailable: {e}, falling back to local Root CA cache"
+                );
+                std::fs::read_to_string(&config.root_ca_path).map_err(|fe| {
+                    format!(
+                        "Root CA unavailable — SM: {e}, local file {}: {fe}",
+                        config.root_ca_path
+                    )
+                })?
             }
         };
 
@@ -177,9 +180,9 @@ pub struct CaStore {
     /// Root CA in-process cache (cert + key, never changes after creation)
     root_ca_cache: std::sync::Arc<OnceCell<CaSecret>>,
     /// Tenant CA in-process cache (tenant_id → CaSecret, never changes after creation)
-    tenant_ca_cache: Arc<DashMap<String, CaSecret>>,
+    tenant_ca_cache: Arc<DashMap<i64, CaSecret>>,
     /// Negative cache: tenant_ids known to have no CA cert (value = expiry instant)
-    tenant_ca_negative: Arc<DashMap<String, tokio::time::Instant>>,
+    tenant_ca_negative: Arc<DashMap<i64, tokio::time::Instant>>,
 }
 
 /// How long a negative cache entry (missing tenant CA) is valid before retrying PG.
@@ -224,15 +227,17 @@ impl CaStore {
     /// Get or create Tenant CA (cached in-process, stored in PostgreSQL)
     pub async fn get_or_create_tenant_ca(
         &self,
-        tenant_id: &str,
+        tenant_id: i64,
         root_ca: &CertificateAuthority,
     ) -> Result<CertificateAuthority, BoxError> {
-        if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
+        if let Some(cached) = self.tenant_ca_cache.get(&tenant_id) {
             return Ok(CertificateAuthority::load(
                 &cached.cert_pem,
                 &cached.key_pem,
             )?);
         }
+
+        let tid_str = tenant_id.to_string();
 
         // 从 PostgreSQL 读取 tenant CA (key is encrypted)
         let secret = match sqlx::query_as::<_, (String, String)>(
@@ -249,7 +254,7 @@ impl CaStore {
             }
             None => {
                 // 创建新 Tenant CA 并写入 PostgreSQL (key encrypted)
-                let profile = CaProfile::intermediate(tenant_id, &format!("Tenant {tenant_id}"));
+                let profile = CaProfile::intermediate(&tid_str, &format!("Tenant {tenant_id}"));
                 let ca = CertificateAuthority::new_intermediate(profile, root_ca)?;
                 let key_encrypted = self.master_key.encrypt_string(&ca.key_pem())
                     .map_err(|e| format!("Failed to encrypt tenant CA key: {e}"))?;
@@ -267,8 +272,7 @@ impl CaStore {
             }
         };
 
-        self.tenant_ca_cache
-            .insert(tenant_id.to_string(), secret.clone());
+        self.tenant_ca_cache.insert(tenant_id, secret.clone());
         Ok(CertificateAuthority::load(
             &secret.cert_pem,
             &secret.key_pem,
@@ -276,8 +280,8 @@ impl CaStore {
     }
 
     /// Load existing Tenant CA (cached, errors if not found, reads from PostgreSQL)
-    pub async fn load_tenant_ca(&self, tenant_id: &str) -> Result<CertificateAuthority, BoxError> {
-        if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
+    pub async fn load_tenant_ca(&self, tenant_id: i64) -> Result<CertificateAuthority, BoxError> {
+        if let Some(cached) = self.tenant_ca_cache.get(&tenant_id) {
             return Ok(CertificateAuthority::load(
                 &cached.cert_pem,
                 &cached.key_pem,
@@ -298,8 +302,7 @@ impl CaStore {
             .map_err(|e| format!("Failed to decrypt tenant CA key: {e}"))?;
 
         let secret = CaSecret { cert_pem, key_pem };
-        self.tenant_ca_cache
-            .insert(tenant_id.to_string(), secret.clone());
+        self.tenant_ca_cache.insert(tenant_id, secret.clone());
         Ok(CertificateAuthority::load(
             &secret.cert_pem,
             &secret.key_pem,
@@ -309,20 +312,20 @@ impl CaStore {
     /// Load Tenant CA cert PEM only (cached, for mTLS verification in edge_auth, reads from PostgreSQL).
     /// Missing tenants are negative-cached to avoid hammering PG on repeated requests from
     /// stale edge-servers whose tenant was deleted (e.g. after a database reset).
-    pub async fn load_tenant_ca_cert(&self, tenant_id: &str) -> Result<String, BoxError> {
+    pub async fn load_tenant_ca_cert(&self, tenant_id: i64) -> Result<String, BoxError> {
         // Positive cache hit
-        if let Some(cached) = self.tenant_ca_cache.get(tenant_id) {
+        if let Some(cached) = self.tenant_ca_cache.get(&tenant_id) {
             return Ok(cached.cert_pem.clone());
         }
 
         // Negative cache hit — skip PG query until TTL expires
-        if let Some(expiry) = self.tenant_ca_negative.get(tenant_id) {
+        if let Some(expiry) = self.tenant_ca_negative.get(&tenant_id) {
             if tokio::time::Instant::now() < *expiry {
                 return Err(format!("Tenant CA cert not found for {tenant_id} (cached)").into());
             }
             // TTL expired — remove and retry
             drop(expiry);
-            self.tenant_ca_negative.remove(tenant_id);
+            self.tenant_ca_negative.remove(&tenant_id);
         }
 
         let row = sqlx::query_as::<_, (String, String)>(
@@ -337,8 +340,7 @@ impl CaStore {
             None => {
                 // Insert negative cache entry
                 let expiry = tokio::time::Instant::now() + NEGATIVE_CACHE_TTL;
-                self.tenant_ca_negative
-                    .insert(tenant_id.to_string(), expiry);
+                self.tenant_ca_negative.insert(tenant_id, expiry);
                 return Err(format!("Tenant CA cert not found for {tenant_id}").into());
             }
         };
@@ -350,7 +352,7 @@ impl CaStore {
 
         let pem = cert_pem.clone();
         self.tenant_ca_cache
-            .insert(tenant_id.to_string(), CaSecret { cert_pem, key_pem });
+            .insert(tenant_id, CaSecret { cert_pem, key_pem });
         Ok(pem)
     }
 

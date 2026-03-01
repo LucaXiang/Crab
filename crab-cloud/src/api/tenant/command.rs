@@ -28,20 +28,19 @@ pub async fn create_command(
     Path(store_id): Path<i64>,
     Json(req): Json<CreateCommandRequest>,
 ) -> ApiResult<serde_json::Value> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     // Map command_type string → CloudRpc
     let rpc = match req.command_type.as_str() {
         "get_status" => shared::cloud::ws::CloudRpc::GetStatus,
         "refresh_subscription" => shared::cloud::ws::CloudRpc::RefreshSubscription,
         "get_order_detail" => {
-            let order_key = req
+            let order_id = req
                 .payload
-                .get("order_key")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            shared::cloud::ws::CloudRpc::GetOrderDetail { order_key }
+                .get("order_id")
+                .and_then(|v| v.as_i64())
+                .unwrap_or_default();
+            shared::cloud::ws::CloudRpc::GetOrderDetail { order_id }
         }
         other => {
             return Err(AppError::with_message(
@@ -57,7 +56,7 @@ pub async fn create_command(
     let command_id = commands::create_command(
         &state.pool,
         store_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         &req.command_type,
         &req.payload,
         now,
@@ -92,7 +91,7 @@ pub async fn create_command(
     });
     let _ = crate::db::audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         if success {
             "command_completed"
         } else {
@@ -125,14 +124,14 @@ pub async fn list_commands(
     Path(store_id): Path<i64>,
     Query(query): Query<CommandsQuery>,
 ) -> ApiResult<Vec<commands::CommandRecord>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let per_page = query.per_page.unwrap_or(20).min(100);
     let page = query.page.unwrap_or(1).max(1);
     let offset = (page - 1) * per_page;
 
     let commands =
-        commands::get_command_history(&state.pool, store_id, &identity.tenant_id, per_page, offset)
+        commands::get_command_history(&state.pool, store_id, identity.tenant_id, per_page, offset)
             .await
             .map_err(|e| {
                 tracing::error!("Commands query error: {e}");

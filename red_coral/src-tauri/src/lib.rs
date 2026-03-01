@@ -240,6 +240,16 @@ pub async fn run() {
             commands::fetch_member_order_history,
             commands::fetch_order_detail,
             commands::fetch_order_invoices,
+            // Chain Entries (统一 hash 链时间线)
+            commands::fetch_chain_entries,
+            commands::fetch_chain_credit_note_detail,
+            commands::fetch_chain_anulacion_detail,
+            commands::check_anulacion_eligibility,
+            commands::create_anulacion,
+            // Upgrade (F3 Sustitutiva)
+            commands::check_upgrade_eligibility,
+            commands::create_upgrade,
+            commands::fetch_chain_upgrade_detail,
             // Credit Note commands
             commands::create_credit_note,
             commands::fetch_credit_note_detail,

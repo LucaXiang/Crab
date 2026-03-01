@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LiveOrderSnapshot, ConsoleMessage, ConnectionState } from '@/core/types/live';
+import type { LiveOrderSnapshot, ConsoleMessage, ConnectionState, StoreInfoSnapshot } from '@/core/types/live';
 
 const WS_BASE = import.meta.env.VITE_WS_BASE || 'wss://cloud.redcoral.app';
 const RECONNECT_MIN_MS = 1000;
@@ -11,7 +11,13 @@ export interface LiveOrdersState {
   connectionState: ConnectionState;
 }
 
-export function useLiveOrders(token: string | null, storeId: number) {
+export type StoreInfoUpdateCallback = (info: StoreInfoSnapshot) => void;
+
+export function useLiveOrders(
+  token: string | null,
+  storeId: number,
+  onStoreInfoUpdated?: StoreInfoUpdateCallback,
+) {
   const [state, setState] = useState<LiveOrdersState>({
     orders: new Map(),
     edgeOnline: false,
@@ -22,6 +28,8 @@ export function useLiveOrders(token: string | null, storeId: number) {
   const reconnectDelayRef = useRef(RECONNECT_MIN_MS);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const destroyedRef = useRef(false);
+  const onStoreInfoRef = useRef(onStoreInfoUpdated);
+  onStoreInfoRef.current = onStoreInfoUpdated;
 
   const handleMessage = useCallback((msg: ConsoleMessage) => {
     switch (msg.type) {
@@ -64,6 +72,11 @@ export function useLiveOrders(token: string | null, storeId: number) {
             }
             return { ...s, orders, edgeOnline: msg.online };
           });
+        }
+        break;
+      case 'StoreInfoUpdated':
+        if (msg.store_id === storeId) {
+          onStoreInfoRef.current?.(msg.info);
         }
         break;
     }

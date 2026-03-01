@@ -82,7 +82,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
         await openCashDrawer();
 
         const payment: PaymentRecord = {
-          payment_id: `pay-${Date.now()}`,
+          payment_id: Date.now(),
           method: 'CASH',
           amount: remaining,
           timestamp: Date.now(),
@@ -121,7 +121,7 @@ export function usePaymentActions(order: HeldOrder, onComplete: () => void) {
     setIsProcessing(true);
     try {
       const payment: PaymentRecord = {
-        payment_id: `pay-${Date.now()}`,
+        payment_id: Date.now(),
         method: 'CARD',
         amount: remaining,
         timestamp: Date.now(),

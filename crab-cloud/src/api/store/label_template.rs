@@ -19,7 +19,7 @@ pub async fn list_label_templates(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<LabelTemplate>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let templates = store::list_label_templates(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -32,10 +32,10 @@ pub async fn create_label_template(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::label_template::LabelTemplateCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) =
-        store::create_label_template_direct(&state.pool, store_id, &identity.tenant_id, &data)
+        store::create_label_template_direct(&state.pool, store_id, identity.tenant_id, &data)
             .await
             .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
@@ -45,6 +45,7 @@ pub async fn create_label_template(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateLabelTemplate {
             id: Some(source_id),
             data,
@@ -61,7 +62,7 @@ pub async fn update_label_template(
     Path((store_id, template_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::label_template::LabelTemplateUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let op_data = store::update_label_template_direct(&state.pool, store_id, template_id, &data)
         .await
@@ -73,6 +74,7 @@ pub async fn update_label_template(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdateLabelTemplate {
             id: template_id,
             data,
@@ -88,7 +90,7 @@ pub async fn delete_label_template(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, template_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_label_template_direct(&state.pool, store_id, template_id)
         .await
@@ -100,6 +102,7 @@ pub async fn delete_label_template(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::DeleteLabelTemplate { id: template_id },
     )
     .await;

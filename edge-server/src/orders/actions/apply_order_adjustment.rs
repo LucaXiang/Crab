@@ -12,7 +12,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// ApplyOrderDiscount action — 应用/清除订单级手动折扣
 #[derive(Debug, Clone)]
 pub struct ApplyOrderDiscountAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub discount_percent: Option<f64>,
     pub discount_fixed: Option<f64>,
     pub authorizer_id: Option<i64>,
@@ -28,7 +28,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 1. Load snapshot
-        let mut snapshot = ctx.load_snapshot(&self.order_id)?;
+        let mut snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 2. Validate: order must be Active
         if !matches!(snapshot.status, OrderStatus::Active) {
@@ -89,10 +89,10 @@ impl CommandHandler for ApplyOrderDiscountAction {
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderDiscountApplied,
             EventPayload::OrderDiscountApplied {
@@ -115,7 +115,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
 /// ApplyOrderSurcharge action — 应用/清除订单级手动附加费
 #[derive(Debug, Clone)]
 pub struct ApplyOrderSurchargeAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub surcharge_percent: Option<f64>,
     pub surcharge_amount: Option<f64>,
     pub authorizer_id: Option<i64>,
@@ -131,7 +131,7 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 1. Load snapshot
-        let mut snapshot = ctx.load_snapshot(&self.order_id)?;
+        let mut snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 2. Validate: order must be Active
         if !matches!(snapshot.status, OrderStatus::Active) {
@@ -192,10 +192,10 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderSurchargeApplied,
             EventPayload::OrderSurchargeApplied {
@@ -236,7 +236,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -275,11 +275,11 @@ mod tests {
 
     fn setup_active_order(
         storage: &OrderStorage,
-        order_id: &str,
+        order_id: i64,
         items: Vec<CartItemSnapshot>,
     ) -> OrderSnapshot {
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.items = items;
         recalculate_totals(&mut snapshot);
@@ -295,14 +295,14 @@ mod tests {
     #[test]
     fn test_apply_percentage_discount() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(10.0),
             discount_fixed: None,
             authorizer_id: Some(1),
@@ -339,14 +339,14 @@ mod tests {
     #[test]
     fn test_apply_fixed_discount() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: None,
             discount_fixed: Some(25.0),
             authorizer_id: None,
@@ -377,7 +377,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置一个已有折扣的订单
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item(100.0, 1)];
         snapshot.order_manual_discount_percent = Some(10.0);
@@ -391,7 +391,7 @@ mod tests {
 
         // 清除折扣：两个都为 None
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: None,
             discount_fixed: None,
             authorizer_id: None,
@@ -424,14 +424,14 @@ mod tests {
     #[test]
     fn test_discount_percent_and_fixed_mutual_exclusion() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(10.0),
             discount_fixed: Some(20.0), // 两者同时设置
             authorizer_id: None,
@@ -448,13 +448,13 @@ mod tests {
     #[test]
     fn test_discount_percent_negative_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(-5.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -467,13 +467,13 @@ mod tests {
     #[test]
     fn test_discount_percent_over_100_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(101.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -486,14 +486,14 @@ mod tests {
     #[test]
     fn test_discount_fixed_must_be_positive() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: None,
             discount_fixed: Some(-10.0),
             authorizer_id: None,
@@ -508,7 +508,7 @@ mod tests {
     fn test_apply_discount_after_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item(100.0, 1)];
         snapshot.paid_amount = 30.0;
@@ -521,7 +521,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(10.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -539,7 +539,7 @@ mod tests {
     fn test_discount_on_non_active_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.items = vec![create_test_item(100.0, 1)];
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -550,7 +550,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(10.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -569,7 +569,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             discount_percent: Some(10.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -587,14 +587,14 @@ mod tests {
     #[test]
     fn test_apply_surcharge() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: None,
             surcharge_amount: Some(15.0),
             authorizer_id: Some(1),
@@ -629,7 +629,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         setup_active_order(
             &storage,
-            "order-1",
+            1001,
             vec![
                 create_test_item(100.0, 4), // subtotal = 400
             ],
@@ -640,7 +640,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: Some(20.0), // 20% of 400 = 80
             surcharge_amount: None,
             authorizer_id: None,
@@ -674,7 +674,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置一个已有附加费的订单
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item(100.0, 1)];
         snapshot.order_manual_surcharge_fixed = Some(15.0);
@@ -687,7 +687,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: None,
             surcharge_amount: None, // 清除
             authorizer_id: None,
@@ -719,7 +719,7 @@ mod tests {
     fn test_apply_surcharge_after_payment_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item(100.0, 1)];
         snapshot.paid_amount = 20.0;
@@ -732,7 +732,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: None,
             surcharge_amount: Some(15.0),
             authorizer_id: None,
@@ -749,14 +749,14 @@ mod tests {
     #[test]
     fn test_surcharge_must_be_positive() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: None,
             surcharge_amount: Some(-5.0),
             authorizer_id: None,
@@ -771,7 +771,7 @@ mod tests {
     fn test_surcharge_on_non_active_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         snapshot.items = vec![create_test_item(100.0, 1)];
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -782,7 +782,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: None,
             surcharge_amount: Some(10.0),
             authorizer_id: None,
@@ -801,7 +801,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             surcharge_percent: None,
             surcharge_amount: Some(10.0),
             authorizer_id: None,
@@ -821,7 +821,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置订单有附加费
         let txn = storage.begin_write().unwrap();
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item(100.0, 2)]; // 200 subtotal
         snapshot.order_manual_surcharge_fixed = Some(20.0);
@@ -835,7 +835,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(10.0), // 10% of 200 = 20 discount
             discount_fixed: None,
             authorizer_id: None,
@@ -864,14 +864,14 @@ mod tests {
     #[test]
     fn test_discount_nan_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(f64::NAN),
             discount_fixed: None,
             authorizer_id: None,
@@ -885,14 +885,14 @@ mod tests {
     #[test]
     fn test_surcharge_nan_rejected() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderSurchargeAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             surcharge_percent: None,
             surcharge_amount: Some(f64::NAN),
             authorizer_id: None,
@@ -906,14 +906,14 @@ mod tests {
     #[test]
     fn test_discount_event_metadata() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        setup_active_order(&storage, "order-1", vec![create_test_item(100.0, 1)]);
+        setup_active_order(&storage, 1001, vec![create_test_item(100.0, 1)]);
 
         let txn = storage.begin_write().unwrap();
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ApplyOrderDiscountAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             discount_percent: Some(5.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -921,7 +921,7 @@ mod tests {
         };
 
         let metadata = CommandMetadata {
-            command_id: "cmd-discount-1".to_string(),
+            command_id: 100,
             operator_id: 100,
             operator_name: "Manager".to_string(),
             timestamp: 9999999999,
@@ -930,10 +930,10 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).unwrap();
         let event = &events[0];
 
-        assert_eq!(event.command_id, "cmd-discount-1");
+        assert_eq!(event.command_id, 100);
         assert_eq!(event.operator_id, 100);
         assert_eq!(event.operator_name, "Manager");
         assert_eq!(event.client_timestamp, Some(9999999999));
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
     }
 }

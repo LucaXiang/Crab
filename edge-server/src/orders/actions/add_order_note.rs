@@ -11,7 +11,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// AddOrderNote action
 #[derive(Debug, Clone)]
 pub struct AddOrderNoteAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub note: String,
 }
 
@@ -27,16 +27,16 @@ impl CommandHandler for AddOrderNoteAction {
         }
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status - must be Active
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -58,10 +58,10 @@ impl CommandHandler for AddOrderNoteAction {
         // 6. Create event
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderNoteAdded,
             EventPayload::OrderNoteAdded {
@@ -83,15 +83,15 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
     }
 
-    fn create_active_order(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_active_order(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot
     }
@@ -101,14 +101,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let snapshot = create_active_order("order-1");
+        let snapshot = create_active_order(1001);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             note: "No onions please".to_string(),
         };
 
@@ -117,7 +117,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::OrderNoteAdded);
 
         if let EventPayload::OrderNoteAdded {
@@ -137,7 +137,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -145,7 +145,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             note: "Test note".to_string(),
         };
 
@@ -159,7 +159,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -167,7 +167,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             note: "Test note".to_string(),
         };
 
@@ -181,7 +181,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_order("order-1");
+        let mut snapshot = create_active_order(1001);
         snapshot.note = Some("Old note".to_string());
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -189,7 +189,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             note: "New note".to_string(),
         };
 
@@ -213,7 +213,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_order("order-1");
+        let mut snapshot = create_active_order(1001);
         snapshot.note = Some("Existing note".to_string());
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -221,7 +221,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             note: "".to_string(),
         };
 
@@ -246,19 +246,19 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let snapshot = create_active_order("order-1");
+        let snapshot = create_active_order(1001);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             note: "Special request".to_string(),
         };
 
         let metadata = CommandMetadata {
-            command_id: "test-cmd-123".to_string(),
+            command_id: 123,
             operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
@@ -267,7 +267,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).unwrap();
 
         let event = &events[0];
-        assert_eq!(event.command_id, "test-cmd-123");
+        assert_eq!(event.command_id, 123);
         assert_eq!(event.operator_id, 456);
         assert_eq!(event.operator_name, "John Doe");
         assert_eq!(event.sequence, current_seq + 1);
@@ -283,7 +283,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddOrderNoteAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             note: "Test".to_string(),
         };
 

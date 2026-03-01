@@ -50,7 +50,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     let store_id = match sync_store::ensure_store(
         &state.pool,
         &identity.entity_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         &identity.device_id,
         now,
     )
@@ -65,7 +65,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
 
     tracing::info!(
         edge_id = %identity.entity_id,
-        tenant_id = %identity.tenant_id,
+        tenant_id = identity.tenant_id,
         store_id,
         "WebSocket connected"
     );
@@ -78,7 +78,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     });
     let _ = audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         "edge_connected",
         Some(&connect_detail),
         None,
@@ -132,7 +132,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
                 // For product ops with images, send EnsureImage with fresh presigned URL
                 if let Some(hash) = op.image_hash()
                     && let Ok(presigned_url) =
-                        super::image::presigned_get_url(&state, &identity.tenant_id, hash).await
+                        super::image::presigned_get_url(&state, identity.tenant_id, hash).await
                 {
                     let ensure_msg = CloudMessage::Rpc {
                         id: format!("img-{hash}"),
@@ -191,7 +191,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     // 所有初始化发送完成后，标记 edge 上线（通知正在观看的 console）
     state
         .live_orders
-        .mark_edge_online(&identity.tenant_id, store_id);
+        .mark_edge_online(identity.tenant_id, store_id);
 
     // Server-side heartbeat: ping edge and detect dead connections
     let mut ping_interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECS));
@@ -292,7 +292,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     state.edges.connected.remove(&store_id);
 
     // 通知 console 订阅者 edge 已离线
-    state.live_orders.clear_edge(&identity.tenant_id, store_id);
+    state.live_orders.clear_edge(identity.tenant_id, store_id);
 
     // Audit: edge disconnected
     let disconnect_now = shared::util::now_millis();
@@ -302,7 +302,7 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     });
     let _ = audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         "edge_disconnected",
         Some(&disconnect_detail),
         None,
@@ -366,14 +366,24 @@ async fn handle_edge_message<S>(
                 match sync_store::upsert_resource(
                     &state.pool,
                     store_id,
-                    &identity.tenant_id,
+                    identity.tenant_id,
                     item,
                     now,
                 )
                 .await
                 {
-                    Ok(()) => {
+                    Ok(effect) => {
                         accepted += 1;
+
+                        // Handle side-effects (e.g. broadcast StoreInfo to consoles)
+                        if let sync_store::SyncEffect::StoreInfoUpdated(info) = effect {
+                            state.live_orders.publish_store_info_updated(
+                                identity.tenant_id,
+                                store_id,
+                                *info,
+                            );
+                        }
+
                         let version = i64::try_from(item.version).unwrap_or(i64::MAX);
                         let entry = cursor_maxes
                             .entry(item.resource.as_str())
@@ -386,7 +396,7 @@ async fn handle_edge_message<S>(
                         rejected += 1;
                         errors.push(shared::cloud::CloudSyncError {
                             index: u32::try_from(idx).unwrap_or(u32::MAX),
-                            resource_id: item.resource_id.clone(),
+                            resource_id: item.resource_id,
                             message: e.to_string(),
                         });
                     }
@@ -445,13 +455,13 @@ async fn handle_edge_message<S>(
             };
             state
                 .live_orders
-                .publish_update(&identity.tenant_id, live_snapshot);
+                .publish_update(identity.tenant_id, live_snapshot);
         }
 
         CloudMessage::ActiveOrderRemoved { order_id } => {
             state
                 .live_orders
-                .publish_remove(&identity.tenant_id, &order_id, store_id);
+                .publish_remove(identity.tenant_id, order_id, store_id);
         }
 
         _ => {

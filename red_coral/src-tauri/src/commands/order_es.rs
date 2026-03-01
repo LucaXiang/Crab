@@ -75,9 +75,9 @@ pub async fn order_get_active_orders(
 #[tauri::command]
 pub async fn order_get_snapshot(
     bridge: State<'_, Arc<ClientBridge>>,
-    order_id: String,
+    order_id: i64,
 ) -> Result<ApiResponse<Option<OrderSnapshot>>, String> {
-    match bridge.get_order_snapshot(&order_id).await {
+    match bridge.get_order_snapshot(order_id).await {
         Ok(snapshot) => Ok(ApiResponse::success(snapshot)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::OrderNotFound,
@@ -128,9 +128,9 @@ pub async fn order_get_events_since(
 #[tauri::command]
 pub async fn order_get_events_for_order(
     bridge: State<'_, Arc<ClientBridge>>,
-    order_id: String,
+    order_id: i64,
 ) -> Result<ApiResponse<Vec<shared::order::OrderEvent>>, String> {
-    match bridge.get_events_for_order(&order_id).await {
+    match bridge.get_events_for_order(order_id).await {
         Ok(events) => Ok(ApiResponse::success(events)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,

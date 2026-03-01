@@ -74,6 +74,47 @@ pub fn compute_verifactu_huella_alta(input: &HuellaAltaInput<'_>) -> Result<Stri
     Ok(format!("{:x}", digest))
 }
 
+// ── Registro de Baja (Anulación) ─────────────────────────────
+
+/// Input fields for computing a Verifactu Registro de Baja huella.
+///
+/// Simpler than Alta: no TipoFactura, no amounts.
+/// Formula: `IDEmisorFacturaAnulada={NIF}&NumSerieFacturaAnulada={NUM}&
+///           FechaExpedicionFacturaAnulada={DD-MM-YYYY}&Huella={prev}&
+///           FechaHoraHusoGenRegistro={RFC3339}`
+pub struct HuellaBajaInput<'a> {
+    pub nif: &'a str,
+    pub invoice_number: &'a str,
+    /// Date in DD-MM-YYYY format.
+    pub fecha_expedicion: &'a str,
+    /// Previous huella in the chain. `None` for the first record.
+    pub prev_huella: Option<&'a str>,
+    /// ISO 8601 timestamp with timezone.
+    pub fecha_hora_registro: &'a str,
+}
+
+/// Compute the Verifactu Registro de Baja huella (anulación fingerprint hash).
+///
+/// Simpler than Alta — no amounts or invoice type in the hash.
+/// Returns a lowercase 64-character hex string.
+pub fn compute_verifactu_huella_baja(input: &HuellaBajaInput<'_>) -> String {
+    let huella_value = input.prev_huella.unwrap_or("");
+
+    let concat = format!(
+        "IDEmisorFacturaAnulada={}&NumSerieFacturaAnulada={}&\
+         FechaExpedicionFacturaAnulada={}&Huella={}&\
+         FechaHoraHusoGenRegistro={}",
+        input.nif,
+        input.invoice_number,
+        input.fecha_expedicion,
+        huella_value,
+        input.fecha_hora_registro
+    );
+
+    let digest = Sha256::digest(concat.as_bytes());
+    format!("{:x}", digest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,5 +522,78 @@ mod tests {
         // Verify negative format
         assert_eq!(format_amount(-5.0).unwrap(), "-5");
         assert_eq!(format_amount(-55.0).unwrap(), "-55");
+    }
+
+    // ── Registro de Baja (Anulación) tests ─────────────────────
+
+    fn make_baja_input<'a>(
+        invoice: &'a str,
+        prev: Option<&'a str>,
+        ts: &'a str,
+    ) -> HuellaBajaInput<'a> {
+        HuellaBajaInput {
+            nif: "B12345678",
+            invoice_number: invoice,
+            fecha_expedicion: "27-02-2026",
+            prev_huella: prev,
+            fecha_hora_registro: ts,
+        }
+    }
+
+    #[test]
+    fn baja_huella_deterministic_and_64_chars() {
+        let input = make_baja_input("INV-001", None, "2026-02-27T10:00:00+01:00");
+        let h1 = compute_verifactu_huella_baja(&input);
+        let h2 = compute_verifactu_huella_baja(&input);
+        assert_eq!(h1.len(), 64);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn baja_first_record_uses_empty_huella() {
+        let raw = "IDEmisorFacturaAnulada=B12345678&NumSerieFacturaAnulada=INV-001&\
+                   FechaExpedicionFacturaAnulada=27-02-2026&Huella=&\
+                   FechaHoraHusoGenRegistro=2026-02-27T10:00:00+01:00";
+        let expected = format!("{:x}", Sha256::digest(raw.as_bytes()));
+
+        let input = make_baja_input("INV-001", None, "2026-02-27T10:00:00+01:00");
+        assert_eq!(compute_verifactu_huella_baja(&input), expected);
+    }
+
+    #[test]
+    fn baja_chained_with_alta() {
+        // Alta (F2) first, then Baja uses same chain
+        let alta = compute_verifactu_huella_alta(&make_input(
+            2.10,
+            12.10,
+            "INV-001",
+            None,
+            "2026-02-27T10:00:00+01:00",
+        ))
+        .unwrap();
+
+        let baja = compute_verifactu_huella_baja(&make_baja_input(
+            "INV-001",
+            Some(&alta),
+            "2026-02-27T11:00:00+01:00",
+        ));
+
+        assert_ne!(alta, baja);
+        assert_eq!(baja.len(), 64);
+    }
+
+    #[test]
+    fn baja_different_invoice_produces_different_hash() {
+        let h1 = compute_verifactu_huella_baja(&make_baja_input(
+            "INV-001",
+            None,
+            "2026-02-27T10:00:00+01:00",
+        ));
+        let h2 = compute_verifactu_huella_baja(&make_baja_input(
+            "INV-002",
+            None,
+            "2026-02-27T10:00:00+01:00",
+        ));
+        assert_ne!(h1, h2);
     }
 }

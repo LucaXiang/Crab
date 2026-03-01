@@ -89,7 +89,7 @@ pub async fn get_next_order_number(pool: &SqlitePool) -> RepoResult<i64> {
 /// Update last order info and chain hash with atomic order_count increment
 pub async fn update_last_order(
     pool: &SqlitePool,
-    order_id: &str,
+    order_id: i64,
     chain_hash: String,
 ) -> RepoResult<SystemState> {
     let now = shared::util::now_millis();
@@ -111,13 +111,13 @@ pub async fn update_last_order(
 /// Update sync state
 pub async fn update_sync_state(
     pool: &SqlitePool,
-    synced_up_to_id: &str,
+    synced_up_to_id: i64,
     synced_up_to_hash: String,
 ) -> RepoResult<SystemState> {
     update(
         pool,
         SystemStateUpdate {
-            synced_up_to_id: Some(synced_up_to_id.to_string()),
+            synced_up_to_id: Some(synced_up_to_id),
             synced_up_to_hash: Some(synced_up_to_hash),
             last_sync_time: Some(shared::util::now_millis()),
             ..Default::default()

@@ -82,13 +82,13 @@ mod tests {
     use super::*;
     use shared::order::{CartItemSnapshot, OrderEventType, OrderSnapshot, StampRedemptionState};
 
-    fn create_cancel_event(order_id: &str, seq: u64) -> OrderEvent {
+    fn create_cancel_event(order_id: i64, seq: u64) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::StampRedemptionCancelled,
             EventPayload::StampRedemptionCancelled {
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_cancel_removes_reward_item() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_paid_item("inst-1", 5.0));
         snapshot
             .items
@@ -175,7 +175,7 @@ mod tests {
             comp_source_instance_id: None,
         });
 
-        let event = create_cancel_event("order-1", 2);
+        let event = create_cancel_event(1001, 2);
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_cancel_recalculates_totals() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_paid_item("inst-1", 5.0));
         snapshot
             .items
@@ -201,7 +201,7 @@ mod tests {
         });
         order_money::recalculate_totals(&mut snapshot);
 
-        let event = create_cancel_event("order-1", 2);
+        let event = create_cancel_event(1001, 2);
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_cancel_updates_sequence_and_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_reward_item("stamp_reward::prev-cmd"));
@@ -224,7 +224,7 @@ mod tests {
         });
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_cancel_event("order-1", 5);
+        let event = create_cancel_event(1001, 5);
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -308,17 +308,17 @@ mod tests {
     }
 
     fn create_cancel_comp_existing_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         reward_instance_id: &str,
         comp_source_instance_id: Option<&str>,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-cancel".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::StampRedemptionCancelled,
             EventPayload::StampRedemptionCancelled {
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn test_cancel_full_comp_existing_uncomps_item() {
         // Full comp: item-1 was fully comped (reward_instance_id == item-1, no source)
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 50, 4.50, 1);
         item.is_comped = true;
         snapshot.items.push(item);
@@ -347,7 +347,7 @@ mod tests {
         order_money::recalculate_totals(&mut snapshot);
         assert!((snapshot.total - 0.0).abs() < f64::EPSILON); // comped = free
 
-        let event = create_cancel_comp_existing_event("order-1", 2, "item-1", None);
+        let event = create_cancel_comp_existing_event(1001, 2, "item-1", None);
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn test_cancel_partial_comp_existing_merges_back() {
         // Partial comp: item-1 had 7, split to 6 + 1 comped
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 6)); // source: reduced to 6
         snapshot
             .items
@@ -381,7 +381,7 @@ mod tests {
         order_money::recalculate_totals(&mut snapshot);
 
         let event =
-            create_cancel_comp_existing_event("order-1", 2, "stamp_reward::cmd-2", Some("item-1"));
+            create_cancel_comp_existing_event(1001, 2, "stamp_reward::cmd-2", Some("item-1"));
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn test_cancel_partial_comp_with_other_items() {
         // Order: 5 coffees + 6 potatoes (source) + 1 comped potato
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("coffee-1", 10, 3.50, 5));
@@ -420,12 +420,8 @@ mod tests {
         });
         order_money::recalculate_totals(&mut snapshot);
 
-        let event = create_cancel_comp_existing_event(
-            "order-1",
-            2,
-            "stamp_reward::cmd-2",
-            Some("potato-1"),
-        );
+        let event =
+            create_cancel_comp_existing_event(1001, 2, "stamp_reward::cmd-2", Some("potato-1"));
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -451,7 +447,7 @@ mod tests {
     #[test]
     fn test_cancel_partial_comp_large_quantity_merge() {
         // Item had 10, split to 7 + 3 comped, now cancel
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 2.00, 7));
         snapshot
             .items
@@ -465,7 +461,7 @@ mod tests {
         order_money::recalculate_totals(&mut snapshot);
 
         let event =
-            create_cancel_comp_existing_event("order-1", 2, "stamp_reward::cmd-2", Some("item-1"));
+            create_cancel_comp_existing_event(1001, 2, "stamp_reward::cmd-2", Some("item-1"));
         let applier = StampRedemptionCancelledApplier;
         applier.apply(&mut snapshot, &event);
 

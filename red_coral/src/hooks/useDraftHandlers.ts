@@ -4,12 +4,12 @@ import { useCartStore } from '@/core/stores/cart/useCartStore';
 
 interface UseDraftHandlersParams {
   saveDraft: (draft: DraftOrder) => void;
-  restoreDraft: (id: string) => CartItem[];
-  deleteDraft: (id: string) => void;
+  restoreDraft: (id: number) => CartItem[];
+  deleteDraft: (id: number) => void;
   clearCart: () => void;
   setCart: (items: CartItem[]) => void;
   setShowDraftModal: (v: boolean) => void;
-  setCurrentOrderKey: (key: string | number | null) => void;
+  setCurrentOrderKey: (key: number | null) => void;
 }
 
 export function useDraftHandlers(params: UseDraftHandlersParams) {
@@ -25,7 +25,7 @@ export function useDraftHandlers(params: UseDraftHandlersParams) {
 
   const handleSaveDraft = useCallback(() => {
     const { cart, totalAmount } = useCartStore.getState();
-    const draftId = `draft-${Date.now()}`;
+    const draftId = Date.now();
     const now = Date.now();
     const draft: DraftOrder = {
       // Required fields from OrderSnapshot
@@ -72,14 +72,14 @@ export function useDraftHandlers(params: UseDraftHandlersParams) {
     setShowDraftModal(true);
   }, [setShowDraftModal]);
 
-  const handleRestoreDraft = useCallback((id: string) => {
+  const handleRestoreDraft = useCallback((id: number) => {
     const items = restoreDraft(id);
     setCart(items);
     setCurrentOrderKey(null);
     setShowDraftModal(false);
   }, [restoreDraft, setCart, setCurrentOrderKey, setShowDraftModal]);
 
-  const handleDeleteDraft = useCallback((id: string) => {
+  const handleDeleteDraft = useCallback((id: number) => {
     deleteDraft(id);
   }, [deleteDraft]);
 

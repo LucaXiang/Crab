@@ -15,7 +15,7 @@ export async function reportError(
   const err = error instanceof Error ? error : new Error(String(error));
 
   let authState: { user?: { id?: number; username?: string; role_name?: string } | null } | null = null;
-  let checkoutState: { currentOrderKey?: string | number | null; checkoutOrder?: { order_id?: string; receipt_number?: string; table_name?: string | null; zone_name?: string | null } | null } | null = null;
+  let checkoutState: { currentOrderKey?: number | null; checkoutOrder?: { order_id?: number; receipt_number?: string; table_name?: string | null; zone_name?: string | null } | null } | null = null;
 
   try {
     const { useAuthStore } = await import('@/core/stores/auth/useAuthStore');
@@ -45,7 +45,7 @@ export async function reportError(
     user_id: authState?.user?.id ?? null,
     username: authState?.user?.username ?? null,
     role: authState?.user?.role_name ?? null,
-    order_key: activeOrderKey,
+    order_id: activeOrderKey,
     receipt_number: receiptNumber,
     table_name: tableName,
     zone_name: zone_name,

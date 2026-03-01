@@ -39,7 +39,7 @@ export const TimelineList = React.memo<TimelineListProps>(({ events, showNoteTag
 
   // Deduplicate events based on event_id
   const uniqueEvents = React.useMemo(() => {
-    const seen = new Set<string>();
+    const seen = new Set<number>();
     return events.filter(event => {
       if (seen.has(event.event_id)) {
         return false;

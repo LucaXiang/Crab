@@ -5,8 +5,8 @@ import { DraftOrder, CartItem } from '@/core/domain/types';
 interface DraftOrderState {
   draftOrders: DraftOrder[];
   saveDraft: (draft: DraftOrder) => void;
-  restoreDraft: (id: string) => CartItem[];
-  deleteDraft: (id: string) => void;
+  restoreDraft: (id: number) => CartItem[];
+  deleteDraft: (id: number) => void;
 }
 
 export const useDraftOrderStore = create<DraftOrderState>()(
@@ -20,7 +20,7 @@ export const useDraftOrderStore = create<DraftOrderState>()(
         }));
       },
 
-      restoreDraft: (id: string) => {
+      restoreDraft: (id: number) => {
         const draft = get().draftOrders.find(d => d.order_id === id);
         if (draft) {
           set((state) => ({
@@ -31,7 +31,7 @@ export const useDraftOrderStore = create<DraftOrderState>()(
         return [];
       },
 
-      deleteDraft: (id: string) => {
+      deleteDraft: (id: number) => {
         set((state) => ({
           draftOrders: state.draftOrders.filter(d => d.order_id !== id)
         }));

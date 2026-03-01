@@ -35,7 +35,7 @@ export const ItemSplitRenderer: EventRenderer<ItemSplitPayload> = {
       icon: Split,
       colorClass: 'bg-teal-500',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
+      tags: payload.payment_id ? [{ text: `#${String(payload.payment_id).slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -53,7 +53,7 @@ export const AmountSplitRenderer: EventRenderer<AmountSplitPayload> = {
       icon: Split,
       colorClass: 'bg-teal-500',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
+      tags: payload.payment_id ? [{ text: `#${String(payload.payment_id).slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -91,7 +91,7 @@ export const AaSplitPaidRenderer: EventRenderer<AaSplitPaidPayload> = {
       icon: Users,
       colorClass: 'bg-cyan-600',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
+      tags: payload.payment_id ? [{ text: `#${String(payload.payment_id).slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };

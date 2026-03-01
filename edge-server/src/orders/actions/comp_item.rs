@@ -18,7 +18,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// CompItem action
 #[derive(Debug, Clone)]
 pub struct CompItemAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub instance_id: String,
     pub quantity: i32,
     pub reason: String,
@@ -51,16 +51,16 @@ impl CommandHandler for CompItemAction {
         }
 
         // 3. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 4. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -116,10 +116,10 @@ impl CommandHandler for CompItemAction {
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::ItemComped,
             EventPayload::ItemComped {
@@ -147,7 +147,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -190,8 +190,8 @@ mod tests {
         }
     }
 
-    fn create_active_order_with_item(order_id: &str, item: CartItemSnapshot) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_active_order_with_item(order_id: i64, item: CartItemSnapshot) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
         snapshot
@@ -203,14 +203,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 2,
             reason: "VIP customer".to_string(),
@@ -223,7 +223,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::ItemComped);
 
         if let EventPayload::ItemComped {
@@ -258,14 +258,14 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 8.0, 1);
         item.original_price = 12.0;
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 1,
             reason: "VIP".to_string(),
@@ -290,14 +290,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 2, // Partial: only 2 of 5
             reason: "Promotion".to_string(),
@@ -335,15 +335,15 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "nonexistent".to_string(),
+            order_id: 1001,
+            instance_id: 9999.to_string(),
             quantity: 1,
             reason: "Test".to_string(),
             authorizer_id: 1,
@@ -361,7 +361,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -370,7 +370,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 1,
             reason: "Test".to_string(),
@@ -389,7 +389,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -398,7 +398,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 1,
             reason: "Test".to_string(),
@@ -417,14 +417,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 0,
             reason: "Test".to_string(),
@@ -443,14 +443,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 1,
             reason: "".to_string(),
@@ -469,14 +469,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 1,
             reason: "VIP".to_string(),
@@ -497,14 +497,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 5, // More than available (3)
             reason: "VIP".to_string(),
@@ -524,14 +524,14 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         item.is_comped = true;
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 1,
             reason: "VIP".to_string(),
@@ -553,14 +553,14 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
         item.unpaid_quantity = 3; // 5 total - 2 paid = 3 unpaid
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 3, // comp all unpaid
             reason: "VIP".to_string(),
@@ -592,14 +592,14 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         item.unpaid_quantity = 1; // Only 1 unpaid out of 3
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             quantity: 2, // Want to comp 2, but only 1 unpaid
             reason: "VIP".to_string(),

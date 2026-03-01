@@ -143,12 +143,11 @@ impl MessageProcessor for ServerCommandProcessor {
                 .await
                 {
                     Ok(issue) => {
-                        let id_str = issue.id.to_string();
                         self.state
                             .broadcast_sync(
                                 shared::cloud::SyncResource::SystemIssue,
                                 SyncChangeType::Created,
-                                &id_str,
+                                issue.id,
                                 Some(&issue),
                                 false,
                             )
@@ -284,7 +283,7 @@ impl RequestCommandProcessor {
             ..
         } = &command.payload
         {
-            Some((order_id.clone(), *target_zone_id))
+            Some((*order_id, *target_zone_id))
         } else {
             None
         };
@@ -295,7 +294,7 @@ impl RequestCommandProcessor {
         if response.success {
             // OpenTable 成功后加载并缓存价格规则
             if let Some((zone_id, is_retail)) = rule_load_info
-                && let Some(ref order_id) = response.order_id
+                && let Some(order_id) = response.order_id
             {
                 let rules = load_matching_rules(&self.state.pool, zone_id, is_retail).await;
                 if !rules.is_empty() {
@@ -311,7 +310,7 @@ impl RequestCommandProcessor {
             // MoveOrder 成功后：用新区域重新加载规则
             if let Some((ref order_id, ref target_zone_id)) = move_order_info {
                 // 从 snapshot 获取 is_retail（移桌不改变 is_retail）
-                if let Ok(Some(snapshot)) = self.state.orders_manager().get_snapshot(order_id) {
+                if let Ok(Some(snapshot)) = self.state.orders_manager().get_snapshot(*order_id) {
                     let rules =
                         load_matching_rules(&self.state.pool, *target_zone_id, snapshot.is_retail)
                             .await;
@@ -321,7 +320,7 @@ impl RequestCommandProcessor {
                         rule_count = rules.len(),
                         "Reloaded zone rules after table move"
                     );
-                    self.state.orders_manager().cache_rules(order_id, rules);
+                    self.state.orders_manager().cache_rules(*order_id, rules);
                 }
             }
         }
@@ -396,7 +395,7 @@ impl RequestCommandProcessor {
         let order_id = params
             .as_ref()
             .and_then(|p| p.get("order_id"))
-            .and_then(|v| v.as_str())
+            .and_then(|v| v.as_i64())
             .ok_or_else(|| AppError::invalid("Missing order_id parameter"))?;
 
         match self.state.orders_manager().get_snapshot(order_id) {

@@ -53,7 +53,7 @@ pub enum CloudMessage {
     },
 
     /// 活跃订单已移除（完成/作废/合并）
-    ActiveOrderRemoved { order_id: String },
+    ActiveOrderRemoved { order_id: i64 },
 }
 
 /// 强类型 RPC 载荷 (cloud↔edge 双向)
@@ -64,7 +64,7 @@ pub enum CloudRpc {
     /// 查询 edge 状态
     GetStatus,
     /// 查询订单详情
-    GetOrderDetail { order_key: String },
+    GetOrderDetail { order_id: i64 },
     /// 刷新订阅信息
     RefreshSubscription,
     /// Store 操作 (CRUD + FullSync) + LWW 时间戳
@@ -105,7 +105,7 @@ mod tests {
                 resource: SyncResource::Product,
                 version: 1,
                 action: SyncAction::Upsert,
-                resource_id: "42".into(),
+                resource_id: 42,
                 data: serde_json::json!({"name": "Test"}),
             }],
             sent_at: 1700000000000,
@@ -131,7 +131,7 @@ mod tests {
             rejected: 1,
             errors: vec![CloudSyncError {
                 index: 3,
-                resource_id: "99".into(),
+                resource_id: 99,
                 message: "Invalid data".into(),
             }],
         };

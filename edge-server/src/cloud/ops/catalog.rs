@@ -27,7 +27,7 @@ pub async fn create_product(
                 .broadcast_sync(
                     SyncResource::Product,
                     SyncChangeType::Created,
-                    &p.id.to_string(),
+                    p.id,
                     Some(&p),
                     true,
                 )
@@ -45,7 +45,7 @@ pub async fn update_product(state: &ServerState, id: i64, data: ProductUpdate) -
                 .broadcast_sync(
                     SyncResource::Product,
                     SyncChangeType::Updated,
-                    &p.id.to_string(),
+                    p.id,
                     Some(&p),
                     true,
                 )
@@ -63,7 +63,7 @@ pub async fn delete_product(state: &ServerState, id: i64) -> StoreOpResult {
                 .broadcast_sync::<()>(
                     SyncResource::Product,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )
@@ -88,7 +88,7 @@ pub async fn batch_update_product_sort_order(
                 .broadcast_sync::<()>(
                     SyncResource::Product,
                     SyncChangeType::Updated,
-                    "batch-sort",
+                    0,
                     None,
                     true,
                 )
@@ -113,7 +113,7 @@ pub async fn batch_update_category_sort_order(
                 .broadcast_sync::<()>(
                     SyncResource::Category,
                     SyncChangeType::Updated,
-                    "batch-sort",
+                    0,
                     None,
                     true,
                 )
@@ -141,7 +141,7 @@ pub async fn create_category(
                 .broadcast_sync(
                     SyncResource::Category,
                     SyncChangeType::Created,
-                    &c.id.to_string(),
+                    c.id,
                     Some(&c),
                     true,
                 )
@@ -159,7 +159,7 @@ pub async fn update_category(state: &ServerState, id: i64, data: CategoryUpdate)
                 .broadcast_sync(
                     SyncResource::Category,
                     SyncChangeType::Updated,
-                    &c.id.to_string(),
+                    c.id,
                     Some(&c),
                     true,
                 )
@@ -177,7 +177,7 @@ pub async fn delete_category(state: &ServerState, id: i64) -> StoreOpResult {
                 .broadcast_sync::<()>(
                     SyncResource::Category,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )

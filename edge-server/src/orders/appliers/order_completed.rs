@@ -53,7 +53,7 @@ mod tests {
     use shared::order::{OrderEventType, PaymentSummaryItem};
 
     fn create_order_completed_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         receipt_number: &str,
         final_total: f64,
@@ -61,10 +61,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -78,11 +78,11 @@ mod tests {
 
     #[test]
     fn test_order_completed_sets_status() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.last_sequence = 5;
 
-        let event = create_order_completed_event("order-1", 6, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 6, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -92,11 +92,11 @@ mod tests {
 
     #[test]
     fn test_order_completed_sets_receipt_number() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         assert!(snapshot.receipt_number.is_empty());
 
-        let event = create_order_completed_event("order-1", 1, "RCP-12345", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-12345", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -106,11 +106,11 @@ mod tests {
 
     #[test]
     fn test_order_completed_sets_end_time() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         assert!(snapshot.end_time.is_none());
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -121,11 +121,11 @@ mod tests {
 
     #[test]
     fn test_order_completed_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.last_sequence = 10;
 
-        let event = create_order_completed_event("order-1", 11, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 11, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -135,11 +135,11 @@ mod tests {
 
     #[test]
     fn test_order_completed_updates_timestamp() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         let old_updated_at = snapshot.updated_at;
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -153,11 +153,11 @@ mod tests {
 
     #[test]
     fn test_order_completed_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_order_completed_with_payment_summary() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
 
@@ -183,7 +183,7 @@ mod tests {
             },
         ];
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, payment_summary);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 100.0, payment_summary);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_order_completed_preserves_existing_data() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
@@ -203,7 +203,7 @@ mod tests {
         snapshot.subtotal = 150.0;
         snapshot.guest_count = 4;
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 150.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 150.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -222,10 +222,10 @@ mod tests {
 
     #[test]
     fn test_order_completed_idempotent() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
 
@@ -245,14 +245,14 @@ mod tests {
 
     #[test]
     fn test_order_completed_different_receipt_numbers() {
-        let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot1 = OrderSnapshot::new(1001);
         snapshot1.status = OrderStatus::Active;
 
-        let mut snapshot2 = OrderSnapshot::new("order-2".to_string());
+        let mut snapshot2 = OrderSnapshot::new(1002);
         snapshot2.status = OrderStatus::Active;
 
-        let event1 = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
-        let event2 = create_order_completed_event("order-2", 1, "RCP-002", 200.0, vec![]);
+        let event1 = create_order_completed_event(1001, 1, "RCP-001", 100.0, vec![]);
+        let event2 = create_order_completed_event(1002, 1, "RCP-002", 200.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot1, &event1);
@@ -264,12 +264,12 @@ mod tests {
 
     #[test]
     fn test_order_completed_sets_service_type() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         // service_type 开台时为 None
         assert_eq!(snapshot.service_type, None);
 
-        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
+        let event = create_order_completed_event(1001, 1, "RCP-001", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
@@ -280,17 +280,17 @@ mod tests {
 
     #[test]
     fn test_order_completed_sets_takeout_service_type() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         assert_eq!(snapshot.service_type, None);
 
         // 手动创建 Takeout 事件
         let event = OrderEvent::new(
             1,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_snapshot_service_type_none_before_completion() {
         // 验证新建的 snapshot 在结单前 service_type 为 None
-        let snapshot = OrderSnapshot::new("order-1".to_string());
+        let snapshot = OrderSnapshot::new(1001);
         assert_eq!(snapshot.service_type, None);
     }
 }

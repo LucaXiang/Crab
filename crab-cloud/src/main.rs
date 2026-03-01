@@ -75,7 +75,7 @@ async fn main() -> Result<(), BoxError> {
 
     // Start mTLS server (edge-only)
     let mtls_addr = std::net::SocketAddr::from(([0, 0, 0, 0], config.mtls_port));
-    let mtls_handle = match build_mtls_config(&config) {
+    let mtls_handle = match build_mtls_config(&config, &state.root_ca_pem) {
         Ok(tls_config) => {
             tracing::info!("crab-cloud mTLS listening on {mtls_addr}");
             let handle = mtls_server_handle.clone();
@@ -132,6 +132,86 @@ async fn main() -> Result<(), BoxError> {
         }
     });
 
+    // Periodic data cleanup (every hour): audit logs, revoked tokens, webhook events, old commands, stale pending ops
+    {
+        let pool = state.pool.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                interval.tick().await;
+                let now = shared::util::now_millis();
+                let day_ms: i64 = 86_400_000;
+
+                // Audit logs older than 90 days
+                match sqlx::query("DELETE FROM audit_logs WHERE created_at < $1")
+                    .bind(now - 90 * day_ms)
+                    .execute(&pool)
+                    .await
+                {
+                    Ok(r) if r.rows_affected() > 0 => {
+                        tracing::info!(deleted = r.rows_affected(), "Cleaned up old audit_logs");
+                    }
+                    Err(e) => tracing::warn!("audit_logs cleanup error: {e}"),
+                    _ => {}
+                }
+
+                // Expired refresh tokens older than 30 days (revoked or naturally expired)
+                match sqlx::query("DELETE FROM refresh_tokens WHERE expires_at < $1")
+                    .bind(now - 30 * day_ms)
+                    .execute(&pool)
+                    .await
+                {
+                    Ok(r) if r.rows_affected() > 0 => {
+                        tracing::info!(
+                            deleted = r.rows_affected(),
+                            "Cleaned up expired refresh_tokens"
+                        );
+                    }
+                    Err(e) => tracing::warn!("refresh_tokens cleanup error: {e}"),
+                    _ => {}
+                }
+
+                // Processed webhook events older than 7 days
+                match sqlx::query("DELETE FROM processed_webhook_events WHERE processed_at < $1")
+                    .bind(now - 7 * day_ms)
+                    .execute(&pool)
+                    .await
+                {
+                    Ok(r) if r.rows_affected() > 0 => {
+                        tracing::info!(
+                            deleted = r.rows_affected(),
+                            "Cleaned up old processed_webhook_events"
+                        );
+                    }
+                    Err(e) => tracing::warn!("webhook_events cleanup error: {e}"),
+                    _ => {}
+                }
+
+                // Completed/failed commands older than 90 days
+                match sqlx::query(
+                    "DELETE FROM store_commands WHERE status IN ('completed', 'failed') AND created_at < $1",
+                )
+                .bind(now - 90 * day_ms)
+                .execute(&pool)
+                .await
+                {
+                    Ok(r) if r.rows_affected() > 0 => {
+                        tracing::info!(
+                            deleted = r.rows_affected(),
+                            "Cleaned up old store_commands"
+                        );
+                    }
+                    Err(e) => tracing::warn!("store_commands cleanup error: {e}"),
+                    _ => {}
+                }
+
+                // Note: store_pending_ops are NOT cleaned by TTL — they represent
+                // undelivered Console edits for offline edges. Delivery deletes them
+                // individually via pending_ops::delete_one() when the edge reconnects.
+            }
+        });
+    }
+
     // Periodic orphaned image cleanup (every 10 minutes, delete images orphaned >1 hour ago)
     {
         let state = state.clone();
@@ -144,9 +224,9 @@ async fn main() -> Result<(), BoxError> {
                     Ok(orphans) if !orphans.is_empty() => {
                         let count = orphans.len();
                         for (tenant_id, hash) in orphans {
-                            api::image::delete_s3_image(&state, &tenant_id, &hash).await;
+                            api::image::delete_s3_image(&state, tenant_id, &hash).await;
                             let _ =
-                                db::tenant_images::delete_records(&state.pool, &tenant_id, &hash)
+                                db::tenant_images::delete_records(&state.pool, tenant_id, &hash)
                                     .await;
                         }
                         tracing::info!(count, "Orphaned S3 images cleaned up");
@@ -216,12 +296,13 @@ fn load_pem(
 
 /// Build rustls ServerConfig with mandatory client certificate verification.
 ///
-/// Supports two modes:
-/// - **PEM env vars** (containerized): SERVER_CERT_PEM, SERVER_KEY_PEM, ROOT_CA_PEM
-/// - **File paths** (local dev): SERVER_CERT_PATH, SERVER_KEY_PATH, ROOT_CA_PATH
-///
-/// PEM env vars take priority when set.
-fn build_mtls_config(config: &Config) -> Result<axum_server::tls_rustls::RustlsConfig, BoxError> {
+/// `root_ca_pem` comes from AppState (Secrets Manager → local cache fallback),
+/// ensuring the mTLS trust root is always consistent with the PKI that signed
+/// tenant/entity certs during activation.
+fn build_mtls_config(
+    config: &Config,
+    root_ca_pem: &str,
+) -> Result<axum_server::tls_rustls::RustlsConfig, BoxError> {
     let cert_pem = load_pem(
         &config.server_cert_pem,
         &config.server_cert_path,
@@ -232,7 +313,7 @@ fn build_mtls_config(config: &Config) -> Result<axum_server::tls_rustls::RustlsC
         &config.server_key_path,
         "server key",
     )?;
-    let ca_pem = load_pem(&config.root_ca_pem, &config.root_ca_path, "root CA")?;
+    let ca_pem = root_ca_pem.as_bytes().to_vec();
 
     // Parse server certs
     let certs: Vec<rustls_pki_types::CertificateDer<'static>> =

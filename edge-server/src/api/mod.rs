@@ -61,6 +61,15 @@ pub mod archive_verify;
 // Credit Notes (退款凭证)
 pub mod credit_notes;
 
+// Invoice Anulación (发票作废)
+pub mod anulacion;
+
+// Invoice Upgrade (F2 → F3 升级)
+pub mod upgrade;
+
+// Chain Entries (统一 hash 链时间线)
+pub mod chain_entries;
+
 // Audit (审计日志)
 pub mod audit_log;
 

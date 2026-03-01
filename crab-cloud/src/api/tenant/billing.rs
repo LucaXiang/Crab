@@ -15,7 +15,7 @@ pub async fn billing_portal(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
 ) -> ApiResult<serde_json::Value> {
-    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
+    let tenant = db::tenants::find_by_id(&state.pool, identity.tenant_id)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?
         .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
@@ -57,7 +57,7 @@ pub async fn create_checkout(
         return Err(AppError::new(ErrorCode::ValidationFailed));
     }
 
-    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
+    let tenant = db::tenants::find_by_id(&state.pool, identity.tenant_id)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?
         .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
@@ -69,7 +69,7 @@ pub async fn create_checkout(
     }
 
     // P12 certificate must be uploaded before payment (Verifactu compliance)
-    let p12 = db::p12::find_by_tenant(&state.pool, &identity.tenant_id)
+    let p12 = db::p12::find_by_tenant(&state.pool, identity.tenant_id)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?;
     if p12.is_none() {
@@ -80,14 +80,17 @@ pub async fn create_checkout(
     let customer_id = if let Some(ref cid) = tenant.stripe_customer_id {
         cid.clone()
     } else {
-        let cid =
-            crate::stripe::create_customer(&state.stripe.secret_key, &tenant.email, &tenant.id)
-                .await
-                .map_err(|e| {
-                    tracing::error!(%e, "Failed to create Stripe customer");
-                    AppError::new(ErrorCode::PaymentSetupFailed)
-                })?;
-        db::tenants::set_stripe_customer(&state.pool, &tenant.id, &cid)
+        let cid = crate::stripe::create_customer(
+            &state.stripe.secret_key,
+            &tenant.email,
+            &tenant.id.to_string(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(%e, "Failed to create Stripe customer");
+            AppError::new(ErrorCode::PaymentSetupFailed)
+        })?;
+        db::tenants::set_stripe_customer(&state.pool, tenant.id, &cid)
             .await
             .map_err(|_| AppError::new(ErrorCode::InternalError))?;
         cid
@@ -118,7 +121,7 @@ pub async fn create_checkout(
     let detail = serde_json::json!({ "plan": plan });
     let _ = crate::db::audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         "checkout_created",
         Some(&detail),
         None,

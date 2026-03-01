@@ -10,6 +10,7 @@ use super::BoxError;
 pub async fn upsert_daily_report_from_sync(
     pool: &PgPool,
     store_id: i64,
+    tenant_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -17,16 +18,16 @@ pub async fn upsert_daily_report_from_sync(
     let report: DailyReport = serde_json::from_value(data.clone())?;
     let mut tx = pool.begin().await?;
 
-    let (pg_id,): (i64,) = sqlx::query_as(
+    let row: Option<(i64,)> = sqlx::query_as(
         r#"
         INSERT INTO store_daily_reports (
-            store_id, source_id, business_date,
+            store_id, tenant_id, source_id, business_date,
             total_orders, completed_orders, void_orders,
             total_sales, total_paid, total_unpaid, void_amount,
             total_tax, total_discount, total_surcharge,
             generated_at, generated_by_id, generated_by_name, note, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             business_date = EXCLUDED.business_date,
@@ -39,10 +40,12 @@ pub async fn upsert_daily_report_from_sync(
             generated_at = EXCLUDED.generated_at, generated_by_id = EXCLUDED.generated_by_id,
             generated_by_name = EXCLUDED.generated_by_name, note = EXCLUDED.note,
             updated_at = EXCLUDED.updated_at
+        WHERE store_daily_reports.updated_at <= EXCLUDED.updated_at
         RETURNING id
         "#,
     )
     .bind(store_id)
+    .bind(tenant_id)
     .bind(source_id)
     .bind(&report.business_date)
     .bind(report.total_orders)
@@ -60,8 +63,14 @@ pub async fn upsert_daily_report_from_sync(
     .bind(&report.generated_by_name)
     .bind(&report.note)
     .bind(now)
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
+
+    // Stale data — cloud already has a newer version, skip child table updates
+    let Some((pg_id,)) = row else {
+        tx.commit().await?;
+        return Ok(());
+    };
 
     // Replace tax breakdowns
     sqlx::query("DELETE FROM store_daily_report_tax_breakdown WHERE report_id = $1")

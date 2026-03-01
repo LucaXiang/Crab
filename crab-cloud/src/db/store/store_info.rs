@@ -14,7 +14,7 @@ pub async fn upsert_store_info_from_sync(
     store_id: i64,
     data: &serde_json::Value,
     now: i64,
-) -> Result<(), BoxError> {
+) -> Result<StoreInfo, BoxError> {
     let info: StoreInfo = serde_json::from_value(data.clone())?;
     sqlx::query(
         r#"
@@ -41,7 +41,7 @@ pub async fn upsert_store_info_from_sync(
     .bind(now)
     .execute(pool)
     .await?;
-    Ok(())
+    Ok(info)
 }
 
 // ── Console Write ──

@@ -403,7 +403,7 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, aaTotalShar
               )}
               {payment.payment_id && (
                 <span className="text-[0.625rem] text-emerald-600 bg-emerald-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                  #{payment.payment_id.slice(-5)}
+                  #{String(payment.payment_id).slice(-5)}
                 </span>
               )}
               {payment.cancelled && (

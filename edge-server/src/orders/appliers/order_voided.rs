@@ -47,7 +47,7 @@ mod tests {
     use shared::order::{OrderEventType, VoidType};
 
     fn create_order_voided_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         note: Option<String>,
         authorizer_id: Option<i64>,
@@ -55,10 +55,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderVoided,
             EventPayload::OrderVoided {
@@ -74,11 +74,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_sets_status() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.last_sequence = 5;
 
-        let event = create_order_voided_event("order-1", 6, None, None, None);
+        let event = create_order_voided_event(1001, 6, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -88,17 +88,12 @@ mod tests {
 
     #[test]
     fn test_order_voided_sets_end_time() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         assert!(snapshot.end_time.is_none());
 
-        let event = create_order_voided_event(
-            "order-1",
-            1,
-            Some("Customer cancelled".to_string()),
-            None,
-            None,
-        );
+        let event =
+            create_order_voided_event(1001, 1, Some("Customer cancelled".to_string()), None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -109,11 +104,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.last_sequence = 10;
 
-        let event = create_order_voided_event("order-1", 11, None, None, None);
+        let event = create_order_voided_event(1001, 11, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -123,11 +118,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_updates_timestamp() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         let old_updated_at = snapshot.updated_at;
 
-        let event = create_order_voided_event("order-1", 1, None, None, None);
+        let event = create_order_voided_event(1001, 1, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -139,11 +134,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_voided_event("order-1", 1, None, None, None);
+        let event = create_order_voided_event(1001, 1, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -154,11 +149,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_with_reason() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         let event = create_order_voided_event(
-            "order-1",
+            1001,
             1,
             Some("Customer changed mind".to_string()),
             None,
@@ -175,11 +170,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_with_authorizer() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         let event = create_order_voided_event(
-            "order-1",
+            1001,
             1,
             Some("Manager override".to_string()),
             Some(100),
@@ -195,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_order_voided_preserves_existing_data() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
@@ -204,8 +199,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot.guest_count = 4;
 
-        let event =
-            create_order_voided_event("order-1", 1, Some("Test void".to_string()), None, None);
+        let event = create_order_voided_event(1001, 1, Some("Test void".to_string()), None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -225,10 +219,10 @@ mod tests {
 
     #[test]
     fn test_order_voided_idempotent() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
-        let event = create_order_voided_event("order-1", 1, None, None, None);
+        let event = create_order_voided_event(1001, 1, None, None, None);
 
         let applier = OrderVoidedApplier;
 
@@ -247,21 +241,16 @@ mod tests {
 
     #[test]
     fn test_order_voided_different_reasons() {
-        let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot1 = OrderSnapshot::new(1001);
         snapshot1.status = OrderStatus::Active;
 
-        let mut snapshot2 = OrderSnapshot::new("order-2".to_string());
+        let mut snapshot2 = OrderSnapshot::new(1002);
         snapshot2.status = OrderStatus::Active;
 
-        let event1 = create_order_voided_event(
-            "order-1",
-            1,
-            Some("Customer cancelled".to_string()),
-            None,
-            None,
-        );
+        let event1 =
+            create_order_voided_event(1001, 1, Some("Customer cancelled".to_string()), None, None);
         let event2 =
-            create_order_voided_event("order-2", 1, Some("Order error".to_string()), None, None);
+            create_order_voided_event(1002, 1, Some("Order error".to_string()), None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot1, &event1);
@@ -274,11 +263,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_preserves_receipt_number() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.receipt_number = "RCP-001".to_string();
 
-        let event = create_order_voided_event("order-1", 1, None, None, None);
+        let event = create_order_voided_event(1001, 1, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -292,12 +281,12 @@ mod tests {
     fn test_order_voided_with_payments_preserved() {
         use shared::order::PaymentRecord;
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 100.0;
         snapshot.payments.push(PaymentRecord {
-            payment_id: "pay-1".to_string(),
+            payment_id: 4001,
             method: "CASH".to_string(),
             amount: 100.0,
             tendered: Some(100.0),
@@ -311,13 +300,8 @@ mod tests {
             split_type: None,
         });
 
-        let event = create_order_voided_event(
-            "order-1",
-            2,
-            Some("Voiding paid order".to_string()),
-            None,
-            None,
-        );
+        let event =
+            create_order_voided_event(1001, 2, Some("Voiding paid order".to_string()), None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -330,11 +314,11 @@ mod tests {
 
     #[test]
     fn test_order_voided_sequence_increments() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.last_sequence = 5;
 
-        let event = create_order_voided_event("order-1", 10, None, None, None);
+        let event = create_order_voided_event(1001, 10, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);

@@ -52,8 +52,18 @@ pub async fn upload_p12(
     };
 
     // JWT 认证
-    let tenant_id = match tenant_auth::verify_token(&token, &state.jwt_secret) {
-        Ok(claims) => claims.sub,
+    let tenant_id: i64 = match tenant_auth::verify_token(&token, &state.jwt_secret) {
+        Ok(claims) => match claims.sub.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                p12_password.zeroize();
+                return Json(serde_json::json!({
+                    "success": false,
+                    "error": "Invalid token subject",
+                    "error_code": ErrorCode::TokenExpired
+                }));
+            }
+        },
         Err(_) => {
             p12_password.zeroize();
             return Json(serde_json::json!({
@@ -64,7 +74,7 @@ pub async fn upload_p12(
         }
     };
 
-    let tenant = match tenants::find_by_id(&state.pool, &tenant_id).await {
+    let tenant = match tenants::find_by_id(&state.pool, tenant_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
             p12_password.zeroize();
@@ -92,7 +102,7 @@ pub async fn upload_p12(
             p12_password.zeroize();
             let (error_code, detail) = map_p12_error(&e);
             tracing::warn!(
-                tenant_id = %tenant.id,
+                tenant_id = tenant.id,
                 error_code = ?error_code,
                 detail = %detail,
                 "P12 validation failed"
@@ -107,7 +117,7 @@ pub async fn upload_p12(
     };
 
     tracing::info!(
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         fingerprint = %cert_info.fingerprint,
         common_name = %cert_info.common_name,
         issuer = %cert_info.issuer,
@@ -121,7 +131,11 @@ pub async fn upload_p12(
     // Reject expired certificates
     if cert_info.expires_at <= now_millis {
         p12_password.zeroize();
-        tracing::warn!(tenant_id = %tenant.id, expires_at = cert_info.expires_at, "P12 certificate has expired");
+        tracing::warn!(
+            tenant_id = tenant.id,
+            expires_at = cert_info.expires_at,
+            "P12 certificate has expired"
+        );
         return Json(serde_json::json!({
             "success": false,
             "error": ErrorCode::P12CertExpired.message(),
@@ -132,7 +146,11 @@ pub async fn upload_p12(
     // Reject certificates not yet valid (not_before in the future)
     if cert_info.not_before > now_millis {
         p12_password.zeroize();
-        tracing::warn!(tenant_id = %tenant.id, not_before = cert_info.not_before, "P12 certificate is not yet valid");
+        tracing::warn!(
+            tenant_id = tenant.id,
+            not_before = cert_info.not_before,
+            "P12 certificate is not yet valid"
+        );
         return Json(serde_json::json!({
             "success": false,
             "error": ErrorCode::P12CertNotYetValid.message(),
@@ -143,7 +161,7 @@ pub async fn upload_p12(
     // NIF consistency: if tenant already has a P12, new cert NIF must match
     let new_nif = cert_info.tax_id();
     if let Some(new_nif) = &new_nif {
-        match p12::find_by_tenant(&state.pool, &tenant.id).await {
+        match p12::find_by_tenant(&state.pool, tenant.id).await {
             Ok(Some(existing)) => {
                 // Normalize existing serial_number the same way as tax_id():
                 // "IDCES-B12345678" → "B12345678", or raw 9-char NIF
@@ -158,7 +176,7 @@ pub async fn upload_p12(
                 {
                     p12_password.zeroize();
                     tracing::warn!(
-                        tenant_id = %tenant.id,
+                        tenant_id = tenant.id,
                         existing_nif = %existing_nif,
                         new_nif = %new_nif,
                         "P12 NIF mismatch: new certificate has different tax ID"
@@ -190,7 +208,7 @@ pub async fn upload_p12(
     if let Err(e) = p12::upsert(
         &state.pool,
         &state.master_key,
-        &tenant.id,
+        tenant.id,
         &p12_base64,
         &p12_password,
         &cert_info,
@@ -216,18 +234,22 @@ pub async fn upload_p12(
             sqlx::query("UPDATE stores SET nif = $1, updated_at = $2 WHERE tenant_id = $3")
                 .bind(nif)
                 .bind(shared::util::now_millis())
-                .bind(&tenant.id)
+                .bind(tenant.id)
                 .execute(&state.pool)
                 .await
         {
-            tracing::error!(tenant_id = %tenant.id, "Failed to set NIF from P12: {e}");
+            tracing::error!(tenant_id = tenant.id, "Failed to set NIF from P12: {e}");
         } else {
-            tracing::info!(tenant_id = %tenant.id, nif, "NIF auto-populated from P12 certificate");
+            tracing::info!(
+                tenant_id = tenant.id,
+                nif,
+                "NIF auto-populated from P12 certificate"
+            );
         }
     }
 
     tracing::info!(
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         fingerprint = %cert_info.fingerprint,
         "P12 certificate uploaded and encrypted in database"
     );

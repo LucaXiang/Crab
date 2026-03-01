@@ -244,7 +244,7 @@ pub struct AuthData {
 /// 激活结果
 #[derive(Debug, Clone, Serialize)]
 pub struct ActivationResultData {
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// 订阅状态 (来自 auth server)，null 表示无订阅信息
     pub subscription_status: Option<String>,
     /// Quota 信息 (设备数已满时返回)
@@ -258,8 +258,8 @@ pub struct ActivationResultData {
 #[derive(Debug, Clone, Serialize)]
 pub struct AppConfigResponse {
     pub current_mode: Option<super::ModeType>,
-    pub current_tenant: Option<String>,
+    pub current_tenant: Option<i64>,
     pub server_config: super::ServerModeConfig,
     pub client_config: Option<super::ClientModeConfig>,
-    pub known_tenants: Vec<String>,
+    pub known_tenants: Vec<i64>,
 }

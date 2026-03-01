@@ -39,9 +39,9 @@ const MAX_SEQUENCE_GAP = 5;
 
 interface ActiveOrdersState {
   /** Map of order_id -> OrderSnapshot */
-  orders: Map<string, OrderSnapshot>;
+  orders: Map<number, OrderSnapshot>;
   /** Map of order_id -> OrderEvent[] (timeline for UI display) */
-  timelines: Map<string, OrderEvent[]>;
+  timelines: Map<number, OrderEvent[]>;
   /** Last processed event sequence number */
   lastSequence: number;
   /** Connection state for order sync */
@@ -57,7 +57,7 @@ interface ActiveOrdersState {
    * Orders that need timeline sync due to sequence gap
    * External listeners can watch this and trigger sync
    */
-  ordersNeedingTimelineSync: Set<string>;
+  ordersNeedingTimelineSync: Set<number>;
 }
 
 interface ActiveOrdersActions {
@@ -66,7 +66,7 @@ interface ActiveOrdersActions {
   /**
    * Get order by ID
    */
-  getOrder: (orderId: string) => OrderSnapshot | undefined;
+  getOrder: (orderId: number) => OrderSnapshot | undefined;
 
   /**
    * Get all active orders (status === 'ACTIVE')
@@ -132,12 +132,12 @@ interface ActiveOrdersActions {
    * Sync timeline for a specific order (called after fetching events)
    * Replaces the timeline with server-provided events
    */
-  _syncOrderTimeline: (orderId: string, events: OrderEvent[]) => void;
+  _syncOrderTimeline: (orderId: number, events: OrderEvent[]) => void;
 
   /**
    * Clear timeline sync request for an order (after sync completes)
    */
-  _clearTimelineSyncRequest: (orderId: string) => void;
+  _clearTimelineSyncRequest: (orderId: number) => void;
 }
 
 type ActiveOrdersStore = ActiveOrdersState & ActiveOrdersActions;
@@ -162,7 +162,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 
   // ==================== Read-Only Queries ====================
 
-  getOrder: (orderId: string) => {
+  getOrder: (orderId: number) => {
     return get().orders.get(orderId);
   },
 
@@ -274,14 +274,14 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 
   _fullSync: (orders: OrderSnapshot[], serverSequence: number, serverEpoch?: string, events?: OrderEvent[]) => {
     set((state) => {
-      const newOrders = new Map<string, OrderSnapshot>();
+      const newOrders = new Map<number, OrderSnapshot>();
 
       for (const order of orders) {
         newOrders.set(order.order_id, order);
       }
 
       // 从 events 构建 timelines
-      const newTimelines = new Map<string, OrderEvent[]>();
+      const newTimelines = new Map<number, OrderEvent[]>();
       if (events && events.length > 0) {
         for (const event of events) {
           const orderId = event.order_id;
@@ -320,7 +320,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     set(initialState);
   },
 
-  _syncOrderTimeline: (orderId: string, events: OrderEvent[]) => {
+  _syncOrderTimeline: (orderId: number, events: OrderEvent[]) => {
     set((state) => {
       const timelines = new Map(state.timelines);
       // 替换该订单的 timeline，按 sequence 排序
@@ -339,7 +339,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     });
   },
 
-  _clearTimelineSyncRequest: (orderId: string) => {
+  _clearTimelineSyncRequest: (orderId: number) => {
     set((state) => {
       const ordersNeedingTimelineSync = new Set(state.ordersNeedingTimelineSync);
       ordersNeedingTimelineSync.delete(orderId);
@@ -355,7 +355,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 /**
  * Select timeline for a specific order
  */
-export const useOrderTimeline = (orderId: string | null | undefined) =>
+export const useOrderTimeline = (orderId: number | null | undefined) =>
   useActiveOrdersStore((state) =>
     orderId ? state.timelines.get(orderId) || [] : []
   );

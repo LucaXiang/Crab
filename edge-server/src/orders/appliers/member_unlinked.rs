@@ -94,13 +94,13 @@ mod tests {
     use super::*;
     use shared::order::{CartItemSnapshot, OrderEventType, OrderSnapshot};
 
-    fn create_member_unlinked_event(order_id: &str, seq: u64) -> OrderEvent {
+    fn create_member_unlinked_event(order_id: i64, seq: u64) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::MemberUnlinked,
             EventPayload::MemberUnlinked {
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_member_unlinked_clears_fields() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
         snapshot.marketing_group_id = Some(1);
@@ -150,7 +150,7 @@ mod tests {
         snapshot.mg_discount_amount = 5.0;
         snapshot.items.push(create_test_item("inst-1", 10.0));
 
-        let event = create_member_unlinked_event("order-1", 2);
+        let event = create_member_unlinked_event(1001, 2);
         let applier = MemberUnlinkedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -165,13 +165,13 @@ mod tests {
 
     #[test]
     fn test_member_unlinked_recalculates_totals() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.items.push(create_test_item("inst-1", 10.0));
         snapshot.subtotal = 10.0;
         snapshot.total = 10.0;
 
-        let event = create_member_unlinked_event("order-1", 2);
+        let event = create_member_unlinked_event(1001, 2);
         let applier = MemberUnlinkedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -182,12 +182,12 @@ mod tests {
 
     #[test]
     fn test_member_unlinked_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_member_unlinked_event("order-1", 1);
+        let event = create_member_unlinked_event(1001, 1);
         let applier = MemberUnlinkedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_unlink_reverses_full_comp_existing() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
 
@@ -248,7 +248,7 @@ mod tests {
             comp_source_instance_id: None,
         });
 
-        let event = create_member_unlinked_event("order-1", 2);
+        let event = create_member_unlinked_event(1001, 2);
         MemberUnlinkedApplier.apply(&mut snapshot, &event);
 
         // Item uncomped
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_unlink_reverses_partial_comp_existing() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
 
@@ -278,7 +278,7 @@ mod tests {
             comp_source_instance_id: Some("item-1".to_string()),
         });
 
-        let event = create_member_unlinked_event("order-1", 2);
+        let event = create_member_unlinked_event(1001, 2);
         MemberUnlinkedApplier.apply(&mut snapshot, &event);
 
         // Comped item removed, source restored
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_unlink_reverses_add_new_redemption() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
 
@@ -308,7 +308,7 @@ mod tests {
             comp_source_instance_id: None,
         });
 
-        let event = create_member_unlinked_event("order-1", 2);
+        let event = create_member_unlinked_event(1001, 2);
         MemberUnlinkedApplier.apply(&mut snapshot, &event);
 
         // Reward item removed, original item unchanged
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_unlink_reverses_mixed_redemptions() {
         // Two stamp activities: one add-new, one partial comp-existing
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
 
@@ -347,7 +347,7 @@ mod tests {
             comp_source_instance_id: None,
         });
 
-        let event = create_member_unlinked_event("order-1", 2);
+        let event = create_member_unlinked_event(1001, 2);
         MemberUnlinkedApplier.apply(&mut snapshot, &event);
 
         // Both reward items removed/merged, only source remains

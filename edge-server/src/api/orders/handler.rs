@@ -90,7 +90,6 @@ pub struct OrderEventDetail {
 #[derive(Debug, Serialize)]
 pub struct OrderDetail {
     pub order_id: i64,
-    pub order_key: String,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
@@ -115,6 +114,8 @@ pub struct OrderDetail {
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
     pub queue_number: Option<i32>,
+    pub is_anulada: bool,
+    pub is_upgraded: bool,
     pub items: Vec<OrderItemDetail>,
     pub payments: Vec<OrderPaymentDetail>,
     pub timeline: Vec<OrderEventDetail>,
@@ -130,7 +131,6 @@ pub async fn get_by_id(
     // Convert from repo model to API response
     let response = OrderDetail {
         order_id: detail.order_id,
-        order_key: detail.order_key,
         receipt_number: detail.receipt_number,
         table_name: detail.table_name,
         zone_name: detail.zone_name,
@@ -154,6 +154,8 @@ pub async fn get_by_id(
         loss_amount: detail.loss_amount,
         void_note: detail.void_note,
         queue_number: detail.queue_number,
+        is_anulada: detail.is_anulada,
+        is_upgraded: detail.is_upgraded,
         items: detail
             .items
             .into_iter()

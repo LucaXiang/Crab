@@ -43,8 +43,8 @@ pub struct KitchenOrderItem {
 /// 一次点单的厨房记录（对应一个 ItemsAdded 事件）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KitchenOrder {
-    pub id: String, // = event_id
-    pub order_id: String,
+    pub id: i64, // = event_id (snowflake)
+    pub order_id: i64,
     #[serde(default)]
     pub receipt_number: String, // 人类可读订单号
     pub table_name: Option<String>,
@@ -59,9 +59,9 @@ pub struct KitchenOrder {
 /// 标签打印记录（单品级别）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LabelPrintRecord {
-    pub id: String, // UUID
-    pub order_id: String,
-    pub kitchen_order_id: String, // 关联的 KitchenOrder
+    pub id: i64, // snowflake
+    pub order_id: i64,
+    pub kitchen_order_id: i64, // 关联的 KitchenOrder (= event_id)
     pub table_name: Option<String>,
     pub queue_number: Option<u32>,
     pub is_retail: bool,

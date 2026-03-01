@@ -9,7 +9,7 @@ import { Role, RolePermission } from '@/core/domain/types';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { MAX_NAME_LEN, MAX_NOTE_LEN } from '@/shared/constants/validation';
 
-// Simplified permission labels (12 configurable permissions)
+// Permission labels (18 configurable permissions)
 const usePermissionLabels = () => {
   const { t } = useI18n();
   return {
@@ -20,12 +20,19 @@ const usePermissionLabels = () => {
     'reports:view': t('settings.permissions.reports_view'),
     'price_rules:manage': t('settings.permissions.price_rules_manage'),
     'settings:manage': t('settings.permissions.settings_manage'),
-    // === 敏感操作 (6) ===
+    // === 营销与会员 (3) ===
+    'marketing:manage': t('settings.permissions.marketing_manage'),
+    'orders:link_member': t('settings.permissions.orders_link_member'),
+    'orders:redeem_stamp': t('settings.permissions.orders_redeem_stamp'),
+    // === 敏感操作 (9) ===
     'orders:void': t('settings.permissions.orders_void'),
     'orders:discount': t('settings.permissions.orders_discount'),
     'orders:comp': t('settings.permissions.orders_comp'),
     'orders:refund': t('settings.permissions.orders_refund'),
     'orders:modify_price': t('settings.permissions.orders_modify_price'),
+    'orders:cancel_item': t('settings.permissions.orders_cancel_item'),
+    'tables:transfer': t('settings.permissions.tables_transfer'),
+    'tables:merge_bill': t('settings.permissions.tables_merge_bill'),
     'cash_drawer:open': t('settings.permissions.cash_drawer_open'),
   };
 };
@@ -49,7 +56,7 @@ export const RolePermissionsEditor: React.FC = () => {
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  // Simplified permission groups (2 groups, 12 permissions total)
+  // Permission groups (3 groups, 18 permissions total)
   const getPermissionGroups = () => {
     return {
       modular: {
@@ -62,6 +69,7 @@ export const RolePermissionsEditor: React.FC = () => {
           'reports:view',
           'price_rules:manage',
           'settings:manage',
+          'marketing:manage',
         ]
       },
       sensitive: {
@@ -73,6 +81,9 @@ export const RolePermissionsEditor: React.FC = () => {
           'orders:comp',
           'orders:refund',
           'orders:modify_price',
+          'orders:cancel_item',
+          'tables:transfer',
+          'tables:merge_bill',
           'cash_drawer:open',
         ]
       }

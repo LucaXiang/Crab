@@ -160,11 +160,11 @@ fn test_certificate_lifecycle() {
 
     // 3. Issue Client Certificate with Extensions
     println!("Issuing Client Certificate...");
-    let tenant_id = "tenant-test-001";
+    let tenant_id: i64 = 1001;
     let device_id = "device-test-999";
     let client_profile = CertProfile::new_client(
         "client-device",
-        Some(tenant_id.to_string()),
+        Some(tenant_id),
         Some(device_id.to_string()),
         Some("My Client Terminal".to_string()),
     );
@@ -177,7 +177,7 @@ fn test_certificate_lifecycle() {
     let metadata = CertMetadata::from_pem(&client_cert_pem).expect("Failed to parse metadata");
 
     assert_eq!(metadata.common_name.as_deref(), Some("client-device"));
-    assert_eq!(metadata.tenant_id.as_deref(), Some(tenant_id));
+    assert_eq!(metadata.tenant_id, Some(tenant_id));
     assert_eq!(metadata.device_id.as_deref(), Some(device_id));
     assert_eq!(metadata.client_name.as_deref(), Some("My Client Terminal"));
 

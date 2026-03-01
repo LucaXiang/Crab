@@ -31,6 +31,8 @@ pub struct OverviewStats {
     pub loss_orders: i32,
     pub loss_amount: f64,
     pub total_discount: f64,
+    pub total_refunded: f64,
+    pub refund_count: i32,
     pub avg_guest_spend: f64,
     pub avg_dining_time: Option<f64>,
 }
@@ -280,6 +282,20 @@ pub async fn get_statistics(
 
     let other_revenue = revenue - cash_revenue - card_revenue;
 
+    // Refund totals from credit_note
+    let (total_refunded, refund_count): (f64, i32) = sqlx::query_as(
+        "SELECT \
+            COALESCE(SUM(total_credit), 0.0), \
+            CAST(COUNT(*) AS INTEGER) \
+         FROM credit_note \
+         WHERE created_at >= ?1 AND created_at < ?2",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
     let overview = OverviewStats {
         revenue,
         orders: total_orders,
@@ -293,6 +309,8 @@ pub async fn get_statistics(
         loss_orders,
         loss_amount,
         total_discount,
+        total_refunded,
+        refund_count,
         avg_guest_spend,
         avg_dining_time,
     };

@@ -26,13 +26,13 @@ use shared::order::{OrderSnapshot, OrderStatus, SplitItem};
 
 pub(super) fn validate_active_order(
     snapshot: &OrderSnapshot,
-    order_id: &str,
+    order_id: i64,
 ) -> Result<(), OrderError> {
     match snapshot.status {
         OrderStatus::Active => Ok(()),
-        OrderStatus::Completed => Err(OrderError::OrderAlreadyCompleted(order_id.to_string())),
-        OrderStatus::Void => Err(OrderError::OrderAlreadyVoided(order_id.to_string())),
-        _ => Err(OrderError::OrderNotFound(order_id.to_string())),
+        OrderStatus::Completed => Err(OrderError::OrderAlreadyCompleted(order_id)),
+        OrderStatus::Void => Err(OrderError::OrderAlreadyVoided(order_id)),
+        _ => Err(OrderError::OrderNotFound(order_id)),
     }
 }
 

@@ -263,7 +263,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             )}
 
             <EscalatableGate
-                permission={Permission.TABLES_MANAGE}
+                permission={Permission.TABLES_MERGE_BILL}
                 mode="intercept"
                 description={t('table.auth_required.merge')}
                 onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.name }); setMode('MERGE'); }}
@@ -287,7 +287,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             </EscalatableGate>
 
             <EscalatableGate
-                permission={Permission.TABLES_MANAGE}
+                permission={Permission.TABLES_TRANSFER}
                 mode="intercept"
                 description={t('table.auth_required.move')}
                 onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.name }); setMode('MOVE'); }}
@@ -311,18 +311,24 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             </EscalatableGate>
 
             {/* Price Rules Button */}
-            <button
-                onClick={() => setMode('PRICE_RULES')}
-                className="flex flex-col items-center justify-center text-center p-4 h-32 rounded-lg border transition-all duration-200 gap-2 bg-teal-50/50 hover:bg-teal-50 border-teal-100 hover:border-teal-200 hover:shadow-md active:scale-[0.99]"
+            <EscalatableGate
+                permission={Permission.PRICE_RULES_MANAGE}
+                mode="intercept"
+                description={t('table.action.price_rules')}
+                onAuthorized={() => setMode('PRICE_RULES')}
             >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm bg-teal-100 text-teal-600">
-                    <Percent size={24} />
-                </div>
-                <div>
-                    <div className="font-bold text-gray-800 text-base mb-0.5">{t('table.action.price_rules')}</div>
-                    <div className="text-xs text-gray-500 font-medium">{t('table.description.price_rules')}</div>
-                </div>
-            </button>
+                <button
+                    className="flex flex-col items-center justify-center text-center p-4 h-32 rounded-lg border transition-all duration-200 gap-2 bg-teal-50/50 hover:bg-teal-50 border-teal-100 hover:border-teal-200 hover:shadow-md active:scale-[0.99]"
+                >
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm bg-teal-100 text-teal-600">
+                        <Percent size={24} />
+                    </div>
+                    <div>
+                        <div className="font-bold text-gray-800 text-base mb-0.5">{t('table.action.price_rules')}</div>
+                        <div className="text-xs text-gray-500 font-medium">{t('table.description.price_rules')}</div>
+                    </div>
+                </button>
+            </EscalatableGate>
         </div>
     );
 

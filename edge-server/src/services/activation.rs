@@ -57,7 +57,7 @@ pub struct ActivationStatus {
     /// 是否已激活
     pub is_activated: bool,
     /// 租户 ID
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<i64>,
     /// 边缘节点 ID
     pub edge_id: Option<String>,
     /// 证书指纹
@@ -236,7 +236,7 @@ impl ActivationService {
                 // P12 字段缺失 → 视为 Missing
                 return Some(P12BlockedInfo {
                     reason: P12BlockedReason::Missing,
-                    tenant_id: cred.binding.tenant_id.clone(),
+                    tenant_id: cred.binding.tenant_id,
                     upload_url: Some(format!("{}/api/p12/upload", self.auth_server_url)),
                     user_message: "p12_missing".to_string(),
                 });
@@ -263,7 +263,7 @@ impl ActivationService {
 
         Some(P12BlockedInfo {
             reason,
-            tenant_id: cred.binding.tenant_id.clone(),
+            tenant_id: cred.binding.tenant_id,
             upload_url: Some(format!("{}/api/p12/upload", self.auth_server_url)),
             user_message: match &p12.has_p12 {
                 false => "p12_missing".to_string(),
@@ -461,7 +461,7 @@ impl ActivationService {
         match credential {
             Some(cred) => Ok(ActivationStatus {
                 is_activated: true,
-                tenant_id: Some(cred.binding.tenant_id.clone()),
+                tenant_id: Some(cred.binding.tenant_id),
                 edge_id: Some(cred.binding.entity_id.clone()),
                 cert_fingerprint: Some(cred.binding.fingerprint.clone()),
                 cert_expires_at: None,
@@ -620,7 +620,7 @@ impl ActivationService {
         };
 
         match self
-            .fetch_subscription_from_auth_server(&credential.binding.tenant_id)
+            .fetch_subscription_from_auth_server(credential.binding.tenant_id)
             .await
         {
             SubscriptionFetchResult::Ok(sub) => {
@@ -652,7 +652,7 @@ impl ActivationService {
                         error
                     );
                     let inactive_sub = SubscriptionInfo {
-                        tenant_id: credential.binding.tenant_id.clone(),
+                        tenant_id: credential.binding.tenant_id,
                         status: SubscriptionStatus::Inactive,
                         signature_valid_until: 0,
                         last_checked_at: shared::util::now_millis(),
@@ -725,7 +725,7 @@ impl ActivationService {
 
     async fn fetch_subscription_from_auth_server(
         &self,
-        _tenant_id: &str,
+        _tenant_id: i64,
     ) -> SubscriptionFetchResult {
         // Use SignedBinding for authentication (no password stored on device)
         let binding = {

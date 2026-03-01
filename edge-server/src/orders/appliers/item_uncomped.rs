@@ -119,7 +119,7 @@ mod tests {
         original_price: f64,
     ) -> CompRecord {
         CompRecord {
-            comp_id: "comp-1".to_string(),
+            comp_id: shared::util::snowflake_id(),
             instance_id: instance_id.to_string(),
             source_instance_id: source_instance_id.to_string(),
             item_name: "Product A".to_string(),
@@ -133,7 +133,7 @@ mod tests {
     }
 
     fn create_item_uncomped_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         instance_id: &str,
         restored_price: f64,
@@ -141,10 +141,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemUncomped,
             EventPayload::ItemUncomped {
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_uncomp_merge_back() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         // Source item (3 remaining after split)
         snapshot
             .items
@@ -179,7 +179,7 @@ mod tests {
             .push(create_comp_record("item-1::comp::uuid-1", "item-1", 10.0));
 
         let event = create_item_uncomped_event(
-            "order-1",
+            1001,
             3,
             "item-1::comp::uuid-1",
             10.0,
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_uncomp_no_merge_restore_price() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         // Full comped item (source == instance)
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 2, true);
         item.original_price = 10.0;
@@ -212,7 +212,7 @@ mod tests {
             .comps
             .push(create_comp_record("item-1", "item-1", 10.0));
 
-        let event = create_item_uncomped_event("order-1", 3, "item-1", 10.0, None);
+        let event = create_item_uncomped_event(1001, 3, "item-1", 10.0, None);
 
         let applier = ItemUncompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_uncomp_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
         item.original_price = 10.0;
         snapshot.items.push(item);
@@ -241,7 +241,7 @@ mod tests {
         snapshot.update_checksum();
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_item_uncomped_event("order-1", 1, "item-1", 10.0, None);
+        let event = create_item_uncomped_event(1001, 1, "item-1", 10.0, None);
 
         let applier = ItemUncompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_uncomp_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
         item.original_price = 10.0;
         snapshot.items.push(item);
@@ -261,7 +261,7 @@ mod tests {
             .push(create_comp_record("item-1", "item-1", 10.0));
         snapshot.last_sequence = 5;
 
-        let event = create_item_uncomped_event("order-1", 6, "item-1", 10.0, None);
+        let event = create_item_uncomped_event(1001, 6, "item-1", 10.0, None);
 
         let applier = ItemUncompedApplier;
         applier.apply(&mut snapshot, &event);

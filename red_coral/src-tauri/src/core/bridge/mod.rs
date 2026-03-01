@@ -95,7 +95,7 @@ impl ClientBridge {
         tenant_manager.load_existing_tenants()?;
 
         // 立即恢复租户选择（同步操作），确保 get_app_state 不会错误返回 ServerNoTenant
-        if let Some(ref tenant_id) = config.current_tenant {
+        if let Some(tenant_id) = config.current_tenant {
             if let Err(e) = tenant_manager.switch_tenant(tenant_id) {
                 tracing::warn!("Failed to restore tenant {}: {}", tenant_id, e);
             }

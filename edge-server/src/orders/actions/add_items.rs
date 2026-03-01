@@ -19,7 +19,7 @@ const MAX_ITEMS_PER_COMMAND: usize = 200;
 /// AddItems action
 #[derive(Debug, Clone)]
 pub struct AddItemsAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub items: Vec<CartItemInput>,
     /// Matched price rules for this order (from cache)
     pub rules: Vec<PriceRule>,
@@ -59,15 +59,15 @@ impl CommandHandler for AddItemsAction {
         }
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status
         match snapshot.status {
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {}
         }
@@ -193,10 +193,10 @@ impl CommandHandler for AddItemsAction {
         // 6. Create event
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::ItemsAdded,
             EventPayload::ItemsAdded {
@@ -217,7 +217,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -252,7 +252,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create and store an active order
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -260,7 +260,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddItemsAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             items: vec![create_cart_item_input(1, "Test Product", 10.0, 2)],
             rules: vec![],
             product_metadata: HashMap::new(),
@@ -272,7 +272,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::ItemsAdded);
 
         if let EventPayload::ItemsAdded { items } = &event.payload {
@@ -294,7 +294,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create a completed order
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -302,7 +302,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddItemsAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             items: vec![create_cart_item_input(1, "Test", 10.0, 1)],
             rules: vec![],
             product_metadata: HashMap::new(),
@@ -322,7 +322,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create a voided order
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -330,7 +330,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddItemsAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             items: vec![create_cart_item_input(1, "Test", 10.0, 1)],
             rules: vec![],
             product_metadata: HashMap::new(),
@@ -352,7 +352,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddItemsAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             items: vec![create_cart_item_input(1, "Test", 10.0, 1)],
             rules: vec![],
             product_metadata: HashMap::new(),
@@ -371,7 +371,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -379,7 +379,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddItemsAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             items: vec![
                 create_cart_item_input(1, "Product A", 10.0, 2),
                 create_cart_item_input(2, "Product B", 15.0, 1),

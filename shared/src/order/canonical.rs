@@ -448,7 +448,7 @@ impl CanonicalHash for CartItemSnapshot {
 
 impl CanonicalHash for PaymentRecord {
     fn canonical_bytes(&self, buf: &mut Vec<u8>) {
-        write_str(buf, &self.payment_id);
+        write_i64(buf, self.payment_id);
         write_str(buf, &self.method);
         write_f64(buf, self.amount);
         write_opt_f64(buf, self.tendered);
@@ -465,7 +465,7 @@ impl CanonicalHash for PaymentRecord {
 
 impl CanonicalHash for CompRecord {
     fn canonical_bytes(&self, buf: &mut Vec<u8>) {
-        write_str(buf, &self.comp_id);
+        write_i64(buf, self.comp_id);
         write_str(buf, &self.instance_id);
         write_str(buf, &self.source_instance_id);
         write_str(buf, &self.item_name);
@@ -644,7 +644,7 @@ impl CanonicalHash for EventPayload {
             } => {
                 write_tag(buf, b"PAYMENT_ADDED");
                 write_sep(buf);
-                write_str(buf, payment_id);
+                write_i64(buf, *payment_id);
                 write_str(buf, method);
                 write_f64(buf, *amount);
                 write_opt_f64(buf, *tendered);
@@ -662,7 +662,7 @@ impl CanonicalHash for EventPayload {
             } => {
                 write_tag(buf, b"PAYMENT_CANCELLED");
                 write_sep(buf);
-                write_str(buf, payment_id);
+                write_i64(buf, *payment_id);
                 write_str(buf, method);
                 write_f64(buf, *amount);
                 write_opt_str(buf, reason);
@@ -680,7 +680,7 @@ impl CanonicalHash for EventPayload {
             } => {
                 write_tag(buf, b"ITEM_SPLIT");
                 write_sep(buf);
-                write_str(buf, payment_id);
+                write_i64(buf, *payment_id);
                 write_f64(buf, *split_amount);
                 write_str(buf, payment_method);
                 write_vec(buf, items);
@@ -697,7 +697,7 @@ impl CanonicalHash for EventPayload {
             } => {
                 write_tag(buf, b"AMOUNT_SPLIT");
                 write_sep(buf);
-                write_str(buf, payment_id);
+                write_i64(buf, *payment_id);
                 write_f64(buf, *split_amount);
                 write_str(buf, payment_method);
                 write_opt_f64(buf, *tendered);
@@ -728,7 +728,7 @@ impl CanonicalHash for EventPayload {
             } => {
                 write_tag(buf, b"AA_SPLIT_PAID");
                 write_sep(buf);
-                write_str(buf, payment_id);
+                write_i64(buf, *payment_id);
                 write_i32(buf, *shares);
                 write_f64(buf, *amount);
                 write_str(buf, payment_method);
@@ -1011,13 +1011,13 @@ impl CanonicalHash for EventPayload {
 
 impl CanonicalHash for super::event::OrderEvent {
     fn canonical_bytes(&self, buf: &mut Vec<u8>) {
-        write_str(buf, &self.event_id);
-        write_str(buf, &self.order_id);
+        write_i64(buf, self.event_id);
+        write_i64(buf, self.order_id);
         write_u64(buf, self.sequence);
         write_i64(buf, self.timestamp);
         write_i64(buf, self.operator_id);
         write_str(buf, &self.operator_name);
-        write_str(buf, &self.command_id);
+        write_i64(buf, self.command_id);
         write_opt_i64(buf, self.client_timestamp);
         self.event_type.canonical_bytes(buf);
         write_sep(buf);
@@ -1025,56 +1025,218 @@ impl CanonicalHash for super::event::OrderEvent {
     }
 }
 
-/// Compute the order chain hash linking orders together.
+// ============================================================================
+// ChainHashable — unified trait for chain_entry hash computation
+// ============================================================================
+
+/// Trait for types that participate in the chain_entry hash chain.
 ///
-/// Hash = SHA256(prev_hash || order_id || receipt_number || status || last_event_hash || total_amount || tax)
-/// All strings are length-prefixed for unambiguous boundary separation.
-/// `total_amount` and `tax` are included to protect against amount tampering.
+/// Each chain entry type (ORDER, CREDIT_NOTE, ANULACION, UPGRADE) implements this trait
+/// to write its tamper-protected fields into a canonical buffer. The chain hash
+/// is then: `SHA256(prev_hash || chain_hashable_bytes)`.
+pub trait ChainHashable {
+    /// Write this entry's protected fields into the buffer.
+    /// Must NOT include prev_hash — that's handled by `compute_chain_hash()`.
+    fn chain_bytes(&self, buf: &mut Vec<u8>);
+}
+
+/// Compute chain hash for any chain entry: `SHA256(prev_hash || entry.chain_bytes())`.
+pub fn compute_chain_hash(prev_hash: &str, entry: &impl ChainHashable) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut buf = Vec::with_capacity(256);
+    write_str(&mut buf, prev_hash);
+    entry.chain_bytes(&mut buf);
+
+    format!("{:x}", Sha256::digest(&buf))
+}
+
+/// Order chain entry data for hash computation.
+pub struct OrderChainData<'a> {
+    pub order_id: i64,
+    pub receipt_number: &'a str,
+    pub status: &'a OrderStatus,
+    pub last_event_hash: &'a str,
+    pub total_amount: f64,
+    pub tax: f64,
+}
+
+impl ChainHashable for OrderChainData<'_> {
+    fn chain_bytes(&self, buf: &mut Vec<u8>) {
+        write_i64(buf, self.order_id);
+        write_str(buf, self.receipt_number);
+        self.status.canonical_bytes(buf);
+        write_str(buf, self.last_event_hash);
+        write_f64(buf, self.total_amount);
+        write_f64(buf, self.tax);
+    }
+}
+
+/// Credit note chain entry data for hash computation.
+pub struct CreditNoteChainData<'a> {
+    pub credit_note_number: &'a str,
+    pub original_receipt: &'a str,
+    pub total_credit: f64,
+    pub tax_credit: f64,
+    pub created_at: i64,
+    pub operator_name: &'a str,
+    pub refund_method: &'a str,
+}
+
+impl ChainHashable for CreditNoteChainData<'_> {
+    fn chain_bytes(&self, buf: &mut Vec<u8>) {
+        write_str(buf, self.credit_note_number);
+        write_str(buf, self.original_receipt);
+        write_f64(buf, self.total_credit);
+        write_f64(buf, self.tax_credit);
+        write_i64(buf, self.created_at);
+        write_str(buf, self.operator_name);
+        write_str(buf, self.refund_method);
+    }
+}
+
+/// Anulación chain entry data for hash computation.
+pub struct AnulacionChainData<'a> {
+    pub anulacion_number: &'a str,
+    pub original_invoice_number: &'a str,
+    pub original_order_pk: i64,
+    pub reason: &'a str,
+    pub created_at: i64,
+    pub operator_name: &'a str,
+}
+
+impl ChainHashable for AnulacionChainData<'_> {
+    fn chain_bytes(&self, buf: &mut Vec<u8>) {
+        write_str(buf, self.anulacion_number);
+        write_str(buf, self.original_invoice_number);
+        write_i64(buf, self.original_order_pk);
+        write_str(buf, self.reason);
+        write_i64(buf, self.created_at);
+        write_str(buf, self.operator_name);
+    }
+}
+
+/// Upgrade (F2→F3 sustitución) chain entry data for hash computation.
+pub struct UpgradeChainData<'a> {
+    pub invoice_number: &'a str,
+    pub original_invoice_number: &'a str,
+    pub original_order_pk: i64,
+    pub total_amount: f64,
+    pub tax: f64,
+    pub created_at: i64,
+    pub operator_name: &'a str,
+}
+
+impl ChainHashable for UpgradeChainData<'_> {
+    fn chain_bytes(&self, buf: &mut Vec<u8>) {
+        write_str(buf, self.invoice_number);
+        write_str(buf, self.original_invoice_number);
+        write_i64(buf, self.original_order_pk);
+        write_f64(buf, self.total_amount);
+        write_f64(buf, self.tax);
+        write_i64(buf, self.created_at);
+        write_str(buf, self.operator_name);
+    }
+}
+
+// ── Legacy wrappers (delegate to ChainHashable) ──
+
+/// Compute the order chain hash. Delegates to `ChainHashable`.
 pub fn compute_order_chain_hash(
     prev_hash: &str,
-    order_id: &str,
+    order_id: i64,
     receipt_number: &str,
     status: &OrderStatus,
     last_event_hash: &str,
     total_amount: f64,
     tax: f64,
 ) -> String {
-    use sha2::{Digest, Sha256};
-
-    let mut buf = Vec::with_capacity(256);
-    write_str(&mut buf, prev_hash);
-    write_str(&mut buf, order_id);
-    write_str(&mut buf, receipt_number);
-    status.canonical_bytes(&mut buf);
-    write_str(&mut buf, last_event_hash);
-    write_f64(&mut buf, total_amount);
-    write_f64(&mut buf, tax);
-
-    format!("{:x}", Sha256::digest(&buf))
+    compute_chain_hash(
+        prev_hash,
+        &OrderChainData {
+            order_id,
+            receipt_number,
+            status,
+            last_event_hash,
+            total_amount,
+            tax,
+        },
+    )
 }
 
-/// Compute the chain hash for a credit note entry.
-///
-/// Hash = SHA256(prev_hash || credit_note_number || original_receipt || total_credit || tax_credit)
-/// All strings are length-prefixed for unambiguous boundary separation.
-/// `tax_credit` is included to protect against tax amount tampering.
+/// Compute the credit note chain hash. Delegates to `ChainHashable`.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_credit_note_chain_hash(
     prev_hash: &str,
     credit_note_number: &str,
     original_receipt: &str,
     total_credit: f64,
     tax_credit: f64,
+    created_at: i64,
+    operator_name: &str,
+    refund_method: &str,
 ) -> String {
-    use sha2::{Digest, Sha256};
+    compute_chain_hash(
+        prev_hash,
+        &CreditNoteChainData {
+            credit_note_number,
+            original_receipt,
+            total_credit,
+            tax_credit,
+            created_at,
+            operator_name,
+            refund_method,
+        },
+    )
+}
 
-    let mut buf = Vec::with_capacity(256);
-    write_str(&mut buf, prev_hash);
-    write_str(&mut buf, credit_note_number);
-    write_str(&mut buf, original_receipt);
-    write_f64(&mut buf, total_credit);
-    write_f64(&mut buf, tax_credit);
+/// Compute the anulación chain hash. Delegates to `ChainHashable`.
+pub fn compute_anulacion_chain_hash(
+    prev_hash: &str,
+    anulacion_number: &str,
+    original_invoice_number: &str,
+    original_order_pk: i64,
+    reason: &str,
+    created_at: i64,
+    operator_name: &str,
+) -> String {
+    compute_chain_hash(
+        prev_hash,
+        &AnulacionChainData {
+            anulacion_number,
+            original_invoice_number,
+            original_order_pk,
+            reason,
+            created_at,
+            operator_name,
+        },
+    )
+}
 
-    format!("{:x}", Sha256::digest(&buf))
+/// Compute the upgrade (F2→F3) chain hash. Delegates to `ChainHashable`.
+#[allow(clippy::too_many_arguments)]
+pub fn compute_upgrade_chain_hash(
+    prev_hash: &str,
+    invoice_number: &str,
+    original_invoice_number: &str,
+    original_order_pk: i64,
+    total_amount: f64,
+    tax: f64,
+    created_at: i64,
+    operator_name: &str,
+) -> String {
+    compute_chain_hash(
+        prev_hash,
+        &UpgradeChainData {
+            invoice_number,
+            original_invoice_number,
+            original_order_pk,
+            total_amount,
+            tax,
+            created_at,
+            operator_name,
+        },
+    )
 }
 
 /// Compute the event hash for tamper-proof verification.
@@ -1179,7 +1341,7 @@ mod tests {
 
     fn full_payment_record() -> PaymentRecord {
         PaymentRecord {
-            payment_id: "pay-1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: 50.0,
             tendered: Some(60.0),
@@ -1330,7 +1492,7 @@ mod tests {
             (
                 "PaymentAdded",
                 EventPayload::PaymentAdded {
-                    payment_id: "pay-1".to_string(),
+                    payment_id: 100001,
                     method: "cash".to_string(),
                     amount: 50.0,
                     tendered: Some(60.0),
@@ -1341,7 +1503,7 @@ mod tests {
             (
                 "PaymentCancelled",
                 EventPayload::PaymentCancelled {
-                    payment_id: "pay-1".to_string(),
+                    payment_id: 100001,
                     method: "cash".to_string(),
                     amount: 50.0,
                     reason: Some("customer changed mind".to_string()),
@@ -1352,7 +1514,7 @@ mod tests {
             (
                 "ItemSplit",
                 EventPayload::ItemSplit {
-                    payment_id: "pay-split-1".to_string(),
+                    payment_id: 100002,
                     split_amount: 25.0,
                     payment_method: "card".to_string(),
                     items: vec![SplitItem {
@@ -1368,7 +1530,7 @@ mod tests {
             (
                 "AmountSplit",
                 EventPayload::AmountSplit {
-                    payment_id: "pay-amount-1".to_string(),
+                    payment_id: 100003,
                     split_amount: 33.33,
                     payment_method: "card".to_string(),
                     tendered: Some(35.0),
@@ -1386,7 +1548,7 @@ mod tests {
             (
                 "AaSplitPaid",
                 EventPayload::AaSplitPaid {
-                    payment_id: "pay-aa-1".to_string(),
+                    payment_id: 100004,
                     shares: 1,
                     amount: 33.33,
                     payment_method: "cash".to_string(),
@@ -1642,7 +1804,7 @@ mod tests {
         // -0.0 is normalized to 0.0 in write_f64 to ensure JSON roundtrip stability
         // (serde_json serializes -0.0 as "0" which deserializes to 0.0)
         let p_pos = EventPayload::PaymentAdded {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: 0.0,
             tendered: None,
@@ -1650,7 +1812,7 @@ mod tests {
             note: None,
         };
         let p_neg = EventPayload::PaymentAdded {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: -0.0,
             tendered: None,
@@ -1669,7 +1831,7 @@ mod tests {
     fn test_f64_negative_zero_json_roundtrip() {
         // Verify that -0.0 survives JSON roundtrip (serde_json normalizes it to 0.0)
         let payload = EventPayload::PaymentAdded {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: -0.0,
             tendered: None,
@@ -1690,7 +1852,7 @@ mod tests {
     fn test_f64_zero_roundtrip_stable() {
         // Crucially, 0.0 survives JSON roundtrip as 0.0 (not -0.0)
         let payload = EventPayload::PaymentAdded {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: 0.0,
             tendered: None,
@@ -1705,7 +1867,7 @@ mod tests {
         // Common money edge cases
         for amount in [0.01, 0.001, 0.1, 1.0, 9.99, 99.99, 999.99, 0.0] {
             let payload = EventPayload::PaymentAdded {
-                payment_id: "p1".to_string(),
+                payment_id: 100001,
                 method: "cash".to_string(),
                 amount,
                 tendered: None,
@@ -1820,7 +1982,7 @@ mod tests {
     #[test]
     fn test_golden_payment_added() {
         let payload = EventPayload::PaymentAdded {
-            payment_id: "pay-001".to_string(),
+            payment_id: 100005,
             method: "cash".to_string(),
             amount: 100.0,
             tendered: Some(120.0),
@@ -1830,7 +1992,7 @@ mod tests {
 
         let hash = canonical_sha256(&payload);
         assert_eq!(
-            hash, "7c88ca889bc1417441aa802f39ec69c1c3fd3240313376502acb5a37b4d3a3f1",
+            hash, "c0170286deed99d5b0cefd5368aac83d4477db493d3a3d95220bb84fd2b910ae",
             "Golden hash mismatch — canonical encoding changed!"
         );
     }
@@ -1916,7 +2078,7 @@ mod tests {
             authorizer_name: Some("Manager".to_string()),
         };
         let cancelled = EventPayload::PaymentCancelled {
-            payment_id: "x".to_string(),
+            payment_id: 100001,
             method: "x".to_string(),
             amount: 0.0,
             reason: None,
@@ -1970,7 +2132,7 @@ mod tests {
     #[test]
     fn test_item_split_vs_amount_split_different_hash() {
         let item_split = EventPayload::ItemSplit {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             split_amount: 50.0,
             payment_method: "cash".to_string(),
             items: vec![],
@@ -1978,7 +2140,7 @@ mod tests {
             change: None,
         };
         let amount_split = EventPayload::AmountSplit {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             split_amount: 50.0,
             payment_method: "cash".to_string(),
             tendered: None,
@@ -2047,7 +2209,7 @@ mod tests {
     #[test]
     fn test_canonical_none_vs_some_different() {
         let p_none = EventPayload::PaymentAdded {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: 50.0,
             tendered: None,
@@ -2055,7 +2217,7 @@ mod tests {
             note: None,
         };
         let p_some = EventPayload::PaymentAdded {
-            payment_id: "p1".to_string(),
+            payment_id: 100001,
             method: "cash".to_string(),
             amount: 50.0,
             tendered: Some(50.0),
@@ -2151,14 +2313,14 @@ mod tests {
         event_type: OrderEventType,
     ) -> crate::order::event::OrderEvent {
         crate::order::event::OrderEvent {
-            event_id: "evt-001".to_string(),
+            event_id: 200001,
             sequence: 1,
-            order_id: "ord-001".to_string(),
+            order_id: 200002,
             timestamp: 1700000000000,
             client_timestamp: Some(1699999999000),
             operator_id: 42,
             operator_name: "Camarero".to_string(),
-            command_id: "cmd-001".to_string(),
+            command_id: 200003,
             event_type,
             payload,
         }
@@ -2208,7 +2370,7 @@ mod tests {
     fn test_order_event_json_roundtrip() {
         let event = make_test_event(
             EventPayload::PaymentAdded {
-                payment_id: "pay-1".to_string(),
+                payment_id: 100001,
                 method: "cash".to_string(),
                 amount: 50.0,
                 tendered: Some(60.0),
@@ -2252,7 +2414,7 @@ mod tests {
         );
         // Pin the golden value
         assert_eq!(
-            hash, "9e7df918610c8f7f82993a99bebc2cf1980241a4c06b0406a32e12b8e6497b4a",
+            hash, "dca1c8432ea2b59169e4dc6ee64c1daff842535751c8045fad0a17c760996a71",
             "OrderEvent golden hash changed — canonical encoding broke!"
         );
     }
@@ -2261,7 +2423,7 @@ mod tests {
     fn test_compute_order_chain_hash_deterministic() {
         let h1 = compute_order_chain_hash(
             "prev",
-            "ord-1",
+            300001,
             "R-001",
             &OrderStatus::Completed,
             "last_evt",
@@ -2270,7 +2432,7 @@ mod tests {
         );
         let h2 = compute_order_chain_hash(
             "prev",
-            "ord-1",
+            300001,
             "R-001",
             &OrderStatus::Completed,
             "last_evt",
@@ -2284,7 +2446,7 @@ mod tests {
     fn test_compute_order_chain_hash_golden() {
         let hash = compute_order_chain_hash(
             "genesis",
-            "ord-001",
+            300002,
             "R-20240101-001",
             &OrderStatus::Completed,
             "abc123def456",
@@ -2295,7 +2457,7 @@ mod tests {
         assert!(!hash.is_empty());
         let hash2 = compute_order_chain_hash(
             "genesis",
-            "ord-001",
+            300002,
             "R-20240101-001",
             &OrderStatus::Completed,
             "abc123def456",
@@ -2309,7 +2471,7 @@ mod tests {
     fn test_compute_order_chain_hash_different_status() {
         let h_completed = compute_order_chain_hash(
             "prev",
-            "ord-1",
+            300001,
             "R-001",
             &OrderStatus::Completed,
             "last",
@@ -2318,7 +2480,7 @@ mod tests {
         );
         let h_voided = compute_order_chain_hash(
             "prev",
-            "ord-1",
+            300001,
             "R-001",
             &OrderStatus::Void,
             "last",
@@ -2335,7 +2497,7 @@ mod tests {
     fn test_compute_order_chain_hash_different_amount() {
         let h1 = compute_order_chain_hash(
             "prev",
-            "ord-1",
+            300001,
             "R-001",
             &OrderStatus::Completed,
             "last",
@@ -2344,7 +2506,7 @@ mod tests {
         );
         let h2 = compute_order_chain_hash(
             "prev",
-            "ord-1",
+            300001,
             "R-001",
             &OrderStatus::Completed,
             "last",
@@ -2372,5 +2534,427 @@ mod tests {
             canonical_sha256(&event2),
             "client_timestamp None vs Some(0) must differ"
         );
+    }
+
+    // ========================================================================
+    // Chain hash tests: all 4 entry types
+    // ========================================================================
+
+    #[test]
+    fn test_compute_upgrade_chain_hash_deterministic() {
+        let h1 = compute_upgrade_chain_hash(
+            "prev",
+            "INV20260101-0001",
+            "INV20260101-0002",
+            1001,
+            121.0,
+            21.0,
+            1700000000000,
+            "op",
+        );
+        let h2 = compute_upgrade_chain_hash(
+            "prev",
+            "INV20260101-0001",
+            "INV20260101-0002",
+            1001,
+            121.0,
+            21.0,
+            1700000000000,
+            "op",
+        );
+        assert_eq!(h1, h2, "same inputs must produce same hash");
+        assert_eq!(h1.len(), 64, "SHA-256 hex = 64 chars");
+    }
+
+    #[test]
+    fn test_compute_upgrade_chain_hash_field_sensitivity() {
+        let base = || {
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV002",
+                1001,
+                121.0,
+                21.0,
+                1700000000000,
+                "op",
+            )
+        };
+        let b = base();
+
+        // Each field change must produce a different hash
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "other_prev",
+                "INV001",
+                "INV002",
+                1001,
+                121.0,
+                21.0,
+                1700000000000,
+                "op",
+            ),
+            "prev_hash"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV999",
+                "INV002",
+                1001,
+                121.0,
+                21.0,
+                1700000000000,
+                "op",
+            ),
+            "invoice_number"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV999",
+                1001,
+                121.0,
+                21.0,
+                1700000000000,
+                "op",
+            ),
+            "original_invoice_number"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV002",
+                9999,
+                121.0,
+                21.0,
+                1700000000000,
+                "op",
+            ),
+            "original_order_pk"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV002",
+                1001,
+                999.0,
+                21.0,
+                1700000000000,
+                "op",
+            ),
+            "total_amount"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV002",
+                1001,
+                121.0,
+                99.0,
+                1700000000000,
+                "op",
+            ),
+            "tax"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV002",
+                1001,
+                121.0,
+                21.0,
+                9999999999999,
+                "op",
+            ),
+            "created_at"
+        );
+        assert_ne!(
+            b,
+            compute_upgrade_chain_hash(
+                "prev",
+                "INV001",
+                "INV002",
+                1001,
+                121.0,
+                21.0,
+                1700000000000,
+                "other_op",
+            ),
+            "operator_name"
+        );
+    }
+
+    #[test]
+    fn test_credit_note_chain_hash_deterministic() {
+        let h1 = compute_credit_note_chain_hash(
+            "prev",
+            "CN-001",
+            "FAC001",
+            50.0,
+            10.5,
+            1700000000000,
+            "op",
+            "cash",
+        );
+        let h2 = compute_credit_note_chain_hash(
+            "prev",
+            "CN-001",
+            "FAC001",
+            50.0,
+            10.5,
+            1700000000000,
+            "op",
+            "cash",
+        );
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_credit_note_chain_hash_field_sensitivity() {
+        let base = || {
+            compute_credit_note_chain_hash(
+                "prev",
+                "CN-001",
+                "FAC001",
+                50.0,
+                10.5,
+                1700000000000,
+                "op",
+                "cash",
+            )
+        };
+        let b = base();
+
+        assert_ne!(
+            b,
+            compute_credit_note_chain_hash(
+                "prev",
+                "CN-002",
+                "FAC001",
+                50.0,
+                10.5,
+                1700000000000,
+                "op",
+                "cash",
+            ),
+            "credit_note_number"
+        );
+        assert_ne!(
+            b,
+            compute_credit_note_chain_hash(
+                "prev",
+                "CN-001",
+                "FAC999",
+                50.0,
+                10.5,
+                1700000000000,
+                "op",
+                "cash",
+            ),
+            "original_receipt"
+        );
+        assert_ne!(
+            b,
+            compute_credit_note_chain_hash(
+                "prev",
+                "CN-001",
+                "FAC001",
+                99.0,
+                10.5,
+                1700000000000,
+                "op",
+                "cash",
+            ),
+            "total_credit"
+        );
+        assert_ne!(
+            b,
+            compute_credit_note_chain_hash(
+                "prev",
+                "CN-001",
+                "FAC001",
+                50.0,
+                99.0,
+                1700000000000,
+                "op",
+                "cash",
+            ),
+            "tax_credit"
+        );
+        assert_ne!(
+            b,
+            compute_credit_note_chain_hash(
+                "prev",
+                "CN-001",
+                "FAC001",
+                50.0,
+                10.5,
+                1700000000000,
+                "op",
+                "card",
+            ),
+            "refund_method"
+        );
+    }
+
+    #[test]
+    fn test_anulacion_chain_hash_deterministic() {
+        let h1 = compute_anulacion_chain_hash(
+            "prev",
+            "ANU-001",
+            "INV-001",
+            1001,
+            "QUALITY",
+            1700000000000,
+            "op",
+        );
+        let h2 = compute_anulacion_chain_hash(
+            "prev",
+            "ANU-001",
+            "INV-001",
+            1001,
+            "QUALITY",
+            1700000000000,
+            "op",
+        );
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_anulacion_chain_hash_field_sensitivity() {
+        let base = || {
+            compute_anulacion_chain_hash(
+                "prev",
+                "ANU-001",
+                "INV-001",
+                1001,
+                "QUALITY",
+                1700000000000,
+                "op",
+            )
+        };
+        let b = base();
+
+        assert_ne!(
+            b,
+            compute_anulacion_chain_hash(
+                "prev",
+                "ANU-002",
+                "INV-001",
+                1001,
+                "QUALITY",
+                1700000000000,
+                "op",
+            ),
+            "anulacion_number"
+        );
+        assert_ne!(
+            b,
+            compute_anulacion_chain_hash(
+                "prev",
+                "ANU-001",
+                "INV-999",
+                1001,
+                "QUALITY",
+                1700000000000,
+                "op",
+            ),
+            "original_invoice_number"
+        );
+        assert_ne!(
+            b,
+            compute_anulacion_chain_hash(
+                "prev",
+                "ANU-001",
+                "INV-001",
+                1001,
+                "OTHER_REASON",
+                1700000000000,
+                "op",
+            ),
+            "reason"
+        );
+    }
+
+    #[test]
+    fn test_all_chain_types_produce_unique_hashes() {
+        // Same prev_hash but different entry types must produce different hashes
+        let prev = "genesis";
+        let order = compute_order_chain_hash(
+            prev,
+            1,
+            "FAC001",
+            &OrderStatus::Completed,
+            "evhash",
+            100.0,
+            21.0,
+        );
+        let credit = compute_credit_note_chain_hash(
+            prev,
+            "CN-001",
+            "FAC001",
+            100.0,
+            21.0,
+            1700000000000,
+            "op",
+            "cash",
+        );
+        let anulacion = compute_anulacion_chain_hash(
+            prev,
+            "ANU-001",
+            "INV-001",
+            1,
+            "QUALITY",
+            1700000000000,
+            "op",
+        );
+        let upgrade = compute_upgrade_chain_hash(
+            prev,
+            "INV-002",
+            "INV-001",
+            1,
+            100.0,
+            21.0,
+            1700000000000,
+            "op",
+        );
+
+        let hashes = [&order, &credit, &anulacion, &upgrade];
+        for (i, a) in hashes.iter().enumerate() {
+            for (j, b) in hashes.iter().enumerate() {
+                if i != j {
+                    assert_ne!(a, b, "chain types {i} and {j} must have different hashes");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_chain_hash_genesis_works() {
+        // "genesis" as prev_hash is the standard bootstrap value
+        let h = compute_order_chain_hash(
+            "genesis",
+            1,
+            "FAC001",
+            &OrderStatus::Completed,
+            "evhash",
+            100.0,
+            21.0,
+        );
+        assert_eq!(h.len(), 64);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }

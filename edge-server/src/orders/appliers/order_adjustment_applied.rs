@@ -97,8 +97,8 @@ mod tests {
         }
     }
 
-    fn create_test_snapshot(order_id: &str, items: Vec<CartItemSnapshot>) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_test_snapshot(order_id: i64, items: Vec<CartItemSnapshot>) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.items = items;
         recalculate_totals(&mut snapshot);
@@ -106,7 +106,7 @@ mod tests {
     }
 
     fn create_discount_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         discount_percent: Option<f64>,
         discount_fixed: Option<f64>,
@@ -115,10 +115,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderDiscountApplied,
             EventPayload::OrderDiscountApplied {
@@ -136,17 +136,17 @@ mod tests {
     }
 
     fn create_surcharge_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         surcharge_amount: Option<f64>,
         previous_surcharge_amount: Option<f64>,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderSurchargeApplied,
             EventPayload::OrderSurchargeApplied {
@@ -169,11 +169,11 @@ mod tests {
 
     #[test]
     fn test_apply_percentage_discount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         assert_eq!(snapshot.total, 100.0);
         assert_eq!(snapshot.order_manual_discount_percent, None);
 
-        let event = create_discount_event("order-1", 2, Some(10.0), None, None, None);
+        let event = create_discount_event(1001, 2, Some(10.0), None, None, None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -189,9 +189,9 @@ mod tests {
 
     #[test]
     fn test_apply_fixed_discount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
 
-        let event = create_discount_event("order-1", 2, None, Some(25.0), None, None);
+        let event = create_discount_event(1001, 2, None, Some(25.0), None, None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -205,12 +205,12 @@ mod tests {
 
     #[test]
     fn test_clear_discount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         snapshot.order_manual_discount_percent = Some(10.0);
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 90.0);
 
-        let event = create_discount_event("order-1", 2, None, None, Some(10.0), None);
+        let event = create_discount_event(1001, 2, None, None, Some(10.0), None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -223,13 +223,13 @@ mod tests {
 
     #[test]
     fn test_replace_percent_with_fixed() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(200.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(200.0, 1)]);
         snapshot.order_manual_discount_percent = Some(10.0);
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 180.0);
 
         // Replace 10% with fixed 50
-        let event = create_discount_event("order-1", 2, None, Some(50.0), Some(10.0), None);
+        let event = create_discount_event(1001, 2, None, Some(50.0), Some(10.0), None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -242,10 +242,10 @@ mod tests {
 
     #[test]
     fn test_discount_updates_checksum() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_discount_event("order-1", 2, Some(10.0), None, None, None);
+        let event = create_discount_event(1001, 2, Some(10.0), None, None, None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -257,7 +257,7 @@ mod tests {
     #[test]
     fn test_discount_with_multiple_items() {
         let mut snapshot = create_test_snapshot(
-            "order-1",
+            1001,
             vec![create_test_item(50.0, 2), create_test_item(30.0, 3)],
         );
         // subtotal = 50*2 + 30*3 = 100 + 90 = 190
@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(snapshot.total, 190.0);
 
         // 10% discount
-        let event = create_discount_event("order-1", 2, Some(10.0), None, None, None);
+        let event = create_discount_event(1001, 2, Some(10.0), None, None, None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -277,13 +277,13 @@ mod tests {
 
     #[test]
     fn test_discount_with_paid_amount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         snapshot.paid_amount = 30.0;
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.remaining_amount, 70.0);
 
         // Apply 10% discount: total = 90, remaining = 90 - 30 = 60
-        let event = create_discount_event("order-1", 2, Some(10.0), None, None, None);
+        let event = create_discount_event(1001, 2, Some(10.0), None, None, None);
 
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -298,10 +298,10 @@ mod tests {
 
     #[test]
     fn test_apply_surcharge() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         assert_eq!(snapshot.total, 100.0);
 
-        let event = create_surcharge_event("order-1", 2, Some(15.0), None);
+        let event = create_surcharge_event(1001, 2, Some(15.0), None);
 
         let applier = OrderSurchargeAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -315,12 +315,12 @@ mod tests {
 
     #[test]
     fn test_clear_surcharge() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         snapshot.order_manual_surcharge_fixed = Some(15.0);
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 115.0);
 
-        let event = create_surcharge_event("order-1", 2, None, Some(15.0));
+        let event = create_surcharge_event(1001, 2, None, Some(15.0));
 
         let applier = OrderSurchargeAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -331,10 +331,10 @@ mod tests {
 
     #[test]
     fn test_surcharge_updates_checksum() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_surcharge_event("order-1", 2, Some(10.0), None);
+        let event = create_surcharge_event(1001, 2, Some(10.0), None);
 
         let applier = OrderSurchargeAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -345,11 +345,11 @@ mod tests {
 
     #[test]
     fn test_surcharge_with_paid_amount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         snapshot.paid_amount = 50.0;
         recalculate_totals(&mut snapshot);
 
-        let event = create_surcharge_event("order-1", 2, Some(20.0), None);
+        let event = create_surcharge_event(1001, 2, Some(20.0), None);
 
         let applier = OrderSurchargeAppliedApplier;
         applier.apply(&mut snapshot, &event);
@@ -364,18 +364,18 @@ mod tests {
 
     #[test]
     fn test_discount_and_surcharge_coexist() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 2)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 2)]);
         // subtotal = 200
 
         // 先加附加费
-        let surcharge_event = create_surcharge_event("order-1", 2, Some(20.0), None);
+        let surcharge_event = create_surcharge_event(1001, 2, Some(20.0), None);
         let surcharge_applier = OrderSurchargeAppliedApplier;
         surcharge_applier.apply(&mut snapshot, &surcharge_event);
 
         assert_eq!(snapshot.total, 220.0); // 200 + 20
 
         // 再加 10% 折扣
-        let discount_event = create_discount_event("order-1", 3, Some(10.0), None, None, None);
+        let discount_event = create_discount_event(1001, 3, Some(10.0), None, None, None);
         let discount_applier = OrderDiscountAppliedApplier;
         discount_applier.apply(&mut snapshot, &discount_event);
 
@@ -387,13 +387,13 @@ mod tests {
 
     #[test]
     fn test_surcharge_with_existing_discount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         snapshot.order_manual_discount_fixed = Some(10.0);
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 90.0); // 100 - 10
 
         // 加附加费
-        let event = create_surcharge_event("order-1", 2, Some(25.0), None);
+        let event = create_surcharge_event(1001, 2, Some(25.0), None);
         let applier = OrderSurchargeAppliedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -403,13 +403,13 @@ mod tests {
 
     #[test]
     fn test_replace_surcharge_amount() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         snapshot.order_manual_surcharge_fixed = Some(10.0);
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 110.0);
 
         // 替换为更大的附加费
-        let event = create_surcharge_event("order-1", 2, Some(30.0), Some(10.0));
+        let event = create_surcharge_event(1001, 2, Some(30.0), Some(10.0));
         let applier = OrderSurchargeAppliedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -419,14 +419,14 @@ mod tests {
 
     #[test]
     fn test_discount_with_rule_surcharge() {
-        let mut snapshot = create_test_snapshot("order-1", vec![create_test_item(100.0, 1)]);
+        let mut snapshot = create_test_snapshot(1001, vec![create_test_item(100.0, 1)]);
         // 模拟规则附加费
         snapshot.order_rule_surcharge_amount = 8.0;
         recalculate_totals(&mut snapshot);
         assert_eq!(snapshot.total, 108.0); // 100 + 8
 
         // 加 10% 手动折扣
-        let event = create_discount_event("order-1", 2, Some(10.0), None, None, None);
+        let event = create_discount_event(1001, 2, Some(10.0), None, None, None);
         let applier = OrderDiscountAppliedApplier;
         applier.apply(&mut snapshot, &event);
 

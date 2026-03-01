@@ -11,7 +11,6 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrderDetail {
     pub order_id: i64,
-    pub order_key: String,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
@@ -35,6 +34,8 @@ pub struct OrderDetail {
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
     pub queue_number: Option<i32>,
+    pub is_anulada: bool,
+    pub is_upgraded: bool,
     pub items: Vec<OrderDetailItem>,
     pub payments: Vec<OrderDetailPayment>,
     pub timeline: Vec<OrderDetailEvent>,
@@ -101,9 +102,10 @@ pub struct OrderDetailEvent {
 
 // Internal FromRow types for sqlx (sqlx tuples max 16 fields)
 #[derive(sqlx::FromRow)]
+#[allow(dead_code)]
 struct OrderRow {
     id: i64,
-    order_key: String,
+    order_id: i64,
     receipt_number: String,
     table_name: Option<String>,
     zone_name: Option<String>,
@@ -127,6 +129,8 @@ struct OrderRow {
     loss_amount: Option<f64>,
     void_note: Option<String>,
     queue_number: Option<i32>,
+    is_anulada: bool,
+    is_upgraded: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -183,7 +187,7 @@ struct ItemRow {
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
     let order: OrderRow = sqlx::query_as::<_, OrderRow>(
-        "SELECT id, order_key, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number FROM archived_order WHERE id = ?",
+        "SELECT id, order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_anulada, is_upgraded FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -298,8 +302,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
     .collect();
 
     Ok(OrderDetail {
-        order_id: order.id,
-        order_key: order.order_key,
+        order_id: order.order_id,
         receipt_number: order.receipt_number,
         table_name: order.table_name,
         zone_name: order.zone_name,
@@ -323,6 +326,8 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         loss_amount: order.loss_amount,
         void_note: order.void_note,
         queue_number: order.queue_number,
+        is_anulada: order.is_anulada,
+        is_upgraded: order.is_upgraded,
         items,
         payments,
         timeline,
@@ -356,6 +361,33 @@ pub async fn mark_cloud_synced(pool: &SqlitePool, ids: &[i64]) -> RepoResult<()>
     Ok(())
 }
 
+/// Slim down ITEMS_ADDED event data for cloud sync.
+///
+/// The raw event data contains full item snapshots (~1.5 KB each) with runtime fields
+/// (instance_id, attribute_id, selected_specification, applied_rules, etc.) that are
+/// redundant with the top-level `items` array. This reduces each to ~60 bytes by keeping
+/// only `{name, quantity, price}` — sufficient for audit timeline display.
+fn slim_items_added_data(data: &Option<String>) -> Option<String> {
+    let raw = data.as_deref()?;
+    let parsed: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let items = parsed.get("items")?.as_array()?;
+    let slim_items: Vec<serde_json::Value> = items
+        .iter()
+        .filter_map(|item| {
+            Some(serde_json::json!({
+                "name": item.get("name")?,
+                "quantity": item.get("quantity")?,
+                "price": item.get("price")?,
+            }))
+        })
+        .collect();
+    serde_json::to_string(&serde_json::json!({
+        "type": "ITEMS_ADDED",
+        "items": slim_items,
+    }))
+    .ok()
+}
+
 /// Build full OrderDetailSync from archived tables for cloud sync
 pub async fn build_order_detail_sync(
     pool: &SqlitePool,
@@ -369,7 +401,7 @@ pub async fn build_order_detail_sync(
     // 1. Query archived_order JOIN chain_entry for hash data
     #[derive(sqlx::FromRow)]
     struct SyncOrderRow {
-        order_key: String,
+        order_id: i64,
         receipt_number: String,
         status: String,
         total_amount: f64,
@@ -403,7 +435,7 @@ pub async fn build_order_detail_sync(
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
-        "SELECT ao.order_key, ao.receipt_number, ao.status, ao.total_amount, ao.tax, ao.end_time, \
+        "SELECT ao.order_id, ao.receipt_number, ao.status, ao.total_amount, ao.tax, ao.end_time, \
          ce.prev_hash, ce.curr_hash, ao.created_at, ao.zone_name, ao.table_name, ao.is_retail, ao.guest_count, \
          ao.original_total, ao.subtotal, ao.paid_amount, ao.discount_amount, ao.surcharge_amount, \
          ao.comp_total_amount, ao.order_manual_discount_amount, ao.order_manual_surcharge_amount, \
@@ -453,7 +485,7 @@ pub async fn build_order_detail_sync(
     if item_rows.is_empty() && order.cloud_synced {
         return Err(RepoError::NotFound(format!(
             "Order {} detail already cleaned (cloud_synced), use cloud copy",
-            order.order_key
+            order.order_id
         )));
     }
 
@@ -535,13 +567,22 @@ pub async fn build_order_detail_sync(
     .into_iter()
     .map(
         |(seq, event_type, timestamp, operator_id, operator_name, data)| {
+            // Slim down ITEMS_ADDED event data for cloud sync:
+            // Full snapshots contain runtime fields (instance_id, attribute_id, etc.)
+            // that are redundant with the top-level items array.
+            // Keep only {name, quantity, price} per item for audit/timeline display.
+            let slim_data = if event_type == "ITEMS_ADDED" {
+                slim_items_added_data(&data)
+            } else {
+                data
+            };
             shared::cloud::OrderEventSync {
                 seq,
                 event_type,
                 timestamp,
                 operator_id,
                 operator_name,
-                data,
+                data: slim_data,
             }
         },
     )
@@ -601,7 +642,7 @@ pub async fn build_order_detail_sync(
         .collect();
 
     Ok(OrderDetailSync {
-        order_key: order.order_key,
+        order_id: order.order_id,
         receipt_number: order.receipt_number,
         status: order.status,
         total_amount: order.total_amount,
@@ -724,7 +765,7 @@ pub struct ArchivedItemsAddedEvent {
 /// Archived order metadata for rebuilding kitchen orders
 #[derive(Debug, sqlx::FromRow)]
 pub struct ArchivedOrderMeta {
-    pub order_key: String,
+    pub order_id: i64,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
@@ -732,16 +773,16 @@ pub struct ArchivedOrderMeta {
     pub queue_number: Option<i32>,
 }
 
-/// Get ITEMS_ADDED events for an archived order by order_key (UUID)
-pub async fn get_items_added_events_by_order_key(
+/// Get ITEMS_ADDED events for an archived order by order_id (snowflake i64)
+pub async fn get_items_added_events_by_order_id(
     pool: &SqlitePool,
-    order_key: &str,
+    order_id: i64,
 ) -> RepoResult<(Option<ArchivedOrderMeta>, Vec<ArchivedItemsAddedEvent>)> {
-    // 1. Find order pk and metadata by order_key
+    // 1. Find order pk and metadata by order_id
     let meta = sqlx::query_as::<_, ArchivedOrderMeta>(
-        "SELECT order_key, receipt_number, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE order_key = ?",
+        "SELECT order_id, receipt_number, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE order_id = ?",
     )
-    .bind(order_key)
+    .bind(order_id)
     .fetch_optional(pool)
     .await?;
 
@@ -749,11 +790,10 @@ pub async fn get_items_added_events_by_order_key(
         return Ok((None, vec![]));
     };
 
-    let order_pk =
-        sqlx::query_scalar::<_, i64>("SELECT id FROM archived_order WHERE order_key = ?")
-            .bind(order_key)
-            .fetch_one(pool)
-            .await?;
+    let order_pk = sqlx::query_scalar::<_, i64>("SELECT id FROM archived_order WHERE order_id = ?")
+        .bind(order_id)
+        .fetch_one(pool)
+        .await?;
 
     // 2. Get ITEMS_ADDED events
     let events = sqlx::query_as::<_, ArchivedItemsAddedEvent>(

@@ -256,17 +256,15 @@ pub async fn upload_p12(
 #[tauri::command]
 pub async fn get_current_tenant(
     bridge: State<'_, Arc<ClientBridge>>,
-) -> Result<ApiResponse<Option<String>>, String> {
+) -> Result<ApiResponse<Option<i64>>, String> {
     let tenant_manager = bridge.tenant_manager().read().await;
-    Ok(ApiResponse::success(
-        tenant_manager.current_tenant_id().map(|s| s.to_string()),
-    ))
+    Ok(ApiResponse::success(tenant_manager.current_tenant_id()))
 }
 
 /// 租户详情 (设置页面展示用)
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TenantDetails {
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub mode: Option<String>,
     pub device_id: String,
     pub entity_id: Option<String>,
@@ -321,7 +319,7 @@ pub async fn get_tenant_details(
     let mode_info = bridge.get_mode_info().await;
 
     let tenant_id = match tenant_manager.current_tenant_id() {
-        Some(id) => id.to_string(),
+        Some(id) => id,
         None => return Ok(ApiResponse::success(None)),
     };
 

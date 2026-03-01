@@ -8,7 +8,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 pub async fn create_command(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     command_type: &str,
     payload: &serde_json::Value,
     now: i64,
@@ -73,7 +73,7 @@ pub struct CommandRecord {
 pub async fn get_command_history(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     limit: i32,
     offset: i32,
 ) -> Result<Vec<CommandRecord>, BoxError> {

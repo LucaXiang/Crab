@@ -96,7 +96,7 @@ pub async fn create(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Created,
-            &id,
+            template.id,
             Some(&template),
             false,
         )
@@ -139,7 +139,7 @@ pub async fn update(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            &id_str,
+            id,
             Some(&template),
             false,
         )
@@ -176,7 +176,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, id, None, false)
             .await;
     }
 

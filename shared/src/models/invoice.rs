@@ -2,11 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Tipo de factura según Verifactu: F2 (simplified) or R5 (rectificativa simplificada)
+/// Tipo de factura según Verifactu: F2 (simplified), R5 (rectificativa simplificada), F3 (sustitutiva)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TipoFactura {
     F2,
     R5,
+    F3,
 }
 
 impl TipoFactura {
@@ -14,6 +15,7 @@ impl TipoFactura {
         match self {
             Self::F2 => "F2",
             Self::R5 => "R5",
+            Self::F3 => "F3",
         }
     }
 }
@@ -25,6 +27,7 @@ impl std::str::FromStr for TipoFactura {
         match s {
             "F2" => Ok(Self::F2),
             "R5" => Ok(Self::R5),
+            "F3" => Ok(Self::F3),
             _ => Err(()),
         }
     }
@@ -42,6 +45,7 @@ impl std::fmt::Display for TipoFactura {
 pub enum InvoiceSourceType {
     Order,
     CreditNote,
+    Upgrade,
 }
 
 impl InvoiceSourceType {
@@ -49,6 +53,7 @@ impl InvoiceSourceType {
         match self {
             Self::Order => "ORDER",
             Self::CreditNote => "CREDIT_NOTE",
+            Self::Upgrade => "UPGRADE",
         }
     }
 }
@@ -81,6 +86,7 @@ impl std::str::FromStr for InvoiceSourceType {
         match s {
             "ORDER" => Ok(Self::Order),
             "CREDIT_NOTE" => Ok(Self::CreditNote),
+            "UPGRADE" => Ok(Self::Upgrade),
             _ => Err(()),
         }
     }
@@ -138,14 +144,108 @@ pub struct Invoice {
     pub nif: String,
     pub nombre_razon: String,
 
-    // Rectificativa reference
+    // Rectificativa reference (R5)
     pub factura_rectificada_id: Option<i64>,
     pub factura_rectificada_num: Option<String>,
+
+    // Sustitutiva reference (F3 replaces F2)
+    pub factura_sustituida_id: Option<i64>,
+    pub factura_sustituida_num: Option<String>,
+
+    // Customer info (F3 only)
+    pub customer_nif: Option<String>,
+    pub customer_nombre: Option<String>,
+    pub customer_address: Option<String>,
+    pub customer_email: Option<String>,
+    pub customer_phone: Option<String>,
 
     // Sync / status
     pub cloud_synced: bool,
     pub aeat_status: AeatStatus,
 
+    pub created_at: i64,
+}
+
+// ── Anulación (RegistroFacturaBaja) ──────────────────────────
+
+/// Reason for voiding an invoice via Anulación
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AnulacionReason {
+    TestOrder,
+    WrongCustomer,
+    Duplicate,
+    Other,
+}
+
+impl AnulacionReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TestOrder => "TEST_ORDER",
+            Self::WrongCustomer => "WRONG_CUSTOMER",
+            Self::Duplicate => "DUPLICATE",
+            Self::Other => "OTHER",
+        }
+    }
+}
+
+impl std::str::FromStr for AnulacionReason {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "TEST_ORDER" => Ok(Self::TestOrder),
+            "WRONG_CUSTOMER" => Ok(Self::WrongCustomer),
+            "DUPLICATE" => Ok(Self::Duplicate),
+            "OTHER" => Ok(Self::Other),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for AnulacionReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Verifactu invoice anulación (RegistroFacturaBaja)
+///
+/// Represents the legal revocation of an invoice — not a refund (R5),
+/// but a declaration that the invoice should never have existed.
+/// Use cases: test orders, wrong customer, duplicate invoices.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InvoiceAnulacion {
+    pub id: i64,
+    pub anulacion_number: String,
+    pub serie: String,
+
+    /// Original F2 invoice being voided
+    pub original_invoice_id: i64,
+    pub original_invoice_number: String,
+
+    /// Huella chain (shared with Alta F2/R5)
+    pub huella: String,
+    pub prev_huella: Option<String>,
+
+    /// AEAT-required fields
+    pub fecha_expedicion: String,
+    pub fecha_hora_registro: String,
+    pub nif: String,
+    pub nombre_razon: String,
+
+    /// Order reference
+    pub original_order_pk: i64,
+
+    /// Reason and audit
+    pub reason: AnulacionReason,
+    pub note: Option<String>,
+    pub operator_id: i64,
+    pub operator_name: String,
+
+    /// Sync status
+    pub cloud_synced: bool,
+    pub aeat_status: AeatStatus,
     pub created_at: i64,
 }
 

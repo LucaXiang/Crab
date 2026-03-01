@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, Copy, Check, MapPin, Phone, Mail, Globe, Clock, FileText, Fingerprint, CalendarDays } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -10,7 +10,9 @@ import { ApiError } from '@/infrastructure/api/client';
 import { apiErrorMessage } from '@/infrastructure/i18n';
 import { Spinner } from '@/presentation/components/ui/Spinner';
 import { ImageUpload } from '@/shared/components/ImageUpload';
+import { useLiveOrders } from '@/core/stores/useLiveOrdersStore';
 import type { StoreDetail, DeviceRecord } from '@/core/types/store';
+import type { StoreInfoSnapshot } from '@/core/types/live';
 
 export const StoreSettingsScreen: React.FC = () => {
   const { t } = useI18n();
@@ -41,6 +43,24 @@ export const StoreSettingsScreen: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Real-time store_info updates via WebSocket
+  const handleStoreInfoUpdated = useCallback((info: StoreInfoSnapshot) => {
+    setForm(prev => ({
+      ...prev,
+      name: info.name ?? prev.name,
+      address: info.address ?? prev.address,
+      phone: info.phone ?? prev.phone,
+      nif: info.nif ?? prev.nif,
+      email: info.email ?? prev.email,
+      website: info.website ?? prev.website,
+      business_day_cutoff: info.business_day_cutoff ?? prev.business_day_cutoff,
+    }));
+    if (info.logo_url !== undefined) {
+      setFormLogo(info.logo_url ?? '');
+    }
+  }, []);
+  useLiveOrders(token, storeId, handleStoreInfoUpdated);
 
   useEffect(() => {
     if (!token) return;

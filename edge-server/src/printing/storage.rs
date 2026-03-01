@@ -6,18 +6,18 @@ use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
 
-/// Kitchen orders table: key = kitchen_order_id, value = JSON
-const KITCHEN_ORDERS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("kitchen_orders");
+/// Kitchen orders table: key = kitchen_order_id (i64 snowflake), value = JSON
+const KITCHEN_ORDERS_TABLE: TableDefinition<i64, &[u8]> = TableDefinition::new("kitchen_orders");
 
 /// Index: (order_id, kitchen_order_id) -> ()
-const KITCHEN_ORDERS_BY_ORDER_TABLE: TableDefinition<(&str, &str), ()> =
+const KITCHEN_ORDERS_BY_ORDER_TABLE: TableDefinition<(i64, i64), ()> =
     TableDefinition::new("kitchen_orders_by_order");
 
-/// Label records table: key = label_record_id, value = JSON
-const LABEL_RECORDS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("label_records");
+/// Label records table: key = label_record_id (i64 snowflake), value = JSON
+const LABEL_RECORDS_TABLE: TableDefinition<i64, &[u8]> = TableDefinition::new("label_records");
 
 /// Index: (order_id, label_record_id) -> ()
-const LABEL_RECORDS_BY_ORDER_TABLE: TableDefinition<(&str, &str), ()> =
+const LABEL_RECORDS_BY_ORDER_TABLE: TableDefinition<(i64, i64), ()> =
     TableDefinition::new("label_records_by_order");
 
 #[derive(Debug, Error)]
@@ -41,10 +41,10 @@ pub enum PrintStorageError {
     Serialization(#[from] serde_json::Error),
 
     #[error("Kitchen order not found: {0}")]
-    KitchenOrderNotFound(String),
+    KitchenOrderNotFound(i64),
 
     #[error("Label record not found: {0}")]
-    LabelRecordNotFound(String),
+    LabelRecordNotFound(i64),
 }
 
 pub type PrintStorageResult<T> = Result<T, PrintStorageError>;
@@ -124,17 +124,17 @@ impl PrintStorage {
     ) -> PrintStorageResult<()> {
         let mut table = txn.open_table(KITCHEN_ORDERS_TABLE)?;
         let value = serde_json::to_vec(order)?;
-        table.insert(order.id.as_str(), value.as_slice())?;
+        table.insert(order.id, value.as_slice())?;
 
         // Update index
         let mut idx_table = txn.open_table(KITCHEN_ORDERS_BY_ORDER_TABLE)?;
-        idx_table.insert((order.order_id.as_str(), order.id.as_str()), ())?;
+        idx_table.insert((order.order_id, order.id), ())?;
 
         Ok(())
     }
 
     /// Get a kitchen order by ID
-    pub fn get_kitchen_order(&self, id: &str) -> PrintStorageResult<Option<KitchenOrder>> {
+    pub fn get_kitchen_order(&self, id: i64) -> PrintStorageResult<Option<KitchenOrder>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(KITCHEN_ORDERS_TABLE)?;
 
@@ -150,15 +150,15 @@ impl PrintStorage {
     /// Get kitchen orders for an order
     pub fn get_kitchen_orders_for_order(
         &self,
-        order_id: &str,
+        order_id: i64,
     ) -> PrintStorageResult<Vec<KitchenOrder>> {
         let read_txn = self.db.begin_read()?;
         let idx_table = read_txn.open_table(KITCHEN_ORDERS_BY_ORDER_TABLE)?;
         let data_table = read_txn.open_table(KITCHEN_ORDERS_TABLE)?;
 
         let mut orders = Vec::new();
-        let range_start: (&str, &str) = (order_id, "");
-        let range_end: (&str, &str) = (order_id, "\u{ffff}");
+        let range_start = (order_id, i64::MIN);
+        let range_end = (order_id, i64::MAX);
 
         for result in idx_table.range(range_start..=range_end)? {
             let (key, _) = result?;
@@ -199,7 +199,7 @@ impl PrintStorage {
     pub fn increment_kitchen_order_print_count(
         &self,
         txn: &WriteTransaction,
-        id: &str,
+        id: i64,
     ) -> PrintStorageResult<()> {
         let mut table = txn.open_table(KITCHEN_ORDERS_TABLE)?;
 
@@ -207,7 +207,7 @@ impl PrintStorage {
         let bytes = {
             let value = table
                 .get(id)?
-                .ok_or_else(|| PrintStorageError::KitchenOrderNotFound(id.to_string()))?;
+                .ok_or(PrintStorageError::KitchenOrderNotFound(id))?;
             value.value().to_vec()
         };
 
@@ -224,26 +224,26 @@ impl PrintStorage {
     pub fn delete_kitchen_orders_for_order(
         &self,
         txn: &WriteTransaction,
-        order_id: &str,
+        order_id: i64,
     ) -> PrintStorageResult<()> {
         let mut idx_table = txn.open_table(KITCHEN_ORDERS_BY_ORDER_TABLE)?;
         let mut data_table = txn.open_table(KITCHEN_ORDERS_TABLE)?;
 
         // Collect IDs to delete
-        let range_start: (&str, &str) = (order_id, "");
-        let range_end: (&str, &str) = (order_id, "\u{ffff}");
+        let range_start = (order_id, i64::MIN);
+        let range_end = (order_id, i64::MAX);
         let mut ids_to_delete = Vec::new();
 
         for result in idx_table.range(range_start..=range_end)? {
             let (key, _) = result?;
             let (_, id) = key.value();
-            ids_to_delete.push(id.to_string());
+            ids_to_delete.push(id);
         }
 
         // Delete from both tables
-        for id in &ids_to_delete {
-            data_table.remove(id.as_str())?;
-            idx_table.remove((order_id, id.as_str()))?;
+        for id in ids_to_delete {
+            data_table.remove(id)?;
+            idx_table.remove((order_id, id))?;
         }
 
         Ok(())
@@ -259,16 +259,16 @@ impl PrintStorage {
     ) -> PrintStorageResult<()> {
         let mut table = txn.open_table(LABEL_RECORDS_TABLE)?;
         let value = serde_json::to_vec(record)?;
-        table.insert(record.id.as_str(), value.as_slice())?;
+        table.insert(record.id, value.as_slice())?;
 
         let mut idx_table = txn.open_table(LABEL_RECORDS_BY_ORDER_TABLE)?;
-        idx_table.insert((record.order_id.as_str(), record.id.as_str()), ())?;
+        idx_table.insert((record.order_id, record.id), ())?;
 
         Ok(())
     }
 
     /// Get a label record by ID
-    pub fn get_label_record(&self, id: &str) -> PrintStorageResult<Option<LabelPrintRecord>> {
+    pub fn get_label_record(&self, id: i64) -> PrintStorageResult<Option<LabelPrintRecord>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(LABEL_RECORDS_TABLE)?;
 
@@ -284,15 +284,15 @@ impl PrintStorage {
     /// Get label records for an order
     pub fn get_label_records_for_order(
         &self,
-        order_id: &str,
+        order_id: i64,
     ) -> PrintStorageResult<Vec<LabelPrintRecord>> {
         let read_txn = self.db.begin_read()?;
         let idx_table = read_txn.open_table(LABEL_RECORDS_BY_ORDER_TABLE)?;
         let data_table = read_txn.open_table(LABEL_RECORDS_TABLE)?;
 
         let mut records = Vec::new();
-        let range_start: (&str, &str) = (order_id, "");
-        let range_end: (&str, &str) = (order_id, "\u{ffff}");
+        let range_start = (order_id, i64::MIN);
+        let range_end = (order_id, i64::MAX);
 
         for result in idx_table.range(range_start..=range_end)? {
             let (key, _) = result?;
@@ -311,7 +311,7 @@ impl PrintStorage {
     pub fn increment_label_record_print_count(
         &self,
         txn: &WriteTransaction,
-        id: &str,
+        id: i64,
     ) -> PrintStorageResult<()> {
         let mut table = txn.open_table(LABEL_RECORDS_TABLE)?;
 
@@ -319,7 +319,7 @@ impl PrintStorage {
         let bytes = {
             let value = table
                 .get(id)?
-                .ok_or_else(|| PrintStorageError::LabelRecordNotFound(id.to_string()))?;
+                .ok_or(PrintStorageError::LabelRecordNotFound(id))?;
             value.value().to_vec()
         };
 
@@ -336,24 +336,24 @@ impl PrintStorage {
     pub fn delete_label_records_for_order(
         &self,
         txn: &WriteTransaction,
-        order_id: &str,
+        order_id: i64,
     ) -> PrintStorageResult<()> {
         let mut idx_table = txn.open_table(LABEL_RECORDS_BY_ORDER_TABLE)?;
         let mut data_table = txn.open_table(LABEL_RECORDS_TABLE)?;
 
-        let range_start: (&str, &str) = (order_id, "");
-        let range_end: (&str, &str) = (order_id, "\u{ffff}");
+        let range_start = (order_id, i64::MIN);
+        let range_end = (order_id, i64::MAX);
         let mut ids_to_delete = Vec::new();
 
         for result in idx_table.range(range_start..=range_end)? {
             let (key, _) = result?;
             let (_, id) = key.value();
-            ids_to_delete.push(id.to_string());
+            ids_to_delete.push(id);
         }
 
-        for id in &ids_to_delete {
-            data_table.remove(id.as_str())?;
-            idx_table.remove((order_id, id.as_str()))?;
+        for id in ids_to_delete {
+            data_table.remove(id)?;
+            idx_table.remove((order_id, id))?;
         }
 
         Ok(())
@@ -374,18 +374,18 @@ impl PrintStorage {
             let mut table = txn.open_table(KITCHEN_ORDERS_TABLE)?;
             let mut idx_table = txn.open_table(KITCHEN_ORDERS_BY_ORDER_TABLE)?;
 
-            let mut to_delete = Vec::new();
+            let mut to_delete: Vec<(i64, i64)> = Vec::new();
             for result in table.iter()? {
                 let (key, guard) = result?;
                 let order: KitchenOrder = serde_json::from_slice(guard.value())?;
                 if order.created_at < cutoff {
-                    to_delete.push((key.value().to_string(), order.order_id.clone()));
+                    to_delete.push((key.value(), order.order_id));
                 }
             }
 
-            for (id, order_id) in &to_delete {
-                table.remove(id.as_str())?;
-                idx_table.remove((order_id.as_str(), id.as_str()))?;
+            for (id, order_id) in to_delete {
+                table.remove(id)?;
+                idx_table.remove((order_id, id))?;
                 deleted += 1;
             }
         }
@@ -395,18 +395,18 @@ impl PrintStorage {
             let mut table = txn.open_table(LABEL_RECORDS_TABLE)?;
             let mut idx_table = txn.open_table(LABEL_RECORDS_BY_ORDER_TABLE)?;
 
-            let mut to_delete = Vec::new();
+            let mut to_delete: Vec<(i64, i64)> = Vec::new();
             for result in table.iter()? {
                 let (key, guard) = result?;
                 let record: LabelPrintRecord = serde_json::from_slice(guard.value())?;
                 if record.created_at < cutoff {
-                    to_delete.push((key.value().to_string(), record.order_id.clone()));
+                    to_delete.push((key.value(), record.order_id));
                 }
             }
 
-            for (id, order_id) in &to_delete {
-                table.remove(id.as_str())?;
-                idx_table.remove((order_id.as_str(), id.as_str()))?;
+            for (id, order_id) in to_delete {
+                table.remove(id)?;
+                idx_table.remove((order_id, id))?;
                 deleted += 1;
             }
         }
@@ -425,8 +425,8 @@ mod tests {
         let storage = PrintStorage::open_in_memory().unwrap();
 
         let order = KitchenOrder {
-            id: "ko-1".to_string(),
-            order_id: "order-1".to_string(),
+            id: 100001,
+            order_id: 200001,
             receipt_number: "FAC202401220001".to_string(),
             table_name: Some("Table 1".to_string()),
             zone_name: None,
@@ -441,8 +441,8 @@ mod tests {
         storage.store_kitchen_order(&txn, &order).unwrap();
         txn.commit().unwrap();
 
-        let retrieved = storage.get_kitchen_order("ko-1").unwrap();
+        let retrieved = storage.get_kitchen_order(100001).unwrap();
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().order_id, "order-1");
+        assert_eq!(retrieved.unwrap().order_id, 200001);
     }
 }

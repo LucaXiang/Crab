@@ -833,10 +833,10 @@ export interface KitchenOrderItem {
  * Used for kitchen order display and reprint
  */
 export interface KitchenOrder {
-  /** Kitchen order ID (= event_id, UUID) */
-  id: string;
-  /** Parent order ID (UUID) */
-  order_id: string;
+  /** Kitchen order ID (= event_id, snowflake) */
+  id: number;
+  /** Parent order ID (snowflake) */
+  order_id: number;
   /** Table name (if applicable) */
   table_name: string | null;
   /** Unix millis */
@@ -852,12 +852,12 @@ export interface KitchenOrder {
  * Each item in an order can have multiple labels (one per quantity unit)
  */
 export interface LabelPrintRecord {
-  /** Label record ID (UUID) */
-  id: string;
-  /** Parent order ID (UUID) */
-  order_id: string;
-  /** Related kitchen order ID (UUID) */
-  kitchen_order_id: string;
+  /** Label record ID (snowflake) */
+  id: number;
+  /** Parent order ID (snowflake) */
+  order_id: number;
+  /** Related kitchen order ID (snowflake) */
+  kitchen_order_id: number;
   /** Table name (if applicable) */
   table_name: string | null;
   /** Unix millis */

@@ -7,15 +7,15 @@ use shared::order::{
 
 fn create_test_metadata() -> CommandMetadata {
     CommandMetadata {
-        command_id: "cmd-1".to_string(),
+        command_id: 1,
         operator_id: 1,
         operator_name: "Test User".to_string(),
         timestamp: 1234567890,
     }
 }
 
-fn create_active_order_with_items(order_id: &str) -> OrderSnapshot {
-    let mut snapshot = OrderSnapshot::new(order_id.to_string());
+fn create_active_order_with_items(order_id: i64) -> OrderSnapshot {
+    let mut snapshot = OrderSnapshot::new(order_id);
     snapshot.status = OrderStatus::Active;
     snapshot.table_id = Some(1);
     snapshot.table_name = Some("Table 1".to_string());
@@ -89,14 +89,14 @@ fn test_split_by_items_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = SplitByItemsAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         payment_method: "CASH".to_string(),
         items: vec![SplitItem {
             instance_id: "item-1".to_string(),
@@ -133,14 +133,14 @@ fn test_split_by_items_empty_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = SplitByItemsAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         payment_method: "CASH".to_string(),
         items: vec![],
         tendered: None,
@@ -158,14 +158,14 @@ fn test_split_by_amount_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = SplitByAmountAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         split_amount: 20.0,
         payment_method: "CARD".to_string(),
         tendered: None,
@@ -195,14 +195,14 @@ fn test_split_by_amount_zero_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = SplitByAmountAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         split_amount: 0.0,
         payment_method: "CASH".to_string(),
         tendered: None,
@@ -220,14 +220,14 @@ fn test_start_aa_split_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = StartAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         total_shares: 3,
         shares: 1,
         payment_method: "CASH".to_string(),
@@ -274,14 +274,14 @@ fn test_start_aa_split_invalid_total_shares() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = StartAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         total_shares: 1, // Must be >= 2
         shares: 1,
         payment_method: "CASH".to_string(),
@@ -300,7 +300,7 @@ fn test_pay_aa_split_success() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     // Simulate AA already started
     snapshot.aa_total_shares = Some(3);
     snapshot.aa_paid_shares = 1;
@@ -311,7 +311,7 @@ fn test_pay_aa_split_success() {
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = PayAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         shares: 1,
         payment_method: "CARD".to_string(),
         tendered: None,
@@ -343,14 +343,14 @@ fn test_pay_aa_split_not_started_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let snapshot = create_active_order_with_items("order-1");
+    let snapshot = create_active_order_with_items(1001);
     storage.store_snapshot(&txn, &snapshot).unwrap();
 
     let current_seq = storage.get_next_sequence(&txn).unwrap();
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = PayAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         shares: 1,
         payment_method: "CASH".to_string(),
         tendered: None,
@@ -368,7 +368,7 @@ fn test_item_split_then_amount_split_allowed() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     // Simulate item split already happened: item-1 has 2 units paid
     snapshot
         .paid_item_quantities
@@ -381,7 +381,7 @@ fn test_item_split_then_amount_split_allowed() {
 
     // Amount split should be allowed after item split
     let action = SplitByAmountAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         split_amount: 10.0,
         payment_method: "CASH".to_string(),
         tendered: None,
@@ -400,7 +400,7 @@ fn test_item_split_then_aa_split_allowed() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     // Simulate item split already happened
     snapshot
         .paid_item_quantities
@@ -413,7 +413,7 @@ fn test_item_split_then_aa_split_allowed() {
 
     // AA split should be allowed after item split
     let action = StartAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         total_shares: 3,
         shares: 1,
         payment_method: "CASH".to_string(),
@@ -433,7 +433,7 @@ fn test_amount_split_then_item_split_blocked() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     snapshot.has_amount_split = true;
     snapshot.paid_amount = 10.0;
     storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -443,7 +443,7 @@ fn test_amount_split_then_item_split_blocked() {
 
     // Item split should be blocked after amount split
     let action = SplitByItemsAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         payment_method: "CASH".to_string(),
         items: vec![SplitItem {
             instance_id: "item-1".to_string(),
@@ -467,7 +467,7 @@ fn test_amount_split_then_aa_split_allowed() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     snapshot.has_amount_split = true;
     snapshot.paid_amount = 10.0;
     storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -477,7 +477,7 @@ fn test_amount_split_then_aa_split_allowed() {
 
     // AA split should be allowed after amount split
     let action = StartAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         total_shares: 3,
         shares: 1,
         payment_method: "CASH".to_string(),
@@ -497,7 +497,7 @@ fn test_aa_active_blocks_item_split() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     snapshot.aa_total_shares = Some(3);
     snapshot.aa_paid_shares = 1;
     snapshot.paid_amount = 15.33;
@@ -507,7 +507,7 @@ fn test_aa_active_blocks_item_split() {
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = SplitByItemsAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         payment_method: "CASH".to_string(),
         items: vec![SplitItem {
             instance_id: "item-1".to_string(),
@@ -531,7 +531,7 @@ fn test_aa_active_blocks_amount_split() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     snapshot.aa_total_shares = Some(3);
     snapshot.aa_paid_shares = 1;
     snapshot.paid_amount = 15.33;
@@ -541,7 +541,7 @@ fn test_aa_active_blocks_amount_split() {
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = SplitByAmountAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         split_amount: 10.0,
         payment_method: "CASH".to_string(),
         tendered: None,
@@ -562,7 +562,7 @@ fn test_pay_aa_split_exceeds_remaining_fails() {
     let storage = OrderStorage::open_in_memory().unwrap();
     let txn = storage.begin_write().unwrap();
 
-    let mut snapshot = create_active_order_with_items("order-1");
+    let mut snapshot = create_active_order_with_items(1001);
     snapshot.aa_total_shares = Some(3);
     snapshot.aa_paid_shares = 2; // Only 1 remaining
     snapshot.paid_amount = 30.67;
@@ -572,7 +572,7 @@ fn test_pay_aa_split_exceeds_remaining_fails() {
     let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
     let action = PayAaSplitAction {
-        order_id: "order-1".to_string(),
+        order_id: 1001,
         shares: 2, // Only 1 available
         payment_method: "CASH".to_string(),
         tendered: None,

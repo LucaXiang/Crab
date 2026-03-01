@@ -25,7 +25,7 @@ pub async fn refresh_token(
             })?
             .ok_or_else(|| AppError::new(ErrorCode::TokenExpired))?;
 
-    let tenant = tenants::find_by_id(&state.pool, &tenant_id)
+    let tenant = tenants::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to find tenant during refresh");
@@ -34,12 +34,12 @@ pub async fn refresh_token(
         .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
     let token =
-        tenant_auth::create_token(&tenant.id, &tenant.email, &state.jwt_secret).map_err(|e| {
+        tenant_auth::create_token(tenant.id, &tenant.email, &state.jwt_secret).map_err(|e| {
             tracing::error!(error = %e, "Failed to create JWT token");
             AppError::new(ErrorCode::InternalError)
         })?;
 
-    tracing::debug!(tenant_id = %tenant.id, "Token refreshed");
+    tracing::debug!(tenant_id = tenant.id, "Token refreshed");
 
     Ok(Json(TokenRefreshResponse {
         token,

@@ -12,7 +12,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, Payme
 /// AddPayment action
 #[derive(Debug, Clone)]
 pub struct AddPaymentAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub payment: PaymentInput,
 }
 
@@ -26,16 +26,16 @@ impl CommandHandler for AddPaymentAction {
         crate::order_money::validate_payment(&self.payment)?;
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status - must be Active
         match snapshot.status {
             OrderStatus::Active => {} // OK - continue with payment
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(
@@ -65,7 +65,7 @@ impl CommandHandler for AddPaymentAction {
         let seq = ctx.next_sequence();
 
         // 6. Generate payment_id
-        let payment_id = uuid::Uuid::new_v4().to_string();
+        let payment_id = shared::util::snowflake_id();
 
         // 7. Validate tendered amount
         if let Some(t) = self.payment.tendered
@@ -89,10 +89,10 @@ impl CommandHandler for AddPaymentAction {
         // 9. Create event
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::PaymentAdded,
             EventPayload::PaymentAdded {
@@ -118,7 +118,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -150,7 +150,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create and store an active order
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -159,7 +159,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CARD", 50.0),
         };
 
@@ -168,7 +168,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::PaymentAdded);
 
         if let EventPayload::PaymentAdded {
@@ -180,7 +180,7 @@ mod tests {
             note,
         } = &event.payload
         {
-            assert!(!payment_id.is_empty());
+            assert!(*payment_id > 0);
             assert_eq!(method, "CARD");
             assert_eq!(*amount, 50.0);
             assert!(tendered.is_none());
@@ -197,7 +197,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 85.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -206,7 +206,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_cash_payment_input(85.0, 100.0),
         };
 
@@ -231,7 +231,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -239,7 +239,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CARD", 50.0),
         };
 
@@ -255,7 +255,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -263,7 +263,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CARD", 50.0),
         };
 
@@ -282,7 +282,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             payment: create_payment_input("CARD", 50.0),
         };
 
@@ -298,7 +298,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -306,7 +306,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CASH", 0.0),
         };
 
@@ -322,7 +322,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -330,7 +330,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CASH", -10.0),
         };
 
@@ -346,7 +346,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 60.0; // Already paid 60, remaining = 40
@@ -356,7 +356,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CARD", 50.0), // 50 > 40 remaining
         };
 
@@ -375,7 +375,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 60.0;
@@ -385,7 +385,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment: create_payment_input("CARD", 40.0), // Exact remaining
         };
 
@@ -400,7 +400,7 @@ mod tests {
 
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -416,7 +416,7 @@ mod tests {
         };
 
         let action = AddPaymentAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             payment,
         };
 

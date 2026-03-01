@@ -19,7 +19,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct StartAaSplitAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub total_shares: i32,
     pub shares: i32,
     pub payment_method: String,
@@ -32,8 +32,8 @@ impl CommandHandler for StartAaSplitAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
-        validate_active_order(&snapshot, &self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
+        validate_active_order(&snapshot, self.order_id)?;
         validate_split_mode_allowed(&snapshot, SplitMode::Aa)?;
 
         // Must not already be in AA mode
@@ -84,10 +84,10 @@ impl CommandHandler for StartAaSplitAction {
         let seq1 = ctx.next_sequence();
         let started_event = OrderEvent::new(
             seq1,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::AaSplitStarted,
             EventPayload::AaSplitStarted {
@@ -99,14 +99,14 @@ impl CommandHandler for StartAaSplitAction {
 
         // Event 2: AASplitPaid (first payment)
         let change = validate_tendered_and_change(self.tendered, amount_f64)?;
-        let payment_id = uuid::Uuid::new_v4().to_string();
+        let payment_id = shared::util::snowflake_id();
         let seq2 = ctx.next_sequence();
         let paid_event = OrderEvent::new(
             seq2,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::AaSplitPaid,
             EventPayload::AaSplitPaid {
@@ -131,7 +131,7 @@ impl CommandHandler for StartAaSplitAction {
 
 #[derive(Debug, Clone)]
 pub struct PayAaSplitAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub shares: i32,
     pub payment_method: String,
     pub tendered: Option<f64>,
@@ -143,8 +143,8 @@ impl CommandHandler for PayAaSplitAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
-        validate_active_order(&snapshot, &self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
+        validate_active_order(&snapshot, self.order_id)?;
 
         // Must already be in AA mode
         let total_shares = snapshot.aa_total_shares.ok_or_else(|| {
@@ -185,17 +185,17 @@ impl CommandHandler for PayAaSplitAction {
         }
 
         let change = validate_tendered_and_change(self.tendered, amount_f64)?;
-        let payment_id = uuid::Uuid::new_v4().to_string();
+        let payment_id = shared::util::snowflake_id();
         let seq = ctx.next_sequence();
 
         let progress_paid = snapshot.aa_paid_shares + self.shares;
 
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::AaSplitPaid,
             EventPayload::AaSplitPaid {

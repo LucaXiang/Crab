@@ -29,7 +29,7 @@ pub struct CreditNote {
 
     // 归属
     pub shift_id: Option<i64>,
-    pub cloud_synced: i64,
+    pub cloud_synced: bool,
     pub created_at: i64,
 }
 
@@ -56,6 +56,13 @@ pub struct CreditNoteDetail {
     pub items: Vec<CreditNoteItem>,
 }
 
+/// Per-item refunded quantity (for preventing duplicate refunds)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RefundedItemInfo {
+    pub instance_id: String,
+    pub refunded_quantity: i64,
+}
+
 /// Refundable info for anti-over-refund
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefundableInfo {
@@ -64,6 +71,8 @@ pub struct RefundableInfo {
     pub original_total: f64,
     pub already_refunded: f64,
     pub remaining_refundable: f64,
+    /// Per-item already refunded quantities
+    pub refunded_items: Vec<RefundedItemInfo>,
 }
 
 /// Request to create a credit note

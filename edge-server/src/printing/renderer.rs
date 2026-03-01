@@ -257,8 +257,8 @@ mod tests {
 
     fn create_test_order() -> KitchenOrder {
         KitchenOrder {
-            id: "evt-1".to_string(),
-            order_id: "order-1".to_string(),
+            id: shared::util::snowflake_id(),
+            order_id: 1001,
             receipt_number: "FAC202401220001".to_string(),
             table_name: Some("B1".to_string()),
             zone_name: Some("Barra".to_string()),
@@ -309,8 +309,8 @@ mod tests {
 
     fn create_multi_category_order() -> KitchenOrder {
         KitchenOrder {
-            id: "evt-2".to_string(),
-            order_id: "order-2".to_string(),
+            id: shared::util::snowflake_id(),
+            order_id: 1002,
             receipt_number: "FAC202401220002".to_string(),
             table_name: Some("100桌".to_string()),
             zone_name: Some("大厅".to_string()),

@@ -14,11 +14,11 @@ pub async fn refresh_binding(
     State(state): State<AppState>,
     Json(req): Json<RefreshBindingRequest>,
 ) -> Json<serde_json::Value> {
-    let tenant_ca = match state.ca_store.load_tenant_ca(&req.binding.tenant_id).await {
+    let tenant_ca = match state.ca_store.load_tenant_ca(req.binding.tenant_id).await {
         Ok(ca) => ca,
         Err(e) => {
             tracing::warn!(
-                tenant_id = %req.binding.tenant_id,
+                tenant_id = req.binding.tenant_id,
                 error = %e,
                 "Failed to load Tenant CA"
             );

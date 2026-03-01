@@ -23,7 +23,7 @@ impl EventApplier for PaymentAddedApplier {
         {
             // Create payment record
             let payment = PaymentRecord {
-                payment_id: payment_id.clone(),
+                payment_id: *payment_id,
                 method: method.clone(),
                 amount: *amount,
                 tendered: *tendered,
@@ -82,9 +82,9 @@ mod tests {
     use shared::order::OrderEventType;
 
     fn create_payment_added_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
-        payment_id: &str,
+        payment_id: i64,
         method: &str,
         amount: f64,
         tendered: Option<f64>,
@@ -93,14 +93,14 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::PaymentAdded,
             EventPayload::PaymentAdded {
-                payment_id: payment_id.to_string(),
+                payment_id: payment_id,
                 method: method.to_string(),
                 amount,
                 tendered,
@@ -112,18 +112,17 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_basic() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.total = 100.0;
         snapshot.last_sequence = 0;
 
-        let event =
-            create_payment_added_event("order-1", 1, "payment-1", "CARD", 50.0, None, None, None);
+        let event = create_payment_added_event(1001, 1, 4001, "CARD", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
 
         assert_eq!(snapshot.payments.len(), 1);
-        assert_eq!(snapshot.payments[0].payment_id, "payment-1");
+        assert_eq!(snapshot.payments[0].payment_id, 4001);
         assert_eq!(snapshot.payments[0].method, "CARD");
         assert_eq!(snapshot.payments[0].amount, 50.0);
         assert!(!snapshot.payments[0].cancelled);
@@ -133,20 +132,12 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_cash_with_change() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.total = 85.0;
         snapshot.last_sequence = 0;
 
-        let event = create_payment_added_event(
-            "order-1",
-            1,
-            "payment-1",
-            "CASH",
-            85.0,
-            Some(100.0),
-            Some(15.0),
-            None,
-        );
+        let event =
+            create_payment_added_event(1001, 1, 4001, "CASH", 85.0, Some(100.0), Some(15.0), None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -161,12 +152,12 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_with_note() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         let event = create_payment_added_event(
-            "order-1",
+            1001,
             1,
-            "payment-1",
+            4001,
             "CARD",
             50.0,
             None,
@@ -185,12 +176,11 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_multiple_payments() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.total = 100.0;
 
         // First payment
-        let event1 =
-            create_payment_added_event("order-1", 1, "payment-1", "CARD", 30.0, None, None, None);
+        let event1 = create_payment_added_event(1001, 1, 4001, "CARD", 30.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event1);
@@ -199,16 +189,8 @@ mod tests {
         assert_eq!(snapshot.paid_amount, 30.0);
 
         // Second payment
-        let event2 = create_payment_added_event(
-            "order-1",
-            2,
-            "payment-2",
-            "CASH",
-            70.0,
-            Some(100.0),
-            Some(30.0),
-            None,
-        );
+        let event2 =
+            create_payment_added_event(1001, 2, 4002, "CASH", 70.0, Some(100.0), Some(30.0), None);
 
         applier.apply(&mut snapshot, &event2);
 
@@ -217,17 +199,16 @@ mod tests {
         assert_eq!(snapshot.last_sequence, 2);
 
         // Verify payment details
-        assert_eq!(snapshot.payments[0].payment_id, "payment-1");
-        assert_eq!(snapshot.payments[1].payment_id, "payment-2");
+        assert_eq!(snapshot.payments[0].payment_id, 4001);
+        assert_eq!(snapshot.payments[1].payment_id, 4002);
     }
 
     #[test]
     fn test_payment_added_applier_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.last_sequence = 5;
 
-        let event =
-            create_payment_added_event("order-1", 6, "payment-1", "CASH", 50.0, None, None, None);
+        let event = create_payment_added_event(1001, 6, 4001, "CASH", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -237,11 +218,10 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event =
-            create_payment_added_event("order-1", 1, "payment-1", "CASH", 50.0, None, None, None);
+        let event = create_payment_added_event(1001, 1, 4001, "CASH", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -252,10 +232,9 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_sets_timestamp() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
-        let event =
-            create_payment_added_event("order-1", 1, "payment-1", "CASH", 50.0, None, None, None);
+        let event = create_payment_added_event(1001, 1, 4001, "CASH", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -268,12 +247,11 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_partial_payment() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.total = 100.0;
 
         // Partial payment
-        let event =
-            create_payment_added_event("order-1", 1, "payment-1", "CARD", 40.0, None, None, None);
+        let event = create_payment_added_event(1001, 1, 4001, "CARD", 40.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -285,11 +263,10 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_full_payment() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.total = 100.0;
 
-        let event =
-            create_payment_added_event("order-1", 1, "payment-1", "CARD", 100.0, None, None, None);
+        let event = create_payment_added_event(1001, 1, 4001, "CARD", 100.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);

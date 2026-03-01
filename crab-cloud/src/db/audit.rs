@@ -7,7 +7,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Write an audit log entry
 pub async fn log(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     action: &str,
     detail: Option<&serde_json::Value>,
     ip_address: Option<&str>,
@@ -38,7 +38,7 @@ pub struct AuditEntry {
 
 pub async fn query(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     limit: i32,
     offset: i32,
 ) -> Result<Vec<AuditEntry>, BoxError> {

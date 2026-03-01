@@ -282,7 +282,7 @@ pub enum SplitType {
 /// Payment record in snapshot
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PaymentRecord {
-    pub payment_id: String,
+    pub payment_id: i64,
     pub method: String,
     pub amount: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -318,19 +318,19 @@ pub struct PaymentSummaryItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandResponse {
     /// The command ID this responds to
-    pub command_id: String,
+    pub command_id: i64,
     /// Whether the command succeeded
     pub success: bool,
     /// New order ID (only for OpenTable command)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub order_id: Option<String>,
+    pub order_id: Option<i64>,
     /// Error details if failed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<CommandError>,
 }
 
 impl CommandResponse {
-    pub fn success(command_id: String, order_id: Option<String>) -> Self {
+    pub fn success(command_id: i64, order_id: Option<i64>) -> Self {
         Self {
             command_id,
             success: true,
@@ -339,7 +339,7 @@ impl CommandResponse {
         }
     }
 
-    pub fn error(command_id: String, error: CommandError) -> Self {
+    pub fn error(command_id: i64, error: CommandError) -> Self {
         Self {
             command_id,
             success: false,
@@ -348,7 +348,7 @@ impl CommandResponse {
         }
     }
 
-    pub fn duplicate(command_id: String) -> Self {
+    pub fn duplicate(command_id: i64) -> Self {
         Self {
             command_id,
             success: true,
@@ -484,7 +484,7 @@ pub struct SyncResponse {
 /// Comp record - audit trail for comped (gifted) items
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CompRecord {
-    pub comp_id: String,
+    pub comp_id: i64,
     /// The comped item's instance_id (the split-off item)
     pub instance_id: String,
     /// The original item this was split from

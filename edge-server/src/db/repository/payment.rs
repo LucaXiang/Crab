@@ -11,8 +11,8 @@ use sqlx::SqlitePool;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
 pub struct PaymentRow {
     pub id: i64,
-    pub payment_id: String,
-    pub order_id: String,
+    pub payment_id: i64,
+    pub order_id: i64,
     pub method: String,
     pub amount: f64,
     pub tendered: Option<f64>,
@@ -106,7 +106,7 @@ pub async fn create_from_snapshot(
 }
 
 /// List payments by order
-pub async fn list_by_order(pool: &SqlitePool, order_id: &str) -> RepoResult<Vec<PaymentRow>> {
+pub async fn list_by_order(pool: &SqlitePool, order_id: i64) -> RepoResult<Vec<PaymentRow>> {
     let rows = sqlx::query_as::<_, PaymentRow>(
         "SELECT id, payment_id, order_id, method, amount, tendered, change_amount, note, split_type, aa_shares, split_items, operator_id, operator_name, cancelled, cancel_reason, timestamp, created_at FROM payment WHERE order_id = ? ORDER BY timestamp ASC",
     )

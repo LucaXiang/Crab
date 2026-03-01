@@ -28,7 +28,7 @@ pub struct TenantClaims {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct TenantIdentity {
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub email: String,
 }
 
@@ -36,7 +36,7 @@ const JWT_EXPIRY_HOURS: i64 = 1;
 
 /// Create a JWT token for a tenant
 pub fn create_token(
-    tenant_id: &str,
+    tenant_id: i64,
     email: &str,
     secret: &str,
 ) -> Result<String, jsonwebtoken::errors::Error> {
@@ -98,8 +98,13 @@ pub async fn tenant_auth_middleware(
         AppError::new(ErrorCode::TokenExpired).into_response()
     })?;
 
+    let tenant_id: i64 = token_data.claims.sub.parse().map_err(|_| {
+        tracing::warn!(sub = %token_data.claims.sub, "JWT sub is not a valid i64");
+        AppError::new(ErrorCode::TokenExpired).into_response()
+    })?;
+
     let identity = TenantIdentity {
-        tenant_id: token_data.claims.sub,
+        tenant_id,
         email: token_data.claims.email,
     };
 

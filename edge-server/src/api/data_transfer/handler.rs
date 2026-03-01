@@ -539,7 +539,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                 .broadcast_sync(
                     SyncResource::Tag,
                     SyncChangeType::Updated,
-                    &t.id.to_string(),
+                    t.id,
                     Some(t),
                     false,
                 )
@@ -554,7 +554,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
             .broadcast_sync(
                 SyncResource::Category,
                 SyncChangeType::Updated,
-                &c.id.to_string(),
+                c.id,
                 Some(c),
                 false,
             )
@@ -568,7 +568,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
             .broadcast_sync(
                 SyncResource::Product,
                 SyncChangeType::Updated,
-                &p.id.to_string(),
+                p.id,
                 Some(p),
                 false,
             )
@@ -582,7 +582,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                 .broadcast_sync(
                     SyncResource::Attribute,
                     SyncChangeType::Updated,
-                    &a.id.to_string(),
+                    a.id,
                     Some(a),
                     false,
                 )
@@ -597,7 +597,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                 .broadcast_sync(
                     SyncResource::Zone,
                     SyncChangeType::Updated,
-                    &z.id.to_string(),
+                    z.id,
                     Some(z),
                     false,
                 )
@@ -612,7 +612,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                 .broadcast_sync(
                     SyncResource::DiningTable,
                     SyncChangeType::Updated,
-                    &dt.id.to_string(),
+                    dt.id,
                     Some(dt),
                     false,
                 )
@@ -627,7 +627,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                 .broadcast_sync(
                     SyncResource::PriceRule,
                     SyncChangeType::Updated,
-                    &pr.id.to_string(),
+                    pr.id,
                     Some(pr),
                     false,
                 )
@@ -649,7 +649,7 @@ async fn broadcast_catalog_sync(state: &ServerState) {
                 .broadcast_sync(
                     SyncResource::AttributeBinding,
                     SyncChangeType::Updated,
-                    &b.id.to_string(),
+                    b.id,
                     Some(b),
                     false,
                 )

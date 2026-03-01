@@ -11,6 +11,7 @@ use super::BoxError;
 pub async fn insert(
     pool: &PgPool,
     store_id: i64,
+    tenant_id: i64,
     op: &StoreOp,
     changed_at: i64,
 ) -> Result<(), BoxError> {
@@ -18,10 +19,11 @@ pub async fn insert(
     let op_json = serde_json::to_value(op)?;
 
     sqlx::query(
-        "INSERT INTO store_pending_ops (store_id, op, changed_at, created_at) \
-         VALUES ($1, $2, $3, $4)",
+        "INSERT INTO store_pending_ops (store_id, tenant_id, op, changed_at, created_at) \
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(store_id)
+    .bind(tenant_id)
     .bind(op_json)
     .bind(changed_at)
     .bind(now)

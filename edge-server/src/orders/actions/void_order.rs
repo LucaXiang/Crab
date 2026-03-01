@@ -12,7 +12,7 @@ use shared::order::{EventPayload, LossReason, OrderEvent, OrderEventType, OrderS
 /// VoidOrder action
 #[derive(Debug, Clone)]
 pub struct VoidOrderAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub void_type: VoidType,
     pub loss_reason: Option<LossReason>,
     pub loss_amount: Option<f64>,
@@ -32,16 +32,16 @@ impl CommandHandler for VoidOrderAction {
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status (must be Active)
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(
@@ -72,10 +72,10 @@ impl CommandHandler for VoidOrderAction {
         // 6. Create event
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderVoided,
             EventPayload::OrderVoided {
@@ -101,16 +101,16 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
     }
 
-    fn create_void_action(order_id: &str, note: Option<String>) -> VoidOrderAction {
+    fn create_void_action(order_id: i64, note: Option<String>) -> VoidOrderAction {
         VoidOrderAction {
-            order_id: order_id.to_string(),
+            order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -126,21 +126,21 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an active order
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", Some("Customer cancelled".to_string()));
+        let action = create_void_action(1001, Some("Customer cancelled".to_string()));
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::OrderVoided);
 
         if let EventPayload::OrderVoided {
@@ -163,14 +163,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", None);
+        let action = create_void_action(1001, None);
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
@@ -188,14 +188,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", None);
+        let action = create_void_action(1001, None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
@@ -208,14 +208,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", None);
+        let action = create_void_action(1001, None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
@@ -231,7 +231,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("nonexistent", None);
+        let action = create_void_action(9999, None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
@@ -244,14 +244,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Merged;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", None);
+        let action = create_void_action(1001, None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
@@ -265,7 +265,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an order with items and payments
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.subtotal = 100.0;
@@ -275,7 +275,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", Some("Order error".to_string()));
+        let action = create_void_action(1001, Some("Order error".to_string()));
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
@@ -290,17 +290,17 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = create_void_action("order-1", None);
+        let action = create_void_action(1001, None);
 
         let metadata = CommandMetadata {
-            command_id: "cmd-void-1".to_string(),
+            command_id: 100,
             operator_id: 2,
             operator_name: "Manager".to_string(),
             timestamp: 9999999999,
@@ -310,7 +310,7 @@ mod tests {
         let event = &events[0];
 
         // Verify event metadata
-        assert_eq!(event.command_id, "cmd-void-1");
+        assert_eq!(event.command_id, 100);
         assert_eq!(event.operator_id, 2);
         assert_eq!(event.operator_name, "Manager");
         // Note: event.timestamp is server-generated (now), client_timestamp is from metadata
@@ -322,7 +322,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -331,7 +331,7 @@ mod tests {
 
         // Intentionally pass loss fields with CANCELLED — backend should strip them
         let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             void_type: VoidType::Cancelled,
             loss_reason: Some(LossReason::CustomerFled),
             loss_amount: Some(50.0),
@@ -363,7 +363,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 60.0;
@@ -373,7 +373,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             void_type: VoidType::LossSettled,
             loss_reason: Some(LossReason::CustomerFled),
             loss_amount: Some(40.0),
@@ -405,7 +405,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 60.0;
@@ -416,7 +416,7 @@ mod tests {
 
         // loss_amount = None → auto-calculate as total - paid_amount = 40
         let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             void_type: VoidType::LossSettled,
             loss_reason: Some(LossReason::CustomerFled),
             loss_amount: None,

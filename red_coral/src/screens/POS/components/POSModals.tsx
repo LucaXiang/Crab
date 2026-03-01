@@ -8,8 +8,8 @@ interface POSModalsProps {
   showDraftModal: boolean;
   draftOrders: DraftOrder[];
   onCloseDraftModal: () => void;
-  onRestoreDraft: (id: string) => void;
-  onDeleteDraft: (id: string) => void;
+  onRestoreDraft: (id: number) => void;
+  onDeleteDraft: (id: number) => void;
 
   // Table Selection Modal
   showTableScreen: boolean;
@@ -18,7 +18,7 @@ interface POSModalsProps {
   onSelectTable: (table: DiningTable, guestCount: number, zone?: Zone) => void;
   onCloseTableScreen: () => void;
   manageTableId?: number | null;
-  onNavigateCheckout: (tableId: string) => void;
+  onNavigateCheckout: (tableId: number) => void;
 }
 
 export const POSModals = React.memo<POSModalsProps>(({

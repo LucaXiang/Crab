@@ -348,33 +348,51 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
               </button>
 
               {/* Row 3: Comp, Discount, Surcharge */}
-              <button
-                onClick={() => onNavigate('COMP')}
-                disabled={isPaidInFull || payment.isProcessing}
-                className="h-40 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+              <EscalatableGate
+                permission={Permission.ORDERS_COMP}
+                mode="intercept"
+                description={t('checkout.comp.title')}
+                onAuthorized={() => onNavigate('COMP')}
               >
-                <Gift size={48} />
-                <div className="text-2xl font-bold">{t('checkout.comp.title')}</div>
-                <div className="text-sm opacity-90">{t('checkout.comp.desc')}</div>
-              </button>
-              <button
-                onClick={() => setShowDiscountModal(true)}
-                disabled={payment.isProcessing}
-                className="h-40 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                <button
+                  disabled={isPaidInFull || payment.isProcessing}
+                  className="h-40 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <Gift size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.comp.title')}</div>
+                  <div className="text-sm opacity-90">{t('checkout.comp.desc')}</div>
+                </button>
+              </EscalatableGate>
+              <EscalatableGate
+                permission={Permission.ORDERS_DISCOUNT}
+                mode="intercept"
+                description={t('checkout.order_discount.title')}
+                onAuthorized={() => setShowDiscountModal(true)}
               >
-                <Percent size={48} />
-                <div className="text-2xl font-bold">{t('checkout.order_discount.title')}</div>
-                <div className="text-sm opacity-90">{t('checkout.order_discount.desc')}</div>
-              </button>
-              <button
-                onClick={() => setShowSurchargeModal(true)}
-                disabled={payment.isProcessing}
-                className="h-40 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                <button
+                  disabled={payment.isProcessing}
+                  className="h-40 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <Percent size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.order_discount.title')}</div>
+                  <div className="text-sm opacity-90">{t('checkout.order_discount.desc')}</div>
+                </button>
+              </EscalatableGate>
+              <EscalatableGate
+                permission={Permission.ORDERS_DISCOUNT}
+                mode="intercept"
+                description={t('checkout.order_surcharge.title')}
+                onAuthorized={() => setShowSurchargeModal(true)}
               >
-                <TrendingUp size={48} />
-                <div className="text-2xl font-bold">{t('checkout.order_surcharge.title')}</div>
-                <div className="text-sm opacity-90">{t('checkout.order_surcharge.desc')}</div>
-              </button>
+                <button
+                  disabled={payment.isProcessing}
+                  className="h-40 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                >
+                  <TrendingUp size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.order_surcharge.title')}</div>
+                  <div className="text-sm opacity-90">{t('checkout.order_surcharge.desc')}</div>
+                </button>
+              </EscalatableGate>
 
               {/* Trailing: Member + Stamp Cards */}
               {order.member_id ? (
@@ -388,15 +406,21 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                   <div className="text-sm opacity-90">{order.marketing_group_name}</div>
                 </button>
               ) : (
-                <button
-                  onClick={() => setShowMemberModal(true)}
-                  disabled={payment.isProcessing}
-                  className="h-40 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                <EscalatableGate
+                  permission={Permission.ORDERS_LINK_MEMBER}
+                  mode="intercept"
+                  description={t('checkout.member.link')}
+                  onAuthorized={() => setShowMemberModal(true)}
                 >
-                  <UserCheck size={48} />
-                  <div className="text-2xl font-bold">{t('checkout.member.link')}</div>
-                  <div className="text-sm opacity-90">{t('checkout.member.link_desc')}</div>
-                </button>
+                  <button
+                    disabled={payment.isProcessing}
+                    className="h-40 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                  >
+                    <UserCheck size={48} />
+                    <div className="text-2xl font-bold">{t('checkout.member.link')}</div>
+                    <div className="text-sm opacity-90">{t('checkout.member.link_desc')}</div>
+                  </button>
+                </EscalatableGate>
               )}
 
               {/* Stamp cards: only show redeemable or already redeemed */}
@@ -418,12 +442,9 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                 // Only show redeemable or already-redeemed cards
                 if (!canRedeem && !alreadyRedeemed) return null;
 
-                return (
+                const stampCardContent = (
                   <div
                     key={sp.stamp_activity_id}
-                    onClick={() => {
-                      if (canRedeem) stamp.setStampRedeemActivity(sp);
-                    }}
                     className={`h-40 rounded-2xl shadow-xl transition-all relative flex flex-col items-center justify-center gap-2 ${
                       alreadyRedeemed
                         ? 'bg-violet-100 text-violet-600'
@@ -476,6 +497,22 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     )}
                   </div>
                 );
+
+                if (canRedeem) {
+                  return (
+                    <EscalatableGate
+                      key={sp.stamp_activity_id}
+                      permission={Permission.ORDERS_REDEEM_STAMP}
+                      mode="intercept"
+                      description={t('checkout.stamp.redeem')}
+                      onAuthorized={() => stamp.setStampRedeemActivity(sp)}
+                    >
+                      {stampCardContent}
+                    </EscalatableGate>
+                  );
+                }
+
+                return React.cloneElement(stampCardContent, { key: sp.stamp_activity_id });
               })}
             </div>
           </div>

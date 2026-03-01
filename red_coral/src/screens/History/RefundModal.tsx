@@ -45,17 +45,25 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
         });
         setRefundableInfo(info);
 
-        // Build refund item list from order items
+        // Build refund item list, subtracting already-refunded quantities
+        const refundedMap = new Map(
+          info.refunded_items.map((ri) => [ri.instance_id, ri.refunded_quantity]),
+        );
         const refundItems: RefundItem[] = order.items
           .filter((item) => !item.is_comped && item.quantity > 0)
-          .map((item) => ({
-            instance_id: item.instance_id,
-            name: item.name + (item.spec_name && item.spec_name !== 'default' ? ` (${item.spec_name})` : ''),
-            unit_price: item.unit_price,
-            max_quantity: item.quantity,
-            quantity: 0,
-            selected: false,
-          }));
+          .map((item) => {
+            const alreadyRefunded = refundedMap.get(item.instance_id) ?? 0;
+            const remaining = item.quantity - alreadyRefunded;
+            return {
+              instance_id: item.instance_id,
+              name: item.name + (item.spec_name && item.spec_name !== 'default' ? ` (${item.spec_name})` : ''),
+              unit_price: item.unit_price,
+              max_quantity: remaining,
+              quantity: 0,
+              selected: false,
+            };
+          })
+          .filter((item) => item.max_quantity > 0); // hide fully refunded items
         setItems(refundItems);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load refundable info');

@@ -18,7 +18,7 @@ use crate::state::AppState;
 #[derive(Debug, Clone)]
 pub struct EdgeIdentity {
     pub entity_id: String,
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub device_id: String,
     pub entity_type: shared::activation::EntityType,
 }
@@ -47,7 +47,7 @@ pub async fn edge_auth_middleware(
     // Load Tenant CA cert for signature verification
     let tenant_ca_cert = state
         .ca_store
-        .load_tenant_ca_cert(&binding.tenant_id)
+        .load_tenant_ca_cert(binding.tenant_id)
         .await
         .map_err(|e| {
             tracing::warn!(
@@ -101,7 +101,7 @@ pub async fn edge_auth_middleware(
     // Inject EdgeIdentity into request extensions
     let identity = EdgeIdentity {
         entity_id: binding.entity_id.clone(),
-        tenant_id: binding.tenant_id.clone(),
+        tenant_id: binding.tenant_id,
         device_id: binding.device_id.clone(),
         entity_type: binding.entity_type,
     };
@@ -119,12 +119,12 @@ mod tests {
     fn test_edge_identity_clone() {
         let identity = EdgeIdentity {
             entity_id: "edge-001".to_string(),
-            tenant_id: "tenant-123".to_string(),
+            tenant_id: 123,
             device_id: "hw-abc".to_string(),
             entity_type: shared::activation::EntityType::Server,
         };
         let cloned = identity.clone();
         assert_eq!(cloned.entity_id, "edge-001");
-        assert_eq!(cloned.tenant_id, "tenant-123");
+        assert_eq!(cloned.tenant_id, 123);
     }
 }

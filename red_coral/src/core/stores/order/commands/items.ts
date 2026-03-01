@@ -53,7 +53,7 @@ export function toCartItemInput(item: CartItem): CartItemInput {
  * Add items to an existing order.
  */
 export const addItems = async (
-  orderId: string,
+  orderId: number,
   items: CartItem[]
 ): Promise<void> => {
   const command = createCommand({
@@ -70,7 +70,7 @@ export const addItems = async (
  * Modify an item in an order.
  */
 export const modifyItem = async (
-  orderId: string,
+  orderId: number,
   instance_id: string,
   changes: {
     price?: number;
@@ -106,7 +106,7 @@ export const modifyItem = async (
  * Remove an item from an order (soft delete).
  */
 export const removeItem = async (
-  orderId: string,
+  orderId: number,
   instance_id: string,
   reason?: string,
   quantity?: number,
@@ -130,7 +130,7 @@ export const removeItem = async (
  * Comp (gift) an item — splits quantity and marks as free.
  */
 export const compItem = async (
-  orderId: string,
+  orderId: number,
   instanceId: string,
   quantity: number,
   reason: string,
@@ -154,7 +154,7 @@ export const compItem = async (
  * Uncomp (undo gift) an item — restore original price.
  */
 export const uncompItem = async (
-  orderId: string,
+  orderId: number,
   instanceId: string,
   authorizer: { id: number; name: string },
 ): Promise<void> => {

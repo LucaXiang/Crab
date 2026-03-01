@@ -35,7 +35,7 @@ fn alignment_to_str(a: &LabelFieldAlignment) -> &'static str {
 pub async fn upsert_label_template_from_sync(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -380,7 +380,7 @@ pub async fn list_label_templates(
 pub async fn create_label_template_direct(
     pool: &PgPool,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     data: &LabelTemplateCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();

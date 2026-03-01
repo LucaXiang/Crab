@@ -16,7 +16,7 @@ pub async fn get_profile(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
 ) -> ApiResult<serde_json::Value> {
-    let profile = tenant_queries::get_profile(&state.pool, &identity.tenant_id)
+    let profile = tenant_queries::get_profile(&state.pool, identity.tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Profile query error: {e}");
@@ -24,14 +24,14 @@ pub async fn get_profile(
         })?
         .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
 
-    let subscription = tenant_queries::get_subscription(&state.pool, &identity.tenant_id)
+    let subscription = tenant_queries::get_subscription(&state.pool, identity.tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Subscription query error: {e}");
             AppError::new(ErrorCode::InternalError)
         })?;
 
-    let p12 = db::p12::get_p12_info(&state.pool, &identity.tenant_id)
+    let p12 = db::p12::get_p12_info(&state.pool, identity.tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("P12 query error: {e}");
@@ -59,7 +59,7 @@ pub async fn update_profile(
     if let Some(ref name) = req.name {
         sqlx::query("UPDATE tenants SET name = $1 WHERE id = $2")
             .bind(name)
-            .bind(&identity.tenant_id)
+            .bind(identity.tenant_id)
             .execute(&state.pool)
             .await
             .map_err(|_| AppError::new(ErrorCode::InternalError))?;
@@ -84,7 +84,7 @@ pub async fn change_email(
         return Err(AppError::new(ErrorCode::ValidationFailed));
     }
 
-    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
+    let tenant = db::tenants::find_by_id(&state.pool, identity.tenant_id)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?
         .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
@@ -150,7 +150,7 @@ pub async fn confirm_email_change(
     if let Some(ref meta) = record.metadata {
         let meta: serde_json::Value =
             serde_json::from_str(meta).map_err(|_| AppError::new(ErrorCode::InternalError))?;
-        if meta.get("tenant_id").and_then(|v| v.as_str()) != Some(&identity.tenant_id) {
+        if meta.get("tenant_id").and_then(|v| v.as_i64()) != Some(identity.tenant_id) {
             return Err(AppError::new(ErrorCode::PermissionDenied));
         }
     } else {
@@ -176,7 +176,7 @@ pub async fn confirm_email_change(
         return Err(AppError::new(ErrorCode::VerificationCodeInvalid));
     }
 
-    db::tenants::update_email(&state.pool, &identity.tenant_id, &new_email)
+    db::tenants::update_email(&state.pool, identity.tenant_id, &new_email)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
@@ -195,7 +195,7 @@ pub async fn confirm_email_change(
     let detail = serde_json::json!({ "old_email": old_email, "new_email": new_email });
     let _ = db::audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         "email_changed",
         Some(&detail),
         None,
@@ -222,7 +222,7 @@ pub async fn change_password(
         return Err(AppError::new(ErrorCode::PasswordTooShort));
     }
 
-    let tenant = db::tenants::find_by_id(&state.pool, &identity.tenant_id)
+    let tenant = db::tenants::find_by_id(&state.pool, identity.tenant_id)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?
         .ok_or_else(|| AppError::new(ErrorCode::TenantNotFound))?;
@@ -233,14 +233,14 @@ pub async fn change_password(
 
     let hashed =
         hash_password(&req.new_password).map_err(|_| AppError::new(ErrorCode::InternalError))?;
-    db::tenants::update_password(&state.pool, &identity.tenant_id, &hashed)
+    db::tenants::update_password(&state.pool, identity.tenant_id, &hashed)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
     let now = shared::util::now_millis();
     let _ = db::audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         "password_changed",
         None,
         None,

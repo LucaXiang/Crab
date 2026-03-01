@@ -66,7 +66,7 @@ pub struct ActivationData {
     /// 实体 ID (Server ID 或 Client Name)
     pub entity_id: String,
     /// 租户 ID
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// 设备 ID (硬件绑定)
     pub device_id: String,
 
@@ -107,7 +107,7 @@ pub struct SignedBinding {
     /// 实体 ID
     pub entity_id: String,
     /// 租户 ID
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// 设备 ID
     pub device_id: String,
     /// 证书指纹 (SHA256)
@@ -133,7 +133,7 @@ impl SignedBinding {
     /// 创建新的绑定数据 (未签名)
     pub fn new(
         entity_id: impl Into<String>,
-        tenant_id: impl Into<String>,
+        tenant_id: i64,
         device_id: impl Into<String>,
         fingerprint: impl Into<String>,
         entity_type: EntityType,
@@ -141,7 +141,7 @@ impl SignedBinding {
         let now = crate::util::now_millis();
         Self {
             entity_id: entity_id.into(),
-            tenant_id: tenant_id.into(),
+            tenant_id,
             device_id: device_id.into(),
             fingerprint: fingerprint.into(),
             bound_at: now,
@@ -304,7 +304,7 @@ pub struct P12Info {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SubscriptionInfo {
     /// 租户 ID
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// 订阅 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -355,7 +355,7 @@ impl SubscriptionInfo {
     /// 创建一个已失活的占位订阅（服务端拒绝时使用）
     pub fn inactive_placeholder() -> Self {
         Self {
-            tenant_id: String::new(),
+            tenant_id: 0,
             id: None,
             status: SubscriptionStatus::Inactive,
             plan: PlanType::Basic,
@@ -536,7 +536,7 @@ pub struct TenantVerifyResponse {
 /// 租户验证数据 (仅身份验证，不签发证书)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantVerifyData {
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// JWT access token (短期，1 小时)
     pub token: String,
     /// Refresh token (长期，30 天，活跃时自动续期)
@@ -604,14 +604,14 @@ mod tests {
     fn test_signable_data() {
         let binding = SignedBinding::new(
             "server-001",
-            "tenant-123",
+            123,
             "hw-abc",
             "fingerprint-xyz",
             EntityType::Server,
         );
         let data = binding.signable_data();
         assert!(data.contains("server-001"));
-        assert!(data.contains("tenant-123"));
+        assert!(data.contains("123"));
         assert!(data.contains("server"));
     }
 }

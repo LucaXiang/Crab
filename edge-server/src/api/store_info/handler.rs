@@ -68,7 +68,7 @@ pub async fn update(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            "main",
+            0,
             Some(&store_info),
             false,
         )

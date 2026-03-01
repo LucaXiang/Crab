@@ -11,7 +11,7 @@ async fn test_open_table() {
     assert!(response.order_id.is_some());
 
     let order_id = response.order_id.unwrap();
-    let snapshot = manager.get_snapshot(&order_id).unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap();
     assert!(snapshot.is_some());
 
     let snapshot = snapshot.unwrap();
@@ -26,7 +26,7 @@ async fn test_idempotency() {
 
     let response1 = manager.execute_command(cmd.clone()).await;
     assert!(response1.success);
-    let _order_id = response1.order_id.clone();
+    let _order_id = response1.order_id;
 
     // Execute same command again
     let response2 = manager.execute_command(cmd).await;
@@ -52,7 +52,7 @@ async fn test_add_items() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Test Product".to_string(),
@@ -72,7 +72,7 @@ async fn test_add_items() {
     let response = manager.execute_command(add_cmd).await;
     assert!(response.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items.len(), 1);
     assert_eq!(snapshot.items[0].quantity, 2);
     assert_eq!(snapshot.subtotal, 20.0);
@@ -92,7 +92,7 @@ async fn test_add_payment_and_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Test Product".to_string(),
@@ -115,7 +115,7 @@ async fn test_add_payment_and_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -127,7 +127,7 @@ async fn test_add_payment_and_complete() {
     let pay_response = manager.execute_command(pay_cmd).await;
     assert!(pay_response.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 10.0);
     assert_eq!(snapshot.payments.len(), 1);
     assert_eq!(snapshot.payments[0].change, Some(10.0));
@@ -137,14 +137,14 @@ async fn test_add_payment_and_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
     let complete_response = manager.execute_command(complete_cmd).await;
     assert!(complete_response.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert!(!snapshot.receipt_number.is_empty()); // Server-generated at OpenTable
 }
@@ -163,7 +163,7 @@ async fn test_void_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -175,7 +175,7 @@ async fn test_void_order() {
     let void_response = manager.execute_command(void_cmd).await;
     assert!(void_response.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Void);
 
     // Order should no longer be active
@@ -219,7 +219,7 @@ async fn test_rebuild_snapshot_matches_stored() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 5.0,
@@ -231,10 +231,10 @@ async fn test_rebuild_snapshot_matches_stored() {
     manager.execute_command(pay_cmd).await;
 
     // Get stored snapshot
-    let stored = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let stored = manager.get_snapshot(order_id).unwrap().unwrap();
 
     // Rebuild from events
-    let rebuilt = manager.rebuild_snapshot(&order_id).unwrap();
+    let rebuilt = manager.rebuild_snapshot(order_id).unwrap();
 
     // Core fields should match
     assert_eq!(stored.order_id, rebuilt.order_id);
@@ -258,7 +258,7 @@ async fn test_move_order_zone_updates_correctly() {
         open_table_with_items(&manager, 201, vec![simple_item(1, "Coffee", 5.0, 1)]).await;
 
     // Verify initial zone
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.zone_id, Some(1));
     assert_eq!(snapshot.zone_name, Some("Zone A".to_string()));
 
@@ -267,7 +267,7 @@ async fn test_move_order_zone_updates_correctly() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MoveOrder {
-            order_id: order_id.clone(),
+            order_id,
             target_table_id: 328,
             target_table_name: "Table T-move-2".to_string(),
             target_zone_id: Some(2),
@@ -279,7 +279,7 @@ async fn test_move_order_zone_updates_correctly() {
     let resp = manager.execute_command(move_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.table_id, Some(328));
     assert_eq!(
         snapshot.zone_id,
@@ -310,7 +310,7 @@ async fn test_merge_orders_source_with_payment_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: source_id.clone(),
+            order_id: source_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 5.0,
@@ -321,7 +321,7 @@ async fn test_merge_orders_source_with_payment_rejected() {
     );
     manager.execute_command(pay_cmd).await;
 
-    let source_before = manager.get_snapshot(&source_id).unwrap().unwrap();
+    let source_before = manager.get_snapshot(source_id).unwrap().unwrap();
     assert_eq!(source_before.paid_amount, 5.0);
 
     // Target order
@@ -332,8 +332,8 @@ async fn test_merge_orders_source_with_payment_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: source_id.clone(),
-            target_order_id: target_id.clone(),
+            source_order_id: source_id,
+            target_order_id: target_id,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -342,11 +342,11 @@ async fn test_merge_orders_source_with_payment_rejected() {
     assert!(!resp.success, "存在支付记录的订单不能合并");
 
     // Source and target should remain unchanged
-    let source_after = manager.get_snapshot(&source_id).unwrap().unwrap();
+    let source_after = manager.get_snapshot(source_id).unwrap().unwrap();
     assert_eq!(source_after.paid_amount, 5.0);
     assert_eq!(source_after.status, OrderStatus::Active);
 
-    let target_after = manager.get_snapshot(&target_id).unwrap().unwrap();
+    let target_after = manager.get_snapshot(target_id).unwrap().unwrap();
     assert_eq!(target_after.items.len(), 1, "Target should be unchanged");
     assert_eq!(target_after.paid_amount, 0.0);
 }
@@ -366,7 +366,7 @@ async fn test_add_payment_overpay_is_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10000.0,
@@ -378,7 +378,7 @@ async fn test_add_payment_overpay_is_rejected() {
     let resp = manager.execute_command(pay_cmd).await;
     assert!(!resp.success, "AddPayment should reject overpayment");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 0.0);
 }
 
@@ -397,7 +397,7 @@ async fn test_cancel_payment_then_repay_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: 10.0,
@@ -409,8 +409,8 @@ async fn test_cancel_payment_then_repay_then_complete() {
     manager.execute_command(pay_cmd).await;
 
     // Get payment_id
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let payment_id = snapshot.payments[0].payment_id.clone();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
+    let payment_id = snapshot.payments[0].payment_id;
     assert_eq!(snapshot.paid_amount, 10.0);
 
     // Cancel the payment
@@ -418,7 +418,7 @@ async fn test_cancel_payment_then_repay_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment_id,
             reason: Some("Wrong card".to_string()),
             authorizer_id: None,
@@ -428,7 +428,7 @@ async fn test_cancel_payment_then_repay_then_complete() {
     let resp = manager.execute_command(cancel_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 0.0, "After cancel, paid should be 0");
     assert!(snapshot.payments[0].cancelled);
 
@@ -437,7 +437,7 @@ async fn test_cancel_payment_then_repay_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -448,7 +448,7 @@ async fn test_cancel_payment_then_repay_then_complete() {
     );
     manager.execute_command(repay_cmd).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 10.0);
     assert_eq!(snapshot.payments.len(), 2);
 
@@ -457,14 +457,14 @@ async fn test_cancel_payment_then_repay_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
     let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
@@ -481,7 +481,7 @@ async fn test_complete_empty_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -492,7 +492,7 @@ async fn test_complete_empty_order() {
         "Zero-total order should complete successfully"
     );
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
@@ -512,7 +512,7 @@ async fn test_sequence_monotonically_increasing() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![simple_item(2, "Tea", 3.0, 1)],
         },
     );
@@ -586,7 +586,7 @@ async fn test_void_already_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -602,7 +602,7 @@ async fn test_void_already_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -632,7 +632,7 @@ async fn test_move_order_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MoveOrder {
-            order_id: order_id.clone(),
+            order_id,
             target_table_id: 329,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -648,7 +648,7 @@ async fn test_move_order_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: 10.0,
@@ -663,14 +663,14 @@ async fn test_move_order_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
     let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert_eq!(snapshot.table_id, Some(329));
 }
@@ -692,7 +692,7 @@ async fn test_split_by_items_then_complete() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 28.0);
     let coffee_instance = snapshot.items[0].instance_id.clone();
 
@@ -701,7 +701,7 @@ async fn test_split_by_items_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.clone(),
+            order_id,
             payment_method: "CASH".to_string(),
             items: vec![shared::order::SplitItem {
                 instance_id: coffee_instance,
@@ -715,7 +715,7 @@ async fn test_split_by_items_then_complete() {
     let resp = manager.execute_command(split_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 20.0);
 
     // Pay remaining: Tea = 8.0
@@ -723,7 +723,7 @@ async fn test_split_by_items_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: 8.0,
@@ -738,14 +738,14 @@ async fn test_split_by_items_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
     let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
@@ -764,7 +764,7 @@ async fn test_aa_split_full_flow_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             total_shares: 3,
             shares: 1,
             payment_method: "CASH".to_string(),
@@ -774,7 +774,7 @@ async fn test_aa_split_full_flow_then_complete() {
     let resp = manager.execute_command(start_aa_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.aa_total_shares, Some(3));
     assert_eq!(snapshot.aa_paid_shares, 1);
     assert_eq!(snapshot.paid_amount, 10.0);
@@ -784,7 +784,7 @@ async fn test_aa_split_full_flow_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::PayAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             shares: 1,
             payment_method: "CARD".to_string(),
             tendered: None,
@@ -798,7 +798,7 @@ async fn test_aa_split_full_flow_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::PayAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             shares: 1,
             payment_method: "CASH".to_string(),
             tendered: None,
@@ -807,7 +807,7 @@ async fn test_aa_split_full_flow_then_complete() {
     let resp = manager.execute_command(pay_aa_last).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.aa_paid_shares, 3);
     assert_eq!(snapshot.paid_amount, 30.0);
 
@@ -816,14 +816,14 @@ async fn test_aa_split_full_flow_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
     let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
@@ -851,7 +851,7 @@ async fn test_retail_order_gets_queue_number() {
     assert!(resp.success);
 
     let order_id = resp.order_id.unwrap();
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert!(
         snapshot.queue_number.is_some(),
         "Retail order should have queue number"
@@ -892,7 +892,7 @@ async fn test_get_events_since_completeness() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -928,8 +928,8 @@ async fn test_merge_source_becomes_merged_status() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: source_id.clone(),
-            target_order_id: target_id.clone(),
+            source_order_id: source_id,
+            target_order_id: target_id,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -937,13 +937,13 @@ async fn test_merge_source_becomes_merged_status() {
     let resp = manager.execute_command(merge_cmd).await;
     assert!(resp.success);
 
-    let source = manager.get_snapshot(&source_id).unwrap().unwrap();
+    let source = manager.get_snapshot(source_id).unwrap().unwrap();
     assert_eq!(source.status, OrderStatus::Merged);
 
     let active = manager.get_active_orders().unwrap();
     assert!(active.iter().all(|o| o.order_id != source_id));
 
-    let target = manager.get_snapshot(&target_id).unwrap().unwrap();
+    let target = manager.get_snapshot(target_id).unwrap().unwrap();
     assert_eq!(target.status, OrderStatus::Active);
     assert_eq!(target.items.len(), 2);
 }
@@ -960,7 +960,7 @@ async fn test_operations_on_nonexistent_order_fail() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: "nonexistent".to_string(),
+            order_id: 999999,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -976,7 +976,7 @@ async fn test_operations_on_nonexistent_order_fail() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: "nonexistent".to_string(),
+            order_id: 999999,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -987,7 +987,7 @@ async fn test_operations_on_nonexistent_order_fail() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: "nonexistent".to_string(),
+            order_id: 999999,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,

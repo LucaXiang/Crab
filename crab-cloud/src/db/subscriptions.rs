@@ -2,7 +2,7 @@ use sqlx::PgPool;
 
 pub struct CreateSubscription<'a> {
     pub id: &'a str,
-    pub tenant_id: &'a str,
+    pub tenant_id: i64,
     pub plan: &'a str,
     pub max_stores: i32,
     pub current_period_end: Option<i64>,
@@ -70,12 +70,11 @@ pub async fn update_subscription_fields(
 pub async fn find_tenant_by_sub_id(
     pool: &PgPool,
     stripe_sub_id: &str,
-) -> Result<Option<String>, sqlx::Error> {
-    let row: Option<(String,)> =
-        sqlx::query_as("SELECT tenant_id FROM subscriptions WHERE id = $1")
-            .bind(stripe_sub_id)
-            .fetch_optional(pool)
-            .await?;
+) -> Result<Option<i64>, sqlx::Error> {
+    let row: Option<(i64,)> = sqlx::query_as("SELECT tenant_id FROM subscriptions WHERE id = $1")
+        .bind(stripe_sub_id)
+        .fetch_optional(pool)
+        .await?;
     Ok(row.map(|r| r.0))
 }
 
@@ -84,7 +83,7 @@ pub async fn find_tenant_by_sub_id(
 #[allow(dead_code)]
 pub struct Subscription {
     pub id: String,
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub status: String,
     pub plan: String,
     pub max_stores: i32,
@@ -101,7 +100,7 @@ pub struct Subscription {
 /// - verify/subscription 端点：返回真实状态让前端展示拦截页面
 pub async fn get_latest_subscription(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<Option<Subscription>, sqlx::Error> {
     sqlx::query_as::<_, Subscription>(
         "SELECT id, tenant_id, status, plan, max_stores,

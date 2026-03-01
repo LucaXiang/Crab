@@ -34,12 +34,12 @@ pub async fn execute_rpc(state: &ServerState, rpc: &CloudRpc) -> CloudRpcResult 
                 error: None,
             }
         }
-        CloudRpc::GetOrderDetail { order_key } => {
-            // Resolve order_key → pk
+        CloudRpc::GetOrderDetail { order_id } => {
+            // Resolve order_id → pk
             let order_pk = match sqlx::query_scalar::<_, i64>(
-                "SELECT id FROM archived_order WHERE order_key = ? LIMIT 1",
+                "SELECT id FROM archived_order WHERE order_id = ? LIMIT 1",
             )
-            .bind(order_key)
+            .bind(order_id)
             .fetch_optional(&state.pool)
             .await
             {
@@ -48,7 +48,7 @@ pub async fn execute_rpc(state: &ServerState, rpc: &CloudRpc) -> CloudRpcResult 
                     return CloudRpcResult::Json {
                         success: false,
                         data: None,
-                        error: Some(format!("Order not found: {order_key}")),
+                        error: Some(format!("Order not found: {order_id}")),
                     };
                 }
                 Err(e) => {

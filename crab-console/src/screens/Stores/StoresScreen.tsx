@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Server, Clock, ArrowRight, AlertTriangle, MapPin } from 'lucide-react';
+import { Store, Clock, ArrowRight, AlertTriangle, MapPin } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getStores } from '@/infrastructure/api/stores';
@@ -67,7 +67,7 @@ export const StoresScreen: React.FC = () => {
         </div>
         {stores.length === 0 ? (
           <div className="text-center py-8">
-            <Server className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <Store className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <p className="text-sm text-slate-500">{t('dash.no_stores')}</p>
             <p className="text-xs text-slate-400 mt-1">{t('dash.no_stores_hint')}</p>
           </div>
@@ -81,7 +81,7 @@ export const StoresScreen: React.FC = () => {
               >
                 <div className="flex items-start sm:items-center gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner">
-                    <Server className="w-6 h-6 text-slate-500" />
+                    <Store className="w-6 h-6 text-slate-500" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">

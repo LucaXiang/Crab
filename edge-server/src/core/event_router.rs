@@ -186,14 +186,14 @@ mod tests {
         };
 
         OrderEvent {
-            event_id: uuid::Uuid::new_v4().to_string(),
+            event_id: shared::util::snowflake_id(),
             sequence,
-            order_id: "test".to_string(),
+            order_id: 9001,
             timestamp: shared::util::now_millis(),
             client_timestamp: None,
             operator_id: 1,
             operator_name: "Test Operator".to_string(),
-            command_id: uuid::Uuid::new_v4().to_string(),
+            command_id: shared::util::snowflake_id(),
             event_type,
             payload,
         }

@@ -20,7 +20,7 @@ fn routes() -> Router<ServerState> {
         .route("/", get(handler::list))
         .route("/{id}", get(handler::get_by_id));
 
-    // 管理路由：需要 marketing_groups:manage 权限
+    // 管理路由：需要 marketing:manage 权限
     let manage_routes = Router::new()
         .route("/", post(handler::create))
         .route("/{id}", put(handler::update).delete(handler::delete))
@@ -36,9 +36,7 @@ fn routes() -> Router<ServerState> {
             "/{id}/stamp-activities/{activity_id}",
             put(handler::update_activity).delete(handler::delete_activity),
         )
-        .layer(middleware::from_fn(require_permission(
-            "marketing_groups:manage",
-        )));
+        .layer(middleware::from_fn(require_permission("marketing:manage")));
 
     read_routes.merge(manage_routes)
 }

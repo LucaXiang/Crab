@@ -9,14 +9,14 @@
 const STORAGE_KEY = 'pos-pending-retail-order';
 
 export interface PendingRetailOrder {
-  orderId: string;
+  orderId: number;
   createdAt: number;
 }
 
 /**
  * 保存待处理的零售订单ID
  */
-export function savePendingRetailOrder(orderId: string): void {
+export function savePendingRetailOrder(orderId: number): void {
   const data: PendingRetailOrder = {
     orderId,
     createdAt: Date.now(),

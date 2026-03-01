@@ -31,12 +31,11 @@ async fn refresh_and_broadcast_products(state: &ServerState, attribute_id: i64) 
         Ok(product_ids) => {
             for pid in product_ids {
                 let product = state.catalog_service.get_product(pid);
-                let pid_str = pid.to_string();
                 state
                     .broadcast_sync(
                         SyncResource::Product,
                         SyncChangeType::Updated,
-                        &pid_str,
+                        pid,
                         product.as_ref(),
                         false,
                     )
@@ -137,20 +136,26 @@ pub async fn create(
 
     let attr = attribute::create(&state.pool, None, payload).await?;
 
-    let id = attr.id.to_string();
+    let id_str = attr.id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::AttributeCreated,
         "attribute",
-        &id,
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&attr, "attribute")
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&attr), false)
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            attr.id,
+            Some(&attr),
+            false,
+        )
         .await;
 
     Ok(Json(attr))
@@ -190,13 +195,7 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&attr),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&attr), false)
         .await;
 
     // 刷新引用此属性的产品缓存并广播 sync
@@ -252,7 +251,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, id, None, false)
             .await;
 
         // 刷新引用此属性的产品缓存
@@ -318,13 +317,7 @@ pub async fn add_option(
 
     // 广播同步通知
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&attr),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&attr), false)
         .await;
 
     // 刷新引用此属性的产品缓存
@@ -398,13 +391,7 @@ pub async fn update_option(
 
     // 广播同步通知
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&attr),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&attr), false)
         .await;
 
     // 刷新引用此属性的产品缓存
@@ -473,13 +460,7 @@ pub async fn remove_option(
 
     // 广播同步通知
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&attr),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&attr), false)
         .await;
 
     // 刷新引用此属性的产品缓存

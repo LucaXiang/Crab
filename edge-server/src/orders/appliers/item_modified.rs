@@ -311,7 +311,7 @@ mod tests {
     }
 
     fn create_item_modified_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         source: CartItemSnapshot,
         affected_quantity: i32,
@@ -320,10 +320,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemModified,
             EventPayload::ItemModified {
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_full_price_change() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
@@ -361,7 +361,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 2, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 2, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_full_discount() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 100.0, 1));
@@ -397,7 +397,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_partial_split() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
@@ -439,7 +439,7 @@ mod tests {
             },
         ];
 
-        let event = create_item_modified_event("order-1", 2, source, 2, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 2, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_note() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
@@ -481,7 +481,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_quantity_change() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
@@ -511,7 +511,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 3, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 3, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
@@ -542,7 +542,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 6, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 6, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -552,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
@@ -571,7 +571,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 1, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_nonexistent_item_is_noop() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
@@ -601,7 +601,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 1, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -613,7 +613,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_multiple_changes() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
@@ -633,7 +633,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 1, source, 2, changes, results);
+        let event = create_item_modified_event(1001, 1, source, 2, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_split_with_note() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
@@ -677,7 +677,7 @@ mod tests {
             },
         ];
 
-        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 1, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_options_full() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
@@ -823,7 +823,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 1, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -836,7 +836,7 @@ mod tests {
 
     #[test]
     fn test_item_modified_split_with_options() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
@@ -878,7 +878,7 @@ mod tests {
             },
         ];
 
-        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+        let event = create_item_modified_event(1001, 1, source, 1, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -903,7 +903,7 @@ mod tests {
     /// 3. Verify the item's instance_id is updated
     #[test]
     fn test_item_modified_full_updates_instance_id() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 100.0, 2));
@@ -922,7 +922,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 2, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 2, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -944,7 +944,7 @@ mod tests {
     fn test_modified_item_does_not_merge_with_new_item() {
         use crate::orders::appliers::items_added::ItemsAddedApplier;
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         // Step 1: Add initial item
         let initial_item = create_test_item("original-id", 1, "Product A", 100.0, 1);
@@ -963,8 +963,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let modify_event =
-            create_item_modified_event("order-1", 2, initial_item, 1, changes, results);
+        let modify_event = create_item_modified_event(1001, 2, initial_item, 1, changes, results);
 
         let modify_applier = ItemModifiedApplier;
         modify_applier.apply(&mut snapshot, &modify_event);
@@ -978,10 +977,10 @@ mod tests {
         let new_item = create_test_item("original-id", 1, "Product A", 100.0, 1);
         let items_added_event = OrderEvent::new(
             3,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-3".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemsAdded,
             EventPayload::ItemsAdded {
@@ -1012,7 +1011,7 @@ mod tests {
     /// User changes unpaid to 7. Expected: total=8, unpaid=7, single item.
     #[test]
     fn test_item_modified_paid_quantity_change_in_place() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 6));
@@ -1033,7 +1032,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 6, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 6, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -1058,7 +1057,7 @@ mod tests {
     /// Expected: single item, quantities unchanged.
     #[test]
     fn test_item_modified_paid_note_only_in_place() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 6));
@@ -1079,7 +1078,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 6, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 6, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -1098,7 +1097,7 @@ mod tests {
     /// User applies 50% discount. Expected: paid portion frozen at 5€, unpaid at 2.5€.
     #[test]
     fn test_item_modified_paid_discount_splits_to_protect_paid() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 5.0, 10));
@@ -1120,7 +1119,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 10, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 10, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -1161,7 +1160,7 @@ mod tests {
     /// Expected: paid(9@5€) + unpaid(10@2.5€=25€). Total=70, remaining=25.
     #[test]
     fn test_item_modified_paid_discount_with_quantity_change() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 5.0, 10));
@@ -1184,7 +1183,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 10, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 10, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
@@ -1210,7 +1209,7 @@ mod tests {
     /// Test: price change on partially paid item also splits.
     #[test]
     fn test_item_modified_paid_price_change_splits() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
@@ -1232,7 +1231,7 @@ mod tests {
             action: "UPDATED".to_string(),
         }];
 
-        let event = create_item_modified_event("order-1", 2, source, 5, changes, results);
+        let event = create_item_modified_event(1001, 2, source, 5, changes, results);
 
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);

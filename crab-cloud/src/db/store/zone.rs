@@ -62,7 +62,7 @@ pub async fn list_zones(pool: &PgPool, store_id: i64) -> Result<Vec<Zone>, BoxEr
 pub async fn create_zone_direct(
     pool: &PgPool,
     store_id: i64,
-    _tenant_id: &str,
+    _tenant_id: i64,
     data: &ZoneCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();

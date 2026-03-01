@@ -7,7 +7,7 @@
 -- ── Tenants & Auth ──
 
 CREATE TABLE IF NOT EXISTS tenants (
-    id                TEXT PRIMARY KEY,
+    id                BIGINT PRIMARY KEY,
     email             TEXT NOT NULL UNIQUE,
     hashed_password   TEXT NOT NULL,
     name              TEXT,
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants (status);
 
 CREATE TABLE IF NOT EXISTS subscriptions (
     id                 TEXT PRIMARY KEY,
-    tenant_id          TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id          BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     status             TEXT NOT NULL DEFAULT 'active',
     plan               TEXT NOT NULL,
     max_stores         INT NOT NULL DEFAULT 1,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS email_verifications (
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     device_id TEXT NOT NULL,
     expires_at BIGINT NOT NULL,
     user_agent TEXT NOT NULL DEFAULT '',
@@ -66,7 +66,7 @@ CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at) WHERE NOT 
 
 CREATE TABLE IF NOT EXISTS activations (
     entity_id         TEXT PRIMARY KEY,
-    tenant_id         TEXT NOT NULL,
+    tenant_id         BIGINT NOT NULL,
     device_id         TEXT NOT NULL,
     fingerprint       TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'active',
@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_activations_replaced_by ON activations(replaced_b
 
 CREATE TABLE IF NOT EXISTS client_connections (
     entity_id         TEXT PRIMARY KEY,
-    tenant_id         TEXT NOT NULL,
+    tenant_id         BIGINT NOT NULL,
     device_id         TEXT NOT NULL,
     fingerprint       TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'active',
@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_client_connections_tenant_status ON client_connec
 CREATE INDEX IF NOT EXISTS idx_client_connections_replaced_by ON client_connections(replaced_by) WHERE replaced_by IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS p12_certificates (
-    tenant_id         TEXT PRIMARY KEY,
+    tenant_id         BIGINT PRIMARY KEY,
     p12_encrypted     TEXT,
     fingerprint       TEXT,
     common_name       TEXT,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS processed_webhook_events (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id BIGSERIAL PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    tenant_id BIGINT NOT NULL,
     action TEXT NOT NULL,
     detail JSONB,
     ip_address TEXT,
@@ -136,9 +136,9 @@ CREATE INDEX idx_audit_logs_tenant ON audit_logs (tenant_id, created_at);
 -- ── Stores (was edge_servers, merged with store_info) ──
 
 CREATE TABLE IF NOT EXISTS stores (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     entity_id TEXT NOT NULL,
-    tenant_id TEXT NOT NULL,
+    tenant_id BIGINT NOT NULL,
     device_id TEXT NOT NULL,
     store_number INT NOT NULL,
     alias TEXT NOT NULL DEFAULT 'Store01',
@@ -390,9 +390,9 @@ CREATE INDEX idx_store_dining_tables_zone ON store_dining_tables(store_id, zone_
 CREATE TABLE IF NOT EXISTS store_archived_orders (
     id BIGSERIAL PRIMARY KEY,
     store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-    tenant_id TEXT NOT NULL,
+    tenant_id BIGINT NOT NULL,
     source_id TEXT NOT NULL,
-    order_key TEXT NOT NULL,
+    order_id BIGINT NOT NULL,
     receipt_number TEXT,
     status TEXT NOT NULL,
     end_time BIGINT,
@@ -413,7 +413,7 @@ CREATE TABLE IF NOT EXISTS store_archived_orders (
 );
 
 CREATE UNIQUE INDEX uq_store_archived_orders_key
-    ON store_archived_orders (tenant_id, store_id, order_key);
+    ON store_archived_orders (tenant_id, store_id, order_id);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_tenant ON store_archived_orders (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_receipt ON store_archived_orders (tenant_id, receipt_number);
 CREATE INDEX IF NOT EXISTS idx_store_archived_orders_end_time ON store_archived_orders (tenant_id, end_time);
@@ -426,6 +426,7 @@ CREATE INDEX idx_store_archived_orders_list
 CREATE TABLE IF NOT EXISTS store_daily_reports (
     id               BIGSERIAL PRIMARY KEY,
     store_id         BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    tenant_id        BIGINT NOT NULL,
     source_id        BIGINT NOT NULL,
     business_date    TEXT NOT NULL,
     total_orders     BIGINT NOT NULL DEFAULT 0,
@@ -503,7 +504,7 @@ CREATE INDEX idx_store_shift_breakdown_report ON store_daily_report_shift_breakd
 CREATE TABLE IF NOT EXISTS store_commands (
     id BIGSERIAL PRIMARY KEY,
     store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-    tenant_id TEXT NOT NULL,
+    tenant_id BIGINT NOT NULL,
     command_type TEXT NOT NULL,
     payload JSONB NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
@@ -521,6 +522,7 @@ CREATE INDEX IF NOT EXISTS idx_store_commands_store ON store_commands(store_id);
 CREATE TABLE IF NOT EXISTS store_shifts (
     id              BIGSERIAL PRIMARY KEY,
     store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    tenant_id       BIGINT NOT NULL,
     source_id       BIGINT NOT NULL,
     operator_id     BIGINT NOT NULL,
     operator_name   TEXT NOT NULL,
@@ -574,7 +576,7 @@ CREATE TABLE store_label_templates (
     id              BIGSERIAL PRIMARY KEY,
     store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     source_id       BIGINT NOT NULL DEFAULT 0,
-    tenant_id       TEXT NOT NULL,
+    tenant_id       BIGINT NOT NULL,
     name            TEXT NOT NULL,
     description     TEXT,
     width           REAL NOT NULL,
@@ -631,6 +633,7 @@ CREATE INDEX idx_store_label_fields_template ON store_label_fields(template_id);
 CREATE TABLE store_pending_ops (
     id BIGSERIAL PRIMARY KEY,
     store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    tenant_id BIGINT NOT NULL,
     op JSONB NOT NULL,
     changed_at BIGINT NOT NULL,
     created_at BIGINT NOT NULL
@@ -641,7 +644,7 @@ CREATE INDEX idx_pending_ops_store ON store_pending_ops(store_id);
 -- ── Tenant Images (S3 orphan tracking) ──
 
 CREATE TABLE tenant_images (
-    tenant_id   TEXT    NOT NULL REFERENCES tenants(id),
+    tenant_id   BIGINT  NOT NULL REFERENCES tenants(id),
     hash        TEXT    NOT NULL,
     ref_count   INTEGER NOT NULL DEFAULT 0,
     created_at  BIGINT  NOT NULL,
@@ -656,10 +659,10 @@ CREATE INDEX idx_tenant_images_orphaned ON tenant_images (orphaned_at) WHERE orp
 CREATE TABLE IF NOT EXISTS store_credit_notes (
     id BIGSERIAL PRIMARY KEY,
     store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-    tenant_id TEXT NOT NULL,
+    tenant_id BIGINT NOT NULL,
     source_id BIGINT NOT NULL,
     credit_note_number TEXT NOT NULL,
-    original_order_key TEXT NOT NULL,
+    original_order_id BIGINT NOT NULL,
     original_receipt TEXT NOT NULL,
     subtotal_credit DOUBLE PRECISION NOT NULL,
     tax_credit DOUBLE PRECISION NOT NULL,
@@ -680,7 +683,7 @@ CREATE TABLE IF NOT EXISTS store_credit_notes (
 CREATE UNIQUE INDEX uq_store_credit_notes_source
     ON store_credit_notes (tenant_id, store_id, source_id);
 CREATE INDEX idx_store_credit_notes_order
-    ON store_credit_notes (tenant_id, store_id, original_order_key);
+    ON store_credit_notes (tenant_id, store_id, original_order_id);
 CREATE INDEX idx_store_credit_notes_tenant
     ON store_credit_notes (tenant_id, created_at DESC);
 
@@ -689,7 +692,7 @@ CREATE INDEX idx_store_credit_notes_tenant
 CREATE TABLE IF NOT EXISTS store_invoices (
     id BIGSERIAL PRIMARY KEY,
     store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-    tenant_id TEXT NOT NULL,
+    tenant_id BIGINT NOT NULL,
     source_id BIGINT NOT NULL,
     invoice_number TEXT NOT NULL,
     serie TEXT NOT NULL,

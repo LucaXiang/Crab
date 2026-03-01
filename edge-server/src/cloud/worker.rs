@@ -2,7 +2,7 @@
 //!
 //! 1. Connect WebSocket to crab-cloud (mTLS)
 //! 2. Wait for Welcome{cursors} → compare with local ResourceVersions → incremental sync
-//! 3. Archived order catch-up sync via HTTP (strong consistency)
+//! 3. Catch-up sync via HTTP: archived orders, credit notes, invoices, anulaciones (chain_entry order)
 //! 4. Listen for MessageBus broadcasts → debounced push via WS (products/categories)
 //! 5. Listen for WS incoming → Command execution (cloud→edge only)
 //! 6. Reconnect with exponential backoff on disconnect
@@ -19,7 +19,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cloud::service::CloudService;
 use crate::core::state::ServerState;
-use crate::db::repository::{credit_note, invoice, order};
+use crate::db::repository::{anulacion, credit_note, invoice, order};
 
 /// Debounce window for batching changes
 const DEBOUNCE_MS: u64 = 500;
@@ -163,7 +163,7 @@ impl CloudWorker {
             tokio::time::interval(Duration::from_secs(ARCHIVED_ORDER_SYNC_INTERVAL_SECS));
         archived_order_sync_interval.tick().await; // skip immediate tick (already did catch-up above)
 
-        let mut pending: HashMap<SyncResource, HashMap<String, CloudSyncItem>> = HashMap::new();
+        let mut pending: HashMap<SyncResource, HashMap<i64, CloudSyncItem>> = HashMap::new();
         let mut debounce_deadline: Option<Instant> = None;
 
         loop {
@@ -222,7 +222,7 @@ impl CloudWorker {
 
                             if let Some(item) = Self::extract_sync_item(&msg) {
                                 let resource = item.resource;
-                                let resource_id = item.resource_id.clone();
+                                let resource_id = item.resource_id;
                                 pending
                                     .entry(resource)
                                     .or_default()
@@ -365,11 +365,11 @@ impl CloudWorker {
                     error: None,
                 }
             }
-            shared::cloud::CloudRpc::GetOrderDetail { order_key } => {
+            shared::cloud::CloudRpc::GetOrderDetail { order_id } => {
                 match sqlx::query_scalar::<_, i64>(
-                    "SELECT id FROM archived_order WHERE order_key = ? LIMIT 1",
+                    "SELECT id FROM archived_order WHERE order_id = ? LIMIT 1",
                 )
-                .bind(order_key)
+                .bind(order_id)
                 .fetch_optional(&self.state.pool)
                 .await
                 {
@@ -395,7 +395,7 @@ impl CloudWorker {
                     Ok(None) => CloudRpcResult::Json {
                         success: false,
                         data: None,
-                        error: Some(format!("Order not found: {order_key}")),
+                        error: Some(format!("Order not found: {order_id}")),
                     },
                     Err(e) => CloudRpcResult::Json {
                         success: false,
@@ -507,6 +507,9 @@ impl CloudWorker {
         if let Err(e) = self.sync_invoices_http().await {
             tracing::warn!("{trigger}: invoice sync failed: {e}");
         }
+        if let Err(e) = self.sync_anulaciones_http().await {
+            tracing::warn!("{trigger}: anulacion sync failed: {e}");
+        }
     }
 
     /// **严格有序**: 按 id 顺序处理，遇到构建失败计数，连续失败 3 次则跳过该订单。
@@ -553,7 +556,7 @@ impl CloudWorker {
                             resource: SyncResource::ArchivedOrder,
                             version: id as u64,
                             action: shared::cloud::SyncAction::Upsert,
-                            resource_id: detail_sync.order_key,
+                            resource_id: id,
                             data,
                         });
                         synced_ids.push(id);
@@ -604,18 +607,44 @@ impl CloudWorker {
                 })?;
 
             if response.rejected > 0 {
-                tracing::warn!(
-                    accepted = response.accepted,
-                    rejected = response.rejected,
-                    "Archived order sync has rejections, stopping catch-up"
-                );
+                // Separate duplicate-key rejections (already synced) from real errors
+                let mut dup_db_ids: Vec<i64> = Vec::new();
+                let mut real_errors = Vec::new();
                 for err in &response.errors {
-                    tracing::warn!(
-                        resource_id = %err.resource_id,
-                        "Rejected: {}", err.message
-                    );
+                    if err.message.contains("duplicate key") {
+                        // Use batch index to find the corresponding i64 database ID
+                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
+                            dup_db_ids.push(db_id);
+                        }
+                        tracing::info!(
+                            resource_id = %err.resource_id,
+                            index = err.index,
+                            "Already exists in cloud, marking as synced"
+                        );
+                    } else {
+                        real_errors.push(err);
+                        tracing::warn!(
+                            resource_id = %err.resource_id,
+                            "Rejected: {}", err.message
+                        );
+                    }
                 }
-                break;
+
+                // Mark duplicate-key items as synced (they're already in cloud)
+                if !dup_db_ids.is_empty()
+                    && let Err(e) = order::mark_cloud_synced(&self.state.pool, &dup_db_ids).await
+                {
+                    tracing::error!("Failed to mark duplicate orders as synced: {e}");
+                }
+
+                if !real_errors.is_empty() {
+                    tracing::warn!(
+                        accepted = response.accepted,
+                        rejected = real_errors.len(),
+                        "Archived order sync has non-duplicate rejections, stopping catch-up"
+                    );
+                    break;
+                }
             }
 
             // Cloud confirmed all accepted — mark as synced
@@ -678,7 +707,7 @@ impl CloudWorker {
                             resource: SyncResource::CreditNote,
                             version: id as u64,
                             action: shared::cloud::SyncAction::Upsert,
-                            resource_id: id.to_string(),
+                            resource_id: id,
                             data,
                         });
                         synced_ids.push(id);
@@ -729,12 +758,41 @@ impl CloudWorker {
                 })?;
 
             if response.rejected > 0 {
-                tracing::warn!(
-                    accepted = response.accepted,
-                    rejected = response.rejected,
-                    "Credit note sync has rejections, stopping catch-up"
-                );
-                break;
+                let mut dup_db_ids: Vec<i64> = Vec::new();
+                let mut real_errors = Vec::new();
+                for err in &response.errors {
+                    if err.message.contains("duplicate key") {
+                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
+                            dup_db_ids.push(db_id);
+                        }
+                        tracing::info!(
+                            resource_id = %err.resource_id,
+                            "Credit note already exists in cloud, marking as synced"
+                        );
+                    } else {
+                        real_errors.push(err);
+                        tracing::warn!(
+                            resource_id = %err.resource_id,
+                            "Credit note rejected: {}", err.message
+                        );
+                    }
+                }
+
+                if !dup_db_ids.is_empty()
+                    && let Err(e) =
+                        credit_note::mark_synced_batch(&self.state.pool, &dup_db_ids).await
+                {
+                    tracing::error!("Failed to mark duplicate credit notes as synced: {e}");
+                }
+
+                if !real_errors.is_empty() {
+                    tracing::warn!(
+                        accepted = response.accepted,
+                        rejected = real_errors.len(),
+                        "Credit note sync has non-duplicate rejections, stopping catch-up"
+                    );
+                    break;
+                }
             }
 
             if let Err(e) = credit_note::mark_synced_batch(&self.state.pool, &synced_ids).await {
@@ -795,7 +853,7 @@ impl CloudWorker {
                             resource: SyncResource::Invoice,
                             version: id as u64,
                             action: shared::cloud::SyncAction::Upsert,
-                            resource_id: id.to_string(),
+                            resource_id: id,
                             data,
                         });
                         synced_ids.push(id);
@@ -845,12 +903,40 @@ impl CloudWorker {
                 })?;
 
             if response.rejected > 0 {
-                tracing::warn!(
-                    accepted = response.accepted,
-                    rejected = response.rejected,
-                    "Invoice sync has rejections, stopping catch-up"
-                );
-                break;
+                let mut dup_db_ids: Vec<i64> = Vec::new();
+                let mut real_errors = Vec::new();
+                for err in &response.errors {
+                    if err.message.contains("duplicate key") {
+                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
+                            dup_db_ids.push(db_id);
+                        }
+                        tracing::info!(
+                            resource_id = %err.resource_id,
+                            "Invoice already exists in cloud, marking as synced"
+                        );
+                    } else {
+                        real_errors.push(err);
+                        tracing::warn!(
+                            resource_id = %err.resource_id,
+                            "Invoice rejected: {}", err.message
+                        );
+                    }
+                }
+
+                if !dup_db_ids.is_empty()
+                    && let Err(e) = invoice::mark_synced(&self.state.pool, &dup_db_ids).await
+                {
+                    tracing::error!("Failed to mark duplicate invoices as synced: {e}");
+                }
+
+                if !real_errors.is_empty() {
+                    tracing::warn!(
+                        accepted = response.accepted,
+                        rejected = real_errors.len(),
+                        "Invoice sync has non-duplicate rejections, stopping catch-up"
+                    );
+                    break;
+                }
             }
 
             if let Err(e) = invoice::mark_synced(&self.state.pool, &synced_ids).await {
@@ -872,11 +958,155 @@ impl CloudWorker {
         Ok(())
     }
 
+    /// Sync unsynced invoice anulaciones to cloud via HTTP batch.
+    async fn sync_anulaciones_http(&mut self) -> Result<(), crate::utils::AppError> {
+        let binding = self.get_binding().await?;
+
+        loop {
+            let ids = anulacion::list_unsynced_ids(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
+                .await
+                .map_err(|e| {
+                    crate::utils::AppError::internal(format!("List unsynced anulaciones: {e}"))
+                })?;
+
+            if ids.is_empty() {
+                break;
+            }
+
+            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
+            let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
+            let mut skipped_ids: Vec<i64> = Vec::new();
+
+            for &id in &ids {
+                match anulacion::build_sync(&self.state.pool, id).await {
+                    Ok(sync_payload) => {
+                        let data = match serde_json::to_value(&sync_payload) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::error!(
+                                    anulacion_id = id,
+                                    "Failed to serialize AnulacionSync, skipping: {e}"
+                                );
+                                skipped_ids.push(id);
+                                continue;
+                            }
+                        };
+                        items.push(CloudSyncItem {
+                            resource: SyncResource::Anulacion,
+                            version: id as u64,
+                            action: shared::cloud::SyncAction::Upsert,
+                            resource_id: id,
+                            data,
+                        });
+                        synced_ids.push(id);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            anulacion_id = id,
+                            "Failed to build AnulacionSync, skipping: {e}"
+                        );
+                        skipped_ids.push(id);
+                    }
+                }
+            }
+
+            // Mark permanently failed anulaciones as synced to unblock the queue
+            if !skipped_ids.is_empty() {
+                tracing::warn!(
+                    count = skipped_ids.len(),
+                    ids = ?skipped_ids,
+                    "Skipped unbuildable anulaciones, marking as synced"
+                );
+                if let Err(e) = anulacion::mark_synced(&self.state.pool, &skipped_ids).await {
+                    tracing::error!("Failed to mark skipped anulaciones as synced: {e}");
+                }
+            }
+
+            if items.is_empty() {
+                if skipped_ids.is_empty() {
+                    break;
+                }
+                continue;
+            }
+
+            let batch_count = items.len();
+            let batch = CloudSyncBatch {
+                edge_id: self.cloud_service.edge_id().to_string(),
+                items,
+                sent_at: shared::util::now_millis(),
+            };
+
+            let response = self
+                .cloud_service
+                .push_batch(batch, &binding)
+                .await
+                .map_err(|e| {
+                    crate::utils::AppError::internal(format!("HTTP sync anulaciones: {e}"))
+                })?;
+
+            if response.rejected > 0 {
+                let mut dup_db_ids: Vec<i64> = Vec::new();
+                let mut real_errors = Vec::new();
+                for err in &response.errors {
+                    if err.message.contains("duplicate key") {
+                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
+                            dup_db_ids.push(db_id);
+                        }
+                        tracing::info!(
+                            resource_id = %err.resource_id,
+                            "Anulacion already exists in cloud, marking as synced"
+                        );
+                    } else {
+                        real_errors.push(err);
+                        tracing::warn!(
+                            resource_id = %err.resource_id,
+                            "Anulacion rejected: {}", err.message
+                        );
+                    }
+                }
+
+                if !dup_db_ids.is_empty()
+                    && let Err(e) = anulacion::mark_synced(&self.state.pool, &dup_db_ids).await
+                {
+                    tracing::error!("Failed to mark duplicate anulaciones as synced: {e}");
+                }
+
+                if !real_errors.is_empty() {
+                    tracing::warn!(
+                        accepted = response.accepted,
+                        rejected = real_errors.len(),
+                        "Anulacion sync has non-duplicate rejections, stopping catch-up"
+                    );
+                    break;
+                }
+            }
+
+            if let Err(e) = anulacion::mark_synced(&self.state.pool, &synced_ids).await {
+                tracing::error!(
+                    "Failed to mark anulaciones as cloud_synced, stopping catch-up: {e}"
+                );
+                break;
+            }
+
+            tracing::info!(
+                batch_size = batch_count,
+                accepted = response.accepted,
+                "Anulaciones synced and confirmed via HTTP"
+            );
+
+            if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Flush pending debounced items via WebSocket
     async fn flush_pending_ws<S>(
         &mut self,
         ws_sink: &mut S,
-        pending: &mut HashMap<SyncResource, HashMap<String, CloudSyncItem>>,
+        pending: &mut HashMap<SyncResource, HashMap<i64, CloudSyncItem>>,
     ) -> Result<(), crate::utils::AppError>
     where
         S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
@@ -967,7 +1197,7 @@ impl CloudWorker {
                             resource,
                             version,
                             action: shared::cloud::SyncAction::Upsert,
-                            resource_id: id_fn(record).to_string(),
+                            resource_id: id_fn(record),
                             data,
                         });
                     }
@@ -1046,7 +1276,7 @@ impl CloudWorker {
                                 resource,
                                 version,
                                 action: shared::cloud::SyncAction::Upsert,
-                                resource_id: "1".into(),
+                                resource_id: 0,
                                 data,
                             });
                         }
@@ -1143,7 +1373,7 @@ impl CloudWorker {
             let events = match self
                 .state
                 .orders_manager
-                .get_events_for_order(&order.order_id)
+                .get_events_for_order(order.order_id)
             {
                 Ok(events) => events,
                 Err(e) => {
@@ -1186,13 +1416,11 @@ impl CloudWorker {
             return None;
         }
 
-        let order_id = &payload.id;
+        let order_id = payload.id;
 
         // deleted = 订单终结 (completed/voided/merged)
         if payload.action == SyncChangeType::Deleted {
-            return Some(CloudMessage::ActiveOrderRemoved {
-                order_id: order_id.clone(),
-            });
+            return Some(CloudMessage::ActiveOrderRemoved { order_id });
         }
 
         // created/updated = 活跃订单变更，读取最新快照 + 事件历史
@@ -1212,15 +1440,11 @@ impl CloudWorker {
             }
             Ok(Some(_)) => {
                 // 非活跃状态（刚完成/作废），发送移除通知
-                Some(CloudMessage::ActiveOrderRemoved {
-                    order_id: order_id.clone(),
-                })
+                Some(CloudMessage::ActiveOrderRemoved { order_id })
             }
             Ok(None) => {
                 // 快照不存在（已被清理），发送移除通知
-                Some(CloudMessage::ActiveOrderRemoved {
-                    order_id: order_id.clone(),
-                })
+                Some(CloudMessage::ActiveOrderRemoved { order_id })
             }
             Err(e) => {
                 tracing::warn!(order_id, error = %e, "Failed to get snapshot for order push");

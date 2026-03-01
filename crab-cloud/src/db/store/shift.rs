@@ -35,6 +35,7 @@ fn default_status() -> String {
 pub async fn upsert_shift_from_sync(
     pool: &PgPool,
     store_id: i64,
+    tenant_id: i64,
     source_id: i64,
     data: &serde_json::Value,
     now: i64,
@@ -43,12 +44,12 @@ pub async fn upsert_shift_from_sync(
     sqlx::query(
         r#"
         INSERT INTO store_shifts (
-            store_id, source_id, operator_id, operator_name, status,
+            store_id, tenant_id, source_id, operator_id, operator_name, status,
             start_time, end_time, starting_cash, expected_cash,
             actual_cash, cash_variance, abnormal_close, last_active_at,
             note, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             operator_name = EXCLUDED.operator_name, status = EXCLUDED.status,
@@ -60,6 +61,7 @@ pub async fn upsert_shift_from_sync(
         "#,
     )
     .bind(store_id)
+    .bind(tenant_id)
     .bind(source_id)
     .bind(shift.operator_id)
     .bind(&shift.operator_name)

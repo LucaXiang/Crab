@@ -150,7 +150,7 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
     // Create subscription
     let sub = db::subscriptions::CreateSubscription {
         id: subscription_id,
-        tenant_id: &tenant.id,
+        tenant_id: tenant.id,
         plan,
         max_stores: quota.max_stores,
         current_period_end: None, // set by subscription.updated events
@@ -163,14 +163,14 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
 
     // Activate tenant
     if let Err(e) =
-        db::tenants::update_status(&state.pool, &tenant.id, TenantStatus::Active.as_db()).await
+        db::tenants::update_status(&state.pool, tenant.id, TenantStatus::Active.as_db()).await
     {
         tracing::error!(%e, "Failed to activate tenant");
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
 
     tracing::info!(
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         subscription_id = subscription_id,
         plan = plan,
         "Tenant activated via Stripe checkout"
@@ -184,7 +184,7 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
     let detail = serde_json::json!({ "subscription_id": subscription_id, "plan": plan });
     let _ = crate::db::audit::log(
         &state.pool,
-        &tenant.id,
+        tenant.id,
         "subscription_activated",
         Some(&detail),
         None,
@@ -246,9 +246,9 @@ async fn handle_subscription_updated(state: &AppState, event: &serde_json::Value
                 TenantStatus::Suspended
             }
         };
-        let _ = db::tenants::update_status(&state.pool, &tenant_id, tenant_status.as_db()).await;
+        let _ = db::tenants::update_status(&state.pool, tenant_id, tenant_status.as_db()).await;
         tracing::info!(
-            tenant_id = %tenant_id,
+            tenant_id = tenant_id,
             tenant_status = tenant_status.as_db(),
             "Tenant status synced from subscription"
         );
@@ -283,18 +283,21 @@ async fn handle_subscription_deleted(state: &AppState, event: &serde_json::Value
     // Find and cancel tenant
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ = db::tenants::update_status(&state.pool, &tenant_id, TenantStatus::Canceled.as_db())
+        let _ = db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Canceled.as_db())
             .await;
-        tracing::info!(tenant_id = %tenant_id, "Tenant canceled (subscription deleted)");
+        tracing::info!(
+            tenant_id = tenant_id,
+            "Tenant canceled (subscription deleted)"
+        );
 
-        if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
+        if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, tenant_id).await {
             let _ = state.email.send_subscription_canceled(&tenant.email).await;
         }
 
         let detail = serde_json::json!({ "subscription_id": sub_id });
         let _ = crate::db::audit::log(
             &state.pool,
-            &tenant_id,
+            tenant_id,
             "subscription_canceled",
             Some(&detail),
             None,
@@ -327,12 +330,11 @@ async fn handle_payment_failed(state: &AppState, event: &serde_json::Value) -> S
     // Suspend tenant
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ =
-            db::tenants::update_status(&state.pool, &tenant_id, TenantStatus::Suspended.as_db())
-                .await;
-        tracing::info!(tenant_id = %tenant_id, "Tenant suspended (payment failed)");
+        let _ = db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Suspended.as_db())
+            .await;
+        tracing::info!(tenant_id = tenant_id, "Tenant suspended (payment failed)");
 
-        if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, &tenant_id).await {
+        if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, tenant_id).await {
             let _ = state.email.send_payment_failed(&tenant.email).await;
         }
     }
@@ -354,7 +356,7 @@ async fn handle_charge_refunded(state: &AppState, event: &serde_json::Value) -> 
 
     if let Ok(Some(tenant)) = db::tenants::find_by_stripe_customer(&state.pool, customer_id).await {
         let _ = state.email.send_refund_processed(&tenant.email).await;
-        tracing::info!(tenant_id = %tenant.id, "Refund notification sent");
+        tracing::info!(tenant_id = tenant.id, "Refund notification sent");
     }
 
     StatusCode::OK
@@ -395,8 +397,11 @@ async fn handle_invoice_paid(state: &AppState, event: &serde_json::Value) -> Sta
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
         let _ =
-            db::tenants::update_status(&state.pool, &tenant_id, TenantStatus::Active.as_db()).await;
-        tracing::info!(tenant_id = %tenant_id, "Tenant restored to active (invoice paid)");
+            db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Active.as_db()).await;
+        tracing::info!(
+            tenant_id = tenant_id,
+            "Tenant restored to active (invoice paid)"
+        );
     }
 
     tracing::info!(subscription_id = sub_id, "Invoice paid, period updated");
@@ -417,7 +422,10 @@ async fn handle_payment_action_required(state: &AppState, event: &serde_json::Va
 
     if let Ok(Some(tenant)) = db::tenants::find_by_stripe_customer(&state.pool, customer_id).await {
         let _ = state.email.send_payment_failed(&tenant.email).await;
-        tracing::info!(tenant_id = %tenant.id, "Payment action required notification sent");
+        tracing::info!(
+            tenant_id = tenant.id,
+            "Payment action required notification sent"
+        );
     }
 
     StatusCode::OK

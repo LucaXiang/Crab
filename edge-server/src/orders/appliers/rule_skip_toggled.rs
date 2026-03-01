@@ -111,17 +111,17 @@ mod tests {
     }
 
     fn create_rule_skip_toggled_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         rule_id: i64,
         skipped: bool,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::RuleSkipToggled,
             EventPayload::RuleSkipToggled {
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_skip_discount_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item: original_price 100, rule_discount 10 → price 90, subtotal 90
@@ -153,7 +153,7 @@ mod tests {
         snapshot.total = 90.0;
 
         // Skip the rule
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_unskip_discount_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item starts with skipped rule
@@ -190,7 +190,7 @@ mod tests {
         snapshot.total = 100.0;
 
         // Unskip the rule
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, false);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, false);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_order_level_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Simple item without item-level rules
@@ -256,7 +256,7 @@ mod tests {
         snapshot.order_rule_discount_amount = 10.0;
 
         // Skip the order-level rule
-        let event = create_rule_skip_toggled_event("order-1", 2, 10, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 10, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_nonexistent_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item_with_rule(
             "inst-1",
@@ -281,7 +281,7 @@ mod tests {
         let original_skipped = snapshot.items[0].applied_rules[0].skipped;
 
         // Toggle nonexistent rule
-        let event = create_rule_skip_toggled_event("order-1", 2, 999, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 999, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item_with_rule(
             "inst-1",
@@ -305,7 +305,7 @@ mod tests {
         ));
         snapshot.last_sequence = 5;
 
-        let event = create_rule_skip_toggled_event("order-1", 10, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 10, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item_with_rule(
             "inst-1",
@@ -328,7 +328,7 @@ mod tests {
         ));
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_multiple_items_same_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Two items with the same rule
@@ -364,7 +364,7 @@ mod tests {
         ));
 
         // Skip the rule
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_surcharge_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item: base 100, surcharge +15 → price 115
@@ -397,7 +397,7 @@ mod tests {
         snapshot.total = 115.0;
 
         // Skip the surcharge
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -409,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_skip_unskip_cycle() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         snapshot.items.push(create_test_item_with_rule(
@@ -427,21 +427,21 @@ mod tests {
         let applier = RuleSkipToggledApplier;
 
         // Skip
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         applier.apply(&mut snapshot, &event);
         assert_eq!(snapshot.subtotal, 100.0);
         assert_eq!(snapshot.total, 100.0);
         let checksum_after_skip = snapshot.state_checksum.clone();
 
         // Unskip
-        let event = create_rule_skip_toggled_event("order-1", 3, 1, false);
+        let event = create_rule_skip_toggled_event(1001, 3, 1, false);
         applier.apply(&mut snapshot, &event);
         assert_eq!(snapshot.subtotal, 90.0);
         assert_eq!(snapshot.total, 90.0);
         assert_eq!(snapshot.last_sequence, 3);
 
         // Skip again → should produce same totals as first skip
-        let event = create_rule_skip_toggled_event("order-1", 4, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 4, 1, true);
         applier.apply(&mut snapshot, &event);
         assert_eq!(snapshot.subtotal, 100.0);
         assert_eq!(snapshot.total, 100.0);
@@ -456,7 +456,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_comped_item_stays_zero() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Comped item with a rule
@@ -477,7 +477,7 @@ mod tests {
         snapshot.total = 0.0;
 
         // Skip the rule on comped item
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -490,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_with_manual_discount() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item: base 100, manual 20% off, rule discount 10 → unit_price = 100-20-10 = 70
@@ -510,7 +510,7 @@ mod tests {
         snapshot.total = 70.0;
 
         // Skip the rule → only manual discount remains
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_with_options_modifier() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item: base 50, option +5, rule discount 6 → unit_price = 55-6 = 49
@@ -552,7 +552,7 @@ mod tests {
         snapshot.total = 49.0;
 
         // Skip the rule
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_item_with_tax_rate() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         let mut item = create_test_item_with_rule(
@@ -588,7 +588,7 @@ mod tests {
         assert_eq!(tax_with_discount, 15.62);
 
         // Skip rule → price goes to 100
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         applier.apply(&mut snapshot, &event);
 
         // Tax on 100: 100 * 21/121 ≈ 17.36
@@ -601,7 +601,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_order_level_discount_with_item_level_rule() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item with item-level discount
@@ -639,7 +639,7 @@ mod tests {
         assert_eq!(snapshot.total, 81.0);
 
         // Skip the item-level rule → subtotal goes up, order discount dynamically recalculated
-        let event = create_rule_skip_toggled_event("order-1", 2, 5, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 5, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -653,7 +653,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_already_in_desired_state() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item with already-skipped rule
@@ -673,7 +673,7 @@ mod tests {
         snapshot.total = 100.0;
 
         // Skip again (no-op in terms of skipped state)
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -687,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_rule_skip_toggled_multiple_rules_on_item_skip_one() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
 
         // Item with two rules
@@ -753,7 +753,7 @@ mod tests {
         assert_eq!(snapshot.subtotal, 82.0);
 
         // Skip only rule-1
-        let event = create_rule_skip_toggled_event("order-1", 2, 1, true);
+        let event = create_rule_skip_toggled_event(1001, 2, 1, true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 

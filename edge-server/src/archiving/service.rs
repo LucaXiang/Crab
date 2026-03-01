@@ -9,6 +9,7 @@ use crate::order_money::{to_decimal, to_f64};
 use rust_decimal::Decimal;
 use serde::Serialize;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
+use shared::util::snowflake_id;
 use sqlx::SqlitePool;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -92,7 +93,7 @@ pub struct EventVerification {
 #[derive(Debug, Serialize)]
 pub struct OrderVerification {
     pub receipt_number: String,
-    pub order_id: String,
+    pub order_id: i64,
     pub prev_hash: String,
     pub curr_hash: String,
     /// 事件链内部是否连续
@@ -157,7 +158,7 @@ struct VerifyChainRow {
 struct VerifyOrderRow {
     id: i64,
     receipt_number: String,
-    order_key: String,
+    order_id: i64,
     prev_hash: String,
     curr_hash: String,
 }
@@ -426,9 +427,10 @@ impl OrderArchiveService {
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 5a. INSERT archived_order (hash lives in chain_entry, not here)
-        let order_pk = sqlx::query_scalar::<_, i64>(
+        let order_pk = snowflake_id();
+        sqlx::query(
             "INSERT INTO archived_order (\
-                receipt_number, zone_name, table_name, status, is_retail, guest_count, \
+                id, receipt_number, zone_name, table_name, status, is_retail, guest_count, \
                 original_total, subtotal, total_amount, paid_amount, \
                 discount_amount, surcharge_amount, comp_total_amount, \
                 order_manual_discount_amount, order_manual_surcharge_amount, \
@@ -437,20 +439,21 @@ impl OrderArchiveService {
                 operator_id, operator_name, \
                 void_type, loss_reason, loss_amount, void_note, \
                 member_id, member_name, \
-                created_at, order_key, queue_number, shift_id\
+                created_at, order_id, queue_number, shift_id\
             ) VALUES (\
-                ?1, ?2, ?3, ?4, ?5, ?6, \
-                ?7, ?8, ?9, ?10, \
-                ?11, ?12, ?13, \
-                ?14, ?15, \
-                ?16, ?17, \
-                ?18, ?19, ?20, \
-                ?21, ?22, \
-                ?23, ?24, ?25, ?26, \
-                ?27, ?28, \
-                ?29, ?30, ?31, ?32\
-            ) RETURNING id",
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
+                ?8, ?9, ?10, ?11, \
+                ?12, ?13, ?14, \
+                ?15, ?16, \
+                ?17, ?18, \
+                ?19, ?20, ?21, \
+                ?22, ?23, \
+                ?24, ?25, ?26, ?27, \
+                ?28, ?29, \
+                ?30, ?31, ?32, ?33\
+            )",
         )
+        .bind(order_pk)
         .bind(&snapshot.receipt_number)
         .bind(&snapshot.zone_name)
         .bind(&snapshot.table_name)
@@ -490,10 +493,10 @@ impl OrderArchiveService {
         .bind(snapshot.member_id)
         .bind(&snapshot.member_name)
         .bind(now)
-        .bind(&snapshot.order_id)
+        .bind(snapshot.order_id)
         .bind(snapshot.queue_number.map(|q| q as i64))
         .bind(shift_id)
-        .fetch_one(&mut *tx)
+        .execute(&mut *tx)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -540,21 +543,23 @@ impl OrderArchiveService {
             let rule_discount_total = to_f64(d_rule_discount_per_unit * d_qty);
             let rule_surcharge_total = to_f64(d_surcharge_per_unit * d_qty);
 
-            let item_pk = sqlx::query_scalar::<_, i64>(
+            let item_pk = snowflake_id();
+            sqlx::query(
                 "INSERT INTO archived_order_item (\
-                    order_pk, spec, instance_id, name, spec_name, price, \
+                    id, order_pk, spec, instance_id, name, spec_name, price, \
                     quantity, unpaid_quantity, unit_price, line_total, \
                     discount_amount, surcharge_amount, \
                     rule_discount_amount, rule_surcharge_amount, \
                     tax, tax_rate, category_id, category_name, applied_rules, note, is_comped\
                 ) VALUES (\
-                    ?1, ?2, ?3, ?4, ?5, ?6, \
-                    ?7, ?8, ?9, ?10, \
-                    ?11, ?12, \
-                    ?13, ?14, \
-                    ?15, ?16, ?17, ?18, ?19, ?20, ?21\
-                ) RETURNING id",
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
+                    ?8, ?9, ?10, ?11, \
+                    ?12, ?13, \
+                    ?14, ?15, \
+                    ?16, ?17, ?18, ?19, ?20, ?21, ?22\
+                )",
             )
+            .bind(item_pk)
             .bind(order_pk)
             .bind(item.id)
             .bind(&instance_id)
@@ -580,7 +585,7 @@ impl OrderArchiveService {
             })
             .bind(&item.note)
             .bind(item.is_comped)
-            .fetch_one(&mut *tx)
+            .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -713,10 +718,12 @@ impl OrderArchiveService {
         }
 
         // 5e. INSERT chain_entry (unified hash chain)
+        let chain_entry_id = snowflake_id();
         sqlx::query(
-            "INSERT INTO chain_entry (entry_type, entry_pk, prev_hash, curr_hash, created_at) \
-             VALUES ('ORDER', ?1, ?2, ?3, ?4)",
+            "INSERT INTO chain_entry (id, entry_type, entry_pk, prev_hash, curr_hash, created_at) \
+             VALUES (?1, 'ORDER', ?2, ?3, ?4, ?5)",
         )
+        .bind(chain_entry_id)
         .bind(order_pk)
         .bind(&prev_hash)
         .bind(&order_hash)
@@ -767,7 +774,7 @@ impl OrderArchiveService {
     ) -> String {
         shared::order::compute_order_chain_hash(
             prev_hash,
-            &snapshot.order_id,
+            snapshot.order_id,
             &snapshot.receipt_number,
             &snapshot.status,
             last_event_hash,
@@ -840,7 +847,7 @@ impl OrderArchiveService {
     pub async fn verify_order(&self, receipt_number: &str) -> ArchiveResult<OrderVerification> {
         // 1. 查询订单 PK（用于委托给 verify_order_events）
         let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
-            "SELECT ao.id, ao.receipt_number, ao.order_key, ce.prev_hash, ce.curr_hash \
+            "SELECT ao.id, ao.receipt_number, ao.order_id, ce.prev_hash, ce.curr_hash \
              FROM archived_order ao \
              JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
              WHERE ao.receipt_number = ?",
@@ -961,7 +968,7 @@ impl OrderArchiveService {
     async fn verify_order_events(&self, order_pk: i64) -> ArchiveResult<OrderVerification> {
         // 获取订单信息和 chain_entry hash
         let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
-            "SELECT ao.id, ao.receipt_number, ao.order_key, ce.prev_hash, ce.curr_hash \
+            "SELECT ao.id, ao.receipt_number, ao.order_id, ce.prev_hash, ce.curr_hash \
              FROM archived_order ao \
              JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
              WHERE ao.id = ?",
@@ -1005,7 +1012,7 @@ impl OrderArchiveService {
 
         Ok(OrderVerification {
             receipt_number: order.receipt_number,
-            order_id: order.order_key,
+            order_id: order.order_id,
             prev_hash: order.prev_hash,
             curr_hash: order.curr_hash,
             events_chain_valid,
@@ -1022,7 +1029,7 @@ mod tests {
 
     fn create_test_snapshot() -> OrderSnapshot {
         OrderSnapshot {
-            order_id: "test-order-1".to_string(),
+            order_id: 1001,
             table_id: Some(1),
             table_name: Some("Table 1".to_string()),
             zone_id: None,
@@ -1080,16 +1087,16 @@ mod tests {
         }
     }
 
-    fn create_test_event(order_id: &str, sequence: u64) -> shared::order::OrderEvent {
+    fn create_test_event(order_id: i64, sequence: u64) -> shared::order::OrderEvent {
         shared::order::OrderEvent {
-            event_id: format!("event-{}", sequence),
+            event_id: snowflake_id(),
             sequence,
-            order_id: order_id.to_string(),
+            order_id,
             timestamp: 1704067200000,
             client_timestamp: None,
             operator_id: 1,
             operator_name: "Test Operator".to_string(),
-            command_id: format!("cmd-{}", sequence),
+            command_id: snowflake_id(),
             event_type: OrderEventType::TableOpened,
             payload: shared::order::EventPayload::TableOpened {
                 table_id: Some(1),
@@ -1127,7 +1134,7 @@ mod tests {
 
     #[test]
     fn test_compute_event_hash_deterministic() {
-        let event = create_test_event("order-1", 1);
+        let event = create_test_event(1001, 1);
 
         let hash1 = compute_event_hash_standalone(&event);
         let hash2 = compute_event_hash_standalone(&event);
@@ -1138,8 +1145,8 @@ mod tests {
 
     #[test]
     fn test_compute_event_hash_includes_payload() {
-        let event1 = create_test_event("order-1", 1);
-        let mut event2 = create_test_event("order-1", 1);
+        let event1 = create_test_event(1001, 1);
+        let mut event2 = create_test_event(1001, 1);
 
         // Modify payload
         event2.payload = shared::order::EventPayload::TableOpened {
@@ -1167,7 +1174,7 @@ mod tests {
     ) -> String {
         shared::order::compute_order_chain_hash(
             prev_hash,
-            &snapshot.order_id,
+            snapshot.order_id,
             &snapshot.receipt_number,
             &snapshot.status,
             last_event_hash,
@@ -1467,7 +1474,7 @@ mod tests {
     fn test_order_verification_model() {
         let verification = OrderVerification {
             receipt_number: "ORD2026012910001".to_string(),
-            order_id: "order:abc123".to_string(),
+            order_id: 1001,
             prev_hash: "genesis".to_string(),
             curr_hash: "some_hash".to_string(),
             events_chain_valid: true,

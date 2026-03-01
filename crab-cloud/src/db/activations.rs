@@ -5,7 +5,7 @@ use sqlx::PgPool;
 #[allow(dead_code)]
 pub struct Activation {
     pub entity_id: String,
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub device_id: String,
     pub fingerprint: String,
     pub status: String,
@@ -15,13 +15,13 @@ pub struct Activation {
 
 /// 获取租户激活 advisory lock (防止并发激活超配额)
 ///
-/// 使用 hashtext(tenant_id) 作为 lock key，保证同一租户串行激活。
+/// 使用 tenant_id (i64) 作为 lock key，保证同一租户串行激活。
 /// 锁在事务结束时自动释放。
 pub async fn acquire_activation_lock(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
         .bind(tenant_id)
         .execute(&mut **tx)
         .await?;
@@ -32,7 +32,7 @@ pub async fn acquire_activation_lock(
 pub async fn insert_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     entity_id: &str,
-    tenant_id: &str,
+    tenant_id: i64,
     device_id: &str,
     fingerprint: &str,
 ) -> Result<(), sqlx::Error> {
@@ -75,7 +75,7 @@ pub async fn mark_replaced_in_tx(
 }
 
 /// 获取租户所有活跃设备
-pub async fn list_active(pool: &PgPool, tenant_id: &str) -> Result<Vec<Activation>, sqlx::Error> {
+pub async fn list_active(pool: &PgPool, tenant_id: i64) -> Result<Vec<Activation>, sqlx::Error> {
     sqlx::query_as::<_, Activation>(
         "SELECT entity_id, tenant_id, device_id, fingerprint, status,
             activated_at, last_refreshed_at
@@ -91,7 +91,7 @@ pub async fn list_active(pool: &PgPool, tenant_id: &str) -> Result<Vec<Activatio
 /// 按 tenant_id + device_id 查找激活记录
 pub async fn find_by_device(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     device_id: &str,
 ) -> Result<Option<Activation>, sqlx::Error> {
     sqlx::query_as::<_, Activation>(

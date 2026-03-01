@@ -132,7 +132,7 @@ pub async fn create(
         .broadcast_sync(
             SyncResource::Role,
             SyncChangeType::Created,
-            &id,
+            r.id,
             Some(&r),
             false,
         )
@@ -184,7 +184,7 @@ pub async fn update(
         .broadcast_sync(
             SyncResource::Role,
             SyncChangeType::Updated,
-            &id_str,
+            id,
             Some(&r),
             false,
         )
@@ -227,13 +227,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(
-                SyncResource::Role,
-                SyncChangeType::Deleted,
-                &id_str,
-                None,
-                false,
-            )
+            .broadcast_sync::<()>(SyncResource::Role, SyncChangeType::Deleted, id, None, false)
             .await;
     }
 
@@ -305,7 +299,7 @@ pub async fn update_role_permissions(
         .broadcast_sync(
             SyncResource::Role,
             SyncChangeType::Updated,
-            &id_str,
+            id,
             Some(&r),
             false,
         )

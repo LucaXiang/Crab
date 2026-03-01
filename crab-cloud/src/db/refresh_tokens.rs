@@ -9,7 +9,7 @@ const REFRESH_TOKEN_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000; // 30 days
 /// Both operations run in a single transaction.
 pub async fn create(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     device_id: &str,
     user_agent: &str,
     ip_address: &str,
@@ -54,7 +54,7 @@ pub async fn rotate(
     refresh_token: &str,
     user_agent: &str,
     ip_address: &str,
-) -> Result<Option<(String, String, String)>, sqlx::Error> {
+) -> Result<Option<(i64, String, String)>, sqlx::Error> {
     let mut tx = pool.begin().await?;
 
     // Find valid token (SELECT ... FOR UPDATE to lock the row)
@@ -88,7 +88,7 @@ pub async fn rotate(
     sqlx::query(
         "UPDATE refresh_tokens SET revoked = TRUE WHERE tenant_id = $1 AND device_id = $2 AND NOT revoked",
     )
-    .bind(&row.tenant_id)
+    .bind(row.tenant_id)
     .bind(&row.device_id)
     .execute(&mut *tx)
     .await?;
@@ -97,7 +97,7 @@ pub async fn rotate(
         "INSERT INTO refresh_tokens (id, tenant_id, device_id, expires_at, user_agent, ip_address, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind(&token_id)
-    .bind(&row.tenant_id)
+    .bind(row.tenant_id)
     .bind(&row.device_id)
     .bind(expires_at)
     .bind(user_agent)
@@ -112,7 +112,7 @@ pub async fn rotate(
 }
 
 /// List active (non-revoked, non-expired) sessions for a tenant.
-pub async fn list_active(pool: &PgPool, tenant_id: &str) -> Result<Vec<SessionRow>, sqlx::Error> {
+pub async fn list_active(pool: &PgPool, tenant_id: i64) -> Result<Vec<SessionRow>, sqlx::Error> {
     let now = now_millis();
     sqlx::query_as(
         "SELECT id, device_id, user_agent, ip_address, created_at \
@@ -129,7 +129,7 @@ pub async fn list_active(pool: &PgPool, tenant_id: &str) -> Result<Vec<SessionRo
 /// Revoke a specific session by token id (must belong to tenant).
 pub async fn revoke_session(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     token_id: &str,
 ) -> Result<bool, sqlx::Error> {
     let result = sqlx::query(
@@ -144,7 +144,7 @@ pub async fn revoke_session(
 
 #[derive(sqlx::FromRow)]
 struct RefreshTokenRow {
-    tenant_id: String,
+    tenant_id: i64,
     device_id: String,
     expires_at: i64,
     revoked: bool,

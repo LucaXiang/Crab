@@ -114,8 +114,8 @@ pub async fn register(
 
     // Use existing tenant_id or generate new one
     let tenant_id = match &existing {
-        Some(t) => t.id.clone(),
-        None => uuid::Uuid::new_v4().to_string(),
+        Some(t) => t.id,
+        None => shared::util::snowflake_id(),
     };
 
     // Insert or update tenant + verification code in a single transaction
@@ -131,7 +131,7 @@ pub async fn register(
         // Update existing pending tenant's password
         if let Err(e) = sqlx::query("UPDATE tenants SET hashed_password = $1 WHERE id = $2")
             .bind(&hashed_password)
-            .bind(&tenant_id)
+            .bind(tenant_id)
             .execute(&mut *tx)
             .await
         {
@@ -144,7 +144,7 @@ pub async fn register(
             "INSERT INTO tenants (id, email, hashed_password, status, created_at)
              VALUES ($1, $2, $3, 'pending', $4)",
         )
-        .bind(&tenant_id)
+        .bind(tenant_id)
         .bind(&email)
         .bind(&hashed_password)
         .bind(now)
@@ -185,7 +185,7 @@ pub async fn register(
         tracing::warn!(%e, "Failed to send verification email (user can resend)");
     }
 
-    tracing::info!(tenant_id = %tenant_id, email = %email, "Tenant registered, verification code sent");
+    tracing::info!(tenant_id = tenant_id, email = %email, "Tenant registered, verification code sent");
 
     Ok((
         StatusCode::OK,
@@ -253,7 +253,7 @@ pub async fn verify_email(
     };
 
     // Mark tenant as verified
-    if let Err(e) = db::tenants::set_verified(&state.pool, &tenant.id, now).await {
+    if let Err(e) = db::tenants::set_verified(&state.pool, tenant.id, now).await {
         tracing::error!(%e, "Failed to verify tenant");
         return Err(AppError::new(ErrorCode::InternalError));
     }
@@ -261,7 +261,7 @@ pub async fn verify_email(
     // Delete verification record
     let _ = db::email_verifications::delete(&state.pool, &email, "registration").await;
 
-    tracing::info!(tenant_id = %tenant.id, "Email verified successfully");
+    tracing::info!(tenant_id = tenant.id, "Email verified successfully");
 
     Ok((
         StatusCode::OK,

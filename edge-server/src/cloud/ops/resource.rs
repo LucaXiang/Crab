@@ -21,7 +21,7 @@ pub async fn create_employee(
                 .broadcast_sync(
                     SyncResource::Employee,
                     SyncChangeType::Created,
-                    &emp.id.to_string(),
+                    emp.id,
                     Some(&emp),
                     true,
                 )
@@ -45,7 +45,7 @@ pub async fn update_employee(
                 .broadcast_sync(
                     SyncResource::Employee,
                     SyncChangeType::Updated,
-                    &emp.id.to_string(),
+                    emp.id,
                     Some(&emp),
                     true,
                 )
@@ -65,7 +65,7 @@ pub async fn delete_employee(state: &ServerState, id: i64) -> StoreOpResult {
                 .broadcast_sync::<()>(
                     SyncResource::Employee,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )
@@ -91,7 +91,7 @@ pub async fn create_zone(
                 .broadcast_sync(
                     SyncResource::Zone,
                     SyncChangeType::Created,
-                    &z.id.to_string(),
+                    z.id,
                     Some(&z),
                     true,
                 )
@@ -115,7 +115,7 @@ pub async fn update_zone(
                 .broadcast_sync(
                     SyncResource::Zone,
                     SyncChangeType::Updated,
-                    &z.id.to_string(),
+                    z.id,
                     Some(&z),
                     true,
                 )
@@ -132,13 +132,7 @@ pub async fn delete_zone(state: &ServerState, id: i64) -> StoreOpResult {
     match zone::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(
-                    SyncResource::Zone,
-                    SyncChangeType::Deleted,
-                    &id.to_string(),
-                    None,
-                    true,
-                )
+                .broadcast_sync::<()>(SyncResource::Zone, SyncChangeType::Deleted, id, None, true)
                 .await;
             StoreOpResult::ok()
         }
@@ -161,7 +155,7 @@ pub async fn create_table(
                 .broadcast_sync(
                     SyncResource::DiningTable,
                     SyncChangeType::Created,
-                    &t.id.to_string(),
+                    t.id,
                     Some(&t),
                     true,
                 )
@@ -185,7 +179,7 @@ pub async fn update_table(
                 .broadcast_sync(
                     SyncResource::DiningTable,
                     SyncChangeType::Updated,
-                    &t.id.to_string(),
+                    t.id,
                     Some(&t),
                     true,
                 )
@@ -205,7 +199,7 @@ pub async fn delete_table(state: &ServerState, id: i64) -> StoreOpResult {
                 .broadcast_sync::<()>(
                     SyncResource::DiningTable,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )
@@ -231,7 +225,7 @@ pub async fn create_price_rule(
                 .broadcast_sync(
                     SyncResource::PriceRule,
                     SyncChangeType::Created,
-                    &rule.id.to_string(),
+                    rule.id,
                     Some(&rule),
                     true,
                 )
@@ -255,7 +249,7 @@ pub async fn update_price_rule(
                 .broadcast_sync(
                     SyncResource::PriceRule,
                     SyncChangeType::Updated,
-                    &rule.id.to_string(),
+                    rule.id,
                     Some(&rule),
                     true,
                 )
@@ -275,7 +269,7 @@ pub async fn delete_price_rule(state: &ServerState, id: i64) -> StoreOpResult {
                 .broadcast_sync::<()>(
                     SyncResource::PriceRule,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )
@@ -300,7 +294,7 @@ pub async fn update_store_info(
                 .broadcast_sync(
                     SyncResource::StoreInfo,
                     SyncChangeType::Updated,
-                    "main",
+                    0,
                     Some(&info),
                     true,
                 )
@@ -332,7 +326,7 @@ pub async fn create_label_template(
                 .broadcast_sync(
                     SyncResource::LabelTemplate,
                     SyncChangeType::Created,
-                    &tpl.id.to_string(),
+                    tpl.id,
                     Some(&tpl),
                     true,
                 )
@@ -356,7 +350,7 @@ pub async fn update_label_template(
                 .broadcast_sync(
                     SyncResource::LabelTemplate,
                     SyncChangeType::Updated,
-                    &tpl.id.to_string(),
+                    tpl.id,
                     Some(&tpl),
                     true,
                 )
@@ -376,7 +370,7 @@ pub async fn delete_label_template(state: &ServerState, id: i64) -> StoreOpResul
                 .broadcast_sync::<()>(
                     SyncResource::LabelTemplate,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )

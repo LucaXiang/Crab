@@ -18,8 +18,17 @@ pub async fn deactivate_client(
     State(state): State<AppState>,
     Json(req): Json<DeactivateClientRequest>,
 ) -> Json<DeactivateResponse> {
-    let tenant_id = match tenant_auth::verify_token(&req.token, &state.jwt_secret) {
-        Ok(claims) => claims.sub,
+    let tenant_id: i64 = match tenant_auth::verify_token(&req.token, &state.jwt_secret) {
+        Ok(claims) => match claims.sub.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                return Json(DeactivateResponse {
+                    success: false,
+                    error: Some("Invalid token subject".to_string()),
+                    error_code: Some(ErrorCode::TokenExpired),
+                });
+            }
+        },
         Err(_) => {
             return Json(DeactivateResponse {
                 success: false,
@@ -29,7 +38,7 @@ pub async fn deactivate_client(
         }
     };
 
-    let tenant = match tenants::find_by_id(&state.pool, &tenant_id).await {
+    let tenant = match tenants::find_by_id(&state.pool, tenant_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
             return Json(DeactivateResponse {
@@ -93,7 +102,7 @@ pub async fn deactivate_client(
 
     tracing::info!(
         entity_id = %req.entity_id,
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         "Client deactivated"
     );
 

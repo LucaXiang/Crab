@@ -41,7 +41,7 @@ pub async fn verify_tenant(
     };
 
     // 获取最新订阅（不过滤 status），前端根据 subscription_status 决定后续流程
-    let sub = match subscriptions::get_latest_subscription(&state.pool, &tenant.id).await {
+    let sub = match subscriptions::get_latest_subscription(&state.pool, tenant.id).await {
         Ok(s) => s, // Some or None
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching subscription");
@@ -57,7 +57,7 @@ pub async fn verify_tenant(
     let active_store_count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM stores WHERE tenant_id = $1 AND status = 'active'",
     )
-    .bind(&tenant.id)
+    .bind(tenant.id)
     .fetch_one(&state.pool)
     .await
     .map(|r| r.0)
@@ -77,7 +77,7 @@ pub async fn verify_tenant(
     let stores: Vec<shared::activation::StoreSlot> = sqlx::query_as::<_, (i64, String, i32)>(
         "SELECT id, alias, store_number FROM stores WHERE tenant_id = $1 AND status = 'active' ORDER BY store_number",
     )
-    .bind(&tenant.id)
+    .bind(tenant.id)
     .fetch_all(&state.pool)
     .await
     .unwrap_or_default()
@@ -89,7 +89,7 @@ pub async fn verify_tenant(
     })
     .collect();
 
-    let has_active_server = activations::find_by_device(&state.pool, &tenant.id, &req.device_id)
+    let has_active_server = activations::find_by_device(&state.pool, tenant.id, &req.device_id)
         .await
         .ok()
         .flatten()
@@ -97,7 +97,7 @@ pub async fn verify_tenant(
         .unwrap_or(false);
 
     let has_active_client =
-        client_connections::find_by_device(&state.pool, &tenant.id, &req.device_id)
+        client_connections::find_by_device(&state.pool, tenant.id, &req.device_id)
             .await
             .ok()
             .flatten()
@@ -105,7 +105,7 @@ pub async fn verify_tenant(
             .unwrap_or(false);
 
     tracing::info!(
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         has_subscription = sub.is_some(),
         "Tenant verified"
     );
@@ -119,7 +119,7 @@ pub async fn verify_tenant(
     };
 
     // Generate JWT session token for subsequent operations (activate, deactivate)
-    let token = match tenant_auth::create_token(&tenant.id, &tenant.email, &state.jwt_secret) {
+    let token = match tenant_auth::create_token(tenant.id, &tenant.email, &state.jwt_secret) {
         Ok(t) => t,
         Err(e) => {
             tracing::error!(error = %e, "Failed to create JWT token");
@@ -133,7 +133,7 @@ pub async fn verify_tenant(
     };
 
     let refresh_token =
-        match refresh_tokens::create(&state.pool, &tenant.id, &req.device_id, "", "").await {
+        match refresh_tokens::create(&state.pool, tenant.id, &req.device_id, "", "").await {
             Ok(t) => t,
             Err(e) => {
                 tracing::error!(error = %e, "Failed to create refresh token");
@@ -146,7 +146,7 @@ pub async fn verify_tenant(
             }
         };
 
-    let has_p12 = p12::get_p12_info(&state.pool, &tenant.id)
+    let has_p12 = p12::get_p12_info(&state.pool, tenant.id)
         .await
         .map(|info| info.has_p12)
         .unwrap_or(false);

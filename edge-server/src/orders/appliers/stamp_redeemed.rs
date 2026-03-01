@@ -129,13 +129,13 @@ mod tests {
     use super::*;
     use shared::order::{OrderEventType, OrderSnapshot};
 
-    fn create_stamp_redeemed_event(order_id: &str, seq: u64) -> OrderEvent {
+    fn create_stamp_redeemed_event(order_id: i64, seq: u64) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::StampRedeemed,
             EventPayload::StampRedeemed {
@@ -157,9 +157,9 @@ mod tests {
 
     #[test]
     fn test_stamp_redeemed_adds_comped_item() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
-        let event = create_stamp_redeemed_event("order-1", 1);
+        let event = create_stamp_redeemed_event(1001, 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -179,9 +179,9 @@ mod tests {
 
     #[test]
     fn test_stamp_redeemed_records_redemption_state() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
-        let event = create_stamp_redeemed_event("order-1", 1);
+        let event = create_stamp_redeemed_event(1001, 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_stamp_redeemed_updates_totals() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         // Add a paid item first
         snapshot.items.push(CartItemSnapshot {
             id: 200,
@@ -228,7 +228,7 @@ mod tests {
         assert!((snapshot.total - 5.00).abs() < f64::EPSILON);
 
         // Redeem stamp — adds free Coffee
-        let event = create_stamp_redeemed_event("order-1", 1);
+        let event = create_stamp_redeemed_event(1001, 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -274,7 +274,7 @@ mod tests {
     }
 
     fn create_comp_existing_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         reward_instance_id: &str,
         comp_existing_instance_id: &str,
@@ -282,10 +282,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-2".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::StampRedeemed,
             EventPayload::StampRedeemed {
@@ -312,12 +312,12 @@ mod tests {
     #[test]
     fn test_comp_existing_full_comp_single_item() {
         // Item qty=1, reward_qty=1 → full comp (no split)
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 1));
         order_money::recalculate_totals(&mut snapshot);
 
         // Full comp: reward_instance_id == comp_existing_instance_id
-        let event = create_comp_existing_event("order-1", 1, "item-1", "item-1", 1);
+        let event = create_comp_existing_event(1001, 1, "item-1", "item-1", 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -344,12 +344,12 @@ mod tests {
     fn test_comp_existing_full_comp_reward_exceeds_qty() {
         // Item qty=2, reward_qty=3 → full comp (cap to item qty, no split)
         // Event quantity is already capped by action to min(3, 2) = 2
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 2));
         order_money::recalculate_totals(&mut snapshot);
 
         // Full comp: reward_instance_id == comp_existing_instance_id
-        let event = create_comp_existing_event("order-1", 1, "item-1", "item-1", 2);
+        let event = create_comp_existing_event(1001, 1, "item-1", "item-1", 2);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -366,13 +366,13 @@ mod tests {
     #[test]
     fn test_comp_existing_partial_comp_splits_item() {
         // Item qty=7, reward_qty=1 → partial comp (split 1 off)
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 7));
         order_money::recalculate_totals(&mut snapshot);
         let initial_total = snapshot.total;
 
         // Partial comp: reward_instance_id != comp_existing_instance_id
-        let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "item-1", 1);
+        let event = create_comp_existing_event(1001, 1, "stamp_reward::cmd-2", "item-1", 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -421,13 +421,13 @@ mod tests {
     #[test]
     fn test_comp_existing_partial_comp_large_split() {
         // Item qty=10, reward_qty=3 → split 3 off, leave 7
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 50, 2.00, 10));
         order_money::recalculate_totals(&mut snapshot);
 
-        let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "item-1", 3);
+        let event = create_comp_existing_event(1001, 1, "stamp_reward::cmd-2", "item-1", 3);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -456,11 +456,11 @@ mod tests {
     #[test]
     fn test_comp_existing_partial_preserves_unpaid_quantity() {
         // Item qty=5, unpaid_qty=5, reward_qty=2
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 3.00, 5));
         order_money::recalculate_totals(&mut snapshot);
 
-        let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "item-1", 2);
+        let event = create_comp_existing_event(1001, 1, "stamp_reward::cmd-2", "item-1", 2);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -484,7 +484,7 @@ mod tests {
     #[test]
     fn test_comp_existing_with_other_items_in_order() {
         // Order has multiple items, only one gets partially comped
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("coffee-1", 10, 3.50, 5)); // 5 coffees
@@ -494,7 +494,7 @@ mod tests {
         snapshot.items.push(create_test_item("cake-1", 20, 5.00, 1)); // 1 cake
         order_money::recalculate_totals(&mut snapshot);
 
-        let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "potato-1", 1);
+        let event = create_comp_existing_event(1001, 1, "stamp_reward::cmd-2", "potato-1", 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 
@@ -540,13 +540,13 @@ mod tests {
 
     #[test]
     fn test_comp_existing_checksum_updates() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.items.push(create_test_item("item-1", 50, 4.50, 3));
         order_money::recalculate_totals(&mut snapshot);
         snapshot.update_checksum();
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_comp_existing_event("order-1", 1, "stamp_reward::cmd-2", "item-1", 1);
+        let event = create_comp_existing_event(1001, 1, "stamp_reward::cmd-2", "item-1", 1);
         let applier = StampRedeemedApplier;
         applier.apply(&mut snapshot, &event);
 

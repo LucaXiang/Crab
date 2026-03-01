@@ -18,11 +18,16 @@ pub mod verifactu;
 pub use applied_mg_rule::AppliedMgRule;
 pub use applied_rule::AppliedRule;
 pub use canonical::{
-    CanonicalHash, compute_credit_note_chain_hash, compute_event_chain_hash,
-    compute_order_chain_hash,
+    AnulacionChainData, CanonicalHash, ChainHashable, CreditNoteChainData, OrderChainData,
+    UpgradeChainData, compute_anulacion_chain_hash, compute_chain_hash,
+    compute_credit_note_chain_hash, compute_event_chain_hash, compute_order_chain_hash,
+    compute_upgrade_chain_hash,
 };
 pub use command::{OrderCommand, OrderCommandPayload};
 pub use event::{EventPayload, MgItemDiscount, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};
 pub use types::*;
-pub use verifactu::{HuellaAltaInput, HuellaError, compute_verifactu_huella_alta};
+pub use verifactu::{
+    HuellaAltaInput, HuellaBajaInput, HuellaError, compute_verifactu_huella_alta,
+    compute_verifactu_huella_baja,
+};

@@ -87,20 +87,31 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
             {/* Price Section */}
             <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
               {/* 原价 (可编辑) */}
-              <div
-                className="flex items-center justify-between p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-100/50 transition-colors group"
-                onClick={() => onBasePriceChange && openNumpad('BASE_PRICE')}
+              <EscalatableGate
+                permission={Permission.ORDERS_MODIFY_PRICE}
+                mode="intercept"
+                description={t('pos.cart.base_price')}
+                onAuthorized={(user) => openNumpad('BASE_PRICE', { id: user.id, name: user.name })}
               >
-                <span className="text-sm text-gray-600">{t('pos.cart.base_price')}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold text-gray-900 font-mono">
-                    {formatCurrency(basePrice)}
-                  </span>
-                  {onBasePriceChange && (
-                    <Edit2 size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  )}
+                <div
+                  className={`flex items-center justify-between p-4 border-b border-gray-100 transition-colors group ${onBasePriceChange ? 'cursor-pointer hover:bg-gray-100/50' : ''}`}
+                  onClick={() => {
+                    if (onBasePriceChange && hasPermission(Permission.ORDERS_MODIFY_PRICE)) {
+                      openNumpad('BASE_PRICE');
+                    }
+                  }}
+                >
+                  <span className="text-sm text-gray-600">{t('pos.cart.base_price')}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold text-gray-900 font-mono">
+                      {formatCurrency(basePrice)}
+                    </span>
+                    {onBasePriceChange && (
+                      <Edit2 size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </div>
                 </div>
-              </div>
+              </EscalatableGate>
 
               {/* 属性加价 (如果有) */}
               {optionsModifier !== 0 && (
@@ -251,14 +262,14 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 {/* Delete Button */}
                 {showDelete && onDelete && (
                     <EscalatableGate
-                        permission={Permission.ORDERS_VOID}
+                        permission={Permission.ORDERS_CANCEL_ITEM}
                         mode="intercept"
                         description={t('common.action.delete')}
                         onAuthorized={(user) => handleProtectedDelete({ id: user.id, name: user.name })}
                     >
                         <button
                             onClick={() => {
-                                if (hasPermission(Permission.ORDERS_VOID)) {
+                                if (hasPermission(Permission.ORDERS_CANCEL_ITEM)) {
                                     handleProtectedDelete();
                                 }
                             }}

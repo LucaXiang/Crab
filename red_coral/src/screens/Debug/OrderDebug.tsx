@@ -31,7 +31,7 @@ import type { OrderSnapshot, SyncResponse } from '@/core/domain/types/orderEvent
 
 export const OrderDebug: React.FC = () => {
   const navigate = useNavigate();
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiding, setIsVoiding] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -64,7 +64,7 @@ export const OrderDebug: React.FC = () => {
   // 检测幽灵订单（有订单但没有 table_id）
   const ghostOrders = useMemo(() => activeOrders.filter((o) => !o.table_id && !o.is_retail), [activeOrders]);
 
-  const toggleExpand = (orderId: string) => {
+  const toggleExpand = (orderId: number) => {
     setExpandedOrders((prev) => {
       const next = new Set(prev);
       if (next.has(orderId)) {

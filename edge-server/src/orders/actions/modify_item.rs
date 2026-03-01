@@ -18,7 +18,7 @@ use shared::order::{
 /// ModifyItem action
 #[derive(Debug, Clone)]
 pub struct ModifyItemAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub instance_id: String,
     pub affected_quantity: Option<i32>,
     pub changes: ItemChanges,
@@ -37,15 +37,15 @@ impl CommandHandler for ModifyItemAction {
         crate::order_money::validate_item_changes(&self.changes)?;
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status
         match snapshot.status {
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {}
         }
@@ -158,10 +158,10 @@ impl CommandHandler for ModifyItemAction {
         // 13. Create event
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::ItemModified,
             EventPayload::ItemModified {
@@ -350,7 +350,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -393,8 +393,8 @@ mod tests {
         }
     }
 
-    fn create_active_order_with_item(order_id: &str, item: CartItemSnapshot) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_active_order_with_item(order_id: i64, item: CartItemSnapshot) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
         snapshot
@@ -407,14 +407,14 @@ mod tests {
 
         // Create order with item
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None, // Full modification
             changes: ItemChanges {
@@ -430,7 +430,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::ItemModified);
 
         if let EventPayload::ItemModified {
@@ -464,14 +464,14 @@ mod tests {
 
         // Create order with item quantity=5
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: Some(2), // Partial: only 2 of 5
             changes: ItemChanges {
@@ -524,14 +524,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 100.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -566,15 +566,15 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "nonexistent".to_string(),
+            order_id: 1001,
+            instance_id: 9999.to_string(),
             affected_quantity: None,
             changes: ItemChanges {
                 price: Some(15.0),
@@ -596,14 +596,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: Some(5), // More than available
             changes: ItemChanges {
@@ -626,7 +626,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -635,7 +635,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -658,7 +658,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -667,7 +667,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -690,14 +690,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: Some(0),
             changes: ItemChanges {
@@ -720,14 +720,14 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -825,7 +825,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -845,7 +845,7 @@ mod tests {
         }];
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -881,7 +881,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -896,7 +896,7 @@ mod tests {
         };
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -937,7 +937,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -945,7 +945,7 @@ mod tests {
 
         // Send empty changes
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges::default(),
@@ -964,7 +964,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -972,7 +972,7 @@ mod tests {
 
         // Send same price as current
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -995,7 +995,7 @@ mod tests {
 
         // Item has manual_discount_percent = None
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -1003,7 +1003,7 @@ mod tests {
 
         // Send discount = 0 (should be treated as same as None)
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1039,7 +1039,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         item.selected_options = Some(opts.clone());
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -1047,7 +1047,7 @@ mod tests {
 
         // Send same options
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1078,7 +1078,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         item.selected_specification = Some(spec.clone());
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -1086,7 +1086,7 @@ mod tests {
 
         // Send same spec
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1179,7 +1179,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 5.0, 5);
         item.unpaid_quantity = 3; // 5 total - 2 paid = 3 unpaid
-        let mut snapshot = create_active_order_with_item("order-1", item);
+        let mut snapshot = create_active_order_with_item(1001, item);
         snapshot
             .paid_item_quantities
             .insert("item-1".to_string(), 2);
@@ -1190,7 +1190,7 @@ mod tests {
 
         // User changes unpaid from 3 to 5
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1230,7 +1230,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 10);
-        let mut snapshot = create_active_order_with_item("order-1", item);
+        let mut snapshot = create_active_order_with_item(1001, item);
         snapshot
             .paid_item_quantities
             .insert("item-1".to_string(), 3);
@@ -1240,7 +1240,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1275,7 +1275,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
-        let mut snapshot = create_active_order_with_item("order-1", item);
+        let mut snapshot = create_active_order_with_item(1001, item);
         snapshot
             .paid_item_quantities
             .insert("item-1".to_string(), 2);
@@ -1285,7 +1285,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1319,7 +1319,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         // No paid_item_quantities
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -1327,7 +1327,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
@@ -1362,14 +1362,14 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Comp Beer", 5.0, 1);
         item.is_comped = true;
-        let snapshot = create_active_order_with_item("order-1", item);
+        let snapshot = create_active_order_with_item(1001, item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {

@@ -94,13 +94,11 @@ impl ShiftAutoCloseScheduler {
                     shifts.len()
                 );
                 for s in &shifts {
-                    let id = s.id.to_string();
-
                     self.state
                         .broadcast_sync(
                             RESOURCE,
                             SyncChangeType::SettlementRequired,
-                            &id,
+                            s.id,
                             Some(s),
                             false,
                         )

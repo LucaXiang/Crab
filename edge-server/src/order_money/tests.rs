@@ -197,7 +197,7 @@ fn test_many_small_items() {
 fn test_is_pre_payment_reset_when_total_changes() {
     use shared::order::OrderSnapshot;
 
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(CartItemSnapshot {
         id: 1,
         instance_id: "i1".to_string(),
@@ -281,7 +281,7 @@ fn test_is_pre_payment_reset_when_total_changes() {
 fn test_is_pre_payment_not_affected_when_false() {
     use shared::order::OrderSnapshot;
 
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(CartItemSnapshot {
         id: 1,
         instance_id: "i1".to_string(),
@@ -706,7 +706,7 @@ fn test_calculate_item_total_large_quantity_times_price() {
 fn test_recalculate_totals_with_mixed_edge_items() {
     use shared::order::OrderSnapshot;
 
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
 
     // 正常商品
     snapshot.items.push(CartItemSnapshot {
@@ -777,7 +777,7 @@ fn test_recalculate_totals_with_mixed_edge_items() {
 fn test_recalculate_totals_order_discount_exceeds_subtotal() {
     use shared::order::OrderSnapshot;
 
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(CartItemSnapshot {
         id: 1,
         instance_id: "i1".to_string(),
@@ -1138,7 +1138,7 @@ fn test_validate_item_changes_valid() {
         price: Some(25.0),
         quantity: Some(3),
         manual_discount_percent: Some(15.0),
-        note: Some("test".to_string()),
+        note: Some("test note".to_string()),
         selected_options: None,
         selected_specification: None,
     };
@@ -1385,7 +1385,7 @@ fn test_sum_payments_empty() {
 #[test]
 fn test_sum_payments_single() {
     let payments = vec![shared::order::PaymentRecord {
-        payment_id: "p1".to_string(),
+        payment_id: 4001,
         method: "CASH".to_string(),
         amount: 25.50,
         tendered: None,
@@ -1405,7 +1405,7 @@ fn test_sum_payments_single() {
 fn test_sum_payments_with_cancelled() {
     let payments = vec![
         shared::order::PaymentRecord {
-            payment_id: "p1".to_string(),
+            payment_id: 4001,
             method: "CASH".to_string(),
             amount: 30.0,
             tendered: None,
@@ -1419,7 +1419,7 @@ fn test_sum_payments_with_cancelled() {
             timestamp: 1000,
         },
         shared::order::PaymentRecord {
-            payment_id: "p2".to_string(),
+            payment_id: 4002,
             method: "CARD".to_string(),
             amount: 15.0,
             tendered: None,
@@ -1443,7 +1443,7 @@ fn test_sum_payments_with_cancelled() {
 #[test]
 fn test_sum_payments_all_cancelled() {
     let payments = vec![shared::order::PaymentRecord {
-        payment_id: "p1".to_string(),
+        payment_id: 4001,
         method: "CASH".to_string(),
         amount: 50.0,
         tendered: None,
@@ -1464,7 +1464,7 @@ fn test_sum_payments_precision() {
     // 10 payments of 0.1 each should sum to exactly 1.0
     let payments: Vec<shared::order::PaymentRecord> = (0..10)
         .map(|i| shared::order::PaymentRecord {
-            payment_id: format!("p{}", i),
+            payment_id: 4000 + i as i64,
             method: "CASH".to_string(),
             amount: 0.1,
             tendered: None,
@@ -1739,7 +1739,7 @@ fn test_unit_price_manual_plus_rule_discount_combined() {
 #[test]
 fn test_recalculate_totals_with_skipped_item_rule() {
     // Verify recalculate_totals produces correct results when item has skipped rules
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(make_item_with_rules(
         100.0,
         vec![
@@ -1769,7 +1769,7 @@ fn test_recalculate_totals_with_skipped_item_rule() {
 
 #[test]
 fn test_recalculate_totals_skipped_order_level_discount() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     // Simple item, no item-level rules
     let mut item = make_item_with_rules(100.0, vec![], None, None);
     item.applied_rules = vec![];
@@ -1791,7 +1791,7 @@ fn test_recalculate_totals_skipped_order_level_discount() {
 
 #[test]
 fn test_recalculate_totals_skipped_order_level_surcharge() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     let mut item = make_item_with_rules(100.0, vec![], None, None);
     item.applied_rules = vec![];
     snapshot.items.push(item);
@@ -1812,7 +1812,7 @@ fn test_recalculate_totals_skipped_order_level_surcharge() {
 
 #[test]
 fn test_recalculate_totals_mixed_active_and_skipped_order_rules() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     let mut item = make_item_with_rules(200.0, vec![], None, None);
     item.applied_rules = vec![];
     snapshot.items.push(item);
@@ -1837,7 +1837,7 @@ fn test_recalculate_totals_mixed_active_and_skipped_order_rules() {
 #[test]
 fn test_recalculate_totals_pre_payment_reset_on_rule_skip() {
     // When a rule skip causes total to change, is_pre_payment must reset
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(make_item_with_rules(
         100.0,
         vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
@@ -1866,7 +1866,7 @@ fn test_recalculate_totals_pre_payment_reset_on_rule_skip() {
 #[test]
 fn test_recalculate_totals_tax_on_item_with_skipped_surcharge() {
     // Tax should be calculated on the effective total (after skipping surcharge)
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     let mut item = make_item_with_rules(
         100.0,
         vec![make_applied_rule(11, RuleType::Surcharge, 10.0, true)], // skipped
@@ -1888,7 +1888,7 @@ fn test_recalculate_totals_tax_on_item_with_skipped_surcharge() {
 #[test]
 fn test_recalculate_totals_tax_on_item_with_active_surcharge() {
     // Compare: with active surcharge, tax is on higher amount
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     let mut item = make_item_with_rules(
         100.0,
         vec![make_applied_rule(11, RuleType::Surcharge, 10.0, false)], // active
@@ -1910,7 +1910,7 @@ fn test_recalculate_totals_tax_on_item_with_active_surcharge() {
 fn test_recalculate_totals_skip_item_rule_changes_order_discount_basis() {
     // When item-level rule is skipped, subtotal changes, which affects
     // order-level percentage discount calculation
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(make_item_with_rules(
         100.0,
         vec![make_applied_rule(1, RuleType::Discount, 20.0, false)], // active: -20
@@ -1985,7 +1985,7 @@ fn test_effective_rule_discount_multiple_active_stacked() {
 #[test]
 fn test_skip_unskip_cycle_preserves_amounts() {
     // Skip a rule, then unskip it → amounts should return to original
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(make_item_with_rules(
         100.0,
         vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
@@ -2019,7 +2019,7 @@ fn test_skip_unskip_cycle_preserves_amounts() {
 
 #[test]
 fn test_effective_order_rule_discount_skipped() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.order_applied_rules = vec![
         make_applied_rule(101, RuleType::Discount, 10.0, false),
         make_applied_rule(102, RuleType::Discount, 5.0, true), // skipped
@@ -2033,7 +2033,7 @@ fn test_effective_order_rule_discount_skipped() {
 
 #[test]
 fn test_effective_order_rule_surcharge_skipped() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.order_applied_rules = vec![
         make_applied_rule(111, RuleType::Surcharge, 8.0, true), // skipped
     ];
@@ -2045,7 +2045,7 @@ fn test_effective_order_rule_surcharge_skipped() {
 
 #[test]
 fn test_effective_order_rule_discount_legacy_fallback() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.order_applied_rules = vec![];
     snapshot.order_rule_discount_amount = 12.0;
 
@@ -2059,7 +2059,7 @@ fn test_effective_order_rule_discount_legacy_fallback() {
 
 #[test]
 fn test_effective_order_rule_surcharge_legacy_fallback() {
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.order_applied_rules = vec![];
     snapshot.order_rule_surcharge_amount = 6.0;
 
@@ -2074,7 +2074,7 @@ fn test_effective_order_rule_surcharge_legacy_fallback() {
 #[test]
 fn test_recalculate_totals_remaining_amount_with_skipped_rule_and_payment() {
     // Verify remaining_amount is correct when a rule is skipped and partial payment exists
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(make_item_with_rules(
         100.0,
         vec![make_applied_rule(1, RuleType::Discount, 20.0, false)],
@@ -2179,7 +2179,7 @@ fn test_fixed_amount_rule_unaffected_by_manual_discount() {
 #[test]
 fn test_order_rule_recalculates_on_subtotal_change() {
     // Order-level 10% discount should recalculate when subtotal changes
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     let mut item = make_item_with_rules(100.0, vec![], None, None);
     item.applied_rules = vec![];
     snapshot.items.push(item);
@@ -2204,7 +2204,7 @@ fn test_order_rule_recalculates_on_subtotal_change() {
 #[test]
 fn test_recalculate_updates_calculated_amount_in_snapshot() {
     // Verify that recalculate_totals syncs calculated_amount in applied_rules
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     snapshot.items.push(make_item_with_rules(
         100.0,
         vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
@@ -2236,7 +2236,7 @@ fn test_recalculate_updates_calculated_amount_in_snapshot() {
 #[test]
 fn test_recalculate_updates_order_calculated_amount_in_snapshot() {
     // Verify that recalculate_totals syncs calculated_amount in order_applied_rules
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
     let mut item = make_item_with_rules(100.0, vec![], None, None);
     item.applied_rules = vec![];
     snapshot.items.push(item);
@@ -2261,7 +2261,7 @@ fn test_recalculate_updates_order_calculated_amount_in_snapshot() {
 #[test]
 fn test_recalculate_totals_with_option_quantity() {
     // Verify recalculate_totals correctly handles option quantity multiplication
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
 
     // Item with options that have quantity > 1
     let item = CartItemSnapshot {
@@ -2440,7 +2440,7 @@ fn test_negative_option_with_quantity_exceeds_base() {
 #[test]
 fn test_recalculate_totals_negative_option_original_total_never_negative() {
     // The original bug: original_total was -85.50€
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
 
     // Normal item
     snapshot.items.push(make_item_with_options(5.50, vec![]));
@@ -2476,7 +2476,7 @@ fn test_recalculate_totals_negative_option_original_total_never_negative() {
 #[test]
 fn test_recalculate_totals_all_items_negative_options() {
     // Every item has options that exceed base price
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
 
     let mut item1 = make_item_with_options(3.50, vec![make_option("Bad", -100.0, 1)]);
     item1.instance_id = "i1".to_string();
@@ -2501,7 +2501,7 @@ fn test_recalculate_totals_all_items_negative_options() {
 #[test]
 fn test_recalculate_totals_comped_item_with_negative_option() {
     // Comped item with negative option modifier — comp_total must not go negative
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
 
     let mut item = make_item_with_options(3.50, vec![make_option("Avena", -100.0, 1)]);
     item.is_comped = true;
@@ -2520,7 +2520,7 @@ fn test_recalculate_totals_comped_item_with_negative_option() {
 #[test]
 fn test_recalculate_totals_negative_option_with_multiple_quantity() {
     // Item quantity > 1 with negative option
-    let mut snapshot = OrderSnapshot::new("order-1".to_string());
+    let mut snapshot = OrderSnapshot::new(1001);
 
     let mut item = make_item_with_options(3.50, vec![make_option("Bad", -100.0, 1)]);
     item.quantity = 5;

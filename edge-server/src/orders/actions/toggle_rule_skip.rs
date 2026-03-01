@@ -7,7 +7,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// ToggleRuleSkip action
 #[derive(Debug, Clone)]
 pub struct ToggleRuleSkipAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub rule_id: i64,
     pub skipped: bool,
 }
@@ -19,7 +19,7 @@ impl CommandHandler for ToggleRuleSkipAction {
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 1. Load snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 2. Validate status
         if !matches!(snapshot.status, OrderStatus::Active) {
@@ -70,10 +70,10 @@ impl CommandHandler for ToggleRuleSkipAction {
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::RuleSkipToggled,
             EventPayload::RuleSkipToggled {
@@ -97,7 +97,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -158,7 +158,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an active order with item that has applied rule
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item_with_rule(1)];
         snapshot.subtotal = 10.0;
@@ -169,7 +169,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: true,
         };
@@ -179,7 +179,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::RuleSkipToggled);
 
         if let EventPayload::RuleSkipToggled {
@@ -199,7 +199,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an active order with order-level applied rule
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.order_applied_rules = vec![create_test_applied_rule(100)];
         snapshot.subtotal = 100.0;
@@ -211,7 +211,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 100,
             skipped: true,
         };
@@ -240,7 +240,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an active order without rules
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -248,7 +248,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 99999,
             skipped: true,
         };
@@ -268,7 +268,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create a completed order
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.items = vec![create_test_item_with_rule(1)];
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -277,7 +277,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: true,
         };
@@ -300,7 +300,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             rule_id: 1,
             skipped: true,
         };
@@ -317,7 +317,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create an active order with item that has skipped rule
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         let mut rule = create_test_applied_rule(1);
         rule.skipped = true;
@@ -355,7 +355,7 @@ mod tests {
 
         // Unskip the rule
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: false,
         };
@@ -376,7 +376,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item_with_rule(1)];
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -385,13 +385,13 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: true,
         };
 
         let metadata = CommandMetadata {
-            command_id: "cmd-toggle-1".to_string(),
+            command_id: 100,
             operator_id: 100,
             operator_name: "Manager".to_string(),
             timestamp: 9999999999,
@@ -400,7 +400,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).unwrap();
         let event = &events[0];
 
-        assert_eq!(event.command_id, "cmd-toggle-1");
+        assert_eq!(event.command_id, 100);
         assert_eq!(event.operator_id, 100);
         assert_eq!(event.operator_name, "Manager");
         assert_eq!(event.client_timestamp, Some(9999999999));
@@ -412,7 +412,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         let mut rule = create_test_applied_rule(1);
         rule.skipped = true; // already skipped
@@ -450,7 +450,7 @@ mod tests {
 
         // Skip again (idempotent-ish)
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: true,
         };
@@ -472,7 +472,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![CartItemSnapshot {
             id: 1,
@@ -508,7 +508,7 @@ mod tests {
 
         // Toggle only rule 2
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 2,
             skipped: true,
         };
@@ -534,7 +534,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item_with_rule(50)];
         snapshot.order_applied_rules = vec![create_test_applied_rule(50)];
@@ -544,7 +544,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 50,
             skipped: true,
         };
@@ -559,7 +559,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item_with_rule(1)];
         snapshot.aa_total_shares = Some(3);
@@ -571,7 +571,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: true,
         };
@@ -590,7 +590,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![create_test_item_with_rule(1)];
         snapshot.has_amount_split = true;
@@ -601,7 +601,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = ToggleRuleSkipAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             rule_id: 1,
             skipped: true,
         };

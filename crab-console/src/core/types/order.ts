@@ -22,7 +22,7 @@ export interface ChainEntryItem {
 export interface CreditNoteDetailResponse {
   source_id: number;
   credit_note_number: string;
-  original_order_key: string;
+  original_order_id: number;
   original_receipt: string;
   subtotal_credit: number;
   tax_credit: number;
@@ -33,21 +33,16 @@ export interface CreditNoteDetailResponse {
   operator_name: string;
   authorizer_name: string | null;
   created_at: number;
-  detail: CreditNoteDetailPayload | null;
-}
-
-export interface CreditNoteDetailPayload {
   items: CreditNoteItem[];
 }
 
 export interface CreditNoteItem {
-  name: string;
-  spec_name: string | null;
+  item_name: string;
   quantity: number;
   unit_price: number;
   line_credit: number;
-  tax_credit: number;
   tax_rate: number;
+  tax_credit: number;
 }
 
 export interface OrderItemOption {

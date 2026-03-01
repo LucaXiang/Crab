@@ -24,13 +24,13 @@ vi.mock('@/hooks/useI18n', () => ({
 
 // Helper to create properly typed mock OrderEvent
 const createMockEvent = (event_type: string, payload: EventPayload, overrides?: Partial<OrderEvent>): OrderEvent => ({
-  event_id: `evt-${event_type}`,
+  event_id: 1001,
   sequence: 1,
-  order_id: 'order-test-1',
+  order_id: 2001,
   timestamp: Date.now(),
   operator_id: 1,
   operator_name: 'Test Operator',
-  command_id: 'cmd-1',
+  command_id: 3001,
   event_type: event_type as OrderEvent['event_type'],
   payload,
   ...overrides,
@@ -74,16 +74,16 @@ describe('TimelineList Integration Tests', () => {
           guest_count: 2,
           is_retail: false,
           receipt_number: 'RCP-TEST',
-        }, { event_id: 'evt-1', timestamp: Date.now() - 2000, sequence: 1 }),
+        }, { event_id: 5001, timestamp: Date.now() - 2000, sequence: 1 }),
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payment_id: 'pay-1',
+          payment_id: 4001,
           method: 'cash',
           amount: 1000,
           tendered: null,
           change: null,
           note: null,
-        }, { event_id: 'evt-2', timestamp: Date.now() - 1000, sequence: 2 }),
+        }, { event_id: 5002, timestamp: Date.now() - 1000, sequence: 2 }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -133,7 +133,7 @@ describe('TimelineList Integration Tests', () => {
       const events: OrderEvent[] = [
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payment_id: 'pay-1',
+          payment_id: 4001,
           method: 'cash',
           amount: 5000,
           tendered: null,
@@ -189,27 +189,27 @@ describe('TimelineList Integration Tests', () => {
           guest_count: 2,
           is_retail: false,
           receipt_number: 'RCP-TEST',
-        }, { event_id: 'evt-1', sequence: 1 }),
+        }, { event_id: 5001, sequence: 1 }),
         createMockEvent('ITEMS_ADDED', {
           type: 'ITEMS_ADDED',
           items: [],
-        }, { event_id: 'evt-2', sequence: 2 }),
+        }, { event_id: 5002, sequence: 2 }),
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payment_id: 'pay-1',
+          payment_id: 4001,
           method: 'cash',
           amount: 1000,
           tendered: null,
           change: null,
           note: null,
-        }, { event_id: 'evt-3', sequence: 3 }),
+        }, { event_id: 5003, sequence: 3 }),
         createMockEvent('ORDER_COMPLETED', {
           type: 'ORDER_COMPLETED',
           final_total: 1000,
           receipt_number: 'FAC-001',
           payment_summary: [],
           service_type: 'DINE_IN',
-        }, { event_id: 'evt-4', sequence: 4 }),
+        }, { event_id: 5004, sequence: 4 }),
       ];
 
       // Should render without throwing
@@ -220,13 +220,13 @@ describe('TimelineList Integration Tests', () => {
       // Create a minimally valid event structure with unknown type
       const events: OrderEvent[] = [
         {
-          event_id: 'evt-bad',
+          event_id: 9999,
           sequence: 1,
-          order_id: 'order-test-1',
+          order_id: 2001,
           timestamp: Date.now(),
           operator_id: 1,
           operator_name: 'Test Operator',
-          command_id: 'cmd-1',
+          command_id: 3001,
           // @ts-expect-error testing invalid event type
           event_type: 'UNKNOWN_TYPE',
           // @ts-expect-error testing invalid payload
@@ -244,14 +244,14 @@ describe('TimelineList Integration Tests', () => {
       const manyEvents: OrderEvent[] = Array.from({ length: 100 }, (_, i) =>
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payment_id: `pay-${i}`,
+          payment_id: 4000 + i,
           method: 'cash',
           amount: 1000 + i,
           tendered: null,
           change: null,
           note: null,
         }, {
-          event_id: `evt-${i}`,
+          event_id: 6000 + i,
           timestamp: Date.now() - i * 1000,
           sequence: i + 1,
         })

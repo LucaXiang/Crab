@@ -30,11 +30,11 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [order.payments]);
 
-  const [cancellingPaymentId, setCancellingPaymentId] = useState<string | null>(null);
-  const [cancelConfirm, setCancelConfirm] = useState<{ paymentId: string; isSplit: boolean } | null>(null);
+  const [cancellingPaymentId, setCancellingPaymentId] = useState<number | null>(null);
+  const [cancelConfirm, setCancelConfirm] = useState<{ paymentId: number; isSplit: boolean } | null>(null);
   const [cancelAuthorizer, setCancelAuthorizer] = useState<{ id: number; name: string } | null>(null);
 
-  const handleCancelPayment = useCallback((paymentId: string, isSplit: boolean) => {
+  const handleCancelPayment = useCallback((paymentId: number, isSplit: boolean) => {
     setCancelConfirm({ paymentId, isSplit });
   }, []);
 
@@ -127,7 +127,7 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
                               minute: '2-digit',
                               hour12: false,
                             })}</span>
-                            <span className="text-[0.625rem] text-emerald-600 bg-emerald-100 font-bold font-mono px-1.5 py-0.5 rounded">#{payment.payment_id.slice(-5)}</span>
+                            <span className="text-[0.625rem] text-emerald-600 bg-emerald-100 font-bold font-mono px-1.5 py-0.5 rounded">#{String(payment.payment_id).slice(-5)}</span>
                           </div>
                         </div>
                       </div>

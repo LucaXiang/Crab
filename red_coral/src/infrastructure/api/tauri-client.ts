@@ -549,13 +549,13 @@ export class TauriApiClient {
 
   // ============ Kitchen Orders (厨房补打) ============
 
-  async getKitchenOrdersForOrder(orderId: string): Promise<KitchenOrderListResponse> {
+  async getKitchenOrdersForOrder(orderId: number): Promise<KitchenOrderListResponse> {
     return invokeApi<KitchenOrderListResponse>('api_get', {
       path: `/api/kitchen-orders?order_id=${orderId}`,
     });
   }
 
-  async reprintKitchenOrder(id: string): Promise<boolean> {
+  async reprintKitchenOrder(id: number): Promise<boolean> {
     return invokeApi<boolean>('api_post', {
       path: `/api/kitchen-orders/${id}/reprint`,
       body: {},
@@ -564,13 +564,13 @@ export class TauriApiClient {
 
   // ============ Label Records (标签补打) ============
 
-  async getLabelRecordsForOrder(orderId: string): Promise<LabelPrintRecord[]> {
+  async getLabelRecordsForOrder(orderId: number): Promise<LabelPrintRecord[]> {
     return invokeApi<LabelPrintRecord[]>('api_get', {
       path: `/api/label-records?order_id=${orderId}`,
     });
   }
 
-  async reprintLabelRecord(id: string): Promise<boolean> {
+  async reprintLabelRecord(id: number): Promise<boolean> {
     return invokeApi<boolean>('api_post', {
       path: `/api/label-records/${id}/reprint`,
       body: {},

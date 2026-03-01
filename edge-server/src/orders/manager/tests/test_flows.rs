@@ -32,7 +32,7 @@ async fn test_complete_dine_in_flow() {
     let order_id = resp.order_id.unwrap();
 
     // 验证开台状态
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Active);
     assert_eq!(snapshot.guest_count, 4);
     assert!(!snapshot.receipt_number.is_empty());
@@ -42,7 +42,7 @@ async fn test_complete_dine_in_flow() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![
                 simple_item(10, "Coffee", 5.0, 2), // 10.0
                 simple_item(11, "Tea", 3.0, 3),    // 9.0
@@ -53,7 +53,7 @@ async fn test_complete_dine_in_flow() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success, "AddItems should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items.len(), 3);
     assert_eq!(snapshot.subtotal, 31.5); // 10 + 9 + 12.5
 
@@ -70,7 +70,7 @@ async fn test_complete_dine_in_flow() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: tea_instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -84,23 +84,23 @@ async fn test_complete_dine_in_flow() {
     let resp = manager.execute_command(modify_cmd).await;
     assert!(resp.success, "ModifyItem should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 新总额: 10 + 6 + 12.5 = 28.5
     assert_eq!(snapshot.subtotal, 28.5);
     assert_eq!(snapshot.total, 28.5);
 
     // 4. 全额支付
-    let pay_resp = pay(&manager, &order_id, 28.5, "CARD").await;
+    let pay_resp = pay(&manager, order_id, 28.5, "CARD").await;
     assert!(pay_resp.success, "Payment should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 28.5);
 
     // 5. 完成订单
-    let complete_resp = complete_order(&manager, &order_id).await;
+    let complete_resp = complete_order(&manager, order_id).await;
     assert!(complete_resp.success, "CompleteOrder should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert!(snapshot.end_time.is_some());
 }
@@ -115,7 +115,7 @@ async fn test_complete_retail_flow_with_queue_number() {
     // 1. 开零售订单
     let order_id = open_retail_order(&manager).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert!(snapshot.is_retail);
     assert!(
         snapshot.queue_number.is_some(),
@@ -131,28 +131,28 @@ async fn test_complete_retail_flow_with_queue_number() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![simple_item(1, "Item", 15.0, 2)],
         },
     );
     manager.execute_command(add_cmd).await;
 
     // 3. 支付
-    pay(&manager, &order_id, 30.0, "CASH").await;
+    pay(&manager, order_id, 30.0, "CASH").await;
 
     // 4. 完成 (指定服务类型为外带)
     let complete_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::Takeout),
         },
     );
     let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert_eq!(snapshot.service_type, Some(ServiceType::Takeout));
 }
@@ -177,7 +177,7 @@ async fn test_void_order_loss_settlement() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id,
             void_type: VoidType::LossSettled,
             loss_reason: Some(shared::order::LossReason::CustomerFled),
             loss_amount: Some(100.0),
@@ -189,7 +189,7 @@ async fn test_void_order_loss_settlement() {
     let resp = manager.execute_command(void_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Void);
     assert_eq!(snapshot.void_type, Some(VoidType::LossSettled));
     assert_eq!(
@@ -217,7 +217,7 @@ async fn test_split_by_items_multiple_then_complete() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 80.0);
     let item_a_id = snapshot
         .items
@@ -239,7 +239,7 @@ async fn test_split_by_items_multiple_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.clone(),
+            order_id,
             payment_method: "CASH".to_string(),
             items: vec![shared::order::SplitItem {
                 instance_id: item_a_id.clone(),
@@ -253,7 +253,7 @@ async fn test_split_by_items_multiple_then_complete() {
     let resp = manager.execute_command(split_cmd1).await;
     assert!(resp.success, "First split should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 20.0);
     assert_eq!(snapshot.paid_item_quantities.get(&item_a_id), Some(&1));
 
@@ -262,7 +262,7 @@ async fn test_split_by_items_multiple_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.clone(),
+            order_id,
             payment_method: "CARD".to_string(),
             items: vec![shared::order::SplitItem {
                 instance_id: item_b_id.clone(),
@@ -276,19 +276,19 @@ async fn test_split_by_items_multiple_then_complete() {
     let resp = manager.execute_command(split_cmd2).await;
     assert!(resp.success, "Second split should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 50.0);
 
     // 支付剩余 (Item A 的 1 个 + Item C): 20 + 10 = 30
-    pay(&manager, &order_id, 30.0, "CASH").await;
+    pay(&manager, order_id, 30.0, "CASH").await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 80.0);
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id).await;
+    let complete_resp = complete_order(&manager, order_id).await;
     assert!(complete_resp.success);
-    assert_order_status(&manager, &order_id, OrderStatus::Completed);
+    assert_order_status(&manager, order_id, OrderStatus::Completed);
 }
 
 // ------------------------------------------------------------------------
@@ -306,7 +306,7 @@ async fn test_split_by_amount_multiple_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByAmount {
-            order_id: order_id.clone(),
+            order_id,
             split_amount: 30.0,
             payment_method: "CASH".to_string(),
             tendered: Some(30.0),
@@ -315,7 +315,7 @@ async fn test_split_by_amount_multiple_then_complete() {
     let resp = manager.execute_command(split_cmd1).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 30.0);
     assert!(snapshot.has_amount_split, "has_amount_split should be true");
 
@@ -324,7 +324,7 @@ async fn test_split_by_amount_multiple_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByAmount {
-            order_id: order_id.clone(),
+            order_id,
             split_amount: 30.0,
             payment_method: "CARD".to_string(),
             tendered: None,
@@ -333,16 +333,16 @@ async fn test_split_by_amount_multiple_then_complete() {
     let resp = manager.execute_command(split_cmd2).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 60.0);
 
     // 支付剩余 40%
-    pay(&manager, &order_id, 40.0, "CASH").await;
+    pay(&manager, order_id, 40.0, "CASH").await;
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id).await;
+    let complete_resp = complete_order(&manager, order_id).await;
     assert!(complete_resp.success);
-    assert_order_status(&manager, &order_id, OrderStatus::Completed);
+    assert_order_status(&manager, order_id, OrderStatus::Completed);
 }
 
 // ------------------------------------------------------------------------
@@ -361,7 +361,7 @@ async fn test_aa_split_three_payers_indivisible() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             total_shares: 3,
             shares: 1,
             payment_method: "CASH".to_string(),
@@ -371,7 +371,7 @@ async fn test_aa_split_three_payers_indivisible() {
     let resp = manager.execute_command(start_aa).await;
     assert!(resp.success, "StartAaSplit should succeed");
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.aa_total_shares, Some(3));
     assert_eq!(snapshot.aa_paid_shares, 1);
     // 100 / 3 ≈ 33.33，实际支付第一份
@@ -386,7 +386,7 @@ async fn test_aa_split_three_payers_indivisible() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::PayAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             shares: 1,
             payment_method: "CARD".to_string(),
             tendered: None,
@@ -395,7 +395,7 @@ async fn test_aa_split_three_payers_indivisible() {
     let resp = manager.execute_command(pay_aa_2).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.aa_paid_shares, 2);
 
     // PayAaSplit: 第三份 (最后一份应该拿剩余金额)
@@ -403,7 +403,7 @@ async fn test_aa_split_three_payers_indivisible() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::PayAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             shares: 1,
             payment_method: "CASH".to_string(),
             tendered: Some(34.0),
@@ -412,7 +412,7 @@ async fn test_aa_split_three_payers_indivisible() {
     let resp = manager.execute_command(pay_aa_3).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.aa_paid_shares, 3);
     // 精度验证: 总支付应该恰好等于 100.0
     let diff = (snapshot.paid_amount - 100.0).abs();
@@ -423,7 +423,7 @@ async fn test_aa_split_three_payers_indivisible() {
     );
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id).await;
+    let complete_resp = complete_order(&manager, order_id).await;
     assert!(complete_resp.success);
 }
 
@@ -455,8 +455,8 @@ async fn test_merge_orders_then_modify_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: source_id.clone(),
-            target_order_id: target_id.clone(),
+            source_order_id: source_id,
+            target_order_id: target_id,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -465,10 +465,10 @@ async fn test_merge_orders_then_modify_then_complete() {
     assert!(resp.success, "Merge should succeed");
 
     // 验证源订单状态
-    assert_order_status(&manager, &source_id, OrderStatus::Merged);
+    assert_order_status(&manager, source_id, OrderStatus::Merged);
 
     // 验证目标订单
-    let target = manager.get_snapshot(&target_id).unwrap().unwrap();
+    let target = manager.get_snapshot(target_id).unwrap().unwrap();
     assert_eq!(
         target.items.len(),
         2,
@@ -481,20 +481,20 @@ async fn test_merge_orders_then_modify_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: target_id.clone(),
+            order_id: target_id,
             items: vec![simple_item(3, "Cake", 6.0, 1)],
         },
     );
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success, "AddItems to merged target should succeed");
 
-    let target = manager.get_snapshot(&target_id).unwrap().unwrap();
+    let target = manager.get_snapshot(target_id).unwrap().unwrap();
     assert_eq!(target.items.len(), 3);
     assert_eq!(target.total, 20.0);
 
     // 支付并完成
-    pay(&manager, &target_id, 20.0, "CARD").await;
-    let complete_resp = complete_order(&manager, &target_id).await;
+    pay(&manager, target_id, 20.0, "CARD").await;
+    let complete_resp = complete_order(&manager, target_id).await;
     assert!(complete_resp.success);
 }
 
@@ -514,7 +514,7 @@ async fn test_move_then_merge_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MoveOrder {
-            order_id: order1.clone(),
+            order_id: order1,
             target_table_id: 400,
             target_table_name: "Table 2".to_string(),
             target_zone_id: Some(2),
@@ -526,7 +526,7 @@ async fn test_move_then_merge_then_complete() {
     let resp = manager.execute_command(move_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order1).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order1).unwrap().unwrap();
     assert_eq!(snapshot.table_id, Some(400));
     assert_eq!(snapshot.zone_id, Some(2));
 
@@ -539,8 +539,8 @@ async fn test_move_then_merge_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: order1.clone(),
-            target_order_id: order2.clone(),
+            source_order_id: order1,
+            target_order_id: order2,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -549,16 +549,16 @@ async fn test_move_then_merge_then_complete() {
     assert!(resp.success);
 
     // order1 应该是 Merged 状态
-    assert_order_status(&manager, &order1, OrderStatus::Merged);
+    assert_order_status(&manager, order1, OrderStatus::Merged);
 
     // order2 应该有所有商品
-    let target = manager.get_snapshot(&order2).unwrap().unwrap();
+    let target = manager.get_snapshot(order2).unwrap().unwrap();
     assert_eq!(target.items.len(), 2);
     assert_eq!(target.total, 30.0);
 
     // 完成
-    pay(&manager, &order2, 30.0, "CASH").await;
-    let complete_resp = complete_order(&manager, &order2).await;
+    pay(&manager, order2, 30.0, "CASH").await;
+    let complete_resp = complete_order(&manager, order2).await;
     assert!(complete_resp.success);
 }
 
@@ -576,7 +576,7 @@ async fn test_items_add_modify_remove_chain() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
     assert_eq!(snapshot.subtotal, 50.0);
 
@@ -585,7 +585,7 @@ async fn test_items_add_modify_remove_chain() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: instance_id.clone(),
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -599,7 +599,7 @@ async fn test_items_add_modify_remove_chain() {
     let resp = manager.execute_command(modify_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items[0].quantity, 3);
     assert_eq!(snapshot.subtotal, 30.0);
 
@@ -608,7 +608,7 @@ async fn test_items_add_modify_remove_chain() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::RemoveItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: instance_id.clone(),
             quantity: Some(2),
             reason: Some("Customer changed mind".to_string()),
@@ -619,7 +619,7 @@ async fn test_items_add_modify_remove_chain() {
     let resp = manager.execute_command(remove_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items[0].quantity, 1);
     assert_eq!(snapshot.subtotal, 10.0);
 
@@ -628,7 +628,7 @@ async fn test_items_add_modify_remove_chain() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::RemoveItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: instance_id.clone(),
             quantity: None, // 移除全部
             reason: None,
@@ -639,7 +639,7 @@ async fn test_items_add_modify_remove_chain() {
     let resp = manager.execute_command(remove_cmd2).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert!(snapshot.items.is_empty() || snapshot.items.iter().all(|i| i.quantity == 0));
     assert_eq!(snapshot.subtotal, 0.0);
 }
@@ -664,7 +664,7 @@ async fn test_remove_item_partial_recalculates() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // 移除 2 个
@@ -672,7 +672,7 @@ async fn test_remove_item_partial_recalculates() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::RemoveItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id,
             quantity: Some(2),
             reason: None,
@@ -683,7 +683,7 @@ async fn test_remove_item_partial_recalculates() {
     let resp = manager.execute_command(remove_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items[0].quantity, 3);
     assert_eq!(snapshot.subtotal, 30.0);
     assert_eq!(snapshot.total, 30.0);
@@ -704,7 +704,7 @@ async fn test_discount_plus_surcharge_calculation() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.clone(),
+            order_id,
             discount_percent: Some(10.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -714,7 +714,7 @@ async fn test_discount_plus_surcharge_calculation() {
     let resp = manager.execute_command(discount_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.order_manual_discount_percent, Some(10.0));
     assert_eq!(snapshot.order_manual_discount_amount, 10.0);
 
@@ -723,7 +723,7 @@ async fn test_discount_plus_surcharge_calculation() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderSurcharge {
-            order_id: order_id.clone(),
+            order_id,
             surcharge_percent: None,
             surcharge_amount: Some(15.0),
             authorizer_id: None,
@@ -733,7 +733,7 @@ async fn test_discount_plus_surcharge_calculation() {
     let resp = manager.execute_command(surcharge_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.order_manual_surcharge_fixed, Some(15.0));
     // total = 100 - 10 + 15 = 105
     assert_eq!(snapshot.total, 105.0);
@@ -766,13 +766,13 @@ async fn test_item_level_plus_order_level_discount() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![item_with_discount(1, "Item", 100.0, 1, 10.0)], // 90 after item discount
         },
     );
     manager.execute_command(add_cmd).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 商品级折扣后 subtotal = 90
     assert_eq!(snapshot.subtotal, 90.0);
 
@@ -781,7 +781,7 @@ async fn test_item_level_plus_order_level_discount() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.clone(),
+            order_id,
             discount_percent: Some(5.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -791,7 +791,7 @@ async fn test_item_level_plus_order_level_discount() {
     let resp = manager.execute_command(discount_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // total = 90 - (90 * 5%) = 90 - 4.5 = 85.5
     assert_eq!(snapshot.total, 85.5);
 }
@@ -810,7 +810,7 @@ async fn test_comp_then_uncomp_restores_price() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
     assert_eq!(snapshot.total, 50.0);
 
@@ -819,7 +819,7 @@ async fn test_comp_then_uncomp_restores_price() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: instance_id.clone(),
             quantity: 2,
             reason: "Birthday gift".to_string(),
@@ -830,7 +830,7 @@ async fn test_comp_then_uncomp_restores_price() {
     let resp = manager.execute_command(comp_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // Comp 后，原商品应该变成 comped，价格为 0
     let comped_item = snapshot.items.iter().find(|i| i.is_comped).unwrap();
     assert_eq!(comped_item.quantity, 2);
@@ -842,7 +842,7 @@ async fn test_comp_then_uncomp_restores_price() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::UncompItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: comped_item.instance_id.clone(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
@@ -851,7 +851,7 @@ async fn test_comp_then_uncomp_restores_price() {
     let resp = manager.execute_command(uncomp_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // Uncomp 后价格恢复
     assert_eq!(snapshot.total, 50.0);
     assert_eq!(snapshot.comp_total_amount, 0.0);
@@ -871,7 +871,7 @@ async fn test_comp_partial_creates_split_item() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // Comp 2 个 (部分)
@@ -879,7 +879,7 @@ async fn test_comp_partial_creates_split_item() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: instance_id.clone(),
             quantity: 2,
             reason: "Promotion".to_string(),
@@ -890,7 +890,7 @@ async fn test_comp_partial_creates_split_item() {
     let resp = manager.execute_command(comp_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 应该有 2 个商品项: 原始 3 个 + comped 2 个
     assert_eq!(snapshot.items.len(), 2);
 
@@ -920,7 +920,7 @@ async fn test_large_order_precision() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 99999.99 * 100 = 9999999.0
     assert_eq!(snapshot.subtotal, 9999999.0);
     assert_eq!(snapshot.total, 9999999.0);
@@ -962,7 +962,7 @@ async fn test_option_price_modifiers_accumulate() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![item_with_options(
                 1,
                 "Pizza",
@@ -1000,7 +1000,7 @@ async fn test_option_price_modifiers_accumulate() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 15 + 5 + 2.5 = 22.5
     assert_eq!(snapshot.subtotal, 22.5);
 }
@@ -1022,16 +1022,16 @@ async fn test_all_commands_reject_completed_order() {
         open_table_with_items(&manager, 260, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
     // 支付并完成
-    pay(&manager, &order_id, 10.0, "CASH").await;
-    complete_order(&manager, &order_id).await;
-    assert_order_status(&manager, &order_id, OrderStatus::Completed);
+    pay(&manager, order_id, 10.0, "CASH").await;
+    complete_order(&manager, order_id).await;
+    assert_order_status(&manager, order_id, OrderStatus::Completed);
 
     // 测试 AddItems
     let add_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![simple_item(2, "New Item", 5.0, 1)],
         },
     );
@@ -1043,7 +1043,7 @@ async fn test_all_commands_reject_completed_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 5.0,
@@ -1060,7 +1060,7 @@ async fn test_all_commands_reject_completed_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1077,7 +1077,7 @@ async fn test_all_commands_reject_completed_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MoveOrder {
-            order_id: order_id.clone(),
+            order_id,
             target_table_id: 332,
             target_table_name: "New Table".to_string(),
             target_zone_id: None,
@@ -1101,15 +1101,15 @@ async fn test_all_commands_reject_voided_order() {
         open_table_with_items(&manager, 261, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
     // 作废订单
-    void_order_helper(&manager, &order_id, VoidType::Cancelled).await;
-    assert_order_status(&manager, &order_id, OrderStatus::Void);
+    void_order_helper(&manager, order_id, VoidType::Cancelled).await;
+    assert_order_status(&manager, order_id, OrderStatus::Void);
 
     // 测试 AddItems
     let add_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id,
             items: vec![simple_item(2, "New Item", 5.0, 1)],
         },
     );
@@ -1121,7 +1121,7 @@ async fn test_all_commands_reject_voided_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 5.0,
@@ -1138,7 +1138,7 @@ async fn test_all_commands_reject_voided_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1168,14 +1168,14 @@ async fn test_merged_order_not_in_active_list() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: source_id.clone(),
-            target_order_id: target_id.clone(),
+            source_order_id: source_id,
+            target_order_id: target_id,
             authorizer_id: None,
             authorizer_name: None,
         },
     );
     manager.execute_command(merge_cmd).await;
-    assert_order_status(&manager, &source_id, OrderStatus::Merged);
+    assert_order_status(&manager, source_id, OrderStatus::Merged);
 
     // 合并后源订单不在活跃列表
     let active = manager.get_active_orders().unwrap();
@@ -1200,7 +1200,7 @@ async fn test_update_guest_count_does_not_affect_totals() {
     let order_id =
         open_table_with_items(&manager, 264, vec![simple_item(1, "Item", 100.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.guest_count, 2); // 默认值
     assert_eq!(snapshot.total, 100.0);
 
@@ -1209,7 +1209,7 @@ async fn test_update_guest_count_does_not_affect_totals() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::UpdateOrderInfo {
-            order_id: order_id.clone(),
+            order_id,
             guest_count: Some(8),
             table_name: None,
             is_pre_payment: None,
@@ -1218,7 +1218,7 @@ async fn test_update_guest_count_does_not_affect_totals() {
     let resp = manager.execute_command(update_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.guest_count, 8);
     assert_eq!(
         snapshot.total, 100.0,
@@ -1240,13 +1240,13 @@ async fn test_add_note_overwrites_previous() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddOrderNote {
-            order_id: order_id.clone(),
+            order_id,
             note: "First note".to_string(),
         },
     );
     manager.execute_command(note_cmd1).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.note, Some("First note".to_string()));
 
     // 添加第二个备注 (应覆盖)
@@ -1254,13 +1254,13 @@ async fn test_add_note_overwrites_previous() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddOrderNote {
-            order_id: order_id.clone(),
+            order_id,
             note: "Second note".to_string(),
         },
     );
     manager.execute_command(note_cmd2).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.note, Some("Second note".to_string()));
 }
 
@@ -1278,13 +1278,13 @@ async fn test_clear_note_with_empty_string() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddOrderNote {
-            order_id: order_id.clone(),
+            order_id,
             note: "Some note".to_string(),
         },
     );
     manager.execute_command(note_cmd).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.note, Some("Some note".to_string()));
 
     // 用空字符串清除
@@ -1292,13 +1292,13 @@ async fn test_clear_note_with_empty_string() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddOrderNote {
-            order_id: order_id.clone(),
+            order_id,
             note: String::new(),
         },
     );
     manager.execute_command(clear_cmd).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert!(snapshot.note.is_none() || snapshot.note.as_deref() == Some(""));
 }
 
@@ -1319,9 +1319,9 @@ async fn test_add_cancel_add_payment_cycle() {
         open_table_with_items(&manager, 265, vec![simple_item(1, "Item", 30.0, 1)]).await;
 
     // 第一次支付
-    pay(&manager, &order_id, 30.0, "CARD").await;
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let payment1_id = snapshot.payments[0].payment_id.clone();
+    pay(&manager, order_id, 30.0, "CARD").await;
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
+    let payment1_id = snapshot.payments[0].payment_id;
     assert_eq!(snapshot.paid_amount, 30.0);
 
     // 取消第一次支付
@@ -1329,7 +1329,7 @@ async fn test_add_cancel_add_payment_cycle() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment_id: payment1_id,
             reason: Some("Wrong card".to_string()),
             authorizer_id: None,
@@ -1339,19 +1339,18 @@ async fn test_add_cancel_add_payment_cycle() {
     let resp = manager.execute_command(cancel_cmd1).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.paid_amount, 0.0);
 
     // 第二次支付
-    pay(&manager, &order_id, 30.0, "CASH").await;
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    pay(&manager, order_id, 30.0, "CASH").await;
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let payment2_id = snapshot
         .payments
         .iter()
         .find(|p| !p.cancelled)
         .unwrap()
-        .payment_id
-        .clone();
+        .payment_id;
     assert_eq!(snapshot.paid_amount, 30.0);
 
     // 取消第二次支付
@@ -1359,7 +1358,7 @@ async fn test_add_cancel_add_payment_cycle() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.clone(),
+            order_id,
             payment_id: payment2_id,
             reason: Some("Customer changed mind".to_string()),
             authorizer_id: None,
@@ -1370,9 +1369,9 @@ async fn test_add_cancel_add_payment_cycle() {
     assert!(resp.success);
 
     // 第三次支付
-    pay(&manager, &order_id, 30.0, "CARD").await;
+    pay(&manager, order_id, 30.0, "CARD").await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.payments.len(), 3);
     assert_eq!(
         snapshot.payments.iter().filter(|p| p.cancelled).count(),
@@ -1382,7 +1381,7 @@ async fn test_add_cancel_add_payment_cycle() {
     assert_eq!(snapshot.paid_amount, 30.0);
 
     // 完成订单
-    let complete_resp = complete_order(&manager, &order_id).await;
+    let complete_resp = complete_order(&manager, order_id).await;
     assert!(complete_resp.success);
 }
 
@@ -1396,7 +1395,7 @@ async fn test_aa_split_cannot_mix_with_item_split() {
     let order_id =
         open_table_with_items(&manager, 266, vec![simple_item(1, "Item", 100.0, 2)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // 开始 AA 分单
@@ -1404,7 +1403,7 @@ async fn test_aa_split_cannot_mix_with_item_split() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id,
             total_shares: 2,
             shares: 1,
             payment_method: "CASH".to_string(),
@@ -1419,7 +1418,7 @@ async fn test_aa_split_cannot_mix_with_item_split() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.clone(),
+            order_id,
             payment_method: "CARD".to_string(),
             items: vec![shared::order::SplitItem {
                 instance_id,
@@ -1454,7 +1453,7 @@ async fn test_comp_then_pay_then_complete() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let item_a_id = snapshot
         .items
         .iter()
@@ -1469,7 +1468,7 @@ async fn test_comp_then_pay_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id: item_a_id,
             quantity: 1,
             reason: "Gift".to_string(),
@@ -1480,18 +1479,18 @@ async fn test_comp_then_pay_then_complete() {
     let resp = manager.execute_command(comp_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // total 应该只包含 Item B: 10.0
     assert_eq!(snapshot.total, 10.0);
 
     // 支付 10.0
-    pay(&manager, &order_id, 10.0, "CASH").await;
+    pay(&manager, order_id, 10.0, "CASH").await;
 
     // 完成
-    let complete_resp = complete_order(&manager, &order_id).await;
+    let complete_resp = complete_order(&manager, order_id).await;
     assert!(complete_resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
 }
 
@@ -1505,7 +1504,7 @@ async fn test_amount_split_blocks_item_split() {
     let order_id =
         open_table_with_items(&manager, 268, vec![simple_item(1, "Item", 100.0, 2)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // 金额分单
@@ -1513,7 +1512,7 @@ async fn test_amount_split_blocks_item_split() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByAmount {
-            order_id: order_id.clone(),
+            order_id,
             split_amount: 50.0,
             payment_method: "CASH".to_string(),
             tendered: Some(50.0),
@@ -1522,7 +1521,7 @@ async fn test_amount_split_blocks_item_split() {
     let resp = manager.execute_command(amount_split).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert!(snapshot.has_amount_split);
 
     // 尝试菜品分单应该失败
@@ -1530,7 +1529,7 @@ async fn test_amount_split_blocks_item_split() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.clone(),
+            order_id,
             payment_method: "CARD".to_string(),
             items: vec![shared::order::SplitItem {
                 instance_id,
@@ -1562,8 +1561,8 @@ async fn test_cancel_nonexistent_payment_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.clone(),
-            payment_id: "nonexistent-payment-id".to_string(),
+            order_id,
+            payment_id: 999_999_999,
             reason: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1586,7 +1585,7 @@ async fn test_split_by_items_overpay_fails() {
     let order_id =
         open_table_with_items(&manager, 270, vec![simple_item(1, "Item", 10.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // 尝试支付超过可用数量
@@ -1594,7 +1593,7 @@ async fn test_split_by_items_overpay_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.clone(),
+            order_id,
             payment_method: "CASH".to_string(),
             items: vec![shared::order::SplitItem {
                 instance_id,
@@ -1619,7 +1618,7 @@ async fn test_remove_item_excessive_quantity_fails() {
     let order_id =
         open_table_with_items(&manager, 271, vec![simple_item(1, "Item", 10.0, 2)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // 尝试移除 5 个，但只有 2 个
@@ -1627,7 +1626,7 @@ async fn test_remove_item_excessive_quantity_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::RemoveItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id,
             quantity: Some(5),
             reason: None,
@@ -1649,7 +1648,7 @@ async fn test_comp_item_excessive_quantity_fails() {
     let order_id =
         open_table_with_items(&manager, 272, vec![simple_item(1, "Item", 10.0, 2)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // 尝试 comp 5 个，但只有 2 个
@@ -1657,7 +1656,7 @@ async fn test_comp_item_excessive_quantity_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompItem {
-            order_id: order_id.clone(),
+            order_id,
             instance_id,
             quantity: 5,
             reason: "Test".to_string(),
@@ -1684,7 +1683,7 @@ async fn test_clear_order_discount() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.clone(),
+            order_id,
             discount_percent: Some(20.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -1693,7 +1692,7 @@ async fn test_clear_order_discount() {
     );
     manager.execute_command(discount_cmd).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 80.0);
 
     // 清除折扣 (两个参数都为 None)
@@ -1701,7 +1700,7 @@ async fn test_clear_order_discount() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.clone(),
+            order_id,
             discount_percent: None,
             discount_fixed: None,
             authorizer_id: None,
@@ -1711,7 +1710,7 @@ async fn test_clear_order_discount() {
     let resp = manager.execute_command(clear_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.total, 100.0);
     assert!(snapshot.order_manual_discount_percent.is_none());
 }
@@ -1732,7 +1731,7 @@ async fn test_toggle_rule_skip_nonexistent_rule_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ToggleRuleSkip {
-            order_id: order_id.clone(),
+            order_id,
             rule_id: 99999,
             skipped: true,
         },
@@ -1759,7 +1758,7 @@ async fn test_fixed_amount_discount() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.clone(),
+            order_id,
             discount_percent: None,
             discount_fixed: Some(25.0),
             authorizer_id: None,
@@ -1769,7 +1768,7 @@ async fn test_fixed_amount_discount() {
     let resp = manager.execute_command(discount_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.order_manual_discount_fixed, Some(25.0));
     assert_eq!(snapshot.total, 75.0);
 }
@@ -1789,7 +1788,7 @@ async fn test_percentage_surcharge() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderSurcharge {
-            order_id: order_id.clone(),
+            order_id,
             surcharge_percent: Some(10.0),
             surcharge_amount: None,
             authorizer_id: None,
@@ -1799,7 +1798,7 @@ async fn test_percentage_surcharge() {
     let resp = manager.execute_command(surcharge_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.order_manual_surcharge_percent, Some(10.0));
     assert_eq!(snapshot.total, 110.0);
 }

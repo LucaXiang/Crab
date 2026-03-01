@@ -177,20 +177,26 @@ pub async fn create(
 
     let group = marketing_group::create(&state.pool, payload).await?;
 
-    let id = group.id.to_string();
+    let id_str = group.id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::MarketingGroupCreated,
         "marketing_group",
-        &id,
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&group, "marketing_group")
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&group), false)
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            group.id,
+            Some(&group),
+            false,
+        )
         .await;
 
     Ok(Json(group))
@@ -230,13 +236,7 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&group),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&group), false)
         .await;
 
     Ok(Json(group))
@@ -271,7 +271,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, id, None, false)
             .await;
     }
 
@@ -317,7 +317,7 @@ pub async fn create_rule(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            &group_id.to_string(),
+            group_id,
             Some(&group),
             false,
         )
@@ -371,7 +371,7 @@ pub async fn update_rule(
             .broadcast_sync(
                 RESOURCE,
                 SyncChangeType::Updated,
-                &group_id.to_string(),
+                group_id,
                 Some(&group),
                 false,
             )
@@ -407,7 +407,7 @@ pub async fn delete_rule(
                 .broadcast_sync(
                     RESOURCE,
                     SyncChangeType::Updated,
-                    &group_id.to_string(),
+                    group_id,
                     Some(&group),
                     false,
                 )
@@ -456,7 +456,7 @@ pub async fn create_activity(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            &group_id.to_string(),
+            group_id,
             Some(&group),
             false,
         )
@@ -494,7 +494,7 @@ pub async fn update_activity(
             .broadcast_sync(
                 RESOURCE,
                 SyncChangeType::Updated,
-                &group_id.to_string(),
+                group_id,
                 Some(&group),
                 false,
             )
@@ -530,7 +530,7 @@ pub async fn delete_activity(
                 .broadcast_sync(
                     RESOURCE,
                     SyncChangeType::Updated,
-                    &group_id.to_string(),
+                    group_id,
                     Some(&group),
                     false,
                 )

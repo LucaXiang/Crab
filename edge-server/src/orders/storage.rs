@@ -34,30 +34,30 @@ use std::sync::Arc;
 use thiserror::Error;
 
 /// Table for storing events: key = (order_id, sequence), value = JSON-serialized OrderEvent
-const EVENTS_TABLE: TableDefinition<(&str, u64), &[u8]> = TableDefinition::new("events");
+const EVENTS_TABLE: TableDefinition<(i64, u64), &[u8]> = TableDefinition::new("events");
 
 /// Table for storing snapshots: key = order_id, value = JSON-serialized OrderSnapshot
-const SNAPSHOTS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("snapshots");
+const SNAPSHOTS_TABLE: TableDefinition<i64, &[u8]> = TableDefinition::new("snapshots");
 
 /// Table for tracking active orders: key = order_id, value = empty (existence check)
-const ACTIVE_ORDERS_TABLE: TableDefinition<&str, ()> = TableDefinition::new("active_orders");
+const ACTIVE_ORDERS_TABLE: TableDefinition<i64, ()> = TableDefinition::new("active_orders");
 
 /// Table for tracking processed commands: key = command_id, value = empty (idempotency)
-const PROCESSED_COMMANDS_TABLE: TableDefinition<&str, ()> =
+const PROCESSED_COMMANDS_TABLE: TableDefinition<i64, ()> =
     TableDefinition::new("processed_commands");
 
 /// Table for sequence counter: key = "seq" or "order_count", value = u64
 const SEQUENCE_TABLE: TableDefinition<&str, u64> = TableDefinition::new("sequence_counter");
 
 /// Table for pending archive queue: key = order_id, value = JSON-serialized PendingArchive
-const PENDING_ARCHIVE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("pending_archive");
+const PENDING_ARCHIVE_TABLE: TableDefinition<i64, &[u8]> = TableDefinition::new("pending_archive");
 
 /// Table for dead letter queue: key = order_id, value = JSON-serialized DeadLetterEntry
-const DEAD_LETTER_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("dead_letter");
+const DEAD_LETTER_TABLE: TableDefinition<i64, &[u8]> = TableDefinition::new("dead_letter");
 
 /// Table for price rule snapshots: key = order_id, value = JSON-serialized Vec<PriceRule>
 /// 开台时定格的价格规则快照，订单生命周期内规则不变
-const RULE_SNAPSHOTS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("rule_snapshots");
+const RULE_SNAPSHOTS_TABLE: TableDefinition<i64, &[u8]> = TableDefinition::new("rule_snapshots");
 
 const SEQUENCE_KEY: &str = "seq";
 const ORDER_COUNT_KEY: &str = "order_count";
@@ -69,7 +69,7 @@ const DAILY_DATE_KEY: &str = "daily_date";
 /// Pending archive queue entry
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PendingArchive {
-    pub order_id: String,
+    pub order_id: i64,
     pub created_at: i64,
     pub retry_count: u32,
     pub last_error: Option<String>,
@@ -78,7 +78,7 @@ pub struct PendingArchive {
 /// Dead letter queue entry (permanently failed archives)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeadLetterEntry {
-    pub order_id: String,
+    pub order_id: i64,
     pub created_at: i64,
     pub failed_at: i64,
     pub retry_count: u32,
@@ -107,10 +107,10 @@ pub enum StorageError {
     Serialization(#[from] serde_json::Error),
 
     #[error("Order not found: {0}")]
-    OrderNotFound(String),
+    OrderNotFound(i64),
 
     #[error("Event not found: order_id={0}, sequence={1}")]
-    EventNotFound(String, u64),
+    EventNotFound(i64, u64),
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
@@ -349,7 +349,7 @@ impl OrderStorage {
     // ========== Command Idempotency ==========
 
     /// Check if a command has been processed
-    pub fn is_command_processed(&self, command_id: &str) -> StorageResult<bool> {
+    pub fn is_command_processed(&self, command_id: i64) -> StorageResult<bool> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
         Ok(table.get(command_id)?.is_some())
@@ -359,7 +359,7 @@ impl OrderStorage {
     pub fn is_command_processed_txn(
         &self,
         txn: &WriteTransaction,
-        command_id: &str,
+        command_id: i64,
     ) -> StorageResult<bool> {
         let table = txn.open_table(PROCESSED_COMMANDS_TABLE)?;
         Ok(table.get(command_id)?.is_some())
@@ -369,7 +369,7 @@ impl OrderStorage {
     pub fn mark_command_processed(
         &self,
         txn: &WriteTransaction,
-        command_id: &str,
+        command_id: i64,
     ) -> StorageResult<()> {
         let mut table = txn.open_table(PROCESSED_COMMANDS_TABLE)?;
         table.insert(command_id, ())?;
@@ -381,14 +381,14 @@ impl OrderStorage {
     /// Store an event
     pub fn store_event(&self, txn: &WriteTransaction, event: &OrderEvent) -> StorageResult<()> {
         let mut table = txn.open_table(EVENTS_TABLE)?;
-        let key = (event.order_id.as_str(), event.sequence);
+        let key = (event.order_id, event.sequence);
         let value = serde_json::to_vec(event)?;
         table.insert(key, value.as_slice())?;
         Ok(())
     }
 
     /// Get all events for an order
-    pub fn get_events_for_order(&self, order_id: &str) -> StorageResult<Vec<OrderEvent>> {
+    pub fn get_events_for_order(&self, order_id: i64) -> StorageResult<Vec<OrderEvent>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(EVENTS_TABLE)?;
 
@@ -431,16 +431,16 @@ impl OrderStorage {
         let active_table = read_txn.open_table(ACTIVE_ORDERS_TABLE)?;
 
         // Get active order IDs
-        let mut active_order_ids: Vec<String> = Vec::new();
+        let mut active_order_ids: Vec<i64> = Vec::new();
         for result in active_table.iter()? {
             let (key, _value) = result?;
-            active_order_ids.push(key.value().to_string());
+            active_order_ids.push(key.value());
         }
 
         let mut events = Vec::new();
         for order_id in &active_order_ids {
-            let range_start = (order_id.as_str(), since_sequence + 1);
-            let range_end = (order_id.as_str(), u64::MAX);
+            let range_start = (*order_id, since_sequence + 1);
+            let range_end = (*order_id, u64::MAX);
 
             for result in events_table.range(range_start..=range_end)? {
                 let (_key, value) = result?;
@@ -463,12 +463,12 @@ impl OrderStorage {
     ) -> StorageResult<()> {
         let mut table = txn.open_table(SNAPSHOTS_TABLE)?;
         let value = serde_json::to_vec(snapshot)?;
-        table.insert(snapshot.order_id.as_str(), value.as_slice())?;
+        table.insert(snapshot.order_id, value.as_slice())?;
         Ok(())
     }
 
     /// Get a snapshot by order ID
-    pub fn get_snapshot(&self, order_id: &str) -> StorageResult<Option<OrderSnapshot>> {
+    pub fn get_snapshot(&self, order_id: i64) -> StorageResult<Option<OrderSnapshot>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(SNAPSHOTS_TABLE)?;
 
@@ -485,7 +485,7 @@ impl OrderStorage {
     pub fn get_snapshot_txn(
         &self,
         txn: &WriteTransaction,
-        order_id: &str,
+        order_id: i64,
     ) -> StorageResult<Option<OrderSnapshot>> {
         let table = txn.open_table(SNAPSHOTS_TABLE)?;
 
@@ -514,7 +514,7 @@ impl OrderStorage {
     }
 
     /// Remove a snapshot
-    pub fn remove_snapshot(&self, txn: &WriteTransaction, order_id: &str) -> StorageResult<()> {
+    pub fn remove_snapshot(&self, txn: &WriteTransaction, order_id: i64) -> StorageResult<()> {
         let mut table = txn.open_table(SNAPSHOTS_TABLE)?;
         table.remove(order_id)?;
         Ok(())
@@ -523,35 +523,35 @@ impl OrderStorage {
     // ========== Active Orders ==========
 
     /// Mark an order as active
-    pub fn mark_order_active(&self, txn: &WriteTransaction, order_id: &str) -> StorageResult<()> {
+    pub fn mark_order_active(&self, txn: &WriteTransaction, order_id: i64) -> StorageResult<()> {
         let mut table = txn.open_table(ACTIVE_ORDERS_TABLE)?;
         table.insert(order_id, ())?;
         Ok(())
     }
 
     /// Mark an order as inactive
-    pub fn mark_order_inactive(&self, txn: &WriteTransaction, order_id: &str) -> StorageResult<()> {
+    pub fn mark_order_inactive(&self, txn: &WriteTransaction, order_id: i64) -> StorageResult<()> {
         let mut table = txn.open_table(ACTIVE_ORDERS_TABLE)?;
         table.remove(order_id)?;
         Ok(())
     }
 
     /// Check if an order is active
-    pub fn is_order_active(&self, order_id: &str) -> StorageResult<bool> {
+    pub fn is_order_active(&self, order_id: i64) -> StorageResult<bool> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(ACTIVE_ORDERS_TABLE)?;
         Ok(table.get(order_id)?.is_some())
     }
 
     /// Get all active order IDs
-    pub fn get_active_order_ids(&self) -> StorageResult<Vec<String>> {
+    pub fn get_active_order_ids(&self) -> StorageResult<Vec<i64>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(ACTIVE_ORDERS_TABLE)?;
 
-        let mut order_ids: Vec<String> = Vec::new();
+        let mut order_ids: Vec<i64> = Vec::new();
         for result in table.iter()? {
             let (key, _value) = result?;
-            order_ids.push(key.value().to_string());
+            order_ids.push(key.value());
         }
 
         Ok(order_ids)
@@ -563,7 +563,7 @@ impl OrderStorage {
         let mut snapshots = Vec::new();
 
         for order_id in active_ids {
-            if let Some(snapshot) = self.get_snapshot(&order_id)? {
+            if let Some(snapshot) = self.get_snapshot(order_id)? {
                 snapshots.push(snapshot);
             }
         }
@@ -578,7 +578,7 @@ impl OrderStorage {
         &self,
         txn: &WriteTransaction,
         table_id: i64,
-    ) -> StorageResult<Option<String>> {
+    ) -> StorageResult<Option<i64>> {
         let active_table = txn.open_table(ACTIVE_ORDERS_TABLE)?;
         let snapshots_table = txn.open_table(SNAPSHOTS_TABLE)?;
 
@@ -589,7 +589,7 @@ impl OrderStorage {
             if let Some(value) = snapshots_table.get(order_id)? {
                 let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
                 if snapshot.table_id == Some(table_id) {
-                    return Ok(Some(order_id.to_string()));
+                    return Ok(Some(order_id));
                 }
             }
         }
@@ -600,7 +600,7 @@ impl OrderStorage {
     /// Find active order for a specific table (read-only, outside transaction)
     ///
     /// Returns the order_id if the table is occupied by an active order.
-    pub fn find_active_order_for_table(&self, table_id: i64) -> StorageResult<Option<String>> {
+    pub fn find_active_order_for_table(&self, table_id: i64) -> StorageResult<Option<i64>> {
         let read_txn = self.db.begin_read()?;
         let active_table = read_txn.open_table(ACTIVE_ORDERS_TABLE)?;
         let snapshots_table = read_txn.open_table(SNAPSHOTS_TABLE)?;
@@ -612,7 +612,7 @@ impl OrderStorage {
             if let Some(value) = snapshots_table.get(order_id)? {
                 let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
                 if snapshot.table_id == Some(table_id) {
-                    return Ok(Some(order_id.to_string()));
+                    return Ok(Some(order_id));
                 }
             }
         }
@@ -624,7 +624,7 @@ impl OrderStorage {
     // 开台时定格的价格规则快照，订单生命周期内规则不变
 
     /// 存储订单的价格规则快照
-    pub fn store_rule_snapshot(&self, order_id: &str, rules: &[PriceRule]) -> StorageResult<()> {
+    pub fn store_rule_snapshot(&self, order_id: i64, rules: &[PriceRule]) -> StorageResult<()> {
         let txn = self.db.begin_write()?;
         {
             let mut table = txn.open_table(RULE_SNAPSHOTS_TABLE)?;
@@ -636,7 +636,7 @@ impl OrderStorage {
     }
 
     /// 获取订单的价格规则快照
-    pub fn get_rule_snapshot(&self, order_id: &str) -> StorageResult<Option<Vec<PriceRule>>> {
+    pub fn get_rule_snapshot(&self, order_id: i64) -> StorageResult<Option<Vec<PriceRule>>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(RULE_SNAPSHOTS_TABLE)?;
 
@@ -650,7 +650,7 @@ impl OrderStorage {
     }
 
     /// 删除订单的价格规则快照
-    pub fn remove_rule_snapshot(&self, order_id: &str) -> StorageResult<()> {
+    pub fn remove_rule_snapshot(&self, order_id: i64) -> StorageResult<()> {
         let txn = self.db.begin_write()?;
         {
             let mut table = txn.open_table(RULE_SNAPSHOTS_TABLE)?;
@@ -661,14 +661,14 @@ impl OrderStorage {
     }
 
     /// 获取所有订单的价格规则快照 (用于启动预热)
-    pub fn get_all_rule_snapshots(&self) -> StorageResult<Vec<(String, Vec<PriceRule>)>> {
+    pub fn get_all_rule_snapshots(&self) -> StorageResult<Vec<(i64, Vec<PriceRule>)>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(RULE_SNAPSHOTS_TABLE)?;
 
         let mut snapshots = Vec::new();
         for result in table.iter()? {
             let (key, value) = result?;
-            let order_id = key.value().to_string();
+            let order_id = key.value();
             let rules: Vec<PriceRule> = serde_json::from_slice(value.value())?;
             snapshots.push((order_id, rules));
         }
@@ -682,7 +682,7 @@ impl OrderStorage {
     pub fn remove_events_for_order(
         &self,
         txn: &WriteTransaction,
-        order_id: &str,
+        order_id: i64,
     ) -> StorageResult<Vec<OrderEvent>> {
         let mut table = txn.open_table(EVENTS_TABLE)?;
 
@@ -691,21 +691,20 @@ impl OrderStorage {
         let range_end = (order_id, u64::MAX);
 
         let mut events = Vec::new();
-        let mut keys_to_remove: Vec<(String, u64)> = Vec::new();
+        let mut keys_to_remove: Vec<(i64, u64)> = Vec::new();
 
         // We need to iterate and collect separately to avoid borrow issues
         for result in table.range(range_start..=range_end)? {
             let (key, value) = result?;
             let event: OrderEvent = serde_json::from_slice(value.value())?;
             events.push(event);
-            // Extract key parts - redb returns the tuple components
             let key_value = key.value();
-            keys_to_remove.push((key_value.0.to_string(), key_value.1));
+            keys_to_remove.push((key_value.0, key_value.1));
         }
 
         // Remove collected keys
         for (oid, seq) in &keys_to_remove {
-            table.remove((oid.as_str(), *seq))?;
+            table.remove((*oid, *seq))?;
         }
 
         events.sort_by_key(|e| e.sequence);
@@ -717,11 +716,11 @@ impl OrderStorage {
     pub fn cleanup_command_ids(
         &self,
         txn: &WriteTransaction,
-        command_ids: &[String],
+        command_ids: &[i64],
     ) -> StorageResult<()> {
         let mut table = txn.open_table(PROCESSED_COMMANDS_TABLE)?;
         for command_id in command_ids {
-            table.remove(command_id.as_str())?;
+            table.remove(*command_id)?;
         }
         Ok(())
     }
@@ -729,10 +728,10 @@ impl OrderStorage {
     // ========== Pending Archive Queue ==========
 
     /// Add order to archive queue (within transaction)
-    pub fn queue_for_archive(&self, txn: &WriteTransaction, order_id: &str) -> StorageResult<()> {
+    pub fn queue_for_archive(&self, txn: &WriteTransaction, order_id: i64) -> StorageResult<()> {
         let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
         let pending = PendingArchive {
-            order_id: order_id.to_string(),
+            order_id,
             created_at: shared::util::now_millis(),
             retry_count: 0,
             last_error: None,
@@ -757,7 +756,7 @@ impl OrderStorage {
     }
 
     /// Complete archive: remove from pending queue and cleanup order data
-    pub fn complete_archive(&self, order_id: &str) -> StorageResult<()> {
+    pub fn complete_archive(&self, order_id: i64) -> StorageResult<()> {
         let txn = self.begin_write()?;
 
         // 1. Remove from pending queue
@@ -778,15 +777,15 @@ impl OrderStorage {
             let range_start = (order_id, 0u64);
             let range_end = (order_id, u64::MAX);
 
-            let mut keys_to_remove: Vec<(String, u64)> = Vec::new();
+            let mut keys_to_remove: Vec<(i64, u64)> = Vec::new();
             for result in table.range(range_start..=range_end)? {
                 let (key, _) = result?;
                 let key_value = key.value();
-                keys_to_remove.push((key_value.0.to_string(), key_value.1));
+                keys_to_remove.push((key_value.0, key_value.1));
             }
 
             for (oid, seq) in &keys_to_remove {
-                table.remove((oid.as_str(), *seq))?;
+                table.remove((*oid, *seq))?;
             }
         }
 
@@ -802,7 +801,7 @@ impl OrderStorage {
     }
 
     /// Mark archive as failed, increment retry count
-    pub fn mark_archive_failed(&self, order_id: &str, error: &str) -> StorageResult<()> {
+    pub fn mark_archive_failed(&self, order_id: i64, error: &str) -> StorageResult<()> {
         let txn = self.begin_write()?;
         {
             let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
@@ -827,7 +826,7 @@ impl OrderStorage {
     }
 
     /// Remove from pending queue without cleanup (for dead letter)
-    pub fn remove_from_pending(&self, order_id: &str) -> StorageResult<()> {
+    pub fn remove_from_pending(&self, order_id: i64) -> StorageResult<()> {
         let txn = self.begin_write()?;
         {
             let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
@@ -838,7 +837,7 @@ impl OrderStorage {
     }
 
     /// Move order from pending queue to dead letter queue
-    pub fn move_to_dead_letter(&self, order_id: &str, error: &str) -> StorageResult<()> {
+    pub fn move_to_dead_letter(&self, order_id: i64, error: &str) -> StorageResult<()> {
         let txn = self.begin_write()?;
         {
             let mut pending_table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
@@ -855,7 +854,7 @@ impl OrderStorage {
             if let Some(pending) = pending_opt {
                 // Create dead letter entry
                 let dead_letter = DeadLetterEntry {
-                    order_id: order_id.to_string(),
+                    order_id,
                     created_at: pending.created_at,
                     failed_at: shared::util::now_millis(),
                     retry_count: pending.retry_count,
@@ -887,7 +886,7 @@ impl OrderStorage {
     }
 
     /// Remove from dead letter queue (after manual recovery)
-    pub fn remove_from_dead_letter(&self, order_id: &str) -> StorageResult<()> {
+    pub fn remove_from_dead_letter(&self, order_id: i64) -> StorageResult<()> {
         let txn = self.begin_write()?;
         {
             let mut table = txn.open_table(DEAD_LETTER_TABLE)?;
@@ -907,10 +906,10 @@ impl OrderStorage {
             let mut dead_letter_table = txn.open_table(DEAD_LETTER_TABLE)?;
 
             // Collect order_ids first (can't iterate and mutate simultaneously)
-            let dead_order_ids: Vec<String> = dead_letter_table
+            let dead_order_ids: Vec<i64> = dead_letter_table
                 .iter()?
                 .filter_map(|r| r.ok())
-                .map(|(k, _v)| k.value().to_string())
+                .map(|(k, _v)| k.value())
                 .collect();
 
             if dead_order_ids.is_empty() {
@@ -921,14 +920,14 @@ impl OrderStorage {
             let mut recovered = 0;
             for order_id in &dead_order_ids {
                 let pending = PendingArchive {
-                    order_id: order_id.clone(),
+                    order_id: *order_id,
                     created_at: now,
                     retry_count: 0,
                     last_error: None,
                 };
                 let value = serde_json::to_vec(&pending)?;
-                pending_table.insert(order_id.as_str(), value.as_slice())?;
-                dead_letter_table.remove(order_id.as_str())?;
+                pending_table.insert(*order_id, value.as_slice())?;
+                dead_letter_table.remove(*order_id)?;
                 recovered += 1;
             }
             recovered
@@ -977,16 +976,16 @@ mod tests {
     use super::*;
     use shared::order::{EventPayload, OrderEventType, OrderStatus};
 
-    fn create_test_event(order_id: &str, sequence: u64) -> OrderEvent {
+    fn create_test_event(order_id: i64, sequence: u64) -> OrderEvent {
         OrderEvent {
-            event_id: uuid::Uuid::new_v4().to_string(),
+            event_id: shared::util::snowflake_id(),
             sequence,
-            order_id: order_id.to_string(),
+            order_id,
             timestamp: shared::util::now_millis(),
             client_timestamp: None,
             operator_id: 1,
             operator_name: "Test Operator".to_string(),
-            command_id: uuid::Uuid::new_v4().to_string(),
+            command_id: shared::util::snowflake_id(),
             event_type: OrderEventType::TableOpened,
             payload: EventPayload::TableOpened {
                 table_id: Some(1),
@@ -1001,9 +1000,9 @@ mod tests {
         }
     }
 
-    fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
+    fn create_test_snapshot(order_id: i64) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot {
-            order_id: order_id.to_string(),
+            order_id,
             table_id: Some(1),
             table_name: Some("Table 1".to_string()),
             zone_id: None,
@@ -1089,7 +1088,7 @@ mod tests {
     #[test]
     fn test_command_idempotency() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let command_id = "cmd-123";
+        let command_id: i64 = 123;
 
         // Command should not be processed initially
         assert!(!storage.is_command_processed(command_id).unwrap());
@@ -1106,7 +1105,7 @@ mod tests {
     #[test]
     fn test_event_storage() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-1";
+        let order_id: i64 = 1001;
 
         // Store events
         let event1 = create_test_event(order_id, 1);
@@ -1127,7 +1126,7 @@ mod tests {
     #[test]
     fn test_snapshot_storage() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-1";
+        let order_id: i64 = 1001;
 
         // Store snapshot
         let snapshot = create_test_snapshot(order_id);
@@ -1144,7 +1143,7 @@ mod tests {
     #[test]
     fn test_active_orders() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-1";
+        let order_id: i64 = 1001;
 
         // Order should not be active initially
         assert!(!storage.is_order_active(order_id).unwrap());
@@ -1171,9 +1170,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
 
         // Store events for multiple orders
-        let event1 = create_test_event("order-1", 1);
-        let event2 = create_test_event("order-2", 2);
-        let event3 = create_test_event("order-1", 3);
+        let event1 = create_test_event(1001, 1);
+        let event2 = create_test_event(1002, 2);
+        let event3 = create_test_event(1001, 3);
 
         let txn = storage.begin_write().unwrap();
         storage.store_event(&txn, &event1).unwrap();
@@ -1190,7 +1189,7 @@ mod tests {
     #[test]
     fn test_pending_archive_queue() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-archive-1";
+        let order_id: i64 = 2001;
 
         // Initially empty
         let pending = storage.get_pending_archives().unwrap();
@@ -1226,7 +1225,7 @@ mod tests {
     #[test]
     fn test_dead_letter_queue() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-dlq-1";
+        let order_id: i64 = 3001;
 
         // Initially empty
         let dead_letters = storage.get_dead_letters().unwrap();
@@ -1270,7 +1269,7 @@ mod tests {
     #[test]
     fn test_complete_archive_cleanup() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-cleanup-1";
+        let order_id: i64 = 4001;
 
         // Create snapshot and events
         let snapshot = create_test_snapshot(order_id);
@@ -1327,7 +1326,7 @@ mod tests {
     #[test]
     fn test_rule_snapshot_store_and_get() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-rule-1";
+        let order_id: i64 = 5001;
 
         // 初始无快照
         assert!(storage.get_rule_snapshot(order_id).unwrap().is_none());
@@ -1351,7 +1350,7 @@ mod tests {
     #[test]
     fn test_rule_snapshot_overwrite() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-rule-2";
+        let order_id: i64 = 5002;
 
         // 第一次存储
         let rules1 = vec![create_test_rule("Rule A")];
@@ -1369,7 +1368,7 @@ mod tests {
     #[test]
     fn test_rule_snapshot_remove() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-rule-3";
+        let order_id: i64 = 5003;
 
         let rules = vec![create_test_rule("Test Rule")];
         storage.store_rule_snapshot(order_id, &rules).unwrap();
@@ -1380,7 +1379,7 @@ mod tests {
         assert!(storage.get_rule_snapshot(order_id).unwrap().is_none());
 
         // 删除不存在的快照不应报错
-        storage.remove_rule_snapshot("nonexistent").unwrap();
+        storage.remove_rule_snapshot(99999).unwrap();
     }
 
     #[test]
@@ -1393,11 +1392,11 @@ mod tests {
 
         // 存储多个订单的快照
         storage
-            .store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")])
+            .store_rule_snapshot(6001, &vec![create_test_rule("Rule A")])
             .unwrap();
         storage
             .store_rule_snapshot(
-                "order-b",
+                6002,
                 &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")],
             )
             .unwrap();
@@ -1406,15 +1405,15 @@ mod tests {
         assert_eq!(all.len(), 2);
 
         // 验证内容（redb 按 key 排序）
-        let order_ids: Vec<&str> = all.iter().map(|(id, _)| id.as_str()).collect();
-        assert!(order_ids.contains(&"order-a"));
-        assert!(order_ids.contains(&"order-b"));
+        let order_ids: Vec<i64> = all.iter().map(|(id, _)| *id).collect();
+        assert!(order_ids.contains(&6001));
+        assert!(order_ids.contains(&6002));
     }
 
     #[test]
     fn test_rule_snapshot_empty_rules() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-empty-rules";
+        let order_id: i64 = 7001;
 
         // 存储空规则列表
         storage.store_rule_snapshot(order_id, &[]).unwrap();
@@ -1427,7 +1426,7 @@ mod tests {
     #[test]
     fn test_complete_archive_cleans_rule_snapshot() {
         let storage = OrderStorage::open_in_memory().unwrap();
-        let order_id = "order-archive-rule";
+        let order_id: i64 = 8001;
 
         // 创建订单数据 + 规则快照
         let snapshot = create_test_snapshot(order_id);

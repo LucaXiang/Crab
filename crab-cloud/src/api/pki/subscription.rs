@@ -17,13 +17,13 @@ pub async fn get_subscription_status(
     State(state): State<AppState>,
     Json(payload): Json<SubscriptionRequest>,
 ) -> Json<serde_json::Value> {
-    let tenant_id = &payload.binding.tenant_id;
+    let tenant_id = payload.binding.tenant_id;
 
     // Verify binding signature using Tenant CA
     let tenant_ca = match state.ca_store.load_tenant_ca(tenant_id).await {
         Ok(ca) => ca,
         Err(e) => {
-            tracing::error!(error = %e, tenant_id = %tenant_id, "Tenant CA not found");
+            tracing::error!(error = %e, tenant_id = tenant_id, "Tenant CA not found");
             return Json(serde_json::json!({
                 "success": false,
                 "error": "Invalid binding",
@@ -33,7 +33,7 @@ pub async fn get_subscription_status(
     };
 
     if let Err(e) = payload.binding.verify_signature(tenant_ca.cert_pem()) {
-        tracing::warn!(tenant_id = %tenant_id, error = %e, "Binding signature verification failed");
+        tracing::warn!(tenant_id = tenant_id, error = %e, "Binding signature verification failed");
         return Json(serde_json::json!({
             "success": false,
             "error": "Invalid binding signature",
@@ -45,7 +45,10 @@ pub async fn get_subscription_status(
     match tenants::find_by_id(&state.pool, tenant_id).await {
         Ok(Some(_)) => {} // tenant 存在，继续
         Ok(None) => {
-            tracing::warn!(tenant_id = %tenant_id, "Tenant not found in database (CA exists in Secrets Manager but PG record missing)");
+            tracing::warn!(
+                tenant_id = tenant_id,
+                "Tenant not found in database (CA exists in Secrets Manager but PG record missing)"
+            );
             return Json(serde_json::json!({
                 "success": false,
                 "error": "Tenant not found",
@@ -87,7 +90,7 @@ pub async fn get_subscription_status(
     let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
 
     let subscription = SubscriptionInfo {
-        tenant_id: tenant_id.clone(),
+        tenant_id,
         id: Some(sub.id),
         status,
         plan,

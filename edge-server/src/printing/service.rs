@@ -12,10 +12,10 @@ pub enum PrintServiceError {
     Storage(#[from] PrintStorageError),
 
     #[error("Kitchen order not found: {0}")]
-    KitchenOrderNotFound(String),
+    KitchenOrderNotFound(i64),
 
     #[error("Label record not found: {0}")]
-    LabelRecordNotFound(String),
+    LabelRecordNotFound(i64),
 
     #[error("Printing disabled")]
     PrintingDisabled,
@@ -68,7 +68,7 @@ impl KitchenPrintService {
         event: &OrderEvent,
         snapshot: &OrderSnapshot,
         catalog: &CatalogService,
-    ) -> PrintServiceResult<Option<String>> {
+    ) -> PrintServiceResult<Option<i64>> {
         // Quick check: is any printing enabled?
         let kitchen_enabled = catalog.is_kitchen_print_enabled();
         let label_enabled = catalog.is_label_print_enabled();
@@ -129,9 +129,9 @@ impl KitchenPrintService {
                     label_context.quantity = 1;
 
                     label_records.push(LabelPrintRecord {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        order_id: event.order_id.clone(),
-                        kitchen_order_id: event.event_id.clone(),
+                        id: shared::util::snowflake_id(),
+                        order_id: event.order_id,
+                        kitchen_order_id: event.event_id,
                         table_name: snapshot.table_name.clone(),
                         queue_number: snapshot.queue_number,
                         is_retail: snapshot.is_retail,
@@ -155,8 +155,8 @@ impl KitchenPrintService {
 
         // Create KitchenOrder
         let kitchen_order = KitchenOrder {
-            id: event.event_id.clone(),
-            order_id: event.order_id.clone(),
+            id: event.event_id,
+            order_id: event.order_id,
             receipt_number: snapshot.receipt_number.clone(),
             table_name: snapshot.table_name.clone(),
             zone_name: snapshot.zone_name.clone(),
@@ -312,10 +312,10 @@ impl KitchenPrintService {
     /// Reprint a kitchen order
     ///
     /// Increments print_count and returns the updated order (post-increment).
-    pub fn reprint_kitchen_order(&self, id: &str) -> PrintServiceResult<KitchenOrder> {
+    pub fn reprint_kitchen_order(&self, id: i64) -> PrintServiceResult<KitchenOrder> {
         // Verify exists first
         if self.storage.get_kitchen_order(id)?.is_none() {
-            return Err(PrintServiceError::KitchenOrderNotFound(id.to_string()));
+            return Err(PrintServiceError::KitchenOrderNotFound(id));
         }
 
         let txn = self.storage.begin_write()?;
@@ -326,7 +326,7 @@ impl KitchenPrintService {
         let order = self
             .storage
             .get_kitchen_order(id)?
-            .ok_or_else(|| PrintServiceError::KitchenOrderNotFound(id.to_string()))?;
+            .ok_or(PrintServiceError::KitchenOrderNotFound(id))?;
 
         tracing::info!(kitchen_order_id = %id, print_count = order.print_count, "Kitchen order reprinted");
 
@@ -334,11 +334,11 @@ impl KitchenPrintService {
     }
 
     /// Reprint a label record
-    pub fn reprint_label_record(&self, id: &str) -> PrintServiceResult<LabelPrintRecord> {
+    pub fn reprint_label_record(&self, id: i64) -> PrintServiceResult<LabelPrintRecord> {
         let record = self
             .storage
             .get_label_record(id)?
-            .ok_or_else(|| PrintServiceError::LabelRecordNotFound(id.to_string()))?;
+            .ok_or(PrintServiceError::LabelRecordNotFound(id))?;
 
         let txn = self.storage.begin_write()?;
         self.storage.increment_label_record_print_count(&txn, id)?;
@@ -352,7 +352,7 @@ impl KitchenPrintService {
     /// Get kitchen orders for an order
     pub fn get_kitchen_orders_for_order(
         &self,
-        order_id: &str,
+        order_id: i64,
     ) -> PrintServiceResult<Vec<KitchenOrder>> {
         Ok(self.storage.get_kitchen_orders_for_order(order_id)?)
     }
@@ -367,20 +367,20 @@ impl KitchenPrintService {
     }
 
     /// Get a kitchen order by ID
-    pub fn get_kitchen_order(&self, id: &str) -> PrintServiceResult<Option<KitchenOrder>> {
+    pub fn get_kitchen_order(&self, id: i64) -> PrintServiceResult<Option<KitchenOrder>> {
         Ok(self.storage.get_kitchen_order(id)?)
     }
 
     /// Get label records for an order
     pub fn get_label_records_for_order(
         &self,
-        order_id: &str,
+        order_id: i64,
     ) -> PrintServiceResult<Vec<LabelPrintRecord>> {
         Ok(self.storage.get_label_records_for_order(order_id)?)
     }
 
     /// Get a label record by ID
-    pub fn get_label_record(&self, id: &str) -> PrintServiceResult<Option<LabelPrintRecord>> {
+    pub fn get_label_record(&self, id: i64) -> PrintServiceResult<Option<LabelPrintRecord>> {
         Ok(self.storage.get_label_record(id)?)
     }
 

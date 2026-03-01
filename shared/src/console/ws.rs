@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::store_info::StoreInfo;
 use crate::order::{OrderEvent, OrderSnapshot};
 
 /// Cloud → Console 推送消息
@@ -22,7 +23,7 @@ pub enum ConsoleMessage {
     OrderUpdated { snapshot: Box<LiveOrderSnapshot> },
 
     /// 订单已移除（完成/作废/合并）
-    OrderRemoved { order_id: String, store_id: i64 },
+    OrderRemoved { order_id: i64, store_id: i64 },
 
     /// Edge 上线/下线通知
     EdgeStatus {
@@ -30,8 +31,11 @@ pub enum ConsoleMessage {
         online: bool,
         /// Edge 离线时被清除的订单 ID（console 应移除这些订单）
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        cleared_order_ids: Vec<String>,
+        cleared_order_ids: Vec<i64>,
     },
+
+    /// 门店信息变更（来自 Edge 同步或 Console 自身修改）
+    StoreInfoUpdated { store_id: i64, info: Box<StoreInfo> },
 }
 
 /// Console → Cloud 命令

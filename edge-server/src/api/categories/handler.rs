@@ -65,13 +65,13 @@ pub async fn create(
 
     let category = state.catalog_service.create_category(None, payload).await?;
 
-    let id = category.id.to_string();
+    let id_str = category.id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryCreated,
         "category",
-        &id,
+        &id_str,
         operator_id = Some(current_user.id),
         operator_name = Some(current_user.name.clone()),
         details = create_snapshot(&category, "category")
@@ -81,7 +81,7 @@ pub async fn create(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Created,
-            &id,
+            category.id,
             Some(&category),
             false,
         )
@@ -125,7 +125,7 @@ pub async fn update(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            &id_str,
+            id,
             Some(&category),
             false,
         )
@@ -161,7 +161,7 @@ pub async fn delete(
     );
 
     state
-        .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
+        .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, id, None, false)
         .await;
 
     Ok(Json(true))
@@ -229,7 +229,7 @@ pub async fn batch_update_sort_order(
 
     // 广播同步通知
     state
-        .broadcast_sync::<()>(RESOURCE, SyncChangeType::Updated, "batch", None, false)
+        .broadcast_sync::<()>(RESOURCE, SyncChangeType::Updated, 0, None, false)
         .await;
 
     Ok(Json(BatchUpdateResponse {
@@ -298,12 +298,11 @@ pub async fn bind_category_attribute(
         Ok(product_ids) => {
             for pid in product_ids {
                 let product = state.catalog_service.get_product(pid);
-                let pid_str = pid.to_string();
                 state
                     .broadcast_sync(
                         SyncResource::Product,
                         SyncChangeType::Updated,
-                        &pid_str,
+                        pid,
                         product.as_ref(),
                         false,
                     )
@@ -324,7 +323,7 @@ pub async fn bind_category_attribute(
         .broadcast_sync(
             SyncResource::AttributeBinding,
             SyncChangeType::Created,
-            &format!("{}:{}", category_id, attr_id),
+            binding.id,
             Some(&binding),
             false,
         )
@@ -363,12 +362,11 @@ pub async fn unbind_category_attribute(
             Ok(product_ids) => {
                 for pid in product_ids {
                     let product = state.catalog_service.get_product(pid);
-                    let pid_str = pid.to_string();
                     state
                         .broadcast_sync(
                             SyncResource::Product,
                             SyncChangeType::Updated,
-                            &pid_str,
+                            pid,
                             product.as_ref(),
                             false,
                         )
@@ -384,12 +382,12 @@ pub async fn unbind_category_attribute(
             }
         }
 
-        // 广播同步通知
+        // 广播同步通知 — use attr_id as representative ID
         state
             .broadcast_sync::<()>(
                 SyncResource::AttributeBinding,
                 SyncChangeType::Deleted,
-                &format!("{}:{}", category_id, attr_id),
+                attr_id,
                 None,
                 false,
             )

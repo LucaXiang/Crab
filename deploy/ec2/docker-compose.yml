@@ -33,6 +33,7 @@ services:
       POSTGRES_DB: crab
       POSTGRES_USER: crab
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: postgres -c max_connections=200 -c shared_buffers=512MB -c work_mem=8MB
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -42,6 +43,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
 
   crab-cloud:
     image: ${CRAB_CLOUD_IMAGE}
@@ -74,13 +80,17 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       CONSOLE_BASE_URL: https://console.redcoral.app
       RUST_LOG: crab_cloud=info,tower_http=info
-      # mTLS certs — mounted from host
-      ROOT_CA_PATH: /certs/root_ca.pem
+      # mTLS certs — mounted from host (server cert/key only)
+      ROOT_CA_PATH: /tmp/root_ca.pem
       SERVER_CERT_PATH: /certs/server.pem
       SERVER_KEY_PATH: /certs/server.key
-      # PKI (merged from crab-auth) — P12 stored in Secrets Manager
     volumes:
       - ./certs:/certs:ro
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2'
 
   # ── Dev Environment ──
 
@@ -128,7 +138,7 @@ services:
       MTLS_PORT: "8443"
       CONSOLE_BASE_URL: https://dev-console.redcoral.app
       RUST_LOG: crab_cloud=debug,tower_http=info
-      ROOT_CA_PATH: /certs/root_ca.pem
+      ROOT_CA_PATH: /tmp/root_ca.pem
       SERVER_CERT_PATH: /certs/server.pem
       SERVER_KEY_PATH: /certs/server.key
       SECRETS_PREFIX: crab-dev

@@ -10,19 +10,19 @@ pub enum ManagerError {
     Storage(#[from] StorageError),
 
     #[error("Order not found: {0}")]
-    OrderNotFound(String),
+    OrderNotFound(i64),
 
     #[error("Order already completed: {0}")]
-    OrderAlreadyCompleted(String),
+    OrderAlreadyCompleted(i64),
 
     #[error("Order already voided: {0}")]
-    OrderAlreadyVoided(String),
+    OrderAlreadyVoided(i64),
 
     #[error("Item not found: {0}")]
     ItemNotFound(String),
 
     #[error("Payment not found: {0}")]
-    PaymentNotFound(String),
+    PaymentNotFound(i64),
 
     #[error("Insufficient quantity")]
     InsufficientQuantity,

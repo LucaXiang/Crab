@@ -7,8 +7,8 @@ import { formatCurrency } from '@/utils/currency/formatCurrency';
 interface DraftListModalProps {
   draftOrders: DraftOrder[];
   onClose: () => void;
-  onRestore: (id: string) => void;
-  onDelete: (id: string) => void;
+  onRestore: (id: number) => void;
+  onDelete: (id: number) => void;
 }
 
 export const DraftListModal = React.memo<DraftListModalProps>(({

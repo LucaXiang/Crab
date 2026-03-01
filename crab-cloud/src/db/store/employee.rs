@@ -91,7 +91,7 @@ pub async fn list_employees(pool: &PgPool, store_id: i64) -> Result<Vec<Employee
 pub async fn create_employee_direct(
     pool: &PgPool,
     store_id: i64,
-    _tenant_id: &str,
+    _tenant_id: i64,
     data: &EmployeeCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();

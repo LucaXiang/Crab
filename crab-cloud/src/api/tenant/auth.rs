@@ -47,7 +47,7 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub token: String,
     pub refresh_token: String,
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub status: String,
 }
 
@@ -74,35 +74,29 @@ pub async fn login(
         return Err(AppError::new(ErrorCode::AccountDisabled));
     }
 
-    let token =
-        crate::auth::tenant_auth::create_token(&tenant.id, &tenant.email, &state.jwt_secret)
-            .map_err(|e| {
-                tracing::error!("JWT creation failed: {e}");
-                AppError::new(ErrorCode::InternalError)
-            })?;
+    let token = crate::auth::tenant_auth::create_token(tenant.id, &tenant.email, &state.jwt_secret)
+        .map_err(|e| {
+            tracing::error!("JWT creation failed: {e}");
+            AppError::new(ErrorCode::InternalError)
+        })?;
 
     let device_id = format!("console-{}", uuid::Uuid::new_v4());
     let (user_agent, ip_address) = extract_client_info(&headers);
-    let refresh_token = db::refresh_tokens::create(
-        &state.pool,
-        &tenant.id,
-        &device_id,
-        &user_agent,
-        &ip_address,
-    )
-    .await
-    .map_err(|e| {
-        tracing::error!("Refresh token creation failed: {e}");
-        AppError::new(ErrorCode::InternalError)
-    })?;
+    let refresh_token =
+        db::refresh_tokens::create(&state.pool, tenant.id, &device_id, &user_agent, &ip_address)
+            .await
+            .map_err(|e| {
+                tracing::error!("Refresh token creation failed: {e}");
+                AppError::new(ErrorCode::InternalError)
+            })?;
 
     let now = shared::util::now_millis();
-    let _ = db::audit::log(&state.pool, &tenant.id, "login", None, None, now).await;
+    let _ = db::audit::log(&state.pool, tenant.id, "login", None, None, now).await;
 
     Ok(Json(LoginResponse {
         token,
         refresh_token,
-        tenant_id: tenant.id.clone(),
+        tenant_id: tenant.id,
         status: tenant.status,
     }))
 }
@@ -206,13 +200,13 @@ pub async fn reset_password(
 
     let hashed =
         hash_password(&req.new_password).map_err(|_| AppError::new(ErrorCode::InternalError))?;
-    db::tenants::update_password(&state.pool, &tenant.id, &hashed)
+    db::tenants::update_password(&state.pool, tenant.id, &hashed)
         .await
         .map_err(|_| AppError::new(ErrorCode::InternalError))?;
 
     let _ = db::email_verifications::delete(&state.pool, &email_addr, "password_reset").await;
 
-    let _ = db::audit::log(&state.pool, &tenant.id, "password_reset", None, None, now).await;
+    let _ = db::audit::log(&state.pool, tenant.id, "password_reset", None, None, now).await;
 
     Ok(Json(
         serde_json::json!({ "message": "Password has been reset" }),

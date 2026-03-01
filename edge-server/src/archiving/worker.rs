@@ -118,9 +118,9 @@ impl ArchiveWorker {
                             tracing::debug!(order_id = %event.order_id, event_type = ?event.event_type, "Received terminal event");
                             // 并发处理归档
                             let w = worker.clone();
-                            let order_id = event.order_id.clone();
+                            let order_id = event.order_id;
                             join_set.spawn(async move {
-                                w.process_order_concurrent(&order_id).await;
+                                w.process_order_concurrent(order_id).await;
                             });
                         }
                         None => {
@@ -144,7 +144,7 @@ impl ArchiveWorker {
     }
 
     /// 带并发限制的订单处理
-    async fn process_order_concurrent(&self, order_id: &str) {
+    async fn process_order_concurrent(&self, order_id: i64) {
         let _permit = match self.semaphore.acquire().await {
             Ok(permit) => permit,
             Err(_) => {
@@ -174,7 +174,7 @@ impl ArchiveWorker {
 
         for entry in pending {
             if self.should_retry(&entry) {
-                self.process_order(&entry.order_id).await;
+                self.process_order(entry.order_id).await;
             }
         }
     }
@@ -190,7 +190,7 @@ impl ArchiveWorker {
             );
             // Move to dead letter queue for manual recovery
             let error = entry.last_error.as_deref().unwrap_or("Unknown error");
-            if let Err(e) = self.storage.move_to_dead_letter(&entry.order_id, error) {
+            if let Err(e) = self.storage.move_to_dead_letter(entry.order_id, error) {
                 tracing::error!(
                     order_id = %entry.order_id,
                     error = %e,
@@ -212,7 +212,7 @@ impl ArchiveWorker {
     /// Process a single order archive
     ///
     /// redb operations are synchronous for stability.
-    async fn process_order(&self, order_id: &str) {
+    async fn process_order(&self, order_id: i64) {
         // 1. Load snapshot and events from redb (synchronous)
         let (snapshot, events) = match self.load_order_data(order_id) {
             Some(data) => data,
@@ -269,7 +269,7 @@ impl ArchiveWorker {
     }
 
     /// Load order data from redb (synchronous helper)
-    fn load_order_data(&self, order_id: &str) -> Option<(OrderSnapshot, Vec<OrderEvent>)> {
+    fn load_order_data(&self, order_id: i64) -> Option<(OrderSnapshot, Vec<OrderEvent>)> {
         let snapshot = match self.storage.get_snapshot(order_id) {
             Ok(Some(s)) => s,
             Ok(None) => {
@@ -586,7 +586,7 @@ impl ArchiveWorker {
                     resource: shared::cloud::SyncResource::Shift,
                     version,
                     action: shared::message::SyncChangeType::Updated,
-                    id: updated_shift.id.to_string(),
+                    id: updated_shift.id,
                     data: serde_json::to_value(&updated_shift).ok(),
                     cloud_origin: false,
                 };

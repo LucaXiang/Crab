@@ -74,7 +74,7 @@ pub async fn update(
         .broadcast_sync(
             shared::cloud::SyncResource::PrintConfig,
             SyncChangeType::Updated,
-            "default",
+            0,
             Some(&config),
             false,
         )

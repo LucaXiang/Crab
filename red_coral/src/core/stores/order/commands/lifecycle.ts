@@ -17,7 +17,7 @@ import type { ServiceType } from '@/core/domain/types/orderEvent';
 // ============================================================================
 
 const handleMergeToOrder = async (
-  orderId: string,
+  orderId: number,
   cart: CartItem[],
 ): Promise<'MERGED'> => {
   const command = createCommand({
@@ -77,7 +77,7 @@ const handleCreateNewOrder = async (
  */
 export const createRetailOrder = async (
   cart: CartItem[],
-): Promise<string> => {
+): Promise<number> => {
   if (cart.length === 0) {
     throw new Error('Cannot create retail order with empty cart');
   }
@@ -149,7 +149,7 @@ export const handleTableSelect = async (
  * Fire & forget — UI updates via WebSocket event.
  */
 export const completeOrder = async (
-  orderId: string,
+  orderId: number,
   newPayments: PaymentRecord[],
   serviceType?: ServiceType | null,
 ): Promise<void> => {
@@ -182,7 +182,7 @@ export const completeOrder = async (
  * Fire & forget — UI updates via WebSocket event.
  */
 export const voidOrder = async (
-  orderId: string,
+  orderId: number,
   options?: VoidOrderOptions
 ): Promise<void> => {
   const command = createCommand({

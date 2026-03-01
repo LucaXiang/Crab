@@ -27,7 +27,7 @@ use tokio::sync::broadcast;
 pub enum LiveHubEvent {
     OrderUpdated(Box<LiveOrderSnapshot>),
     OrderRemoved {
-        order_id: String,
+        order_id: i64,
         store_id: i64,
     },
     EdgeOnline {
@@ -35,7 +35,11 @@ pub enum LiveHubEvent {
     },
     EdgeOffline {
         store_id: i64,
-        cleared_order_ids: Vec<String>,
+        cleared_order_ids: Vec<i64>,
+    },
+    StoreInfoUpdated {
+        store_id: i64,
+        info: Box<shared::models::store_info::StoreInfo>,
     },
 }
 
@@ -45,7 +49,7 @@ const BROADCAST_CAPACITY: usize = 256;
 /// 单个 tenant 的活跃订单数据
 struct TenantLive {
     /// store_id → (order_id → LiveOrderSnapshot)
-    snapshots: DashMap<i64, DashMap<String, LiveOrderSnapshot>>,
+    snapshots: DashMap<i64, DashMap<i64, LiveOrderSnapshot>>,
     /// 当前在线的 edge server ID
     online_edges: DashSet<i64>,
     /// 广播给该 tenant 的所有 console 订阅者
@@ -67,7 +71,7 @@ impl TenantLive {
 #[derive(Clone, Default)]
 pub struct LiveOrderHub {
     /// tenant_id → TenantLive
-    tenants: Arc<DashMap<String, TenantLive>>,
+    tenants: Arc<DashMap<i64, TenantLive>>,
 }
 
 impl LiveOrderHub {
@@ -76,7 +80,7 @@ impl LiveOrderHub {
     }
 
     /// Edge 上线（WS 连接建立时调用）
-    pub fn mark_edge_online(&self, tenant_id: &str, store_id: i64) {
+    pub fn mark_edge_online(&self, tenant_id: i64, store_id: i64) {
         let tenant = self.get_or_create_tenant(tenant_id);
         tenant.online_edges.insert(store_id);
         let _ = tenant.tx.send(LiveHubEvent::EdgeOnline { store_id });
@@ -85,8 +89,8 @@ impl LiveOrderHub {
     /// 查询指定 edge 列表中哪些在线
     ///
     /// `store_ids` 为空时返回该 tenant 下所有在线 edge
-    pub fn get_online_edges(&self, tenant_id: &str, store_ids: &[i64]) -> Vec<i64> {
-        let tenant = match self.tenants.get(tenant_id) {
+    pub fn get_online_edges(&self, tenant_id: i64, store_ids: &[i64]) -> Vec<i64> {
+        let tenant = match self.tenants.get(&tenant_id) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -103,10 +107,10 @@ impl LiveOrderHub {
     }
 
     /// Edge 推送订单快照更新
-    pub fn publish_update(&self, tenant_id: &str, snapshot: LiveOrderSnapshot) {
+    pub fn publish_update(&self, tenant_id: i64, snapshot: LiveOrderSnapshot) {
         let tenant = self.get_or_create_tenant(tenant_id);
         let edge_id = snapshot.store_id;
-        let order_id = snapshot.order.order_id.clone();
+        let order_id = snapshot.order.order_id;
 
         // 更新缓存
         tenant
@@ -122,24 +126,23 @@ impl LiveOrderHub {
     }
 
     /// Edge 推送订单移除
-    pub fn publish_remove(&self, tenant_id: &str, order_id: &str, store_id: i64) {
-        if let Some(tenant) = self.tenants.get(tenant_id) {
+    pub fn publish_remove(&self, tenant_id: i64, order_id: i64, store_id: i64) {
+        if let Some(tenant) = self.tenants.get(&tenant_id) {
             // 从缓存移除
             if let Some(orders) = tenant.snapshots.get(&store_id) {
-                orders.remove(order_id);
+                orders.remove(&order_id);
             }
 
             // 广播
-            let _ = tenant.tx.send(LiveHubEvent::OrderRemoved {
-                order_id: order_id.to_string(),
-                store_id,
-            });
+            let _ = tenant
+                .tx
+                .send(LiveHubEvent::OrderRemoved { order_id, store_id });
         }
     }
 
     /// Edge 断线，清理该 edge 的缓存并通知 console
-    pub fn clear_edge(&self, tenant_id: &str, store_id: i64) {
-        if let Some(tenant) = self.tenants.get(tenant_id) {
+    pub fn clear_edge(&self, tenant_id: i64, store_id: i64) {
+        if let Some(tenant) = self.tenants.get(&tenant_id) {
             // 标记下线
             tenant.online_edges.remove(&store_id);
 
@@ -147,7 +150,7 @@ impl LiveOrderHub {
             let cleared_order_ids = tenant
                 .snapshots
                 .get(&store_id)
-                .map(|orders| orders.iter().map(|e| e.key().clone()).collect::<Vec<_>>())
+                .map(|orders| orders.iter().map(|e| *e.key()).collect::<Vec<_>>())
                 .unwrap_or_default();
 
             tenant.snapshots.remove(&store_id);
@@ -162,7 +165,7 @@ impl LiveOrderHub {
                 && tenant.tx.receiver_count() == 0
             {
                 drop(tenant);
-                self.tenants.remove(tenant_id);
+                self.tenants.remove(&tenant_id);
             }
         }
     }
@@ -170,8 +173,8 @@ impl LiveOrderHub {
     /// 获取 tenant 下指定 edge 的活跃订单（新 console 连接初始化用）
     ///
     /// `store_ids` 为空时返回该 tenant 下所有 edge 的订单
-    pub fn get_all_active(&self, tenant_id: &str, store_ids: &[i64]) -> Vec<LiveOrderSnapshot> {
-        let tenant = match self.tenants.get(tenant_id) {
+    pub fn get_all_active(&self, tenant_id: i64, store_ids: &[i64]) -> Vec<LiveOrderSnapshot> {
+        let tenant = match self.tenants.get(&tenant_id) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -197,18 +200,32 @@ impl LiveOrderHub {
         result
     }
 
+    /// 门店信息变更广播（Console/Edge 修改后调用）
+    pub fn publish_store_info_updated(
+        &self,
+        tenant_id: i64,
+        store_id: i64,
+        info: shared::models::store_info::StoreInfo,
+    ) {
+        let tenant = self.get_or_create_tenant(tenant_id);
+        let _ = tenant.tx.send(LiveHubEvent::StoreInfoUpdated {
+            store_id,
+            info: Box::new(info),
+        });
+    }
+
     /// 订阅 tenant 的 broadcast channel
-    pub fn subscribe(&self, tenant_id: &str) -> broadcast::Receiver<LiveHubEvent> {
+    pub fn subscribe(&self, tenant_id: i64) -> broadcast::Receiver<LiveHubEvent> {
         let tenant = self.get_or_create_tenant(tenant_id);
         tenant.tx.subscribe()
     }
 
     fn get_or_create_tenant(
         &self,
-        tenant_id: &str,
-    ) -> dashmap::mapref::one::Ref<'_, String, TenantLive> {
+        tenant_id: i64,
+    ) -> dashmap::mapref::one::Ref<'_, i64, TenantLive> {
         self.tenants
-            .entry(tenant_id.to_string())
+            .entry(tenant_id)
             .or_insert_with(TenantLive::new)
             .downgrade()
     }
@@ -219,10 +236,10 @@ mod tests {
     use super::*;
     use shared::order::OrderSnapshot;
 
-    fn make_snapshot(store_id: i64, order_id: &str) -> LiveOrderSnapshot {
+    fn make_snapshot(store_id: i64, order_id: i64) -> LiveOrderSnapshot {
         LiveOrderSnapshot {
             store_id,
-            order: OrderSnapshot::new(order_id.to_string()),
+            order: OrderSnapshot::new(order_id),
             events: vec![],
         }
     }
@@ -231,78 +248,78 @@ mod tests {
     fn basic_publish_get_remove() {
         let hub = LiveOrderHub::new();
 
-        hub.publish_update("t1", make_snapshot(1, "order-a"));
-        hub.publish_update("t1", make_snapshot(1, "order-b"));
+        hub.publish_update(1, make_snapshot(1, 1001));
+        hub.publish_update(1, make_snapshot(1, 1002));
 
-        let all = hub.get_all_active("t1", &[]);
+        let all = hub.get_all_active(1, &[]);
         assert_eq!(all.len(), 2);
 
-        let filtered = hub.get_all_active("t1", &[1]);
+        let filtered = hub.get_all_active(1, &[1]);
         assert_eq!(filtered.len(), 2);
 
-        let empty = hub.get_all_active("t1", &[999]);
+        let empty = hub.get_all_active(1, &[999]);
         assert!(empty.is_empty());
 
-        hub.publish_remove("t1", "order-a", 1);
-        let after = hub.get_all_active("t1", &[]);
+        hub.publish_remove(1, 1001, 1);
+        let after = hub.get_all_active(1, &[]);
         assert_eq!(after.len(), 1);
-        assert_eq!(after[0].order.order_id, "order-b");
+        assert_eq!(after[0].order.order_id, 1002);
 
-        hub.publish_remove("t1", "order-b", 1);
-        assert!(hub.get_all_active("t1", &[]).is_empty());
+        hub.publish_remove(1, 1002, 1);
+        assert!(hub.get_all_active(1, &[]).is_empty());
     }
 
     #[test]
     fn tenant_isolation() {
         let hub = LiveOrderHub::new();
 
-        hub.publish_update("tenant-a", make_snapshot(1, "order-1"));
-        hub.publish_update("tenant-b", make_snapshot(2, "order-2"));
+        hub.publish_update(100, make_snapshot(1, 2001));
+        hub.publish_update(200, make_snapshot(2, 2002));
 
-        let a = hub.get_all_active("tenant-a", &[]);
+        let a = hub.get_all_active(100, &[]);
         assert_eq!(a.len(), 1);
-        assert_eq!(a[0].order.order_id, "order-1");
+        assert_eq!(a[0].order.order_id, 2001);
 
-        let b = hub.get_all_active("tenant-b", &[]);
+        let b = hub.get_all_active(200, &[]);
         assert_eq!(b.len(), 1);
-        assert_eq!(b[0].order.order_id, "order-2");
+        assert_eq!(b[0].order.order_id, 2002);
 
-        assert!(hub.get_all_active("tenant-x", &[]).is_empty());
+        assert!(hub.get_all_active(999, &[]).is_empty());
     }
 
     #[test]
     fn store_isolation_via_edge_filter() {
         let hub = LiveOrderHub::new();
 
-        hub.publish_update("t1", make_snapshot(10, "s10-a"));
-        hub.publish_update("t1", make_snapshot(10, "s10-b"));
-        hub.publish_update("t1", make_snapshot(20, "s20-c"));
+        hub.publish_update(1, make_snapshot(10, 3001));
+        hub.publish_update(1, make_snapshot(10, 3002));
+        hub.publish_update(1, make_snapshot(20, 3003));
 
-        let store10 = hub.get_all_active("t1", &[10]);
+        let store10 = hub.get_all_active(1, &[10]);
         assert_eq!(store10.len(), 2);
         assert!(store10.iter().all(|s| s.store_id == 10));
 
-        let store20 = hub.get_all_active("t1", &[20]);
+        let store20 = hub.get_all_active(1, &[20]);
         assert_eq!(store20.len(), 1);
-        assert_eq!(store20[0].order.order_id, "s20-c");
+        assert_eq!(store20[0].order.order_id, 3003);
 
-        assert_eq!(hub.get_all_active("t1", &[]).len(), 3);
+        assert_eq!(hub.get_all_active(1, &[]).len(), 3);
     }
 
     #[tokio::test]
     async fn clear_edge_broadcasts_offline_with_order_ids() {
         let hub = LiveOrderHub::new();
-        let mut rx = hub.subscribe("t1");
+        let mut rx = hub.subscribe(1);
 
-        hub.publish_update("t1", make_snapshot(1, "ox"));
-        hub.publish_update("t1", make_snapshot(1, "oy"));
+        hub.publish_update(1, make_snapshot(1, 4001));
+        hub.publish_update(1, make_snapshot(1, 4002));
 
         // 消费 OrderUpdated
         let _ = rx.recv().await.unwrap();
         let _ = rx.recv().await.unwrap();
 
-        hub.clear_edge("t1", 1);
-        assert!(hub.get_all_active("t1", &[1]).is_empty());
+        hub.clear_edge(1, 1);
+        assert!(hub.get_all_active(1, &[1]).is_empty());
 
         match rx.recv().await.unwrap() {
             LiveHubEvent::EdgeOffline {
@@ -311,8 +328,8 @@ mod tests {
             } => {
                 assert_eq!(store_id, 1);
                 assert_eq!(cleared_order_ids.len(), 2);
-                assert!(cleared_order_ids.contains(&"ox".to_string()));
-                assert!(cleared_order_ids.contains(&"oy".to_string()));
+                assert!(cleared_order_ids.contains(&4001));
+                assert!(cleared_order_ids.contains(&4002));
             }
             other => panic!("Expected EdgeOffline, got {other:?}"),
         }
@@ -321,32 +338,32 @@ mod tests {
     #[test]
     fn tenant_auto_cleanup_when_empty() {
         let hub = LiveOrderHub::new();
-        hub.publish_update("t-temp", make_snapshot(1, "o1"));
-        assert_eq!(hub.get_all_active("t-temp", &[]).len(), 1);
+        hub.publish_update(300, make_snapshot(1, 5001));
+        assert_eq!(hub.get_all_active(300, &[]).len(), 1);
 
         // clear_edge 后无 subscriber + 无 edge → 自动清理
-        hub.clear_edge("t-temp", 1);
-        assert!(hub.get_all_active("t-temp", &[]).is_empty());
+        hub.clear_edge(300, 1);
+        assert!(hub.get_all_active(300, &[]).is_empty());
     }
 
     #[tokio::test]
     async fn subscribe_receives_updates_and_removals() {
         let hub = LiveOrderHub::new();
-        let mut rx = hub.subscribe("t1");
+        let mut rx = hub.subscribe(1);
 
-        hub.publish_update("t1", make_snapshot(5, "o1"));
+        hub.publish_update(1, make_snapshot(5, 6001));
         match rx.recv().await.unwrap() {
             LiveHubEvent::OrderUpdated(snap) => {
                 assert_eq!(snap.store_id, 5);
-                assert_eq!(snap.order.order_id, "o1");
+                assert_eq!(snap.order.order_id, 6001);
             }
             other => panic!("Expected OrderUpdated, got {other:?}"),
         }
 
-        hub.publish_remove("t1", "o1", 5);
+        hub.publish_remove(1, 6001, 5);
         match rx.recv().await.unwrap() {
             LiveHubEvent::OrderRemoved { order_id, store_id } => {
-                assert_eq!(order_id, "o1");
+                assert_eq!(order_id, 6001);
                 assert_eq!(store_id, 5);
             }
             other => panic!("Expected OrderRemoved, got {other:?}"),

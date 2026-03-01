@@ -20,6 +20,7 @@ pub mod zone;
 pub mod price_rule;
 
 // Orders
+pub mod anulacion;
 pub mod credit_note;
 pub mod invoice;
 pub mod order;
@@ -64,6 +65,9 @@ pub enum RepoError {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    #[error("Data corruption: {0}")]
+    DataCorruption(String),
+
     #[error("{1}")]
     Business(ErrorCode, String),
 }
@@ -94,6 +98,7 @@ impl From<RepoError> for AppError {
             RepoError::Duplicate(msg) => AppError::with_message(ErrorCode::AlreadyExists, msg),
             RepoError::Database(msg) => AppError::database(msg),
             RepoError::Validation(msg) => AppError::validation(msg),
+            RepoError::DataCorruption(msg) => AppError::internal(msg),
             RepoError::Business(code, msg) => AppError::with_message(code, msg),
         }
     }

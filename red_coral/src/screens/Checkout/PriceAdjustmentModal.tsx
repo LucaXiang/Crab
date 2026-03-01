@@ -21,7 +21,7 @@ export interface AdjustmentConfig {
   /** Get existing values from order */
   getExisting: (order: HeldOrder) => { percent?: number | null; fixed?: number | null };
   /** Apply the adjustment */
-  applyFn: (orderId: string, payload: {
+  applyFn: (orderId: number, payload: {
     percent?: number;
     fixed?: number;
     authorizer?: { id: number; name: string };

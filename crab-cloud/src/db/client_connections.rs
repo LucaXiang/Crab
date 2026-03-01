@@ -5,7 +5,7 @@ use sqlx::PgPool;
 #[allow(dead_code)]
 pub struct ClientConnection {
     pub entity_id: String,
-    pub tenant_id: String,
+    pub tenant_id: i64,
     pub device_id: String,
     pub fingerprint: String,
     pub status: String,
@@ -16,12 +16,11 @@ pub struct ClientConnection {
 /// 获取租户 client 激活 advisory lock (防止并发激活超配额)
 pub async fn acquire_activation_lock(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<(), sqlx::Error> {
-    // 使用 'client:' 前缀避免与 server activation lock 冲突
-    let lock_key = format!("client:{tenant_id}");
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
-        .bind(&lock_key)
+    // Offset by 1_000_000_000 to avoid collision with server activation lock
+    sqlx::query("SELECT pg_advisory_xact_lock($1 + 1000000000)")
+        .bind(tenant_id)
         .execute(&mut **tx)
         .await?;
     Ok(())
@@ -30,7 +29,7 @@ pub async fn acquire_activation_lock(
 /// 按 tenant_id + device_id 查找
 pub async fn find_by_device(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     device_id: &str,
 ) -> Result<Option<ClientConnection>, sqlx::Error> {
     sqlx::query_as::<_, ClientConnection>(
@@ -65,7 +64,7 @@ pub async fn find_by_entity(
 pub async fn insert_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     entity_id: &str,
-    tenant_id: &str,
+    tenant_id: i64,
     device_id: &str,
     fingerprint: &str,
 ) -> Result<(), sqlx::Error> {

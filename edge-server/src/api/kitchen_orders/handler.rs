@@ -29,8 +29,8 @@ use shared::order::EventPayload;
 /// Query params for listing kitchen orders
 #[derive(Debug, Deserialize)]
 pub struct ListQuery {
-    /// Filter by order_id (optional)
-    pub order_id: Option<String>,
+    /// Filter by order_id (optional, snowflake i64)
+    pub order_id: Option<i64>,
     /// Page offset (default 0)
     #[serde(default)]
     pub offset: usize,
@@ -65,19 +65,18 @@ pub async fn list(
     let service = state.kitchen_print_service();
 
     let items = if let Some(order_id) = query.order_id {
-        // Try redb first
-        tracing::debug!(order_id = %order_id, "kitchen_orders::list querying redb");
-        let redb_items = match service.get_kitchen_orders_for_order(&order_id) {
+        tracing::debug!(order_id, "kitchen_orders::list querying redb");
+        let redb_items = match service.get_kitchen_orders_for_order(order_id) {
             Ok(items) => items,
             Err(e) => {
-                tracing::warn!(order_id = %order_id, error = %e, "redb query failed, trying archive");
+                tracing::warn!(order_id, error = %e, "redb query failed, trying archive");
                 vec![]
             }
         };
-        tracing::debug!(order_id = %order_id, redb_count = redb_items.len(), "redb result");
+        tracing::debug!(order_id, redb_count = redb_items.len(), "redb result");
         if redb_items.is_empty() {
             // Fallback: rebuild from archived events
-            rebuild_kitchen_orders_from_archive(&state, &order_id).await?
+            rebuild_kitchen_orders_from_archive(&state, order_id).await?
         } else {
             redb_items
         }
@@ -92,11 +91,11 @@ pub async fn list(
 /// GET /api/kitchen-orders/:id - Get a single kitchen order
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<KitchenOrder>> {
     let service = state.kitchen_print_service();
 
-    let order = service.get_kitchen_order(&id)?.ok_or_else(|| {
+    let order = service.get_kitchen_order(id)?.ok_or_else(|| {
         AppError::with_message(
             ErrorCode::OrderNotFound,
             format!("Kitchen order {} not found", id),
@@ -113,25 +112,21 @@ pub async fn get_by_id(
 /// For archived: rebuilds from events, reprints without storing.
 pub async fn reprint(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     let service = state.kitchen_print_service();
 
     // Try redb first
-    let order = if let Some(_existing) = service.get_kitchen_order(&id)? {
+    let order = if let Some(_existing) = service.get_kitchen_order(id)? {
         // Redb path: increment count
-        service.reprint_kitchen_order(&id)?
+        service.reprint_kitchen_order(id)?
     } else {
         // Fallback: the `id` might be an event_id from archived events.
-        // We need the order_id to query archived events, but the caller
-        // sends the kitchen_order.id (= event_id).
-        // Search all archived ITEMS_ADDED events across all orders to find matching event_id.
-        // Since this is expensive, we use a direct query.
         let event_row = sqlx::query_as::<_, (i64, i64, Option<String>)>(
             "SELECT e.id, e.timestamp, e.data FROM archived_order_event e \
-             WHERE e.event_type = 'ITEMS_ADDED' AND CAST(e.id AS TEXT) = ?",
+             WHERE e.event_type = 'ITEMS_ADDED' AND e.id = ?",
         )
-        .bind(&id)
+        .bind(id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -139,25 +134,25 @@ pub async fn reprint(
         if let Some((_event_id, timestamp, data)) = event_row {
             // Get order metadata
             let order_meta =
-                sqlx::query_as::<_, (Option<String>, Option<String>, bool, Option<i32>, String, String)>(
-                    "SELECT o.table_name, o.zone_name, o.is_retail, o.queue_number, o.order_key, o.receipt_number \
+                sqlx::query_as::<_, (Option<String>, Option<String>, bool, Option<i32>, i64, String)>(
+                    "SELECT o.table_name, o.zone_name, o.is_retail, o.queue_number, o.order_id, o.receipt_number \
                  FROM archived_order o \
                  JOIN archived_order_event e ON e.order_pk = o.id \
-                 WHERE CAST(e.id AS TEXT) = ?",
+                 WHERE e.id = ?",
                 )
-                .bind(&id)
+                .bind(id)
                 .fetch_optional(&state.pool)
                 .await
                 .map_err(|e| AppError::database(e.to_string()))?;
 
-            let (table_name, zone_name, is_retail, queue_number, order_key, receipt_number) =
+            let (table_name, zone_name, is_retail, queue_number, order_id, receipt_number) =
                 order_meta
                     .ok_or_else(|| AppError::not_found(format!("Archived order for event {id}")))?;
 
             rebuild_single_kitchen_order(
                 &state,
-                &id,
-                &order_key,
+                id,
+                order_id,
                 &receipt_number,
                 table_name,
                 zone_name,
@@ -203,8 +198,8 @@ pub async fn reprint(
 /// Query params for listing label records
 #[derive(Debug, Deserialize)]
 pub struct LabelListQuery {
-    /// Filter by order_id (required)
-    pub order_id: String,
+    /// Filter by order_id (required, snowflake i64)
+    pub order_id: i64,
 }
 
 /// GET /api/label-records - List label records for an order
@@ -216,24 +211,24 @@ pub async fn list_labels(
 ) -> AppResult<Json<Vec<LabelPrintRecord>>> {
     let service = state.kitchen_print_service();
 
-    let records = service.get_label_records_for_order(&query.order_id)?;
+    let records = service.get_label_records_for_order(query.order_id)?;
     if !records.is_empty() {
         return Ok(Json(records));
     }
 
     // Fallback: rebuild from archived events
-    let records = rebuild_label_records_from_archive(&state, &query.order_id).await?;
+    let records = rebuild_label_records_from_archive(&state, query.order_id).await?;
     Ok(Json(records))
 }
 
 /// GET /api/label-records/:id - Get a single label record
 pub async fn get_label_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<LabelPrintRecord>> {
     let service = state.kitchen_print_service();
 
-    let record = service.get_label_record(&id)?.ok_or_else(|| {
+    let record = service.get_label_record(id)?.ok_or_else(|| {
         AppError::with_message(
             ErrorCode::OrderItemNotFound,
             format!("Label record {} not found", id),
@@ -249,18 +244,17 @@ pub async fn get_label_by_id(
 /// and sends it to the printer. Increments print_count on the original record.
 pub async fn reprint_label(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     let service = state.kitchen_print_service();
 
     // Get original record (redb or archived)
-    let record = if let Some(r) = service.get_label_record(&id)? {
+    let record = if let Some(r) = service.get_label_record(id)? {
         // Increment print_count in redb
-        service.reprint_label_record(&id)?;
+        service.reprint_label_record(id)?;
         r
     } else {
         // Archived label — no redb record to update
-        // Return not found for now; archived labels are rebuilt from events
         return Err(AppError::not_found(format!("Label record {id}")));
     };
 
@@ -270,7 +264,7 @@ pub async fn reprint_label(
     reprint_context.quantity = 1;
 
     let reprint_record = LabelPrintRecord {
-        id: format!("reprint-{}", uuid::Uuid::new_v4()),
+        id: shared::util::snowflake_id(),
         order_id: record.order_id,
         kitchen_order_id: record.kitchen_order_id,
         table_name: record.table_name,
@@ -330,9 +324,9 @@ pub async fn reprint_label(
 /// Rebuild KitchenOrder list from archived ITEMS_ADDED events
 async fn rebuild_kitchen_orders_from_archive(
     state: &ServerState,
-    order_id: &str,
+    order_id: i64,
 ) -> Result<Vec<KitchenOrder>, AppError> {
-    let (meta, events) = order_repo::get_items_added_events_by_order_key(&state.pool, order_id)
+    let (meta, events) = order_repo::get_items_added_events_by_order_id(&state.pool, order_id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -367,8 +361,8 @@ async fn rebuild_kitchen_orders_from_archive(
         }
 
         orders.push(KitchenOrder {
-            id: event.event_id.to_string(),
-            order_id: meta.order_key.clone(),
+            id: event.event_id,
+            order_id: meta.order_id,
             receipt_number: meta.receipt_number.clone(),
             table_name: meta.table_name.clone(),
             zone_name: meta.zone_name.clone(),
@@ -386,9 +380,9 @@ async fn rebuild_kitchen_orders_from_archive(
 /// Rebuild LabelPrintRecord list from archived ITEMS_ADDED events
 async fn rebuild_label_records_from_archive(
     state: &ServerState,
-    order_id: &str,
+    order_id: i64,
 ) -> Result<Vec<LabelPrintRecord>, AppError> {
-    let (meta, events) = order_repo::get_items_added_events_by_order_key(&state.pool, order_id)
+    let (meta, events) = order_repo::get_items_added_events_by_order_id(&state.pool, order_id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -421,9 +415,9 @@ async fn rebuild_label_records_from_archive(
                 label_context.quantity = 1;
 
                 records.push(LabelPrintRecord {
-                    id: format!("archived-{}-{}-{}", event.event_id, item.id, i),
-                    order_id: meta.order_key.clone(),
-                    kitchen_order_id: event.event_id.to_string(),
+                    id: shared::util::snowflake_id(),
+                    order_id: meta.order_id,
+                    kitchen_order_id: event.event_id,
                     table_name: meta.table_name.clone(),
                     queue_number: meta.queue_number.map(|n| n as u32),
                     is_retail: meta.is_retail,
@@ -442,8 +436,8 @@ async fn rebuild_label_records_from_archive(
 #[allow(clippy::too_many_arguments)]
 fn rebuild_single_kitchen_order(
     state: &ServerState,
-    event_id: &str,
-    order_key: &str,
+    event_id: i64,
+    order_id: i64,
     receipt_number: &str,
     table_name: Option<String>,
     zone_name: Option<String>,
@@ -468,8 +462,8 @@ fn rebuild_single_kitchen_order(
         .collect();
 
     Ok(KitchenOrder {
-        id: event_id.to_string(),
-        order_id: order_key.to_string(),
+        id: event_id,
+        order_id,
         receipt_number: receipt_number.to_string(),
         table_name,
         zone_name,

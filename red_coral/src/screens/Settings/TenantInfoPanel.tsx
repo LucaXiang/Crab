@@ -47,7 +47,7 @@ interface CertificateDetail {
 }
 
 interface TenantDetails {
-  tenant_id: string;
+  tenant_id: number;
   mode: string | null;
   device_id: string;
   entity_id: string | null;
@@ -212,7 +212,7 @@ export const TenantInfoPanel: React.FC = () => {
         >
           <InfoRow
             label={t('settings.tenant_info.device.tenant_id')}
-            value={truncateId(details.tenant_id)}
+            value={String(details.tenant_id)}
             mono
           />
           <InfoRow

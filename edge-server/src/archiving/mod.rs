@@ -5,17 +5,21 @@
 //! - **worker**: ArchiveWorker (队列处理，并发归档，重试)
 //! - **verify**: VerifyScheduler (启动补扫 + 每日定时验证)
 
+pub mod anulacion;
 pub mod credit_note;
 pub mod invoice;
 pub mod service;
+pub mod upgrade;
 pub mod verify;
 pub mod worker;
 
+pub use anulacion::AnulacionService;
 pub use credit_note::CreditNoteService;
 pub use invoice::InvoiceService;
 pub use service::{
     ArchiveError, ArchiveResult, ChainBreak, ChainReset, DailyChainVerification, EventVerification,
     OrderArchiveService, OrderVerification,
 };
+pub use upgrade::UpgradeService;
 pub use verify::VerifyScheduler;
 pub use worker::ArchiveWorker;

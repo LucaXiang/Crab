@@ -74,7 +74,7 @@ impl EventApplier for ItemCompedApplier {
 
             // Create CompRecord and push to snapshot.comps
             let comp_record = CompRecord {
-                comp_id: event.event_id.clone(),
+                comp_id: event.event_id,
                 instance_id: instance_id.clone(),
                 source_instance_id: source_instance_id.clone(),
                 item_name: item_name.clone(),
@@ -142,7 +142,7 @@ mod tests {
     }
 
     fn create_item_comped_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         instance_id: &str,
         source_instance_id: &str,
@@ -152,10 +152,10 @@ mod tests {
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemComped,
             EventPayload::ItemComped {
@@ -173,15 +173,14 @@ mod tests {
 
     #[test]
     fn test_item_comped_full() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
-        let event =
-            create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 2, 10.0);
+        let event = create_item_comped_event(1001, 2, "item-1", "item-1", "Product A", 2, 10.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -206,13 +205,12 @@ mod tests {
 
     #[test]
     fn test_item_comped_full_preserves_existing_original_price() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 1, "Product A", 8.0, 1);
         item.original_price = 12.0; // Already has original_price
         snapshot.items.push(item);
 
-        let event =
-            create_item_comped_event("order-1", 2, "item-1", "item-1", "Product A", 1, 12.0);
+        let event = create_item_comped_event(1001, 2, "item-1", "item-1", "Product A", 1, 12.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -225,7 +223,7 @@ mod tests {
 
     #[test]
     fn test_item_comped_partial_split() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
@@ -234,7 +232,7 @@ mod tests {
 
         // Partial comp: 2 of 5 items (derived instance_id, source is "item-1")
         let event = create_item_comped_event(
-            "order-1",
+            1001,
             2,
             "item-1::comp::uuid-1",
             "item-1",
@@ -276,14 +274,13 @@ mod tests {
 
     #[test]
     fn test_item_comped_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event =
-            create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 10.0);
+        let event = create_item_comped_event(1001, 1, "item-1", "item-1", "Product A", 1, 10.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -294,14 +291,13 @@ mod tests {
 
     #[test]
     fn test_item_comped_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
-        let event =
-            create_item_comped_event("order-1", 6, "item-1", "item-1", "Product A", 1, 10.0);
+        let event = create_item_comped_event(1001, 6, "item-1", "item-1", "Product A", 1, 10.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -311,15 +307,14 @@ mod tests {
 
     #[test]
     fn test_item_comped_preserves_discounts_and_rules() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 1, "Product A", 100.0, 1);
         item.manual_discount_percent = Some(10.0);
         item.rule_discount_amount = 5.0;
         item.rule_surcharge_amount = 2.0;
         snapshot.items.push(item);
 
-        let event =
-            create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 100.0);
+        let event = create_item_comped_event(1001, 1, "item-1", "item-1", "Product A", 1, 100.0);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);
@@ -335,13 +330,12 @@ mod tests {
     #[test]
     fn test_item_comped_original_price_not_zero() {
         // This test verifies the bug fix: original_price should NOT be 0.0
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 15.50, 1));
 
-        let event =
-            create_item_comped_event("order-1", 1, "item-1", "item-1", "Product A", 1, 15.50);
+        let event = create_item_comped_event(1001, 1, "item-1", "item-1", "Product A", 1, 15.50);
 
         let applier = ItemCompedApplier;
         applier.apply(&mut snapshot, &event);

@@ -75,7 +75,7 @@ impl CrabClient<Remote, Disconnected> {
         // 2. Download certificates using tenant token
         tracing::info!("Downloading certificates...");
         let (cert_pem, key_pem, ca_cert_pem) = cert_manager
-            .request_certificates(http.base_url(), credential.token(), &credential.tenant_id)
+            .request_certificates(http.base_url(), credential.token(), credential.tenant_id)
             .await
             .map_err(|e| ClientError::Certificate(e.to_string()))?;
 

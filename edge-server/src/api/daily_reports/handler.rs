@@ -139,7 +139,13 @@ pub async fn generate(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&report), false)
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            report.id,
+            Some(&report),
+            false,
+        )
         .await;
 
     Ok(Json(report))

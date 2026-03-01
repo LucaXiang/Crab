@@ -22,7 +22,7 @@ impl EventApplier for TableOpenedApplier {
         } = &event.payload
         {
             // Set order_id from event (important for replay scenarios)
-            snapshot.order_id = event.order_id.clone();
+            snapshot.order_id = event.order_id;
             snapshot.table_id = *table_id;
             snapshot.table_name = table_name.clone();
             snapshot.zone_id = *zone_id;
@@ -49,14 +49,14 @@ mod tests {
 
     #[test]
     fn test_table_opened_applier() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
 
         let event = OrderEvent::new(
             1,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             shared::order::OrderEventType::TableOpened,
             EventPayload::TableOpened {

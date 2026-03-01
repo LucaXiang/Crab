@@ -114,7 +114,7 @@ mod tests {
     }
 
     fn create_item_removed_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         instance_id: &str,
         item_name: &str,
@@ -123,14 +123,14 @@ mod tests {
     ) -> OrderEvent {
         // Use struct initialization directly to set a known timestamp for testing
         OrderEvent {
-            event_id: uuid::Uuid::new_v4().to_string(),
+            event_id: shared::util::snowflake_id(),
             sequence: seq,
-            order_id: order_id.to_string(),
+            order_id: order_id,
             timestamp: 1234567890,
             client_timestamp: Some(1234567890),
             operator_id: 1,
             operator_name: "Test User".to_string(),
-            command_id: "cmd-1".to_string(),
+            command_id: shared::util::snowflake_id(),
             event_type: OrderEventType::ItemRemoved,
             payload: EventPayload::ItemRemoved {
                 instance_id: instance_id.to_string(),
@@ -145,14 +145,14 @@ mod tests {
 
     #[test]
     fn test_item_removed_full() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
-        let event = create_item_removed_event("order-1", 2, "item-1", "Product A", None, None);
+        let event = create_item_removed_event(1001, 2, "item-1", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_partial() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
@@ -174,7 +174,7 @@ mod tests {
         snapshot.total = 50.0;
 
         // Remove 2 of 5
-        let event = create_item_removed_event("order-1", 2, "item-1", "Product A", Some(2), None);
+        let event = create_item_removed_event(1001, 2, "item-1", "Product A", Some(2), None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_partial_to_zero() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
@@ -198,7 +198,7 @@ mod tests {
         snapshot.total = 30.0;
 
         // Remove all 3
-        let event = create_item_removed_event("order-1", 2, "item-1", "Product A", Some(3), None);
+        let event = create_item_removed_event(1001, 2, "item-1", "Product A", Some(3), None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_with_discount() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 1, "Product A", 100.0, 2);
         item.manual_discount_percent = Some(10.0);
         snapshot.items.push(item);
@@ -220,7 +220,7 @@ mod tests {
         snapshot.total = 180.0;
 
         // Remove 1 of 2 with 10% discount
-        let event = create_item_removed_event("order-1", 2, "item-1", "Product A", Some(1), None);
+        let event = create_item_removed_event(1001, 2, "item-1", "Product A", Some(1), None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -233,13 +233,13 @@ mod tests {
 
     #[test]
     fn test_item_removed_updates_sequence() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
-        let event = create_item_removed_event("order-1", 6, "item-1", "Product A", None, None);
+        let event = create_item_removed_event(1001, 6, "item-1", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -249,13 +249,13 @@ mod tests {
 
     #[test]
     fn test_item_removed_updates_checksum() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_item_removed_event("order-1", 1, "item-1", "Product A", None, None);
+        let event = create_item_removed_event(1001, 1, "item-1", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_nonexistent_is_noop() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
@@ -274,7 +274,7 @@ mod tests {
         snapshot.total = 10.0;
 
         // Try to remove nonexistent item
-        let event = create_item_removed_event("order-1", 1, "nonexistent", "Product A", None, None);
+        let event = create_item_removed_event(1001, 1, "nonexistent", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_multiple_items() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
@@ -299,7 +299,7 @@ mod tests {
         snapshot.total = 40.0;
 
         // Remove item-1
-        let event = create_item_removed_event("order-1", 2, "item-1", "Product A", None, None);
+        let event = create_item_removed_event(1001, 2, "item-1", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_with_paid_quantities() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 3));
@@ -323,7 +323,7 @@ mod tests {
             .insert("item-1".to_string(), 1);
 
         // Remove item entirely
-        let event = create_item_removed_event("order-1", 1, "item-1", "Product A", None, None);
+        let event = create_item_removed_event(1001, 1, "item-1", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_item_removed_partial_with_paid_quantities() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         let mut item = create_test_item("item-1", 1, "Product A", 10.0, 5);
         item.unpaid_quantity = 4; // 1 already paid
         snapshot.items.push(item);
@@ -346,7 +346,7 @@ mod tests {
         snapshot.total = 50.0;
 
         // Remove 2 items
-        let event = create_item_removed_event("order-1", 1, "item-1", "Product A", Some(2), None);
+        let event = create_item_removed_event(1001, 1, "item-1", "Product A", Some(2), None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -361,13 +361,13 @@ mod tests {
 
     #[test]
     fn test_item_removed_with_reason() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
 
         let event = create_item_removed_event(
-            "order-1",
+            1001,
             1,
             "item-1",
             "Product A",
@@ -384,14 +384,14 @@ mod tests {
 
     #[test]
     fn test_item_removed_updates_timestamp() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 1));
         snapshot.updated_at = 1000;
 
         // Event has a different timestamp
-        let event = create_item_removed_event("order-1", 1, "item-1", "Product A", None, None);
+        let event = create_item_removed_event(1001, 1, "item-1", "Product A", None, None);
 
         let applier = ItemRemovedApplier;
         applier.apply(&mut snapshot, &event);
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_apply_item_removed_function_full() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 2));
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_apply_item_removed_function_partial() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot
             .items
             .push(create_test_item("item-1", 1, "Product A", 10.0, 5));
@@ -427,7 +427,7 @@ mod tests {
 
     #[test]
     fn test_recalculate_totals_empty() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.subtotal = 100.0;
         snapshot.total = 100.0;
 
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_recalculate_totals_with_tax_discount() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         // Create item with 21% IVA tax rate (Spanish standard rate)
         let mut item = create_test_item("item-1", 1, "Product A", 121.0, 1);
         item.tax_rate = 21; // 21% IVA

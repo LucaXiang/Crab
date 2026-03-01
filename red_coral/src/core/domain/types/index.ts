@@ -19,6 +19,9 @@ export * from './archivedOrder';
 // Credit note types (退款凭证)
 export * from './creditNote';
 
+// Chain entry types (统一 hash 链时间线)
+export * from './chainEntry';
+
 // Invoice types (Verifactu 发票)
 export * from './invoice';
 
@@ -57,28 +60,31 @@ export type HeldOrder = import('./orderEvent').OrderSnapshot;
 export type DraftOrder = HeldOrder;
 
 // Permission type and constants
-// 简化权限系统：12 个可配置权限 + 1 个管理员专属权限
+// 18 个可配置权限 + 1 个管理员专属权限
 export type Permission = string;
 
 export const Permission = {
-  // === 模块化权限 (6) ===
+  // === 模块化权限 (7) ===
   MENU_MANAGE: 'menu:manage' as Permission,           // 菜单管理
   TABLES_MANAGE: 'tables:manage' as Permission,       // 桌台管理
   SHIFTS_MANAGE: 'shifts:manage' as Permission,       // 班次管理
   REPORTS_VIEW: 'reports:view' as Permission,         // 报表查看
   PRICE_RULES_MANAGE: 'price_rules:manage' as Permission, // 价格规则
   SETTINGS_MANAGE: 'settings:manage' as Permission,   // 系统设置
+  MARKETING_MANAGE: 'marketing:manage' as Permission,  // 营销组+会员管理
+  ORDERS_LINK_MEMBER: 'orders:link_member' as Permission,   // 订单关联会员
+  ORDERS_REDEEM_STAMP: 'orders:redeem_stamp' as Permission, // 订单兑换印花
 
-  // === 敏感操作 (6) ===
+  // === 敏感操作 (9) ===
   ORDERS_VOID: 'orders:void' as Permission,           // 作废订单
   ORDERS_DISCOUNT: 'orders:discount' as Permission,   // 应用折扣
   ORDERS_COMP: 'orders:comp' as Permission,           // 赠送菜品
   ORDERS_REFUND: 'orders:refund' as Permission,       // 退款
   ORDERS_MODIFY_PRICE: 'orders:modify_price' as Permission, // 修改价格
+  ORDERS_CANCEL_ITEM: 'orders:cancel_item' as Permission,   // 删除商品
+  TABLES_TRANSFER: 'tables:transfer' as Permission,         // 移台
+  TABLES_MERGE_BILL: 'tables:merge_bill' as Permission,     // 合台
   CASH_DRAWER_OPEN: 'cash_drawer:open' as Permission, // 打开钱箱
-
-  // === 营销管理 ===
-  MARKETING_MANAGE: 'marketing:manage' as Permission,  // 营销组+会员管理
 
   // === 管理员专属 ===
   USERS_MANAGE: 'users:manage' as Permission,         // 用户管理 (仅 admin)
@@ -102,6 +108,8 @@ export interface OverviewStats {
   loss_orders: number;
   loss_amount: number;
   total_discount: number;
+  total_refunded: number;
+  refund_count: number;
   avg_guest_spend: number;
   avg_dining_time?: number;
 }

@@ -755,6 +755,7 @@
       "voided_orders": "作废订单",
       "loss_orders": "损失订单",
       "total_discount": "总折扣",
+      "refunds": "退款",
       "orders": "订单",
       "revenue": "营业额",
       "customers": "客数"
@@ -1806,6 +1807,12 @@
       "orders_comp": "赠送菜品",
       "orders_refund": "退款",
       "orders_modify_price": "修改价格",
+      "orders_cancel_item": "删除商品",
+      "orders_link_member": "关联会员",
+      "orders_redeem_stamp": "兑换印花",
+      "tables_transfer": "移台",
+      "tables_merge_bill": "合台",
+      "marketing_manage": "营销与会员",
       "cash_drawer_open": "打开钱箱",
       "group": {
         "modular": "功能模块",
@@ -2783,6 +2790,74 @@
     },
     "error": {
       "over_refund": "退款金额超过可退余额"
-    }
+    },
+    "subtotal": "税前金额",
+    "tax": "税金"
+  },
+  "chain_entry": {
+    "original_order": "原始订单",
+    "hash_info": "完整性信息",
+    "prev_hash": "前一哈希",
+    "curr_hash": "当前哈希",
+    "order_not_in_view": "该订单不在当前视图中"
+  },
+  "anulacion": {
+    "title": "作废",
+    "status": {
+      "anulada": "已作废"
+    },
+    "original_invoice": "原始发票",
+    "details": "作废详情",
+    "serie": "系列号",
+    "reason_label": "作废原因",
+    "reason": {
+      "TEST_ORDER": "测试订单",
+      "WRONG_CUSTOMER": "客户信息错误",
+      "DUPLICATE": "重复开票",
+      "OTHER": "其他"
+    },
+    "aeat_status_label": "AEAT 状态",
+    "huella": "数字指纹 (Huella)",
+    "action": {
+      "void": "作废发票"
+    },
+    "modal": {
+      "title": "作废发票",
+      "warning": "此操作将作废该订单的发票，不可撤销。作废后该订单将标记为已作废状态。",
+      "ineligible": "该订单不符合作废条件",
+      "note": "备注（可选）",
+      "note_placeholder": "输入备注信息...",
+      "confirm": "确认作废"
+    },
+    "created": "发票已成功作废"
+  },
+  "upgrade": {
+    "title": "发票升级",
+    "status": {
+      "upgraded": "已升级"
+    },
+    "original_invoice": "原始发票",
+    "customer_info": "客户信息",
+    "invoice_details": "发票详情",
+    "field": {
+      "nombre": "公司/客户名称",
+      "nombre_placeholder": "输入公司或客户名称",
+      "address": "地址",
+      "address_placeholder": "输入地址",
+      "email": "邮箱",
+      "phone": "电话",
+      "serie": "系列号",
+      "subtotal": "税前金额",
+      "tax": "税额"
+    },
+    "action": {
+      "upgrade": "升级发票"
+    },
+    "modal": {
+      "title": "升级为完整发票 (F3)",
+      "description": "输入客户信息，将简化发票 (F2) 升级为完整发票 (F3 Sustitutiva)。",
+      "submit": "确认升级"
+    },
+    "success": "发票已成功升级为 F3"
   }
 }

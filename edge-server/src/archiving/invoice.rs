@@ -38,6 +38,22 @@ impl InvoiceService {
         }
     }
 
+    pub fn tz(&self) -> chrono_tz::Tz {
+        self.tz
+    }
+
+    pub fn serie(&self) -> &str {
+        &self.serie
+    }
+
+    pub fn nif(&self) -> &str {
+        &self.nif
+    }
+
+    pub fn nombre_razon(&self) -> &str {
+        &self.nombre_razon
+    }
+
     /// Create an F2 invoice for a completed order.
     ///
     /// Returns `Ok(None)` if total <= 0 (comped orders skip invoicing).
@@ -107,6 +123,13 @@ impl InvoiceService {
             nombre_razon: self.nombre_razon.clone(),
             factura_rectificada_id: None,
             factura_rectificada_num: None,
+            factura_sustituida_id: None,
+            factura_sustituida_num: None,
+            customer_nif: None,
+            customer_nombre: None,
+            customer_address: None,
+            customer_email: None,
+            customer_phone: None,
             cloud_synced: false,
             aeat_status: AeatStatus::Pending,
             created_at: now,
@@ -227,6 +250,13 @@ impl InvoiceService {
             nombre_razon: self.nombre_razon.clone(),
             factura_rectificada_id: rectificada_id,
             factura_rectificada_num: rectificada_num,
+            factura_sustituida_id: None,
+            factura_sustituida_num: None,
+            customer_nif: None,
+            customer_nombre: None,
+            customer_address: None,
+            customer_email: None,
+            customer_phone: None,
             cloud_synced: false,
             aeat_status: AeatStatus::Pending,
             created_at: now,

@@ -91,7 +91,7 @@ async fn do_full_sync(
                     .broadcast_sync(
                         shared::cloud::SyncResource::Category,
                         SyncChangeType::Created,
-                        &c.id.to_string(),
+                        c.id,
                         Some(&c),
                         true,
                     )
@@ -154,7 +154,7 @@ async fn do_full_sync(
                     .broadcast_sync(
                         shared::cloud::SyncResource::Product,
                         SyncChangeType::Created,
-                        &p.id.to_string(),
+                        p.id,
                         Some(&p),
                         true,
                     )

@@ -68,7 +68,7 @@ impl EventApplier for ItemSplitApplier {
                 .collect();
 
             let payment = PaymentRecord {
-                payment_id: payment_id.clone(),
+                payment_id: *payment_id,
                 method: payment_method.clone(),
                 amount: *split_amount,
                 tendered: *tendered,
@@ -132,7 +132,7 @@ impl EventApplier for AmountSplitApplier {
             snapshot.has_amount_split = true;
 
             let payment = PaymentRecord {
-                payment_id: payment_id.clone(),
+                payment_id: *payment_id,
                 method: payment_method.clone(),
                 amount: *split_amount,
                 tendered: *tendered,
@@ -202,7 +202,7 @@ impl EventApplier for AaSplitPaidApplier {
             snapshot.aa_paid_shares += shares;
 
             let payment = PaymentRecord {
-                payment_id: payment_id.clone(),
+                payment_id: *payment_id,
                 method: payment_method.clone(),
                 amount: *amount,
                 tendered: *tendered,
@@ -251,8 +251,8 @@ mod tests {
     use super::*;
     use shared::order::{CartItemSnapshot, OrderEventType, OrderStatus, SplitItem};
 
-    fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_test_snapshot(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
@@ -323,19 +323,19 @@ mod tests {
 
     #[test]
     fn test_item_split_updates_paid_quantities() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert!(snapshot.paid_item_quantities.is_empty());
 
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemSplit,
             EventPayload::ItemSplit {
-                payment_id: uuid::Uuid::new_v4().to_string(),
+                payment_id: shared::util::snowflake_id(),
                 split_amount: 20.0,
                 payment_method: "CASH".to_string(),
                 items: vec![SplitItem {
@@ -360,18 +360,18 @@ mod tests {
 
     #[test]
     fn test_item_split_creates_payment_with_note() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
 
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::ItemSplit,
             EventPayload::ItemSplit {
-                payment_id: "pay-1".to_string(),
+                payment_id: 4001,
                 split_amount: 28.0,
                 payment_method: "CARD".to_string(),
                 items: vec![
@@ -405,20 +405,20 @@ mod tests {
 
     #[test]
     fn test_amount_split_updates_paid_amount() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert_eq!(snapshot.paid_amount, 0.0);
         assert!(!snapshot.has_amount_split);
 
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::AmountSplit,
             EventPayload::AmountSplit {
-                payment_id: "pay-1".to_string(),
+                payment_id: 4001,
                 split_amount: 20.0,
                 payment_method: "CASH".to_string(),
                 tendered: None,
@@ -443,15 +443,15 @@ mod tests {
 
     #[test]
     fn test_aa_split_started_locks_shares() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert!(snapshot.aa_total_shares.is_none());
 
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::AaSplitStarted,
             EventPayload::AaSplitStarted {
@@ -474,19 +474,19 @@ mod tests {
 
     #[test]
     fn test_aa_split_paid_creates_payment() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.aa_total_shares = Some(3);
 
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::AaSplitPaid,
             EventPayload::AaSplitPaid {
-                payment_id: "pay-1".to_string(),
+                payment_id: 4001,
                 shares: 1,
                 amount: 15.33,
                 payment_method: "CASH".to_string(),
@@ -511,16 +511,16 @@ mod tests {
 
     #[test]
     fn test_aa_split_cancelled_unlocks() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.aa_total_shares = Some(3);
         snapshot.aa_paid_shares = 0;
 
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::AaSplitCancelled,
             EventPayload::AaSplitCancelled { total_shares: 3 },

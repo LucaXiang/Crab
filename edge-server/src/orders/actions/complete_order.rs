@@ -13,7 +13,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, Payme
 /// CompleteOrder action
 #[derive(Debug, Clone)]
 pub struct CompleteOrderAction {
-    pub order_id: String,
+    pub order_id: i64,
     /// 服务类型（零售订单结单时确认：堂食/外带）
     pub service_type: Option<ServiceType>,
 }
@@ -25,16 +25,16 @@ impl CommandHandler for CompleteOrderAction {
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 1. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 2. Validate order status (must be Active)
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -84,10 +84,10 @@ impl CommandHandler for CompleteOrderAction {
         // 7. Create event (receipt_number from snapshot, set at OpenTable)
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
@@ -112,7 +112,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -121,7 +121,7 @@ mod tests {
 
     fn create_payment_record(method: &str, amount: f64) -> PaymentRecord {
         PaymentRecord {
-            payment_id: format!("pay-{}", uuid::Uuid::new_v4()),
+            payment_id: shared::util::snowflake_id(),
             method: method.to_string(),
             amount,
             tendered: None,
@@ -137,8 +137,8 @@ mod tests {
     }
 
     /// Helper: create an active order snapshot with receipt_number set
-    fn create_active_snapshot(order_id: &str, receipt_number: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_active_snapshot(order_id: i64, receipt_number: &str) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.receipt_number = receipt_number.to_string();
         snapshot
@@ -149,7 +149,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-001");
+        let mut snapshot = create_active_snapshot(1001, "RCP-001");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 100.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -158,7 +158,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -167,7 +167,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::OrderCompleted);
 
         if let EventPayload::OrderCompleted {
@@ -193,7 +193,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-002");
+        let mut snapshot = create_active_snapshot(1001, "RCP-002");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 50.0));
         snapshot.payments.push(create_payment_record("CARD", 30.0));
@@ -204,7 +204,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -238,7 +238,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-003");
+        let mut snapshot = create_active_snapshot(1001, "RCP-003");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 100.0));
         let mut cancelled_payment = create_payment_record("CARD", 50.0);
@@ -250,7 +250,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -274,7 +274,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-004");
+        let mut snapshot = create_active_snapshot(1001, "RCP-004");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -283,7 +283,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -301,7 +301,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-005");
+        let mut snapshot = create_active_snapshot(1001, "RCP-005");
         snapshot.total = 100.0;
         snapshot
             .payments
@@ -312,7 +312,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -326,7 +326,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.receipt_number = "RCP-006".to_string();
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -335,7 +335,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -349,7 +349,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         snapshot.receipt_number = "RCP-007".to_string();
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -358,7 +358,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -376,7 +376,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -390,7 +390,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-009");
+        let mut snapshot = create_active_snapshot(1001, "RCP-009");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 150.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -399,7 +399,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -425,7 +425,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-010");
+        let mut snapshot = create_active_snapshot(1001, "RCP-010");
         snapshot.total = 0.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -433,7 +433,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -456,7 +456,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-011");
+        let mut snapshot = create_active_snapshot(1001, "RCP-011");
         snapshot.total = 50.0;
         snapshot.payments.push(create_payment_record("CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -465,7 +465,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::DineIn),
         };
 
@@ -485,7 +485,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_snapshot("order-1", "RCP-012");
+        let mut snapshot = create_active_snapshot(1001, "RCP-012");
         snapshot.total = 30.0;
         snapshot.payments.push(create_payment_record("CARD", 30.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -494,7 +494,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = CompleteOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             service_type: Some(ServiceType::Takeout),
         };
 

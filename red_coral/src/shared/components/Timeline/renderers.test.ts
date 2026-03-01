@@ -19,13 +19,13 @@ const mockT = (key: string, params?: Record<string, string | number>): string =>
 
 // Helper to create properly typed mock OrderEvent
 const createMockEvent = (event_type: string, payload: EventPayload, overrides?: Partial<OrderEvent>): OrderEvent => ({
-  event_id: `evt-${event_type}`,
+  event_id: 1001,
   sequence: 1,
-  order_id: 'order-test-1',
+  order_id: 2001,
   timestamp: Date.now(),
   operator_id: 1,
   operator_name: 'Test Operator',
-  command_id: 'cmd-1',
+  command_id: 3001,
   event_type: event_type as OrderEvent['event_type'],
   payload,
   ...overrides,
@@ -58,7 +58,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         }),
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payment_id: 'pay-1',
+          payment_id: 4001,
           method: 'cash',
           amount: 1000,
           tendered: null,
@@ -127,7 +127,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         }),
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payment_id: 'pay-1',
+          payment_id: 4001,
           method: 'cash',
           amount: 1000,
           tendered: null,
@@ -158,7 +158,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
     it('should handle missing optional fields', () => {
       const event = createMockEvent('PAYMENT_ADDED', {
         type: 'PAYMENT_ADDED',
-        payment_id: 'pay-1',
+        payment_id: 4001,
         method: 'cash',
         amount: 1000,
         tendered: null,
@@ -192,7 +192,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
       const events: OrderEvent[] = [
         createMockEvent('TABLE_OPENED', { type: 'TABLE_OPENED', table_id: 1, table_name: 'T1', zone_id: 1, zone_name: 'Z', guest_count: 2, is_retail: false, receipt_number: 'RCP-TEST' }),
         createMockEvent('ITEMS_ADDED', { type: 'ITEMS_ADDED', items: [] }),
-        createMockEvent('PAYMENT_ADDED', { type: 'PAYMENT_ADDED', payment_id: 'p1', method: 'cash', amount: 100, tendered: null, change: null, note: null }),
+        createMockEvent('PAYMENT_ADDED', { type: 'PAYMENT_ADDED', payment_id: 4002, method: 'cash', amount: 100, tendered: null, change: null, note: null }),
         createMockEvent('ORDER_COMPLETED', { type: 'ORDER_COMPLETED', final_total: 100, receipt_number: 'R1', payment_summary: [], service_type: 'DINE_IN' }),
         createMockEvent('ORDER_VOIDED', { type: 'ORDER_VOIDED', void_type: 'CANCELLED', loss_reason: null, loss_amount: null, note: null }),
       ];

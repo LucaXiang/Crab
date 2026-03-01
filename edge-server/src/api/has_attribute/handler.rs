@@ -105,7 +105,6 @@ pub async fn create(
     );
 
     // Refresh product cache and broadcast sync (attribute bindings changed)
-    let product_id_str = payload.product_id.to_string();
     match state
         .catalog_service
         .refresh_product_cache(payload.product_id)
@@ -117,7 +116,7 @@ pub async fn create(
                 .broadcast_sync(
                     SyncResource::Product,
                     SyncChangeType::Updated,
-                    &product_id_str,
+                    payload.product_id,
                     product.as_ref(),
                     false,
                 )
@@ -205,12 +204,11 @@ pub async fn update(
             );
         }
         let product = state.catalog_service.get_product(binding.owner_id);
-        let owner_id_str = binding.owner_id.to_string();
         state
             .broadcast_sync(
                 SyncResource::Product,
                 SyncChangeType::Updated,
-                &owner_id_str,
+                binding.owner_id,
                 product.as_ref(),
                 false,
             )
@@ -269,12 +267,11 @@ pub async fn delete(
             tracing::warn!("Failed to refresh product cache for {}: {}", oid, e);
         }
         let product = state.catalog_service.get_product(oid);
-        let oid_str = oid.to_string();
         state
             .broadcast_sync(
                 SyncResource::Product,
                 SyncChangeType::Updated,
-                &oid_str,
+                oid,
                 product.as_ref(),
                 false,
             )

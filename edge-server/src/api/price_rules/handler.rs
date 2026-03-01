@@ -172,7 +172,13 @@ pub async fn create(
     );
 
     state
-        .broadcast_sync(RESOURCE, SyncChangeType::Created, &id, Some(&rule), false)
+        .broadcast_sync(
+            RESOURCE,
+            SyncChangeType::Created,
+            rule.id,
+            Some(&rule),
+            false,
+        )
         .await;
 
     Ok(Json(rule))
@@ -222,13 +228,7 @@ pub async fn update(
     );
 
     state
-        .broadcast_sync(
-            RESOURCE,
-            SyncChangeType::Updated,
-            &id_str,
-            Some(&rule),
-            false,
-        )
+        .broadcast_sync(RESOURCE, SyncChangeType::Updated, id, Some(&rule), false)
         .await;
 
     Ok(Json(rule))
@@ -262,7 +262,7 @@ pub async fn delete(
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, &id_str, None, false)
+            .broadcast_sync::<()>(RESOURCE, SyncChangeType::Deleted, id, None, false)
             .await;
     }
 

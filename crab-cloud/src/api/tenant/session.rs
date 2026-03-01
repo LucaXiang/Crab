@@ -30,8 +30,7 @@ pub async fn list_sessions(
         .extensions
         .get::<crate::auth::tenant_auth::TenantIdentity>()
         .ok_or_else(|| AppError::new(ErrorCode::TokenExpired))?
-        .tenant_id
-        .clone();
+        .tenant_id;
 
     // Get current token from Authorization header to mark current session
     let current_token = parts
@@ -41,7 +40,7 @@ pub async fn list_sessions(
         .and_then(|v| v.strip_prefix("Bearer "))
         .unwrap_or("");
 
-    let rows = refresh_tokens::list_active(&state.pool, &tenant_id)
+    let rows = refresh_tokens::list_active(&state.pool, tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Failed to list sessions: {e}");
@@ -82,10 +81,9 @@ pub async fn revoke_session(
         .extensions
         .get::<crate::auth::tenant_auth::TenantIdentity>()
         .ok_or_else(|| AppError::new(ErrorCode::TokenExpired))?
-        .tenant_id
-        .clone();
+        .tenant_id;
 
-    let revoked = refresh_tokens::revoke_session(&state.pool, &tenant_id, &req.session_id)
+    let revoked = refresh_tokens::revoke_session(&state.pool, tenant_id, &req.session_id)
         .await
         .map_err(|e| {
             tracing::error!("Failed to revoke session: {e}");

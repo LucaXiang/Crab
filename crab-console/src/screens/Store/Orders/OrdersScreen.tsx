@@ -503,7 +503,7 @@ const CreditNoteDetailView: React.FC<{
           {/* Jump to original order */}
           <button
             type="button"
-            onClick={() => onJumpToOrder(detail.original_order_key, detail.original_receipt)}
+            onClick={() => onJumpToOrder(String(detail.original_order_id), detail.original_receipt)}
             className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -536,22 +536,21 @@ const CreditNoteDetailView: React.FC<{
         </div>
 
         {/* Items card */}
-        {detail.detail && detail.detail.items.length > 0 && (
+        {detail.items && detail.items.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 font-bold text-slate-700">
               <Receipt className="w-[18px] h-[18px]" />
               <span>{t('orders.refund_items')}</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {detail.detail.items.map((item, i) => (
+              {detail.items.map((item, i) => (
                 <div key={i} className="px-4 py-3 flex justify-between items-center">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm shrink-0">
                       x{item.quantity}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium text-slate-800">{item.name}</span>
-                      {item.spec_name && <span className="text-xs text-slate-500 ml-1">({item.spec_name})</span>}
+                      <span className="font-medium text-slate-800">{item.item_name}</span>
                       <div className="text-xs text-slate-400">{item.tax_rate}% · {formatCurrency(item.unit_price)}</div>
                     </div>
                   </div>
@@ -599,7 +598,7 @@ const MobileCreditNoteDetail: React.FC<{
       {/* Jump to original order */}
       <button
         type="button"
-        onClick={() => onJumpToOrder(detail.original_order_key, detail.original_receipt)}
+        onClick={() => onJumpToOrder(String(detail.original_order_id), detail.original_receipt)}
         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100 transition-colors cursor-pointer border border-primary-100"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -615,16 +614,15 @@ const MobileCreditNoteDetail: React.FC<{
       </div>
 
       {/* Items */}
-      {detail.detail && detail.detail.items.length > 0 && (
+      {detail.items && detail.items.length > 0 && (
         <div className="border-t border-slate-100 pt-3">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('orders.refund_items')}</h3>
           <div className="space-y-2">
-            {detail.detail.items.map((item, i) => (
+            {detail.items.map((item, i) => (
               <div key={i} className="flex items-start justify-between text-sm gap-2">
                 <div className="flex-1 min-w-0">
                   <span className="font-medium text-slate-900">{item.quantity}x</span>
-                  <span className="text-slate-800 ml-1">{item.name}</span>
-                  {item.spec_name && <span className="text-xs text-slate-500 ml-1">({item.spec_name})</span>}
+                  <span className="text-slate-800 ml-1">{item.item_name}</span>
                 </div>
                 <span className="text-red-500 font-medium shrink-0">-{formatCurrency(item.line_credit)}</span>
               </div>

@@ -7,12 +7,7 @@ use sqlx::PgPool;
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Register an image hash on upload (idempotent). Does NOT increment ref_count.
-pub async fn register(
-    pool: &PgPool,
-    tenant_id: &str,
-    hash: &str,
-    now: i64,
-) -> Result<(), BoxError> {
+pub async fn register(pool: &PgPool, tenant_id: i64, hash: &str, now: i64) -> Result<(), BoxError> {
     sqlx::query(
         r#"
         INSERT INTO tenant_images (tenant_id, hash, ref_count, created_at)
@@ -30,7 +25,7 @@ pub async fn register(
 
 /// Increment ref_count for a hash (product created/updated with this image).
 /// Also clears orphaned_at if it was previously marked.
-pub async fn increment_ref(pool: &PgPool, tenant_id: &str, hash: &str) -> Result<(), BoxError> {
+pub async fn increment_ref(pool: &PgPool, tenant_id: i64, hash: &str) -> Result<(), BoxError> {
     sqlx::query(
         r#"
         UPDATE tenant_images
@@ -48,7 +43,7 @@ pub async fn increment_ref(pool: &PgPool, tenant_id: &str, hash: &str) -> Result
 /// Decrement ref_count for a hash. If it reaches 0, mark as orphaned.
 pub async fn decrement_ref(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     hash: &str,
     now: i64,
 ) -> Result<(), BoxError> {
@@ -74,8 +69,8 @@ pub async fn fetch_orphans(
     pool: &PgPool,
     cutoff: i64,
     limit: i32,
-) -> Result<Vec<(String, String)>, BoxError> {
-    let rows: Vec<(String, String)> = sqlx::query_as(
+) -> Result<Vec<(i64, String)>, BoxError> {
+    let rows: Vec<(i64, String)> = sqlx::query_as(
         r#"
         SELECT tenant_id, hash FROM tenant_images
         WHERE orphaned_at IS NOT NULL AND orphaned_at < $1
@@ -90,7 +85,7 @@ pub async fn fetch_orphans(
 }
 
 /// Delete image records after S3 cleanup.
-pub async fn delete_records(pool: &PgPool, tenant_id: &str, hash: &str) -> Result<(), BoxError> {
+pub async fn delete_records(pool: &PgPool, tenant_id: i64, hash: &str) -> Result<(), BoxError> {
     sqlx::query("DELETE FROM tenant_images WHERE tenant_id = $1 AND hash = $2")
         .bind(tenant_id)
         .bind(hash)
@@ -101,10 +96,7 @@ pub async fn delete_records(pool: &PgPool, tenant_id: &str, hash: &str) -> Resul
 
 /// Delete all image records for a tenant (for tenant data purge).
 /// Returns the hashes that were deleted (for S3 cleanup).
-pub async fn delete_all_for_tenant(
-    pool: &PgPool,
-    tenant_id: &str,
-) -> Result<Vec<String>, BoxError> {
+pub async fn delete_all_for_tenant(pool: &PgPool, tenant_id: i64) -> Result<Vec<String>, BoxError> {
     let hashes: Vec<String> =
         sqlx::query_scalar("DELETE FROM tenant_images WHERE tenant_id = $1 RETURNING hash")
             .bind(tenant_id)

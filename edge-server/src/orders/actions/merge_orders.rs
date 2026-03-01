@@ -16,8 +16,8 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// MergeOrders action
 #[derive(Debug, Clone)]
 pub struct MergeOrdersAction {
-    pub source_order_id: String,
-    pub target_order_id: String,
+    pub source_order_id: i64,
+    pub target_order_id: i64,
     pub authorizer_id: Option<i64>,
     pub authorizer_name: Option<String>,
 }
@@ -32,18 +32,16 @@ impl CommandHandler for MergeOrdersAction {
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 2. Load source snapshot
-        let source_snapshot = ctx.load_snapshot(&self.source_order_id)?;
+        let source_snapshot = ctx.load_snapshot(self.source_order_id)?;
 
         // 2. Validate source order status - must be Active
         match source_snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(
-                    self.source_order_id.clone(),
-                ));
+                return Err(OrderError::OrderAlreadyCompleted(self.source_order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.source_order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.source_order_id));
             }
             OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(
@@ -54,18 +52,16 @@ impl CommandHandler for MergeOrdersAction {
         }
 
         // 3. Load target snapshot
-        let target_snapshot = ctx.load_snapshot(&self.target_order_id)?;
+        let target_snapshot = ctx.load_snapshot(self.target_order_id)?;
 
         // 4. Validate target order status - must be Active
         match target_snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(
-                    self.target_order_id.clone(),
-                ));
+                return Err(OrderError::OrderAlreadyCompleted(self.target_order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.target_order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.target_order_id));
             }
             OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(
@@ -132,10 +128,10 @@ impl CommandHandler for MergeOrdersAction {
         // 11. Create OrderMergedOut event for source order
         let event1 = OrderEvent::new(
             seq1,
-            self.source_order_id.clone(),
+            self.source_order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderMergedOut,
             EventPayload::OrderMergedOut {
@@ -150,10 +146,10 @@ impl CommandHandler for MergeOrdersAction {
         // 12. Create OrderMerged event for target order (includes source items)
         let event2 = OrderEvent::new(
             seq2,
-            self.target_order_id.clone(),
+            self.target_order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderMerged,
             EventPayload::OrderMerged {
@@ -184,15 +180,15 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
     }
 
-    fn create_active_order(order_id: &str, table_id: i64, table_name: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_active_order(order_id: i64, table_id: i64, table_name: &str) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(table_id);
         snapshot.table_name = Some(table_name.to_string());
@@ -235,8 +231,8 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create source and target orders
-        let source = create_active_order("source-1", 1, "Table 1");
-        let target = create_active_order("target-1", 2, "Table 2");
+        let source = create_active_order(1001, 1, "Table 1");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -244,8 +240,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -256,7 +252,7 @@ mod tests {
         assert_eq!(events.len(), 2);
 
         // First event: OrderMergedOut for source
-        assert_eq!(events[0].order_id, "source-1");
+        assert_eq!(events[0].order_id, 1001);
         assert_eq!(events[0].event_type, OrderEventType::OrderMergedOut);
         if let EventPayload::OrderMergedOut {
             target_table_id,
@@ -271,7 +267,7 @@ mod tests {
         }
 
         // Second event: OrderMerged for target
-        assert_eq!(events[1].order_id, "target-1");
+        assert_eq!(events[1].order_id, 2001);
         assert_eq!(events[1].event_type, OrderEventType::OrderMerged);
         if let EventPayload::OrderMerged {
             source_table_id,
@@ -297,11 +293,11 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", 1, "Table 1");
+        let mut source = create_active_order(1001, 1, "Table 1");
         source.items.push(create_test_item("item-1", "Coffee"));
         source.items.push(create_test_item("item-2", "Tea"));
 
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -309,8 +305,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -343,15 +339,15 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &target).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "nonexistent".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 9999,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -367,15 +363,15 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
+        let source = create_active_order(1001, 1, "Table 1");
         storage.store_snapshot(&txn, &source).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "nonexistent".to_string(),
+            source_order_id: 1001,
+            target_order_id: 9999,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -391,9 +387,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = OrderSnapshot::new("source-1".to_string());
+        let mut source = OrderSnapshot::new(1001);
         source.status = OrderStatus::Completed;
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -401,8 +397,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -418,9 +414,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = OrderSnapshot::new("source-1".to_string());
+        let mut source = OrderSnapshot::new(1001);
         source.status = OrderStatus::Void;
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -428,8 +424,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -445,9 +441,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = OrderSnapshot::new("source-1".to_string());
+        let mut source = OrderSnapshot::new(1001);
         source.status = OrderStatus::Merged;
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -455,8 +451,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -472,8 +468,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
-        let mut target = OrderSnapshot::new("target-1".to_string());
+        let source = create_active_order(1001, 1, "Table 1");
+        let mut target = OrderSnapshot::new(2001);
         target.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
@@ -482,8 +478,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -499,8 +495,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
-        let mut target = OrderSnapshot::new("target-1".to_string());
+        let source = create_active_order(1001, 1, "Table 1");
+        let mut target = OrderSnapshot::new(2001);
         target.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
@@ -509,8 +505,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -526,15 +522,15 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let order = create_active_order("order-1", 1, "Table 1");
+        let order = create_active_order(3001, 1, "Table 1");
         storage.store_snapshot(&txn, &order).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "order-1".to_string(),
-            target_order_id: "order-1".to_string(),
+            source_order_id: 3001,
+            target_order_id: 3001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -550,8 +546,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
-        let target = create_active_order("target-1", 2, "Table 2");
+        let source = create_active_order(1001, 1, "Table 1");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -559,8 +555,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -578,8 +574,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
-        let target = create_active_order("target-1", 2, "Table 2");
+        let source = create_active_order(1001, 1, "Table 1");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -587,14 +583,14 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
 
         let metadata = CommandMetadata {
-            command_id: "test-cmd-123".to_string(),
+            command_id: 123,
             operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
@@ -604,7 +600,7 @@ mod tests {
 
         // Both events should have same metadata
         for event in &events {
-            assert_eq!(event.command_id, "test-cmd-123");
+            assert_eq!(event.command_id, 123);
             assert_eq!(event.operator_id, 456);
             assert_eq!(event.operator_name, "John Doe");
         }
@@ -615,11 +611,11 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = OrderSnapshot::new("source-1".to_string());
+        let mut source = OrderSnapshot::new(1001);
         source.status = OrderStatus::Active;
         // No table info
 
-        let mut target = OrderSnapshot::new("target-1".to_string());
+        let mut target = OrderSnapshot::new(2001);
         target.status = OrderStatus::Active;
         // No table info
 
@@ -630,8 +626,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -674,9 +670,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", 1, "Table 1");
+        let mut source = create_active_order(1001, 1, "Table 1");
         source.paid_amount = 5.0;
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -684,8 +680,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -701,8 +697,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
-        let mut target = create_active_order("target-1", 2, "Table 2");
+        let source = create_active_order(1001, 1, "Table 1");
+        let mut target = create_active_order(2001, 2, "Table 2");
         target.paid_amount = 15.0;
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
@@ -711,8 +707,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -728,9 +724,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", 1, "Table 1");
+        let mut source = create_active_order(1001, 1, "Table 1");
         source.aa_total_shares = Some(3);
-        let target = create_active_order("target-1", 2, "Table 2");
+        let target = create_active_order(2001, 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -738,8 +734,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -756,8 +752,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", 1, "Table 1");
-        let mut target = create_active_order("target-1", 2, "Table 2");
+        let source = create_active_order(1001, 1, "Table 1");
+        let mut target = create_active_order(2001, 2, "Table 2");
         target.aa_total_shares = Some(2);
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
@@ -766,8 +762,8 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MergeOrdersAction {
-            source_order_id: "source-1".to_string(),
-            target_order_id: "target-1".to_string(),
+            source_order_id: 1001,
+            target_order_id: 2001,
             authorizer_id: None,
             authorizer_name: None,
         };

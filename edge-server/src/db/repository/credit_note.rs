@@ -4,19 +4,21 @@
 
 use super::{RepoError, RepoResult};
 use shared::models::{CreditNote, CreditNoteDetail, CreditNoteItem};
+use shared::util::snowflake_id;
 use sqlx::SqlitePool;
 
 /// Insert a credit note (header only). Returns the inserted row.
 pub async fn create(pool: &SqlitePool, cn: &CreditNote) -> RepoResult<CreditNote> {
-    let id = sqlx::query_scalar::<_, i64>(
+    let id = snowflake_id();
+    sqlx::query(
         "INSERT INTO credit_note \
-         (credit_note_number, original_order_pk, original_receipt, \
+         (id, credit_note_number, original_order_pk, original_receipt, \
           subtotal_credit, tax_credit, total_credit, refund_method, \
           reason, note, operator_id, operator_name, \
           authorizer_id, authorizer_name, shift_id, cloud_synced, created_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16) \
-         RETURNING id",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
     )
+    .bind(id)
     .bind(&cn.credit_note_number)
     .bind(cn.original_order_pk)
     .bind(&cn.original_receipt)
@@ -33,7 +35,7 @@ pub async fn create(pool: &SqlitePool, cn: &CreditNote) -> RepoResult<CreditNote
     .bind(cn.shift_id)
     .bind(cn.cloud_synced)
     .bind(cn.created_at)
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
 
     get_by_id(pool, id)
@@ -43,12 +45,14 @@ pub async fn create(pool: &SqlitePool, cn: &CreditNote) -> RepoResult<CreditNote
 
 /// Insert a credit note item row.
 pub async fn create_item(pool: &SqlitePool, item: &CreditNoteItem) -> RepoResult<()> {
+    let item_id = snowflake_id();
     sqlx::query(
         "INSERT INTO credit_note_item \
-         (credit_note_id, original_instance_id, item_name, quantity, \
+         (id, credit_note_id, original_instance_id, item_name, quantity, \
           unit_price, line_credit, tax_rate, tax_credit) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
     )
+    .bind(item_id)
     .bind(item.credit_note_id)
     .bind(&item.original_instance_id)
     .bind(&item.item_name)
@@ -125,6 +129,37 @@ pub async fn get_total_refunded(pool: &SqlitePool, order_pk: i64) -> RepoResult<
     Ok(total)
 }
 
+/// Get per-item refunded quantities for an order.
+pub async fn get_refunded_items(
+    pool: &SqlitePool,
+    order_pk: i64,
+) -> RepoResult<Vec<shared::models::RefundedItemInfo>> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        original_instance_id: String,
+        total_qty: i64,
+    }
+
+    let rows = sqlx::query_as::<_, Row>(
+        "SELECT ci.original_instance_id, SUM(ci.quantity) AS total_qty \
+         FROM credit_note_item ci \
+         JOIN credit_note cn ON cn.id = ci.credit_note_id \
+         WHERE cn.original_order_pk = ? \
+         GROUP BY ci.original_instance_id",
+    )
+    .bind(order_pk)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| shared::models::RefundedItemInfo {
+            instance_id: r.original_instance_id,
+            refunded_quantity: r.total_qty,
+        })
+        .collect())
+}
+
 /// Mark a credit note as synced to cloud.
 pub async fn mark_synced(pool: &SqlitePool, id: i64) -> RepoResult<()> {
     sqlx::query("UPDATE credit_note SET cloud_synced = 1 WHERE id = ?")
@@ -167,7 +202,7 @@ pub async fn build_sync(
 ) -> RepoResult<shared::cloud::CreditNoteSync> {
     use shared::cloud::{CreditNoteItemSync, CreditNoteSync};
 
-    // Join credit_note with archived_order (for order_key) and chain_entry (for hashes)
+    // Join credit_note with archived_order (for order_id) and chain_entry (for hashes)
     #[derive(sqlx::FromRow)]
     struct CnRow {
         credit_note_number: String,
@@ -181,7 +216,7 @@ pub async fn build_sync(
         operator_name: String,
         authorizer_name: Option<String>,
         created_at: i64,
-        order_key: String,
+        order_id: i64,
         prev_hash: String,
         curr_hash: String,
     }
@@ -191,7 +226,7 @@ pub async fn build_sync(
          cn.subtotal_credit, cn.tax_credit, cn.total_credit, \
          cn.refund_method, cn.reason, cn.note, \
          cn.operator_name, cn.authorizer_name, cn.created_at, \
-         ao.order_key, \
+         ao.order_id, \
          ce.prev_hash, ce.curr_hash \
          FROM credit_note cn \
          JOIN archived_order ao ON ao.id = cn.original_order_pk \
@@ -215,7 +250,7 @@ pub async fn build_sync(
 
     Ok(CreditNoteSync {
         credit_note_number: row.credit_note_number,
-        original_order_key: row.order_key,
+        original_order_id: row.order_id,
         original_receipt: row.original_receipt,
         subtotal_credit: row.subtotal_credit,
         tax_credit: row.tax_credit,

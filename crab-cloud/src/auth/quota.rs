@@ -27,7 +27,7 @@ struct QuotaCacheEntry {
 /// Quota cache shared across requests
 #[derive(Clone)]
 pub struct QuotaCache {
-    entries: Arc<RwLock<HashMap<String, QuotaCacheEntry>>>,
+    entries: Arc<RwLock<HashMap<i64, QuotaCacheEntry>>>,
 }
 
 impl QuotaCache {
@@ -54,19 +54,22 @@ pub async fn quota_middleware(
         .cloned()
         .ok_or_else(|| AppError::new(ErrorCode::InternalError).into_response())?;
 
-    let cache_key = identity.tenant_id.clone();
+    let cache_key = identity.tenant_id;
 
-    // Check cache
-    {
+    // Check cache (extract result before dropping read lock)
+    let cached_result = {
         let entries = state.quota_cache.entries.read().await;
-        if let Some(entry) = entries.get(&cache_key)
-            && entry.expires_at > Instant::now()
-        {
-            if let Some(code) = entry.error {
-                return Err(AppError::new(code).into_response());
-            }
-            return Ok(next.run(request).await);
+        entries
+            .get(&cache_key)
+            .filter(|e| e.expires_at > Instant::now())
+            .map(|e| e.error)
+    };
+
+    if let Some(maybe_err) = cached_result {
+        if let Some(code) = maybe_err {
+            return Err(AppError::new(code).into_response());
         }
+        return Ok(next.run(request).await);
     }
 
     // Query DB
@@ -96,7 +99,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
     // Check tenant status
     let tenant_status: Option<(String,)> =
         match sqlx::query_as("SELECT status FROM tenants WHERE id = $1")
-            .bind(&identity.tenant_id)
+            .bind(identity.tenant_id)
             .fetch_optional(pool)
             .await
         {
@@ -120,7 +123,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
     let sub: Option<(i32,)> = match sqlx::query_as(
         "SELECT max_stores FROM subscriptions WHERE tenant_id = $1 AND status = 'active'",
     )
-    .bind(&identity.tenant_id)
+    .bind(identity.tenant_id)
     .fetch_optional(pool)
     .await
     {
@@ -138,7 +141,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
     // Count current edge servers
     let (current_count,): (i64,) =
         match sqlx::query_as("SELECT COUNT(*) FROM stores WHERE tenant_id = $1")
-            .bind(&identity.tenant_id)
+            .bind(identity.tenant_id)
             .fetch_one(pool)
             .await
         {
@@ -154,7 +157,7 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
         "SELECT COUNT(*) FROM stores WHERE entity_id = $1 AND tenant_id = $2",
     )
     .bind(&identity.entity_id)
-    .bind(&identity.tenant_id)
+    .bind(identity.tenant_id)
     .fetch_one(pool)
     .await
     {

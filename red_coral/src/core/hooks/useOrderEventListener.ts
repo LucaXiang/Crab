@@ -164,8 +164,8 @@ const RETRY_BASE_DELAY = 1000;
  * ```
  */
 export function useOrderTimelineSync() {
-  const syncingRef = useRef<Set<string>>(new Set());
-  const retryCountRef = useRef<Map<string, number>>(new Map());
+  const syncingRef = useRef<Set<number>>(new Set());
+  const retryCountRef = useRef<Map<number, number>>(new Map());
   const mountedRef = useRef(true);
 
   // 使用 useShallow 防止 Array.from 创建的新数组导致无限重渲染
@@ -176,7 +176,7 @@ export function useOrderTimelineSync() {
   useEffect(() => {
     mountedRef.current = true;
 
-    const syncTimeline = async (orderId: string) => {
+    const syncTimeline = async (orderId: number) => {
       // 防止重复同步
       if (syncingRef.current.has(orderId)) return;
       syncingRef.current.add(orderId);

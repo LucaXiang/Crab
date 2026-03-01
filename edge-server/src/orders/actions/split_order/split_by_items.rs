@@ -12,7 +12,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct SplitByItemsAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub payment_method: String,
     pub items: Vec<SplitItem>,
     pub tendered: Option<f64>,
@@ -24,8 +24,8 @@ impl CommandHandler for SplitByItemsAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
-        validate_active_order(&snapshot, &self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
+        validate_active_order(&snapshot, self.order_id)?;
         validate_split_mode_allowed(&snapshot, SplitMode::Item)?;
 
         if self.items.is_empty() {
@@ -55,15 +55,15 @@ impl CommandHandler for SplitByItemsAction {
         }
 
         let change = validate_tendered_and_change(self.tendered, amount_f64)?;
-        let payment_id = uuid::Uuid::new_v4().to_string();
+        let payment_id = shared::util::snowflake_id();
         let seq = ctx.next_sequence();
 
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::ItemSplit,
             EventPayload::ItemSplit {

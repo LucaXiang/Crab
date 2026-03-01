@@ -115,11 +115,7 @@ impl CertManager {
             .ok_or_else(|| CertError::Invalid("No token in response".to_string()))?
             .to_string();
 
-        let tenant_id = data
-            .get("tenant_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+        let tenant_id = data.get("tenant_id").and_then(|v| v.as_i64()).unwrap_or(0);
 
         let credential = Credential::new(self.client_name.clone(), tenant_id, token, None);
 
@@ -215,7 +211,7 @@ impl CertManager {
         &self,
         auth_url: &str,
         token: &str,
-        tenant_id: &str,
+        tenant_id: i64,
     ) -> Result<(String, String, String), CertError> {
         // 检查本地证书
         if self.has_local_certificates() {
@@ -233,7 +229,7 @@ impl CertManager {
         &self,
         auth_url: &str,
         token: &str,
-        tenant_id: &str,
+        tenant_id: i64,
     ) -> Result<(String, String, String), CertError> {
         let client = reqwest::Client::new();
         let device_id = crab_cert::generate_hardware_id();

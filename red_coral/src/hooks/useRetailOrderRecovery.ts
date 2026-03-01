@@ -15,7 +15,7 @@ import {
 
 interface UseRetailOrderRecoveryParams {
   setViewMode: (mode: 'pos' | 'checkout') => void;
-  setCurrentOrderKey: (key: string | number | null) => void;
+  setCurrentOrderKey: (key: number | null) => void;
 }
 
 /**

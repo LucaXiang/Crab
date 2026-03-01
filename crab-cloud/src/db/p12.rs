@@ -6,7 +6,7 @@ use crate::crypto::MasterKey;
 #[derive(sqlx::FromRow)]
 #[allow(dead_code)]
 pub struct P12Certificate {
-    pub tenant_id: String,
+    pub tenant_id: i64,
     /// AES-256-GCM encrypted JSON: { "p12_data": "<base64>", "p12_password": "<pwd>" }
     pub p12_encrypted: Option<String>,
     pub fingerprint: Option<String>,
@@ -33,7 +33,7 @@ pub struct P12Sensitive {
 #[allow(dead_code)]
 pub async fn find_by_tenant(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<Option<P12Certificate>, sqlx::Error> {
     sqlx::query_as::<_, P12Certificate>(
         "SELECT tenant_id, p12_encrypted, fingerprint, common_name, serial_number,
@@ -50,7 +50,7 @@ pub async fn find_by_tenant(
 /// 获取租户的 P12 证书状态 (供 SubscriptionInfo 使用)
 pub async fn get_p12_info(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<shared::activation::P12Info, sqlx::Error> {
     match find_by_tenant(pool, tenant_id).await? {
         Some(cert) => Ok(shared::activation::P12Info {
@@ -94,7 +94,7 @@ pub fn decrypt_p12(
 pub async fn upsert(
     pool: &PgPool,
     master_key: &MasterKey,
-    tenant_id: &str,
+    tenant_id: i64,
     p12_data: &str,
     p12_password: &str,
     info: &crab_cert::P12CertInfo,

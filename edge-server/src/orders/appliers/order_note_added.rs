@@ -35,24 +35,24 @@ mod tests {
     use super::*;
     use shared::order::{OrderEventType, OrderStatus};
 
-    fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_test_snapshot(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot
     }
 
     fn create_order_note_added_event(
-        order_id: &str,
+        order_id: i64,
         seq: u64,
         note: &str,
         previous_note: Option<String>,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
-            order_id.to_string(),
+            order_id,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderNoteAdded,
             EventPayload::OrderNoteAdded {
@@ -64,10 +64,10 @@ mod tests {
 
     #[test]
     fn test_apply_note_sets_snapshot_note() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         assert_eq!(snapshot.note, None);
 
-        let event = create_order_note_added_event("order-1", 2, "No onions please", None);
+        let event = create_order_note_added_event(1001, 2, "No onions please", None);
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -77,11 +77,10 @@ mod tests {
 
     #[test]
     fn test_apply_empty_note_clears_snapshot_note() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.note = Some("Existing note".to_string());
 
-        let event =
-            create_order_note_added_event("order-1", 2, "", Some("Existing note".to_string()));
+        let event = create_order_note_added_event(1001, 2, "", Some("Existing note".to_string()));
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -91,11 +90,11 @@ mod tests {
 
     #[test]
     fn test_apply_note_overwrites_existing() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.note = Some("Old note".to_string());
 
         let event =
-            create_order_note_added_event("order-1", 2, "New note", Some("Old note".to_string()));
+            create_order_note_added_event(1001, 2, "New note", Some("Old note".to_string()));
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -105,11 +104,11 @@ mod tests {
 
     #[test]
     fn test_updates_sequence_and_timestamp() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.last_sequence = 5;
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_note_added_event("order-1", 10, "Test note", None);
+        let event = create_order_note_added_event(1001, 10, "Test note", None);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderNoteAddedApplier;
@@ -121,10 +120,10 @@ mod tests {
 
     #[test]
     fn test_updates_checksum() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_note_added_event("order-1", 2, "Test note", None);
+        let event = create_order_note_added_event(1001, 2, "Test note", None);
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -135,13 +134,13 @@ mod tests {
 
     #[test]
     fn test_does_not_affect_totals() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         snapshot.subtotal = 100.0;
         snapshot.total = 100.0;
         snapshot.paid_amount = 50.0;
         snapshot.remaining_amount = 50.0;
 
-        let event = create_order_note_added_event("order-1", 2, "Test note", None);
+        let event = create_order_note_added_event(1001, 2, "Test note", None);
 
         let applier = OrderNoteAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -154,17 +153,17 @@ mod tests {
 
     #[test]
     fn test_wrong_event_type_is_noop() {
-        let mut snapshot = create_test_snapshot("order-1");
+        let mut snapshot = create_test_snapshot(1001);
         let original_note = snapshot.note.clone();
         let original_sequence = snapshot.last_sequence;
 
         // Create an event with wrong payload type
         let event = OrderEvent::new(
             2,
-            "order-1".to_string(),
+            1001,
             1,
             "Test User".to_string(),
-            "cmd-1".to_string(),
+            shared::util::snowflake_id(),
             Some(1234567890),
             OrderEventType::OrderInfoUpdated,
             EventPayload::OrderInfoUpdated {

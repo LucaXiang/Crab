@@ -14,7 +14,7 @@ async fn test_cannot_add_items_to_completed_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -29,7 +29,7 @@ async fn test_cannot_add_items_to_completed_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -39,7 +39,7 @@ async fn test_cannot_add_items_to_completed_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(2, "Tea", 5.0, 1)],
         },
     );
@@ -66,7 +66,7 @@ async fn test_add_items_with_zero_price() {
     let order_id =
         open_table_with_items(&manager, 214, vec![simple_item(1, "Free Sample", 0.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items.len(), 1);
     assert_eq!(snapshot.items[0].price, 0.0);
     assert_eq!(snapshot.subtotal, 0.0);
@@ -77,7 +77,7 @@ async fn test_add_items_with_zero_price() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -112,7 +112,7 @@ async fn test_add_items_with_nan_price_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "NaN Item", f64::NAN, 2)],
         },
     );
@@ -147,7 +147,7 @@ async fn test_add_items_with_infinity_price_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Infinity Item", f64::INFINITY, 1)],
         },
     );
@@ -185,7 +185,7 @@ async fn test_add_items_with_negative_price_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Negative Item", -10.0, 1)],
         },
     );
@@ -210,7 +210,7 @@ async fn test_add_items_large_price_and_quantity() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 99999.99 * 100 = 9_999_999.0
     assert_eq!(snapshot.subtotal, 9_999_999.0);
     assert_eq!(snapshot.total, 9_999_999.0);
@@ -243,7 +243,7 @@ async fn test_add_items_with_f64_max_price_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Max Item", f64::MAX, 1)],
         },
     );
@@ -281,7 +281,7 @@ async fn test_add_items_with_zero_quantity_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Zero Qty", 10.0, 0)],
         },
     );
@@ -316,7 +316,7 @@ async fn test_add_items_with_negative_quantity_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Negative Qty", 10.0, -3)],
         },
     );
@@ -351,7 +351,7 @@ async fn test_add_items_with_i32_max_quantity_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Max Qty", 0.01, i32::MAX)],
         },
     );
@@ -372,7 +372,7 @@ async fn test_add_items_with_max_allowed_quantity() {
     )
     .await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.items[0].quantity, 9999);
     // 0.01 * 9999 = 99.99
     assert_eq!(snapshot.subtotal, 99.99);
@@ -407,7 +407,7 @@ async fn test_add_items_with_discount_over_100_percent() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Over Discounted".to_string(),
@@ -454,7 +454,7 @@ async fn test_add_items_with_negative_discount_acts_as_markup() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Neg Discount Item".to_string(),
@@ -491,7 +491,7 @@ async fn test_add_payment_with_nan_amount_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: f64::NAN,
@@ -518,7 +518,7 @@ async fn test_add_payment_with_infinity_amount_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: f64::INFINITY,
@@ -545,7 +545,7 @@ async fn test_add_payment_with_f64_max_amount_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: f64::MAX,
@@ -589,7 +589,7 @@ async fn test_multiple_edge_items_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![
                 simple_item(1, "Normal", 25.50, 2),
                 simple_item(2, "Free", 0.0, 1),
@@ -600,7 +600,7 @@ async fn test_multiple_edge_items_then_complete() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 25.50*2 + 0*1 + 0.01*100 = 51.0 + 0 + 1.0 = 52.0
     assert_eq!(snapshot.subtotal, 52.0);
 
@@ -609,7 +609,7 @@ async fn test_multiple_edge_items_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 52.0,
@@ -624,14 +624,14 @@ async fn test_multiple_edge_items_then_complete() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
     let resp = manager.execute_command(complete_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(snapshot.status, OrderStatus::Completed);
     assert_eq!(snapshot.payments[0].change, Some(8.0)); // 60 - 52 = 8
 }
@@ -663,7 +663,7 @@ async fn test_add_items_with_option_price_modifiers() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Pizza".to_string(),
@@ -707,7 +707,7 @@ async fn test_add_items_with_option_price_modifiers() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // reducer: item_final = base(12) + options(3+1.50) = 16.50
     // money: original_price=12.0, options=4.50, base_with_options=16.50
     //   unit_price=16.50, line_total=16.50
@@ -741,7 +741,7 @@ async fn test_add_items_with_negative_option_modifier() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Special".to_string(),
@@ -776,7 +776,7 @@ async fn test_add_items_with_negative_option_modifier() {
         "Negative option modifier within bounds is allowed"
     );
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // reducer: base=10+(-15)=-5, item_final=max(0,-5)=0
     // money: base_price=0, options=-15, base_with_options=-15 → clamped to 0
     assert_eq!(
@@ -799,7 +799,7 @@ async fn test_add_cash_payment_tendered_less_than_amount_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -842,7 +842,7 @@ async fn test_discount_surcharge_options_combined_precision() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Combo Item".to_string(),
@@ -872,7 +872,7 @@ async fn test_discount_surcharge_options_combined_precision() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // reducer: base=33.33+1.67=35.0, discount=3.5, item_final=31.5
     // money: original_price=33.33, options=1.67, base_with_options=35.0
     //   manual_discount=35.0*10/100=3.5
@@ -896,7 +896,7 @@ async fn test_nan_payment_then_complete_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: f64::NAN,
@@ -916,7 +916,7 @@ async fn test_nan_payment_then_complete_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -952,7 +952,7 @@ async fn test_rebuild_snapshot_with_edge_values() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![
                 simple_item(1, "Free", 0.0, 5),
                 simple_item(2, "Penny", 0.01, 99),
@@ -961,8 +961,8 @@ async fn test_rebuild_snapshot_with_edge_values() {
     );
     manager.execute_command(add_cmd).await;
 
-    let stored = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let rebuilt = manager.rebuild_snapshot(&order_id).unwrap();
+    let stored = manager.get_snapshot(order_id).unwrap().unwrap();
+    let rebuilt = manager.rebuild_snapshot(order_id).unwrap();
 
     assert_eq!(stored.subtotal, rebuilt.subtotal);
     assert_eq!(stored.total, rebuilt.total);
@@ -1000,7 +1000,7 @@ async fn test_many_small_amounts_precision() {
             1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
+                order_id: order_id,
                 items: vec![CartItemInput {
                     product_id: i + 1,
                     name: format!("Item {}", i),
@@ -1019,7 +1019,7 @@ async fn test_many_small_amounts_precision() {
         manager.execute_command(add_cmd).await;
     }
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     // 0.1 * 10 = 1.0 (使用 Decimal 精确计算)
     assert_eq!(snapshot.subtotal, 1.0, "10 x 0.1 should be exactly 1.0");
     assert_eq!(snapshot.total, 1.0);
@@ -1039,7 +1039,7 @@ async fn test_add_cash_payment_nan_tendered() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -1069,7 +1069,7 @@ async fn test_add_payment_after_move_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MoveOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             target_table_id: 330,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -1085,7 +1085,7 @@ async fn test_add_payment_after_move_order() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -1116,7 +1116,7 @@ async fn test_payment_tolerance_boundary() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: 9.99,
@@ -1131,7 +1131,7 @@ async fn test_payment_tolerance_boundary() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1153,7 +1153,7 @@ async fn test_payment_below_tolerance_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: 9.98,
@@ -1168,7 +1168,7 @@ async fn test_payment_below_tolerance_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1209,7 +1209,7 @@ async fn test_options_discount_rule_fields_no_double_counting() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Steak".to_string(),
@@ -1253,7 +1253,7 @@ async fn test_options_discount_rule_fields_no_double_counting() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let item = &snapshot.items[0];
 
     // original_price should be set to the input price (spec price)
@@ -1298,7 +1298,7 @@ async fn test_modify_item_unit_price_consistency() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![CartItemInput {
                 product_id: 1,
                 name: "Pasta".to_string(),
@@ -1328,7 +1328,7 @@ async fn test_modify_item_unit_price_consistency() {
     let resp = manager.execute_command(add_cmd).await;
     assert!(resp.success);
 
-    let snapshot_before = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot_before = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot_before.items[0].instance_id.clone();
     // unit_price = 15 + 2.5 = 17.5, subtotal = 17.5 * 3 = 52.5
     assert_eq!(snapshot_before.items[0].unit_price, 17.5);
@@ -1339,7 +1339,7 @@ async fn test_modify_item_unit_price_consistency() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -1357,7 +1357,7 @@ async fn test_modify_item_unit_price_consistency() {
     let resp = manager.execute_command(modify_cmd).await;
     assert!(resp.success, "ModifyItem should succeed");
 
-    let snapshot_after = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot_after = manager.get_snapshot(order_id).unwrap().unwrap();
     let item = &snapshot_after.items[0];
 
     // original_price should still be 15.0
@@ -1395,7 +1395,7 @@ async fn test_add_items_to_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1411,7 +1411,7 @@ async fn test_add_items_to_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(2, "Tea", 5.0, 1)],
         },
     );
@@ -1429,7 +1429,7 @@ async fn test_add_payment_to_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1444,7 +1444,7 @@ async fn test_add_payment_to_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -1466,7 +1466,7 @@ async fn test_complete_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1481,7 +1481,7 @@ async fn test_complete_voided_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1504,7 +1504,7 @@ async fn test_void_completed_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -1519,7 +1519,7 @@ async fn test_void_completed_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1530,7 +1530,7 @@ async fn test_void_completed_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1553,7 +1553,7 @@ async fn test_double_complete_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -1568,7 +1568,7 @@ async fn test_double_complete_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1579,7 +1579,7 @@ async fn test_double_complete_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -1597,14 +1597,14 @@ async fn test_modify_item_nan_price_rejected() {
     let order_id =
         open_table_with_items(&manager, 230, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     let modify_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -1632,14 +1632,14 @@ async fn test_modify_item_negative_price_rejected() {
     let order_id =
         open_table_with_items(&manager, 231, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     let modify_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -1667,14 +1667,14 @@ async fn test_modify_item_nan_discount_rejected() {
     let order_id =
         open_table_with_items(&manager, 232, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     let modify_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -1702,14 +1702,14 @@ async fn test_modify_item_discount_over_100_rejected() {
     let order_id =
         open_table_with_items(&manager, 233, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     let modify_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -1737,14 +1737,14 @@ async fn test_modify_item_zero_quantity_rejected() {
     let order_id =
         open_table_with_items(&manager, 234, vec![simple_item(1, "Coffee", 10.0, 2)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     let modify_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -1779,14 +1779,14 @@ async fn test_add_empty_items_array() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![], // Empty array
         },
     );
     let _resp = manager.execute_command(add_cmd).await;
     // 即使 AddItems 允许空数组（当前行为），订单不应进入不一致状态
     // 记录当前行为，不管成功与否，订单仍可继续操作
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(
         snapshot.status,
         OrderStatus::Active,
@@ -1799,7 +1799,7 @@ async fn test_add_empty_items_array() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddItems {
-            order_id: order_id.clone(),
+            order_id: order_id,
             items: vec![simple_item(1, "Coffee", 10.0, 1)],
         },
     );
@@ -1825,7 +1825,7 @@ async fn test_merge_voided_source_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: source_id.clone(),
+            order_id: source_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1840,8 +1840,8 @@ async fn test_merge_voided_source_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: source_id.clone(),
-            target_order_id: target_id.clone(),
+            source_order_id: source_id,
+            target_order_id: target_id,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -1861,7 +1861,7 @@ async fn test_merge_into_voided_target_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: target_id.clone(),
+            order_id: target_id,
             void_type: VoidType::Cancelled,
             loss_reason: None,
             loss_amount: None,
@@ -1876,8 +1876,8 @@ async fn test_merge_into_voided_target_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: source_id.clone(),
-            target_order_id: target_id.clone(),
+            source_order_id: source_id,
+            target_order_id: target_id,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -1895,8 +1895,8 @@ async fn test_merge_self_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MergeOrders {
-            source_order_id: order_id.clone(),
-            target_order_id: order_id.clone(),
+            source_order_id: order_id,
+            target_order_id: order_id,
             authorizer_id: None,
             authorizer_name: None,
         },
@@ -1919,7 +1919,7 @@ async fn test_aa_split_zero_total_shares_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id: order_id,
             total_shares: 0, // Invalid
             shares: 0,
             payment_method: "CASH".to_string(),
@@ -1940,7 +1940,7 @@ async fn test_aa_split_one_share_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id: order_id,
             total_shares: 1, // Must be >= 2
             shares: 1,
             payment_method: "CASH".to_string(),
@@ -1964,7 +1964,7 @@ async fn test_aa_split_shares_exceed_total_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id: order_id,
             total_shares: 3,
             shares: 5, // More than total
             payment_method: "CASH".to_string(),
@@ -1986,7 +1986,7 @@ async fn test_pay_aa_split_exceed_remaining_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::StartAaSplit {
-            order_id: order_id.clone(),
+            order_id: order_id,
             total_shares: 3,
             shares: 2,
             payment_method: "CASH".to_string(),
@@ -2001,7 +2001,7 @@ async fn test_pay_aa_split_exceed_remaining_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::PayAaSplit {
-            order_id: order_id.clone(),
+            order_id: order_id,
             shares: 3,
             payment_method: "CASH".to_string(),
             tendered: None,
@@ -2029,7 +2029,7 @@ async fn test_cancel_already_cancelled_payment_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CARD".to_string(),
                 amount: 10.0,
@@ -2040,16 +2040,16 @@ async fn test_cancel_already_cancelled_payment_fails() {
     );
     manager.execute_command(pay_cmd).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-    let payment_id = snapshot.payments[0].payment_id.clone();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
+    let payment_id = snapshot.payments[0].payment_id;
 
     // Cancel once
     let cancel1 = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.clone(),
-            payment_id: payment_id.clone(),
+            order_id: order_id,
+            payment_id,
             reason: Some("mistake".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -2063,7 +2063,7 @@ async fn test_cancel_already_cancelled_payment_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment_id,
             reason: Some("again".to_string()),
             authorizer_id: None,
@@ -2093,7 +2093,7 @@ async fn test_move_to_occupied_table_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::MoveOrder {
-            order_id: order2.clone(),
+            order_id: order2,
             target_table_id: 240,
             target_table_name: "Table 1".to_string(),
             target_zone_id: None,
@@ -2116,7 +2116,7 @@ async fn test_modify_item_on_completed_order_fails() {
     let order_id =
         open_table_with_items(&manager, 242, vec![simple_item(1, "Coffee", 10.0, 1)]).await;
 
-    let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+    let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     let instance_id = snapshot.items[0].instance_id.clone();
 
     // Pay + complete
@@ -2124,7 +2124,7 @@ async fn test_modify_item_on_completed_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 10.0,
@@ -2138,7 +2138,7 @@ async fn test_modify_item_on_completed_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.clone(),
+            order_id: order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -2149,7 +2149,7 @@ async fn test_modify_item_on_completed_order_fails() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.clone(),
+            order_id: order_id,
             instance_id,
             affected_quantity: None,
             changes: shared::order::ItemChanges {
@@ -2182,7 +2182,7 @@ async fn test_add_payment_negative_amount_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: -10.0,
@@ -2205,7 +2205,7 @@ async fn test_add_payment_zero_amount_rejected() {
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.clone(),
+            order_id: order_id,
             payment: PaymentInput {
                 method: "CASH".to_string(),
                 amount: 0.0,

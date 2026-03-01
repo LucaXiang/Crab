@@ -164,7 +164,7 @@ mod tests {
                 authorizer_id: Some(2),
                 authorizer_name: Some("Manager".to_string()),
                 shift_id: Some(10),
-                cloud_synced: 0,
+                cloud_synced: false,
                 created_at: 1740667500000, // 2025-02-27 14:35 UTC
             },
             items: vec![

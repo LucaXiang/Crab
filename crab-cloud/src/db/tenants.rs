@@ -3,7 +3,7 @@ use sqlx::PgPool;
 #[derive(sqlx::FromRow)]
 #[allow(dead_code)]
 pub struct Tenant {
-    pub id: String,
+    pub id: i64,
     pub email: String,
     pub hashed_password: String,
     pub name: Option<String>,
@@ -30,11 +30,7 @@ pub async fn find_by_stripe_customer(
         .await
 }
 
-pub async fn update_status(
-    pool: &PgPool,
-    tenant_id: &str,
-    status: &str,
-) -> Result<(), sqlx::Error> {
+pub async fn update_status(pool: &PgPool, tenant_id: i64, status: &str) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE tenants SET status = $1 WHERE id = $2")
         .bind(status)
         .bind(tenant_id)
@@ -43,7 +39,7 @@ pub async fn update_status(
     Ok(())
 }
 
-pub async fn set_verified(pool: &PgPool, tenant_id: &str, now: i64) -> Result<(), sqlx::Error> {
+pub async fn set_verified(pool: &PgPool, tenant_id: i64, now: i64) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE tenants SET status = 'verified', verified_at = $1 WHERE id = $2")
         .bind(now)
         .bind(tenant_id)
@@ -54,7 +50,7 @@ pub async fn set_verified(pool: &PgPool, tenant_id: &str, now: i64) -> Result<()
 
 pub async fn set_stripe_customer(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     stripe_customer_id: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE tenants SET stripe_customer_id = $1 WHERE id = $2")
@@ -67,7 +63,7 @@ pub async fn set_stripe_customer(
 
 pub async fn update_password(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     hashed_password: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE tenants SET hashed_password = $1 WHERE id = $2")
@@ -80,7 +76,7 @@ pub async fn update_password(
 
 pub async fn update_email(
     pool: &PgPool,
-    tenant_id: &str,
+    tenant_id: i64,
     new_email: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE tenants SET email = $1 WHERE id = $2")
@@ -91,7 +87,7 @@ pub async fn update_email(
     Ok(())
 }
 
-pub async fn find_by_id(pool: &PgPool, id: &str) -> Result<Option<Tenant>, sqlx::Error> {
+pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Option<Tenant>, sqlx::Error> {
     sqlx::query_as("SELECT * FROM tenants WHERE id = $1")
         .bind(id)
         .fetch_optional(pool)

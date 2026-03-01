@@ -12,8 +12,8 @@ pub struct Config {
     pub http_port: u16,
     /// mTLS port (edge-server sync API)
     pub mtls_port: u16,
-    /// Root CA PEM content (env: ROOT_CA_PEM) or file path (env: ROOT_CA_PATH)
-    pub root_ca_pem: Option<String>,
+    /// Local Root CA cache path (Secrets Manager is the source of truth,
+    /// this file is auto-updated on startup and used as offline fallback)
     pub root_ca_path: String,
     /// Server cert PEM content (env: SERVER_CERT_PEM) or file path (env: SERVER_CERT_PATH)
     pub server_cert_pem: Option<String>,
@@ -83,7 +83,6 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8443),
-            root_ca_pem: std::env::var("ROOT_CA_PEM").ok().filter(|s| !s.is_empty()),
             root_ca_path: std::env::var("ROOT_CA_PATH")
                 .unwrap_or_else(|_| "certs/root_ca.pem".into()),
             server_cert_pem: std::env::var("SERVER_CERT_PEM")

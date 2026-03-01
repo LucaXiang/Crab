@@ -120,14 +120,14 @@ mod tests {
 
         // Create an OrderEvent with all required fields
         let order_event = OrderEvent {
-            event_id: "evt-001".to_string(),
+            event_id: 1001,
             sequence: 1,
-            order_id: "order-123".to_string(),
+            order_id: 2001,
             timestamp: 1705900000000,
             client_timestamp: None,
             operator_id: 1,
             operator_name: "Test Operator".to_string(),
-            command_id: "cmd-001".to_string(),
+            command_id: 3001,
             event_type: OrderEventType::TableOpened,
             payload: EventPayload::TableOpened {
                 table_id: Some(1),
@@ -143,7 +143,7 @@ mod tests {
 
         // Create a minimal OrderSnapshot
         let order_snapshot = OrderSnapshot {
-            order_id: "order-123".to_string(),
+            order_id: 2001,
             table_id: Some(1),
             table_name: Some("A1".to_string()),
             zone_id: None,
@@ -205,7 +205,7 @@ mod tests {
             resource: shared::cloud::SyncResource::OrderSync,
             version: order_event.sequence,
             action: shared::message::SyncChangeType::Created,
-            id: order_event.order_id.clone(),
+            id: order_event.order_id,
             data: Some(serde_json::json!({
                 "event": order_event,
                 "snapshot": order_snapshot
@@ -220,9 +220,9 @@ mod tests {
         // Should be routed as OrderSync with event + snapshot
         match route {
             MessageRoute::OrderSync(sync) => {
-                assert_eq!(sync.event.order_id, "order-123");
+                assert_eq!(sync.event.order_id, 2001);
                 assert_eq!(sync.event.sequence, 1);
-                assert_eq!(sync.snapshot.order_id, "order-123");
+                assert_eq!(sync.snapshot.order_id, 2001);
                 assert_eq!(sync.snapshot.guest_count, 2);
             }
             MessageRoute::ServerMessage(_) => {
@@ -238,7 +238,7 @@ mod tests {
             resource: shared::cloud::SyncResource::Product,
             version: 1,
             action: shared::message::SyncChangeType::Updated,
-            id: "prod-1".to_string(),
+            id: 5001,
             data: Some(serde_json::json!({"name": "Coffee"})),
             cloud_origin: false,
         };

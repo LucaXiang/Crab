@@ -9,8 +9,8 @@ import { sendCommand, ensureSuccess } from './sendCommand';
  * Cancel a payment.
  */
 export const cancelPayment = async (
-  orderId: string,
-  paymentId: string,
+  orderId: number,
+  paymentId: number,
   reason?: string,
   authorizer?: { id: number; name: string },
 ): Promise<void> => {
@@ -32,7 +32,7 @@ export const cancelPayment = async (
  * Fire & forget — UI updates via WebSocket event.
  */
 export const splitByItems = async (
-  orderId: string,
+  orderId: number,
   items: { instance_id: string; name: string; quantity: number; unit_price: number }[],
   paymentMethod: string,
   tendered?: number,
@@ -59,7 +59,7 @@ export const splitByItems = async (
  * Fire & forget — UI updates via WebSocket event.
  */
 export const splitByAmount = async (
-  orderId: string,
+  orderId: number,
   splitAmount: number,
   paymentMethod: string,
   tendered?: number,
@@ -81,7 +81,7 @@ export const splitByAmount = async (
  * Fire & forget — UI updates via WebSocket event.
  */
 export const startAaSplit = async (
-  orderId: string,
+  orderId: number,
   totalShares: number,
   shares: number,
   paymentMethod: string,
@@ -105,7 +105,7 @@ export const startAaSplit = async (
  * Fire & forget — UI updates via WebSocket event.
  */
 export const payAaSplit = async (
-  orderId: string,
+  orderId: number,
   shares: number,
   paymentMethod: string,
   tendered?: number,

@@ -10,7 +10,7 @@ import { sendCommand, ensureSuccess } from './sendCommand';
  * Both null = clear discount.
  */
 export const applyOrderDiscount = async (
-  orderId: string,
+  orderId: number,
   options?: {
     discountPercent?: number;
     discountFixed?: number;
@@ -35,7 +35,7 @@ export const applyOrderDiscount = async (
  * null = clear surcharge.
  */
 export const applyOrderSurcharge = async (
-  orderId: string,
+  orderId: number,
   options?: {
     surchargePercent?: number;
     surchargeAmount?: number;
@@ -59,7 +59,7 @@ export const applyOrderSurcharge = async (
  * Toggle rule skip status for an order.
  */
 export const toggleRuleSkip = async (
-  orderId: string,
+  orderId: number,
   ruleId: number,
   skipped: boolean
 ): Promise<void> => {
@@ -78,7 +78,7 @@ export const toggleRuleSkip = async (
  * Move order to a different table.
  */
 export const moveOrder = async (
-  orderId: string,
+  orderId: number,
   targetTableId: number,
   targetTableName: string,
   targetZoneId?: number | null,
@@ -104,8 +104,8 @@ export const moveOrder = async (
  * Merge source order into target order.
  */
 export const mergeOrders = async (
-  sourceOrderId: string,
-  targetOrderId: string,
+  sourceOrderId: number,
+  targetOrderId: number,
   authorizer?: { id: number; name: string },
 ): Promise<void> => {
   const command = createCommand({
@@ -125,7 +125,7 @@ export const mergeOrders = async (
  * Note: receipt_number is immutable (set at OpenTable).
  */
 export const updateOrderInfo = async (
-  orderId: string,
+  orderId: number,
   info: {
     guest_count?: number;
     table_name?: string;

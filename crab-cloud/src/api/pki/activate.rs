@@ -24,14 +24,19 @@ pub async fn activate(
     State(state): State<AppState>,
     Json(req): Json<ActivateRequest>,
 ) -> Json<ActivationResponse> {
-    let tenant_id = match tenant_auth::verify_token(&req.token, &state.jwt_secret) {
-        Ok(claims) => claims.sub,
+    let tenant_id: i64 = match tenant_auth::verify_token(&req.token, &state.jwt_secret) {
+        Ok(claims) => match claims.sub.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                return Json(fail(ErrorCode::TokenExpired, "Invalid token subject"));
+            }
+        },
         Err(_) => {
             return Json(fail(ErrorCode::TokenExpired, "Invalid or expired token"));
         }
     };
 
-    let tenant = match tenants::find_by_id(&state.pool, &tenant_id).await {
+    let tenant = match tenants::find_by_id(&state.pool, tenant_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
             return Json(fail(
@@ -49,7 +54,7 @@ pub async fn activate(
     // 激活 = 证书签发 + 设备绑定，不应因订阅状态而拒绝。
     // 订阅检查由 edge-server 运行时的 is_subscription_blocked() 处理，
     // 前端展示 SubscriptionBlockedScreen。
-    let sub = match subscriptions::get_latest_subscription(&state.pool, &tenant.id).await {
+    let sub = match subscriptions::get_latest_subscription(&state.pool, tenant.id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             return Json(fail(
@@ -68,8 +73,7 @@ pub async fn activate(
     let plan = parse_plan_type(&sub.plan);
     let max_stores = sub.max_stores;
 
-    let existing = match activations::find_by_device(&state.pool, &tenant.id, &req.device_id).await
-    {
+    let existing = match activations::find_by_device(&state.pool, tenant.id, &req.device_id).await {
         Ok(v) => v,
         Err(e) => {
             tracing::error!(error = %e, "Database error checking existing device");
@@ -99,12 +103,12 @@ pub async fn activate(
 
     let tenant_ca = match state
         .ca_store
-        .get_or_create_tenant_ca(&tenant.id, &root_ca)
+        .get_or_create_tenant_ca(tenant.id, &root_ca)
         .await
     {
         Ok(ca) => ca,
         Err(e) => {
-            tracing::error!(error = %e, tenant_id = %tenant.id, "Tenant CA error");
+            tracing::error!(error = %e, tenant_id = tenant.id, "Tenant CA error");
             return Json(fail(ErrorCode::AuthServerError, "Internal error"));
         }
     };
@@ -115,7 +119,7 @@ pub async fn activate(
     let mut profile = CertProfile::new_server(
         &entity_id,
         vec![entity_id.clone(), "localhost".to_string()],
-        Some(tenant.id.clone()),
+        Some(tenant.id),
         req.device_id.clone(),
     );
     profile.is_client = true;
@@ -138,7 +142,7 @@ pub async fn activate(
 
     let binding = SignedBinding::new(
         &entity_id,
-        &tenant.id,
+        tenant.id,
         &req.device_id,
         &fingerprint,
         EntityType::Server,
@@ -154,7 +158,7 @@ pub async fn activate(
 
     let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
     let subscription_info = SubscriptionInfo {
-        tenant_id: tenant.id.clone(),
+        tenant_id: tenant.id,
         id: Some(sub.id.clone()),
         status: sub_status,
         plan,
@@ -168,7 +172,7 @@ pub async fn activate(
         signature_valid_until,
         signature: String::new(),
         last_checked_at: 0,
-        p12: match p12::get_p12_info(&state.pool, &tenant.id).await {
+        p12: match p12::get_p12_info(&state.pool, tenant.id).await {
             Ok(info) => Some(info),
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to query P12 info, defaulting to None");
@@ -195,7 +199,7 @@ pub async fn activate(
         }
     };
 
-    if let Err(e) = activations::acquire_activation_lock(&mut tx, &tenant.id).await {
+    if let Err(e) = activations::acquire_activation_lock(&mut tx, tenant.id).await {
         tracing::error!(error = %e, "Failed to acquire activation lock");
         return Json(fail(ErrorCode::InternalError, "Internal error"));
     }
@@ -206,7 +210,7 @@ pub async fn activate(
             "SELECT entity_id FROM stores WHERE id = $1 AND tenant_id = $2 AND status = 'active'",
         )
         .bind(store_id)
-        .bind(&tenant.id)
+        .bind(tenant.id)
         .fetch_optional(&mut *tx)
         .await;
 
@@ -227,7 +231,7 @@ pub async fn activate(
         let active_store_count: i64 = sqlx::query_as::<_, (i64,)>(
             "SELECT COUNT(*) FROM stores WHERE tenant_id = $1 AND status = 'active'",
         )
-        .bind(&tenant.id)
+        .bind(tenant.id)
         .fetch_one(&mut *tx)
         .await
         .map(|r| r.0)
@@ -255,7 +259,7 @@ pub async fn activate(
                     }
                 }
             } else {
-                let active_devices = match activations::list_active(&state.pool, &tenant.id).await {
+                let active_devices = match activations::list_active(&state.pool, tenant.id).await {
                     Ok(list) => list
                         .into_iter()
                         .map(|a| ActiveDevice {
@@ -286,14 +290,9 @@ pub async fn activate(
         }
     }
 
-    if let Err(e) = activations::insert_in_tx(
-        &mut tx,
-        &entity_id,
-        &tenant.id,
-        &req.device_id,
-        &fingerprint,
-    )
-    .await
+    if let Err(e) =
+        activations::insert_in_tx(&mut tx, &entity_id, tenant.id, &req.device_id, &fingerprint)
+            .await
     {
         tracing::error!(error = %e, "Failed to write activation record");
         return Json(fail(ErrorCode::InternalError, "Internal error"));
@@ -315,7 +314,7 @@ pub async fn activate(
     } else {
         // 新建: ensure_store
         if let Err(e) =
-            sync_store::ensure_store(&state.pool, &entity_id, &tenant.id, &req.device_id, now).await
+            sync_store::ensure_store(&state.pool, &entity_id, tenant.id, &req.device_id, now).await
         {
             tracing::error!(error = %e, "Failed to ensure store record");
             return Json(fail(ErrorCode::InternalError, "Internal error"));
@@ -323,7 +322,7 @@ pub async fn activate(
     }
 
     // Query store_number for this edge-server
-    let store_number = match sync_store::get_store_number(&state.pool, &entity_id, &tenant.id).await
+    let store_number = match sync_store::get_store_number(&state.pool, &entity_id, tenant.id).await
     {
         Ok(n) => n,
         Err(e) => {
@@ -334,7 +333,7 @@ pub async fn activate(
 
     tracing::info!(
         entity_id = %entity_id,
-        tenant_id = %tenant.id,
+        tenant_id = tenant.id,
         store_number = store_number,
         "Activated server"
     );

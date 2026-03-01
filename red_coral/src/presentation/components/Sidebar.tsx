@@ -19,7 +19,7 @@ import {
 import { CartList } from './cart/CartList';
 
 interface SidebarProps {
-	  currentOrderNumber: string | number | null;
+	  currentOrderNumber: number | null;
 	  onManageTable: () => void;
 	  onSaveDraft: () => void;
 	  onRestoreDraft: () => void;

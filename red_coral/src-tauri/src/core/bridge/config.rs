@@ -62,7 +62,7 @@ pub struct AppConfig {
     /// 当前模式 (None = 未选模式)
     pub current_mode: Option<ModeType>,
     /// 当前租户
-    pub current_tenant: Option<String>,
+    pub current_tenant: Option<i64>,
     /// 当前激活的 entity_id (注销时用)
     #[serde(default)]
     pub active_entity_id: Option<String>,
@@ -71,7 +71,7 @@ pub struct AppConfig {
     /// Client 模式配置
     pub client_config: Option<ClientModeConfig>,
     /// 已知租户列表
-    pub known_tenants: Vec<String>,
+    pub known_tenants: Vec<i64>,
     /// Auth Server URL (全局，激活和 edge-server 都用)
     #[serde(default = "default_auth_url")]
     pub auth_url: String,

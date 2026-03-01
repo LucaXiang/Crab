@@ -349,7 +349,7 @@ CREATE TABLE store_info (
 CREATE TABLE system_state (
     id                 INTEGER PRIMARY KEY,
     genesis_hash       TEXT,
-    last_order_id      TEXT,
+    last_order_id      INTEGER,
     last_order_hash    TEXT,
     synced_up_to_id    TEXT,
     synced_up_to_hash  TEXT,
@@ -585,17 +585,15 @@ CREATE TABLE archived_order (
     loss_reason                     TEXT,
     loss_amount                     REAL,
     void_note                       TEXT,
-    related_order_id                TEXT,
+    related_order_id                INTEGER,
     prev_hash                       TEXT    NOT NULL,
     curr_hash                       TEXT    NOT NULL,
-    order_key                       TEXT    NOT NULL DEFAULT '',
     queue_number                    INTEGER,
     shift_id                        INTEGER REFERENCES shift(id),
     cloud_synced                    INTEGER NOT NULL DEFAULT 0,
     created_at                      INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX idx_archived_order_receipt ON archived_order(receipt_number);
-CREATE UNIQUE INDEX idx_archived_order_order_key ON archived_order(order_key);
 CREATE INDEX idx_archived_order_status ON archived_order(status);
 CREATE INDEX idx_archived_order_end_time ON archived_order(end_time);
 CREATE INDEX idx_archived_order_hash ON archived_order(curr_hash);
@@ -683,8 +681,8 @@ CREATE INDEX idx_archived_event_operator ON archived_order_event(operator_id);
 -- Independent payment table for statistics
 CREATE TABLE payment (
     id            INTEGER PRIMARY KEY,
-    payment_id    TEXT    NOT NULL,
-    order_id      TEXT    NOT NULL,
+    payment_id    INTEGER NOT NULL,
+    order_id      INTEGER NOT NULL,
     method        TEXT    NOT NULL,
     amount        REAL    NOT NULL,
     tendered      REAL,

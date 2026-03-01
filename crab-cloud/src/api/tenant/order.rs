@@ -28,7 +28,7 @@ pub async fn list_orders(
     Path(store_id): Path<i64>,
     Query(query): Query<OrdersQuery>,
 ) -> ApiResult<Vec<tenant_queries::ArchivedOrderSummary>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let per_page = query.per_page.unwrap_or(20).min(100);
     let page = query.page.unwrap_or(1).max(1);
@@ -37,7 +37,7 @@ pub async fn list_orders(
     let orders = tenant_queries::list_orders(
         &state.pool,
         store_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         query.status.as_deref(),
         per_page,
         offset,
@@ -51,42 +51,32 @@ pub async fn list_orders(
     Ok(Json(orders))
 }
 
-/// GET /api/tenant/stores/:id/orders/:order_key/detail
+/// GET /api/tenant/stores/:id/orders/:order_id/detail
 ///
 /// Permanent detail store first, fallback to on-demand edge fetch if not yet synced.
 pub async fn get_order_detail(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
-    Path((store_id, order_key)): Path<(i64, String)>,
+    Path((store_id, order_id)): Path<(i64, i64)>,
 ) -> ApiResult<shared::cloud::OrderDetailResponse> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
-    // 1. Check permanent detail store
-    if let Some(detail_json) =
-        tenant_queries::get_order_detail(&state.pool, store_id, &identity.tenant_id, &order_key)
+    // 1. Check permanent detail store (relational tables)
+    if let Some(detail) =
+        tenant_queries::get_order_detail(&state.pool, store_id, identity.tenant_id, order_id)
             .await
             .map_err(|e| {
                 tracing::error!("Order detail query error: {e}");
                 AppError::new(ErrorCode::InternalError)
             })?
     {
-        let detail: shared::cloud::OrderDetailPayload = serde_json::from_value(detail_json)
-            .map_err(|e| {
-                tracing::error!("Failed to deserialize cached OrderDetailPayload: {e}");
-                AppError::new(ErrorCode::InternalError)
-            })?;
-
-        let desglose = tenant_queries::get_order_desglose(
-            &state.pool,
-            store_id,
-            &identity.tenant_id,
-            &order_key,
-        )
-        .await
-        .map_err(|e| {
-            tracing::error!(order_key = %order_key, "Failed to query desglose: {e}");
-            AppError::new(ErrorCode::InternalError)
-        })?;
+        let desglose =
+            tenant_queries::get_order_desglose(&state.pool, store_id, identity.tenant_id, order_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(order_id, "Failed to query desglose: {e}");
+                    AppError::new(ErrorCode::InternalError)
+                })?;
 
         return Ok(Json(shared::cloud::OrderDetailResponse {
             source: "cache".to_string(),
@@ -96,9 +86,7 @@ pub async fn get_order_detail(
     }
 
     // 2. Not yet synced — fetch from edge via RPC
-    let rpc = shared::cloud::ws::CloudRpc::GetOrderDetail {
-        order_key: order_key.clone(),
-    };
+    let rpc = shared::cloud::ws::CloudRpc::GetOrderDetail { order_id };
     let result = call_edge_rpc(&state.edges, store_id, rpc).await?;
 
     let (success, data, error) = match result {
@@ -135,22 +123,7 @@ pub async fn get_order_detail(
             AppError::new(ErrorCode::InternalError)
         })?;
 
-    // 3. Write fetched detail back to store_archived_orders (best-effort)
-    if let Ok(detail_json) = serde_json::to_value(&detail_sync.detail) {
-        let _ = sqlx::query(
-            r#"
-            UPDATE store_archived_orders
-            SET detail = $4
-            WHERE store_id = $1 AND tenant_id = $2 AND order_key = $3
-            "#,
-        )
-        .bind(store_id)
-        .bind(&identity.tenant_id)
-        .bind(&order_key)
-        .bind(&detail_json)
-        .execute(&state.pool)
-        .await;
-    }
+    // Detail will be written via normal sync pipeline — no best-effort caching needed
 
     Ok(Json(shared::cloud::OrderDetailResponse {
         source: "edge".to_string(),
@@ -159,19 +132,19 @@ pub async fn get_order_detail(
     }))
 }
 
-/// GET /api/tenant/stores/:id/orders/:order_key/credit-notes
+/// GET /api/tenant/stores/:id/orders/:order_id/credit-notes
 pub async fn list_credit_notes(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
-    Path((store_id, order_key)): Path<(i64, String)>,
+    Path((store_id, order_id)): Path<(i64, i64)>,
 ) -> ApiResult<Vec<tenant_queries::CreditNoteSummary>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let notes = tenant_queries::list_credit_notes_by_order(
         &state.pool,
         store_id,
-        &identity.tenant_id,
-        &order_key,
+        identity.tenant_id,
+        order_id,
     )
     .await
     .map_err(|e| {
@@ -195,7 +168,7 @@ pub async fn list_chain_entries(
     Path(store_id): Path<i64>,
     Query(query): Query<ChainEntriesQuery>,
 ) -> ApiResult<Vec<tenant_queries::ChainEntryItem>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let per_page = query.per_page.unwrap_or(20).min(100);
     let page = query.page.unwrap_or(1).max(1);
@@ -204,7 +177,7 @@ pub async fn list_chain_entries(
     let entries = tenant_queries::list_chain_entries(
         &state.pool,
         store_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         per_page,
         offset,
     )
@@ -221,15 +194,15 @@ pub async fn list_chain_entries(
 pub async fn get_credit_note_detail(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
-    Path((store_id, source_id)): Path<(i64, String)>,
+    Path((store_id, source_id)): Path<(i64, i64)>,
 ) -> ApiResult<tenant_queries::CreditNoteDetail> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let detail = tenant_queries::get_credit_note_detail(
         &state.pool,
         store_id,
-        &identity.tenant_id,
-        &source_id,
+        identity.tenant_id,
+        source_id,
     )
     .await
     .map_err(|e| {

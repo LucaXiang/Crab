@@ -68,7 +68,7 @@ pub struct CertProfile {
     pub validity_days: u32,
     pub is_client: bool,
     pub is_server: bool,
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<i64>,
     pub device_id: Option<String>,
     pub client_name: Option<String>,
     pub key_type: KeyType,
@@ -78,7 +78,7 @@ impl CertProfile {
     pub fn new_server(
         common_name: &str,
         mut sans: Vec<String>,
-        tenant_id: Option<String>,
+        tenant_id: Option<i64>,
         device_id: String,
     ) -> Self {
         if !sans.contains(&common_name.to_string()) {
@@ -100,7 +100,7 @@ impl CertProfile {
 
     pub fn new_client(
         common_name: &str,
-        tenant_id: Option<String>,
+        tenant_id: Option<i64>,
         device_id: Option<String>,
         client_name: Option<String>,
     ) -> Self {
@@ -218,8 +218,8 @@ pub(crate) fn create_cert_params(profile: &CertProfile) -> CertificateParams {
     params.extended_key_usages = extended_key_usages;
 
     // Custom Extensions
-    if let Some(tenant_id) = &profile.tenant_id {
-        let content = encode_utf8_string(tenant_id);
+    if let Some(tenant_id) = profile.tenant_id {
+        let content = encode_utf8_string(&tenant_id.to_string());
         let mut ext = CustomExtension::from_oid_content(OID_TENANT_ID, content);
         ext.set_criticality(false);
         params.custom_extensions.push(ext);

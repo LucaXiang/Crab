@@ -11,7 +11,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// UncompItem action
 #[derive(Debug, Clone)]
 pub struct UncompItemAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub instance_id: String,
     pub authorizer_id: i64,
     pub authorizer_name: String,
@@ -27,16 +27,16 @@ impl CommandHandler for UncompItemAction {
         validate_order_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -102,10 +102,10 @@ impl CommandHandler for UncompItemAction {
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::ItemUncomped,
             EventPayload::ItemUncomped {
@@ -131,7 +131,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -182,7 +182,7 @@ mod tests {
         quantity: i32,
     ) -> CompRecord {
         CompRecord {
-            comp_id: "comp-1".to_string(),
+            comp_id: 1,
             instance_id: instance_id.to_string(),
             source_instance_id: source_instance_id.to_string(),
             item_name: "Test Product".to_string(),
@@ -202,7 +202,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 0.0, 2, true);
         item.original_price = 10.0;
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
         snapshot
@@ -214,7 +214,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
@@ -251,7 +251,7 @@ mod tests {
             create_test_item("item-1::comp::uuid-1", 1, "Test Product", 0.0, 2, true);
         comped_item.original_price = 10.0;
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(source_item);
         snapshot.items.push(comped_item);
@@ -267,7 +267,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1::comp::uuid-1".to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
@@ -301,7 +301,7 @@ mod tests {
             create_test_item("item-1::comp::uuid-1", 1, "Test Product", 0.0, 2, true);
         comped_item.original_price = 10.0;
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(comped_item);
         snapshot.comps.push(create_comp_record(
@@ -316,7 +316,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1::comp::uuid-1".to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
@@ -338,7 +338,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let item = create_test_item("item-1", 1, "Test Product", 10.0, 1, false);
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -347,7 +347,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
@@ -363,15 +363,15 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let snapshot = OrderSnapshot::new("order-1".to_string());
+        let snapshot = OrderSnapshot::new(1001);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "nonexistent".to_string(),
+            order_id: 1001,
+            instance_id: 9999.to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
         };
@@ -388,7 +388,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 0.0, 1, true);
         item.original_price = 10.0;
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(item);
         snapshot
@@ -400,7 +400,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             authorizer_id: 0,
             authorizer_name: "Manager".to_string(),
@@ -419,7 +419,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 0.0, 1, true);
         item.original_price = 10.0;
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
         snapshot
@@ -431,7 +431,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),
@@ -449,7 +449,7 @@ mod tests {
 
         let mut item = create_test_item("item-1", 1, "Test Product", 0.0, 1, true);
         item.original_price = 10.0;
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
         snapshot
@@ -461,7 +461,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = UncompItemAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             instance_id: "item-1".to_string(),
             authorizer_id: 1,
             authorizer_name: "Manager".to_string(),

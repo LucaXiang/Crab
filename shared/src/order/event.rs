@@ -10,13 +10,13 @@ use serde::{Deserialize, Serialize};
 /// Order event - immutable audit record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderEvent {
-    /// Event unique ID
-    pub event_id: String,
+    /// Event unique ID (snowflake i64)
+    pub event_id: i64,
     /// Global sequence number (for ordering and replay)
     /// This is the AUTHORITATIVE ordering mechanism for state evolution
     pub sequence: u64,
-    /// Order this event belongs to
-    pub order_id: String,
+    /// Order this event belongs to (snowflake i64)
+    pub order_id: i64,
     /// Server timestamp (Unix milliseconds) - AUTHORITATIVE for state evolution
     /// Always set by server when event is created
     pub timestamp: i64,
@@ -29,7 +29,7 @@ pub struct OrderEvent {
     /// Operator name (snapshot for audit)
     pub operator_name: String,
     /// Command that triggered this event (for audit tracing)
-    pub command_id: String,
+    pub command_id: i64,
     /// Event type
     pub event_type: OrderEventType,
     /// Event payload
@@ -247,7 +247,7 @@ pub enum EventPayload {
 
     // ========== Payments ==========
     PaymentAdded {
-        payment_id: String,
+        payment_id: i64,
         method: String,
         amount: f64,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -259,7 +259,7 @@ pub enum EventPayload {
     },
 
     PaymentCancelled {
-        payment_id: String,
+        payment_id: i64,
         method: String,
         amount: f64,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -273,7 +273,7 @@ pub enum EventPayload {
     // ========== Split ==========
     /// 菜品分单
     ItemSplit {
-        payment_id: String,
+        payment_id: i64,
         split_amount: f64,
         payment_method: String,
         items: Vec<SplitItem>,
@@ -285,7 +285,7 @@ pub enum EventPayload {
 
     /// 金额分单
     AmountSplit {
-        payment_id: String,
+        payment_id: i64,
         split_amount: f64,
         payment_method: String,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -303,7 +303,7 @@ pub enum EventPayload {
 
     /// AA 支付（进度）
     AaSplitPaid {
-        payment_id: String,
+        payment_id: i64,
         shares: i32,
         amount: f64,
         payment_method: String,
@@ -526,16 +526,16 @@ impl OrderEvent {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         sequence: u64,
-        order_id: String,
+        order_id: i64,
         operator_id: i64,
         operator_name: String,
-        command_id: String,
+        command_id: i64,
         client_timestamp: Option<i64>,
         event_type: OrderEventType,
         payload: EventPayload,
     ) -> Self {
         Self {
-            event_id: uuid::Uuid::new_v4().to_string(),
+            event_id: crate::util::snowflake_id(),
             sequence,
             order_id,
             // Server timestamp is ALWAYS set by server - this is authoritative
@@ -553,7 +553,7 @@ impl OrderEvent {
     /// Create event from command (extracts metadata including client timestamp)
     pub fn from_command(
         sequence: u64,
-        order_id: String,
+        order_id: i64,
         command: &super::OrderCommand,
         event_type: OrderEventType,
         payload: EventPayload,
@@ -563,7 +563,7 @@ impl OrderEvent {
             order_id,
             command.operator_id,
             command.operator_name.clone(),
-            command.command_id.clone(),
+            command.command_id,
             Some(command.timestamp), // Preserve client timestamp
             event_type,
             payload,

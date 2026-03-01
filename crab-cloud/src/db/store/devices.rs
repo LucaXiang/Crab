@@ -16,7 +16,7 @@ pub struct DeviceRecord {
 pub async fn list_devices_for_store(
     pool: &PgPool,
     entity_id: &str,
-    tenant_id: &str,
+    tenant_id: i64,
 ) -> Result<Vec<DeviceRecord>, sqlx::Error> {
     sqlx::query_as::<_, DeviceRecord>(
         r#"

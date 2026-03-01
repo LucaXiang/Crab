@@ -98,8 +98,8 @@ impl PrintExecutor {
 
             // Create a sub-order with only items for this destination
             let sub_order = KitchenOrder {
-                id: order.id.clone(),
-                order_id: order.order_id.clone(),
+                id: order.id,
+                order_id: order.order_id,
                 receipt_number: order.receipt_number.clone(),
                 table_name: order.table_name.clone(),
                 zone_name: order.zone_name.clone(),
@@ -486,8 +486,8 @@ mod tests {
 
     fn create_test_order() -> KitchenOrder {
         KitchenOrder {
-            id: "evt-1".to_string(),
-            order_id: "order-1".to_string(),
+            id: shared::util::snowflake_id(),
+            order_id: 1001,
             receipt_number: "FAC202401220001".to_string(),
             table_name: Some("100桌".to_string()),
             zone_name: Some("大厅".to_string()),

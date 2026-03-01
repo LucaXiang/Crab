@@ -49,7 +49,7 @@ pub async fn handle_sync(
     let store_id = sync_store::ensure_store(
         &state.pool,
         &identity.entity_id,
-        &identity.tenant_id,
+        identity.tenant_id,
         &identity.device_id,
         now,
     )
@@ -73,11 +73,20 @@ pub async fn handle_sync(
 
     // Process each item
     for (idx, item) in batch.items.iter().enumerate() {
-        match sync_store::upsert_resource(&state.pool, store_id, &identity.tenant_id, item, now)
+        match sync_store::upsert_resource(&state.pool, store_id, identity.tenant_id, item, now)
             .await
         {
-            Ok(()) => {
+            Ok(effect) => {
                 accepted += 1;
+
+                // Handle side-effects (e.g. broadcast StoreInfo to consoles)
+                if let sync_store::SyncEffect::StoreInfoUpdated(info) = effect {
+                    state.live_orders.publish_store_info_updated(
+                        identity.tenant_id,
+                        store_id,
+                        *info,
+                    );
+                }
 
                 // Update sync cursor
                 if let Err(e) = sync_store::update_cursor(
@@ -100,7 +109,7 @@ pub async fn handle_sync(
                 rejected += 1;
                 errors.push(CloudSyncError {
                     index: u32::try_from(idx).unwrap_or(u32::MAX),
-                    resource_id: item.resource_id.clone(),
+                    resource_id: item.resource_id,
                     message: e.to_string(),
                 });
             }
@@ -117,7 +126,7 @@ pub async fn handle_sync(
     });
     let _ = audit::log(
         &state.pool,
-        &identity.tenant_id,
+        identity.tenant_id,
         "sync_batch",
         Some(&sync_detail),
         None,
@@ -127,7 +136,7 @@ pub async fn handle_sync(
 
     tracing::info!(
         edge_id = %identity.entity_id,
-        tenant_id = %identity.tenant_id,
+        tenant_id = identity.tenant_id,
         accepted,
         rejected,
         total = batch.items.len(),

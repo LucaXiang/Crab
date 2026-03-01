@@ -18,7 +18,7 @@ pub async fn list_employees(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<shared::models::employee::Employee>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let employees = store::list_employees(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,10 +31,10 @@ pub async fn create_employee(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::employee::EmployeeCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) =
-        store::create_employee_direct(&state.pool, store_id, &identity.tenant_id, &data)
+        store::create_employee_direct(&state.pool, store_id, identity.tenant_id, &data)
             .await
             .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
@@ -44,6 +44,7 @@ pub async fn create_employee(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateEmployee {
             id: Some(source_id),
             data,
@@ -60,7 +61,7 @@ pub async fn update_employee(
     Path((store_id, employee_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::employee::EmployeeUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let op_data = store::update_employee_direct(&state.pool, store_id, employee_id, &data)
         .await
@@ -72,6 +73,7 @@ pub async fn update_employee(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdateEmployee {
             id: employee_id,
             data,
@@ -87,7 +89,7 @@ pub async fn delete_employee(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, employee_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_employee_direct(&state.pool, store_id, employee_id)
         .await
@@ -99,6 +101,7 @@ pub async fn delete_employee(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::DeleteEmployee { id: employee_id },
     )
     .await;

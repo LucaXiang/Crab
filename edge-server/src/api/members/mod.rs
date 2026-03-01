@@ -21,11 +21,11 @@ fn routes() -> Router<ServerState> {
         .route("/search", get(handler::search))
         .route("/{id}", get(handler::get_by_id));
 
-    // 管理路由：需要 members:manage 权限
+    // 管理路由：需要 marketing:manage 权限
     let manage_routes = Router::new()
         .route("/", post(handler::create))
         .route("/{id}", put(handler::update).delete(handler::delete))
-        .layer(middleware::from_fn(require_permission("members:manage")));
+        .layer(middleware::from_fn(require_permission("marketing:manage")));
 
     read_routes.merge(manage_routes)
 }

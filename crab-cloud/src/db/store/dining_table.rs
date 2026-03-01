@@ -64,7 +64,7 @@ pub async fn list_tables(pool: &PgPool, store_id: i64) -> Result<Vec<DiningTable
 pub async fn create_table_direct(
     pool: &PgPool,
     store_id: i64,
-    _tenant_id: &str,
+    _tenant_id: i64,
     data: &DiningTableCreate,
 ) -> Result<(i64, StoreOpData), BoxError> {
     let now = shared::util::now_millis();

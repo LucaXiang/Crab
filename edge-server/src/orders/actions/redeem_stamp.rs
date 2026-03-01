@@ -25,7 +25,7 @@ pub struct RewardProductInfo {
 /// RedeemStamp action
 #[derive(Debug, Clone)]
 pub struct RedeemStampAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub stamp_activity_id: i64,
     /// Selection mode product_id (Eco/Gen selection or Designated)
     pub product_id: Option<i64>,
@@ -46,16 +46,16 @@ impl CommandHandler for RedeemStampAction {
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 1. Load snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 2. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -256,10 +256,10 @@ impl CommandHandler for RedeemStampAction {
         // 6. Generate single StampRedeemed event
         let event = OrderEvent::new(
             ctx.next_sequence(),
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::StampRedeemed,
             EventPayload::StampRedeemed {
@@ -292,7 +292,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -355,7 +355,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -368,7 +368,7 @@ mod tests {
         activity.designated_product_id = Some(100);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -426,7 +426,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -434,7 +434,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -453,7 +453,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -465,7 +465,7 @@ mod tests {
         activity.designated_product_id = Some(100);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -485,7 +485,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -505,7 +505,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -545,7 +545,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -564,7 +564,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -604,7 +604,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -620,7 +620,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -658,7 +658,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -671,7 +671,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -696,7 +696,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -712,7 +712,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -742,7 +742,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.member_id = Some(42);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -751,7 +751,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -769,7 +769,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         snapshot.member_id = Some(42);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -778,7 +778,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -797,7 +797,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -810,7 +810,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: None,
@@ -845,7 +845,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -867,7 +867,7 @@ mod tests {
         activity.designated_product_id = Some(100);
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1, // Same activity as already redeemed
             product_id: None,
             comp_existing_instance_id: None,
@@ -905,7 +905,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -922,7 +922,7 @@ mod tests {
         activity.reward_quantity = 1;
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: Some("potato-1".to_string()),
@@ -956,7 +956,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -974,7 +974,7 @@ mod tests {
         activity.reward_quantity = 1;
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: Some("potato-1".to_string()),
@@ -1009,7 +1009,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -1027,7 +1027,7 @@ mod tests {
         activity.reward_quantity = 5; // More than item qty
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: Some("potato-1".to_string()),
@@ -1059,7 +1059,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -1076,7 +1076,7 @@ mod tests {
         activity.reward_quantity = 1;
 
         let action = RedeemStampAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             stamp_activity_id: 1,
             product_id: None,
             comp_existing_instance_id: Some("item-1".to_string()),

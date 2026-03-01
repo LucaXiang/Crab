@@ -22,7 +22,7 @@ pub async fn create(
                 .broadcast_sync(
                     SyncResource::Attribute,
                     SyncChangeType::Created,
-                    &attr.id.to_string(),
+                    attr.id,
                     Some(&attr),
                     true,
                 )
@@ -42,7 +42,7 @@ pub async fn update(state: &ServerState, id: i64, data: AttributeUpdate) -> Stor
                 .broadcast_sync(
                     SyncResource::Attribute,
                     SyncChangeType::Updated,
-                    &attr.id.to_string(),
+                    attr.id,
                     Some(&attr),
                     true,
                 )
@@ -63,7 +63,7 @@ pub async fn delete(state: &ServerState, id: i64) -> StoreOpResult {
                 .broadcast_sync::<()>(
                     SyncResource::Attribute,
                     SyncChangeType::Deleted,
-                    &id.to_string(),
+                    id,
                     None,
                     true,
                 )
@@ -118,7 +118,7 @@ pub async fn create_option(
         .broadcast_sync::<()>(
             SyncResource::Attribute,
             SyncChangeType::Updated,
-            &attribute_id.to_string(),
+            attribute_id,
             None,
             true,
         )
@@ -164,7 +164,7 @@ pub async fn update_option(
             .broadcast_sync::<()>(
                 SyncResource::Attribute,
                 SyncChangeType::Updated,
-                &attr_id.to_string(),
+                attr_id,
                 None,
                 true,
             )
@@ -201,7 +201,7 @@ pub async fn delete_option(state: &ServerState, id: i64) -> StoreOpResult {
             .broadcast_sync::<()>(
                 SyncResource::Attribute,
                 SyncChangeType::Updated,
-                &aid.to_string(),
+                aid,
                 None,
                 true,
             )
@@ -231,7 +231,7 @@ pub async fn batch_update_option_sort_order(
         .broadcast_sync::<()>(
             SyncResource::Attribute,
             SyncChangeType::Updated,
-            &attribute_id.to_string(),
+            attribute_id,
             None,
             true,
         )
@@ -280,7 +280,7 @@ pub async fn bind(
                 .broadcast_sync(
                     SyncResource::AttributeBinding,
                     SyncChangeType::Created,
-                    &binding.id.to_string(),
+                    binding.id,
                     Some(&binding),
                     true,
                 )
@@ -326,7 +326,7 @@ pub async fn unbind(state: &ServerState, binding_id: i64) -> StoreOpResult {
         .broadcast_sync::<()>(
             SyncResource::AttributeBinding,
             SyncChangeType::Deleted,
-            &binding_id.to_string(),
+            binding_id,
             None,
             true,
         )
@@ -349,7 +349,7 @@ pub async fn create_tag(
                 .broadcast_sync(
                     SyncResource::Tag,
                     SyncChangeType::Created,
-                    &t.id.to_string(),
+                    t.id,
                     Some(&t),
                     true,
                 )
@@ -373,7 +373,7 @@ pub async fn update_tag(
                 .broadcast_sync(
                     SyncResource::Tag,
                     SyncChangeType::Updated,
-                    &t.id.to_string(),
+                    t.id,
                     Some(&t),
                     true,
                 )
@@ -391,13 +391,7 @@ pub async fn delete_tag(state: &ServerState, id: i64) -> StoreOpResult {
     match tag::delete(&state.pool, id).await {
         Ok(_) => {
             state
-                .broadcast_sync::<()>(
-                    SyncResource::Tag,
-                    SyncChangeType::Deleted,
-                    &id.to_string(),
-                    None,
-                    true,
-                )
+                .broadcast_sync::<()>(SyncResource::Tag, SyncChangeType::Deleted, id, None, true)
                 .await;
             StoreOpResult::ok()
         }

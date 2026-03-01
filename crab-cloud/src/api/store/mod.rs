@@ -42,7 +42,7 @@ fn internal(e: impl std::fmt::Display) -> AppError {
 }
 
 /// Push StoreOp to edge: direct send if online, queue to pending_ops if offline.
-async fn push_to_edge(state: &AppState, store_id: i64, op: StoreOp) {
+pub async fn push_to_edge(state: &AppState, store_id: i64, tenant_id: i64, op: StoreOp) {
     let now = shared::util::now_millis();
 
     if let Some(sender) = state.edges.connected.get(&store_id) {
@@ -55,7 +55,7 @@ async fn push_to_edge(state: &AppState, store_id: i64, op: StoreOp) {
         };
         let _ = sender.try_send(msg);
     } else if let Err(e) =
-        crate::db::store::pending_ops::insert(&state.pool, store_id, &op, now).await
+        crate::db::store::pending_ops::insert(&state.pool, store_id, tenant_id, &op, now).await
     {
         tracing::error!(store_id, "Failed to queue pending op: {e}");
     }
@@ -65,7 +65,7 @@ async fn push_to_edge(state: &AppState, store_id: i64, op: StoreOp) {
 async fn fire_ensure_image(
     state: &AppState,
     store_id: i64,
-    tenant_id: &str,
+    tenant_id: i64,
     image_hash: Option<&str>,
 ) {
     let hash = match image_hash {

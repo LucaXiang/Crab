@@ -18,7 +18,7 @@ pub async fn list_tables(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<shared::models::dining_table::DiningTable>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let tables = store::list_tables(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,10 +31,10 @@ pub async fn create_table(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::dining_table::DiningTableCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) =
-        store::create_table_direct(&state.pool, store_id, &identity.tenant_id, &data)
+        store::create_table_direct(&state.pool, store_id, identity.tenant_id, &data)
             .await
             .map_err(internal)?;
     store::increment_store_version(&state.pool, store_id)
@@ -44,6 +44,7 @@ pub async fn create_table(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateTable {
             id: Some(source_id),
             data,
@@ -60,7 +61,7 @@ pub async fn update_table(
     Path((store_id, table_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::dining_table::DiningTableUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let op_data = store::update_table_direct(&state.pool, store_id, table_id, &data)
         .await
@@ -72,6 +73,7 @@ pub async fn update_table(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdateTable { id: table_id, data },
     )
     .await;
@@ -84,7 +86,7 @@ pub async fn delete_table(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, table_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_table_direct(&state.pool, store_id, table_id)
         .await
@@ -93,7 +95,13 @@ pub async fn delete_table(
         .await
         .map_err(internal)?;
 
-    push_to_edge(&state, store_id, StoreOp::DeleteTable { id: table_id }).await;
+    push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::DeleteTable { id: table_id },
+    )
+    .await;
 
     Ok(Json(StoreOpResult::ok()))
 }

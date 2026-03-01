@@ -14,7 +14,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// MoveOrder action
 #[derive(Debug, Clone)]
 pub struct MoveOrderAction {
-    pub order_id: String,
+    pub order_id: i64,
     pub target_table_id: i64,
     pub target_table_name: String,
     pub target_zone_id: Option<i64>,
@@ -35,19 +35,19 @@ impl CommandHandler for MoveOrderAction {
         validate_order_optional_text(&self.authorizer_name, "authorizer_name", MAX_NAME_LEN)?;
 
         // 2. Load existing snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 3. Validate order status - must be Active
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
-                return Err(OrderError::OrderNotFound(self.order_id.clone()));
+                return Err(OrderError::OrderNotFound(self.order_id));
             }
         }
 
@@ -80,10 +80,10 @@ impl CommandHandler for MoveOrderAction {
         // 7. Create event
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::OrderMoved,
             EventPayload::OrderMoved {
@@ -112,15 +112,15 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
     }
 
-    fn create_active_order(order_id: &str) -> OrderSnapshot {
-        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+    fn create_active_order(order_id: i64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
@@ -134,14 +134,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let snapshot = create_active_order("order-1");
+        let snapshot = create_active_order(1001);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: Some(2),
@@ -155,7 +155,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.order_id, "order-1");
+        assert_eq!(event.order_id, 1001);
         assert_eq!(event.event_type, OrderEventType::OrderMoved);
 
         if let EventPayload::OrderMoved {
@@ -186,7 +186,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_order("order-1");
+        let mut snapshot = create_active_order(1001);
         let item = CartItemSnapshot {
             id: 1,
             instance_id: "item-1".to_string(),
@@ -221,7 +221,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 3,
             target_table_name: "Table 3".to_string(),
             target_zone_id: None,
@@ -247,7 +247,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -255,7 +255,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -275,7 +275,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -283,7 +283,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -307,7 +307,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "nonexistent".to_string(),
+            order_id: 9999,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -327,14 +327,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let snapshot = create_active_order("order-1");
+        let snapshot = create_active_order(1001);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -354,14 +354,14 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let snapshot = create_active_order("order-1");
+        let snapshot = create_active_order(1001);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -371,7 +371,7 @@ mod tests {
         };
 
         let metadata = CommandMetadata {
-            command_id: "test-cmd-123".to_string(),
+            command_id: 123,
             operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
@@ -379,7 +379,7 @@ mod tests {
 
         let events = action.execute(&mut ctx, &metadata).unwrap();
 
-        assert_eq!(events[0].command_id, "test-cmd-123");
+        assert_eq!(events[0].command_id, 123);
         assert_eq!(events[0].operator_id, 456);
         assert_eq!(events[0].operator_name, "John Doe");
     }
@@ -389,7 +389,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         // No table_id or table_name set
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -398,7 +398,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -430,27 +430,27 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order-1 at dining_table:t1
-        let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot1 = OrderSnapshot::new(1001);
         snapshot1.status = OrderStatus::Active;
         snapshot1.table_id = Some(1);
         snapshot1.table_name = Some("Table 1".to_string());
         storage.store_snapshot(&txn, &snapshot1).unwrap();
-        storage.mark_order_active(&txn, "order-1").unwrap();
+        storage.mark_order_active(&txn, 1001).unwrap();
 
         // Create order-2 at dining_table:t2
-        let mut snapshot2 = OrderSnapshot::new("order-2".to_string());
+        let mut snapshot2 = OrderSnapshot::new(2001);
         snapshot2.status = OrderStatus::Active;
         snapshot2.table_id = Some(2);
         snapshot2.table_name = Some("Table 2".to_string());
         storage.store_snapshot(&txn, &snapshot2).unwrap();
-        storage.mark_order_active(&txn, "order-2").unwrap();
+        storage.mark_order_active(&txn, 2001).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         // Try to move order-1 to dining_table:t2 (which is occupied by order-2)
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
@@ -471,19 +471,19 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order-1 at dining_table:t1
-        let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot1 = OrderSnapshot::new(1001);
         snapshot1.status = OrderStatus::Active;
         snapshot1.table_id = Some(1);
         snapshot1.table_name = Some("Table 1".to_string());
         storage.store_snapshot(&txn, &snapshot1).unwrap();
-        storage.mark_order_active(&txn, "order-1").unwrap();
+        storage.mark_order_active(&txn, 1001).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         // Move order-1 to dining_table:t1 (same table - should succeed as a no-op)
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 1,
             target_table_name: "Table 1".to_string(),
             target_zone_id: None,
@@ -503,7 +503,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = create_active_order("order-1");
+        let mut snapshot = create_active_order(1001);
         snapshot.paid_amount = 10.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -511,7 +511,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = MoveOrderAction {
-            order_id: "order-1".to_string(),
+            order_id: 1001,
             target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,

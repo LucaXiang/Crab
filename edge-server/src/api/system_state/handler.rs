@@ -28,7 +28,7 @@ pub async fn update(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            "main",
+            0,
             Some(&system_state),
             false,
         )
@@ -48,7 +48,7 @@ pub async fn init_genesis(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            "main",
+            0,
             Some(&system_state),
             false,
         )
@@ -60,7 +60,7 @@ pub async fn init_genesis(
 /// Update last order request
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateLastOrderRequest {
-    pub order_id: String,
+    pub order_id: i64,
     pub order_hash: String,
 }
 
@@ -70,13 +70,13 @@ pub async fn update_last_order(
     Json(payload): Json<UpdateLastOrderRequest>,
 ) -> AppResult<Json<SystemState>> {
     let system_state =
-        system_state::update_last_order(&state.pool, &payload.order_id, payload.order_hash).await?;
+        system_state::update_last_order(&state.pool, payload.order_id, payload.order_hash).await?;
 
     state
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            "main",
+            0,
             Some(&system_state),
             false,
         )
@@ -88,7 +88,7 @@ pub async fn update_last_order(
 /// Update sync state request
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateSyncStateRequest {
-    pub synced_up_to_id: String,
+    pub synced_up_to_id: i64,
     pub synced_up_to_hash: String,
 }
 
@@ -99,7 +99,7 @@ pub async fn update_sync_state(
 ) -> AppResult<Json<SystemState>> {
     let system_state = system_state::update_sync_state(
         &state.pool,
-        &payload.synced_up_to_id,
+        payload.synced_up_to_id,
         payload.synced_up_to_hash,
     )
     .await?;
@@ -108,7 +108,7 @@ pub async fn update_sync_state(
         .broadcast_sync(
             RESOURCE,
             SyncChangeType::Updated,
-            "main",
+            0,
             Some(&system_state),
             false,
         )

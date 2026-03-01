@@ -18,7 +18,7 @@ pub async fn list_stores(
     State(state): State<AppState>,
     Extension(identity): Extension<TenantIdentity>,
 ) -> ApiResult<Vec<shared::cloud::StoreDetailResponse>> {
-    let stores = tenant_queries::list_stores(&state.pool, &identity.tenant_id)
+    let stores = tenant_queries::list_stores(&state.pool, identity.tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Stores query error: {e}");
@@ -67,7 +67,7 @@ pub async fn update_store(
     Path(store_id): Path<i64>,
     Json(payload): Json<UpdateStoreRequest>,
 ) -> ApiResult<shared::models::store_info::StoreInfo> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     if let Some(alias) = &payload.alias {
         store::update_store_alias(&state.pool, store_id, alias)
@@ -96,6 +96,19 @@ pub async fn update_store(
             AppError::new(ErrorCode::InternalError)
         })?;
 
+    // Push to edge + broadcast to consoles
+    use shared::cloud::store_op::StoreOp;
+    crate::api::store::push_to_edge(
+        &state,
+        store_id,
+        identity.tenant_id,
+        StoreOp::UpdateStoreInfo { data: update },
+    )
+    .await;
+    state
+        .live_orders
+        .publish_store_info_updated(identity.tenant_id, store_id, info.clone());
+
     Ok(Json(info))
 }
 
@@ -105,10 +118,10 @@ pub async fn delete_store(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<()> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let now = shared::util::now_millis();
-    tenant_queries::soft_delete_store(&state.pool, store_id, &identity.tenant_id, now)
+    tenant_queries::soft_delete_store(&state.pool, store_id, identity.tenant_id, now)
         .await
         .map_err(|e| {
             tracing::error!("Delete store error: {e}");
@@ -124,9 +137,9 @@ pub async fn list_devices(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<store::devices::DeviceRecord>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
-    let entity_id = tenant_queries::get_store_entity_id(&state.pool, store_id, &identity.tenant_id)
+    let entity_id = tenant_queries::get_store_entity_id(&state.pool, store_id, identity.tenant_id)
         .await
         .map_err(|e| {
             tracing::error!("Get store entity_id error: {e}");
@@ -135,7 +148,7 @@ pub async fn list_devices(
         .ok_or_else(|| AppError::with_message(ErrorCode::NotFound, "Store not found"))?;
 
     let devices =
-        store::devices::list_devices_for_store(&state.pool, &entity_id, &identity.tenant_id)
+        store::devices::list_devices_for_store(&state.pool, &entity_id, identity.tenant_id)
             .await
             .map_err(|e| {
                 tracing::error!("List devices error: {e}");

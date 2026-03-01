@@ -42,13 +42,16 @@ pub async fn handle_console_ws(
         AppError::new(ErrorCode::TokenExpired)
     })?;
 
-    let tenant_id = claims.sub;
+    let tenant_id: i64 = claims.sub.parse().map_err(|_| {
+        tracing::debug!("Console WS JWT sub is not a valid i64");
+        AppError::new(ErrorCode::TokenExpired)
+    })?;
 
     // Check concurrent connection limit (atomic increment to avoid TOCTOU race)
     {
         let counter = state
             .console_connections
-            .entry(tenant_id.clone())
+            .entry(tenant_id)
             .or_insert_with(|| std::sync::atomic::AtomicUsize::new(0));
         let prev = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if prev >= MAX_CONSOLE_WS_PER_TENANT {
@@ -63,22 +66,22 @@ pub async fn handle_console_ws(
     Ok(ws.on_upgrade(move |socket| console_ws_session(socket, state, tenant_id)))
 }
 
-async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: String) {
+async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: i64) {
     let (mut sink, mut stream) = socket.split();
 
-    tracing::info!(tenant_id = %tenant_id, "Console WS connected");
+    tracing::info!(tenant_id = tenant_id, "Console WS connected");
 
     // Connection count already incremented in handler (atomic TOCTOU fix)
 
     // 订阅 LiveOrderHub
-    let mut hub_rx = state.live_orders.subscribe(&tenant_id);
+    let mut hub_rx = state.live_orders.subscribe(tenant_id);
 
     // 默认订阅全部门店（空 = 不过滤）
     let mut subscribed_edges: Option<HashSet<i64>> = None;
 
     // 发送初始全量快照 + 在线 edge 列表
-    let initial = state.live_orders.get_all_active(&tenant_id, &[]);
-    let online_edge_ids = state.live_orders.get_online_edges(&tenant_id, &[]);
+    let initial = state.live_orders.get_all_active(tenant_id, &[]);
+    let online_edge_ids = state.live_orders.get_online_edges(tenant_id, &[]);
     let ready = ConsoleMessage::Ready {
         snapshots: initial,
         online_edge_ids,
@@ -108,15 +111,15 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!(tenant_id = %tenant_id, lagged = n, "Console subscriber lagged, resending full snapshot");
+                        tracing::warn!(tenant_id = tenant_id, lagged = n, "Console subscriber lagged, resending full snapshot");
                         // 重新订阅以获取从当前位置开始的新 receiver，避免事件间隙
-                        hub_rx = state.live_orders.subscribe(&tenant_id);
+                        hub_rx = state.live_orders.subscribe(tenant_id);
                         let edges: Vec<i64> = subscribed_edges
                             .as_ref()
                             .map(|s| s.iter().copied().collect())
                             .unwrap_or_default();
-                        let all = state.live_orders.get_all_active(&tenant_id, &edges);
-                        let online = state.live_orders.get_online_edges(&tenant_id, &edges);
+                        let all = state.live_orders.get_all_active(tenant_id, &edges);
+                        let online = state.live_orders.get_online_edges(tenant_id, &edges);
                         let msg = ConsoleMessage::Ready {
                             snapshots: all,
                             online_edge_ids: online,
@@ -146,8 +149,8 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
                                         .as_ref()
                                         .map(|s| s.iter().copied().collect())
                                         .unwrap_or_default();
-                                    let filtered = state.live_orders.get_all_active(&tenant_id, &edges);
-                                    let online = state.live_orders.get_online_edges(&tenant_id, &edges);
+                                    let filtered = state.live_orders.get_all_active(tenant_id, &edges);
+                                    let online = state.live_orders.get_online_edges(tenant_id, &edges);
                                     let msg = ConsoleMessage::Ready {
                                         snapshots: filtered,
                                         online_edge_ids: online,
@@ -173,7 +176,7 @@ async fn console_ws_session(socket: WebSocket, state: AppState, tenant_id: Strin
         counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    tracing::info!(tenant_id = %tenant_id, "Console WS disconnected");
+    tracing::info!(tenant_id = tenant_id, "Console WS disconnected");
 }
 
 /// 将 LiveHubEvent 转换为 ConsoleMessage，应用订阅过滤
@@ -216,6 +219,12 @@ fn convert_hub_event(
                 online: false,
                 cleared_order_ids,
             })
+        }
+        LiveHubEvent::StoreInfoUpdated { store_id, info } => {
+            if !passes_filter(subscribed, store_id) {
+                return None;
+            }
+            Some(ConsoleMessage::StoreInfoUpdated { store_id, info })
         }
     }
 }

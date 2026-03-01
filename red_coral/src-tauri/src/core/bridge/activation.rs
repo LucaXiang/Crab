@@ -6,7 +6,7 @@ impl ClientBridge {
     /// 切换当前租户并保存配置
     ///
     /// Server 和 Client 模式都会先 stop，切换后重启对应模式
-    pub async fn switch_tenant(self: &Arc<Self>, tenant_id: &str) -> Result<(), BridgeError> {
+    pub async fn switch_tenant(self: &Arc<Self>, tenant_id: i64) -> Result<(), BridgeError> {
         let _lifecycle = self.lifecycle_lock.lock().await;
 
         // 检查当前模式，决定切换后是否重启
@@ -55,7 +55,7 @@ impl ClientBridge {
         // 2. 更新并保存配置
         {
             let mut config = self.config.write().await;
-            config.current_tenant = Some(tenant_id.to_string());
+            config.current_tenant = Some(tenant_id);
             config.save(&self.config_path)?;
         }
 
@@ -90,7 +90,7 @@ impl ClientBridge {
     /// 仅保存证书到磁盘，不启动任何模式。
     /// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
     /// 返回 (tenant_id, subscription_status)，前端据此决定下一步。
-    pub async fn handle_activation(&self) -> Result<(String, Option<String>), BridgeError> {
+    pub async fn handle_activation(&self) -> Result<(i64, Option<String>), BridgeError> {
         self.handle_activation_with_replace(None).await
     }
 
@@ -100,7 +100,7 @@ impl ClientBridge {
     pub async fn handle_activation_with_replace(
         &self,
         store_id: Option<i64>,
-    ) -> Result<(String, Option<String>), BridgeError> {
+    ) -> Result<(i64, Option<String>), BridgeError> {
         let token = self.get_fresh_token().await?;
         let auth_url = self.get_auth_url().await;
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
@@ -113,9 +113,9 @@ impl ClientBridge {
         {
             let mut config = self.config.write().await;
             if !config.known_tenants.contains(&tenant_id) {
-                config.known_tenants.push(tenant_id.clone());
+                config.known_tenants.push(tenant_id);
             }
-            config.current_tenant = Some(tenant_id.clone());
+            config.current_tenant = Some(tenant_id);
             config.active_entity_id = Some(entity_id.clone());
             config.save(&self.config_path)?;
         }
@@ -123,7 +123,7 @@ impl ClientBridge {
         // 3. 读取订阅状态（从刚保存的 credential）
         let subscription_status = {
             let tm = self.tenant_manager.read().await;
-            tm.get_subscription_status(&tenant_id)
+            tm.get_subscription_status(tenant_id)
         };
 
         tracing::info!(tenant_id = %tenant_id, entity_id = %entity_id, ?subscription_status, "Device activated and config saved (mode not started)");
@@ -135,7 +135,7 @@ impl ClientBridge {
     /// 仅保存客户端证书到磁盘，不启动任何模式。
     /// 自动通过 refresh_token 获取 JWT，无需前端传入 token。
     /// 返回 (tenant_id, subscription_status)，前端据此决定下一步。
-    pub async fn handle_client_activation(&self) -> Result<(String, Option<String>), BridgeError> {
+    pub async fn handle_client_activation(&self) -> Result<(i64, Option<String>), BridgeError> {
         let token = self.get_fresh_token().await?;
         let auth_url = self.get_auth_url().await;
         // 1. 调用 TenantManager 客户端激活
@@ -148,9 +148,9 @@ impl ClientBridge {
         {
             let mut config = self.config.write().await;
             if !config.known_tenants.contains(&tenant_id) {
-                config.known_tenants.push(tenant_id.clone());
+                config.known_tenants.push(tenant_id);
             }
-            config.current_tenant = Some(tenant_id.clone());
+            config.current_tenant = Some(tenant_id);
             config.active_entity_id = Some(entity_id.clone());
             config.save(&self.config_path)?;
         }
@@ -158,7 +158,7 @@ impl ClientBridge {
         // 3. 读取订阅状态
         let subscription_status = {
             let tm = self.tenant_manager.read().await;
-            tm.get_subscription_status(&tenant_id)
+            tm.get_subscription_status(tenant_id)
         };
 
         tracing::info!(tenant_id = %tenant_id, entity_id = %entity_id, ?subscription_status, "Client activated and config saved");
@@ -177,17 +177,17 @@ impl ClientBridge {
 
         // 验证成功后，确保租户目录存在并切换
         drop(tm);
-        let tenant_id = data.tenant_id.clone();
+        let tenant_id = data.tenant_id;
         {
             let mut tm = self.tenant_manager.write().await;
-            let tenant_path = tm.base_path().join(&tenant_id);
+            let tenant_path = tm.base_path().join(tenant_id.to_string());
             if !tenant_path.exists() {
                 let paths = super::super::paths::TenantPaths::new(&tenant_path);
                 paths.ensure_common_dirs()?;
                 tm.load_existing_tenants()?;
             }
-            if tm.current_tenant_id() != Some(&tenant_id) {
-                tm.switch_tenant(&tenant_id)?;
+            if tm.current_tenant_id() != Some(tenant_id) {
+                tm.switch_tenant(tenant_id)?;
             }
         }
 
@@ -195,7 +195,7 @@ impl ClientBridge {
         {
             let mut config = self.config.write().await;
             if !config.known_tenants.contains(&tenant_id) {
-                config.known_tenants.push(tenant_id.clone());
+                config.known_tenants.push(tenant_id);
             }
             config.current_tenant = Some(tenant_id);
             config.refresh_token = Some(data.refresh_token.clone());

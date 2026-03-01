@@ -150,7 +150,7 @@ pub enum P12BlockedReason {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct P12BlockedInfo {
     pub reason: P12BlockedReason,
-    pub tenant_id: String,
+    pub tenant_id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upload_url: Option<String>,
     pub user_message: String,
@@ -233,7 +233,7 @@ pub struct DeviceInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<i64>,
 }
 
 /// 健康检查响应

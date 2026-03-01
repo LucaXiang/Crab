@@ -10,7 +10,7 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// UnlinkMember action
 #[derive(Debug, Clone)]
 pub struct UnlinkMemberAction {
-    pub order_id: String,
+    pub order_id: i64,
 }
 
 impl CommandHandler for UnlinkMemberAction {
@@ -20,16 +20,16 @@ impl CommandHandler for UnlinkMemberAction {
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 1. Load snapshot
-        let snapshot = ctx.load_snapshot(&self.order_id)?;
+        let snapshot = ctx.load_snapshot(self.order_id)?;
 
         // 2. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
-                return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyCompleted(self.order_id));
             }
             OrderStatus::Void => {
-                return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
+                return Err(OrderError::OrderAlreadyVoided(self.order_id));
             }
             _ => {
                 return Err(OrderError::InvalidOperation(
@@ -73,10 +73,10 @@ impl CommandHandler for UnlinkMemberAction {
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
-            self.order_id.clone(),
+            self.order_id,
             metadata.operator_id,
             metadata.operator_name.clone(),
-            metadata.command_id.clone(),
+            metadata.command_id,
             Some(metadata.timestamp),
             OrderEventType::MemberUnlinked,
             EventPayload::MemberUnlinked {
@@ -98,7 +98,7 @@ mod tests {
 
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
-            command_id: "cmd-1".to_string(),
+            command_id: 1,
             operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
@@ -110,7 +110,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -121,9 +121,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = UnlinkMemberAction {
-            order_id: "order-1".to_string(),
-        };
+        let action = UnlinkMemberAction { order_id: 1001 };
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).unwrap();
@@ -149,7 +147,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         // No member linked
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -157,9 +155,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = UnlinkMemberAction {
-            order_id: "order-1".to_string(),
-        };
+        let action = UnlinkMemberAction { order_id: 1001 };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
@@ -171,7 +167,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Completed;
         snapshot.member_id = Some(42);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -179,9 +175,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = UnlinkMemberAction {
-            order_id: "order-1".to_string(),
-        };
+        let action = UnlinkMemberAction { order_id: 1001 };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);
@@ -193,7 +187,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.member_id = Some(42);
         snapshot.member_name = Some("Alice".to_string());
@@ -203,9 +197,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = UnlinkMemberAction {
-            order_id: "order-1".to_string(),
-        };
+        let action = UnlinkMemberAction { order_id: 1001 };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata);

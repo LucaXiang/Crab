@@ -110,7 +110,7 @@ pub struct ModeInfo {
     pub mode: Option<ModeType>,
     pub is_connected: bool,
     pub is_authenticated: bool,
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<i64>,
     pub username: Option<String>,
 }
 

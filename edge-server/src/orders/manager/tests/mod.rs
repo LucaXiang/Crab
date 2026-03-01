@@ -30,7 +30,7 @@ async fn open_table_with_items(
     manager: &OrdersManager,
     table_id: i64,
     items: Vec<CartItemInput>,
-) -> String {
+) -> i64 {
     let open_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -51,10 +51,7 @@ async fn open_table_with_items(
         let add_cmd = OrderCommand::new(
             1,
             "Test Operator".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items,
-            },
+            OrderCommandPayload::AddItems { order_id, items },
         );
         let resp = manager.execute_command(add_cmd).await;
         assert!(resp.success, "Failed to add items");
@@ -162,12 +159,12 @@ fn item_with_discount(
 }
 
 /// 快速完成订单
-async fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
+async fn complete_order(manager: &OrdersManager, order_id: i64) -> CommandResponse {
     let complete_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompleteOrder {
-            order_id: order_id.to_string(),
+            order_id,
             service_type: Some(ServiceType::DineIn),
         },
     );
@@ -177,14 +174,14 @@ async fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandRespo
 /// 快速作废订单
 async fn void_order_helper(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     void_type: VoidType,
 ) -> CommandResponse {
     let void_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::VoidOrder {
-            order_id: order_id.to_string(),
+            order_id,
             void_type,
             loss_reason: None,
             loss_amount: None,
@@ -197,7 +194,7 @@ async fn void_order_helper(
 }
 
 /// 断言订单状态
-fn assert_order_status(manager: &OrdersManager, order_id: &str, expected: OrderStatus) {
+fn assert_order_status(manager: &OrdersManager, order_id: i64, expected: OrderStatus) {
     let snapshot = manager.get_snapshot(order_id).unwrap().unwrap();
     assert_eq!(
         snapshot.status, expected,
@@ -207,7 +204,7 @@ fn assert_order_status(manager: &OrdersManager, order_id: &str, expected: OrderS
 }
 
 /// 打开零售订单
-async fn open_retail_order(manager: &OrdersManager) -> String {
+async fn open_retail_order(manager: &OrdersManager) -> i64 {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -232,7 +229,7 @@ async fn open_retail_order(manager: &OrdersManager) -> String {
 /// Helper: 修改商品（折扣/价格/数量）
 async fn modify_item(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     instance_id: &str,
     changes: shared::order::ItemChanges,
 ) -> CommandResponse {
@@ -240,7 +237,7 @@ async fn modify_item(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ModifyItem {
-            order_id: order_id.to_string(),
+            order_id,
             instance_id: instance_id.to_string(),
             affected_quantity: None,
             changes,
@@ -252,17 +249,12 @@ async fn modify_item(
 }
 
 /// Helper: 添加支付
-async fn pay(
-    manager: &OrdersManager,
-    order_id: &str,
-    amount: f64,
-    method: &str,
-) -> CommandResponse {
+async fn pay(manager: &OrdersManager, order_id: i64, amount: f64, method: &str) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::AddPayment {
-            order_id: order_id.to_string(),
+            order_id,
             payment: PaymentInput {
                 method: method.to_string(),
                 amount,
@@ -277,15 +269,15 @@ async fn pay(
 /// Helper: 取消支付
 async fn cancel_payment(
     manager: &OrdersManager,
-    order_id: &str,
-    payment_id: &str,
+    order_id: i64,
+    payment_id: i64,
 ) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CancelPayment {
-            order_id: order_id.to_string(),
-            payment_id: payment_id.to_string(),
+            order_id,
+            payment_id,
             reason: Some("test".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -295,12 +287,12 @@ async fn cancel_payment(
 }
 
 /// Helper: 整单折扣
-async fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
+async fn apply_discount(manager: &OrdersManager, order_id: i64, percent: f64) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.to_string(),
+            order_id,
             discount_percent: Some(percent),
             discount_fixed: None,
             authorizer_id: None,
@@ -311,12 +303,12 @@ async fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -
 }
 
 /// Helper: 清除整单折扣
-async fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
+async fn clear_discount(manager: &OrdersManager, order_id: i64) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.to_string(),
+            order_id,
             discount_percent: Some(0.0),
             discount_fixed: None,
             authorizer_id: None,
@@ -329,7 +321,7 @@ async fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandRespo
 /// Helper: 分单支付（按商品）
 async fn split_by_items(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     items: Vec<shared::order::SplitItem>,
     method: &str,
 ) -> CommandResponse {
@@ -337,7 +329,7 @@ async fn split_by_items(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::SplitByItems {
-            order_id: order_id.to_string(),
+            order_id,
             items,
             payment_method: method.to_string(),
             tendered: None,
@@ -347,7 +339,7 @@ async fn split_by_items(
 }
 
 /// Helper: comp 商品 (comp all unpaid quantity)
-async fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
+async fn comp_item(manager: &OrdersManager, order_id: i64, instance_id: &str) -> CommandResponse {
     let s = manager.get_snapshot(order_id).unwrap().unwrap();
     let qty = s
         .items
@@ -359,7 +351,7 @@ async fn comp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompItem {
-            order_id: order_id.to_string(),
+            order_id,
             instance_id: instance_id.to_string(),
             quantity: qty,
             reason: "test comp".to_string(),
@@ -407,7 +399,7 @@ fn qty_changes(qty: i32) -> shared::order::ItemChanges {
 }
 
 /// Helper: 验证快照一致性 (stored vs rebuilt from events)
-fn assert_snapshot_consistent(manager: &OrdersManager, order_id: &str) {
+fn assert_snapshot_consistent(manager: &OrdersManager, order_id: i64) {
     let stored = manager.get_snapshot(order_id).unwrap().unwrap();
     let rebuilt = manager.rebuild_snapshot(order_id).unwrap();
     assert_eq!(
@@ -434,12 +426,12 @@ fn assert_snapshot_consistent(manager: &OrdersManager, order_id: &str) {
 // ========================================================================
 
 /// Helper: 整单附加费
-async fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
+async fn apply_surcharge(manager: &OrdersManager, order_id: i64, percent: f64) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderSurcharge {
-            order_id: order_id.to_string(),
+            order_id,
             surcharge_percent: Some(percent),
             surcharge_amount: None,
             authorizer_id: None,
@@ -452,14 +444,14 @@ async fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) 
 /// Helper: 整单固定附加费
 async fn apply_surcharge_fixed(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     amount: f64,
 ) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderSurcharge {
-            order_id: order_id.to_string(),
+            order_id,
             surcharge_percent: None,
             surcharge_amount: Some(amount),
             authorizer_id: None,
@@ -472,14 +464,14 @@ async fn apply_surcharge_fixed(
 /// Helper: 整单固定折扣
 async fn apply_discount_fixed(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     amount: f64,
 ) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ApplyOrderDiscount {
-            order_id: order_id.to_string(),
+            order_id,
             discount_percent: None,
             discount_fixed: Some(amount),
             authorizer_id: None,
@@ -492,7 +484,7 @@ async fn apply_discount_fixed(
 /// Helper: 删除商品
 async fn remove_item(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     instance_id: &str,
     qty: Option<i32>,
 ) -> CommandResponse {
@@ -500,7 +492,7 @@ async fn remove_item(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::RemoveItem {
-            order_id: order_id.to_string(),
+            order_id,
             instance_id: instance_id.to_string(),
             quantity: qty,
             reason: Some("test".to_string()),
@@ -512,16 +504,12 @@ async fn remove_item(
 }
 
 /// Helper: uncomp 商品
-async fn uncomp_item(
-    manager: &OrdersManager,
-    order_id: &str,
-    instance_id: &str,
-) -> CommandResponse {
+async fn uncomp_item(manager: &OrdersManager, order_id: i64, instance_id: &str) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::UncompItem {
-            order_id: order_id.to_string(),
+            order_id,
             instance_id: instance_id.to_string(),
             authorizer_id: 1,
             authorizer_name: "Test".to_string(),
@@ -533,16 +521,13 @@ async fn uncomp_item(
 /// Helper: 添加更多商品
 async fn add_items(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     items: Vec<CartItemInput>,
 ) -> CommandResponse {
     let cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
-        OrderCommandPayload::AddItems {
-            order_id: order_id.to_string(),
-            items,
-        },
+        OrderCommandPayload::AddItems { order_id, items },
     );
     manager.execute_command(cmd).await
 }
@@ -565,7 +550,7 @@ fn assert_remaining_consistent(s: &shared::order::OrderSnapshot) {
 // ========================================================================
 
 /// Helper: 开台（不加商品）
-async fn open_table(manager: &OrdersManager, table_id: i64) -> String {
+async fn open_table(manager: &OrdersManager, table_id: i64) -> i64 {
     let open_cmd = OrderCommand::new(
         1,
         "Test Operator".to_string(),
@@ -586,7 +571,7 @@ async fn open_table(manager: &OrdersManager, table_id: i64) -> String {
 /// Helper: 跳过/恢复规则
 async fn toggle_rule_skip(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     rule_id: i64,
     skipped: bool,
 ) -> CommandResponse {
@@ -594,7 +579,7 @@ async fn toggle_rule_skip(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::ToggleRuleSkip {
-            order_id: order_id.to_string(),
+            order_id,
             rule_id,
             skipped,
         },
@@ -775,7 +760,7 @@ fn assert_close(actual: f64, expected: f64, msg: &str) {
 /// Helper: comp 指定数量
 async fn comp_item_qty(
     manager: &OrdersManager,
-    order_id: &str,
+    order_id: i64,
     instance_id: &str,
     quantity: i32,
 ) -> CommandResponse {
@@ -783,7 +768,7 @@ async fn comp_item_qty(
         1,
         "Test Operator".to_string(),
         OrderCommandPayload::CompItem {
-            order_id: order_id.to_string(),
+            order_id,
             instance_id: instance_id.to_string(),
             quantity,
             reason: "test comp".to_string(),

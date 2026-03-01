@@ -4,7 +4,7 @@
  */
 
 export interface ReceiptPrintConfig {
-  orderId: string;
+  orderId: number;
   printerId?: number;
   copyType: 'original' | 'copy' | 'reprint';
   includePaymentDetails?: boolean;
@@ -12,7 +12,7 @@ export interface ReceiptPrintConfig {
 }
 
 export interface KitchenTicketPrintConfig {
-  orderId: string;
+  orderId: number;
   printerId?: number;
   items: string[]; // item IDs to print
   note?: string;
@@ -20,7 +20,7 @@ export interface KitchenTicketPrintConfig {
 }
 
 export interface LabelPrintConfig {
-  orderId: string;
+  orderId: number;
   itemId: string;
   printerId?: number;
   templateId?: number;

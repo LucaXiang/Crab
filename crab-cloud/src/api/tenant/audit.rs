@@ -28,7 +28,7 @@ pub async fn audit_log(
     let page = query.page.unwrap_or(1).max(1);
     let offset = (page - 1) * per_page;
 
-    let entries = crate::db::audit::query(&state.pool, &identity.tenant_id, per_page, offset)
+    let entries = crate::db::audit::query(&state.pool, identity.tenant_id, per_page, offset)
         .await
         .map_err(|e| {
             tracing::error!("Audit log query error: {e}");

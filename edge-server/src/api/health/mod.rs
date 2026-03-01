@@ -14,7 +14,7 @@
 //!   "status": "ok",
 //!   "version": "0.1.0",
 //!   "is_activated": true,
-//!   "tenant_id": "tenant-123"
+//!   "tenant_id": 123456789
 //! }
 //! ```
 
@@ -43,7 +43,7 @@ pub struct HealthResponse {
     git_hash: &'static str,
     /// 租户 ID (如果已激活)
     #[serde(skip_serializing_if = "Option::is_none")]
-    tenant_id: Option<String>,
+    tenant_id: Option<i64>,
     /// 边缘节点 ID (如果已激活)
     #[serde(skip_serializing_if = "Option::is_none")]
     edge_id: Option<String>,

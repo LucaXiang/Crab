@@ -10,7 +10,7 @@ export interface TableSelectionScreenProps {
     zone?: Zone
   ) => void;
   onClose: () => void;
-  onNavigateCheckout?: (tableId: string) => void;
+  onNavigateCheckout?: (tableId: number) => void;
   mode: 'HOLD' | 'RETRIEVE';
   cart?: CartItem[];
   manageTableId?: number;

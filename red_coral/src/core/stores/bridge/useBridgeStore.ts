@@ -89,12 +89,12 @@ export interface ModeInfo {
   mode: ModeType | null;
   is_connected: boolean;
   is_authenticated: boolean;
-  tenant_id: string | null;
+  tenant_id: number | null;
   username: string | null;
 }
 
 export interface TenantInfo {
-  tenant_id: string;
+  tenant_id: number;
   tenant_name: string | null;
   has_certificates: boolean;
   last_used: number | null;
@@ -155,19 +155,19 @@ export interface ActiveDevice {
 }
 
 export interface ActivationResult {
-  tenant_id: string;
+  tenant_id: number;
   subscription_status: string | null;
   quota_info: QuotaInfo | null;
 }
 
 export interface AppConfigResponse {
   current_mode: ModeType | null;
-  current_tenant: string | null;
-  known_tenants: string[];
+  current_tenant: number | null;
+  known_tenants: number[];
 }
 
 export interface TenantVerifyData {
-  tenant_id: string;
+  tenant_id: number;
   token: string;
   refresh_token: string;
   subscription_status: SubscriptionStatus;
@@ -208,7 +208,7 @@ interface BridgeStore {
   activateClientTenant: () => Promise<ActivationResult>;
   deactivateCurrentMode: () => Promise<void>;
   exitTenant: () => Promise<void>;
-  getCurrentTenant: () => Promise<string | null>;
+  getCurrentTenant: () => Promise<number | null>;
 
   // Auth Actions (unified - ClientBridge based)
   loginEmployee: (username: string, password: string) => Promise<LoginResponse>;
@@ -415,7 +415,7 @@ export const useBridgeStore = create<BridgeStore>()(
 
       getCurrentTenant: async () => {
         try {
-          return await invokeApi<string | null>('get_current_tenant');
+          return await invokeApi<number | null>('get_current_tenant');
         } catch (error) {
           return null;
         }

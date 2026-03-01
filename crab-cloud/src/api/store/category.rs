@@ -18,7 +18,7 @@ pub async fn list_categories(
     Extension(identity): Extension<TenantIdentity>,
     Path(store_id): Path<i64>,
 ) -> ApiResult<Vec<store::StoreCategory>> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
     let categories = store::list_categories(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -31,7 +31,7 @@ pub async fn create_category(
     Path(store_id): Path<i64>,
     Json(data): Json<shared::models::category::CategoryCreate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     let (source_id, op_data) = store::create_category_direct(&state.pool, store_id, &data)
         .await
@@ -43,6 +43,7 @@ pub async fn create_category(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::CreateCategory {
             id: Some(source_id),
             data,
@@ -59,7 +60,7 @@ pub async fn update_category(
     Path((store_id, category_id)): Path<(i64, i64)>,
     Json(data): Json<shared::models::category::CategoryUpdate>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::update_category_direct(&state.pool, store_id, category_id, &data)
         .await
@@ -71,6 +72,7 @@ pub async fn update_category(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::UpdateCategory {
             id: category_id,
             data,
@@ -92,7 +94,7 @@ pub async fn batch_update_category_sort_order(
     Path(store_id): Path<i64>,
     Json(req): Json<BatchSortOrderRequest>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::batch_update_sort_order_categories(&state.pool, store_id, &req.items)
         .await
@@ -104,6 +106,7 @@ pub async fn batch_update_category_sort_order(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::BatchUpdateCategorySortOrder { items: req.items },
     )
     .await;
@@ -116,7 +119,7 @@ pub async fn delete_category(
     Extension(identity): Extension<TenantIdentity>,
     Path((store_id, category_id)): Path<(i64, i64)>,
 ) -> ApiResult<StoreOpResult> {
-    verify_store(&state, store_id, &identity.tenant_id).await?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
 
     store::delete_category_direct(&state.pool, store_id, category_id)
         .await
@@ -128,6 +131,7 @@ pub async fn delete_category(
     push_to_edge(
         &state,
         store_id,
+        identity.tenant_id,
         StoreOp::DeleteCategory { id: category_id },
     )
     .await;
