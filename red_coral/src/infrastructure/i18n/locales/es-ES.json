@@ -1235,11 +1235,7 @@
         "email": "Email",
         "website": "Web",
         "business_day_cutoff": "Cierre día",
-        "business_day_cutoff_help": "Para turnos e informes. Restaurantes: 00:00, bares: 06:00",
-        "cutoff_presets": {
-          "midnight": "Medianoche (00:00) - Restaurantes",
-          "early_morning": "Madrugada (06:00) - Bares"
-        }
+        "business_day_cutoff_help": "Para turnos e informes. Restaurantes: 00:00, bares: 06:00"
       }
     },
     "batch_delete": {

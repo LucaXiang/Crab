@@ -891,11 +891,10 @@ export interface StoreInfo {
   email: string | null;
   website: string | null;
   /**
-   * Business day cutoff time (HH:MM format, e.g., "06:00")
-   * Used for shift cross-day detection and daily report calculation
-   * Default "02:00", bars/nightclubs can set to "06:00"
+   * Business day cutoff in minutes from midnight (0-480).
+   * E.g. 120 = 02:00, 360 = 06:00.
    */
-  business_day_cutoff: string;
+  business_day_cutoff: number;
   created_at: number | null;
   updated_at: number | null;
 }
@@ -908,8 +907,8 @@ export interface StoreInfoUpdate {
   phone?: string | null;
   email?: string | null;
   website?: string | null;
-  /** Business day cutoff time (HH:MM format) */
-  business_day_cutoff?: string;
+  /** Business day cutoff in minutes from midnight (0-480) */
+  business_day_cutoff?: number;
 }
 
 // ============ Label Template (API DTOs) ============

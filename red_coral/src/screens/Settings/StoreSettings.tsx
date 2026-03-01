@@ -9,7 +9,18 @@ import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { ProductImage } from '@/features/product/ProductImage';
 import { getErrorMessage } from '@/utils/error';
 import { MAX_NAME_LEN, MAX_ADDRESS_LEN, MAX_SHORT_TEXT_LEN, MAX_EMAIL_LEN, MAX_URL_LEN } from '@/shared/constants/validation';
-import { WheelTimePicker } from '@/shared/components/FormField';
+
+const CUTOFF_PRESETS = [
+  { value: 0, label: '00:00' },
+  { value: 60, label: '01:00' },
+  { value: 120, label: '02:00' },
+  { value: 180, label: '03:00' },
+  { value: 240, label: '04:00' },
+  { value: 300, label: '05:00' },
+  { value: 360, label: '06:00' },
+  { value: 420, label: '07:00' },
+  { value: 480, label: '08:00' },
+];
 
 export const StoreSettings: React.FC = () => {
   const info = useStoreInfo();
@@ -29,7 +40,7 @@ export const StoreSettings: React.FC = () => {
     phone: info.phone || '',
     email: info.email || '',
     website: info.website || '',
-    businessDayCutoff: info.business_day_cutoff || '02:00',
+    businessDayCutoff: info.business_day_cutoff ?? 120,
   };
 
   const { values: formData, handleChange, isDirty, reset } = useDirtyForm(formInfo);
@@ -198,35 +209,18 @@ export const StoreSettings: React.FC = () => {
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3 text-gray-400" />{t('settings.store.form.business_day_cutoff')}</span>
             </label>
-            <div className="w-40">
-              <WheelTimePicker
-                value={formData.businessDayCutoff}
-                onChange={(v) => handleChange('businessDayCutoff', v)}
-                placeholder={t('settings.store.form.business_day_cutoff')}
-              />
-            </div>
+            <select
+              value={formData.businessDayCutoff}
+              onChange={(e) => handleChange('businessDayCutoff', Number(e.target.value))}
+              className="w-40 rounded-lg border border-gray-200 bg-gray-50/50 text-sm p-2.5 focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all outline-none cursor-pointer"
+            >
+              {CUTOFF_PRESETS.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
           </div>
           <div className="pt-5">
-            <div className="flex gap-2">
-              {[
-                { value: '00:00', label: t('settings.store.form.cutoff_presets.midnight') },
-                { value: '06:00', label: t('settings.store.form.cutoff_presets.early_morning') },
-              ].map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => handleChange('businessDayCutoff', preset.value)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    formData.businessDayCutoff === preset.value
-                      ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1.5 text-[11px] text-gray-400">{t('settings.store.form.business_day_cutoff_help')}</p>
+            <p className="text-[11px] text-gray-400">{t('settings.store.form.business_day_cutoff_help')}</p>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -81,17 +81,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
   const [prevData, setPrevData] = useState<StoreOverview | null>(null);
   const [lastWeekData, setLastWeekData] = useState<StoreOverview | null>(null);
 
-  // Parse cutoff — backend now sends i32 (minutes), but TS type is still string until Task 6
-  const cutoffMinutes = useMemo(() => {
-    const raw = storeInfo.business_day_cutoff;
-    if (typeof raw === 'number') return raw;
-    // Legacy string format "HH:MM"
-    if (typeof raw === 'string' && raw.includes(':')) {
-      const [h, m] = raw.split(':').map(Number);
-      return (h || 0) * 60 + (m || 0);
-    }
-    return Number(raw) || 0;
-  }, [storeInfo.business_day_cutoff]);
+  const cutoffMinutes = storeInfo.business_day_cutoff ?? 0;
 
   const fetchOverview = useCallback(async (from: number, to: number): Promise<StoreOverview> => {
     return invokeApi<StoreOverview>('get_statistics', { from, to });
