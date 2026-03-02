@@ -22,36 +22,24 @@ export interface ChainEntryItem {
 }
 
 export interface AnulacionDetailResponse {
-  source_id: number;
-  anulacion_number: string;
-  serie: string;
-  original_invoice_number: string;
-  original_order_id: number;
-  reason: string;
-  note: string | null;
-  operator_name: string;
-  huella: string;
-  aeat_status: string;
+  order_id: number;
+  receipt_number: string;
+  total_amount: number;
+  is_anulada: boolean;
   created_at: number;
 }
 
 export interface UpgradeDetailResponse {
-  source_id: number;
-  invoice_number: string;
-  serie: string;
-  tipo_factura: string;
-  source_pk: number;
-  subtotal: number;
+  order_id: number;
+  receipt_number: string;
+  total_amount: number;
   tax: number;
-  total: number;
-  factura_sustituida_num: string | null;
+  is_upgraded: boolean;
   customer_nif: string | null;
   customer_nombre: string | null;
   customer_address: string | null;
   customer_email: string | null;
   customer_phone: string | null;
-  huella: string;
-  aeat_status: string;
   created_at: number;
 }
 

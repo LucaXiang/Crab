@@ -203,32 +203,29 @@ pub async fn list_chain_entries(
         (
             SELECT
                 'ANULACION'::TEXT AS entry_type,
-                a.source_id AS entry_id,
-                a.anulacion_number AS display_number,
+                o.order_id AS entry_id,
+                COALESCE(o.receipt_number, CAST(o.order_id AS TEXT)) AS display_number,
                 'ANULADA'::TEXT AS status,
-                NULL::NUMERIC AS amount,
-                a.created_at,
-                a.original_order_id,
-                (SELECT o.receipt_number FROM store_archived_orders o
-                 WHERE o.store_id = a.store_id AND o.order_id = a.original_order_id
-                 LIMIT 1) AS original_receipt
-            FROM store_anulaciones a
-            WHERE a.store_id = $1 AND a.tenant_id = $2
+                o.total AS amount,
+                COALESCE(o.end_time, o.synced_at) AS created_at,
+                NULL::BIGINT AS original_order_id,
+                NULL::TEXT AS original_receipt
+            FROM store_archived_orders o
+            WHERE o.store_id = $1 AND o.tenant_id = $2 AND o.is_anulada = true
         )
         UNION ALL
         (
             SELECT
                 'UPGRADE'::TEXT AS entry_type,
-                inv.source_id AS entry_id,
-                inv.invoice_number AS display_number,
-                'F3'::TEXT AS status,
-                inv.total AS amount,
-                inv.created_at,
-                inv.source_pk AS original_order_id,
+                o.order_id AS entry_id,
+                COALESCE(o.receipt_number, CAST(o.order_id AS TEXT)) AS display_number,
+                'UPGRADED'::TEXT AS status,
+                o.total AS amount,
+                COALESCE(o.end_time, o.synced_at) AS created_at,
+                NULL::BIGINT AS original_order_id,
                 NULL::TEXT AS original_receipt
-            FROM store_invoices inv
-            WHERE inv.store_id = $1 AND inv.tenant_id = $2
-              AND inv.tipo_factura = 'F3'
+            FROM store_archived_orders o
+            WHERE o.store_id = $1 AND o.tenant_id = $2 AND o.is_upgraded = true
         )
         ORDER BY created_at DESC
         LIMIT $3 OFFSET $4
@@ -346,19 +343,13 @@ pub async fn get_credit_note_detail(
     }))
 }
 
-/// Anulacion detail
+/// Anulacion detail (order-layer: queried from store_archived_orders)
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct AnulacionDetail {
-    pub source_id: i64,
-    pub anulacion_number: String,
-    pub serie: String,
-    pub original_invoice_number: String,
-    pub original_order_id: i64,
-    pub reason: String,
-    pub note: Option<String>,
-    pub operator_name: String,
-    pub huella: String,
-    pub aeat_status: String,
+    pub order_id: i64,
+    pub receipt_number: String,
+    pub total_amount: f64,
+    pub is_anulada: bool,
     pub created_at: i64,
 }
 
@@ -366,43 +357,37 @@ pub async fn get_anulacion_detail(
     pool: &PgPool,
     store_id: i64,
     tenant_id: i64,
-    source_id: i64,
+    order_id: i64,
 ) -> Result<Option<AnulacionDetail>, BoxError> {
     let row: Option<AnulacionDetail> = sqlx::query_as(
         r#"
-        SELECT source_id, anulacion_number, serie, original_invoice_number,
-               original_order_id, reason, note, operator_name, huella, aeat_status, created_at
-        FROM store_anulaciones
-        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3
+        SELECT order_id, receipt_number, total AS total_amount, is_anulada,
+               COALESCE(end_time, synced_at) AS created_at
+        FROM store_archived_orders
+        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3 AND is_anulada = true
         "#,
     )
     .bind(store_id)
     .bind(tenant_id)
-    .bind(source_id)
+    .bind(order_id)
     .fetch_optional(pool)
     .await?;
     Ok(row)
 }
 
-/// Upgrade (F3 invoice) detail
+/// Upgrade detail (order-layer: queried from store_archived_orders)
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct UpgradeDetail {
-    pub source_id: i64,
-    pub invoice_number: String,
-    pub serie: String,
-    pub tipo_factura: String,
-    pub source_pk: i64,
-    pub subtotal: Decimal,
-    pub tax: Decimal,
-    pub total: Decimal,
-    pub factura_sustituida_num: Option<String>,
+    pub order_id: i64,
+    pub receipt_number: String,
+    pub total_amount: f64,
+    pub tax: f64,
+    pub is_upgraded: bool,
     pub customer_nif: Option<String>,
     pub customer_nombre: Option<String>,
     pub customer_address: Option<String>,
     pub customer_email: Option<String>,
     pub customer_phone: Option<String>,
-    pub huella: String,
-    pub aeat_status: String,
     pub created_at: i64,
 }
 
@@ -410,21 +395,21 @@ pub async fn get_upgrade_detail(
     pool: &PgPool,
     store_id: i64,
     tenant_id: i64,
-    source_id: i64,
+    order_id: i64,
 ) -> Result<Option<UpgradeDetail>, BoxError> {
     let row: Option<UpgradeDetail> = sqlx::query_as(
         r#"
-        SELECT source_id, invoice_number, serie, tipo_factura, source_pk,
-               subtotal, tax, total, factura_sustituida_num,
-               customer_nif, customer_nombre, customer_address, customer_email, customer_phone,
-               huella, aeat_status, created_at
-        FROM store_invoices
-        WHERE store_id = $1 AND tenant_id = $2 AND source_id = $3 AND tipo_factura = 'F3'
+        SELECT order_id, receipt_number, total AS total_amount, tax,
+               is_upgraded, customer_nif, customer_nombre, customer_address,
+               customer_email, customer_phone,
+               COALESCE(end_time, synced_at) AS created_at
+        FROM store_archived_orders
+        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3 AND is_upgraded = true
         "#,
     )
     .bind(store_id)
     .bind(tenant_id)
-    .bind(source_id)
+    .bind(order_id)
     .fetch_optional(pool)
     .await?;
     Ok(row)
@@ -686,6 +671,13 @@ pub async fn get_order_detail(
         discount_amount: Decimal,
         void_type: Option<String>,
         loss_amount: Option<Decimal>,
+        is_anulada: Option<bool>,
+        is_upgraded: Option<bool>,
+        customer_nif: Option<String>,
+        customer_nombre: Option<String>,
+        customer_address: Option<String>,
+        customer_email: Option<String>,
+        customer_phone: Option<String>,
     }
 
     let header = sqlx::query_as::<_, HeaderRow>(
@@ -695,7 +687,9 @@ pub async fn get_order_detail(
                order_manual_discount_amount, order_manual_surcharge_amount,
                order_rule_discount_amount, order_rule_surcharge_amount,
                operator_name, loss_reason, void_note, member_name,
-               guest_count, discount_amount, void_type, loss_amount
+               guest_count, discount_amount, void_type, loss_amount,
+               is_anulada, is_upgraded, customer_nif, customer_nombre,
+               customer_address, customer_email, customer_phone
         FROM store_archived_orders
         WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
         "#,
@@ -904,6 +898,13 @@ pub async fn get_order_detail(
         items,
         payments,
         events,
+        is_anulada: header.is_anulada.unwrap_or(false),
+        is_upgraded: header.is_upgraded.unwrap_or(false),
+        customer_nif: header.customer_nif,
+        customer_nombre: header.customer_nombre,
+        customer_address: header.customer_address,
+        customer_email: header.customer_email,
+        customer_phone: header.customer_phone,
     }))
 }
 

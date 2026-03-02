@@ -57,15 +57,15 @@ export function getCreditNoteDetail(
 export function getAnulacionDetail(
   token: string,
   storeId: number,
-  sourceId: number,
+  orderId: number,
 ): Promise<AnulacionDetailResponse> {
-  return request('GET', `/api/tenant/stores/${storeId}/anulaciones/${sourceId}`, undefined, token);
+  return request('GET', `/api/tenant/stores/${storeId}/anulaciones/${orderId}`, undefined, token);
 }
 
 export function getUpgradeDetail(
   token: string,
   storeId: number,
-  sourceId: number,
+  orderId: number,
 ): Promise<UpgradeDetailResponse> {
-  return request('GET', `/api/tenant/stores/${storeId}/upgrades/${sourceId}`, undefined, token);
+  return request('GET', `/api/tenant/stores/${storeId}/upgrades/${orderId}`, undefined, token);
 }

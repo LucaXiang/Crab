@@ -312,6 +312,20 @@ pub struct OrderDetailPayload {
     pub payments: Vec<OrderPaymentSync>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<OrderEventSync>,
+    #[serde(default)]
+    pub is_anulada: bool,
+    #[serde(default)]
+    pub is_upgraded: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_nif: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_nombre: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_email: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_phone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1086,6 +1100,13 @@ mod tests {
                 items: vec![],
                 payments: vec![],
                 events: vec![],
+                is_anulada: false,
+                is_upgraded: false,
+                customer_nif: None,
+                customer_nombre: None,
+                customer_address: None,
+                customer_email: None,
+                customer_phone: None,
             },
         };
 
@@ -1147,6 +1168,13 @@ mod tests {
                 items: vec![],
                 payments: vec![],
                 events: vec![],
+                is_anulada: false,
+                is_upgraded: false,
+                customer_nif: None,
+                customer_nombre: None,
+                customer_address: None,
+                customer_email: None,
+                customer_phone: None,
             },
         };
         assert!(
@@ -1284,6 +1312,13 @@ mod tests {
                     change_amount: None,
                 }],
                 events: vec![],
+                is_anulada: false,
+                is_upgraded: false,
+                customer_nif: None,
+                customer_nombre: None,
+                customer_address: None,
+                customer_email: None,
+                customer_phone: None,
             },
         }
     }
@@ -1682,6 +1717,13 @@ mod tests {
                     items: vec![],
                     payments: vec![],
                     events: vec![],
+                    is_anulada: false,
+                    is_upgraded: false,
+                    customer_nif: None,
+                    customer_nombre: None,
+                    customer_address: None,
+                    customer_email: None,
+                    customer_phone: None,
                 },
             };
 

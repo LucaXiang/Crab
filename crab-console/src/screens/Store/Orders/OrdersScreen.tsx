@@ -128,8 +128,8 @@ export const OrdersScreen: React.FC = () => {
     const raw = selectedEntry?.display_number
       ?? selected?.displayHint
       ?? (selected?.type === 'CREDIT_NOTE' && cnDetail ? cnDetail.credit_note_number : null)
-      ?? (selected?.type === 'ANULACION' && anulacionDetail ? anulacionDetail.anulacion_number : null)
-      ?? (selected?.type === 'UPGRADE' && upgradeDetail ? upgradeDetail.invoice_number : null)
+      ?? (selected?.type === 'ANULACION' && anulacionDetail ? anulacionDetail.receipt_number : null)
+      ?? (selected?.type === 'UPGRADE' && upgradeDetail ? upgradeDetail.receipt_number : null)
       ?? String(selected?.id ?? '').slice(0, 8);
     return selected ? formatChainNumber(raw, selected.type) : '';
   }, [selectedEntry, selected, cnDetail, anulacionDetail, upgradeDetail]);
@@ -676,7 +676,7 @@ const AnulacionDetailView: React.FC<{
         <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center">
           <Ban className="text-white w-5 h-5" />
         </div>
-        <h1 className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{detail.anulacion_number}</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{detail.receipt_number}</h1>
         <span className="px-2 py-1 bg-slate-800 text-white text-xs font-bold rounded uppercase">
           {t('orders.anulacion')}
         </span>
@@ -690,18 +690,17 @@ const AnulacionDetailView: React.FC<{
           <Clock className="w-4 h-4" />
           {new Date(detail.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
         </span>
-        {detail.operator_name && <span>{t('orders.operator')}: {detail.operator_name}</span>}
       </div>
 
       {/* Jump to original order */}
       <button
         type="button"
-        onClick={() => onJumpToOrder(detail.original_order_id)}
+        onClick={() => onJumpToOrder(detail.order_id, detail.receipt_number)}
         className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full cursor-pointer"
       >
         <FileText className="w-4 h-4 text-slate-400" />
-        <span className="text-slate-500">{t('orders.anulacion_original_invoice')}:</span>
-        <span className="font-mono font-bold">{detail.original_invoice_number}</span>
+        <span className="text-slate-500">{t('orders.view_order')}:</span>
+        <span className="font-mono font-bold">{detail.receipt_number}</span>
         <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400" />
       </button>
     </div>
@@ -713,21 +712,8 @@ const AnulacionDetailView: React.FC<{
         <span>{t('orders.anulacion_details')}</span>
       </div>
       <div className="divide-y divide-slate-100">
-        <DetailRow label={t('orders.anulacion_serie')} value={detail.serie} />
-        <DetailRow label={t('orders.reason')} value={detail.reason} />
-        {detail.note && <DetailRow label={t('orders.note')} value={detail.note} />}
-        {(() => { const s = formatAeatStatus(detail.aeat_status); return (
-          <DetailRow label={t('orders.aeat_status')} value={
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.style}`}>{s.label}</span>
-          } />
-        ); })()}
+        <DetailRow label={t('orders.total')} value={<span className="line-through text-slate-400">{formatCurrency(detail.total_amount)}</span>} />
       </div>
-    </div>
-
-    {/* Huella */}
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-      <div className="text-xs font-bold text-slate-500 uppercase mb-2">Huella</div>
-      <div className="font-mono text-xs text-slate-600 break-all bg-slate-50 p-3 rounded-lg">{detail.huella}</div>
     </div>
   </div>
 );
@@ -749,9 +735,9 @@ const UpgradeDetailView: React.FC<{
           <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
             <FileUp className="text-blue-600 w-5 h-5" />
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{detail.invoice_number}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{detail.receipt_number}</h1>
           <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded uppercase">
-            {detail.tipo_factura}
+            UPGRADE
           </span>
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
@@ -765,23 +751,21 @@ const UpgradeDetailView: React.FC<{
           </span>
         </div>
 
-        {/* Original invoice */}
-        {detail.factura_sustituida_num && (
-          <button
-            type="button"
-            onClick={() => onJumpToOrder(detail.source_pk)}
-            className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-500">{t('orders.upgrade_original')}:</span>
-            <span className="font-mono font-bold">{detail.factura_sustituida_num}</span>
-            <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400" />
-          </button>
-        )}
+        {/* Jump to original order */}
+        <button
+          type="button"
+          onClick={() => onJumpToOrder(detail.order_id, detail.receipt_number)}
+          className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full cursor-pointer"
+        >
+          <FileText className="w-4 h-4 text-slate-400" />
+          <span className="text-slate-500">{t('orders.view_order')}:</span>
+          <span className="font-mono font-bold">{detail.receipt_number}</span>
+          <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400" />
+        </button>
       </div>
       <div className="text-right shrink-0 pl-6">
         <p className="text-sm text-blue-400 uppercase font-bold tracking-wider mb-1">{t('orders.total')}</p>
-        <p className="text-2xl md:text-3xl font-bold text-blue-600">{formatCurrency(detail.total)}</p>
+        <p className="text-2xl md:text-3xl font-bold text-blue-600">{formatCurrency(detail.total_amount)}</p>
       </div>
     </div>
 
@@ -808,29 +792,16 @@ const UpgradeDetailView: React.FC<{
       </div>
     )}
 
-    {/* Invoice details */}
+    {/* Amount details */}
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 font-bold text-slate-700">
         <FileUp className="w-[18px] h-[18px]" />
-        <span>{t('orders.upgrade_invoice_details')}</span>
+        <span>{t('orders.details')}</span>
       </div>
       <div className="divide-y divide-slate-100">
-        <DetailRow label={t('orders.anulacion_serie')} value={detail.serie} />
-        <DetailRow label={t('orders.subtotal')} value={formatCurrency(detail.subtotal)} />
         <DetailRow label={t('orders.tax_amount')} value={formatCurrency(detail.tax)} />
-        <DetailRow label={t('orders.total')} value={<span className="font-bold text-blue-600">{formatCurrency(detail.total)}</span>} />
-        {(() => { const s = formatAeatStatus(detail.aeat_status); return (
-          <DetailRow label={t('orders.aeat_status')} value={
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.style}`}>{s.label}</span>
-          } />
-        ); })()}
+        <DetailRow label={t('orders.total')} value={<span className="font-bold text-blue-600">{formatCurrency(detail.total_amount)}</span>} />
       </div>
-    </div>
-
-    {/* Huella */}
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-      <div className="text-xs font-bold text-slate-500 uppercase mb-2">Huella</div>
-      <div className="font-mono text-xs text-slate-600 break-all bg-slate-50 p-3 rounded-lg">{detail.huella}</div>
     </div>
   </div>
 );

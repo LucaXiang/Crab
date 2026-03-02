@@ -439,9 +439,11 @@ async fn upsert_archived_order(
             order_rule_discount_amount, order_rule_surcharge_amount,
             operator_name, loss_reason, void_note, member_name, service_type,
             operator_id, member_id, queue_number, shift_id, created_at,
-            version, synced_at
+            version, synced_at,
+            is_anulada, is_upgraded, customer_nif, customer_nombre,
+            customer_address, customer_email, customer_phone
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48)
         ON CONFLICT (tenant_id, store_id, order_id)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -478,7 +480,14 @@ async fn upsert_archived_order(
                       queue_number = EXCLUDED.queue_number,
                       shift_id = EXCLUDED.shift_id,
                       version = EXCLUDED.version,
-                      synced_at = EXCLUDED.synced_at
+                      synced_at = EXCLUDED.synced_at,
+                      is_anulada = EXCLUDED.is_anulada,
+                      is_upgraded = EXCLUDED.is_upgraded,
+                      customer_nif = EXCLUDED.customer_nif,
+                      customer_nombre = EXCLUDED.customer_nombre,
+                      customer_address = EXCLUDED.customer_address,
+                      customer_email = EXCLUDED.customer_email,
+                      customer_phone = EXCLUDED.customer_phone
         WHERE store_archived_orders.version <= EXCLUDED.version
         RETURNING id
         "#,
@@ -524,6 +533,13 @@ async fn upsert_archived_order(
     .bind(detail_sync.created_at)            // $39
     .bind(version_to_i64(item.version))      // $40
     .bind(now)                               // $41
+    .bind(d.is_anulada)                      // $42
+    .bind(d.is_upgraded)                     // $43
+    .bind(&d.customer_nif)                   // $44
+    .bind(&d.customer_nombre)                // $45
+    .bind(&d.customer_address)               // $46
+    .bind(&d.customer_email)                 // $47
+    .bind(&d.customer_phone)                 // $48
     .fetch_optional(&mut *tx)
     .await?;
 

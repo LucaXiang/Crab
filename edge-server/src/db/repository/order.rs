@@ -104,7 +104,6 @@ pub struct OrderDetailEvent {
 #[derive(sqlx::FromRow)]
 #[allow(dead_code)]
 struct OrderRow {
-    id: i64,
     order_id: i64,
     receipt_number: String,
     table_name: Option<String>,
@@ -187,7 +186,7 @@ struct ItemRow {
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
     let order: OrderRow = sqlx::query_as::<_, OrderRow>(
-        "SELECT id, order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_anulada, is_upgraded FROM archived_order WHERE id = ?",
+        "SELECT id AS order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_anulada, is_upgraded FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -437,16 +436,24 @@ pub async fn build_order_detail_sync(
         queue_number: Option<i32>,
         shift_id: Option<i64>,
         cloud_synced: bool,
+        is_anulada: bool,
+        is_upgraded: bool,
+        customer_nif: Option<String>,
+        customer_nombre: Option<String>,
+        customer_address: Option<String>,
+        customer_email: Option<String>,
+        customer_phone: Option<String>,
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
-        "SELECT ao.order_id, ao.receipt_number, ao.status, ao.total_amount, ao.tax, ao.end_time, \
+        "SELECT ao.id AS order_id, ao.receipt_number, ao.status, ao.total_amount, ao.tax, ao.end_time, \
          ce.prev_hash, ce.curr_hash, ao.created_at, ao.zone_name, ao.table_name, ao.is_retail, ao.guest_count, \
          ao.original_total, ao.subtotal, ao.paid_amount, ao.discount_amount, ao.surcharge_amount, \
          ao.comp_total_amount, ao.order_manual_discount_amount, ao.order_manual_surcharge_amount, \
          ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
          ao.operator_id, ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, \
-         ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced \
+         ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced, \
+         ao.is_anulada, ao.is_upgraded, ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -701,6 +708,13 @@ pub async fn build_order_detail_sync(
             items,
             payments,
             events,
+            is_anulada: order.is_anulada,
+            is_upgraded: order.is_upgraded,
+            customer_nif: order.customer_nif,
+            customer_nombre: order.customer_nombre,
+            customer_address: order.customer_address,
+            customer_email: order.customer_email,
+            customer_phone: order.customer_phone,
         },
     })
 }
@@ -803,7 +817,7 @@ pub async fn get_items_added_events_by_order_id(
 ) -> RepoResult<(Option<ArchivedOrderMeta>, Vec<ArchivedItemsAddedEvent>)> {
     // 1. Find order pk and metadata by order_id
     let meta = sqlx::query_as::<_, ArchivedOrderMeta>(
-        "SELECT order_id, receipt_number, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE order_id = ?",
+        "SELECT id AS order_id, receipt_number, table_name, zone_name, is_retail, queue_number FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -813,7 +827,7 @@ pub async fn get_items_added_events_by_order_id(
         return Ok((None, vec![]));
     };
 
-    let order_pk = sqlx::query_scalar::<_, i64>("SELECT id FROM archived_order WHERE order_id = ?")
+    let order_pk = sqlx::query_scalar::<_, i64>("SELECT id FROM archived_order WHERE id = ?")
         .bind(order_id)
         .fetch_one(pool)
         .await?;

@@ -1,21 +1,18 @@
-//! Invoice Upgrade Service (F2 → F3 Sustitutiva)
+//! Upgrade Service — Order-layer upgrade (mark order as upgraded)
 //!
-//! Creates F3 invoices that substitute the original F2 simplified invoice,
-//! adding customer information (NIF, company name, etc.) while keeping
-//! the same amounts as the original F2.
+//! Marks an archived order as upgraded + chain_entry + chain_hash.
+//! Invoice layer (Verifactu F2→F3) is a downstream consumer that scans chain entries separately.
+//!
+//! Shares the same hash_chain_lock as OrderArchiveService and CreditNoteService.
 
-use crate::db::repository::invoice as inv_repo;
-use shared::models::invoice::{AeatStatus, Invoice, InvoiceSourceType, TipoFactura};
-use shared::order::verifactu::{HuellaAltaInput, compute_verifactu_huella_alta};
 use shared::util::snowflake_id;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use super::invoice::InvoiceService;
 use super::service::{ArchiveError, ArchiveResult};
 
-/// Request to create an invoice upgrade (F2 → F3)
+/// Request to create an order upgrade
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CreateUpgradeRequest {
     pub order_pk: i64,
@@ -29,49 +26,42 @@ pub struct CreateUpgradeRequest {
     pub customer_phone: Option<String>,
 }
 
-/// Service for upgrading F2 invoices to F3 (sustitutiva)
+/// Response from creating an upgrade
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct UpgradeResponse {
+    pub order_pk: i64,
+    pub chain_entry_id: i64,
+    pub receipt_number: String,
+}
+
+/// Service for upgrading orders
 #[derive(Clone)]
 pub struct UpgradeService {
     pool: SqlitePool,
     /// Shared with OrderArchiveService, CreditNoteService, AnulacionService
     hash_chain_lock: Arc<Mutex<()>>,
-    invoice_service: Option<InvoiceService>,
 }
 
 impl UpgradeService {
-    pub fn new(
-        pool: SqlitePool,
-        hash_chain_lock: Arc<Mutex<()>>,
-        invoice_service: Option<InvoiceService>,
-    ) -> Self {
+    pub fn new(pool: SqlitePool, hash_chain_lock: Arc<Mutex<()>>) -> Self {
         Self {
             pool,
             hash_chain_lock,
-            invoice_service,
         }
     }
 
-    /// Create an F3 sustitutiva invoice.
+    /// Create an order upgrade (order-layer).
     ///
-    /// Preconditions:
-    /// 1. Order must be archived and COMPLETED
-    /// 2. Order must not be voided (is_anulada = 0)
-    /// 3. Order must not be already upgraded (is_upgraded = 0)
-    /// 4. Order must have an F2 invoice
-    /// 5. InvoiceService must be configured (Verifactu enabled)
-    ///
-    /// The F3 invoice copies amounts from the original F2, adds customer info,
-    /// and sets factura_sustituida reference.
+    /// - Validates order is COMPLETED, not anulada, not already upgraded
+    /// - Creates chain_entry (entry_pk = order_pk, type = UPGRADE)
+    /// - Updates system_state.last_chain_hash
+    /// - Marks archived_order.is_upgraded = 1
     pub async fn create_upgrade(
         &self,
         request: &CreateUpgradeRequest,
         operator_id: i64,
         operator_name: &str,
-    ) -> ArchiveResult<Invoice> {
-        let inv_svc = self.invoice_service.as_ref().ok_or_else(|| {
-            ArchiveError::Validation("Verifactu not configured — cannot create upgrade".into())
-        })?;
-
+    ) -> ArchiveResult<UpgradeResponse> {
         // Acquire hash chain lock
         let _hash_lock = self.hash_chain_lock.lock().await;
 
@@ -79,7 +69,8 @@ impl UpgradeService {
 
         // 1. Validate order
         let order = sqlx::query_as::<_, OrderUpgradeRef>(
-            "SELECT id, status, is_anulada, is_upgraded FROM archived_order WHERE id = ?",
+            "SELECT id, status, is_anulada, is_upgraded, receipt_number, total_amount, tax \
+             FROM archived_order WHERE id = ?",
         )
         .bind(request.order_pk)
         .fetch_optional(&self.pool)
@@ -104,134 +95,46 @@ impl UpgradeService {
 
         if order.is_upgraded != 0 {
             return Err(ArchiveError::Validation(
-                "Order already has an F3 upgrade".into(),
+                "Order already has an upgrade".into(),
             ));
         }
 
-        // 2. Begin transaction and find original F2 invoice
+        // 2. Begin transaction
         let mut tx = self
             .pool
             .begin()
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        let f2_invoice = inv_repo::find_order_invoice(&mut tx, request.order_pk)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?
-            .ok_or_else(|| {
-                ArchiveError::Validation(format!(
-                    "No F2 invoice found for order {}",
-                    request.order_pk
-                ))
-            })?;
+        // 3. Read last_chain_hash
+        let prev_hash: String = sqlx::query_scalar(
+            "SELECT COALESCE(last_chain_hash, 'genesis') FROM system_state WHERE id = 1",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 3. Copy desglose from F2
-        let f2_desglose = inv_repo::get_desglose_tx(&mut tx, f2_invoice.id)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        // 4. Compute huella (F3 uses huella_alta same as F2/R5)
-        let now_dt = chrono::Utc::now().with_timezone(&inv_svc.tz());
-        let fecha_expedicion = now_dt.format("%d-%m-%Y").to_string();
-        let fecha_hora_registro = now_dt.to_rfc3339();
-        let date_str = now_dt.format("%Y%m%d").to_string();
-
-        // 4a. Read both last_huella and last_chain_hash from tx (single row)
-        let (prev_huella, prev_hash) = {
-            let row: Option<(Option<String>, Option<String>)> = sqlx::query_as(
-                "SELECT last_huella, last_chain_hash FROM system_state WHERE id = 1",
-            )
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-            match row {
-                Some((huella, hash)) => (huella, hash.unwrap_or_else(|| "genesis".to_string())),
-                None => (None, "genesis".to_string()),
-            }
-        };
-
-        let invoice_number = inv_repo::next_invoice_number(&mut tx, inv_svc.serie(), &date_str)
-            .await
-            .map_err(|e| ArchiveError::InvoiceNumber(e.to_string()))?;
-
-        let huella = compute_verifactu_huella_alta(&HuellaAltaInput {
-            nif: inv_svc.nif(),
-            invoice_number: &invoice_number,
-            fecha_expedicion: &fecha_expedicion,
-            tipo_factura: TipoFactura::F3.as_str(),
-            cuota_total: f2_invoice.tax,
-            importe_total: f2_invoice.total,
-            prev_huella: prev_huella.as_deref(),
-            fecha_hora_registro: &fecha_hora_registro,
-        })?;
-
-        // 5. Build F3 invoice (amounts copied from F2)
-        let invoice = Invoice {
-            id: 0,
-            invoice_number: invoice_number.clone(),
-            serie: inv_svc.serie().to_string(),
-            tipo_factura: TipoFactura::F3,
-            source_type: InvoiceSourceType::Upgrade,
-            source_pk: request.order_pk,
-            subtotal: f2_invoice.subtotal,
-            tax: f2_invoice.tax,
-            total: f2_invoice.total,
-            huella: huella.clone(),
-            prev_huella,
-            fecha_expedicion,
-            fecha_hora_registro,
-            nif: inv_svc.nif().to_string(),
-            nombre_razon: inv_svc.nombre_razon().to_string(),
-            factura_rectificada_id: None,
-            factura_rectificada_num: None,
-            factura_sustituida_id: Some(f2_invoice.id),
-            factura_sustituida_num: Some(f2_invoice.invoice_number.clone()),
-            customer_nif: Some(request.customer_nif.clone()),
-            customer_nombre: Some(request.customer_nombre.clone()),
-            customer_address: request.customer_address.clone(),
-            customer_email: request.customer_email.clone(),
-            customer_phone: request.customer_phone.clone(),
-            cloud_synced: false,
-            aeat_status: AeatStatus::Pending,
-            created_at: now,
-        };
-
-        // 6. Insert F3 invoice
-        let f3_invoice_id = inv_repo::insert(&mut tx, &invoice).await?;
-
-        // 7. Copy desglose lines from F2
-        for d in &f2_desglose {
-            inv_repo::insert_desglose(
-                &mut tx,
-                f3_invoice_id,
-                d.tax_rate,
-                d.base_amount,
-                d.tax_amount,
-            )
-            .await?;
-        }
-
-        // 8. Compute chain hash (prev_hash already read from tx in step 4a)
+        // 4. Compute chain hash
+        let receipt = order.receipt_number.as_deref().unwrap_or("unknown");
         let chain_hash = shared::order::compute_upgrade_chain_hash(
             &prev_hash,
-            &invoice_number,
-            &f2_invoice.invoice_number,
+            &format!("UPG-{receipt}"),
+            receipt,
             request.order_pk,
-            f2_invoice.total,
-            f2_invoice.tax,
+            order.total_amount,
+            order.tax,
             now,
             operator_name,
         );
 
-        // 9. Insert chain_entry
+        // 5. Insert chain_entry (entry_pk = order_pk)
         let chain_entry_id = snowflake_id();
         sqlx::query(
             "INSERT INTO chain_entry (id, entry_type, entry_pk, prev_hash, curr_hash, created_at) \
              VALUES (?1, 'UPGRADE', ?2, ?3, ?4, ?5)",
         )
         .bind(chain_entry_id)
-        .bind(f3_invoice_id)
+        .bind(request.order_pk)
         .bind(&prev_hash)
         .bind(&chain_hash)
         .bind(now)
@@ -239,53 +142,56 @@ impl UpgradeService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 10. Update system_state
-        sqlx::query(
-            "UPDATE system_state SET last_chain_hash = ?1, last_huella = ?2, updated_at = ?3 WHERE id = 1",
-        )
-        .bind(&chain_hash)
-        .bind(&huella)
-        .bind(now)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        // 11. Mark archived_order as upgraded
-        sqlx::query("UPDATE archived_order SET is_upgraded = 1 WHERE id = ?")
-            .bind(request.order_pk)
+        // 6. Update system_state.last_chain_hash
+        sqlx::query("UPDATE system_state SET last_chain_hash = ?1, updated_at = ?2 WHERE id = 1")
+            .bind(&chain_hash)
+            .bind(now)
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        // 7. Mark archived_order as upgraded + store customer info + reset cloud_synced for re-sync
+        sqlx::query(
+            "UPDATE archived_order SET is_upgraded = 1, cloud_synced = 0, \
+             customer_nif = ?1, customer_nombre = ?2, customer_address = ?3, \
+             customer_email = ?4, customer_phone = ?5, updated_at = ?6 \
+             WHERE id = ?7",
+        )
+        .bind(&request.customer_nif)
+        .bind(&request.customer_nombre)
+        .bind(&request.customer_address)
+        .bind(&request.customer_email)
+        .bind(&request.customer_phone)
+        .bind(now)
+        .bind(request.order_pk)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         tx.commit()
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         tracing::info!(
-            f3_invoice_id,
-            invoice_number = %invoice_number,
-            original_f2 = %f2_invoice.invoice_number,
             order_pk = request.order_pk,
+            %operator_id,
+            operator_name,
             customer_nif = %request.customer_nif,
-            operator_id,
-            "F3 sustitutiva invoice created"
+            "Order upgrade created"
         );
 
-        // Read back
-        inv_repo::get_by_id(&self.pool, f3_invoice_id)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?
-            .ok_or_else(|| ArchiveError::Database("Failed to read F3 invoice after insert".into()))
+        Ok(UpgradeResponse {
+            order_pk: request.order_pk,
+            chain_entry_id,
+            receipt_number: receipt.to_string(),
+        })
     }
 
-    /// Check if an order is eligible for F3 upgrade.
+    /// Check if an order is eligible for upgrade.
     pub async fn check_upgrade_eligibility(&self, order_pk: i64) -> ArchiveResult<()> {
-        if self.invoice_service.is_none() {
-            return Err(ArchiveError::Validation("Verifactu not configured".into()));
-        }
-
         let order = sqlx::query_as::<_, OrderUpgradeRef>(
-            "SELECT id, status, is_anulada, is_upgraded FROM archived_order WHERE id = ?",
+            "SELECT id, status, is_anulada, is_upgraded, receipt_number, total_amount, tax \
+             FROM archived_order WHERE id = ?",
         )
         .bind(order_pk)
         .fetch_optional(&self.pool)
@@ -308,22 +214,7 @@ impl UpgradeService {
 
         if order.is_upgraded != 0 {
             return Err(ArchiveError::Validation(
-                "Order already has an F3 upgrade".into(),
-            ));
-        }
-
-        // Check F2 invoice exists
-        let invoice_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM invoice WHERE source_type = 'ORDER' AND source_pk = ? AND tipo_factura = 'F2'",
-        )
-        .bind(order_pk)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        if invoice_count == 0 {
-            return Err(ArchiveError::Validation(
-                "No F2 invoice found for order".into(),
+                "Order already has an upgrade".into(),
             ));
         }
 
@@ -342,4 +233,7 @@ struct OrderUpgradeRef {
     status: String,
     is_anulada: i64,
     is_upgraded: i64,
+    receipt_number: Option<String>,
+    total_amount: f64,
+    tax: f64,
 }
