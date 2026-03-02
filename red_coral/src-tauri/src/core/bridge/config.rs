@@ -149,6 +149,13 @@ impl AppConfig {
             config.server_config.cloud_url = shared::DEFAULT_CLOUD_SYNC_URL.to_string();
         }
 
+        tracing::info!(
+            auth_url = %config.auth_url,
+            cloud_url = %config.server_config.cloud_url,
+            debug_build = cfg!(debug_assertions),
+            "AppConfig loaded"
+        );
+
         Ok(config)
     }
 
