@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, SlidersHorizontal, Trash2, Edit, Star, Hash, DollarSign, ChefHat, ReceiptText, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import {
   listAttributes, createAttribute, updateAttribute, deleteAttribute,
@@ -13,6 +14,7 @@ import { DetailPanel } from '@/shared/components/DetailPanel';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, inputClass, CheckboxField } from '@/shared/components/FormField';
 import { formatCurrency } from '@/utils/format';
+import { useStoreInfo } from '@/core/context/StoreInfoContext';
 import type {
   StoreAttribute, StoreAttributeOption,
   AttributeCreate, AttributeUpdate,
@@ -42,7 +44,9 @@ type PanelState =
 export const AttributeManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
+  const { currencySymbol } = useStoreInfo();
 
   const [attributes, setAttributes] = useState<StoreAttribute[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,7 +291,7 @@ export const AttributeManagement: React.FC = () => {
 
       <FormField label={t('settings.attribute.price')}>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{currencySymbol}</span>
           <input
             type="text" inputMode="decimal" value={optForm.price_modifier}
             onChange={e => setOptForm(prev => ({ ...prev, price_modifier: e.target.value }))}
@@ -340,7 +344,7 @@ export const AttributeManagement: React.FC = () => {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">{t('settings.attribute.title')}</h1>
-          <p className="text-xs text-gray-400">{t('settings.attribute.subtitle')}</p>
+          <p className="text-xs text-gray-400">{storeName}</p>
         </div>
       </div>
 

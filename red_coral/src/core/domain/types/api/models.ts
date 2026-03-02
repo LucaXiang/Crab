@@ -895,6 +895,20 @@ export interface StoreInfo {
    * E.g. 120 = 02:00, 360 = 06:00.
    */
   business_day_cutoff: number;
+  /** ISO 4217 currency code (e.g. "EUR", "USD", "CNY") */
+  currency_code: string | null;
+  /** Currency symbol (e.g. "€", "$", "¥") */
+  currency_symbol: string | null;
+  /** Currency decimal places (e.g. 2 for EUR, 0 for JPY) */
+  currency_decimal_places: number | null;
+  /** IANA timezone (e.g. "Europe/Madrid", "Asia/Shanghai") */
+  timezone: string | null;
+  /** Receipt locale (e.g. "es-ES", "zh-CN", "en") */
+  receipt_locale: string | null;
+  /** Custom receipt header text */
+  receipt_header: string | null;
+  /** Custom receipt footer text */
+  receipt_footer: string | null;
   created_at: number | null;
   updated_at: number | null;
 }
@@ -909,6 +923,13 @@ export interface StoreInfoUpdate {
   website?: string | null;
   /** Business day cutoff in minutes from midnight (0-480) */
   business_day_cutoff?: number;
+  currency_code?: string;
+  currency_symbol?: string;
+  currency_decimal_places?: number;
+  timezone?: string;
+  receipt_locale?: string;
+  receipt_header?: string;
+  receipt_footer?: string;
 }
 
 // ============ Label Template (API DTOs) ============

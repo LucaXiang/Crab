@@ -5,21 +5,29 @@
 
 use chrono_tz::Tz;
 use crab_printer::EscPosBuilder;
-use shared::models::CreditNoteDetail;
+use shared::models::{CreditNoteDetail, receipt_text};
 
 /// Credit note receipt renderer
 pub struct CreditNoteReceiptRenderer {
     width: usize,
     timezone: Tz,
+    locale: String,
+    currency_symbol: String,
 }
 
 impl CreditNoteReceiptRenderer {
-    pub fn new(width: usize, timezone: Tz) -> Self {
-        Self { width, timezone }
+    pub fn new(width: usize, timezone: Tz, locale: String, currency_symbol: String) -> Self {
+        Self {
+            width,
+            timezone,
+            locale,
+            currency_symbol,
+        }
     }
 
     /// Render a credit note receipt to ESC/POS bytes
     pub fn render(&self, detail: &CreditNoteDetail) -> Vec<u8> {
+        let txt = receipt_text(&self.locale);
         let mut b = EscPosBuilder::new(self.width);
         let cn = &detail.credit_note;
 
@@ -27,7 +35,7 @@ impl CreditNoteReceiptRenderer {
         b.center();
         b.double_size();
         b.bold();
-        b.line("NOTA DE CREDITO");
+        b.line(txt.credit_note_title);
         b.bold_off();
         b.reset_size();
 
@@ -36,25 +44,28 @@ impl CreditNoteReceiptRenderer {
 
         // Credit note number + date
         b.line_lr(
-            &format!("No: {}", cn.credit_note_number),
+            &format!("{} {}", txt.credit_note_num_label, cn.credit_note_number),
             &format_timestamp(cn.created_at, self.timezone),
         );
 
         // Original receipt reference
-        b.line(&format!("Factura original: {}", cn.original_receipt));
+        b.line(&format!(
+            "{} {}",
+            txt.original_receipt_label, cn.original_receipt
+        ));
 
         b.sep_single();
 
         // Items header
         b.bold();
-        self.render_item_header(&mut b);
+        self.render_item_header(&mut b, &txt);
         b.bold_off();
         b.sep_single();
 
         // Items
         for item in &detail.items {
             let qty_str = format!("x{}", item.quantity);
-            let amount_str = format!("{:.2}", item.line_credit);
+            let amount_str = format!("{:.2}", item.line_credit).replace('.', txt.decimal_separator);
             // Name column = width - qty(5) - amount(10) - spaces(2)
             let name_width = self.width.saturating_sub(17);
             let name = if item.item_name.len() > name_width {
@@ -74,19 +85,22 @@ impl CreditNoteReceiptRenderer {
         b.sep_single();
 
         // Amounts
-        let subtotal_str = format!("{:.2} EUR", cn.subtotal_credit);
-        b.line_lr("Subtotal:", &subtotal_str);
+        let subtotal_str = format!("{:.2} {}", cn.subtotal_credit, self.currency_symbol)
+            .replace('.', txt.decimal_separator);
+        b.line_lr(txt.credit_subtotal_label, &subtotal_str);
 
-        let tax_str = format!("{:.2} EUR", cn.tax_credit);
-        b.line_lr("IVA:", &tax_str);
+        let tax_str = format!("{:.2} {}", cn.tax_credit, self.currency_symbol)
+            .replace('.', txt.decimal_separator);
+        b.line_lr(txt.iva_label, &tax_str);
 
         b.sep_single();
 
         // Total (bold, double size)
         b.bold();
         b.double_size();
-        let total_str = format!("{:.2} EUR", cn.total_credit);
-        b.line_lr("TOTAL", &total_str);
+        let total_str = format!("{:.2} {}", cn.total_credit, self.currency_symbol)
+            .replace('.', txt.decimal_separator);
+        b.line_lr(txt.total_label, &total_str);
         b.reset_size();
         b.bold_off();
 
@@ -94,17 +108,17 @@ impl CreditNoteReceiptRenderer {
 
         // Method + reason + operator
         let method_display = match cn.refund_method.as_str() {
-            "CASH" => "EFECTIVO",
-            "CARD" => "TARJETA",
+            "CASH" => txt.refund_cash,
+            "CARD" => txt.refund_card,
             other => other,
         };
-        b.line_lr("Metodo:", method_display);
-        b.line(&format!("Motivo: {}", cn.reason));
+        b.line_lr(txt.refund_method_label, method_display);
+        b.line(&format!("{} {}", txt.refund_reason_label, cn.reason));
 
         if let Some(ref authorizer) = cn.authorizer_name {
-            b.line(&format!("Autorizado: {}", authorizer));
+            b.line(&format!("{} {}", txt.authorizer_label, authorizer));
         }
-        b.line(&format!("Cajero: {}", cn.operator_name));
+        b.line(&format!("{} {}", txt.cashier_label, cn.operator_name));
 
         b.sep_double();
 
@@ -114,13 +128,13 @@ impl CreditNoteReceiptRenderer {
         b.build()
     }
 
-    fn render_item_header(&self, b: &mut EscPosBuilder) {
+    fn render_item_header(&self, b: &mut EscPosBuilder, txt: &shared::models::ReceiptText) {
         let name_width = self.width.saturating_sub(17);
         b.line(&format!(
             "{:<nw$} {:>5} {:>10}",
-            "ARTICULO",
-            "CANT.",
-            "IMPORTE",
+            txt.col_article,
+            txt.col_cant,
+            txt.col_amount,
             nw = name_width
         ));
     }
@@ -128,7 +142,12 @@ impl CreditNoteReceiptRenderer {
 
 impl Default for CreditNoteReceiptRenderer {
     fn default() -> Self {
-        Self::new(48, chrono_tz::Europe::Madrid)
+        Self::new(
+            48,
+            chrono_tz::Europe::Madrid,
+            "es-ES".to_string(),
+            "EUR".to_string(),
+        )
     }
 }
 
@@ -196,14 +215,24 @@ mod tests {
 
     #[test]
     fn test_render_credit_note_receipt() {
-        let renderer = CreditNoteReceiptRenderer::new(48, chrono_tz::Europe::Madrid);
+        let renderer = CreditNoteReceiptRenderer::new(
+            48,
+            chrono_tz::Europe::Madrid,
+            "es-ES".to_string(),
+            "EUR".to_string(),
+        );
         let data = renderer.render(&test_detail());
         assert!(data.len() > 100);
     }
 
     #[test]
     fn test_render_58mm() {
-        let renderer = CreditNoteReceiptRenderer::new(32, chrono_tz::Europe::Madrid);
+        let renderer = CreditNoteReceiptRenderer::new(
+            32,
+            chrono_tz::Europe::Madrid,
+            "es-ES".to_string(),
+            "EUR".to_string(),
+        );
         let data = renderer.render(&test_detail());
         assert!(data.len() > 100);
     }

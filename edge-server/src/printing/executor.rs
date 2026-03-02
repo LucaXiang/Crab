@@ -58,10 +58,10 @@ impl PrintExecutor {
         }
     }
 
-    /// Create an executor with custom paper width and timezone
-    pub fn with_config(width: usize, timezone: Tz) -> Self {
+    /// Create an executor with custom paper width, timezone, and locale
+    pub fn with_config(width: usize, timezone: Tz, locale: String) -> Self {
         Self {
-            renderer: KitchenTicketRenderer::new(width, timezone),
+            renderer: KitchenTicketRenderer::new(width, timezone, locale),
         }
     }
 

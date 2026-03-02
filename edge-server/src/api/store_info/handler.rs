@@ -29,6 +29,15 @@ fn validate_update(payload: &StoreInfoUpdate) -> AppResult<()> {
     validate_optional_text(&payload.phone, "phone", MAX_SHORT_TEXT_LEN)?;
     validate_optional_text(&payload.email, "email", MAX_EMAIL_LEN)?;
     validate_optional_text(&payload.website, "website", MAX_URL_LEN)?;
+    validate_optional_text(&payload.currency_code, "currency_code", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(
+        &payload.currency_symbol,
+        "currency_symbol",
+        MAX_SHORT_TEXT_LEN,
+    )?;
+    validate_optional_text(&payload.timezone, "timezone", MAX_SHORT_TEXT_LEN)?;
+    validate_optional_text(&payload.receipt_header, "receipt_header", MAX_ADDRESS_LEN)?;
+    validate_optional_text(&payload.receipt_footer, "receipt_footer", MAX_ADDRESS_LEN)?;
     if let Some(cutoff) = payload.business_day_cutoff
         && !(0..=480).contains(&cutoff)
     {

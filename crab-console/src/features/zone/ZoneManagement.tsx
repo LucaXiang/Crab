@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { ApiError } from '@/infrastructure/api/client';
 import { MasterDetail } from '@/shared/components/MasterDetail';
@@ -22,6 +23,7 @@ export const ZoneManagement: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
@@ -116,7 +118,10 @@ export const ZoneManagement: React.FC = () => {
         <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
           <MapPin className="w-5 h-5 text-teal-600" />
         </div>
-        <h1 className="text-xl font-bold text-slate-900">{t('zones.title')}</h1>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('zones.title')}</h1>
+          <p className="text-xs text-gray-400">{storeName}</p>
+        </div>
       </div>
 
       {/* Master-Detail 布局 */}

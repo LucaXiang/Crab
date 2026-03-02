@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { Currency } from '@/utils/currency';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 import { useCategoryStore, useTagStore, useProductStore } from '@/core/stores/resources';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
@@ -102,6 +103,7 @@ export const DiscountRuleEditModal: React.FC<DiscountRuleEditModalProps> = ({
   onSuccess,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const categories = useCategoryStore((s) => s.items);
   const tags = useTagStore((s) => s.items);
   const products = useProductStore((s) => s.items);
@@ -337,7 +339,7 @@ export const DiscountRuleEditModal: React.FC<DiscountRuleEditModalProps> = ({
                   placeholder={isPercentage ? '10' : '5.00'}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
-                  {isPercentage ? '%' : '€'}
+                  {isPercentage ? '%' : currencySymbol}
                 </span>
               </div>
             </FormField>

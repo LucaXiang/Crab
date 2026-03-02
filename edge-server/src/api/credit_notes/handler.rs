@@ -83,7 +83,24 @@ pub async fn get_receipt(
         .await?
         .ok_or_else(|| AppError::not_found(format!("Credit note {} not found", id)))?;
 
-    let renderer = crate::printing::CreditNoteReceiptRenderer::new(48, state.config.timezone);
+    let store_info = crate::db::repository::store_info::get(&state.pool)
+        .await
+        .ok()
+        .flatten();
+    let locale = store_info
+        .as_ref()
+        .and_then(|i| i.receipt_locale.clone())
+        .unwrap_or_else(|| "es-ES".to_string());
+    let currency = store_info
+        .as_ref()
+        .and_then(|i| i.currency_symbol.clone())
+        .unwrap_or_else(|| "EUR".to_string());
+    let renderer = crate::printing::CreditNoteReceiptRenderer::new(
+        48,
+        state.config.timezone,
+        locale,
+        currency,
+    );
     let bytes = renderer.render(&detail);
     Ok(bytes)
 }

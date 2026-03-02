@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, Percent, DollarSign } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { Currency } from '@/utils/currency';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 import type { WizardState } from './index';
 import { FormSection, FormField, inputClass } from '@/shared/components/FormField';
 
@@ -12,6 +13,7 @@ interface Step2AdjustmentProps {
 
 export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateState }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
 
   // Local string state for free text input
   const [inputValue, setInputValue] = useState(() =>
@@ -110,7 +112,7 @@ export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateS
             placeholder={isPercentage ? '10' : '5.00'}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
-            {isPercentage ? '%' : '€'}
+            {isPercentage ? '%' : currencySymbol}
           </span>
         </div>
         <p className="mt-1.5 text-xs text-gray-500">

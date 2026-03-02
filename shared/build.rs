@@ -117,6 +117,7 @@ export const ErrorCode = {
   CategoryHasProducts: 6102,
   CategoryNameExists: 6103,
   SpecNotFound: 6201,
+  SpecRootRequired: 6205,
   ProductExternalIdExists: 6202,
   ProductExternalIdRequired: 6203,
   ProductCategoryInvalid: 6204,

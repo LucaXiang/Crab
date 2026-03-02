@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { ApiError } from '@/infrastructure/api/client';
 import { MasterDetail } from '@/shared/components/MasterDetail';
@@ -22,6 +23,7 @@ export const TagManagement: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
@@ -121,7 +123,10 @@ export const TagManagement: React.FC = () => {
         <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
           <Tag className="w-5 h-5 text-indigo-600" />
         </div>
-        <h1 className="text-xl font-bold text-slate-900">{t('tags.title')}</h1>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('tags.title')}</h1>
+          <p className="text-xs text-gray-400">{storeName}</p>
+        </div>
         {systemMsg && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md ml-auto">{systemMsg}</span>}
       </div>
 

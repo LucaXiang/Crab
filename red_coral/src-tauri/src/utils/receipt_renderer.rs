@@ -1,5 +1,6 @@
 use crate::api::ReceiptData;
 use crate::utils::escpos_text::{get_gbk_width, pad_to_gbk_width, EscPosTextBuilder};
+use shared::models::receipt_text;
 
 pub struct ReceiptRenderer<'a> {
     receipt: &'a ReceiptData,
@@ -11,14 +12,31 @@ impl<'a> ReceiptRenderer<'a> {
         Self { receipt, width }
     }
 
+    /// Get currency symbol from store info, default "€"
+    fn currency_sym(&self) -> &str {
+        self.receipt
+            .store_info
+            .as_ref()
+            .and_then(|i| i.currency_symbol.as_deref())
+            .unwrap_or("€")
+    }
+
     pub fn render(&self) -> String {
+        let cur = self.currency_sym();
+        let locale = self
+            .receipt
+            .store_info
+            .as_ref()
+            .and_then(|i| i.receipt_locale.as_deref())
+            .unwrap_or("es-ES");
+        let txt = receipt_text(locale);
         let mut b = EscPosTextBuilder::new(self.width);
         b.align_center();
         if self.receipt.void_reason.is_some() {
             b.align_center();
             b.size_double();
             b.bold_on();
-            b.write_line("*** ANULADO ***");
+            b.write_line(txt.voided);
             b.bold_off();
             b.size_reset();
             b.write("\n");
@@ -26,7 +44,7 @@ impl<'a> ReceiptRenderer<'a> {
             b.align_center();
             b.size_double();
             b.bold_on();
-            b.write_line("*** CUENTA ***");
+            b.write_line(txt.bill);
             b.bold_off();
             b.size_reset();
             b.write("\n");
@@ -34,22 +52,29 @@ impl<'a> ReceiptRenderer<'a> {
             b.align_center();
             b.size_double();
             b.bold_on();
-            b.write_line("*** REIMPRESION ***");
+            b.write_line(txt.reprint);
             b.bold_off();
             b.size_reset();
             b.write("\n");
         }
         if let Some(info) = &self.receipt.store_info {
+            // Receipt header (custom text above store info)
+            if let Some(header) = &info.receipt_header {
+                if !header.is_empty() {
+                    b.write_line(header);
+                    b.write("\n");
+                }
+            }
             b.size_double();
             b.write_line(&info.name.to_string());
             b.size_reset();
             b.write_line(&info.address.to_string());
-            b.write_line(&format!("CIF: {}", info.nif));
+            b.write_line(&format!("{} {}", txt.tax_id_label, info.nif));
             if let Some(phone) = &info.phone {
-                b.write_line(&format!("Tel: {}", phone));
+                b.write_line(&format!("{} {}", txt.phone_label, phone));
             }
             if let Some(email) = &info.email {
-                b.write_line(&format!("Email: {}", email));
+                b.write_line(&format!("{} {}", txt.email_label, email));
             }
             if let Some(website) = &info.website {
                 b.write_line(&website.to_string());
@@ -60,35 +85,43 @@ impl<'a> ReceiptRenderer<'a> {
         // Header
         b.align_left();
         b.bold_on();
-        b.write_line("FACTURA SIMPLIFICADA");
+        b.write_line(txt.receipt_title);
         b.bold_off();
 
         b.line_lr(
-            &format!("Num: {}", self.receipt.order_id),
+            &format!("{} {}", txt.receipt_num_label, self.receipt.order_id),
             &self.receipt.timestamp,
         );
 
         if let Some(qn) = self.receipt.queue_number {
-            let pedido_str = format!("PEDIDO: #{:03}", qn);
-            b.line_lr(&pedido_str, "Terminal: 01");
+            let pedido_str = format!("{}{:03}", txt.queue_label, qn);
+            b.line_lr(&pedido_str, &format!("{} 01", txt.terminal_label));
         } else {
             let zone_str = self.receipt.zone_name.as_deref().unwrap_or("");
-            let table_full = format!("{} MESA: {}", zone_str, self.receipt.table_name);
-            b.line_lr(table_full.trim(), "Terminal: 01");
+            let table_full = format!(
+                "{} {} {}",
+                zone_str, txt.table_label, self.receipt.table_name
+            );
+            b.line_lr(table_full.trim(), &format!("{} 01", txt.terminal_label));
         }
 
-        let guest_str = format!("Pers: {}", self.receipt.guest_count.unwrap_or(0));
+        let guest_str = format!(
+            "{} {}",
+            txt.guests_label,
+            self.receipt.guest_count.unwrap_or(0)
+        );
         let opened_str = format!(
-            "Apertura: {}",
+            "{} {}",
+            txt.opened_label,
             self.receipt.opened_at.as_deref().unwrap_or("")
         );
         b.line_lr(&guest_str, &opened_str);
         if let Some(checkout_time) = &self.receipt.checkout_time {
-            b.line_lr("", &format!("Cierre:   {}", checkout_time));
+            b.line_lr("", &format!("{}{}", txt.closed_label, checkout_time));
         }
         if let Some(reason) = &self.receipt.void_reason {
             b.bold_on();
-            b.write_line(&format!("ANULADO:  {}", reason));
+            b.write_line(&format!("{}  {}", txt.void_reason_label, reason));
             b.bold_off();
         }
 
@@ -96,10 +129,10 @@ impl<'a> ReceiptRenderer<'a> {
 
         // ── Items ──
         b.align_left();
-        let h_uds = "UDS";
-        let h_desc_padded = format!("{:<24}", "DESCRIPCION");
-        let h_pvp = format!("{:>8}", "PVP");
-        let h_importe = format!("{:>10}", "IMPORTE");
+        let h_uds = txt.col_qty;
+        let h_desc_padded = format!("{:<24}", txt.col_desc);
+        let h_pvp = format!("{:>8}", txt.col_price);
+        let h_importe = format!("{:>10}", txt.col_amount);
         b.write_line(&format!(
             "{} {} {} {}",
             h_uds, h_desc_padded, h_pvp, h_importe
@@ -109,10 +142,16 @@ impl<'a> ReceiptRenderer<'a> {
         for item in &self.receipt.items {
             let qty_str = pad_to_gbk_width(&item.quantity.to_string(), 3, true);
             let name_str = pad_to_gbk_width(&item.name, 24, false);
-            let price_str =
-                pad_to_gbk_width(&format!("{:.2} €", item.price).replace('.', ","), 8, true);
-            let total_str =
-                pad_to_gbk_width(&format!("{:.2} €", item.total).replace('.', ","), 10, true);
+            let price_str = pad_to_gbk_width(
+                &format!("{:.2} {cur}", item.price).replace('.', txt.decimal_separator),
+                8,
+                true,
+            );
+            let total_str = pad_to_gbk_width(
+                &format!("{:.2} {cur}", item.total).replace('.', txt.decimal_separator),
+                10,
+                true,
+            );
             b.write_line(&format!(
                 "{} {} {} {}",
                 qty_str, name_str, price_str, total_str
@@ -154,11 +193,17 @@ impl<'a> ReceiptRenderer<'a> {
                         let option_line = if total_price.abs() < 0.001 {
                             format!("   > {}: {}", attr_name, opts_str)
                         } else if total_price > 0.0 {
-                            format!("   > {}: {} (+{:.2} €)", attr_name, opts_str, total_price)
-                                .replace('.', ",")
+                            format!(
+                                "   > {}: {} (+{:.2} {cur})",
+                                attr_name, opts_str, total_price
+                            )
+                            .replace('.', txt.decimal_separator)
                         } else {
-                            format!("   > {}: {} ({:.2} €)", attr_name, opts_str, total_price)
-                                .replace('.', ",")
+                            format!(
+                                "   > {}: {} ({:.2} {cur})",
+                                attr_name, opts_str, total_price
+                            )
+                            .replace('.', txt.decimal_separator)
                         };
                         b.write_line(&option_line);
                     }
@@ -170,13 +215,14 @@ impl<'a> ReceiptRenderer<'a> {
                 if dp > 0.0 {
                     b.bold_on();
                     let before = item.original_price.unwrap_or(item.price);
-                    let before_str = format!("{:.2} €", before).replace('.', ",");
+                    let before_str =
+                        format!("{:.2} {cur}", before).replace('.', txt.decimal_separator);
 
-                    let discount_text = format!("> DESC -{}%", dp.round() as i32);
+                    let discount_text = format!("{} -{}%", txt.discount_prefix, dp.round() as i32);
 
                     let pvp_col_end_len = 37;
                     let before_width = get_gbk_width(&before_str);
-                    let antes_str = " ANTES ";
+                    let antes_str = txt.before_price_label;
                     let antes_width = get_gbk_width(antes_str);
 
                     let mut line = String::new();
@@ -215,8 +261,9 @@ impl<'a> ReceiptRenderer<'a> {
 
         if has_adjustments {
             // Show subtotal line
-            let subtotal_str = format!("{:.2} €", items_subtotal).replace('.', ",");
-            b.line_lr("SUBTOTAL", &subtotal_str);
+            let subtotal_str =
+                format!("{:.2} {cur}", items_subtotal).replace('.', txt.decimal_separator);
+            b.line_lr(txt.subtotal_label, &subtotal_str);
             b.dash_sep();
         }
 
@@ -231,10 +278,12 @@ impl<'a> ReceiptRenderer<'a> {
             let desc = if rule.adjustment_type == "PERCENTAGE" {
                 format!("{} ({}{}%)", rule.name, prefix, rule.value)
             } else {
-                format!("{} ({}{:.2} €)", rule.name, prefix, rule.value).replace('.', ",")
+                format!("{} ({}{:.2} {cur})", rule.name, prefix, rule.value)
+                    .replace('.', txt.decimal_separator)
             };
 
-            let amount_str = format!("{}{:.2} €", sign, rule.amount).replace('.', ",");
+            let amount_str =
+                format!("{}{:.2} {cur}", sign, rule.amount).replace('.', txt.decimal_separator);
             b.write_line(&format!(
                 "{:<36}{:>10}",
                 pad_to_gbk_width(&desc, 36, false),
@@ -247,9 +296,11 @@ impl<'a> ReceiptRenderer<'a> {
             let desc = if discount.type_ == "percentage" {
                 format!("{} (-{}%)", discount.name, discount.value)
             } else {
-                format!("{} (-{:.2} €)", discount.name, discount.value).replace('.', ",")
+                format!("{} (-{:.2} {cur})", discount.name, discount.value)
+                    .replace('.', txt.decimal_separator)
             };
-            let amount_str = format!("-{:.2} €", discount.amount).replace('.', ",");
+            let amount_str =
+                format!("-{:.2} {cur}", discount.amount).replace('.', txt.decimal_separator);
             b.write_line(&format!(
                 "{:<36}{:>10}",
                 pad_to_gbk_width(&desc, 36, false),
@@ -262,9 +313,11 @@ impl<'a> ReceiptRenderer<'a> {
             let desc = if surcharge.type_ == "percentage" {
                 format!("{} (+{}%)", surcharge.name, surcharge.value)
             } else {
-                format!("{} (+{:.2} €)", surcharge.name, surcharge.value).replace('.', ",")
+                format!("{} (+{:.2} {cur})", surcharge.name, surcharge.value)
+                    .replace('.', txt.decimal_separator)
             };
-            let amount_str = format!("+{:.2} €", surcharge.amount).replace('.', ",");
+            let amount_str =
+                format!("+{:.2} {cur}", surcharge.amount).replace('.', txt.decimal_separator);
             b.write_line(&format!(
                 "{:<36}{:>10}",
                 pad_to_gbk_width(&desc, 36, false),
@@ -312,7 +365,7 @@ impl<'a> ReceiptRenderer<'a> {
         } else {
             format!("{:.2}", total_qty)
         };
-        let left_text = format!("Total Uds: {}", qty_display);
+        let left_text = format!("{} {}", txt.total_units_label, qty_display);
         let left_header = pad_to_gbk_width(&left_text, 23, false);
 
         // Calculate total savings (manual discounts + rule discounts)
@@ -338,9 +391,9 @@ impl<'a> ReceiptRenderer<'a> {
             total_savings += discount.amount;
         }
 
-        let h_iva = pad_to_gbk_width("IVA", 4, true);
-        let h_base = pad_to_gbk_width("BASE IMP", 8, true);
-        let h_cuota = pad_to_gbk_width("CUOTA", 10, true);
+        let h_iva = pad_to_gbk_width(txt.col_tax_rate, 4, true);
+        let h_base = pad_to_gbk_width(txt.col_tax_base, 8, true);
+        let h_cuota = pad_to_gbk_width(txt.col_tax_amount, 10, true);
         b.write_line(&format!("{} {} {} {}", left_header, h_iva, h_base, h_cuota));
 
         let mut sorted_rates: Vec<_> = tax_groups.keys().cloned().collect();
@@ -357,16 +410,17 @@ impl<'a> ReceiptRenderer<'a> {
             total_base += base_amount;
             total_tax += tax_amount;
 
-            let base_str = format!("{:.2} €", base_amount).replace('.', ",");
+            let base_str = format!("{:.2} {cur}", base_amount).replace('.', txt.decimal_separator);
             let rate_str = format!("{}%", rate_key);
-            let tax_str = format!("{:.2} €", tax_amount).replace('.', ",");
+            let tax_str = format!("{:.2} {cur}", tax_amount).replace('.', txt.decimal_separator);
 
             let col1 = pad_to_gbk_width(&rate_str, 4, true);
             let col2 = pad_to_gbk_width(&base_str, 8, true);
             let col3 = pad_to_gbk_width(&tax_str, 10, true);
 
             let left_content = if i == 0 && total_savings > 0.005 {
-                format!("AHORRO: -{:.2} €", total_savings).replace('.', ",")
+                format!("{}: -{:.2} {cur}", txt.savings, total_savings)
+                    .replace('.', txt.decimal_separator)
             } else {
                 "".to_string()
             };
@@ -380,8 +434,8 @@ impl<'a> ReceiptRenderer<'a> {
         let sub_sep = format!("{}{}", sub_padding, "-".repeat(19));
         b.write_line(&sub_sep);
 
-        let total_base_str = format!("{:.2} €", total_base).replace('.', ",");
-        let total_tax_str = format!("{:.2} €", total_tax).replace('.', ",");
+        let total_base_str = format!("{:.2} {cur}", total_base).replace('.', txt.decimal_separator);
+        let total_tax_str = format!("{:.2} {cur}", total_tax).replace('.', txt.decimal_separator);
         let col_t2 = pad_to_gbk_width(&total_base_str, 8, true);
         let col_t3 = pad_to_gbk_width(&total_tax_str, 10, true);
         b.write_line(&format!("{}{} {}", sub_padding, col_t2, col_t3));
@@ -393,8 +447,9 @@ impl<'a> ReceiptRenderer<'a> {
         // ── TOTAL ──
         b.size_double();
         b.bold_on();
-        let total_val = format!("{:.2} €", self.receipt.total_amount).replace('.', ",");
-        let total_label = "TOTAL";
+        let total_val =
+            format!("{:.2} {cur}", self.receipt.total_amount).replace('.', txt.decimal_separator);
+        let total_label = txt.total_label;
         let max_dw = 24;
         let lw = get_gbk_width(total_label);
         let vw = get_gbk_width(&total_val);
@@ -414,9 +469,20 @@ impl<'a> ReceiptRenderer<'a> {
 
         b.write("\n\n");
         b.align_center();
-        b.write_line("IVA INCLUIDO");
+        b.write_line(txt.tax_included);
+
+        // Receipt footer (custom text from store settings)
+        if let Some(info) = &self.receipt.store_info {
+            if let Some(footer) = &info.receipt_footer {
+                if !footer.is_empty() {
+                    b.write("\n");
+                    b.write_line(footer);
+                }
+            }
+        }
+
         b.bold_on();
-        b.write_line("*** GRACIAS POR SU VISITA ***");
+        b.write_line(txt.farewell);
         b.bold_off();
         b.eq_sep();
 

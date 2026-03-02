@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Package, Trash2, CheckSquare, Link, Unlink } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import {
   listProducts, createProduct, updateProduct, deleteProduct,
@@ -32,6 +33,7 @@ interface FormSpec {
   receipt_name: string;
   is_default: boolean;
   is_active: boolean;
+  is_root: boolean;
 }
 
 function computePriceDisplay(specs: { price: number; is_active: boolean }[]): string {
@@ -54,6 +56,7 @@ type PanelState =
 export const ProductManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
 
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -161,7 +164,7 @@ export const ProductManagement: React.FC = () => {
     setFormReceiptName(''); setFormKitchenPrintName('');
     setFormIsKitchenPrint(0); setFormIsLabelPrint(0); setFormExternalId('');
     setFormTagIds([]); setFormIsActive(true);
-    setFormSpecs([{ name: '', price: 0, receipt_name: '', is_default: true, is_active: true }]);
+    setFormSpecs([{ name: '', price: 0, receipt_name: '', is_default: true, is_active: true, is_root: true }]);
     setFormError('');
     setPanel({ type: 'create' });
   };
@@ -202,9 +205,9 @@ export const ProductManagement: React.FC = () => {
     setFormIsKitchenPrint(prod.is_kitchen_print_enabled); setFormIsLabelPrint(prod.is_label_print_enabled);
     setFormExternalId(prod.external_id != null ? String(prod.external_id) : '');
     setFormTagIds(prod.tag_ids ?? []); setFormIsActive(prod.is_active);
-    setFormSpecs(prod.specs.map(s => ({
+    setFormSpecs(prod.specs.map((s, i) => ({
       name: s.name, price: s.price, receipt_name: s.receipt_name ?? '',
-      is_default: s.is_default, is_active: s.is_active,
+      is_default: s.is_default, is_active: s.is_active, is_root: i === 0,
     })));
     setFormError('');
     setBindings([]);
@@ -213,7 +216,7 @@ export const ProductManagement: React.FC = () => {
   };
 
   const addSpec = () => {
-    setFormSpecs([...formSpecs, { name: '', price: 0, receipt_name: '', is_default: false, is_active: true }]);
+    setFormSpecs([...formSpecs, { name: '', price: 0, receipt_name: '', is_default: false, is_active: true, is_root: false }]);
   };
 
   const removeSpec = (index: number) => {
@@ -335,7 +338,10 @@ export const ProductManagement: React.FC = () => {
         <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
           <Package className="w-5 h-5 text-blue-600" />
         </div>
-        <h1 className="text-xl font-bold text-slate-900">{t('settings.product.title')}</h1>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('settings.product.title')}</h1>
+          <p className="text-xs text-gray-400">{storeName}</p>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {bulkMode ? (
             <>
@@ -541,7 +547,7 @@ export const ProductManagement: React.FC = () => {
                         className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         placeholder={t('settings.product.price')} step="0.01" min={0}
                       />
-                      <button type="button" onClick={() => removeSpec(idx)} disabled={formSpecs.length <= 1} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                      <button type="button" onClick={() => removeSpec(idx)} disabled={formSpecs.length <= 1 || spec.is_root} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                         <Trash2 size={14} />
                       </button>
                     </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Minus, Plus, X, Trash2, Check, Edit2 } from 'lucide-react';
 import { Numpad } from '../Numpad';
 import { formatCurrency } from '@/utils/currency';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 import { EscalatableGate } from '../../auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
@@ -44,6 +45,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
   } = useItemActionLogic(props);
 
   const { user: currentUser } = useAuthStore();
+  const currencySymbol = useCurrencySymbol();
   const { hasPermission } = usePermission();
 
   const QUICK_DISCOUNTS = [5, 10, 20, 50];
@@ -322,7 +324,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
           <div className="flex-1 flex flex-col p-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-4 flex items-center justify-end h-24 shrink-0">
                 <span className="text-5xl font-bold text-gray-900 tracking-tight font-mono">
-                {(editMode === 'PRICE' || editMode === 'BASE_PRICE') && '€'}
+                {(editMode === 'PRICE' || editMode === 'BASE_PRICE') && currencySymbol}
                 {inputBuffer}
                 {editMode === 'DISC' && <span className="text-gray-400 text-3xl ml-2">%</span>}
                 </span>

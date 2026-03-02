@@ -57,7 +57,11 @@ impl KitchenPrintWorker {
         shutdown: CancellationToken,
     ) {
         tracing::info!("Kitchen print worker started");
-        let executor = PrintExecutor::with_config(48, self.timezone);
+        let locale = match crate::db::repository::store_info::get(&self.pool).await {
+            Ok(Some(info)) => info.receipt_locale.unwrap_or_else(|| "es-ES".to_string()),
+            _ => "es-ES".to_string(),
+        };
+        let executor = PrintExecutor::with_config(48, self.timezone, locale);
 
         loop {
             tokio::select! {

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { tEnum } from '@/infrastructure/i18n';
+import { useStoreInfo } from '@/core/context/StoreInfoContext';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Types
@@ -448,6 +449,7 @@ export const EventTimeline: React.FC<{
   events: TimelineEvent[];
   t: (k: string) => string;
 }> = ({ events, t }) => {
+  const { currencySymbol } = useStoreInfo();
   const displays = useMemo(() => events.map(e => renderEventDisplay(e, t)), [events, t]);
 
   return (
@@ -488,7 +490,7 @@ export const EventTimeline: React.FC<{
                 ))}
                 {d.details.map((line, j) => (
                   <div key={j}>
-                    {line.includes(':') && !line.includes('€') && !line.includes('→')
+                    {line.includes(':') && !line.includes(currencySymbol) && !line.includes('→')
                       ? <NoteTag text={line} />
                       : <HashText text={line} />
                     }

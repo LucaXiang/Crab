@@ -27,6 +27,7 @@ impl ErrorCode {
             | Self::ProductInvalidPrice
             | Self::ProductExternalIdRequired
             | Self::ProductCategoryInvalid
+            | Self::SpecRootRequired
             | Self::AttributeBindFailed
             | Self::NoFileProvided
             | Self::EmptyFile

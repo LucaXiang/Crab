@@ -23,9 +23,13 @@ pub async fn upsert_store_info_from_sync(
             logo_url = $5, phone = $6,
             email = $7, website = $8,
             business_day_cutoff = $9,
-            created_at = COALESCE(created_at, $10),
-            updated_at = $11
-        WHERE id = $1 AND (updated_at IS NULL OR updated_at <= $11)
+            currency_code = $10, currency_symbol = $11,
+            currency_decimal_places = $12, timezone = $13,
+            receipt_locale = $14,
+            receipt_header = $15, receipt_footer = $16,
+            created_at = COALESCE(created_at, $17),
+            updated_at = $18
+        WHERE id = $1 AND (updated_at IS NULL OR updated_at <= $18)
         "#,
     )
     .bind(store_id)
@@ -37,6 +41,13 @@ pub async fn upsert_store_info_from_sync(
     .bind(&info.email)
     .bind(&info.website)
     .bind(info.business_day_cutoff)
+    .bind(&info.currency_code)
+    .bind(&info.currency_symbol)
+    .bind(info.currency_decimal_places)
+    .bind(&info.timezone)
+    .bind(&info.receipt_locale)
+    .bind(&info.receipt_header)
+    .bind(&info.receipt_footer)
     .bind(info.created_at)
     .bind(now)
     .execute(pool)
@@ -64,9 +75,18 @@ pub async fn update_store_info_direct(
             email = COALESCE($7, email),
             website = COALESCE($8, website),
             business_day_cutoff = COALESCE($9, business_day_cutoff),
-            updated_at = $10
+            currency_code = COALESCE($10, currency_code),
+            currency_symbol = COALESCE($11, currency_symbol),
+            currency_decimal_places = COALESCE($12, currency_decimal_places),
+            timezone = COALESCE($13, timezone),
+            receipt_locale = COALESCE($14, receipt_locale),
+            receipt_header = COALESCE($15, receipt_header),
+            receipt_footer = COALESCE($16, receipt_footer),
+            updated_at = $17
         WHERE id = $1
-        RETURNING 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website, business_day_cutoff, created_at, updated_at
+        RETURNING 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website,
+                  business_day_cutoff, currency_code, currency_symbol, currency_decimal_places,
+                  timezone, receipt_locale, receipt_header, receipt_footer, created_at, updated_at
         "#,
     )
     .bind(store_id)
@@ -78,6 +98,13 @@ pub async fn update_store_info_direct(
     .bind(&data.email)
     .bind(&data.website)
     .bind(data.business_day_cutoff)
+    .bind(&data.currency_code)
+    .bind(&data.currency_symbol)
+    .bind(data.currency_decimal_places)
+    .bind(&data.timezone)
+    .bind(&data.receipt_locale)
+    .bind(&data.receipt_header)
+    .bind(&data.receipt_footer)
     .bind(now)
     .fetch_one(pool)
     .await?;
@@ -101,7 +128,8 @@ pub async fn get_store_info(pool: &PgPool, store_id: i64) -> Result<Option<Store
     let row: Option<StoreInfo> = sqlx::query_as(
         r#"
         SELECT 1::BIGINT AS id, name, address, nif, logo_url, phone, email, website,
-               business_day_cutoff, created_at, updated_at
+               business_day_cutoff, currency_code, currency_symbol, currency_decimal_places,
+               timezone, receipt_locale, receipt_header, receipt_footer, created_at, updated_at
         FROM stores
         WHERE id = $1
         "#,

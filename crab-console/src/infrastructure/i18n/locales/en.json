@@ -911,6 +911,7 @@
     "6202": "Product external ID already exists.",
     "6203": "Product external ID is required.",
     "6204": "Product cannot belong to a virtual category.",
+    "6205": "Cannot delete root specification, each product must keep at least one.",
     "6301": "Attribute not found.",
     "6302": "Attribute binding failed.",
     "6303": "This attribute is in use and cannot be deleted.",

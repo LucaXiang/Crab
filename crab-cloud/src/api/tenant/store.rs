@@ -59,6 +59,13 @@ pub struct UpdateStoreRequest {
     pub email: Option<String>,
     pub website: Option<String>,
     pub business_day_cutoff: Option<i32>,
+    pub currency_code: Option<String>,
+    pub currency_symbol: Option<String>,
+    pub currency_decimal_places: Option<i32>,
+    pub timezone: Option<String>,
+    pub receipt_locale: Option<String>,
+    pub receipt_header: Option<String>,
+    pub receipt_footer: Option<String>,
 }
 
 pub async fn update_store(
@@ -82,11 +89,18 @@ pub async fn update_store(
         name: payload.name,
         address: payload.address,
         nif: payload.nif,
-        logo_url: None,
         phone: payload.phone,
         email: payload.email,
         website: payload.website,
         business_day_cutoff: payload.business_day_cutoff,
+        currency_code: payload.currency_code,
+        currency_symbol: payload.currency_symbol,
+        currency_decimal_places: payload.currency_decimal_places,
+        timezone: payload.timezone,
+        receipt_locale: payload.receipt_locale,
+        receipt_header: payload.receipt_header,
+        receipt_footer: payload.receipt_footer,
+        ..Default::default()
     };
 
     let info = store::update_store_info_direct(&state.pool, store_id, &update)

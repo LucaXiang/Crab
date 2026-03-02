@@ -9,6 +9,8 @@ import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { Globe, ShoppingCart, Armchair } from 'lucide-react';
+import { getCurrencySymbol } from '@/utils/currency';
+import { getLocale } from '@/infrastructure/i18n';
 
 const getApi = () => createTauriClient();
 
@@ -79,7 +81,7 @@ export function useRuleEditor(rule: PriceRule, onRuleUpdated: () => void) {
   const formatAdjustment = (): string => {
     const sign = isDiscount ? '-' : '+';
     if (current.adjustmentType === 'PERCENTAGE') return `${sign}${current.adjustmentValue}%`;
-    return `${sign}€${current.adjustmentValue.toFixed(2)}`;
+    return `${sign}${getCurrencySymbol()}${current.adjustmentValue.toFixed(2)}`;
   };
 
   const getStackingMode = (): 'exclusive' | 'non_stackable' | 'stackable' => {
@@ -100,8 +102,8 @@ export function useRuleEditor(rule: PriceRule, onRuleUpdated: () => void) {
       parts.push(`${current.activeStartTime}-${current.activeEndTime}`);
     }
     if (current.validFrom || current.validUntil) {
-      const from = current.validFrom ? new Date(current.validFrom).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
-      const until = current.validUntil ? new Date(current.validUntil).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
+      const from = current.validFrom ? new Date(current.validFrom).toLocaleDateString(getLocale(), { month: 'numeric', day: 'numeric' }) : '';
+      const until = current.validUntil ? new Date(current.validUntil).toLocaleDateString(getLocale(), { month: 'numeric', day: 'numeric' }) : '';
       if (from && until) parts.push(`${from}~${until}`);
       else if (from) parts.push(`${from}起`);
       else if (until) parts.push(`至${until}`);

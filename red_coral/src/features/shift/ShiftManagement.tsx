@@ -16,6 +16,7 @@ import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { formatCurrency } from '@/utils/currency';
+import { getLocale } from '@/infrastructure/i18n';
 import type { Shift, ShiftStatus } from '@/core/domain/types/api';
 
 const getApi = () => createTauriClient();
@@ -71,7 +72,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
     return shifts.filter(
       (shift) =>
         shift.operator_name.toLowerCase().includes(q) ||
-        new Date(shift.start_time).toLocaleString('zh-CN').includes(q)
+        new Date(shift.start_time).toLocaleString(getLocale()).includes(q)
     );
   }, [shifts, searchQuery]);
 
@@ -99,7 +100,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
   // Format time
   const formatTime = (millis: number) => {
     try {
-      return new Date(millis).toLocaleString('zh-CN', {
+      return new Date(millis).toLocaleString(getLocale(), {
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',

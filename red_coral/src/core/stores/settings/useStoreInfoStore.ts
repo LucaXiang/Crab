@@ -40,6 +40,13 @@ const defaultStoreInfo: StoreInfo = {
   email: null,
   website: null,
   business_day_cutoff: 120,
+  currency_code: null,
+  currency_symbol: null,
+  currency_decimal_places: null,
+  timezone: null,
+  receipt_locale: null,
+  receipt_header: null,
+  receipt_footer: null,
   created_at: null,
   updated_at: null,
 };
@@ -110,3 +117,7 @@ export const useStoreInfoActions = () => ({
   fetch: useStoreInfoStore.getState().fetchAll,
   update: useStoreInfoStore.getState().updateStoreInfo,
 });
+
+/** Currency symbol from StoreInfo (React hook, e.g. "€", "$", "¥") */
+export const useCurrencySymbol = () =>
+  useStoreInfoStore((state) => state.info.currency_symbol ?? '€');

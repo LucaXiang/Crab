@@ -911,6 +911,7 @@
     "6202": "El ID externo del producto ya existe.",
     "6203": "El ID externo del producto es obligatorio.",
     "6204": "El producto no puede pertenecer a una categoría virtual.",
+    "6205": "No se puede eliminar la especificación raíz, cada producto debe mantener al menos una.",
     "6301": "Atributo no encontrado.",
     "6302": "Error al vincular el atributo.",
     "6303": "Este atributo está en uso y no se puede eliminar.",

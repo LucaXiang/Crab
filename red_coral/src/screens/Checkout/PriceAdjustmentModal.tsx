@@ -7,6 +7,7 @@ import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate'
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { Numpad } from '@/presentation/components/ui/Numpad';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
 type AdjustmentInputType = 'percent' | 'fixed';
 
@@ -71,6 +72,7 @@ export const PriceAdjustmentModal: React.FC<PriceAdjustmentModalProps> = ({
   config,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const cs = COLOR_SCHEMES[config.color] ?? COLOR_SCHEMES.orange;
 
   const existing = config.getExisting(order);
@@ -250,7 +252,7 @@ export const PriceAdjustmentModal: React.FC<PriceAdjustmentModalProps> = ({
             <div className={`h-14 bg-white rounded-xl flex items-center justify-center px-4 border-2 ${cs.inputBorder} shadow-sm`}>
               <div className="flex items-center">
                 {inputType === 'fixed' && (
-                  <span className={`${cs.symbolText} mr-2 text-xl font-bold`}>€</span>
+                  <span className={`${cs.symbolText} mr-2 text-xl font-bold`}>{currencySymbol}</span>
                 )}
                 <span
                   className={`text-3xl font-mono font-bold px-2 rounded transition-colors ${

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftRight, BarChart3, ChevronDown, ChevronLeft, Clock, FolderTree, Globe, Grid3x3, LogOut, Map, Menu,
@@ -9,8 +9,11 @@ import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getStores } from '@/infrastructure/api/stores';
+import { getStoreInfo } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { SUPPORTED_LOCALES, LANG_LABELS, type Locale } from '@/infrastructure/i18n';
+import { StoreInfoContext } from '@/core/context/StoreInfoContext';
+import type { StoreInfo } from '@/core/types/store';
 
 interface NavItem { key: string; href: string; icon: React.FC<{ className?: string }> }
 interface NavGroup { label: string; items: NavItem[] }
@@ -24,6 +27,7 @@ export const StoreLayout: React.FC = () => {
   const clearAuth = useAuthStore(s => s.clearAuth);
   const [storeName, setStoreName] = useState('');
   const [storeOnline, setStoreOnline] = useState(false);
+  const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [langOpen, setLangOpen] = useState(false);
 
   useEffect(() => {
@@ -37,7 +41,14 @@ export const StoreLayout: React.FC = () => {
     }).catch(err => {
       if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
     });
+    getStoreInfo(token, storeId).then(setStoreInfo).catch(err => {
+      if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
+    });
   }, [token, storeId, clearAuth, navigate]);
+
+  const currencySymbol = storeInfo?.currency_symbol ?? '\u20ac';
+  const currencyCode = storeInfo?.currency_code ?? 'EUR';
+  const storeInfoCtx = useMemo(() => ({ storeInfo, currencySymbol, currencyCode }), [storeInfo, currencySymbol, currencyCode]);
 
   const storeNav: NavGroup[] = [
     {
@@ -234,7 +245,9 @@ export const StoreLayout: React.FC = () => {
         )}
 
         <main className="flex-1 overflow-y-auto bg-slate-50/50">
-          <Outlet />
+          <StoreInfoContext.Provider value={storeInfoCtx}>
+            <Outlet context={{ storeName }} />
+          </StoreInfoContext.Provider>
         </main>
       </div>
     </div>

@@ -122,6 +122,13 @@ export interface StoreInfoSnapshot {
   email: string | null;
   website: string | null;
   business_day_cutoff: number;
+  currency_code: string | null;
+  currency_symbol: string | null;
+  currency_decimal_places: number | null;
+  timezone: string | null;
+  receipt_locale: string | null;
+  receipt_header: string | null;
+  receipt_footer: string | null;
   created_at: number | null;
   updated_at: number | null;
 }

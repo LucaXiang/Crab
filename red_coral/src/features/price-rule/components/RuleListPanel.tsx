@@ -4,6 +4,7 @@ import type { PriceRule } from '@/core/domain/types/api';
 import { useI18n } from '@/hooks/useI18n';
 import { useZoneStore } from '@/features/zone/store';
 import { calculatePriority, getStackingMode } from '../utils';
+import { getCurrencySymbol } from '@/utils/currency';
 
 interface RuleListPanelProps {
   rules: PriceRule[];
@@ -144,7 +145,7 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
     if (rule.adjustment_type === 'PERCENTAGE') {
       return `${sign}${rule.adjustment_value}%`;
     }
-    return `${sign}€${rule.adjustment_value.toFixed(2)}`;
+    return `${sign}${getCurrencySymbol()}${rule.adjustment_value.toFixed(2)}`;
   };
 
   return (

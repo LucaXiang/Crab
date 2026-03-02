@@ -29,6 +29,7 @@ pub mod tag;
 pub mod zone;
 
 pub mod catalog_export;
+pub mod receipt_text;
 
 // Re-exports
 pub use attribute::*;
@@ -56,3 +57,4 @@ pub use tag::*;
 pub use zone::*;
 
 pub use catalog_export::{CatalogExport, validate_catalog};
+pub use receipt_text::{ReceiptText, receipt_text};

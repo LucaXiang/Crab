@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Tag, Clock, Settings2, FileText, Percent } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { useStoreInfo } from '@/core/context/StoreInfoContext';
 import { Wizard, WizardStep } from '@/shared/components/Wizard';
 import { FormField, CheckboxField, inputClass } from '@/shared/components/FormField';
 import { SelectField } from '@/shared/components/FormField/SelectField';
@@ -16,6 +17,7 @@ const DAY_INDICES = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
 
 export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({ onFinish, onCancel, isSubmitting }) => {
   const { t } = useI18n();
+  const { currencySymbol } = useStoreInfo();
 
   // ── Form State ──
   const [name, setName] = useState('');
@@ -144,7 +146,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({ onFinish, onCa
                 min={0} 
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
-                {adjustmentType === 'PERCENTAGE' ? '%' : '€'}
+                {adjustmentType === 'PERCENTAGE' ? '%' : currencySymbol}
               </div>
             </div>
           </FormField>

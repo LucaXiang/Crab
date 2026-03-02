@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Users } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { listEmployees, createEmployee, updateEmployee, deleteEmployee } from '@/infrastructure/api/management';
 import { ApiError } from '@/infrastructure/api/client';
@@ -42,6 +43,7 @@ type PanelState =
 export const EmployeeManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
   const roleOptions = useRoleOptions(t);
 
@@ -168,7 +170,7 @@ export const EmployeeManagement: React.FC = () => {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">{t('settings.employee.title')}</h1>
-          <p className="text-xs text-gray-400">{t('settings.employee.subtitle')}</p>
+          <p className="text-xs text-gray-400">{storeName}</p>
         </div>
       </div>
 

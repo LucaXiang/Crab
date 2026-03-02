@@ -9,9 +9,10 @@ import type { ArchivedOrderDetail } from '@/core/domain/types/archivedOrder';
 import type { StoreInfo } from '@/core/domain/types/api';
 import type { ReceiptData, ReceiptItem, ReceiptStoreInfo, ReceiptSurchargeInfo, ReceiptDiscountInfo, ReceiptRuleAdjustment } from '@/infrastructure/print/printService';
 import { Currency } from '@/utils/currency';
+import { getLocale, t } from '@/infrastructure/i18n';
 
 function formatTimestamp(ms: number): string {
-  return new Date(ms).toLocaleString('es-ES', {
+  return new Date(ms).toLocaleString(getLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -31,6 +32,10 @@ function buildStoreInfo(storeInfo: StoreInfo | null): ReceiptStoreInfo | null {
     email: storeInfo.email ?? null,
     website: storeInfo.website ?? null,
     logo_url: storeInfo.logo_url ?? null,
+    currency_symbol: storeInfo.currency_symbol ?? null,
+    receipt_header: storeInfo.receipt_header ?? null,
+    receipt_footer: storeInfo.receipt_footer ?? null,
+    receipt_locale: getLocale(),
   };
 }
 
@@ -92,14 +97,14 @@ export function buildReceiptData(
   if (order.order_manual_surcharge_amount > 0) {
     if (order.order_manual_surcharge_percent != null && order.order_manual_surcharge_percent > 0) {
       surcharge = {
-        name: 'Suplemento',
+        name: t('pos.receipt.surcharge'),
         type: 'percentage',
         value: order.order_manual_surcharge_percent,
         amount: order.order_manual_surcharge_amount,
       };
     } else if (order.order_manual_surcharge_fixed != null && order.order_manual_surcharge_fixed > 0) {
       surcharge = {
-        name: 'Suplemento',
+        name: t('pos.receipt.surcharge'),
         type: 'fixed',
         value: order.order_manual_surcharge_fixed,
         amount: order.order_manual_surcharge_amount,
@@ -112,14 +117,14 @@ export function buildReceiptData(
   if (order.order_manual_discount_amount > 0) {
     if (order.order_manual_discount_percent != null && order.order_manual_discount_percent > 0) {
       discount = {
-        name: 'Descuento',
+        name: t('pos.receipt.discount'),
         type: 'percentage',
         value: order.order_manual_discount_percent,
         amount: order.order_manual_discount_amount,
       };
     } else if (order.order_manual_discount_fixed != null && order.order_manual_discount_fixed > 0) {
       discount = {
-        name: 'Descuento',
+        name: t('pos.receipt.discount'),
         type: 'fixed',
         value: order.order_manual_discount_fixed,
         amount: order.order_manual_discount_amount,
@@ -174,7 +179,7 @@ export function buildReceiptData(
   return {
     order_id: order.receipt_number,
     timestamp: formatTimestamp(now),
-    table_name: order.table_name ?? 'Mostrador',
+    table_name: order.table_name ?? t('pos.receipt.counter'),
     zone_name: order.zone_name ?? null,
     guest_count: order.guest_count || null,
     opened_at: order.start_time ? formatTimestamp(order.start_time) : null,
@@ -206,7 +211,7 @@ export function buildArchivedReceiptData(
   let surcharge: ReceiptSurchargeInfo | null = null;
   if (order.order_manual_surcharge_amount > 0) {
     surcharge = {
-      name: 'Suplemento',
+      name: t('pos.receipt.surcharge'),
       type: 'fixed',
       value: order.order_manual_surcharge_amount,
       amount: order.order_manual_surcharge_amount,
@@ -217,7 +222,7 @@ export function buildArchivedReceiptData(
   let discount: ReceiptDiscountInfo | null = null;
   if (order.order_manual_discount_amount > 0) {
     discount = {
-      name: 'Descuento',
+      name: t('pos.receipt.discount'),
       type: 'fixed',
       value: order.order_manual_discount_amount,
       amount: order.order_manual_discount_amount,
@@ -290,14 +295,14 @@ export function buildArchivedReceiptData(
       };
     });
 
-  const voidReason = order.void_type === 'CANCELLED' ? 'ANULADO'
-    : order.void_type === 'LOSS_SETTLED' ? 'PÉRDIDA'
+  const voidReason = order.void_type === 'CANCELLED' ? t('pos.receipt.voided')
+    : order.void_type === 'LOSS_SETTLED' ? t('pos.receipt.loss')
     : null;
 
   return {
     order_id: order.receipt_number,
     timestamp: formatTimestamp(Date.now()),
-    table_name: order.table_name ?? 'Mostrador',
+    table_name: order.table_name ?? t('pos.receipt.counter'),
     zone_name: order.zone_name ?? null,
     guest_count: order.guest_count || null,
     opened_at: order.start_time ? formatTimestamp(order.start_time) : null,

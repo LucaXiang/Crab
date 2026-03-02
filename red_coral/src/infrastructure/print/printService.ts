@@ -28,6 +28,10 @@ export interface ReceiptStoreInfo {
   email: string | null;
   website: string | null;
   logo_url: string | null;
+  currency_symbol: string | null;
+  receipt_header: string | null;
+  receipt_footer: string | null;
+  receipt_locale: string | null;
 }
 
 export interface ReceiptSurchargeInfo {

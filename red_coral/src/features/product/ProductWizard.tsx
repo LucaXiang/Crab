@@ -5,6 +5,7 @@ import { Wizard, WizardStep } from '@/shared/components/Wizard';
 import { FormField, CheckboxField, inputClass, selectClass } from '@/shared/components/FormField';
 import { ProductImage } from './ProductImage';
 import type { Category, Tag as TagType, ProductCreate, ProductSpecInput } from '@/core/domain/types/api/models';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
 interface ProductWizardProps {
   categories: Category[];
@@ -33,6 +34,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   isSubmitting,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
 
   // ── Form State ──
   const [name, setName] = useState('');
@@ -203,7 +205,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
                       className={`${inputClass} pr-8`}
                       placeholder="0.00"
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">€</div>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">{currencySymbol}</div>
                   </div>
                 </FormField>
               </div>
@@ -244,7 +246,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
                         className={`${inputClass} pr-8`}
                         placeholder="0.00"
                       />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">€</div>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">{currencySymbol}</div>
                     </div>
                   </FormField>
                 </div>

@@ -4,6 +4,7 @@
 
 use chrono_tz::Tz;
 use crab_printer::EscPosBuilder;
+use shared::models::receipt_text;
 
 use super::types::{KitchenOrder, PrintItemContext};
 
@@ -14,6 +15,7 @@ use super::types::{KitchenOrder, PrintItemContext};
 pub struct KitchenTicketRenderer {
     width: usize,
     timezone: Tz,
+    locale: String,
 }
 
 impl KitchenTicketRenderer {
@@ -22,12 +24,17 @@ impl KitchenTicketRenderer {
     /// Common widths:
     /// - 58mm paper: 32 characters
     /// - 80mm paper: 48 characters
-    pub fn new(width: usize, timezone: Tz) -> Self {
-        Self { width, timezone }
+    pub fn new(width: usize, timezone: Tz, locale: String) -> Self {
+        Self {
+            width,
+            timezone,
+            locale,
+        }
     }
 
     /// Render a kitchen order to ESC/POS bytes
     pub fn render(&self, order: &KitchenOrder) -> Vec<u8> {
+        let txt = receipt_text(&self.locale);
         let mut b = EscPosBuilder::new(self.width);
 
         // Group items by category
@@ -41,7 +48,7 @@ impl KitchenTicketRenderer {
             .map(|item| item.quantity)
             .sum();
 
-        self.render_header(&mut b, order, total_kinds, total_qty);
+        self.render_header(&mut b, order, total_kinds, total_qty, &txt);
 
         // Single category → flat list, multiple → show category headers
         let show_categories = grouped.len() > 1;
@@ -58,11 +65,11 @@ impl KitchenTicketRenderer {
             }
 
             for item in items {
-                self.render_item(&mut b, item);
+                self.render_item(&mut b, item, &txt);
             }
         }
 
-        self.render_footer(&mut b, order);
+        self.render_footer(&mut b, order, &txt);
 
         b.build()
     }
@@ -74,6 +81,7 @@ impl KitchenTicketRenderer {
         order: &KitchenOrder,
         total_kinds: usize,
         total_qty: i32,
+        txt: &shared::models::ReceiptText,
     ) {
         // Line 1: table/queue name (centered, double size, bold)
         b.center();
@@ -85,7 +93,7 @@ impl KitchenTicketRenderer {
         } else if let Some(n) = order.queue_number {
             format!("#{:03}", n)
         } else {
-            "Para llevar".to_string()
+            txt.takeaway_title.to_string()
         };
         b.line(&title);
 
@@ -96,7 +104,7 @@ impl KitchenTicketRenderer {
         // Line 2: zone | receipt_number (+ service tag)
         let zone = order.zone_name.as_deref().unwrap_or("");
         let right = if order.is_retail && order.queue_number.is_none() {
-            format!("{} [LLEVAR]", order.receipt_number)
+            format!("{} {}", order.receipt_number, txt.takeaway_tag)
         } else {
             order.receipt_number.clone()
         };
@@ -104,9 +112,9 @@ impl KitchenTicketRenderer {
 
         // Line 3: total count | timestamp
         let count_str = if total_kinds as i32 == total_qty {
-            format!("{} uds", total_qty)
+            format!("{} {}", total_qty, txt.units_word)
         } else {
-            format!("{} uds ({} items)", total_qty, total_kinds)
+            format!("{} {} ({} items)", total_qty, txt.units_word, total_kinds)
         };
         let timestamp = format_timestamp(order.created_at, self.timezone);
         b.bold();
@@ -159,7 +167,12 @@ impl KitchenTicketRenderer {
     const COL_EID: usize = 5; // " 0001"
 
     /// Render a single item with fixed-column layout
-    fn render_item(&self, b: &mut EscPosBuilder, item: &PrintItemContext) {
+    fn render_item(
+        &self,
+        b: &mut EscPosBuilder,
+        item: &PrintItemContext,
+        txt: &shared::models::ReceiptText,
+    ) {
         // Main line: "  2x 0001 Espresso"
         let qty_col = format!(
             "{:>width$}",
@@ -187,7 +200,7 @@ impl KitchenTicketRenderer {
             && !spec.is_empty()
         {
             b.bold();
-            b.line(&format!("{} > SPEC: {}", prefix, spec));
+            b.line(&format!("{} > {} {}", prefix, txt.spec_label, spec));
             b.bold_off();
         }
 
@@ -211,7 +224,12 @@ impl KitchenTicketRenderer {
     }
 
     /// Footer: reprint indicator + bottom margin + cut
-    fn render_footer(&self, b: &mut EscPosBuilder, order: &KitchenOrder) {
+    fn render_footer(
+        &self,
+        b: &mut EscPosBuilder,
+        order: &KitchenOrder,
+        txt: &shared::models::ReceiptText,
+    ) {
         b.sep_double();
 
         // Reprint indicator
@@ -219,7 +237,10 @@ impl KitchenTicketRenderer {
             b.newline();
             b.center();
             b.bold();
-            b.line(&format!("** REIMPRESION #{} **", order.print_count));
+            b.line(&format!(
+                "** {} #{} **",
+                txt.reprint_indicator, order.print_count
+            ));
             b.bold_off();
             b.left();
         }
@@ -235,7 +256,7 @@ impl KitchenTicketRenderer {
 
 impl Default for KitchenTicketRenderer {
     fn default() -> Self {
-        Self::new(48, chrono_tz::Europe::Madrid)
+        Self::new(48, chrono_tz::Europe::Madrid, "es-ES".to_string())
     }
 }
 
@@ -361,7 +382,8 @@ mod tests {
 
     #[test]
     fn test_render_kitchen_ticket() {
-        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
+        let renderer =
+            KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid, "es-ES".to_string());
         let order = create_test_order();
         let data = renderer.render(&order);
         assert!(data.len() > 100);
@@ -369,7 +391,8 @@ mod tests {
 
     #[test]
     fn test_single_category_no_header() {
-        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
+        let renderer =
+            KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid, "es-ES".to_string());
         let order = create_test_order();
         // All items in same category — should NOT have category header
         let grouped = renderer.group_by_category(&order.items);
@@ -378,7 +401,8 @@ mod tests {
 
     #[test]
     fn test_multi_category_has_headers() {
-        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
+        let renderer =
+            KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid, "es-ES".to_string());
         let order = create_multi_category_order();
         let grouped = renderer.group_by_category(&order.items);
         assert_eq!(grouped.len(), 2);
@@ -386,7 +410,8 @@ mod tests {
 
     #[test]
     fn test_reprint_indicator() {
-        let renderer = KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid);
+        let renderer =
+            KitchenTicketRenderer::new(48, chrono_tz::Europe::Madrid, "es-ES".to_string());
         let mut order = create_test_order();
         order.print_count = 2;
         let data = renderer.render(&order);

@@ -183,6 +183,8 @@ pub enum ErrorCode {
     ProductExternalIdRequired = 6203,
     /// Product cannot belong to virtual category
     ProductCategoryInvalid = 6204,
+    /// Cannot delete root specification (each product must keep at least one)
+    SpecRootRequired = 6205,
     /// Attribute not found
     AttributeNotFound = 6301,
     /// Attribute binding failed
@@ -422,6 +424,9 @@ impl ErrorCode {
             ErrorCode::CategoryHasProducts => "Category has associated products",
             ErrorCode::CategoryNameExists => "Category name already exists",
             ErrorCode::SpecNotFound => "Specification not found",
+            ErrorCode::SpecRootRequired => {
+                "Cannot delete root specification, each product must keep at least one"
+            }
             ErrorCode::ProductExternalIdExists => "Product external_id already exists",
             ErrorCode::ProductExternalIdRequired => "Product external_id is required",
             ErrorCode::ProductCategoryInvalid => "Product cannot belong to a virtual category",
@@ -611,6 +616,7 @@ impl TryFrom<u16> for ErrorCode {
             6102 => Ok(ErrorCode::CategoryHasProducts),
             6103 => Ok(ErrorCode::CategoryNameExists),
             6201 => Ok(ErrorCode::SpecNotFound),
+            6205 => Ok(ErrorCode::SpecRootRequired),
             6202 => Ok(ErrorCode::ProductExternalIdExists),
             6203 => Ok(ErrorCode::ProductExternalIdRequired),
             6204 => Ok(ErrorCode::ProductCategoryInvalid),
@@ -999,7 +1005,7 @@ mod tests {
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
             6101, 6102, 6103, // 61xx Category
-            6201, 6202, 6203, 6204, // 62xx Spec/ExtId
+            6201, 6202, 6203, 6204, 6205, // 62xx Spec/ExtId
             6301, 6302, 6303, 6304, // 63xx Attribute
             6401, 6402, // 64xx Tag
             6501, 6502, 6503, 6504, 6505, 6506, 6507, 6508, 6509, // 65xx File Upload
@@ -1020,7 +1026,7 @@ mod tests {
             9401, 9402, 9403, 9404, // 94xx Storage
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 134;
+        const EXPECTED_VARIANT_COUNT: usize = 135;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

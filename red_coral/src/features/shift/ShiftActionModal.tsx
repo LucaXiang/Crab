@@ -21,6 +21,7 @@ import { Currency, formatCurrency } from '@/utils/currency';
 import { Numpad } from '@/presentation/components/ui/Numpad';
 import type { Shift } from '@/core/domain/types/api';
 import { MAX_NOTE_LEN } from '@/shared/constants/validation';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
 const getApi = () => createTauriClient();
 
@@ -40,6 +41,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
   onSuccess,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const user = useAuthStore(state => state.user);
   const { openShift: storeOpenShift, closeShift: storeCloseShift, forceCloseShift: storeForceCloseShift } = useShiftStore();
 
@@ -357,7 +359,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
             </label>
             <div className="h-16 md:h-20 bg-white rounded-xl flex items-center justify-between px-6 mt-2 border-2 border-green-200 shadow-sm">
               <div className="flex items-center">
-                <span className="text-green-500 mr-2 text-xl md:text-2xl font-bold">€</span>
+                <span className="text-green-500 mr-2 text-xl md:text-2xl font-bold">{currencySymbol}</span>
                 <span
                   className={`text-2xl md:text-4xl font-mono font-bold px-1 rounded transition-colors ${
                     isSelected

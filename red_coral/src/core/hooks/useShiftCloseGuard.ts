@@ -14,6 +14,7 @@ import { createTauriClient } from '@/infrastructure/api/tauri-client';
 import { logger } from '@/utils/logger';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { formatCurrency } from '@/utils/currency';
+import { getLocale } from '@/infrastructure/i18n';
 import type { Shift } from '@/core/domain/types/api';
 
 const client = createTauriClient();
@@ -124,7 +125,7 @@ export function useShiftCloseGuard() {
 function formatTime(millis: number): string {
   try {
     const date = new Date(millis);
-    return date.toLocaleString('zh-CN', {
+    return date.toLocaleString(getLocale(), {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',

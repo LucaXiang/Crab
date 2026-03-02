@@ -10,6 +10,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { getLocale } from '@/infrastructure/i18n';
 import {
   Info,
   AlertTriangle,
@@ -130,7 +131,7 @@ function ServerToast({ item, onDismiss }: ToastProps) {
   }, [item.id, onDismiss]);
 
   // Format timestamp
-  const timeStr = new Date(item.timestamp).toLocaleTimeString('zh-CN', {
+  const timeStr = new Date(item.timestamp).toLocaleTimeString(getLocale(), {
     hour: '2-digit',
     minute: '2-digit',
   });

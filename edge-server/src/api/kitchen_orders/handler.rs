@@ -182,7 +182,13 @@ pub async fn reprint(
         .map(|d| (d.id.to_string(), d))
         .collect();
 
-    let executor = PrintExecutor::with_config(48, state.config.timezone);
+    let locale = crate::db::repository::store_info::get(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|i| i.receipt_locale)
+        .unwrap_or_else(|| "es-ES".to_string());
+    let executor = PrintExecutor::with_config(48, state.config.timezone, locale);
     if let Err(e) = executor.print_kitchen_order(&order, &dest_map).await {
         tracing::warn!(
             kitchen_order_id = %id,
@@ -283,7 +289,13 @@ pub async fn reprint_label(
         .map(|d| (d.id.to_string(), d))
         .collect();
 
-    let executor = PrintExecutor::with_config(48, state.config.timezone);
+    let locale = crate::db::repository::store_info::get(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|i| i.receipt_locale)
+        .unwrap_or_else(|| "es-ES".to_string());
+    let executor = PrintExecutor::with_config(48, state.config.timezone, locale);
 
     #[cfg(windows)]
     {

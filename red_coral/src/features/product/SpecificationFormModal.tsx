@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
 import { useFormInitialization } from '@/hooks/useFormInitialization';
 import { usePriceInput } from '@/hooks/usePriceInput';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 import type { ProductSpec } from '@/core/domain/types';
 import { validateSpecData, createEmptySpec } from './spec-utils';
 import { toast } from '@/presentation/components/Toast';
@@ -52,6 +53,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
   onSave,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const isEditing = spec !== null;
 
   // Memoize the initial form data to prevent useEffect from re-running on every render
@@ -184,7 +186,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
 
             <FormField label={t('settings.specification.form.price')} required={!isRootSpec}>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">EUR</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{currencySymbol}</span>
                 <input
                   type="text"
                   inputMode="decimal"

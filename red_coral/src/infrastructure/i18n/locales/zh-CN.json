@@ -357,6 +357,13 @@
     },
     "error": {
       "product_not_found": "找不到该菜品"
+    },
+    "receipt": {
+      "surcharge": "附加费",
+      "discount": "折扣",
+      "counter": "柜台",
+      "voided": "已作废",
+      "loss": "损失"
     }
   },
   "checkout": {

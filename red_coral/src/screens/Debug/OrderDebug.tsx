@@ -27,6 +27,8 @@ import { invokeApi } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { ConfirmDialog } from '@/shared/components';
+import { formatCurrency } from '@/utils/currency';
+import { getLocale } from '@/infrastructure/i18n';
 import type { OrderSnapshot, SyncResponse } from '@/core/domain/types/orderEvent';
 
 export const OrderDebug: React.FC = () => {
@@ -134,7 +136,7 @@ export const OrderDebug: React.FC = () => {
 
   const formatTime = (timestamp: number | null) => {
     if (!timestamp) return '-';
-    return new Date(timestamp).toLocaleString('zh-CN');
+    return new Date(timestamp).toLocaleString(getLocale());
   };
 
   const getStatusColor = (status: string) => {
@@ -200,7 +202,7 @@ export const OrderDebug: React.FC = () => {
                 </span>
                 <span className="flex items-center gap-1">
                   <DollarSign size={12} />
-                  €{order.total.toFixed(2)}
+                  {formatCurrency(order.total)}
                 </span>
               </div>
             </div>
@@ -239,28 +241,28 @@ export const OrderDebug: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <div className="text-gray-500">Original Total</div>
-                <div>€{order.original_total.toFixed(2)}</div>
+                <div>{formatCurrency(order.original_total)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Subtotal</div>
-                <div>€{order.subtotal.toFixed(2)}</div>
+                <div>{formatCurrency(order.subtotal)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Discount</div>
-                <div className="text-red-600">-€{order.total_discount.toFixed(2)}</div>
+                <div className="text-red-600">-{formatCurrency(order.total_discount)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Total</div>
-                <div className="font-bold">€{order.total.toFixed(2)}</div>
+                <div className="font-bold">{formatCurrency(order.total)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Paid</div>
-                <div className="text-green-600">€{order.paid_amount.toFixed(2)}</div>
+                <div className="text-green-600">{formatCurrency(order.paid_amount)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Remaining</div>
                 <div className={order.remaining_amount > 0 ? 'text-orange-600' : ''}>
-                  €{order.remaining_amount.toFixed(2)}
+                  {formatCurrency(order.remaining_amount)}
                 </div>
               </div>
             </div>
@@ -301,7 +303,7 @@ export const OrderDebug: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div>€{(item.price * item.quantity).toFixed(2)}</div>
+                      <div>{formatCurrency(item.price * item.quantity)}</div>
                     </div>
                   ))}
                 </div>

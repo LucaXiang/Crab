@@ -14,6 +14,7 @@ import { Numpad } from '@/presentation/components/ui/Numpad';
 import { useI18n } from '@/hooks/useI18n';
 import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
 interface CashPaymentModalProps {
   /** 应付金额 */
@@ -39,6 +40,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
   note,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const [tenderedInput, setTenderedInput] = useState<string>(amountDue.toFixed(2));
   const [isSelected, setIsSelected] = useState(true); // 覆盖模式：输入时替换全部
 
@@ -219,7 +221,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
             </label>
             <div className="h-16 md:h-20 bg-white rounded-xl flex items-center justify-between px-4 md:px-6 mt-2 border-2 border-green-200 shadow-sm">
               <div className="flex items-center">
-                <span className="text-green-500 mr-2 text-xl md:text-2xl font-bold">€</span>
+                <span className="text-green-500 mr-2 text-xl md:text-2xl font-bold">{currencySymbol}</span>
                 <span
                   className={`text-2xl md:text-4xl font-mono font-bold px-1 rounded transition-colors ${
                     isSelected

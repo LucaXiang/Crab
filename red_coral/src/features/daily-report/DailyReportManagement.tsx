@@ -15,6 +15,7 @@ import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { formatCurrency } from '@/utils/currency';
+import { getLocale } from '@/infrastructure/i18n';
 import type { DailyReport } from '@/core/domain/types/api';
 
 const getApi = () => createTauriClient();
@@ -78,7 +79,7 @@ export const DailyReportManagement: React.FC = React.memo(() => {
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('zh-CN', {
+      return date.toLocaleDateString(getLocale(), {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',

@@ -14,6 +14,10 @@ pub struct StoreInfo {
     pub email: Option<String>,
     pub website: Option<String>,
     pub logo_url: Option<String>,
+    pub currency_symbol: Option<String>,
+    pub receipt_header: Option<String>,
+    pub receipt_footer: Option<String>,
+    pub receipt_locale: Option<String>,
 }
 
 /// 附加费信息 (整单手动)

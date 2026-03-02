@@ -200,13 +200,33 @@ impl ServerState {
         })?;
         let pool = db_service.pool;
 
-        // 2. Initialize Services
+        // 2. Load StoreInfo early (for timezone resolution)
+        let store_info = crate::db::repository::store_info::get(&pool)
+            .await
+            .ok()
+            .flatten();
+
+        // Resolve effective timezone: StoreInfo > Config > Europe/Madrid
+        let mut config = config.clone();
+        if let Some(ref tz_str) = store_info.as_ref().and_then(|i| i.timezone.as_ref()) {
+            match tz_str.parse::<chrono_tz::Tz>() {
+                Ok(tz) => {
+                    tracing::info!(timezone = %tz, "Using timezone from StoreInfo");
+                    config.timezone = tz;
+                }
+                Err(_) => {
+                    tracing::warn!(timezone = %tz_str, "Invalid timezone in StoreInfo, using default");
+                }
+            }
+        }
+
+        // 3. Initialize Services
         let activation = ActivationService::new(
             config.auth_server_url.clone(),
             PathBuf::from(&config.work_dir),
         );
         let cert_service = CertService::new(PathBuf::from(&config.work_dir));
-        let message_bus = MessageBusService::new(config);
+        let message_bus = MessageBusService::new(&config);
         let https = HttpsService::new(config.clone());
         let jwt_secret = crate::auth::jwt::load_or_create_persistent_secret(&config.data_dir());
         let jwt_service = Arc::new(JwtService::with_config(crate::auth::jwt::JwtConfig {
@@ -215,11 +235,11 @@ impl ServerState {
         }));
         let resource_versions = Arc::new(ResourceVersions::new());
 
-        // 3. Initialize CatalogService first (OrdersManager depends on it)
+        // 4. Initialize CatalogService first (OrdersManager depends on it)
         let images_dir = config.images_dir();
         let catalog_service = Arc::new(CatalogService::new(pool.clone(), images_dir));
 
-        // 4. Initialize OrdersManager (event sourcing) with CatalogService
+        // 5. Initialize OrdersManager (event sourcing) with CatalogService
         let orders_db_path = config.orders_db_file();
         let store_number = {
             let cred = activation.credential_cache.read().await;
@@ -234,10 +254,6 @@ impl ServerState {
         orders_manager.set_catalog_service(catalog_service.clone());
 
         // Initialize InvoiceService from store_info (Verifactu)
-        let store_info = crate::db::repository::store_info::get(&pool)
-            .await
-            .ok()
-            .flatten();
         let invoice_service = if let Some(ref info) = store_info {
             if !info.nif.is_empty() {
                 Some(crate::archiving::InvoiceService::new(

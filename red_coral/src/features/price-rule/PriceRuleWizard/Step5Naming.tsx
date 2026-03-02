@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import type { WizardState } from './index';
 import { FormSection, FormField, inputClass } from '@/shared/components/FormField';
 import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN, MAX_NOTE_LEN } from '@/shared/constants/validation';
+import { getCurrencySymbol } from '@/utils/currency';
 
 interface Step5NamingProps {
   state: WizardState;
@@ -51,7 +52,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
     parts.push(
       state.adjustment_type === 'PERCENTAGE'
         ? `${state.adjustment_value}%`
-        : `€${state.adjustment_value.toFixed(2)}`
+        : `${getCurrencySymbol()}${state.adjustment_value.toFixed(2)}`
     );
 
     // Scope

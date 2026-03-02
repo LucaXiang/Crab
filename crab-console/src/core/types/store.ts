@@ -560,12 +560,13 @@ export interface StoreInfo {
   nif: string | null;
   email: string | null;
   website: string | null;
-  business_day_cutoff: number | null;
+  business_day_cutoff: number;
+  logo_url: string | null;
   currency_code: string | null;
   currency_symbol: string | null;
   currency_decimal_places: number | null;
-  logo: string | null;
   timezone: string | null;
+  receipt_locale: string | null;
   receipt_header: string | null;
   receipt_footer: string | null;
 }
@@ -578,11 +579,12 @@ export interface StoreInfoUpdate {
   email?: string;
   website?: string;
   business_day_cutoff?: number;
+  logo_url?: string;
   currency_code?: string;
   currency_symbol?: string;
   currency_decimal_places?: number;
-  logo?: string;
   timezone?: string;
+  receipt_locale?: string;
   receipt_header?: string;
   receipt_footer?: string;
 }

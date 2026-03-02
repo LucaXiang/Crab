@@ -8,6 +8,7 @@ import { useFormInitialization } from '@/hooks/useFormInitialization';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { useFormSubmit } from '@/shared/hooks/useFormSubmit';
 import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN } from '@/shared/constants/validation';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
 // Extended option type with index for UI (matches store type)
 interface AttributeOptionWithIndex extends AttributeOption {
@@ -64,6 +65,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
   editingOption,
 }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const { createOption, updateOption } = useOptionActions();
 
   // Memoize the initial form data to prevent useEffect from re-running on every render
@@ -199,7 +201,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
 
             <FormField label={t('settings.attribute.option.form.price')}>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{currencySymbol}</span>
                 <input
                   type="text"
                   inputMode="decimal"

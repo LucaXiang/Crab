@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tag, Pencil, Monitor } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { ApiError } from '@/infrastructure/api/client';
 import {
@@ -18,7 +19,8 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, CheckboxField, inputClass } from '@/shared/components/FormField';
 import { StatusToggle } from '@/shared/components/StatusToggle/StatusToggle';
 import { LabelEditorScreen } from './LabelEditorScreen';
-import { DEFAULT_LABEL_TEMPLATES } from './constants';
+import { getDefaultLabelTemplates } from './constants';
+import { useStoreInfo } from '@/core/context/StoreInfoContext';
 
 type PanelState =
   | { type: 'closed' }
@@ -30,8 +32,11 @@ export const LabelTemplateManagement: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
+  const { currencySymbol } = useStoreInfo();
+  const defaultLabelTemplates = useMemo(() => getDefaultLabelTemplates(currencySymbol), [currencySymbol]);
 
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +147,7 @@ export const LabelTemplateManagement: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  const handleCreateFromPreset = async (preset: (typeof DEFAULT_LABEL_TEMPLATES)[number]) => {
+  const handleCreateFromPreset = async (preset: (typeof defaultLabelTemplates)[number]) => {
     if (!token) return;
     try {
       const payload: LabelTemplateCreate = {
@@ -234,7 +239,10 @@ export const LabelTemplateManagement: React.FC = () => {
         <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
           <Tag className="w-5 h-5 text-indigo-600" />
         </div>
-        <h1 className="text-xl font-bold text-slate-900">{t('settings.label.templates')}</h1>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('settings.label.templates')}</h1>
+          <p className="text-xs text-gray-400">{storeName}</p>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -349,7 +357,7 @@ export const LabelTemplateManagement: React.FC = () => {
                 <h3 className="text-lg font-bold text-gray-700 mb-2">Sin plantillas</h3>
                 <p className="text-sm text-gray-500 mb-6">{t('settings.label.no_templates_desc')}</p>
                 <div className="flex flex-col gap-2 w-full max-w-xs">
-                  {DEFAULT_LABEL_TEMPLATES.map((preset, i) => (
+                  {defaultLabelTemplates.map((preset, i) => (
                     <button
                       key={i}
                       onClick={() => handleCreateFromPreset(preset)}

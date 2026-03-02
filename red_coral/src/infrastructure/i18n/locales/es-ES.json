@@ -357,6 +357,13 @@
     },
     "error": {
       "product_not_found": "Plato no encontrado"
+    },
+    "receipt": {
+      "surcharge": "Suplemento",
+      "discount": "Descuento",
+      "counter": "Mostrador",
+      "voided": "ANULADO",
+      "loss": "PÉRDIDA"
     }
   },
   "checkout": {

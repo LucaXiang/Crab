@@ -1,0 +1,2 @@
+-- SQLite cannot drop columns, recreate would be needed
+-- For development, this is acceptable

@@ -20,6 +20,7 @@ import { ZonePicker } from './ZonePicker';
 import { TargetPicker } from './TargetPicker';
 import { TimeConditionEditor } from './TimeConditionEditor';
 import { useRuleEditor } from './useRuleEditor';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
 interface RuleDetailPanelProps {
   rule: PriceRule | null;
@@ -63,6 +64,7 @@ const RuleDetailContent: React.FC<{
   onDeleteRule: (rule: PriceRule) => void;
 }> = ({ rule, onRuleUpdated, onDeleteRule }) => {
   const { t } = useI18n();
+  const currencySymbol = useCurrencySymbol();
   const editor = useRuleEditor(rule, onRuleUpdated);
 
   const ProductScopeIcon = PRODUCT_SCOPE_ICONS[editor.current.productScope] || Globe;
@@ -198,7 +200,7 @@ const RuleDetailContent: React.FC<{
                           : 'bg-white text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      €
+                      {currencySymbol}
                     </button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -213,7 +215,7 @@ const RuleDetailContent: React.FC<{
                       min={0}
                     />
                     <span className="text-gray-500 shrink-0">
-                      {editor.current.adjustmentType === 'PERCENTAGE' ? '%' : '€'}
+                      {editor.current.adjustmentType === 'PERCENTAGE' ? '%' : currencySymbol}
                     </span>
                   </div>
                 </div>

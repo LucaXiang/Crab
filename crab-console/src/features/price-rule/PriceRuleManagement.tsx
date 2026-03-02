@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Percent, Tag, Settings2, Clock } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
+import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { listPriceRules, createPriceRule, updatePriceRule, deletePriceRule } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
@@ -56,6 +57,7 @@ type PanelState =
 export const PriceRuleManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
+  const storeName = useStoreName();
   const token = useAuthStore(s => s.token);
 
   const ruleTypeOptions = useRuleTypeOptions(t);
@@ -313,7 +315,7 @@ export const PriceRuleManagement: React.FC = () => {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">{t('settings.price_rule.title')}</h1>
-          <p className="text-xs text-gray-400">{t('settings.price_rule.subtitle')}</p>
+          <p className="text-xs text-gray-400">{storeName}</p>
         </div>
       </div>
 

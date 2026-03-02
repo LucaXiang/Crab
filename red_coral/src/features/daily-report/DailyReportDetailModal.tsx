@@ -11,6 +11,7 @@ import React from 'react';
 import { X, Calendar, TrendingUp, Receipt, CreditCard, Percent } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
+import { getLocale } from '@/infrastructure/i18n';
 import type { DailyReport, TaxBreakdown, PaymentMethodBreakdown } from '@/core/domain/types/api';
 
 interface DailyReportDetailModalProps {
@@ -31,7 +32,7 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('zh-CN', {
+      return date.toLocaleDateString(getLocale(), {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -267,7 +268,7 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
                 <span className="text-gray-500">{t('settings.daily_report.generated_at')}</span>
                 <span>
                   {report.generated_at
-                    ? new Date(report.generated_at).toLocaleString('zh-CN')
+                    ? new Date(report.generated_at).toLocaleString(getLocale())
                     : '-'}
                 </span>
               </div>

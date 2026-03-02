@@ -21,6 +21,20 @@ pub struct StoreInfo {
     /// 营业日分界时间 — 从午夜 00:00 起的偏移分钟数 (0-480，即 00:00-08:00)
     #[serde(default)]
     pub business_day_cutoff: i32,
+    /// ISO 4217 货币代码 (e.g. "EUR", "USD", "CNY")
+    pub currency_code: Option<String>,
+    /// 货币符号 (e.g. "€", "$", "¥")
+    pub currency_symbol: Option<String>,
+    /// 货币小数位数 (e.g. 2 for EUR, 0 for JPY)
+    pub currency_decimal_places: Option<i32>,
+    /// IANA 时区 (e.g. "Europe/Madrid", "Asia/Shanghai")
+    pub timezone: Option<String>,
+    /// 收据 locale (e.g. "es-ES", "zh-CN", "en")
+    pub receipt_locale: Option<String>,
+    /// 收据页眉自定义文本
+    pub receipt_header: Option<String>,
+    /// 收据页脚自定义文本
+    pub receipt_footer: Option<String>,
     pub created_at: Option<i64>,
     pub updated_at: Option<i64>,
 }
@@ -36,4 +50,11 @@ pub struct StoreInfoUpdate {
     pub email: Option<String>,
     pub website: Option<String>,
     pub business_day_cutoff: Option<i32>,
+    pub currency_code: Option<String>,
+    pub currency_symbol: Option<String>,
+    pub currency_decimal_places: Option<i32>,
+    pub timezone: Option<String>,
+    pub receipt_locale: Option<String>,
+    pub receipt_header: Option<String>,
+    pub receipt_footer: Option<String>,
 }

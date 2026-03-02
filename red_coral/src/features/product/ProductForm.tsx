@@ -8,6 +8,8 @@ import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { MAX_NAME_LEN, MAX_RECEIPT_NAME_LEN } from '@/shared/constants/validation';
 import { Category, ProductSpec, PrintState } from '@/core/domain/types';
+import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
+import { formatCurrency } from '@/utils/currency';
 
 interface ProductFormData {
   id?: number; // Product ID (for editing existing product)
@@ -45,6 +47,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   t,
   inheritedAttributeIds = [] as number[],
 }) => {
+  const currencySymbol = useCurrencySymbol();
   const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const allTags = useTags();
@@ -160,7 +163,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <FormField label={t('settings.product.form.price')} required>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">€</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">{currencySymbol}</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -519,7 +522,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       </span>
                     )}
                   </div>
-                  <span className="text-sm font-mono text-gray-600">EUR{spec.price.toFixed(2)}</span>
+                  <span className="text-sm font-mono text-gray-600">{formatCurrency(spec.price)}</span>
                 </div>
 
                 {spec.receipt_name && (

@@ -84,7 +84,7 @@ export const StoreSettingsScreen: React.FC = () => {
             business_day_cutoff: s.business_day_cutoff ?? 0,
           });
         }
-        setFormLogo(info.logo ?? '');
+        setFormLogo(info.logo_url ?? '');
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
       } finally {
@@ -124,7 +124,7 @@ export const StoreSettingsScreen: React.FC = () => {
     try {
       await Promise.all([
         updateStore(token, storeId, form),
-        updateStoreInfo(token, storeId, { logo: formLogo || undefined }),
+        updateStoreInfo(token, storeId, { logo_url: formLogo || undefined }),
       ]);
       setMsg({ text: t('store.saved'), ok: true });
     } catch (err) {

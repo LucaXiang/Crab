@@ -6,8 +6,22 @@ export function formatDateTime(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+// Formatter cache keyed by locale:currency
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
+export function formatCurrency(
+  amount: number,
+  options?: { currency?: string; locale?: string },
+): string {
+  const currency = options?.currency ?? 'EUR';
+  const locale = options?.locale ?? navigator.language ?? 'es-ES';
+  const key = `${locale}:${currency}`;
+  let fmt = currencyFormatters.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { style: 'currency', currency });
+    currencyFormatters.set(key, fmt);
+  }
+  return fmt.format(amount);
 }
 
 export function timeAgo(ms: number): string {

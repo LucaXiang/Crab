@@ -52,6 +52,10 @@ fn validate_update(payload: &ProductUpdate) -> AppResult<()> {
 
 /// Validate product spec prices and text fields
 fn validate_specs(specs: &[shared::models::ProductSpecInput]) -> AppResult<()> {
+    // At least one root spec must exist
+    if !specs.iter().any(|s| s.is_root) {
+        return Err(AppError::new(shared::ErrorCode::SpecRootRequired));
+    }
     for spec in specs {
         // Root spec name can be empty (won't display on receipts when empty)
         if spec.is_root {
