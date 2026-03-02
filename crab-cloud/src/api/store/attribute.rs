@@ -87,9 +87,7 @@ pub async fn delete_attribute(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
 
-    store::delete_attribute_direct(&state.pool, store_id, attr_id)
-        .await
-        .map_err(internal)?;
+    store::delete_attribute_direct(&state.pool, store_id, attr_id).await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -284,8 +282,7 @@ pub async fn bind_attribute(
             default_option_ids: req.default_option_ids.clone(),
         },
     )
-    .await
-    .map_err(internal)?;
+    .await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;

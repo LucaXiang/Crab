@@ -87,9 +87,7 @@ pub async fn delete_tag(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
 
-    store::delete_tag_direct(&state.pool, store_id, tag_id)
-        .await
-        .map_err(internal)?;
+    store::delete_tag_direct(&state.pool, store_id, tag_id).await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;

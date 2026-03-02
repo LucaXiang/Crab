@@ -36,9 +36,13 @@ use shared::error::{AppError, ErrorCode};
 
 use crate::state::AppState;
 
-fn internal(e: impl std::fmt::Display) -> AppError {
+fn internal(e: Box<dyn std::error::Error + Send + Sync>) -> AppError {
+    // If the BoxError is actually an AppError, preserve it (keeps specific error codes)
+    if e.downcast_ref::<AppError>().is_some() {
+        return *e.downcast::<AppError>().unwrap();
+    }
     tracing::error!("Store query error: {e}");
-    AppError::new(ErrorCode::InternalError)
+    AppError::with_message(ErrorCode::InternalError, e.to_string())
 }
 
 /// Push StoreOp to edge: direct send if online, queue to pending_ops if offline.

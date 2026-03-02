@@ -121,9 +121,7 @@ pub async fn delete_category(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
 
-    store::delete_category_direct(&state.pool, store_id, category_id)
-        .await
-        .map_err(internal)?;
+    store::delete_category_direct(&state.pool, store_id, category_id).await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;

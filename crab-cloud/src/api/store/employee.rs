@@ -63,9 +63,7 @@ pub async fn update_employee(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
 
-    let op_data = store::update_employee_direct(&state.pool, store_id, employee_id, &data)
-        .await
-        .map_err(internal)?;
+    let op_data = store::update_employee_direct(&state.pool, store_id, employee_id, &data).await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;
@@ -91,9 +89,7 @@ pub async fn delete_employee(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
 
-    store::delete_employee_direct(&state.pool, store_id, employee_id)
-        .await
-        .map_err(internal)?;
+    store::delete_employee_direct(&state.pool, store_id, employee_id).await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;

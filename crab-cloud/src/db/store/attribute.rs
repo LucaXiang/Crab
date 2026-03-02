@@ -448,7 +448,9 @@ pub async fn update_attribute_direct(
     .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or("Attribute not found")?;
+    .ok_or_else(|| -> BoxError {
+        shared::error::AppError::new(shared::ErrorCode::AttributeNotFound).into()
+    })?;
 
     sqlx::query("UPDATE store_attributes SET name = COALESCE($1, name), is_multi_select = COALESCE($2, is_multi_select), max_selections = COALESCE($3, max_selections), default_option_ids = COALESCE($4, default_option_ids), display_order = COALESCE($5, display_order), show_on_receipt = COALESCE($6, show_on_receipt), receipt_name = COALESCE($7, receipt_name), show_on_kitchen_print = COALESCE($8, show_on_kitchen_print), kitchen_print_name = COALESCE($9, kitchen_print_name), is_active = COALESCE($10, is_active), updated_at = $11 WHERE id = $12")
         .bind(&data.name).bind(data.is_multi_select).bind(data.max_selections).bind(&default_ids_json).bind(data.display_order).bind(data.show_on_receipt).bind(&data.receipt_name).bind(data.show_on_kitchen_print).bind(&data.kitchen_print_name).bind(data.is_active).bind(now).bind(pg_id)
@@ -506,14 +508,41 @@ pub async fn delete_attribute_direct(
     pool: &PgPool,
     store_id: i64,
     source_id: i64,
-) -> Result<(), BoxError> {
+) -> Result<(), shared::error::AppError> {
+    // Check for active bindings before deletion
+    let binding_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM store_attribute_bindings WHERE store_id = $1 AND attribute_source_id = $2",
+    )
+    .bind(store_id)
+    .bind(source_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+    })?;
+
+    if binding_count > 0 {
+        return Err(shared::error::AppError::with_message(
+            shared::ErrorCode::AttributeInUse,
+            format!(
+                "Cannot delete attribute: {} product/category binding(s) exist",
+                binding_count
+            ),
+        ));
+    }
+
     let rows = sqlx::query("DELETE FROM store_attributes WHERE store_id = $1 AND source_id = $2")
         .bind(store_id)
         .bind(source_id)
         .execute(pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?;
     if rows.rows_affected() == 0 {
-        return Err("Attribute not found".into());
+        return Err(shared::error::AppError::new(
+            shared::ErrorCode::AttributeNotFound,
+        ));
     }
     Ok(())
 }
@@ -534,7 +563,9 @@ pub async fn create_option_direct(
     .bind(attribute_source_id)
     .fetch_optional(pool)
     .await?
-    .ok_or("Attribute not found")?;
+    .ok_or_else(|| -> BoxError {
+        shared::error::AppError::new(shared::ErrorCode::AttributeNotFound).into()
+    })?;
 
     let source_id = super::snowflake_id();
 
@@ -588,7 +619,7 @@ pub async fn update_option_direct(
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
-        return Err("Attribute option not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::AttributeNotFound).into());
     }
     Ok(())
 }
@@ -608,7 +639,7 @@ pub async fn delete_option_direct(
     .execute(pool)
     .await?;
     if rows.rows_affected() == 0 {
-        return Err("Attribute option not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::AttributeNotFound).into());
     }
     Ok(())
 }
@@ -705,16 +736,61 @@ pub async fn bind_attribute_direct(
     pool: &PgPool,
     store_id: i64,
     params: BindAttributeParams<'_>,
-) -> Result<i64, BoxError> {
+) -> Result<i64, shared::error::AppError> {
+    // If binding to a product, check if the attribute is already inherited from its category
+    if params.owner_type == "product" {
+        let category_id: Option<i64> = sqlx::query_scalar(
+            "SELECT p.category_source_id FROM store_products p WHERE p.store_id = $1 AND p.source_id = $2",
+        )
+        .bind(store_id)
+        .bind(params.owner_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?
+        .flatten();
+
+        if let Some(cat_id) = category_id {
+            let inherited: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM store_attribute_bindings WHERE store_id = $1 AND owner_type = 'category' AND owner_source_id = $2 AND attribute_source_id = $3",
+            )
+            .bind(store_id)
+            .bind(cat_id)
+            .bind(params.attribute_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| {
+                shared::error::AppError::with_message(
+                    shared::ErrorCode::InternalError,
+                    e.to_string(),
+                )
+            })?;
+
+            if inherited > 0 {
+                return Err(shared::error::AppError::with_message(
+                    shared::ErrorCode::AttributeDuplicateBinding,
+                    "This attribute is already inherited from the category",
+                ));
+            }
+        }
+    }
+
     let default_ids_json = params
         .default_option_ids
         .as_ref()
         .map(serde_json::to_value)
-        .transpose()?;
+        .transpose()
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?;
     let source_id = super::snowflake_id();
     sqlx::query("INSERT INTO store_attribute_bindings (store_id, source_id, owner_type, owner_source_id, attribute_source_id, is_required, display_order, default_option_ids) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
         .bind(store_id).bind(source_id).bind(params.owner_type).bind(params.owner_id).bind(params.attribute_id).bind(params.is_required).bind(params.display_order).bind(&default_ids_json)
-        .execute(pool).await?;
+        .execute(pool).await
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?;
     Ok(source_id)
 }
 
@@ -730,7 +806,7 @@ pub async fn unbind_attribute_direct(
             .execute(pool)
             .await?;
     if rows.rows_affected() == 0 {
-        return Err("Attribute binding not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::AttributeNotFound).into());
     }
     Ok(())
 }

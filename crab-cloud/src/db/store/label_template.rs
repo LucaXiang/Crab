@@ -480,7 +480,9 @@ pub async fn update_label_template_direct(
     .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or("Label template not found")?;
+    .ok_or_else(|| -> BoxError {
+        shared::error::AppError::new(shared::ErrorCode::LabelTemplateNotFound).into()
+    })?;
 
     sqlx::query(
         r#"
@@ -578,7 +580,7 @@ pub async fn delete_label_template_direct(
             .execute(pool)
             .await?;
     if rows.rows_affected() == 0 {
-        return Err("Label template not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::LabelTemplateNotFound).into());
     }
     Ok(())
 }

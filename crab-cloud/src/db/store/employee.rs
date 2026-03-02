@@ -147,9 +147,30 @@ pub async fn update_employee_direct(
     store_id: i64,
     source_id: i64,
     data: &shared::models::employee::EmployeeUpdate,
-) -> Result<StoreOpData, BoxError> {
+) -> Result<StoreOpData, shared::error::AppError> {
     let now = shared::util::now_millis();
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.begin().await.map_err(|e| {
+        shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+    })?;
+
+    // Check system employee protection
+    let is_system: bool = sqlx::query_scalar(
+        "SELECT is_system FROM store_employees WHERE store_id = $1 AND source_id = $2",
+    )
+    .bind(store_id)
+    .bind(source_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| {
+        shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+    })?
+    .ok_or_else(|| shared::error::AppError::new(shared::ErrorCode::EmployeeNotFound))?;
+
+    if is_system {
+        return Err(shared::error::AppError::new(
+            shared::ErrorCode::EmployeeIsSystem,
+        ));
+    }
 
     // Hash new password if provided
     let hash_pass = if let Some(ref password) = data.password {
@@ -161,7 +182,12 @@ pub async fn update_employee_direct(
         Some(
             Argon2::default()
                 .hash_password(password.as_bytes(), &salt)
-                .map_err(|e| format!("Failed to hash password: {e}"))?
+                .map_err(|e| {
+                    shared::error::AppError::with_message(
+                        shared::ErrorCode::InternalError,
+                        format!("Failed to hash password: {e}"),
+                    )
+                })?
                 .to_string(),
         )
     } else {
@@ -189,7 +215,8 @@ pub async fn update_employee_direct(
     .bind(store_id)
     .bind(source_id)
     .execute(&mut *tx)
-    .await?;
+    .await
+    .map_err(db_err)?;
 
     // Read back updated employee
     let employee: Employee = sqlx::query_as(
@@ -203,10 +230,11 @@ pub async fn update_employee_direct(
     .bind(store_id)
     .bind(source_id)
     .fetch_optional(&mut *tx)
-    .await?
-    .ok_or("Employee not found")?;
+    .await
+    .map_err(db_err)?
+    .ok_or_else(|| shared::error::AppError::new(shared::ErrorCode::EmployeeNotFound))?;
 
-    tx.commit().await?;
+    tx.commit().await.map_err(db_err)?;
     Ok(StoreOpData::Employee(employee))
 }
 
@@ -214,14 +242,40 @@ pub async fn delete_employee_direct(
     pool: &PgPool,
     store_id: i64,
     source_id: i64,
-) -> Result<(), BoxError> {
-    let rows = sqlx::query("DELETE FROM store_employees WHERE store_id = $1 AND source_id = $2")
+) -> Result<(), shared::error::AppError> {
+    // Check system employee protection
+    let is_system: Option<bool> = sqlx::query_scalar(
+        "SELECT is_system FROM store_employees WHERE store_id = $1 AND source_id = $2",
+    )
+    .bind(store_id)
+    .bind(source_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(db_err)?;
+
+    match is_system {
+        None => {
+            return Err(shared::error::AppError::new(
+                shared::ErrorCode::EmployeeNotFound,
+            ));
+        }
+        Some(true) => {
+            return Err(shared::error::AppError::new(
+                shared::ErrorCode::EmployeeIsSystem,
+            ));
+        }
+        _ => {}
+    }
+
+    sqlx::query("DELETE FROM store_employees WHERE store_id = $1 AND source_id = $2")
         .bind(store_id)
         .bind(source_id)
         .execute(pool)
-        .await?;
-    if rows.rows_affected() == 0 {
-        return Err("Employee not found".into());
-    }
+        .await
+        .map_err(db_err)?;
     Ok(())
+}
+
+fn db_err(e: sqlx::Error) -> shared::error::AppError {
+    shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
 }

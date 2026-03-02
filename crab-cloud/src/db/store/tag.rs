@@ -120,7 +120,7 @@ pub async fn update_tag_direct(
         .bind(&data.name).bind(&data.color).bind(data.display_order).bind(data.is_active).bind(now).bind(store_id).bind(source_id)
         .execute(pool).await?;
     if rows.rows_affected() == 0 {
-        return Err("Tag not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::TagNotFound).into());
     }
     Ok(())
 }
@@ -129,14 +129,33 @@ pub async fn delete_tag_direct(
     pool: &PgPool,
     store_id: i64,
     source_id: i64,
-) -> Result<(), BoxError> {
+) -> Result<(), shared::error::AppError> {
+    let in_use: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM store_product_tags pt JOIN store_products p ON p.id = pt.product_id WHERE p.store_id = $1 AND pt.tag_source_id = $2",
+    )
+    .bind(store_id)
+    .bind(source_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string()))?;
+
+    if in_use > 0 {
+        return Err(shared::error::AppError::with_message(
+            shared::ErrorCode::TagInUse,
+            format!("Cannot delete tag: {} product(s) using it", in_use),
+        ));
+    }
+
     let rows = sqlx::query("DELETE FROM store_tags WHERE store_id = $1 AND source_id = $2")
         .bind(store_id)
         .bind(source_id)
         .execute(pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?;
     if rows.rows_affected() == 0 {
-        return Err("Tag not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::TagNotFound));
     }
     Ok(())
 }

@@ -131,7 +131,9 @@ pub async fn update_zone_direct(
     .bind(source_id)
     .fetch_optional(pool)
     .await?
-    .ok_or("Zone not found")?;
+    .ok_or_else(|| -> BoxError {
+        shared::error::AppError::new(shared::ErrorCode::ZoneNotFound).into()
+    })?;
 
     Ok(StoreOpData::Zone(zone))
 }
@@ -140,14 +142,37 @@ pub async fn delete_zone_direct(
     pool: &PgPool,
     store_id: i64,
     source_id: i64,
-) -> Result<(), BoxError> {
+) -> Result<(), shared::error::AppError> {
+    let table_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM store_dining_tables WHERE store_id = $1 AND zone_source_id = $2",
+    )
+    .bind(store_id)
+    .bind(source_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+    })?;
+
+    if table_count > 0 {
+        return Err(shared::error::AppError::with_message(
+            shared::ErrorCode::ZoneHasTables,
+            format!("Cannot delete zone: {} table(s) in this zone", table_count),
+        ));
+    }
+
     let rows = sqlx::query("DELETE FROM store_zones WHERE store_id = $1 AND source_id = $2")
         .bind(store_id)
         .bind(source_id)
         .execute(pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?;
     if rows.rows_affected() == 0 {
-        return Err("Zone not found".into());
+        return Err(shared::error::AppError::new(
+            shared::ErrorCode::ZoneNotFound,
+        ));
     }
     Ok(())
 }

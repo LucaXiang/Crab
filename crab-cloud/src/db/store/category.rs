@@ -330,7 +330,9 @@ pub async fn update_category_direct(
     .bind(source_id)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or("Category not found")?;
+    .ok_or_else(|| -> BoxError {
+        shared::error::AppError::new(shared::ErrorCode::CategoryNotFound).into()
+    })?;
 
     sqlx::query(
         r#"
@@ -452,14 +454,41 @@ pub async fn delete_category_direct(
     pool: &PgPool,
     store_id: i64,
     source_id: i64,
-) -> Result<(), BoxError> {
+) -> Result<(), shared::error::AppError> {
+    // Check if category has active products
+    let product_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM store_products WHERE store_id = $1 AND category_source_id = $2",
+    )
+    .bind(store_id)
+    .bind(source_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+    })?;
+
+    if product_count > 0 {
+        return Err(shared::error::AppError::with_message(
+            shared::ErrorCode::CategoryHasProducts,
+            format!(
+                "Cannot delete category: {} product(s) in this category",
+                product_count
+            ),
+        ));
+    }
+
     let rows = sqlx::query("DELETE FROM store_categories WHERE store_id = $1 AND source_id = $2")
         .bind(store_id)
         .bind(source_id)
         .execute(pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+        })?;
     if rows.rows_affected() == 0 {
-        return Err("Category not found".into());
+        return Err(shared::error::AppError::new(
+            shared::ErrorCode::CategoryNotFound,
+        ));
     }
     Ok(())
 }

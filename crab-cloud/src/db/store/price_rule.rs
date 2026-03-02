@@ -1,10 +1,47 @@
 //! Price rule database operations
 
 use shared::cloud::store_op::StoreOpData;
-use shared::models::price_rule::PriceRuleCreate;
+use shared::models::price_rule::{AdjustmentType, PriceRuleCreate};
 use sqlx::PgPool;
 
 use super::BoxError;
+
+fn db_err(e: sqlx::Error) -> shared::error::AppError {
+    shared::error::AppError::with_message(shared::ErrorCode::InternalError, e.to_string())
+}
+
+fn validate_adjustment_value(
+    adjustment_type: &AdjustmentType,
+    value: f64,
+) -> Result<(), shared::error::AppError> {
+    if !value.is_finite() {
+        return Err(shared::error::AppError::validation(
+            "adjustment_value must be a finite number",
+        ));
+    }
+    if value < 0.0 {
+        return Err(shared::error::AppError::validation(
+            "adjustment_value must be non-negative",
+        ));
+    }
+    match adjustment_type {
+        AdjustmentType::Percentage => {
+            if value > 100.0 {
+                return Err(shared::error::AppError::validation(
+                    "Percentage adjustment_value must be between 0 and 100",
+                ));
+            }
+        }
+        AdjustmentType::FixedAmount => {
+            if value > 1_000_000.0 {
+                return Err(shared::error::AppError::validation(
+                    "FixedAmount adjustment_value must not exceed 1,000,000",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
 
 // ── Edge Sync ──
 
@@ -177,7 +214,8 @@ pub async fn create_price_rule_direct(
     pool: &PgPool,
     store_id: i64,
     data: &PriceRuleCreate,
-) -> Result<(i64, StoreOpData), BoxError> {
+) -> Result<(i64, StoreOpData), shared::error::AppError> {
+    validate_adjustment_value(&data.adjustment_type, data.adjustment_value)?;
     let now = shared::util::now_millis();
     let zone_scope = data.zone_scope.as_deref().unwrap_or("all");
     let is_stackable = data.is_stackable.unwrap_or(true);
@@ -205,7 +243,7 @@ pub async fn create_price_rule_direct(
         r#"INSERT INTO store_price_rules (store_id, source_id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, TRUE, $19, $20, $20)"#,
     )
     .bind(store_id).bind(source_id).bind(&data.name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(is_stackable).bind(is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.created_by).bind(now)
-    .execute(pool).await?;
+    .execute(pool).await.map_err(db_err)?;
 
     let rule = shared::models::PriceRule {
         id: source_id,
@@ -237,7 +275,11 @@ pub async fn update_price_rule_direct(
     store_id: i64,
     source_id: i64,
     data: &shared::models::price_rule::PriceRuleUpdate,
-) -> Result<(), BoxError> {
+) -> Result<(), shared::error::AppError> {
+    // Validate adjustment value if both type and value are provided
+    if let (Some(adj_type), Some(adj_value)) = (&data.adjustment_type, data.adjustment_value) {
+        validate_adjustment_value(adj_type, adj_value)?;
+    }
     let now = shared::util::now_millis();
     let rule_type_str = data
         .rule_type
@@ -261,9 +303,11 @@ pub async fn update_price_rule_direct(
 
     let rows = sqlx::query("UPDATE store_price_rules SET name = COALESCE($1, name), receipt_name = COALESCE($2, receipt_name), description = COALESCE($3, description), rule_type = COALESCE($4, rule_type), product_scope = COALESCE($5, product_scope), target_id = COALESCE($6, target_id), zone_scope = COALESCE($7, zone_scope), adjustment_type = COALESCE($8, adjustment_type), adjustment_value = COALESCE($9, adjustment_value), is_stackable = COALESCE($10, is_stackable), is_exclusive = COALESCE($11, is_exclusive), valid_from = COALESCE($12, valid_from), valid_until = COALESCE($13, valid_until), active_days = COALESCE($14, active_days), active_start_time = COALESCE($15, active_start_time), active_end_time = COALESCE($16, active_end_time), is_active = COALESCE($17, is_active), updated_at = $18 WHERE store_id = $19 AND source_id = $20")
         .bind(&data.name).bind(&data.receipt_name).bind(&data.description).bind(&rule_type_str).bind(&product_scope_str).bind(data.target_id).bind(&data.zone_scope).bind(&adjustment_type_str).bind(data.adjustment_value).bind(data.is_stackable).bind(data.is_exclusive).bind(data.valid_from).bind(data.valid_until).bind(active_days_mask).bind(&data.active_start_time).bind(&data.active_end_time).bind(data.is_active).bind(now).bind(store_id).bind(source_id)
-        .execute(pool).await?;
+        .execute(pool).await.map_err(db_err)?;
     if rows.rows_affected() == 0 {
-        return Err("Price rule not found".into());
+        return Err(shared::error::AppError::new(
+            shared::ErrorCode::PriceRuleNotFound,
+        ));
     }
     Ok(())
 }
@@ -272,14 +316,17 @@ pub async fn delete_price_rule_direct(
     pool: &PgPool,
     store_id: i64,
     source_id: i64,
-) -> Result<(), BoxError> {
+) -> Result<(), shared::error::AppError> {
     let rows = sqlx::query("DELETE FROM store_price_rules WHERE store_id = $1 AND source_id = $2")
         .bind(store_id)
         .bind(source_id)
         .execute(pool)
-        .await?;
+        .await
+        .map_err(db_err)?;
     if rows.rows_affected() == 0 {
-        return Err("Price rule not found".into());
+        return Err(shared::error::AppError::new(
+            shared::ErrorCode::PriceRuleNotFound,
+        ));
     }
     Ok(())
 }

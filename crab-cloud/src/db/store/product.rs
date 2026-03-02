@@ -442,7 +442,9 @@ pub async fn update_product_direct(
             .bind(source_id)
             .fetch_optional(&mut *tx)
             .await?
-            .ok_or("Product not found")?;
+            .ok_or_else(|| -> BoxError {
+                shared::error::AppError::new(shared::ErrorCode::ProductNotFound).into()
+            })?;
 
     sqlx::query(
         r#"
@@ -591,7 +593,7 @@ pub async fn delete_product_direct(
         .execute(pool)
         .await?;
     if rows.rows_affected() == 0 {
-        return Err("Product not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::ProductNotFound).into());
     }
     Ok(())
 }

@@ -88,9 +88,7 @@ pub async fn delete_zone(
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
 
-    store::delete_zone_direct(&state.pool, store_id, zone_id)
-        .await
-        .map_err(internal)?;
+    store::delete_zone_direct(&state.pool, store_id, zone_id).await?;
     store::increment_store_version(&state.pool, store_id)
         .await
         .map_err(internal)?;

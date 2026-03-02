@@ -138,7 +138,9 @@ pub async fn update_table_direct(
     .bind(source_id)
     .fetch_optional(pool)
     .await?
-    .ok_or("Dining table not found")?;
+    .ok_or_else(|| -> BoxError {
+        shared::error::AppError::new(shared::ErrorCode::TableNotFound).into()
+    })?;
 
     Ok(StoreOpData::Table(table))
 }
@@ -155,7 +157,7 @@ pub async fn delete_table_direct(
             .execute(pool)
             .await?;
     if rows.rows_affected() == 0 {
-        return Err("Dining table not found".into());
+        return Err(shared::error::AppError::new(shared::ErrorCode::TableNotFound).into());
     }
     Ok(())
 }
