@@ -2262,6 +2262,7 @@
     "6202": "Código ya existe",
     "6203": "Código requerido",
     "6204": "El plato no puede pertenecer a una categoría virtual",
+    "6205": "No se puede eliminar la especificación raíz, cada producto debe mantener al menos una",
     "6301": "Atributo no existe",
     "6302": "Error vinculando atributo",
     "6303": "Atributo en uso por platos/categorías, no se puede eliminar",
