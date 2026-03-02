@@ -49,6 +49,11 @@ async fn main() -> Result<(), BoxError> {
     // Initialize application state
     let state = AppState::new(&config).await?;
 
+    // Seed dev account (idempotent — skipped in production)
+    if config.environment != "production" {
+        seed_dev_account(&state.pool).await;
+    }
+
     // Build routers
     let public_app = api::public_router(state.clone());
     let edge_app = api::edge_router(state.clone());
@@ -292,6 +297,52 @@ fn load_pem(
         tracing::info!("Loading {label} from file: {file_path}");
         Ok(std::fs::read(&path)?)
     }
+}
+
+/// Seed a dev test account with active pro subscription.
+/// Idempotent — does nothing if the account already exists.
+async fn seed_dev_account(pool: &sqlx::PgPool) {
+    let email = "dev@redcoral.app";
+    let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM tenants WHERE email = $1")
+        .bind(email)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_some() {
+        tracing::debug!("Dev account already exists, skipping seed");
+        return;
+    }
+    // password: dev123456
+    let hashed = crate::util::hash_password("dev123456").expect("hash_password");
+    let now = shared::util::now_millis();
+    let tenant_id: i64 = 1_000_000_000_000_001;
+    if let Err(e) = sqlx::query(
+        "INSERT INTO tenants (id, email, hashed_password, name, status, created_at, verified_at)
+         VALUES ($1, $2, $3, 'Dev Tenant', 'active', $4, $4)",
+    )
+    .bind(tenant_id)
+    .bind(email)
+    .bind(&hashed)
+    .bind(now)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!("Failed to seed dev tenant: {e}");
+        return;
+    }
+    if let Err(e) = sqlx::query(
+        "INSERT INTO subscriptions (id, tenant_id, status, plan, max_stores, features, cancel_at_period_end, created_at)
+         VALUES ('dev_sub_001', $1, 'active', 'pro', 5, '{}', false, $2)",
+    )
+    .bind(tenant_id)
+    .bind(now)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!("Failed to seed dev subscription: {e}");
+        return;
+    }
+    tracing::info!("Dev account seeded: {email} / dev123456 (pro plan, 5 stores)");
 }
 
 /// Build rustls ServerConfig with mandatory client certificate verification.
