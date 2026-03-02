@@ -1,0 +1,65 @@
+## Dev environment — safe to reset, no impact on production
+name: crab-dev
+
+services:
+  dev-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      POSTGRES_DB: crab
+      POSTGRES_USER: crab
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD}
+    volumes:
+      - dev_pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dev-cloud:
+    image: ${DEV_CRAB_CLOUD_IMAGE}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      dev-postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - crab_default
+    expose:
+      - "8081"
+    ports:
+      - "8444:8443"
+    environment:
+      DATABASE_URL: postgres://crab:${DEV_POSTGRES_PASSWORD}@dev-postgres:5432/crab
+      ENVIRONMENT: development
+      HTTP_PORT: "8081"
+      MTLS_PORT: "8443"
+      CONSOLE_BASE_URL: https://dev-console.redcoral.app
+      RUST_LOG: crab_cloud=debug,tower_http=info
+      ROOT_CA_PATH: /tmp/root_ca.pem
+      SERVER_CERT_PATH: /certs/server.pem
+      SERVER_KEY_PATH: /certs/server.key
+      SECRETS_PREFIX: crab-dev
+      UPDATE_S3_BUCKET: crab-dev-images
+    volumes:
+      - ./dev-certs:/certs:ro
+
+volumes:
+  dev_pgdata:
+
+networks:
+  crab_default:
+    external: true

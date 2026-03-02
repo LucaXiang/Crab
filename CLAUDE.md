@@ -153,15 +153,35 @@ Tauri identifier: `com.craboss.redcoral`
 **域名**: `cloud.redcoral.app` → Caddy → crab-cloud:8080
 **mTLS**: 端口 8443 直接暴露 (edge-server 双向 TLS 连接用)
 
-### 部署安全规则
+### 部署安全规则 — 生产隔离
 
-- **禁止** `docker-compose down && docker-compose up -d` — 这会重启所有服务（包括生产！）
-- **必须** 指定服务名: `docker-compose up -d dev-cloud` 只重启目标服务
-- **prod 和 dev 共用一个 docker-compose**，生产用固定 image tag，dev 用 `:latest`
-- **Console 部署必须指定 Vite mode**: `npx vite build --mode development` 用于 dev-console（读 `.env.development` → `dev-cloud.redcoral.app`），`npm run build` 默认 production（读 `.env.production` → `cloud.redcoral.app`）
-- **不要混淆部署目录**: portal → `/opt/crab/portal/`，console → `/opt/crab/console/`，dev-console → `/opt/crab/dev-console/`
+**prod 和 dev 使用独立的 docker-compose 文件**，物理隔离，互不影响：
+- `docker-compose.yml` — 生产环境 (Caddy + PG + crab-cloud)
+- `docker-compose.dev.yml` — 开发环境 (dev-postgres + dev-cloud)
 
-### 完整部署流程
+**绝对禁止的操作**：
+- `docker-compose down` (不指定 -f 时默认操作 prod compose，会停掉生产！)
+- `docker-compose down --volumes` (会删除生产数据库！)
+- `docker volume rm crab_pgdata` / `docker volume rm crab_caddy_data` (生产数据卷！)
+- 任何不带 `-f docker-compose.dev.yml` 的 docker-compose 命令操作 dev 服务
+
+**dev 环境所有操作必须通过**：
+- 脚本: `./deploy/deploy-dev.sh {cloud|console|all|reset-db}`
+- 或手动: `docker-compose -f docker-compose.dev.yml ...`
+
+**Console 部署必须指定 Vite mode**: `npx vite build --mode development` 用于 dev-console，`npm run build` 默认 production
+**不要混淆部署目录**: portal → `/opt/crab/portal/`，console → `/opt/crab/console/`，dev-console → `/opt/crab/dev-console/`
+
+### Dev 部署 (推荐使用脚本)
+
+```bash
+./deploy/deploy-dev.sh cloud      # 构建 + 推送 + 重启 dev-cloud
+./deploy/deploy-dev.sh console    # 构建 + 上传 dev-console
+./deploy/deploy-dev.sh all        # 两个都部署
+./deploy/deploy-dev.sh reset-db   # 重置 dev 数据库 (仅删 dev_pgdata)
+```
+
+### Prod 部署 (手动，谨慎操作)
 
 ```bash
 # 1. 本地构建 + 推送到 ECR
@@ -175,14 +195,12 @@ aws ecr get-login-password --region eu-south-2 | \
   docker login --username AWS --password-stdin 364453382269.dkr.ecr.eu-south-2.amazonaws.com
 docker pull 364453382269.dkr.ecr.eu-south-2.amazonaws.com/crab-cloud:latest
 
-# 4. 重启服务 (只重启目标服务！)
+# 4. 重启 (只重启 crab-cloud)
 cd /opt/crab
-docker-compose up -d dev-cloud    # dev 环境
-# docker-compose up -d crab-cloud  # 生产环境 (谨慎!)
+docker-compose up -d crab-cloud
 
 # 5. 验证
-curl https://dev-cloud.redcoral.app/health
-# 期望: {"git_hash":"...","service":"crab-cloud","status":"ok","version":"..."}
+curl https://cloud.redcoral.app/health
 ```
 
 ### Console 部署
@@ -201,25 +219,18 @@ cp build/index.html build/200.html
 scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/console/
 ```
 
-### 清理数据库 (仅内测阶段)
-
-```bash
-# 在 EC2 上
-cd /opt/crab
-docker-compose down
-docker volume rm crab_pgdata    # 删除 PostgreSQL 数据卷
-docker-compose up -d            # 重启，自动 migrate
-```
-
 ### 关键文件
 
 | 文件 | 用途 |
 |------|------|
 | `deploy/build-cloud.sh` | 构建 Docker 镜像 + 推送 ECR |
-| `deploy/ec2/docker-compose.yml` | 生产编排 (Caddy + PG + crab-cloud) |
+| `deploy/deploy-dev.sh` | Dev 一键部署脚本 (隔离安全) |
+| `deploy/ec2/docker-compose.yml` | **生产**编排 (Caddy + PG + crab-cloud) |
+| `deploy/ec2/docker-compose.dev.yml` | **开发**编排 (dev-postgres + dev-cloud) |
 | `deploy/ec2/Caddyfile` | 反向代理 + 自动 HTTPS |
-| `deploy/ec2/.env` | 生产密钥 (不入 git) |
-| `deploy/ec2/certs/` | mTLS 证书 (root_ca, server.pem/key) |
+| `deploy/ec2/.env` | 密钥 (不入 git) |
+| `deploy/ec2/certs/` | 生产 mTLS 证书 |
+| `deploy/ec2/dev-certs/` | 开发 mTLS 证书 |
 | `deploy/ec2/crab-ec2.pem` | SSH 密钥 (不入 git) |
 
 ### Portal 部署 (crab-portal → EC2)
