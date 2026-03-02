@@ -342,7 +342,27 @@ async fn seed_dev_account(pool: &sqlx::PgPool) {
         tracing::warn!("Failed to seed dev subscription: {e}");
         return;
     }
-    tracing::info!("Dev account seeded: {email} / dev123456 (pro plan, 5 stores)");
+    // Seed mock P12 certificate metadata (no real P12 data, just metadata for UI/Verifactu flow)
+    let expires_at = now + 365 * 24 * 60 * 60 * 1000; // 1 year from now
+    if let Err(e) = sqlx::query(
+        "INSERT INTO p12_certificates
+            (tenant_id, fingerprint, common_name, serial_number, organization_id,
+             organization, issuer, country, expires_at, not_before, uploaded_at, updated_at)
+         VALUES ($1, 'DEV-MOCK-FINGERPRINT', 'DEV TENANT - CERTIFICADO DE PRUEBA',
+                 'IDCES-B99999999', 'B99999999', 'DEV TENANT SL',
+                 'AC FNMT Usuarios (DEV)', 'ES', $2, $3, $3, $3)",
+    )
+    .bind(tenant_id)
+    .bind(expires_at)
+    .bind(now)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!("Failed to seed dev P12: {e}");
+    }
+    tracing::info!(
+        "Dev account seeded: {email} / dev123456 (pro plan, 5 stores, mock P12 NIF=B99999999)"
+    );
 }
 
 /// Build rustls ServerConfig with mandatory client certificate verification.
