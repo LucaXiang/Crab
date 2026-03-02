@@ -22,6 +22,7 @@ interface FormSpec {
   receipt_name: string;
   is_default: boolean;
   is_active: boolean;
+  is_root: boolean;
 }
 
 export const ProductWizard: React.FC<ProductWizardProps> = ({
@@ -40,7 +41,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   const [image, setImage] = useState('');
   
   const [specs, setSpecs] = useState<FormSpec[]>([
-    { name: 'Standard', price: 0, receipt_name: '', is_default: true, is_active: true }
+    { name: '', price: 0, receipt_name: '', is_default: true, is_active: true, is_root: true }
   ]);
 
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -55,10 +56,11 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
 
   // ── Helpers ──
   const addSpec = () => {
-    setSpecs([...specs, { name: '', price: 0, receipt_name: '', is_default: false, is_active: true }]);
+    setSpecs([...specs, { name: '', price: 0, receipt_name: '', is_default: false, is_active: true, is_root: false }]);
   };
 
   const removeSpec = (index: number) => {
+    if (specs[index]?.is_root) return;
     setSpecs(specs.filter((_, i) => i !== index));
   };
 
@@ -78,12 +80,12 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
 
   const handleFinish = () => {
     const specInputs: ProductSpecInput[] = specs.map((s, i) => ({
-      name: s.name.trim() || 'Standard',
+      name: s.name.trim(),
       price: s.price,
       display_order: i,
       is_default: s.is_default,
       is_active: s.is_active,
-      is_root: specs.length === 1,
+      is_root: s.is_root,
       receipt_name: s.receipt_name.trim() || undefined,
     }));
 
@@ -150,24 +152,24 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
     component: (
       <div className="space-y-4">
         {specs.map((spec, idx) => (
-          <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 relative group animate-in slide-in-from-bottom-2 duration-300">
-            {specs.length > 1 && (
-              <button 
+          <div key={idx} className={`p-4 rounded-xl border relative group animate-in slide-in-from-bottom-2 duration-300 ${spec.is_root ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+            {!spec.is_root && specs.length > 1 && (
+              <button
                 onClick={() => removeSpec(idx)}
                 className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            
+
             <div className="grid grid-cols-12 gap-3 items-end">
               <div className="col-span-7">
                 <FormField label={t('settings.product.spec_name')}>
-                  <input 
-                    value={spec.name} 
-                    onChange={e => updateSpec(idx, 'name', e.target.value)} 
-                    className={inputClass} 
-                    placeholder="Standard" 
+                  <input
+                    value={spec.name}
+                    onChange={e => updateSpec(idx, 'name', e.target.value)}
+                    className={inputClass}
+                    placeholder="Standard"
                   />
                 </FormField>
               </div>

@@ -474,6 +474,8 @@
       "quantity_range": "Qty: 1~{max}",
       "show_on_receipt": "Show on receipt",
       "show_on_kitchen_print": "Show on kitchen print",
+      "inherited": "From category",
+      "instant_save": "Auto-save",
       "confirm": {
         "delete": "This attribute will be permanently removed. Continue?",
         "delete_option": "This option will be permanently removed. Continue?"
@@ -762,7 +764,8 @@
       "upload_image": "Upload image",
       "change": "Change",
       "bind": "Bind",
-      "unbind": "Unbind"
+      "unbind": "Unbind",
+      "bound": "Bound"
     },
     "dialog": {
       "confirm_delete": "Confirm deletion"

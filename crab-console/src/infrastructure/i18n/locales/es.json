@@ -474,6 +474,8 @@
       "quantity_range": "Cant: 1~{max}",
       "show_on_receipt": "Mostrar en recibo",
       "show_on_kitchen_print": "Mostrar en impresión cocina",
+      "inherited": "De categoría",
+      "instant_save": "Guardado instantáneo",
       "confirm": {
         "delete": "Este atributo se eliminará permanentemente. ¿Continuar?",
         "delete_option": "Esta opción se eliminará permanentemente. ¿Continuar?"
@@ -762,7 +764,8 @@
       "upload_image": "Subir imagen",
       "change": "Cambiar",
       "bind": "Vincular",
-      "unbind": "Desvincular"
+      "unbind": "Desvincular",
+      "bound": "Vinculado"
     },
     "dialog": {
       "confirm_delete": "Confirmar eliminación"

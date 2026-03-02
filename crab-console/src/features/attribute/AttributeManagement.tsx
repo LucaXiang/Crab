@@ -234,7 +234,10 @@ export const AttributeManagement: React.FC = () => {
       if (isDefault) {
         newDefaults = current.filter(id => id !== optionId);
       } else {
-        if (selectedAttr.max_selections && current.length >= selectedAttr.max_selections) return;
+        if (selectedAttr.max_selections && current.length >= selectedAttr.max_selections) {
+          alert(t('settings.attribute.max_defaults_reached'));
+          return;
+        }
         newDefaults = [...current, optionId];
       }
     } else {

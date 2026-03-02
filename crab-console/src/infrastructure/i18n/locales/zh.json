@@ -476,6 +476,8 @@
       "quantity_range": "数量: 1~{max}",
       "show_on_receipt": "显示在小票",
       "show_on_kitchen_print": "显示在厨打",
+      "inherited": "继承自分类",
+      "instant_save": "即时保存",
       "confirm": {
         "delete": "此属性将被永久删除，确定继续？",
         "delete_option": "此选项将被永久删除，确定继续？"
@@ -764,7 +766,8 @@
       "upload_image": "上传图片",
       "change": "更换",
       "bind": "绑定",
-      "unbind": "解绑"
+      "unbind": "解绑",
+      "bound": "已绑定"
     },
     "dialog": {
       "confirm_delete": "确认删除"

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Package, Trash2, CheckSquare, Link, Unlink } from 'lucide-react';
+import { Plus, Package, Trash2, CheckSquare, Link, Unlink, Lock, Search, Zap } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useStoreName } from '@/hooks/useStoreName';
@@ -64,7 +64,9 @@ export const ProductManagement: React.FC = () => {
   const [tags, setTags] = useState<StoreTag[]>([]);
   const [attributes, setAttributes] = useState<StoreAttribute[]>([]);
   const [bindings, setBindings] = useState<StoreBinding[]>([]);
+  const [categoryBindings, setCategoryBindings] = useState<StoreBinding[]>([]);
   const [bindingLoading, setBindingLoading] = useState(false);
+  const [attrSearch, setAttrSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [panel, setPanel] = useState<PanelState>({ type: 'closed' });
@@ -169,12 +171,16 @@ export const ProductManagement: React.FC = () => {
     setPanel({ type: 'create' });
   };
 
-  const loadBindings = useCallback(async (productId: number) => {
+  const loadBindings = useCallback(async (productId: number, categoryId: number) => {
     if (!token) return;
     setBindingLoading(true);
     try {
-      const data = await listBindings(token, storeId, 'product', productId);
-      setBindings(data);
+      const [prodBindings, catBindings] = await Promise.all([
+        listBindings(token, storeId, 'product', productId),
+        listBindings(token, storeId, 'category', categoryId),
+      ]);
+      setBindings(prodBindings);
+      setCategoryBindings(catBindings);
     } catch (err) { handleError(err); }
     finally { setBindingLoading(false); }
   }, [token, storeId, handleError]);
@@ -186,7 +192,7 @@ export const ProductManagement: React.FC = () => {
         owner: { type: 'Product', id: panel.item.source_id },
         attribute_id: attributeId,
       });
-      await loadBindings(panel.item.source_id);
+      await loadBindings(panel.item.source_id, panel.item.category_source_id);
     } catch (err) { handleError(err); }
   };
 
@@ -194,7 +200,7 @@ export const ProductManagement: React.FC = () => {
     if (!token) return;
     try {
       await unbindAttribute(token, storeId, bindingId);
-      if (panel.type === 'edit') await loadBindings(panel.item.source_id);
+      if (panel.type === 'edit') await loadBindings(panel.item.source_id, panel.item.category_source_id);
     } catch (err) { handleError(err); }
   };
 
@@ -205,14 +211,16 @@ export const ProductManagement: React.FC = () => {
     setFormIsKitchenPrint(prod.is_kitchen_print_enabled); setFormIsLabelPrint(prod.is_label_print_enabled);
     setFormExternalId(prod.external_id != null ? String(prod.external_id) : '');
     setFormTagIds(prod.tag_ids ?? []); setFormIsActive(prod.is_active);
-    setFormSpecs(prod.specs.map((s, i) => ({
+    setFormSpecs(prod.specs.map(s => ({
       name: s.name, price: s.price, receipt_name: s.receipt_name ?? '',
-      is_default: s.is_default, is_active: s.is_active, is_root: i === 0,
+      is_default: s.is_default, is_active: s.is_active, is_root: s.is_root,
     })));
     setFormError('');
     setBindings([]);
+    setCategoryBindings([]);
+    setAttrSearch('');
     setPanel({ type: 'edit', item: prod });
-    loadBindings(prod.source_id);
+    loadBindings(prod.source_id, prod.category_source_id);
   };
 
   const addSpec = () => {
@@ -237,7 +245,7 @@ export const ProductManagement: React.FC = () => {
     formSpecs.map((s, i) => ({
       name: s.name.trim(), price: s.price, display_order: i,
       is_default: s.is_default, is_active: s.is_active,
-      is_root: formSpecs.length === 1,
+      is_root: s.is_root,
       receipt_name: s.receipt_name.trim() || undefined,
     }));
 
@@ -471,50 +479,97 @@ export const ProductManagement: React.FC = () => {
               )}
 
               {/* Attribute Bindings (edit mode only) */}
-              {panel.type === 'edit' && attributes.length > 0 && (
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700">{t('settings.attribute.title')}</label>
-                  {bindingLoading ? (
-                    <div className="text-sm text-gray-400 text-center py-4">{t('common.loading')}</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {attributes.filter(a => a.is_active).map(attr => {
-                        const binding = bindings.find(b => b.attribute_source_id === attr.source_id);
-                        return (
-                          <div key={attr.source_id} className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-xl">
-                            <div className="min-w-0">
-                              <span className="text-sm text-slate-800">{attr.name}</span>
-                              <span className="ml-2 text-xs text-gray-400">
-                                {attr.is_multi_select ? t('settings.attribute.multi') : t('settings.attribute.single')}
-                                {attr.options.length > 0 && ` · ${attr.options.length} ${t('settings.attribute.options')}`}
-                              </span>
-                            </div>
-                            {binding ? (
-                              <button
-                                type="button"
-                                onClick={() => handleUnbind(binding.source_id)}
-                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                              >
-                                <Unlink size={12} />
-                                {t('common.action.unbind')}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleBind(attr.source_id)}
-                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                              >
-                                <Link size={12} />
-                                {t('common.action.bind')}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
+              {panel.type === 'edit' && attributes.length > 0 && (() => {
+                const activeAttrs = attributes.filter(a => a.is_active);
+                const filteredAttrs = attrSearch.trim()
+                  ? activeAttrs.filter(a => a.name.toLowerCase().includes(attrSearch.toLowerCase()))
+                  : activeAttrs;
+                const boundCount = activeAttrs.filter(a =>
+                  bindings.some(b => b.attribute_source_id === a.source_id) ||
+                  categoryBindings.some(b => b.attribute_source_id === a.source_id)
+                ).length;
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {t('settings.attribute.title')}
+                        {boundCount > 0 && (
+                          <span className="ml-2 text-xs font-normal text-gray-400">{boundCount} {t('common.selection.selected')}</span>
+                        )}
+                      </label>
+                      <span className="flex items-center gap-1 text-[10px] text-amber-600">
+                        <Zap size={10} />
+                        {t('settings.attribute.instant_save')}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
+                    {activeAttrs.length >= 8 && (
+                      <div className="relative">
+                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          value={attrSearch}
+                          onChange={e => setAttrSearch(e.target.value)}
+                          placeholder={t('common.hint.search_placeholder')}
+                          className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+                    {bindingLoading ? (
+                      <div className="text-sm text-gray-400 text-center py-4">{t('common.loading')}</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredAttrs.map(attr => {
+                          const productBinding = bindings.find(b => b.attribute_source_id === attr.source_id);
+                          const catBinding = categoryBindings.find(b => b.attribute_source_id === attr.source_id);
+                          const isInherited = !!catBinding && !productBinding;
+                          const isBound = !!productBinding || !!catBinding;
+                          return (
+                            <div key={attr.source_id} className={`flex items-center justify-between px-3 py-2.5 rounded-xl ${
+                              isInherited ? 'bg-purple-50/50' : 'bg-gray-50'
+                            }`}>
+                              <div className="min-w-0 flex items-center gap-2">
+                                {isInherited && <Lock size={12} className="text-purple-400 shrink-0" />}
+                                <div>
+                                  <span className="text-sm text-slate-800">{attr.name}</span>
+                                  <span className="ml-2 text-xs text-gray-400">
+                                    {attr.is_multi_select ? t('settings.attribute.multi') : t('settings.attribute.single')}
+                                    {attr.options.length > 0 && ` · ${attr.options.length} ${t('settings.attribute.options')}`}
+                                  </span>
+                                  {isInherited && (
+                                    <span className="ml-2 text-[10px] text-purple-500">{t('settings.attribute.inherited')}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {isInherited ? (
+                                <span className="px-2.5 py-1 text-xs font-medium text-purple-500 bg-purple-100 rounded-lg">
+                                  {t('common.action.bound')}
+                                </span>
+                              ) : productBinding ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnbind(productBinding.source_id)}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                >
+                                  <Unlink size={12} />
+                                  {t('common.action.unbind')}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleBind(attr.source_id)}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                >
+                                  <Link size={12} />
+                                  {t('common.action.bind')}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Specs */}
               <div className="space-y-3">
@@ -533,8 +588,11 @@ export const ProductManagement: React.FC = () => {
                 )}
 
                 {formSpecs.map((spec, idx) => (
-                  <div key={idx} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <div key={idx} className={`rounded-xl p-3 space-y-2 ${spec.is_root ? 'bg-amber-50/50 ring-1 ring-amber-200' : 'bg-gray-50'}`}>
                     <div className="flex items-center gap-2">
+                      {spec.is_root && (
+                        <span className="px-1.5 py-0.5 text-[0.625rem] font-medium bg-amber-100 text-amber-700 rounded shrink-0">ROOT</span>
+                      )}
                       <input
                         type="text" value={spec.name}
                         onChange={(e) => updateSpec(idx, 'name', e.target.value)}
@@ -547,9 +605,11 @@ export const ProductManagement: React.FC = () => {
                         className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         placeholder={t('settings.product.price')} step="0.01" min={0}
                       />
-                      <button type="button" onClick={() => removeSpec(idx)} disabled={formSpecs.length <= 1 || spec.is_root} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
-                        <Trash2 size={14} />
-                      </button>
+                      {!spec.is_root && (
+                        <button type="button" onClick={() => removeSpec(idx)} disabled={formSpecs.length <= 1} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                     <input
                       type="text" value={spec.receipt_name}
