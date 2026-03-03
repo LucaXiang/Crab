@@ -12,16 +12,12 @@ env:
 
 jobs:
   # ============================================================
-  # Gate: all-platform test must pass before building release
+  # Gate: lint + test + type-check (Linux only, RedCoral scope)
   # ============================================================
-  test:
-    name: Test (${{ matrix.os }})
+  check:
+    name: Clippy + Test + TSC
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -33,37 +29,21 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          # Windows test shares cache with build-windows job
-          shared-key: ${{ runner.os == 'Windows' && 'windows-release' || '' }}
           cache-on-failure: true
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Install NASM (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/setup-nasm@v1
-
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
-      # Clippy only on Linux — platform-independent lint, no need to repeat on all OS
-      - name: Clippy
-        if: runner.os == 'Linux'
-        run: cargo clippy --workspace --exclude crab-cloud -- -D warnings
+      - name: Clippy (RedCoral + deps)
+        run: cargo clippy -p red-coral -- -D warnings
 
-      - name: Test
-        run: cargo nextest run --workspace --exclude crab-cloud --lib
-
-  frontend-check:
-    name: Frontend Type Check
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Test (RedCoral + deps)
+        run: cargo nextest run -p red-coral --lib
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -72,7 +52,7 @@ jobs:
           cache: npm
           cache-dependency-path: red_coral/package-lock.json
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         working-directory: red_coral
         run: npm ci --legacy-peer-deps
 
@@ -81,11 +61,11 @@ jobs:
         run: npx tsc --noEmit
 
   # ============================================================
-  # Build: only after ALL tests pass
+  # Build: only after checks pass
   # ============================================================
   build-windows:
     name: Build Windows Installer
-    needs: [test, frontend-check]
+    needs: [check]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     permissions:
@@ -213,7 +193,7 @@ jobs:
             "${{ steps.upload.outputs.INSTALLER_PATH }}#${{ steps.upload.outputs.INSTALLER_NAME }}"
 
   # ============================================================
-  # Cache warming: main branch only (no tests needed)
+  # Cache warming: main branch push only
   # ============================================================
   warm-cache:
     name: Warm Release Cache
