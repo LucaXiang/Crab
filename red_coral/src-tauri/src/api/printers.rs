@@ -72,6 +72,8 @@ pub struct ReceiptItem {
     pub original_price: Option<f64>,
     pub selected_options: Option<Vec<SelectedOption>>,
     pub spec_name: Option<String>,
+    #[serde(default)]
+    pub is_comped: bool,
 }
 
 /// 收据数据

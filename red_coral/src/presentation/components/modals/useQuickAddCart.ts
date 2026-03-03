@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Currency } from '@/utils/currency';
 import { logger } from '@/utils/logger';
 import { CartItem as CartItemType, Product, ItemOption, Attribute, AttributeOption, ProductSpec, ProductAttribute } from '@/core/domain/types';
-import { calculateOptionsModifier, generateCartKey } from '@/utils/pricing';
+import { calculateOptionsModifier, generateCartKey, computeDraftItemPrices } from '@/utils/pricing';
 import { useCategories, useCategoryStore } from '@/features/category';
 import { useProducts, useProductStore, useProductsLoading, ProductWithPrice } from '@/features/product';
 
@@ -338,9 +338,12 @@ export function useQuickAddCart({ onClose, onConfirm }: UseQuickAddCartProps) {
 
   // Handle item update from edit modal
   const handleUpdateItem = useCallback((instanceId: string, updates: Partial<CartItemType>) => {
-    setTempItems(prev => prev.map(item =>
-      item.instance_id === instanceId ? { ...item, ...updates } : item
-    ));
+    setTempItems(prev => prev.map(item => {
+      if (item.instance_id !== instanceId) return item;
+      const merged = { ...item, ...updates };
+      const prices = computeDraftItemPrices(merged);
+      return { ...merged, unit_price: prices.unit_price, line_total: prices.line_total };
+    }));
   }, []);
 
   // Handle item remove from edit modal

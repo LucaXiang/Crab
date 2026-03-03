@@ -210,8 +210,33 @@ impl<'a> ReceiptRenderer<'a> {
                 }
             }
 
+            // Comped item sub-line: show INVITACION with original price
+            if item.is_comped {
+                if let Some(orig) = item.original_price {
+                    b.bold_on();
+                    let orig_str = format!("{:.2} {cur}", orig).replace('.', txt.decimal_separator);
+                    let comp_text = format!("   > {}", txt.comp_label);
+                    let antes_str = txt.before_price_label;
+
+                    let pvp_col_end_len = 37;
+                    let orig_width = get_gbk_width(&orig_str);
+                    let antes_width = get_gbk_width(antes_str);
+                    let current_len = get_gbk_width(&comp_text);
+                    let total_right_width = orig_width + antes_width;
+
+                    let mut line = comp_text;
+                    if pvp_col_end_len > total_right_width + current_len {
+                        let padding = pvp_col_end_len - total_right_width - current_len;
+                        line.push_str(&" ".repeat(padding));
+                    }
+                    line.push_str(antes_str);
+                    line.push_str(&orig_str);
+                    b.write_line(&line);
+                    b.bold_off();
+                }
+            }
             // Manual discount sub-line
-            if let Some(dp) = item.discount_percent {
+            else if let Some(dp) = item.discount_percent {
                 if dp > 0.0 {
                     b.bold_on();
                     let before = item.original_price.unwrap_or(item.price);
@@ -294,10 +319,13 @@ impl<'a> ReceiptRenderer<'a> {
         // ── Manual order discount (整单手动折扣) ──
         if let Some(discount) = &self.receipt.discount {
             let desc = if discount.type_ == "percentage" {
-                format!("{} (-{}%)", discount.name, discount.value)
+                format!("{} (-{}%)", txt.order_discount_label, discount.value)
             } else {
-                format!("{} (-{:.2} {cur})", discount.name, discount.value)
-                    .replace('.', txt.decimal_separator)
+                format!(
+                    "{} (-{:.2} {cur})",
+                    txt.order_discount_label, discount.value
+                )
+                .replace('.', txt.decimal_separator)
             };
             let amount_str =
                 format!("-{:.2} {cur}", discount.amount).replace('.', txt.decimal_separator);
@@ -311,10 +339,13 @@ impl<'a> ReceiptRenderer<'a> {
         // ── Manual order surcharge (整单手动附加费) ──
         if let Some(surcharge) = &self.receipt.surcharge {
             let desc = if surcharge.type_ == "percentage" {
-                format!("{} (+{}%)", surcharge.name, surcharge.value)
+                format!("{} (+{}%)", txt.order_surcharge_label, surcharge.value)
             } else {
-                format!("{} (+{:.2} {cur})", surcharge.name, surcharge.value)
-                    .replace('.', txt.decimal_separator)
+                format!(
+                    "{} (+{:.2} {cur})",
+                    txt.order_surcharge_label, surcharge.value
+                )
+                .replace('.', txt.decimal_separator)
             };
             let amount_str =
                 format!("+{:.2} {cur}", surcharge.amount).replace('.', txt.decimal_separator);

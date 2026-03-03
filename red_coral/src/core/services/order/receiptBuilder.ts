@@ -137,14 +137,44 @@ export function buildReceiptData(
 
   // PVP = 规格价格 + 属性价格 + 手动折扣（不含规则调整）
   // IMPORTE = PVP × 数量
+  // 赠送菜品保留在列表中，price/total 设为 0，original_price 记录原价
   const items: ReceiptItem[] = order.items
-    .filter((item) => !item._removed && !item.is_comped)
+    .filter((item) => !item._removed)
     .map((item) => {
       const basePrice = item.original_price > 0 ? item.original_price : item.price;
       const optionsTotal = item.selected_options
         ? item.selected_options.reduce((sum, opt) => Currency.add(sum, opt.price_modifier ?? 0).toNumber(), 0)
         : 0;
       const priceBeforeDiscount = Currency.add(basePrice, optionsTotal).toNumber();
+
+      // 赠送菜品: price=0, total=0, original_price=原价
+      if (item.is_comped) {
+        return {
+          name: item.name,
+          quantity: item.quantity,
+          price: 0,
+          total: 0,
+          tax_rate: item.tax_rate / 100,
+          discount_percent: null,
+          original_price: priceBeforeDiscount,
+          selected_options: item.selected_options
+            ? item.selected_options
+                .filter((opt) => opt.show_on_receipt)
+                .map((opt) => ({
+                  attribute_name: opt.attribute_name,
+                  option_name: opt.option_name,
+                  receipt_name: opt.receipt_name ?? null,
+                  price_modifier: opt.price_modifier ?? 0,
+                  show_on_receipt: opt.show_on_receipt,
+                }))
+            : null,
+          spec_name: item.selected_specification?.receipt_name
+            || item.selected_specification?.name
+            || null,
+          is_comped: true,
+        };
+      }
+
       const discountPct = item.manual_discount_percent ?? 0;
       const pvp = discountPct > 0
         ? Currency.mul(priceBeforeDiscount, Currency.div(Currency.sub(100, discountPct), 100).toNumber()).toNumber()
@@ -173,6 +203,7 @@ export function buildReceiptData(
         spec_name: item.selected_specification?.receipt_name
           || item.selected_specification?.name
           || null,
+        is_comped: false,
       };
     });
 
@@ -261,13 +292,37 @@ export function buildArchivedReceiptData(
 
   // PVP = 规格价格 + 属性价格 + 手动折扣（不含规则调整）
   // IMPORTE = PVP × 数量
+  // 赠送菜品保留在列表中，price/total 设为 0，original_price 记录原价
   const items: ReceiptItem[] = order.items
-    .filter((item) => !item.is_comped)
     .map((item) => {
       const optionsTotal = item.selected_options.reduce(
         (sum, opt) => Currency.add(sum, opt.price_modifier ?? 0).toNumber(), 0,
       );
       const priceBeforeDiscount = Currency.add(item.price, optionsTotal).toNumber();
+
+      if (item.is_comped) {
+        return {
+          name: item.name,
+          quantity: item.quantity,
+          price: 0,
+          total: 0,
+          tax_rate: item.tax_rate / 100,
+          discount_percent: null,
+          original_price: priceBeforeDiscount,
+          selected_options: item.selected_options.length > 0
+            ? item.selected_options.map((opt) => ({
+                attribute_name: opt.attribute_name,
+                option_name: opt.option_name,
+                receipt_name: null,
+                price_modifier: opt.price_modifier ?? 0,
+                show_on_receipt: true,
+              }))
+            : null,
+          spec_name: item.spec_name,
+          is_comped: true,
+        };
+      }
+
       const hasDiscount = item.discount_amount > 0;
       const pvp = hasDiscount
         ? Currency.sub(priceBeforeDiscount, Currency.div(item.discount_amount, item.quantity).toNumber()).toNumber()
@@ -292,6 +347,7 @@ export function buildArchivedReceiptData(
             }))
           : null,
         spec_name: item.spec_name,
+        is_comped: false,
       };
     });
 

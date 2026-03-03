@@ -74,6 +74,7 @@ export interface ReceiptItem {
   original_price: number | null;
   selected_options: ReceiptSelectedOption[] | null;
   spec_name: string | null;
+  is_comped: boolean;
 }
 
 export interface ReceiptData {
