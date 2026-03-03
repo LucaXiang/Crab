@@ -266,6 +266,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       || selectedSpecification?.price !== item.selected_specification?.price;
     if (specChanged) {
       changes.selected_specification = selectedSpecification;
+      changes.price = currentPrice;
     }
 
     // No actual changes — just close

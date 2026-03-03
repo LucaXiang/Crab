@@ -17,6 +17,16 @@ interface RefundModalProps {
   onCreated: () => void;
 }
 
+type RefundReason = 'CUSTOMER_REQUEST' | 'WRONG_ORDER' | 'QUALITY_ISSUE' | 'OVERCHARGE' | 'OTHER';
+
+const REFUND_REASONS: RefundReason[] = [
+  'CUSTOMER_REQUEST',
+  'WRONG_ORDER',
+  'QUALITY_ISSUE',
+  'OVERCHARGE',
+  'OTHER',
+];
+
 interface RefundItem {
   instance_id: string;
   name: string;
@@ -31,7 +41,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
   const [refundableInfo, setRefundableInfo] = useState<RefundableInfo | null>(null);
   const [items, setItems] = useState<RefundItem[]>([]);
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState<RefundReason>('CUSTOMER_REQUEST');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -102,7 +112,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
 
   const canSubmit =
     selectedItems.length > 0 &&
-    reason.trim().length > 0 &&
+    (reason !== 'OTHER' || note.trim().length > 0) &&
     !submitting &&
     refundableInfo != null &&
     totalCredit <= refundableInfo.remaining_refundable + 0.01;
@@ -119,7 +129,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
           quantity: item.quantity,
         })),
         refund_method: refundMethod,
-        reason: reason.trim(),
+        reason: t(`credit_note.reason.${reason}`),
         note: note.trim() || undefined,
       };
 
@@ -239,28 +249,45 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('credit_note.modal.reason')} *
                 </label>
-                <input
-                  type="text"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder={t('credit_note.modal.reason_placeholder')}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
-                />
+                <div className="space-y-2">
+                  {REFUND_REASONS.map((r) => (
+                    <label
+                      key={r}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-colors ${
+                        reason === r
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="refund-reason"
+                        value={r}
+                        checked={reason === r}
+                        onChange={() => setReason(r)}
+                        className="w-4 h-4 text-red-500 focus:ring-red-500"
+                      />
+                      <span className="text-sm font-medium text-gray-800">{t(`credit_note.reason.${r}`)}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
-              {/* Note (optional) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('credit_note.modal.note')}
-                </label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder={t('credit_note.modal.note_placeholder')}
-                  rows={2}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
-                />
-              </div>
+              {/* Note - only for OTHER reason */}
+              {reason === 'OTHER' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('credit_note.modal.note')} *
+                  </label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('credit_note.modal.note_placeholder')}
+                    rows={2}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
+                  />
+                </div>
+              )}
 
               {/* Over-refund warning */}
               {refundableInfo && totalCredit > refundableInfo.remaining_refundable + 0.01 && (

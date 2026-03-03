@@ -11,13 +11,13 @@ interface AnulacionModalProps {
   onCreated: () => void;
 }
 
-type AnulacionReason = 'TestOrder' | 'WrongCustomer' | 'Duplicate' | 'Other';
+type AnulacionReason = 'TEST_ORDER' | 'WRONG_CUSTOMER' | 'DUPLICATE' | 'OTHER';
 
 const REASONS: { value: AnulacionReason; i18nKey: string }[] = [
-  { value: 'TestOrder', i18nKey: 'anulacion.reason.TEST_ORDER' },
-  { value: 'WrongCustomer', i18nKey: 'anulacion.reason.WRONG_CUSTOMER' },
-  { value: 'Duplicate', i18nKey: 'anulacion.reason.DUPLICATE' },
-  { value: 'Other', i18nKey: 'anulacion.reason.OTHER' },
+  { value: 'TEST_ORDER', i18nKey: 'anulacion.reason.TEST_ORDER' },
+  { value: 'WRONG_CUSTOMER', i18nKey: 'anulacion.reason.WRONG_CUSTOMER' },
+  { value: 'DUPLICATE', i18nKey: 'anulacion.reason.DUPLICATE' },
+  { value: 'OTHER', i18nKey: 'anulacion.reason.OTHER' },
 ];
 
 interface EligibilityResult {
@@ -30,7 +30,7 @@ export const AnulacionModal: React.FC<AnulacionModalProps> = ({ order, onClose, 
   const [loading, setLoading] = useState(true);
   const [eligible, setEligible] = useState(false);
   const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
-  const [reason, setReason] = useState<AnulacionReason>('TestOrder');
+  const [reason, setReason] = useState<AnulacionReason>('TEST_ORDER');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -142,19 +142,21 @@ export const AnulacionModal: React.FC<AnulacionModalProps> = ({ order, onClose, 
                 </div>
               </div>
 
-              {/* Note (optional) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('anulacion.modal.note')}
-                </label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder={t('anulacion.modal.note_placeholder')}
-                  rows={2}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
-                />
-              </div>
+              {/* Note - only for OTHER reason */}
+              {reason === 'OTHER' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('anulacion.modal.note')} *
+                  </label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('anulacion.modal.note_placeholder')}
+                    rows={2}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
