@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════
--- Crab Cloud — Unified Schema (consolidated from 0001–0007)
+-- Crab Cloud — Unified Schema (consolidated 0001–0014)
 -- ════════════════════════════════════════════════════════════════
 -- Naming: store_* = store-scoped (has store_id)
 --         no prefix = global infrastructure
@@ -59,8 +59,9 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     revoked BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE INDEX idx_refresh_tokens_tenant ON refresh_tokens(tenant_id);
-CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at) WHERE NOT revoked;
+CREATE INDEX idx_refresh_tokens_active
+    ON refresh_tokens (tenant_id, expires_at DESC)
+    WHERE NOT revoked;
 
 -- ── PKI / Activations ──
 
@@ -132,8 +133,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX idx_audit_logs_tenant ON audit_logs (tenant_id, created_at);
+CREATE INDEX idx_audit_logs_tenant_action ON audit_logs (tenant_id, action, created_at DESC);
 
--- ── Stores (was edge_servers, merged with store_info) ──
+-- ── Stores ──
 
 CREATE TABLE IF NOT EXISTS stores (
     id BIGINT PRIMARY KEY,
@@ -150,6 +152,13 @@ CREATE TABLE IF NOT EXISTS stores (
     website TEXT,
     logo_url TEXT,
     business_day_cutoff INTEGER DEFAULT 0,
+    currency_code TEXT,
+    currency_symbol TEXT,
+    currency_decimal_places INTEGER,
+    timezone TEXT,
+    receipt_header TEXT,
+    receipt_footer TEXT,
+    receipt_locale TEXT,
     last_sync_at BIGINT,
     registered_at BIGINT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
@@ -311,8 +320,8 @@ CREATE TABLE store_attribute_bindings (
     default_option_ids  JSONB,
     UNIQUE (store_id, source_id)
 );
-CREATE INDEX idx_store_bindings_store ON store_attribute_bindings (store_id);
-CREATE INDEX idx_store_bindings_owner ON store_attribute_bindings (owner_type, owner_source_id);
+CREATE INDEX idx_store_bindings_owner
+    ON store_attribute_bindings (store_id, owner_type, owner_source_id);
 
 -- ── Price Rules ──
 
@@ -342,7 +351,7 @@ CREATE TABLE store_price_rules (
     updated_at       BIGINT NOT NULL,
     UNIQUE (store_id, source_id)
 );
-CREATE INDEX IF NOT EXISTS idx_store_price_rules_store ON store_price_rules(store_id);
+CREATE INDEX idx_store_price_rules_store ON store_price_rules(store_id);
 
 -- ── Store Version Tracking ──
 
@@ -385,41 +394,159 @@ CREATE TABLE store_dining_tables (
 CREATE INDEX idx_store_dining_tables_store ON store_dining_tables(store_id);
 CREATE INDEX idx_store_dining_tables_zone ON store_dining_tables(store_id, zone_source_id);
 
--- ── Orders (archived, simplified — detail as JSONB) ──
+-- ── Archived Orders ──
 
 CREATE TABLE IF NOT EXISTS store_archived_orders (
     id BIGSERIAL PRIMARY KEY,
     store_id BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
     tenant_id BIGINT NOT NULL,
-    source_id TEXT NOT NULL,
+    source_id BIGINT NOT NULL,
     order_id BIGINT NOT NULL,
     receipt_number TEXT,
     status TEXT NOT NULL,
     end_time BIGINT,
-    total DOUBLE PRECISION,
-    tax DOUBLE PRECISION,
-    desglose JSONB NOT NULL DEFAULT '[]'::JSONB,
+    total NUMERIC(12,2),
+    tax NUMERIC(12,2),
     guest_count INTEGER,
-    discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
     void_type TEXT,
-    loss_amount DOUBLE PRECISION,
+    loss_amount NUMERIC(12,2),
     start_time BIGINT,
     prev_hash TEXT,
     curr_hash TEXT,
     last_event_hash TEXT,
     version BIGINT NOT NULL DEFAULT 0,
-    detail JSONB,
-    synced_at BIGINT NOT NULL
+    synced_at BIGINT NOT NULL,
+    -- Denormalized fields (from 0006/0008/0009/0012)
+    zone_name TEXT,
+    table_name TEXT,
+    is_retail BOOLEAN NOT NULL DEFAULT false,
+    original_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+    subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+    paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    surcharge_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    comp_total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    order_manual_discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    order_manual_surcharge_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    order_rule_discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    order_rule_surcharge_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    operator_name TEXT,
+    loss_reason TEXT,
+    void_note TEXT,
+    member_name TEXT,
+    service_type TEXT,
+    created_at BIGINT,
+    queue_number TEXT,
+    shift_id BIGINT,
+    operator_id BIGINT,
+    member_id BIGINT,
+    is_voided BOOLEAN NOT NULL DEFAULT false,
+    is_upgraded BOOLEAN NOT NULL DEFAULT false,
+    customer_nif TEXT,
+    customer_nombre TEXT,
+    customer_address TEXT,
+    customer_email TEXT,
+    customer_phone TEXT
 );
 
 CREATE UNIQUE INDEX uq_store_archived_orders_key
     ON store_archived_orders (tenant_id, store_id, order_id);
-CREATE INDEX IF NOT EXISTS idx_store_archived_orders_tenant ON store_archived_orders (tenant_id);
-CREATE INDEX IF NOT EXISTS idx_store_archived_orders_receipt ON store_archived_orders (tenant_id, receipt_number);
-CREATE INDEX IF NOT EXISTS idx_store_archived_orders_end_time ON store_archived_orders (tenant_id, end_time);
-CREATE INDEX IF NOT EXISTS idx_store_archived_orders_status ON store_archived_orders (tenant_id, status);
+CREATE INDEX idx_store_archived_orders_tenant ON store_archived_orders (tenant_id);
+CREATE INDEX idx_store_archived_orders_receipt ON store_archived_orders (tenant_id, receipt_number);
+CREATE INDEX idx_store_archived_orders_end_time ON store_archived_orders (tenant_id, end_time);
+CREATE INDEX idx_store_archived_orders_status ON store_archived_orders (tenant_id, status);
 CREATE INDEX idx_store_archived_orders_list
     ON store_archived_orders (store_id, tenant_id, status, end_time DESC);
+CREATE INDEX idx_archived_orders_overview
+    ON store_archived_orders (tenant_id, end_time)
+    INCLUDE (store_id, status, total, tax, guest_count,
+             discount_amount, start_time, void_type, loss_amount)
+    WHERE end_time IS NOT NULL;
+CREATE INDEX idx_archived_orders_page
+    ON store_archived_orders (store_id, tenant_id, end_time DESC NULLS LAST);
+CREATE INDEX idx_sao_overview
+    ON store_archived_orders(tenant_id, store_id, end_time)
+    WHERE status = 'COMPLETED';
+
+-- ── Order Items ──
+
+CREATE TABLE store_order_items (
+    id                BIGSERIAL PRIMARY KEY,
+    order_id          BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
+    instance_id       TEXT NOT NULL DEFAULT '',
+    name              TEXT NOT NULL,
+    spec_name         TEXT,
+    category_name     TEXT,
+    product_source_id BIGINT,
+    price             NUMERIC(12,2) NOT NULL DEFAULT 0,
+    quantity          INTEGER NOT NULL DEFAULT 1,
+    unit_price        NUMERIC(12,2) NOT NULL DEFAULT 0,
+    line_total        NUMERIC(12,2) NOT NULL DEFAULT 0,
+    discount_amount   NUMERIC(12,2) NOT NULL DEFAULT 0,
+    surcharge_amount  NUMERIC(12,2) NOT NULL DEFAULT 0,
+    tax               NUMERIC(12,2) NOT NULL DEFAULT 0,
+    tax_rate          INTEGER NOT NULL DEFAULT 0,
+    is_comped         BOOLEAN NOT NULL DEFAULT false,
+    note              TEXT
+);
+CREATE INDEX idx_soi_order ON store_order_items(order_id);
+CREATE INDEX idx_soi_product ON store_order_items(product_source_id) WHERE product_source_id IS NOT NULL;
+
+CREATE TABLE store_order_item_options (
+    id              BIGSERIAL PRIMARY KEY,
+    item_id         BIGINT NOT NULL REFERENCES store_order_items(id) ON DELETE CASCADE,
+    attribute_name  TEXT NOT NULL,
+    option_name     TEXT NOT NULL,
+    price           NUMERIC(12,2) NOT NULL DEFAULT 0,
+    quantity        INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_soio_item ON store_order_item_options(item_id);
+
+-- ── Order Payments ──
+
+CREATE TABLE store_order_payments (
+    id              BIGSERIAL PRIMARY KEY,
+    order_id        BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
+    seq             INTEGER NOT NULL DEFAULT 0,
+    method          TEXT NOT NULL,
+    amount          NUMERIC(12,2) NOT NULL DEFAULT 0,
+    timestamp       BIGINT NOT NULL,
+    cancelled       BOOLEAN NOT NULL DEFAULT false,
+    cancel_reason   TEXT,
+    tendered        NUMERIC(12,2),
+    change_amount   NUMERIC(12,2)
+);
+CREATE INDEX idx_sop_order ON store_order_payments(order_id);
+CREATE INDEX idx_sop_method ON store_order_payments(method);
+CREATE INDEX idx_sop_active
+    ON store_order_payments(order_id, method, amount)
+    WHERE cancelled IS NOT TRUE;
+
+-- ── Order Events ──
+
+CREATE TABLE store_order_events (
+    id              BIGSERIAL PRIMARY KEY,
+    order_id        BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
+    seq             INTEGER NOT NULL DEFAULT 0,
+    event_type      TEXT NOT NULL,
+    timestamp       BIGINT NOT NULL,
+    operator_id     BIGINT,
+    operator_name   TEXT,
+    data            TEXT
+);
+CREATE INDEX idx_soe_order ON store_order_events(order_id);
+CREATE INDEX idx_soe_type ON store_order_events(event_type);
+
+-- ── Order Desglose ──
+
+CREATE TABLE store_order_desglose (
+    id              BIGSERIAL PRIMARY KEY,
+    order_id        BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
+    tax_rate        INTEGER NOT NULL,
+    base_amount     NUMERIC(12,2) NOT NULL,
+    tax_amount      NUMERIC(12,2) NOT NULL,
+    UNIQUE(order_id, tax_rate)
+);
 
 -- ── Daily Reports ──
 
@@ -448,7 +575,7 @@ CREATE TABLE IF NOT EXISTS store_daily_reports (
     UNIQUE (store_id, business_date)
 );
 
-CREATE INDEX IF NOT EXISTS idx_store_daily_reports_store ON store_daily_reports(store_id);
+CREATE INDEX idx_store_daily_reports_store ON store_daily_reports(store_id);
 
 CREATE TABLE IF NOT EXISTS store_daily_report_tax_breakdown (
     id           BIGSERIAL PRIMARY KEY,
@@ -460,7 +587,7 @@ CREATE TABLE IF NOT EXISTS store_daily_report_tax_breakdown (
     order_count  BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_store_dr_tax_report ON store_daily_report_tax_breakdown(report_id);
+CREATE INDEX idx_store_dr_tax_report ON store_daily_report_tax_breakdown(report_id);
 
 CREATE TABLE IF NOT EXISTS store_daily_report_payment_breakdown (
     id        BIGSERIAL PRIMARY KEY,
@@ -470,7 +597,7 @@ CREATE TABLE IF NOT EXISTS store_daily_report_payment_breakdown (
     count     BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_store_dr_payment_report ON store_daily_report_payment_breakdown(report_id);
+CREATE INDEX idx_store_dr_payment_report ON store_daily_report_payment_breakdown(report_id);
 
 CREATE TABLE store_daily_report_shift_breakdown (
     id               BIGSERIAL PRIMARY KEY,
@@ -513,9 +640,10 @@ CREATE TABLE IF NOT EXISTS store_commands (
     result JSONB
 );
 
-CREATE INDEX IF NOT EXISTS idx_store_commands_pending
+CREATE INDEX idx_store_commands_pending
     ON store_commands (store_id, status) WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_store_commands_store ON store_commands(store_id);
+CREATE INDEX idx_store_commands_history
+    ON store_commands (store_id, tenant_id, created_at DESC);
 
 -- ── Shifts ──
 
@@ -540,8 +668,8 @@ CREATE TABLE IF NOT EXISTS store_shifts (
     updated_at      BIGINT NOT NULL,
     UNIQUE (store_id, source_id)
 );
-CREATE INDEX IF NOT EXISTS idx_store_shifts_store ON store_shifts(store_id);
-CREATE INDEX IF NOT EXISTS idx_store_shifts_status ON store_shifts(store_id, status);
+CREATE INDEX idx_store_shifts_store ON store_shifts(store_id);
+CREATE INDEX idx_store_shifts_status ON store_shifts(store_id, status);
 
 -- ── Employees ──
 
@@ -560,7 +688,7 @@ CREATE TABLE IF NOT EXISTS store_employees (
     UNIQUE (store_id, source_id),
     UNIQUE (store_id, username)
 );
-CREATE INDEX IF NOT EXISTS idx_store_employees_store ON store_employees(store_id);
+CREATE INDEX idx_store_employees_store ON store_employees(store_id);
 
 -- ── Label Templates ──
 
@@ -628,7 +756,7 @@ CREATE TABLE store_label_fields (
 
 CREATE INDEX idx_store_label_fields_template ON store_label_fields(template_id);
 
--- ── Pending Ops (Console edits when edge offline) ──
+-- ── Pending Ops ──
 
 CREATE TABLE store_pending_ops (
     id BIGSERIAL PRIMARY KEY,
@@ -641,7 +769,7 @@ CREATE TABLE store_pending_ops (
 
 CREATE INDEX idx_pending_ops_store ON store_pending_ops(store_id);
 
--- ── Tenant Images (S3 orphan tracking) ──
+-- ── Tenant Images ──
 
 CREATE TABLE tenant_images (
     tenant_id   BIGINT  NOT NULL REFERENCES tenants(id),
@@ -654,7 +782,7 @@ CREATE TABLE tenant_images (
 
 CREATE INDEX idx_tenant_images_orphaned ON tenant_images (orphaned_at) WHERE orphaned_at IS NOT NULL;
 
--- ── Credit Notes (synced from edge) ──
+-- ── Credit Notes ──
 
 CREATE TABLE IF NOT EXISTS store_credit_notes (
     id BIGSERIAL PRIMARY KEY,
@@ -664,9 +792,9 @@ CREATE TABLE IF NOT EXISTS store_credit_notes (
     credit_note_number TEXT NOT NULL,
     original_order_id BIGINT NOT NULL,
     original_receipt TEXT NOT NULL,
-    subtotal_credit DOUBLE PRECISION NOT NULL,
-    tax_credit DOUBLE PRECISION NOT NULL,
-    total_credit DOUBLE PRECISION NOT NULL,
+    subtotal_credit NUMERIC(12,2) NOT NULL,
+    tax_credit NUMERIC(12,2) NOT NULL,
+    total_credit NUMERIC(12,2) NOT NULL,
     refund_method TEXT NOT NULL,
     reason TEXT NOT NULL,
     note TEXT,
@@ -675,7 +803,6 @@ CREATE TABLE IF NOT EXISTS store_credit_notes (
     prev_hash TEXT NOT NULL,
     curr_hash TEXT NOT NULL,
     created_at BIGINT NOT NULL,
-    detail JSONB,
     version BIGINT NOT NULL DEFAULT 0,
     synced_at BIGINT NOT NULL
 );
@@ -686,8 +813,26 @@ CREATE INDEX idx_store_credit_notes_order
     ON store_credit_notes (tenant_id, store_id, original_order_id);
 CREATE INDEX idx_store_credit_notes_tenant
     ON store_credit_notes (tenant_id, created_at DESC);
+CREATE INDEX idx_credit_notes_time
+    ON store_credit_notes (tenant_id, store_id, created_at)
+    INCLUDE (total_credit, refund_method);
 
--- ── Verifactu Invoices (synced from edge) ──
+-- ── Credit Note Items ──
+
+CREATE TABLE store_credit_note_items (
+    id              BIGSERIAL PRIMARY KEY,
+    credit_note_id  BIGINT NOT NULL REFERENCES store_credit_notes(id) ON DELETE CASCADE,
+    item_name       TEXT NOT NULL,
+    quantity        INTEGER NOT NULL,
+    unit_price      NUMERIC(12,2) NOT NULL,
+    line_credit     NUMERIC(12,2) NOT NULL,
+    tax_rate        INTEGER NOT NULL,
+    tax_credit      NUMERIC(12,2) NOT NULL,
+    original_instance_id TEXT
+);
+CREATE INDEX idx_scni_cn ON store_credit_note_items(credit_note_id);
+
+-- ── Verifactu Invoices ──
 
 CREATE TABLE IF NOT EXISTS store_invoices (
     id BIGSERIAL PRIMARY KEY,
@@ -699,22 +844,29 @@ CREATE TABLE IF NOT EXISTS store_invoices (
     tipo_factura TEXT NOT NULL,
     source_type TEXT NOT NULL,
     source_pk BIGINT NOT NULL,
-    subtotal DOUBLE PRECISION NOT NULL,
-    tax DOUBLE PRECISION NOT NULL,
-    total DOUBLE PRECISION NOT NULL,
+    subtotal NUMERIC(12,2) NOT NULL,
+    tax NUMERIC(12,2) NOT NULL,
+    total NUMERIC(12,2) NOT NULL,
     huella TEXT NOT NULL,
     prev_huella TEXT,
     fecha_expedicion TEXT NOT NULL,
+    fecha_hora_registro TEXT,
     nif TEXT NOT NULL,
     nombre_razon TEXT NOT NULL,
     factura_rectificada_id BIGINT,
     factura_rectificada_num TEXT,
+    customer_nif TEXT,
+    customer_nombre TEXT,
+    customer_address TEXT,
+    customer_email TEXT,
+    customer_phone TEXT,
+    factura_sustituida_id BIGINT,
+    factura_sustituida_num TEXT,
     aeat_status TEXT NOT NULL DEFAULT 'PENDING',
     aeat_csv TEXT,
     aeat_submitted_at BIGINT,
     aeat_response_at BIGINT,
     created_at BIGINT NOT NULL,
-    detail JSONB,
     version BIGINT NOT NULL DEFAULT 0,
     synced_at BIGINT NOT NULL
 );
@@ -726,6 +878,72 @@ CREATE UNIQUE INDEX uq_store_invoices_number
 CREATE INDEX idx_store_invoices_tenant
     ON store_invoices (tenant_id, created_at DESC);
 CREATE INDEX idx_store_invoices_aeat_pending
-    ON store_invoices (aeat_status) WHERE aeat_status != 'ACCEPTED';
+    ON store_invoices (store_id, aeat_status, created_at)
+    WHERE aeat_status != 'ACCEPTED';
 CREATE INDEX idx_store_invoices_order
     ON store_invoices (store_id, source_type, source_pk);
+
+-- ── Invoice Desglose ──
+
+CREATE TABLE store_invoice_desglose (
+    id              BIGSERIAL PRIMARY KEY,
+    invoice_id      BIGINT NOT NULL REFERENCES store_invoices(id) ON DELETE CASCADE,
+    tax_rate        INTEGER NOT NULL,
+    base_amount     NUMERIC(12,2) NOT NULL,
+    tax_amount      NUMERIC(12,2) NOT NULL,
+    UNIQUE(invoice_id, tax_rate)
+);
+
+-- ── Anulaciones ──
+
+CREATE TABLE store_anulaciones (
+    id              BIGSERIAL PRIMARY KEY,
+    store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    tenant_id       BIGINT NOT NULL,
+    source_id       BIGINT NOT NULL,
+    anulacion_number TEXT NOT NULL,
+    serie           TEXT NOT NULL,
+    original_invoice_id BIGINT NOT NULL,
+    original_invoice_number TEXT NOT NULL,
+    original_order_id BIGINT NOT NULL,
+    huella          TEXT NOT NULL,
+    prev_huella     TEXT,
+    fecha_expedicion TEXT NOT NULL,
+    fecha_hora_registro TEXT NOT NULL,
+    nif             TEXT NOT NULL,
+    nombre_razon    TEXT NOT NULL,
+    reason          TEXT NOT NULL,
+    note            TEXT,
+    operator_name   TEXT NOT NULL,
+    operator_id     BIGINT NOT NULL DEFAULT 0,
+    prev_hash       TEXT NOT NULL,
+    curr_hash       TEXT NOT NULL,
+    aeat_status     TEXT NOT NULL DEFAULT 'PENDING',
+    version         BIGINT NOT NULL DEFAULT 0,
+    created_at      BIGINT NOT NULL,
+    synced_at       BIGINT NOT NULL,
+    UNIQUE(tenant_id, store_id, source_id)
+);
+
+CREATE INDEX idx_store_anulaciones_store ON store_anulaciones(store_id);
+CREATE INDEX idx_store_anulaciones_order ON store_anulaciones(store_id, original_order_id);
+CREATE INDEX idx_store_anulaciones_tenant ON store_anulaciones(tenant_id, created_at DESC);
+
+-- ── Chain Entries ──
+
+CREATE TABLE store_chain_entries (
+    id          BIGSERIAL PRIMARY KEY,
+    store_id    BIGINT NOT NULL,
+    tenant_id   BIGINT NOT NULL,
+    source_id   BIGINT NOT NULL,
+    entry_type  TEXT   NOT NULL,
+    entry_pk    BIGINT NOT NULL,
+    prev_hash   TEXT   NOT NULL,
+    curr_hash   TEXT   NOT NULL,
+    created_at  BIGINT NOT NULL,
+    synced_at   BIGINT NOT NULL,
+    UNIQUE(tenant_id, store_id, source_id)
+);
+
+CREATE INDEX idx_sce_store ON store_chain_entries(store_id, tenant_id);
+CREATE INDEX idx_sce_created ON store_chain_entries(store_id, tenant_id, created_at DESC);

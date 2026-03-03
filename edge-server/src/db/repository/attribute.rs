@@ -23,6 +23,18 @@ pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
     Ok(attrs)
 }
 
+/// Find all attributes including inactive ones (for export)
+pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Attribute>> {
+    let mut attrs = sqlx::query_as::<_, Attribute>(
+        "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_ids, 'null') as default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute ORDER BY display_order",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    batch_load_options(pool, &mut attrs).await?;
+    Ok(attrs)
+}
+
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Attribute>> {
     let mut attr = sqlx::query_as::<_, Attribute>(
         "SELECT id, name, is_multi_select, max_selections, COALESCE(default_option_ids, 'null') as default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name FROM attribute WHERE id = ?",

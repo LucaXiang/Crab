@@ -103,7 +103,7 @@ pub async fn generate(
     .await?;
 
     let completed_orders: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
         start_millis,
         end_millis,
     )
@@ -119,7 +119,7 @@ pub async fn generate(
     .await?;
 
     let total_sales: f64 = sqlx::query_scalar!(
-        "SELECT COALESCE(SUM(total_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
         start_millis,
         end_millis,
     )
@@ -127,7 +127,7 @@ pub async fn generate(
     .await?;
 
     let total_paid: f64 = sqlx::query_scalar!(
-        "SELECT COALESCE(SUM(paid_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        "SELECT COALESCE(SUM(paid_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
         start_millis,
         end_millis,
     )
@@ -143,7 +143,7 @@ pub async fn generate(
     .await?;
 
     let total_tax: f64 = sqlx::query_scalar!(
-        "SELECT COALESCE(SUM(tax), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        "SELECT COALESCE(SUM(tax), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
         start_millis,
         end_millis,
     )
@@ -151,7 +151,7 @@ pub async fn generate(
     .await?;
 
     let total_discount: f64 = sqlx::query_scalar!(
-        "SELECT COALESCE(SUM(discount_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        "SELECT COALESCE(SUM(discount_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
         start_millis,
         end_millis,
     )
@@ -159,7 +159,7 @@ pub async fn generate(
     .await?;
 
     let total_surcharge: f64 = sqlx::query_scalar!(
-        "SELECT COALESCE(SUM(surcharge_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+        "SELECT COALESCE(SUM(surcharge_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
         start_millis,
         end_millis,
     )
@@ -196,7 +196,7 @@ pub async fn generate(
 
     // Tax breakdown by rate (use subquery directly — both strings are compile-time constants)
     let tax_rows: Vec<(i32, f64, f64, f64, i64)> = sqlx::query_as(
-        "SELECT tax_rate, COALESCE(SUM(quantity * unit_price), 0.0), COALESCE(SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0.0), COALESCE(SUM(quantity * unit_price) - SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0.0), COUNT(DISTINCT order_pk) FROM archived_order_item WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') GROUP BY tax_rate ORDER BY tax_rate DESC",
+        "SELECT tax_rate, COALESCE(SUM(quantity * unit_price), 0.0), COALESCE(SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0.0), COALESCE(SUM(quantity * unit_price) - SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0.0), COUNT(DISTINCT order_pk) FROM archived_order_item WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0) GROUP BY tax_rate ORDER BY tax_rate DESC",
     )
     .bind(start_millis)
     .bind(end_millis)
@@ -221,7 +221,7 @@ pub async fn generate(
 
     // Payment breakdown by method
     let payment_rows: Vec<(String, f64, i64)> = sqlx::query_as(
-        "SELECT method, COALESCE(SUM(amount), 0.0), COUNT(*) FROM archived_order_payment WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') AND cancelled = 0 GROUP BY method",
+        "SELECT method, COALESCE(SUM(amount), 0.0), COUNT(*) FROM archived_order_payment WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0) AND cancelled = 0 GROUP BY method",
     )
     .bind(start_millis)
     .bind(end_millis)
@@ -246,14 +246,14 @@ pub async fn generate(
     let shift_rows: Vec<ShiftAggRow> = sqlx::query_as(
         "SELECT ao.shift_id, \
          COUNT(*) as total_orders, \
-         COUNT(CASE WHEN ao.status = 'COMPLETED' THEN 1 END), \
+         COUNT(CASE WHEN ao.status = 'COMPLETED' AND ao.is_voided = 0 THEN 1 END), \
          COUNT(CASE WHEN ao.status = 'VOID' THEN 1 END), \
-         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' THEN ao.total_amount ELSE 0 END), 0.0), \
-         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' THEN ao.paid_amount ELSE 0 END), 0.0), \
+         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' AND ao.is_voided = 0 THEN ao.total_amount ELSE 0 END), 0.0), \
+         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' AND ao.is_voided = 0 THEN ao.paid_amount ELSE 0 END), 0.0), \
          COALESCE(SUM(CASE WHEN ao.status = 'VOID' THEN ao.total_amount ELSE 0 END), 0.0), \
-         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' THEN ao.tax ELSE 0 END), 0.0), \
-         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' THEN ao.discount_amount ELSE 0 END), 0.0), \
-         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' THEN ao.surcharge_amount ELSE 0 END), 0.0) \
+         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' AND ao.is_voided = 0 THEN ao.tax ELSE 0 END), 0.0), \
+         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' AND ao.is_voided = 0 THEN ao.discount_amount ELSE 0 END), 0.0), \
+         COALESCE(SUM(CASE WHEN ao.status = 'COMPLETED' AND ao.is_voided = 0 THEN ao.surcharge_amount ELSE 0 END), 0.0) \
          FROM archived_order ao \
          WHERE ao.end_time >= ? AND ao.end_time < ? \
          GROUP BY ao.shift_id",

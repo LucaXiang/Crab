@@ -229,7 +229,7 @@
     "top_products": "Productos más vendidos",
     "category_sales": "Ventas por categoría",
     "service_type_breakdown": "Desglose por tipo de servicio",
-    "svc_dinein": "En sala",
+    "svc_dine_in": "En sala",
     "svc_takeout": "Para llevar",
     "zone_sales": "Ventas por zona",
     "avg_items_per_order": "Media artículos/pedido",
@@ -245,6 +245,9 @@
     "custom_range": "Personalizado",
     "refunds": "Devoluciones",
     "refund_methods": "Métodos de devolución",
+    "net_revenue": "Ingresos netos",
+    "gross_revenue": "Ingresos brutos",
+    "anulacion": "Anulaciones",
     "just_now": "Recién actualizado",
     "ago": "hace",
     "refresh": "Actualizar datos"

@@ -13,11 +13,12 @@ import { WheelDateTimePicker } from '@/shared/components/FormField';
 import { useStoreInfo } from '@/core/stores/settings/useStoreInfoStore';
 
 const EMPTY_OVERVIEW: StoreOverview = {
-  revenue: 0, orders: 0, guests: 0, average_order_value: 0,
+  revenue: 0, net_revenue: 0, orders: 0, guests: 0, average_order_value: 0,
   per_guest_spend: 0, average_dining_minutes: 0,
   total_tax: 0, total_discount: 0, total_surcharge: 0,
   avg_items_per_order: 0, voided_orders: 0, voided_amount: 0,
-  loss_orders: 0, loss_amount: 0, refund_count: 0, refund_amount: 0,
+  loss_orders: 0, loss_amount: 0, anulacion_count: 0, anulacion_amount: 0,
+  refund_count: 0, refund_amount: 0,
   revenue_trend: [], daily_trend: [], payment_breakdown: [],
   tax_breakdown: [], category_sales: [], top_products: [],
   tag_sales: [], refund_method_breakdown: [], service_type_breakdown: [],

@@ -229,7 +229,7 @@
     "top_products": "Top products",
     "category_sales": "Sales by category",
     "service_type_breakdown": "Service type breakdown",
-    "svc_dinein": "Dine-in",
+    "svc_dine_in": "Dine-in",
     "svc_takeout": "Takeout",
     "zone_sales": "Sales by zone",
     "avg_items_per_order": "Avg items/order",
@@ -245,6 +245,9 @@
     "custom_range": "Custom",
     "refunds": "Refunds",
     "refund_methods": "Refund methods",
+    "net_revenue": "Net Revenue",
+    "gross_revenue": "Gross Revenue",
+    "anulacion": "Voided (Post-Archive)",
     "just_now": "Just updated",
     "ago": "ago",
     "refresh": "Refresh data"

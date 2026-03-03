@@ -943,6 +943,7 @@ pub async fn get_order_desglose(
 #[derive(Debug, serde::Serialize)]
 pub struct StoreOverview {
     pub revenue: f64,
+    pub net_revenue: f64,
     pub orders: i64,
     pub guests: i64,
     pub average_order_value: f64,
@@ -954,6 +955,8 @@ pub struct StoreOverview {
     pub voided_amount: f64,
     pub loss_orders: i64,
     pub loss_amount: f64,
+    pub anulacion_count: i64,
+    pub anulacion_amount: f64,
     pub refund_count: i64,
     pub refund_amount: f64,
     pub revenue_trend: Vec<RevenueTrendPoint>,
@@ -1076,14 +1079,14 @@ async fn get_overview(
     let overview: (f64, i64, i64, f64, f64, i64, f64, f64, i64, f64, f64) = sqlx::query_as(
         r#"
         SELECT
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total ELSE 0 END), 0)::DOUBLE PRECISION,
-            COUNT(*) FILTER (WHERE status = 'COMPLETED'),
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided IS NOT TRUE THEN total ELSE 0 END), 0)::DOUBLE PRECISION,
+            COUNT(*) FILTER (WHERE status = 'COMPLETED' AND is_voided IS NOT TRUE),
             COUNT(*) FILTER (WHERE status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED')),
             COALESCE(SUM(CASE WHEN status = 'VOID' THEN COALESCE(total, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(tax, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(guest_count, 0) ELSE 0 END), 0)::BIGINT,
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN COALESCE(discount_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
-            COALESCE(AVG(CASE WHEN status = 'COMPLETED' AND start_time IS NOT NULL AND end_time IS NOT NULL
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided IS NOT TRUE THEN COALESCE(tax, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided IS NOT TRUE THEN COALESCE(guest_count, 0) ELSE 0 END), 0)::BIGINT,
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided IS NOT TRUE THEN COALESCE(discount_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
+            COALESCE(AVG(CASE WHEN status = 'COMPLETED' AND is_voided IS NOT TRUE AND start_time IS NOT NULL AND end_time IS NOT NULL
                 THEN (end_time - start_time) / 60000.0 END), 0)::DOUBLE PRECISION,
             COUNT(*) FILTER (WHERE status = 'VOID' AND void_type = 'LOSS_SETTLED'),
             COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0) ELSE 0 END), 0)::DOUBLE PRECISION,
@@ -1143,6 +1146,7 @@ async fn get_overview(
         zone_sales_r,
         surcharge_r,
         avg_items_r,
+        anulacion_agg_r,
     ) = tokio::join!(
         // 2. Revenue trend (by hour of day)
         sqlx::query_as::<_, RevenueTrendPoint>(
@@ -1156,6 +1160,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
+                AND is_voided IS NOT TRUE
             GROUP BY hour
             ORDER BY hour
             "#,
@@ -1178,6 +1183,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
             GROUP BY d.tax_rate
             ORDER BY d.tax_rate
             "#,
@@ -1200,6 +1206,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
                 AND p.cancelled IS NOT TRUE
             GROUP BY p.method
             ORDER BY amount DESC
@@ -1223,6 +1230,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
             GROUP BY i.name
             ORDER BY quantity DESC
             LIMIT 10
@@ -1245,6 +1253,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
             GROUP BY name
             ORDER BY revenue DESC
             LIMIT 10
@@ -1274,6 +1283,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR o.store_id = $2)
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
                 AND i.product_source_id IS NOT NULL
             GROUP BY t.name, t.color
             ORDER BY revenue DESC
@@ -1355,7 +1365,7 @@ async fn get_overview(
         sqlx::query_as::<_, ServiceTypeEntry>(
             r#"
             SELECT
-                service_type,
+                COALESCE(service_type, 'DINE_IN') AS service_type,
                 COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
                 COUNT(*) AS orders
             FROM store_archived_orders
@@ -1363,7 +1373,8 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
-            GROUP BY service_type
+                AND is_voided IS NOT TRUE
+            GROUP BY COALESCE(service_type, 'DINE_IN')
             ORDER BY revenue DESC
             "#,
         )
@@ -1385,6 +1396,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
+                AND is_voided IS NOT TRUE
                 AND zone_name IS NOT NULL
                 AND zone_name != ''
             GROUP BY zone_name
@@ -1409,6 +1421,7 @@ async fn get_overview(
                 AND ($2::BIGINT IS NULL OR store_id = $2)
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
+                AND is_voided IS NOT TRUE
             "#,
         )
         .bind(tenant_id)
@@ -1429,8 +1442,27 @@ async fn get_overview(
                     AND ($2::BIGINT IS NULL OR o.store_id = $2)
                     AND o.end_time >= $3 AND o.end_time < $4
                     AND o.status = 'COMPLETED'
+                    AND o.is_voided IS NOT TRUE
                 GROUP BY o.id
             ) sub
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_one(pool),
+        // 15. Anulacion aggregate from store_anulaciones
+        sqlx::query_as::<_, (i64, f64)>(
+            r#"
+            SELECT
+                COUNT(*),
+                COALESCE(SUM(o.total), 0)::DOUBLE PRECISION
+            FROM store_anulaciones a
+            JOIN store_archived_orders o ON o.store_id = a.store_id AND o.order_id = a.original_order_id
+            WHERE a.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR a.store_id = $2)
+                AND a.created_at >= $3 AND a.created_at < $4
             "#,
         )
         .bind(tenant_id)
@@ -1453,9 +1485,12 @@ async fn get_overview(
     let zone_sales = zone_sales_r.unwrap_or_default();
     let total_surcharge = surcharge_r.map(|(v,)| v).unwrap_or(0.0);
     let avg_items_per_order = avg_items_r.map(|(v,)| v).unwrap_or(0.0);
+    let (anulacion_count, anulacion_amount) = anulacion_agg_r.unwrap_or((0, 0.0));
+    let net_revenue = revenue - refund_amount - anulacion_amount;
 
     Ok(StoreOverview {
         revenue,
+        net_revenue,
         orders,
         guests,
         average_order_value,
@@ -1467,6 +1502,8 @@ async fn get_overview(
         voided_amount,
         loss_orders,
         loss_amount,
+        anulacion_count,
+        anulacion_amount,
         refund_count,
         refund_amount,
         revenue_trend,

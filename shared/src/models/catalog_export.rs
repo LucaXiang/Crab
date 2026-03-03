@@ -128,3 +128,28 @@ pub fn validate_catalog(catalog: &CatalogExport) -> Result<(), String> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_exported_catalog() {
+        let json = std::fs::read_to_string("/tmp/test_catalog.json").unwrap();
+        match serde_json::from_str::<CatalogExport>(&json) {
+            Ok(c) => {
+                println!(
+                    "OK: {} products, {} categories",
+                    c.products.len(),
+                    c.categories.len()
+                );
+                // Also validate
+                validate_catalog(&c).unwrap();
+                println!("Validation passed");
+            }
+            Err(e) => {
+                panic!("Deserialization failed: {e}");
+            }
+        }
+    }
+}

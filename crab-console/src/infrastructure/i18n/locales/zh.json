@@ -231,7 +231,7 @@
     "top_products": "热销商品",
     "category_sales": "分类销售",
     "service_type_breakdown": "服务类型分布",
-    "svc_dinein": "堂食",
+    "svc_dine_in": "堂食",
     "svc_takeout": "外带",
     "zone_sales": "区域营收",
     "avg_items_per_order": "平均商品数/单",
@@ -247,6 +247,9 @@
     "custom_range": "自定义",
     "refunds": "退款",
     "refund_methods": "退款方式明细",
+    "net_revenue": "净营收",
+    "gross_revenue": "总营业额",
+    "anulacion": "作废撤销",
     "just_now": "刚刚更新",
     "ago": "前",
     "refresh": "刷新数据"

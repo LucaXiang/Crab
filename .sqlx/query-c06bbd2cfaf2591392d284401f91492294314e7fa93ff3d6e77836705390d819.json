@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+  "query": "SELECT COUNT(*) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "b603d8d306966a775fd8e4f36eacfad9298d2771199e953e25c82219012bdd3c"
+  "hash": "c06bbd2cfaf2591392d284401f91492294314e7fa93ff3d6e77836705390d819"
 }

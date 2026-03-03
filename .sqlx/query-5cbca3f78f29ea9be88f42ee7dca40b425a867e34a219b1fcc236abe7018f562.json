@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COALESCE(SUM(discount_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'",
+  "query": "SELECT COALESCE(SUM(discount_amount), 0.0) FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED' AND is_voided = 0",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "a9beee5cc2a871a779202db1310f708fc135d4852686c8d9454cc28d31d311d5"
+  "hash": "5cbca3f78f29ea9be88f42ee7dca40b425a867e34a219b1fcc236abe7018f562"
 }

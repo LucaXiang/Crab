@@ -101,7 +101,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 
       {/* KPI Row 1 — Primary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={DollarSign} bg="bg-primary-100" color="text-primary-600" value={formatCurrency(overview.revenue)} label={t('stats.total_sales')} accent delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
+        <KpiCard icon={DollarSign} bg="bg-primary-100" color="text-primary-600" value={formatCurrency(overview.net_revenue)} label={t('stats.net_revenue')} accent delta={prev ? pctChange(overview.net_revenue, prev.net_revenue) : undefined} />
         <KpiCard icon={ShoppingBag} bg="bg-green-100" color="text-green-600" value={String(overview.orders)} label={t('stats.completed_orders')} delta={prev ? pctChange(overview.orders, prev.orders) : undefined} />
         <KpiCard icon={Users} bg="bg-blue-100" color="text-blue-600" value={String(overview.guests)} label={t('stats.guests')} delta={prev ? pctChange(overview.guests, prev.guests) : undefined} />
         <KpiCard icon={TrendingUp} bg="bg-purple-100" color="text-purple-600" value={formatCurrency(overview.average_order_value)} label={t('stats.average_order')} delta={prev ? pctChange(overview.average_order_value, prev.average_order_value) : undefined} />
@@ -124,11 +124,13 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('stats.void_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
         <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('stats.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
         <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('stats.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
-        <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('stats.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
+        <KpiCard icon={XCircle} bg="bg-rose-100" color="text-rose-600" value={String(overview.anulacion_count)} label={`${t('stats.anulacion')} (${formatCurrency(overview.anulacion_amount)})`} delta={prev ? pctChange(overview.anulacion_count, prev.anulacion_count) : undefined} invertDelta />
       </div>
 
-      {/* KPI Row 4 — Tax, Surcharge & Items */}
+      {/* KPI Row 4 — Tax, Surcharge, Discount & Items */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={DollarSign} bg="bg-green-50" color="text-green-500" value={formatCurrency(overview.revenue)} label={t('stats.gross_revenue')} delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
+        <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('stats.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
         <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('stats.total_tax')} delta={prev ? pctChange(overview.total_tax, prev.total_tax) : undefined} />
         {overview.total_surcharge > 0 && (
           <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('stats.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />

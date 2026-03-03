@@ -19,6 +19,7 @@ use crate::utils::{AppError, AppResult};
 #[derive(Debug, Clone, Serialize)]
 pub struct StoreOverview {
     pub revenue: f64,
+    pub net_revenue: f64,
     pub orders: i32,
     pub guests: i32,
     pub average_order_value: f64,
@@ -32,6 +33,8 @@ pub struct StoreOverview {
     pub voided_amount: f64,
     pub loss_orders: i32,
     pub loss_amount: f64,
+    pub anulacion_count: i32,
+    pub anulacion_amount: f64,
     pub refund_count: i32,
     pub refund_amount: f64,
     pub revenue_trend: Vec<RevenueTrendPoint>,
@@ -283,21 +286,24 @@ pub async fn get_statistics(
     let pool = &state.pool;
 
     // ── Overview aggregate ──
+    // COMPLETED + is_voided=0 → active revenue; COMPLETED + is_voided=1 → anulacion
     #[allow(clippy::type_complexity)]
-    let (revenue, total_orders, guests, voided_orders, voided_amount, loss_orders, loss_amount, total_discount, total_surcharge, total_tax, avg_dining_time): (f64, i32, i32, i32, f64, i32, f64, f64, f64, f64, Option<f64>) = sqlx::query_as(
+    let (revenue, total_orders, guests, voided_orders, voided_amount, loss_orders, loss_amount, total_discount, total_surcharge, total_tax, avg_dining_time, anulacion_count, anulacion_amount): (f64, i32, i32, i32, f64, i32, f64, f64, f64, f64, Option<f64>, i32, f64) = sqlx::query_as(
         "SELECT \
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0.0 END), 0.0), \
-            CAST(COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) AS INTEGER), \
-            CAST(COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN guest_count ELSE 0 END), 0) AS INTEGER), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided = 0 THEN total_amount ELSE 0.0 END), 0.0), \
+            CAST(COUNT(CASE WHEN status = 'COMPLETED' AND is_voided = 0 THEN 1 END) AS INTEGER), \
+            CAST(COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided = 0 THEN guest_count ELSE 0 END), 0) AS INTEGER), \
             CAST(COUNT(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN 1 END) AS INTEGER), \
             COALESCE(SUM(CASE WHEN status = 'VOID' AND (void_type IS NULL OR void_type != 'LOSS_SETTLED') THEN total_amount ELSE 0.0 END), 0.0), \
             CAST(COUNT(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN 1 END) AS INTEGER), \
             COALESCE(SUM(CASE WHEN status = 'VOID' AND void_type = 'LOSS_SETTLED' THEN COALESCE(loss_amount, 0.0) ELSE 0.0 END), 0.0), \
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN discount_amount ELSE 0.0 END), 0.0), \
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN surcharge_amount ELSE 0.0 END), 0.0), \
-            COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN tax ELSE 0.0 END), 0.0), \
-            AVG(CASE WHEN status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL \
-                THEN CAST((end_time - start_time) AS REAL) / 60000.0 END) \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided = 0 THEN discount_amount ELSE 0.0 END), 0.0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided = 0 THEN surcharge_amount ELSE 0.0 END), 0.0), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided = 0 THEN tax ELSE 0.0 END), 0.0), \
+            AVG(CASE WHEN status = 'COMPLETED' AND is_voided = 0 AND end_time IS NOT NULL AND start_time IS NOT NULL \
+                THEN CAST((end_time - start_time) AS REAL) / 60000.0 END), \
+            CAST(COUNT(CASE WHEN status = 'COMPLETED' AND is_voided = 1 THEN 1 END) AS INTEGER), \
+            COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_voided = 1 THEN total_amount ELSE 0.0 END), 0.0) \
          FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
     )
     .bind(start_dt).bind(end_dt)
@@ -319,7 +325,7 @@ pub async fn get_statistics(
         "SELECT COALESCE(AVG(cnt), 0.0) FROM (\
             SELECT COUNT(*) AS cnt FROM archived_order_item i \
             JOIN archived_order o ON i.order_pk = o.id \
-            WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+            WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
             GROUP BY o.id\
         )",
     )
@@ -334,7 +340,7 @@ pub async fn get_statistics(
         "SELECT p.method, COALESCE(SUM(p.amount), 0.0), CAST(COUNT(*) AS INTEGER) \
          FROM archived_order_payment p \
          JOIN archived_order o ON p.order_pk = o.id \
-         WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0 \
+         WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND o.is_voided = 0 AND p.cancelled = 0 \
          GROUP BY p.method ORDER BY SUM(p.amount) DESC",
     )
     .bind(start_dt)
@@ -384,7 +390,7 @@ pub async fn get_statistics(
         "SELECT CAST((end_time / 1000 / 3600) % 24 AS INTEGER) AS hour, \
             COALESCE(SUM(total_amount), 0.0), COUNT(*) \
          FROM archived_order \
-         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 \
+         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 \
          GROUP BY hour ORDER BY hour",
     )
     .bind(start_dt)
@@ -405,7 +411,7 @@ pub async fn get_statistics(
         "SELECT STRFTIME('%Y-%m-%d', end_time / 1000, 'unixepoch') AS date, \
             COALESCE(SUM(total_amount), 0.0), COUNT(*) \
          FROM archived_order \
-         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 \
+         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 \
          GROUP BY date ORDER BY date",
     )
     .bind(start_dt)
@@ -428,7 +434,7 @@ pub async fn get_statistics(
             COALESCE(SUM(i.tax), 0.0) AS tax_amt \
          FROM archived_order_item i \
          JOIN archived_order o ON i.order_pk = o.id \
-         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
          GROUP BY i.tax_rate ORDER BY rate",
     )
     .bind(start_dt)
@@ -449,7 +455,7 @@ pub async fn get_statistics(
         "SELECT COALESCE(i.category_name, 'Unknown'), COALESCE(SUM(i.line_total), 0.0) \
          FROM archived_order_item i \
          JOIN archived_order o ON i.order_pk = o.id \
-         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
          GROUP BY i.category_name ORDER BY SUM(i.line_total) DESC LIMIT 10",
     )
     .bind(start_dt)
@@ -466,7 +472,7 @@ pub async fn get_statistics(
         "SELECT i.name, CAST(COALESCE(SUM(i.quantity), 0) AS INTEGER), COALESCE(SUM(i.line_total), 0.0) \
          FROM archived_order_item i \
          JOIN archived_order o ON i.order_pk = o.id \
-         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
          GROUP BY i.name ORDER BY SUM(i.line_total) DESC LIMIT 10",
     )
     .bind(start_dt).bind(end_dt)
@@ -482,7 +488,7 @@ pub async fn get_statistics(
          JOIN archived_order o ON i.order_pk = o.id \
          JOIN product_tag pt ON CAST(i.spec AS INTEGER) = pt.product_id \
          JOIN tag t ON pt.tag_id = t.id \
-         WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
          GROUP BY t.id ORDER BY SUM(i.line_total) DESC LIMIT 20",
     )
     .bind(start_dt).bind(end_dt)
@@ -496,7 +502,7 @@ pub async fn get_statistics(
         "SELECT COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'DineIn' END), \
             COALESCE(SUM(total_amount), 0.0), CAST(COUNT(*) AS INTEGER) \
          FROM archived_order \
-         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 \
+         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 \
          GROUP BY COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'DineIn' END) \
          ORDER BY SUM(total_amount) DESC",
     )
@@ -518,7 +524,7 @@ pub async fn get_statistics(
         "SELECT COALESCE(zone_name, 'Unknown'), COALESCE(SUM(total_amount), 0.0), \
             CAST(COUNT(*) AS INTEGER), CAST(COALESCE(SUM(guest_count), 0) AS INTEGER) \
          FROM archived_order \
-         WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 AND zone_name IS NOT NULL \
+         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 AND zone_name IS NOT NULL \
          GROUP BY zone_name ORDER BY SUM(total_amount) DESC",
     )
     .bind(start_dt)
@@ -537,6 +543,7 @@ pub async fn get_statistics(
 
     Ok(Json(StoreOverview {
         revenue,
+        net_revenue: revenue - refund_amount,
         orders: total_orders,
         guests,
         average_order_value,
@@ -550,6 +557,8 @@ pub async fn get_statistics(
         voided_amount,
         loss_orders,
         loss_amount,
+        anulacion_count,
+        anulacion_amount,
         refund_count,
         refund_amount,
         revenue_trend,

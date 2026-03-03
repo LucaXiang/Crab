@@ -88,7 +88,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
     <div className="space-y-4 md:space-y-6">
       {/* KPI Row 1 — Primary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={DollarSign} bg="bg-green-100" color="text-green-600" value={formatCurrency(overview.revenue)} label={t('statistics.metric.revenue')} accent delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
+        <KpiCard icon={DollarSign} bg="bg-green-100" color="text-green-600" value={formatCurrency(overview.net_revenue)} label={t('statistics.metric.net_revenue')} accent delta={prev ? pctChange(overview.net_revenue, prev.net_revenue) : undefined} />
         <KpiCard icon={ShoppingBag} bg="bg-blue-100" color="text-blue-600" value={String(overview.orders)} label={t('statistics.metric.orders')} delta={prev ? pctChange(overview.orders, prev.orders) : undefined} />
         <KpiCard icon={Users} bg="bg-purple-100" color="text-purple-600" value={String(overview.guests)} label={t('statistics.metric.customers')} delta={prev ? pctChange(overview.guests, prev.guests) : undefined} />
         <KpiCard icon={TrendingUp} bg="bg-orange-100" color="text-orange-600" value={formatCurrency(overview.average_order_value)} label={t('statistics.metric.avg_order_value')} delta={prev ? pctChange(overview.average_order_value, prev.average_order_value) : undefined} />
@@ -111,11 +111,13 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('statistics.metric.voided_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
         <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('statistics.metric.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
         <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('statistics.metric.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
-        <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('statistics.metric.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
+        <KpiCard icon={XCircle} bg="bg-rose-100" color="text-rose-600" value={String(overview.anulacion_count)} label={`${t('statistics.metric.anulacion')} (${formatCurrency(overview.anulacion_amount)})`} delta={prev ? pctChange(overview.anulacion_count, prev.anulacion_count) : undefined} invertDelta />
       </div>
 
-      {/* KPI Row 4 — Tax, Surcharge & Items */}
+      {/* KPI Row 4 — Tax, Surcharge, Discount & Items */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={DollarSign} bg="bg-green-50" color="text-green-500" value={formatCurrency(overview.revenue)} label={t('statistics.metric.gross_revenue')} delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
+        <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('statistics.metric.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
         <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('statistics.metric.total_tax')} delta={prev ? pctChange(overview.total_tax, prev.total_tax) : undefined} />
         {overview.total_surcharge > 0 && (
           <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('statistics.metric.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />

@@ -11,15 +11,9 @@ use axum::extract::{Path, State};
 use axum::http::header;
 use axum::response::IntoResponse;
 use axum::{Extension, Json};
-use shared::cloud::store_op::{
-    AttributeSnapshotItem, CategorySnapshotItem, ProductSnapshotItem, SnapshotBinding, StoreOp,
-    StoreOpResult, StoreSnapshot,
-};
+use shared::cloud::CloudMessage;
+use shared::cloud::store_op::StoreOpResult;
 use shared::error::AppError;
-use shared::models::attribute::{AttributeCreate, AttributeOptionInput};
-use shared::models::category::CategoryCreate;
-use shared::models::product::{ProductCreate, ProductSpecInput};
-use shared::models::tag::TagCreate;
 use shared::models::{
     Attribute, AttributeBinding, AttributeOption, Category, DiningTable, PriceRule, ProductFull,
     ProductSpec, Tag, Zone, validate_catalog,
@@ -32,7 +26,7 @@ use crate::db::store;
 use crate::db::store::data_transfer::CatalogExport;
 use crate::state::AppState;
 
-use super::{internal, push_to_edge, verify_store};
+use super::{internal, verify_store};
 
 // ── Reusable catalog builders for WS connect + CatalogSyncData ──
 
@@ -446,178 +440,22 @@ pub async fn import_catalog(
         .await
         .map_err(internal)?;
 
-    // Build StoreSnapshot for FullSync push to edge
-    let snapshot = build_snapshot(&catalog);
-    push_to_edge(
-        &state,
-        store_id,
-        identity.tenant_id,
-        StoreOp::FullSync { snapshot },
-    )
-    .await;
+    // Push CatalogSyncData to edge (preserves real IDs for bidirectional sync).
+    // If edge is online, send directly via WebSocket channel.
+    // If offline, edge will pull full catalog via RequestCatalogSync on reconnect.
+    let msg = CloudMessage::CatalogSyncData {
+        catalog: Box::new(catalog),
+    };
+    if let Some(sender) = state.edges.connected.get(&store_id)
+        && sender.try_send(msg).is_err()
+    {
+        tracing::warn!(
+            store_id,
+            "WS channel full after import, edge will sync on reconnect"
+        );
+    }
+    // Clear any stale pending_ops — full import supersedes all queued ops
+    let _ = crate::db::store::pending_ops::delete_all(&state.pool, store_id).await;
 
     Ok(Json(StoreOpResult::ok()))
-}
-
-// ── Snapshot builder ──
-
-/// Convert CatalogExport into StoreSnapshot (Create types + index-based references)
-fn build_snapshot(catalog: &CatalogExport) -> StoreSnapshot {
-    // Build lookup maps: id → index in snapshot arrays
-    let cat_index: HashMap<i64, usize> = catalog
-        .categories
-        .iter()
-        .enumerate()
-        .map(|(i, c)| (c.id, i))
-        .collect();
-    let attr_index: HashMap<i64, usize> = catalog
-        .attributes
-        .iter()
-        .enumerate()
-        .map(|(i, a)| (a.id, i))
-        .collect();
-
-    // Group bindings by (owner_type, owner_id)
-    let mut binding_map: HashMap<(String, i64), Vec<&AttributeBinding>> = HashMap::new();
-    for b in &catalog.attribute_bindings {
-        binding_map
-            .entry((b.owner_type.clone(), b.owner_id))
-            .or_default()
-            .push(b);
-    }
-
-    let tags: Vec<TagCreate> = catalog
-        .tags
-        .iter()
-        .map(|t| TagCreate {
-            name: t.name.clone(),
-            color: Some(t.color.clone()),
-            display_order: Some(t.display_order),
-        })
-        .collect();
-
-    let categories: Vec<CategorySnapshotItem> = catalog
-        .categories
-        .iter()
-        .map(|c| {
-            let bindings = binding_map
-                .remove(&("category".to_string(), c.id))
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|b| {
-                    attr_index.get(&b.attribute_id).map(|&idx| SnapshotBinding {
-                        attribute_index: idx,
-                        is_required: b.is_required,
-                        display_order: b.display_order,
-                        default_option_ids: b.default_option_ids.clone(),
-                    })
-                })
-                .collect();
-            CategorySnapshotItem {
-                data: CategoryCreate {
-                    name: c.name.clone(),
-                    sort_order: Some(c.sort_order),
-                    kitchen_print_destinations: c.kitchen_print_destinations.clone(),
-                    label_print_destinations: c.label_print_destinations.clone(),
-                    is_kitchen_print_enabled: Some(c.is_kitchen_print_enabled),
-                    is_label_print_enabled: Some(c.is_label_print_enabled),
-                    is_virtual: Some(c.is_virtual),
-                    tag_ids: c.tag_ids.clone(),
-                    match_mode: Some(c.match_mode.clone()),
-                    is_display: Some(c.is_display),
-                },
-                attribute_bindings: bindings,
-            }
-        })
-        .collect();
-
-    let products: Vec<ProductSnapshotItem> = catalog
-        .products
-        .iter()
-        .map(|p| {
-            let category_index = cat_index.get(&p.category_id).copied().unwrap_or(0);
-            let bindings = binding_map
-                .remove(&("product".to_string(), p.id))
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|b| {
-                    attr_index.get(&b.attribute_id).map(|&idx| SnapshotBinding {
-                        attribute_index: idx,
-                        is_required: b.is_required,
-                        display_order: b.display_order,
-                        default_option_ids: b.default_option_ids.clone(),
-                    })
-                })
-                .collect();
-            ProductSnapshotItem {
-                category_index,
-                data: ProductCreate {
-                    name: p.name.clone(),
-                    image: Some(p.image.clone()),
-                    category_id: p.category_id,
-                    sort_order: Some(p.sort_order),
-                    tax_rate: Some(p.tax_rate),
-                    receipt_name: p.receipt_name.clone(),
-                    kitchen_print_name: p.kitchen_print_name.clone(),
-                    is_kitchen_print_enabled: Some(p.is_kitchen_print_enabled),
-                    is_label_print_enabled: Some(p.is_label_print_enabled),
-                    external_id: p.external_id,
-                    tags: Some(p.tags.iter().map(|t| t.id).collect()),
-                    specs: p
-                        .specs
-                        .iter()
-                        .map(|s| ProductSpecInput {
-                            name: s.name.clone(),
-                            price: s.price,
-                            display_order: s.display_order,
-                            is_default: s.is_default,
-                            is_active: s.is_active,
-                            receipt_name: s.receipt_name.clone(),
-                            is_root: s.is_root,
-                        })
-                        .collect(),
-                },
-                attribute_bindings: bindings,
-            }
-        })
-        .collect();
-
-    let attributes: Vec<AttributeSnapshotItem> = catalog
-        .attributes
-        .iter()
-        .map(|a| AttributeSnapshotItem {
-            data: AttributeCreate {
-                name: a.name.clone(),
-                is_multi_select: Some(a.is_multi_select),
-                max_selections: a.max_selections,
-                default_option_ids: a.default_option_ids.clone(),
-                display_order: Some(a.display_order),
-                show_on_receipt: Some(a.show_on_receipt),
-                receipt_name: a.receipt_name.clone(),
-                show_on_kitchen_print: Some(a.show_on_kitchen_print),
-                kitchen_print_name: a.kitchen_print_name.clone(),
-                options: Some(
-                    a.options
-                        .iter()
-                        .map(|o| AttributeOptionInput {
-                            name: o.name.clone(),
-                            price_modifier: o.price_modifier,
-                            display_order: o.display_order,
-                            receipt_name: o.receipt_name.clone(),
-                            kitchen_print_name: o.kitchen_print_name.clone(),
-                            enable_quantity: o.enable_quantity,
-                            max_quantity: o.max_quantity,
-                        })
-                        .collect(),
-                ),
-            },
-        })
-        .collect();
-
-    StoreSnapshot {
-        tags,
-        categories,
-        products,
-        attributes,
-    }
 }

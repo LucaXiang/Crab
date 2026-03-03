@@ -55,13 +55,14 @@ pub async fn import(
 
 /// Build catalog export ZIP bytes
 pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError> {
-    let categories = state.catalog_service.list_categories();
-    let products = state.catalog_service.list_products();
+    // Direct DB queries — include inactive records (unlike CatalogService cache)
+    let categories = export_all_categories(&state.pool).await?;
+    let products = export_all_products(&state.pool).await?;
     let mut tags = tag::find_all_with_inactive(&state.pool)
         .await
         .map_err(AppError::from)?;
     tags.sort_by_key(|t| t.display_order);
-    let attributes = attribute::find_all(&state.pool)
+    let attributes = attribute::find_all_with_inactive(&state.pool)
         .await
         .map_err(AppError::from)?;
     let all_bindings = attribute::find_all_bindings(&state.pool)
@@ -541,6 +542,123 @@ pub async fn import_catalog_data(
     Ok(())
 }
 
+// =============================================================================
+// Export helpers — direct DB queries (include inactive records)
+// =============================================================================
+
+/// Load ALL categories from DB (including inactive) for export.
+/// Unlike CatalogService.warmup() which filters is_active=1, this returns everything.
+async fn export_all_categories(
+    pool: &sqlx::SqlitePool,
+) -> Result<Vec<shared::models::Category>, AppError> {
+    let rows: Vec<shared::models::Category> = sqlx::query_as(
+        "SELECT id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, \
+         is_active, is_virtual, match_mode, is_display \
+         FROM category ORDER BY sort_order",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    let mut categories = Vec::with_capacity(rows.len());
+    for mut cat in rows {
+        let cat_id = cat.id;
+
+        cat.kitchen_print_destinations = sqlx::query_scalar(
+            "SELECT cpd.print_destination_id FROM category_print_dest cpd \
+             JOIN print_destination pd ON pd.id = cpd.print_destination_id \
+             WHERE cpd.category_id = ? AND pd.purpose = 'kitchen'",
+        )
+        .bind(cat_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        cat.label_print_destinations = sqlx::query_scalar(
+            "SELECT cpd.print_destination_id FROM category_print_dest cpd \
+             JOIN print_destination pd ON pd.id = cpd.print_destination_id \
+             WHERE cpd.category_id = ? AND pd.purpose = 'label'",
+        )
+        .bind(cat_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        cat.tag_ids = sqlx::query_scalar("SELECT tag_id FROM category_tag WHERE category_id = ?")
+            .bind(cat_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+        categories.push(cat);
+    }
+
+    Ok(categories)
+}
+
+/// Load ALL products from DB (including inactive) for export.
+/// Loads all specs (including inactive) and all tag associations (including inactive tags).
+/// Sets `attributes: vec![]` since export uses top-level `attribute_bindings`.
+async fn export_all_products(
+    pool: &sqlx::SqlitePool,
+) -> Result<Vec<shared::models::ProductFull>, AppError> {
+    let products: Vec<shared::models::Product> = sqlx::query_as(
+        "SELECT id, name, image, category_id, sort_order, tax_rate, receipt_name, \
+         kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, \
+         is_active, external_id \
+         FROM product ORDER BY sort_order",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    let mut result = Vec::with_capacity(products.len());
+    for product in products {
+        let product_id = product.id;
+
+        // All specs (no is_active filter)
+        let specs: Vec<shared::models::ProductSpec> = sqlx::query_as(
+            "SELECT id, product_id, name, price, display_order, is_default, is_active, \
+             receipt_name, is_root \
+             FROM product_spec WHERE product_id = ? ORDER BY display_order",
+        )
+        .bind(product_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        // All tag associations (no t.is_active filter)
+        let tags: Vec<shared::models::Tag> = sqlx::query_as(
+            "SELECT t.id, t.name, t.color, t.display_order, t.is_active, t.is_system \
+             FROM tag t JOIN product_tag pt ON t.id = pt.tag_id WHERE pt.product_id = ?",
+        )
+        .bind(product_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        result.push(shared::models::ProductFull {
+            id: product.id,
+            name: product.name,
+            image: product.image,
+            category_id: product.category_id,
+            sort_order: product.sort_order,
+            tax_rate: product.tax_rate,
+            receipt_name: product.receipt_name,
+            kitchen_print_name: product.kitchen_print_name,
+            is_kitchen_print_enabled: product.is_kitchen_print_enabled,
+            is_label_print_enabled: product.is_label_print_enabled,
+            is_active: product.is_active,
+            external_id: product.external_id,
+            specs,
+            attributes: vec![],
+            tags,
+        });
+    }
+
+    Ok(result)
+}
+
 /// Read actual DB state and broadcast individual sync events for each catalog resource.
 /// CloudSyncWorker picks these up and pushes to cloud.
 async fn broadcast_catalog_sync(state: &ServerState) {
@@ -559,36 +677,38 @@ async fn broadcast_catalog_sync(state: &ServerState) {
         }
     }
 
-    // Categories (from cache)
-    let categories = state.catalog_service.list_categories();
-    for c in &categories {
-        state
-            .broadcast_sync(
-                SyncResource::Category,
-                SyncChangeType::Updated,
-                c.id,
-                Some(c),
-                false,
-            )
-            .await;
+    // Categories (direct DB — includes inactive after import)
+    if let Ok(categories) = export_all_categories(&state.pool).await {
+        for c in &categories {
+            state
+                .broadcast_sync(
+                    SyncResource::Category,
+                    SyncChangeType::Updated,
+                    c.id,
+                    Some(c),
+                    false,
+                )
+                .await;
+        }
     }
 
-    // Products (from cache)
-    let products = state.catalog_service.list_products();
-    for p in &products {
-        state
-            .broadcast_sync(
-                SyncResource::Product,
-                SyncChangeType::Updated,
-                p.id,
-                Some(p),
-                false,
-            )
-            .await;
+    // Products (direct DB — includes inactive after import)
+    if let Ok(products) = export_all_products(&state.pool).await {
+        for p in &products {
+            state
+                .broadcast_sync(
+                    SyncResource::Product,
+                    SyncChangeType::Updated,
+                    p.id,
+                    Some(p),
+                    false,
+                )
+                .await;
+        }
     }
 
-    // Attributes
-    if let Ok(attrs) = attribute::find_all(&state.pool).await {
+    // Attributes (includes inactive after import)
+    if let Ok(attrs) = attribute::find_all_with_inactive(&state.pool).await {
         for a in &attrs {
             state
                 .broadcast_sync(

@@ -99,6 +99,7 @@ export type ActiveTab = 'overview' | 'sales' | 'daily_report' | 'audit_log';
 
 export interface StoreOverview {
   revenue: number;
+  net_revenue: number;
   orders: number;
   guests: number;
   average_order_value: number;
@@ -112,6 +113,8 @@ export interface StoreOverview {
   voided_amount: number;
   loss_orders: number;
   loss_amount: number;
+  anulacion_count: number;
+  anulacion_amount: number;
   refund_count: number;
   refund_amount: number;
   revenue_trend: RevenueTrendPoint[];
