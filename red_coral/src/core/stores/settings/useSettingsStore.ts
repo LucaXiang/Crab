@@ -119,17 +119,11 @@ interface SettingsStore {
   activeCategory: SettingsCategory;
   setActiveCategory: (category: SettingsCategory) => void;
 
-  // Filter & Pagination UI State
+  // Filter UI State
   selectedZoneFilter: string | 'all';
-  tablesPage: number;
-  tablesTotal: number;
   productCategoryFilter: string | 'all';
-  productsPage: number;
-  productsTotal: number;
   setSelectedZoneFilter: (zoneId: string | 'all') => void;
-  setTablesPagination: (page: number, total: number) => void;
   setProductCategoryFilter: (category: string | 'all') => void;
-  setProductsPagination: (page: number, total: number) => void;
 
   // Modal State
   modal: ModalState;
@@ -197,17 +191,11 @@ export const useSettingsStore = create<SettingsStore>()(
       activeCategory: 'STORE',
       setActiveCategory: (category) => set({ activeCategory: category }),
 
-      // Filter & Pagination UI State
+      // Filter UI State
       selectedZoneFilter: 'all',
-      tablesPage: 1,
-      tablesTotal: 0,
       productCategoryFilter: 'all',
-      productsPage: 1,
-      productsTotal: 0,
-      setSelectedZoneFilter: (zoneId) => set({ selectedZoneFilter: zoneId, tablesPage: 1 }),
-      setTablesPagination: (page, total) => set({ tablesPage: page, tablesTotal: total }),
-      setProductCategoryFilter: (category) => set({ productCategoryFilter: category, productsPage: 1 }),
-      setProductsPagination: (page, total) => set({ productsPage: page, productsTotal: total }),
+      setSelectedZoneFilter: (zoneId) => set({ selectedZoneFilter: zoneId }),
+      setProductCategoryFilter: (category) => set({ productCategoryFilter: category }),
 
       // Modal State
       modal: { open: false, action: 'CREATE', entity: 'TABLE', data: null } as ModalState,
@@ -403,15 +391,9 @@ export const useSettingsFilters = () =>
   useSettingsStore(
     useShallow((state) => ({
       selectedZoneFilter: state.selectedZoneFilter,
-      tablesPage: state.tablesPage,
-      tablesTotal: state.tablesTotal,
       productCategoryFilter: state.productCategoryFilter,
-      productsPage: state.productsPage,
-      productsTotal: state.productsTotal,
       setSelectedZoneFilter: state.setSelectedZoneFilter,
-      setTablesPagination: state.setTablesPagination,
       setProductCategoryFilter: state.setProductCategoryFilter,
-      setProductsPagination: state.setProductsPagination,
     }))
   );
 

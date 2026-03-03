@@ -41,16 +41,17 @@ export const StoreOverviewScreen: React.FC = () => {
   const cutoffLoaded = useRef(false);
 
   const fetchData = useCallback(async (range: TimeRange) => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     setLoading(true);
     setError('');
     try {
       const prevRange = getPreviousRange(range);
       const lwRange = getLastWeekSameDayRange(range);
       const [current, prev, lastWeek] = await Promise.all([
-        getStoreOverview(token, storeId, range.from, range.to),
-        getStoreOverview(token, storeId, prevRange.from, prevRange.to),
-        getStoreOverview(token, storeId, lwRange.from, lwRange.to),
+        getStoreOverview(tk, storeId, range.from, range.to),
+        getStoreOverview(tk, storeId, prevRange.from, prevRange.to),
+        getStoreOverview(tk, storeId, lwRange.from, lwRange.to),
       ]);
       setOverview(current);
       setPreviousOverview(prev);
@@ -62,20 +63,23 @@ export const StoreOverviewScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, storeId, clearAuth, navigate, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   // Fetch store info to get business_day_cutoff, then recalculate time range
   useEffect(() => {
-    if (!token || cutoffLoaded.current) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk || cutoffLoaded.current) return;
     cutoffLoaded.current = true;
-    getStoreInfo(token, storeId).then(info => {
+    getStoreInfo(tk, storeId).then(info => {
       const minutes = Math.min(Math.max(info.business_day_cutoff ?? 0, 0), 480);
       if (minutes > 0) {
         setCutoffMinutes(minutes);
         setTimeRange(getPresetRange('today', t, undefined, undefined, minutes));
       }
     }).catch(() => { /* ignore — use midnight fallback */ });
-  }, [token, storeId, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   useEffect(() => { fetchData(timeRange); }, [fetchData, timeRange]);
 

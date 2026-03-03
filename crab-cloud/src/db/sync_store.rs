@@ -167,6 +167,14 @@ pub async fn upsert_resource(
         return Ok(SyncEffect::None);
     }
 
+    // LWW: use Edge's updated_at if present in data, otherwise fall back to now.
+    // This ensures Cloud doesn't blindly overwrite Console edits with stale Edge data.
+    let effective_ts = item
+        .data
+        .get("updated_at")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(now);
+
     match item.resource {
         SyncResource::Product => {
             let source_id = item.resource_id;
@@ -176,7 +184,7 @@ pub async fn upsert_resource(
                 source_id,
                 &item.data,
                 version_to_i64(item.version),
-                now,
+                effective_ts,
             )
             .await?;
         }
@@ -188,7 +196,7 @@ pub async fn upsert_resource(
                 source_id,
                 &item.data,
                 version_to_i64(item.version),
-                now,
+                effective_ts,
             )
             .await?;
         }
@@ -204,7 +212,8 @@ pub async fn upsert_resource(
         }
         SyncResource::StoreInfo => {
             let info =
-                super::store::upsert_store_info_from_sync(pool, store_id, &item.data, now).await?;
+                super::store::upsert_store_info_from_sync(pool, store_id, &item.data, effective_ts)
+                    .await?;
             return Ok(SyncEffect::StoreInfoUpdated(Box::new(info)));
         }
         SyncResource::Shift => {
@@ -216,41 +225,84 @@ pub async fn upsert_resource(
         }
         SyncResource::Employee => {
             let source_id = item.resource_id;
-            super::store::upsert_employee_from_sync(pool, store_id, source_id, &item.data, now)
-                .await?;
+            super::store::upsert_employee_from_sync(
+                pool,
+                store_id,
+                source_id,
+                &item.data,
+                effective_ts,
+            )
+            .await?;
         }
         SyncResource::Tag => {
             let source_id = item.resource_id;
-            super::store::upsert_tag_from_sync(pool, store_id, source_id, &item.data, now).await?;
+            super::store::upsert_tag_from_sync(pool, store_id, source_id, &item.data, effective_ts)
+                .await?;
         }
         SyncResource::Attribute => {
             let source_id = item.resource_id;
-            super::store::upsert_attribute_from_sync(pool, store_id, source_id, &item.data, now)
-                .await?;
+            super::store::upsert_attribute_from_sync(
+                pool,
+                store_id,
+                source_id,
+                &item.data,
+                effective_ts,
+            )
+            .await?;
         }
         SyncResource::AttributeBinding => {
             let source_id = item.resource_id;
-            super::store::upsert_binding_from_sync(pool, store_id, source_id, &item.data, now)
-                .await?;
+            super::store::upsert_binding_from_sync(
+                pool,
+                store_id,
+                source_id,
+                &item.data,
+                effective_ts,
+            )
+            .await?;
         }
         SyncResource::PriceRule => {
             let source_id = item.resource_id;
-            super::store::upsert_price_rule_from_sync(pool, store_id, source_id, &item.data, now)
-                .await?;
+            super::store::upsert_price_rule_from_sync(
+                pool,
+                store_id,
+                source_id,
+                &item.data,
+                effective_ts,
+            )
+            .await?;
         }
         SyncResource::Zone => {
             let source_id = item.resource_id;
-            super::store::upsert_zone_from_sync(pool, store_id, source_id, &item.data, now).await?;
+            super::store::upsert_zone_from_sync(
+                pool,
+                store_id,
+                source_id,
+                &item.data,
+                effective_ts,
+            )
+            .await?;
         }
         SyncResource::DiningTable => {
             let source_id = item.resource_id;
-            super::store::upsert_dining_table_from_sync(pool, store_id, source_id, &item.data, now)
-                .await?;
+            super::store::upsert_dining_table_from_sync(
+                pool,
+                store_id,
+                source_id,
+                &item.data,
+                effective_ts,
+            )
+            .await?;
         }
         SyncResource::LabelTemplate => {
             let source_id = item.resource_id;
             super::store::upsert_label_template_from_sync(
-                pool, store_id, tenant_id, source_id, &item.data, now,
+                pool,
+                store_id,
+                tenant_id,
+                source_id,
+                &item.data,
+                effective_ts,
             )
             .await?;
         }
@@ -262,6 +314,18 @@ pub async fn upsert_resource(
         }
         SyncResource::Anulacion => {
             upsert_anulacion(pool, store_id, tenant_id, item, now).await?;
+        }
+        SyncResource::ChainEntry => {
+            upsert_chain_entry(pool, store_id, tenant_id, item, now).await?;
+        }
+        SyncResource::ChainBreak => {
+            // BREAK markers are logged but not stored in a separate table.
+            // The chain_entry with entry_type='BREAK' is already stored via ChainEntry sync.
+            tracing::warn!(
+                store_id,
+                resource_id = item.resource_id,
+                "Received chain break marker — hash chain has a gap"
+            );
         }
         other => return Err(format!("Unhandled resource type: {other}").into()),
     }
@@ -440,7 +504,7 @@ async fn upsert_archived_order(
             operator_name, loss_reason, void_note, member_name, service_type,
             operator_id, member_id, queue_number, shift_id, created_at,
             version, synced_at,
-            is_anulada, is_upgraded, customer_nif, customer_nombre,
+            is_voided, is_upgraded, customer_nif, customer_nombre,
             customer_address, customer_email, customer_phone
         )
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48)
@@ -481,7 +545,7 @@ async fn upsert_archived_order(
                       shift_id = EXCLUDED.shift_id,
                       version = EXCLUDED.version,
                       synced_at = EXCLUDED.synced_at,
-                      is_anulada = EXCLUDED.is_anulada,
+                      is_voided = EXCLUDED.is_voided,
                       is_upgraded = EXCLUDED.is_upgraded,
                       customer_nif = EXCLUDED.customer_nif,
                       customer_nombre = EXCLUDED.customer_nombre,
@@ -533,7 +597,7 @@ async fn upsert_archived_order(
     .bind(detail_sync.created_at)            // $39
     .bind(version_to_i64(item.version))      // $40
     .bind(now)                               // $41
-    .bind(d.is_anulada)                      // $42
+    .bind(d.is_voided)                      // $42
     .bind(d.is_upgraded)                     // $43
     .bind(&d.customer_nif)                   // $44
     .bind(&d.customer_nombre)                // $45
@@ -572,6 +636,7 @@ async fn upsert_archived_order(
     // ── Items + Options ──
     if !d.items.is_empty() {
         let oids: Vec<i64> = d.items.iter().map(|_| order_pk).collect();
+        let instance_ids: Vec<&str> = d.items.iter().map(|i| i.instance_id.as_str()).collect();
         let names: Vec<&str> = d.items.iter().map(|i| i.name.as_str()).collect();
         let spec_names: Vec<Option<&str>> =
             d.items.iter().map(|i| i.spec_name.as_deref()).collect();
@@ -592,19 +657,20 @@ async fn upsert_archived_order(
         let item_rows: Vec<(i64,)> = sqlx::query_as(
             r#"
             INSERT INTO store_order_items (
-                order_id, name, spec_name, category_name, product_source_id,
+                order_id, instance_id, name, spec_name, category_name, product_source_id,
                 price, quantity, unit_price, line_total,
                 discount_amount, surcharge_amount, tax, tax_rate, is_comped, note
             )
             SELECT * FROM UNNEST(
-                $1::bigint[], $2::text[], $3::text[], $4::text[], $5::bigint[],
-                $6::float8[], $7::int[], $8::float8[], $9::float8[],
-                $10::float8[], $11::float8[], $12::float8[], $13::int[], $14::bool[], $15::text[]
+                $1::bigint[], $2::text[], $3::text[], $4::text[], $5::text[], $6::bigint[],
+                $7::float8[], $8::int[], $9::float8[], $10::float8[],
+                $11::float8[], $12::float8[], $13::float8[], $14::int[], $15::bool[], $16::text[]
             )
             RETURNING id
             "#,
         )
         .bind(&oids)
+        .bind(&instance_ids)
         .bind(&names)
         .bind(&spec_names)
         .bind(&cat_names)
@@ -789,6 +855,50 @@ async fn delete_resource(
         .bind(resource_id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+/// Upsert chain entry metadata into store_chain_entries.
+async fn upsert_chain_entry(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: i64,
+    item: &CloudSyncItem,
+    now: i64,
+) -> Result<(), BoxError> {
+    use shared::cloud::ChainEntrySync;
+
+    let ce: ChainEntrySync = serde_json::from_value(item.data.clone())?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO store_chain_entries (
+            store_id, tenant_id, source_id, entry_type, entry_pk,
+            prev_hash, curr_hash, created_at, synced_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (tenant_id, store_id, source_id)
+        DO UPDATE SET
+            entry_type = EXCLUDED.entry_type,
+            entry_pk   = EXCLUDED.entry_pk,
+            prev_hash  = EXCLUDED.prev_hash,
+            curr_hash  = EXCLUDED.curr_hash,
+            created_at = EXCLUDED.created_at,
+            synced_at  = EXCLUDED.synced_at
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(ce.id) // source_id = chain_entry.id from edge
+    .bind(&ce.entry_type)
+    .bind(ce.entry_pk)
+    .bind(&ce.prev_hash)
+    .bind(&ce.curr_hash)
+    .bind(ce.created_at)
+    .bind(now)
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 

@@ -19,6 +19,18 @@ export function friendlyError(raw: string): string {
     return t('error.friendly.network');
   }
 
+  // Database errors
+  if (
+    lower.includes('database') ||
+    lower.includes('constraint') ||
+    lower.includes('foreign key') ||
+    lower.includes('unique') ||
+    lower.includes('sqlx') ||
+    lower.includes('sqlite')
+  ) {
+    return t('error.friendly.database');
+  }
+
   // Authentication errors
   if (lower.includes('auth') || lower.includes('credential') || lower.includes('password')) {
     return t('error.friendly.auth');

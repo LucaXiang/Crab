@@ -69,7 +69,7 @@ impl UpgradeService {
 
         // 1. Validate order
         let order = sqlx::query_as::<_, OrderUpgradeRef>(
-            "SELECT id, status, is_anulada, is_upgraded, receipt_number, total_amount, tax \
+            "SELECT id, status, is_voided, is_upgraded, receipt_number, total_amount, tax \
              FROM archived_order WHERE id = ?",
         )
         .bind(request.order_pk)
@@ -87,7 +87,7 @@ impl UpgradeService {
             )));
         }
 
-        if order.is_anulada != 0 {
+        if order.is_voided != 0 {
             return Err(ArchiveError::Validation(
                 "Order is voided — cannot upgrade".into(),
             ));
@@ -190,7 +190,7 @@ impl UpgradeService {
     /// Check if an order is eligible for upgrade.
     pub async fn check_upgrade_eligibility(&self, order_pk: i64) -> ArchiveResult<()> {
         let order = sqlx::query_as::<_, OrderUpgradeRef>(
-            "SELECT id, status, is_anulada, is_upgraded, receipt_number, total_amount, tax \
+            "SELECT id, status, is_voided, is_upgraded, receipt_number, total_amount, tax \
              FROM archived_order WHERE id = ?",
         )
         .bind(order_pk)
@@ -206,7 +206,7 @@ impl UpgradeService {
             )));
         }
 
-        if order.is_anulada != 0 {
+        if order.is_voided != 0 {
             return Err(ArchiveError::Validation(
                 "Order is voided — cannot upgrade".into(),
             ));
@@ -231,7 +231,7 @@ struct OrderUpgradeRef {
     #[allow(dead_code)]
     id: i64,
     status: String,
-    is_anulada: i64,
+    is_voided: i64,
     is_upgraded: i64,
     receipt_number: Option<String>,
     total_amount: f64,

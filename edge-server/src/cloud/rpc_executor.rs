@@ -37,7 +37,7 @@ pub async fn execute_rpc(state: &ServerState, rpc: &CloudRpc) -> CloudRpcResult 
         CloudRpc::GetOrderDetail { order_id } => {
             // Resolve order_id → pk
             let order_pk = match sqlx::query_scalar::<_, i64>(
-                "SELECT id FROM archived_order WHERE order_id = ? LIMIT 1",
+                "SELECT id FROM archived_order WHERE id = ? LIMIT 1",
             )
             .bind(order_id)
             .fetch_optional(&state.pool)

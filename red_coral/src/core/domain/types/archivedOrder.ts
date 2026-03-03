@@ -138,7 +138,7 @@ export interface ArchivedOrderDetail {
   void_type: ArchivedVoidType | null;
   loss_reason: ArchivedLossReason | null;
   loss_amount: number | null;
-  is_anulada: boolean;
+  is_voided: boolean;
   is_upgraded: boolean;
   items: ArchivedOrderItem[];
   payments: ArchivedPayment[];

@@ -66,12 +66,22 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showAnulacionModal, setShowAnulacionModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const categories = useCategoryStore((s) => s.items);
   const categoriesLoaded = useCategoryStore((s) => s.isLoaded);
 
   useEffect(() => {
     if (!categoriesLoaded) useCategoryStore.getState().fetchAll();
   }, [categoriesLoaded]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    if (!printMenuOpen && !actionMenuOpen) return;
+    const handler = () => { setPrintMenuOpen(false); setActionMenuOpen(false); };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [printMenuOpen, actionMenuOpen]);
 
   // Convert archived events to OrderEvent format for TimelineList
   const timelineEvents = useMemo(() => {
@@ -180,7 +190,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                 {t('history.status.merged')}
               </span>
             )}
-            {order.is_anulada && (
+            {order.is_voided && (
               <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase">
                 {t('anulacion.status.anulada')}
               </span>
@@ -190,67 +200,95 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                 {t('upgrade.status.upgraded')}
               </span>
             )}
-            <EscalatableGate permission={Permission.SETTINGS_MANAGE}>
+            {/* Print dropdown */}
+            <div className="relative">
               <button
-                onClick={onReprint}
-                className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                onClick={(e) => { e.stopPropagation(); setPrintMenuOpen(!printMenuOpen); setActionMenuOpen(false); }}
+                className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Printer size={16} />
-                <span>{t('history.action.reprint')}</span>
+                <span>{t('history.action.print_group')}</span>
+                <ChevronDown size={14} />
               </button>
-            </EscalatableGate>
-            <button
-              onClick={() => setShowKitchenReprint(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-white border border-amber-300 rounded-lg shadow-sm text-sm font-medium text-amber-700 hover:bg-amber-50 hover:text-amber-900 transition-colors"
-            >
-              <Printer size={16} />
-              <span>{t('checkout.kitchen_reprint.tab_kitchen')}</span>
-            </button>
-            <button
-              onClick={() => setShowLabelReprint(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-white border border-amber-300 rounded-lg shadow-sm text-sm font-medium text-amber-700 hover:bg-amber-50 hover:text-amber-900 transition-colors"
-            >
-              <Tag size={16} />
-              <span>{t('checkout.label_reprint.tab_label')}</span>
-            </button>
-            {!isVoid && !isMerged && (
-              <>
-                <EscalatableGate permission={Permission.ORDERS_REFUND}>
+              {printMenuOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                  <EscalatableGate permission={Permission.SETTINGS_MANAGE}>
+                    <button
+                      onClick={() => { onReprint(); setPrintMenuOpen(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <Printer size={15} />
+                      <span>{t('history.action.reprint')}</span>
+                    </button>
+                  </EscalatableGate>
                   <button
-                    onClick={() => setShowRefundModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-300 rounded-lg shadow-sm text-sm font-medium text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors"
+                    onClick={() => { setShowKitchenReprint(true); setPrintMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50"
                   >
-                    <Undo2 size={16} />
-                    <span>{t('credit_note.action.create')}</span>
+                    <Printer size={15} />
+                    <span>{t('checkout.kitchen_reprint.tab_kitchen')}</span>
                   </button>
-                </EscalatableGate>
-                {!order.is_anulada && (
-                  <EscalatableGate permission={Permission.ORDERS_VOID}>
-                    <button
-                      onClick={() => setShowAnulacionModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 border border-gray-400 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                    >
-                      <Ban size={16} />
-                      <span>{t('anulacion.action.void')}</span>
-                    </button>
-                  </EscalatableGate>
-                )}
-                {!order.is_upgraded && (
-                  <EscalatableGate
-                    permission={Permission.SETTINGS_MANAGE}
-                    mode="intercept"
-                    description={t('upgrade.action.upgrade')}
-                    onAuthorized={() => setShowUpgradeModal(true)}
+                  <button
+                    onClick={() => { setShowLabelReprint(true); setPrintMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50"
                   >
-                    <button
-                      className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-300 rounded-lg shadow-sm text-sm font-medium text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                    >
-                      <FileUp size={16} />
-                      <span>{t('upgrade.action.upgrade')}</span>
-                    </button>
-                  </EscalatableGate>
+                    <Tag size={15} />
+                    <span>{t('checkout.label_reprint.tab_label')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Action dropdown */}
+            {!isVoid && !isMerged && (
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setActionMenuOpen(!actionMenuOpen); setPrintMenuOpen(false); }}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-white border border-red-300 rounded-lg shadow-sm text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <Undo2 size={16} />
+                  <span>{t('history.action.correction_group')}</span>
+                  <ChevronDown size={14} />
+                </button>
+                {actionMenuOpen && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                    <EscalatableGate permission={Permission.ORDERS_REFUND}>
+                      <button
+                        onClick={() => { setShowRefundModal(true); setActionMenuOpen(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <Undo2 size={15} />
+                        <span>{t('credit_note.action.create')}</span>
+                      </button>
+                    </EscalatableGate>
+                    {!order.is_voided && (
+                      <EscalatableGate permission={Permission.ORDERS_VOID}>
+                        <button
+                          onClick={() => { setShowAnulacionModal(true); setActionMenuOpen(false); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <Ban size={15} />
+                          <span>{t('anulacion.action.void')}</span>
+                        </button>
+                      </EscalatableGate>
+                    )}
+                    {!order.is_upgraded && (
+                      <EscalatableGate
+                        permission={Permission.SETTINGS_MANAGE}
+                        mode="intercept"
+                        description={t('upgrade.action.upgrade')}
+                        onAuthorized={() => { setShowUpgradeModal(true); setActionMenuOpen(false); }}
+                      >
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                        >
+                          <FileUp size={15} />
+                          <span>{t('upgrade.action.upgrade')}</span>
+                        </button>
+                      </EscalatableGate>
+                    )}
+                  </div>
                 )}
-              </>
+              </div>
             )}
           </div>
           <div className="flex gap-4 text-sm text-gray-500 flex-wrap">

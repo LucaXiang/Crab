@@ -97,12 +97,13 @@ export const DashboardScreen: React.FC = () => {
     }
   }, [token]);
 
-  // Initial load: profile + stores + overview
+  // Initial load: profile + stores + overview (mount-only)
   useEffect(() => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     (async () => {
       try {
-        const profileRes = await getProfile(token);
+        const profileRes = await getProfile(tk);
         setProfile(profileRes);
 
         if (profileRes.p12?.has_p12) {
@@ -113,7 +114,7 @@ export const DashboardScreen: React.FC = () => {
         }
 
         if (profileRes.subscription && profileRes.subscription.status !== 'canceled') {
-          const storeList = await getStores(token);
+          const storeList = await getStores(tk);
           setStores(storeList);
 
           // Use the latest cutoff across all stores for cross-store aggregation
@@ -135,9 +136,9 @@ export const DashboardScreen: React.FC = () => {
           const prevRange2 = getPreviousRange(effectiveRange);
           const lwRange2 = getLastWeekSameDayRange(effectiveRange);
           const [ov, prevOv, lwOv] = await Promise.all([
-            getTenantOverview(token, effectiveRange.from, effectiveRange.to),
-            getTenantOverview(token, prevRange2.from, prevRange2.to),
-            getTenantOverview(token, lwRange2.from, lwRange2.to),
+            getTenantOverview(tk, effectiveRange.from, effectiveRange.to),
+            getTenantOverview(tk, prevRange2.from, prevRange2.to),
+            getTenantOverview(tk, lwRange2.from, lwRange2.to),
           ]);
           setOverview(ov);
           setPreviousOverview(prevOv);
@@ -156,7 +157,7 @@ export const DashboardScreen: React.FC = () => {
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, clearAuth, navigate, t]);
+  }, []);
 
   // Update the relative time label every 10s
   useEffect(() => {

@@ -21,10 +21,11 @@ export const StoresScreen: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     (async () => {
       try {
-        setStores(await getStores(token));
+        setStores(await getStores(tk));
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           clearAuth();
@@ -36,7 +37,8 @@ export const StoresScreen: React.FC = () => {
         setLoading(false);
       }
     })();
-  }, [token, clearAuth, navigate, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (

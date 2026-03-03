@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::core::response::{ApiResponse, ErrorCode};
+use crate::core::response::ApiResponse;
 use crate::core::ClientBridge;
 
 /// 通用 GET 请求
@@ -16,10 +16,7 @@ pub async fn api_get(
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     match bridge.get(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NetworkError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -32,10 +29,7 @@ pub async fn api_post(
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     match bridge.post(&path, &body).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NetworkError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -48,10 +42,7 @@ pub async fn api_put(
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     match bridge.put(&path, &body).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NetworkError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -63,9 +54,6 @@ pub async fn api_delete(
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     match bridge.delete(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NetworkError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

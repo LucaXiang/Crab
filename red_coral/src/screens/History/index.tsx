@@ -26,7 +26,8 @@ type SelectedEntry =
   | { type: 'ORDER'; chainId: number; entryPk: number }
   | { type: 'CREDIT_NOTE'; chainId: number; entryPk: number }
   | { type: 'ANULACION'; chainId: number; entryPk: number }
-  | { type: 'UPGRADE'; chainId: number; entryPk: number };
+  | { type: 'UPGRADE'; chainId: number; entryPk: number }
+  | { type: 'BREAK'; chainId: number; entryPk: number };
 
 const PAGE_SIZE = 50;
 
@@ -157,6 +158,14 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack 
           <ChainAnulacionDetailView detail={anulacionDetail} onNavigateToOrder={navigateToOrder} />
         ) : selected?.type === 'CREDIT_NOTE' && cnDetail ? (
           <ChainCreditNoteDetailView detail={cnDetail} onNavigateToOrder={navigateToOrder} />
+        ) : selected?.type === 'BREAK' ? (
+          <div className="h-full flex flex-col items-center justify-center text-amber-500 gap-3">
+            <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            </div>
+            <span className="text-lg font-bold">{t('chain_entry.break')}</span>
+            <span className="text-sm text-gray-400">{t('chain_entry.break_description')}</span>
+          </div>
         ) : selected?.type === 'ORDER' && selectedOrder ? (
           <HistoryDetail
             order={selectedOrder}

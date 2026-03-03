@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Clock, ChevronRight, Receipt, Calendar, CreditCard, Coins,
   Gift, Ban, ChevronDown, ChevronUp, Cloud, Wifi, X, Users,
-  ArrowLeft, FileUp, FileText, User, Mail, Phone, MapPin,
+  ArrowLeft, FileUp, FileText, User, Mail, Phone, MapPin, AlertTriangle,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { tEnum } from '@/infrastructure/i18n';
@@ -30,6 +30,7 @@ function formatChainNumber(displayNumber: string, entryType: ChainEntryType): st
     case 'CREDIT_NOTE': return `DEV ${displayNumber}`;
     case 'ANULACION': return `ANU ${displayNumber}`;
     case 'UPGRADE': return `UPG ${displayNumber}`;
+    case 'BREAK': return `BRK ${displayNumber}`;
     default: return `ORD ${displayNumber}`;
   }
 }
@@ -68,7 +69,6 @@ export const OrdersScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const storeId = useStoreId();
-  const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
   const [entries, setEntries] = useState<ChainEntryItem[]>([]);
@@ -89,15 +89,17 @@ export const OrdersScreen: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const loadPage = useCallback(async (page: number, reset: boolean) => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     try {
-      const batch = await getChainEntries(token, storeId, page, 20);
+      const batch = await getChainEntries(tk, storeId, page, 20);
       if (reset) setEntries(batch); else setEntries(prev => [...prev, ...batch]);
       setHasMore(batch.length === 20);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
     }
-  }, [token, storeId, clearAuth, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   useEffect(() => {
     (async () => {
@@ -155,7 +157,8 @@ export const OrdersScreen: React.FC = () => {
 
   // Load detail when selection changes
   useEffect(() => {
-    if (!token || !selected) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk || !selected) return;
     let cancelled = false;
     (async () => {
       setDetailLoading(true);
@@ -168,24 +171,24 @@ export const OrdersScreen: React.FC = () => {
         switch (selected.type) {
           case 'ORDER': {
             const [res, notes] = await Promise.all([
-              getOrderDetail(token, storeId, selected.id),
-              getCreditNotes(token, storeId, selected.id).catch(() => [] as CreditNoteSummary[]),
+              getOrderDetail(tk, storeId, selected.id),
+              getCreditNotes(tk, storeId, selected.id).catch(() => [] as CreditNoteSummary[]),
             ]);
             if (!cancelled) { setOrderDetail(res); setCreditNotes(notes); }
             break;
           }
           case 'CREDIT_NOTE': {
-            const res = await getCreditNoteDetail(token, storeId, selected.id);
+            const res = await getCreditNoteDetail(tk, storeId, selected.id);
             if (!cancelled) setCnDetail(res);
             break;
           }
           case 'ANULACION': {
-            const res = await getAnulacionDetail(token, storeId, selected.id);
+            const res = await getAnulacionDetail(tk, storeId, selected.id);
             if (!cancelled) setAnulacionDetail(res);
             break;
           }
           case 'UPGRADE': {
-            const res = await getUpgradeDetail(token, storeId, selected.id);
+            const res = await getUpgradeDetail(tk, storeId, selected.id);
             if (!cancelled) setUpgradeDetail(res);
             break;
           }
@@ -197,7 +200,8 @@ export const OrdersScreen: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [token, storeId, selected]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, selected]);
 
   const handleLoadMore = async () => {
     const next = currentPage + 1;
@@ -513,6 +517,7 @@ function entryIcon(type: ChainEntryType) {
     case 'CREDIT_NOTE': return <Undo2 className="w-3.5 h-3.5 text-orange-500" />;
     case 'ANULACION': return <Ban className="w-3.5 h-3.5 text-white" />;
     case 'UPGRADE': return <FileUp className="w-3.5 h-3.5 text-blue-600" />;
+    case 'BREAK': return <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />;
     default: return <Receipt className="w-3.5 h-3.5 text-slate-500" />;
   }
 }
@@ -522,6 +527,7 @@ function entryIconBg(type: ChainEntryType) {
     case 'CREDIT_NOTE': return 'bg-orange-100';
     case 'ANULACION': return 'bg-slate-800';
     case 'UPGRADE': return 'bg-blue-100';
+    case 'BREAK': return 'bg-amber-100';
     default: return 'bg-slate-100';
   }
 }
@@ -536,17 +542,20 @@ const ChainEntryRow: React.FC<{
   const isCreditNote = entry.entry_type === 'CREDIT_NOTE';
   const isAnulacion = entry.entry_type === 'ANULACION';
   const isUpgrade = entry.entry_type === 'UPGRADE';
+  const isBreak = entry.entry_type === 'BREAK';
   const isVoid = entry.status === 'VOID';
   const isMerged = entry.status === 'MERGED';
 
-  const statusBadge = isAnulacion ? 'bg-slate-800 text-white'
+  const statusBadge = isBreak ? 'bg-amber-100 text-amber-700'
+    : isAnulacion ? 'bg-slate-800 text-white'
     : isUpgrade ? 'bg-blue-100 text-blue-700'
     : isCreditNote ? 'bg-orange-100 text-orange-700'
     : isVoid ? 'bg-red-100 text-red-600'
     : isMerged ? 'bg-blue-100 text-blue-700'
     : 'bg-green-100 text-green-700';
 
-  const statusLabel = isAnulacion ? t('orders.anulacion')
+  const statusLabel = isBreak ? t('orders.chain_break')
+    : isAnulacion ? t('orders.anulacion')
     : isUpgrade ? t('orders.upgrade')
     : isCreditNote ? t('orders.credit_note')
     : isVoid ? t('orders.void')
@@ -557,8 +566,8 @@ const ChainEntryRow: React.FC<{
 
   return (
     <button
-      onClick={onClick}
-      className={`w-full p-4 text-left transition-colors flex justify-between items-start group cursor-pointer ${isSelected ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
+      onClick={() => !isBreak && onClick()}
+      className={`w-full p-4 text-left transition-colors flex justify-between items-start group ${isBreak ? 'cursor-default opacity-60' : 'cursor-pointer'} ${isSelected ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
     >
       <div className="flex items-start gap-3 flex-1 min-w-0">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${entryIconBg(entry.entry_type)}`}>
@@ -566,7 +575,7 @@ const ChainEntryRow: React.FC<{
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`font-bold ${isSelected ? 'text-primary-600' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-slate-800' : isUpgrade ? 'text-blue-700' : 'text-slate-800'}`}>
+            <span className={`font-bold ${isSelected ? 'text-primary-600' : isBreak ? 'text-amber-700' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-slate-800' : isUpgrade ? 'text-blue-700' : 'text-slate-800'}`}>
               {formatChainNumber(entry.display_number, entry.entry_type)}
             </span>
           </div>
@@ -586,10 +595,10 @@ const ChainEntryRow: React.FC<{
         </div>
       </div>
       <div className="text-right shrink-0 pl-2">
-        <div className={`font-bold ${isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-          {entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
+        <div className={`font-bold ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+          {isBreak ? '\u2014' : entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </div>
-        <ChevronRight className={`w-4 h-4 ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />
+        {!isBreak && <ChevronRight className={`w-4 h-4 ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />}
       </div>
     </button>
   );
@@ -607,22 +616,26 @@ const MobileChainEntryCard: React.FC<{
   const isCreditNote = entry.entry_type === 'CREDIT_NOTE';
   const isAnulacion = entry.entry_type === 'ANULACION';
   const isUpgrade = entry.entry_type === 'UPGRADE';
+  const isBreak = entry.entry_type === 'BREAK';
   const isVoid = entry.status === 'VOID';
   const isMerged = entry.status === 'MERGED';
 
-  const borderStyle = isAnulacion ? 'bg-slate-50 border-slate-300'
+  const borderStyle = isBreak ? 'bg-amber-50/50 border-amber-200'
+    : isAnulacion ? 'bg-slate-50 border-slate-300'
     : isUpgrade ? 'bg-blue-50/50 border-blue-200'
     : isCreditNote ? 'bg-orange-50/50 border-orange-200'
     : 'bg-white border-slate-200';
 
-  const statusLabel = isAnulacion ? t('orders.anulacion')
+  const statusLabel = isBreak ? t('orders.chain_break')
+    : isAnulacion ? t('orders.anulacion')
     : isUpgrade ? t('orders.upgrade')
     : isCreditNote ? t('orders.credit_note')
     : isVoid ? t('orders.void')
     : isMerged ? t('orders.merged')
     : t('orders.completed');
 
-  const statusBadge = isAnulacion ? 'bg-slate-800 text-white'
+  const statusBadge = isBreak ? 'bg-amber-100 text-amber-700'
+    : isAnulacion ? 'bg-slate-800 text-white'
     : isUpgrade ? 'bg-blue-100 text-blue-700'
     : isCreditNote ? 'bg-orange-100 text-orange-700'
     : isVoid ? 'bg-red-100 text-red-600'
@@ -652,8 +665,8 @@ const MobileChainEntryCard: React.FC<{
             <span className="text-slate-400 font-mono">← {entry.original_receipt}</span>
           )}
         </div>
-        <span className={`text-lg font-bold ${isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
-          {entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
+        <span className={`text-lg font-bold ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+          {isBreak ? '\u2014' : entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </span>
       </div>
     </button>

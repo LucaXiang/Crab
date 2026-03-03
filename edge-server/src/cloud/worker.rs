@@ -19,7 +19,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cloud::service::CloudService;
 use crate::core::state::ServerState;
-use crate::db::repository::{anulacion, credit_note, invoice, order};
+use crate::db::repository::{chain_entry, credit_note, invoice, order};
 
 /// Debounce window for batching changes
 const DEBOUNCE_MS: u64 = 500;
@@ -138,10 +138,67 @@ impl CloudWorker {
             }
         };
 
+        // 1b. If local catalog is empty, request full catalog from Cloud (re-bind scenario)
+        if self.state.catalog_service.list_products().is_empty() {
+            tracing::info!("Local catalog is empty, requesting CatalogSyncData from cloud");
+            let req = CloudMessage::RequestCatalogSync;
+            if let Ok(json) = serde_json::to_string(&req) {
+                if ws_sink.send(Message::Text(json.into())).await.is_err() {
+                    tracing::error!("Failed to send RequestCatalogSync");
+                    return;
+                }
+                // Wait for CatalogSyncData response (up to 30s)
+                let deadline = Instant::now() + Duration::from_secs(30);
+                loop {
+                    let remaining = deadline.saturating_duration_since(Instant::now());
+                    if remaining.is_zero() {
+                        tracing::warn!("Timeout waiting for CatalogSyncData");
+                        break;
+                    }
+                    tokio::select! {
+                        _ = tokio::time::sleep(remaining) => {
+                            tracing::warn!("Timeout waiting for CatalogSyncData");
+                            break;
+                        }
+                        msg = ws_stream.next() => {
+                            match msg {
+                                Some(Ok(Message::Text(text))) => {
+                                    if let Ok(CloudMessage::CatalogSyncData { catalog }) = serde_json::from_str(&text) {
+                                        match crate::cloud::ops::provisioning::apply_catalog_sync_data(&self.state, &catalog).await {
+                                            Ok(()) => tracing::info!("CatalogSyncData applied (re-bind)"),
+                                            Err(e) => tracing::error!("Failed to apply CatalogSyncData: {e}"),
+                                        }
+                                        break;
+                                    } else {
+                                        // Handle other messages (e.g. RPCs for EnsureImage) inline
+                                        self.handle_ws_message(&text, &mut ws_sink).await;
+                                    }
+                                }
+                                Some(Ok(Message::Ping(data))) => {
+                                    let _ = ws_sink.send(Message::Pong(data)).await;
+                                }
+                                Some(Ok(Message::Close(_))) | None => {
+                                    tracing::warn!("WS closed while waiting for CatalogSyncData");
+                                    return;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 2. Incremental sync based on cursors
         if let Err(e) = self.send_initial_sync(&cursors, &mut ws_sink).await {
             tracing::error!("Initial sync failed: {e}");
             return;
+        }
+
+        // 2b. Upload pending catalog changelog entries (Edge→Cloud)
+        if let Err(e) = self.send_catalog_changelog(&mut ws_sink).await {
+            tracing::error!("Catalog changelog sync failed: {e}");
+            // Non-fatal: will retry on next reconnect
         }
 
         // 3. Catch-up sync via HTTP (archived orders + credit notes + invoices)
@@ -311,6 +368,23 @@ impl CloudWorker {
                     }
                 }
             }
+            CloudMessage::CatalogSyncData { catalog } => {
+                tracing::info!("Received CatalogSyncData from cloud");
+                match crate::cloud::ops::provisioning::apply_catalog_sync_data(
+                    &self.state,
+                    &catalog,
+                )
+                .await
+                {
+                    Ok(()) => {
+                        tracing::info!("CatalogSyncData applied successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to apply CatalogSyncData: {e}");
+                    }
+                }
+            }
+
             CloudMessage::SyncAck {
                 accepted,
                 rejected,
@@ -367,7 +441,7 @@ impl CloudWorker {
             }
             shared::cloud::CloudRpc::GetOrderDetail { order_id } => {
                 match sqlx::query_scalar::<_, i64>(
-                    "SELECT id FROM archived_order WHERE order_id = ? LIMIT 1",
+                    "SELECT id FROM archived_order WHERE id = ? LIMIT 1",
                 )
                 .bind(order_id)
                 .fetch_optional(&self.state.pool)
@@ -493,250 +567,226 @@ impl CloudWorker {
         Ok(())
     }
 
-    /// Catch-up sync for unsynced archived orders via HTTP POST (strong consistency).
-    ///
-    /// Sync all archive resources (orders, credit notes, invoices) via HTTP.
-    /// Each resource syncs independently — one failure does not block others.
-    async fn sync_archives_http(&mut self, trigger: &str) {
-        if let Err(e) = self.sync_archived_orders_http().await {
-            tracing::warn!("{trigger}: archived order sync failed: {e}");
+    /// Upload pending catalog_changelog entries to Cloud via WS SyncBatch.
+    /// On success, marks entries as cloud_synced = 1.
+    async fn send_catalog_changelog<S>(
+        &mut self,
+        ws_sink: &mut S,
+    ) -> Result<(), crate::utils::AppError>
+    where
+        S: futures::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
+    {
+        let rows: Vec<(i64, String, i64, String, Option<String>, i64)> = sqlx::query_as(
+            "SELECT id, resource, resource_id, action, data, updated_at FROM catalog_changelog WHERE cloud_synced = 0 ORDER BY id",
+        )
+        .fetch_all(&self.state.pool)
+        .await
+        .map_err(|e| crate::utils::AppError::internal(format!("Read catalog_changelog: {e}")))?;
+
+        if rows.is_empty() {
+            return Ok(());
         }
-        if let Err(e) = self.sync_credit_notes_http().await {
-            tracing::warn!("{trigger}: credit note sync failed: {e}");
-        }
-        if let Err(e) = self.sync_invoices_http().await {
-            tracing::warn!("{trigger}: invoice sync failed: {e}");
-        }
-        if let Err(e) = self.sync_anulaciones_http().await {
-            tracing::warn!("{trigger}: anulacion sync failed: {e}");
-        }
-    }
 
-    /// **严格有序**: 按 id 顺序处理，遇到构建失败计数，连续失败 3 次则跳过该订单。
-    /// **强一致**: HTTP request-response — cloud 确认 accepted 后才标记 cloud_synced = 1。
-    /// Hash 链要求上游订单必须先到达 cloud，否则链验证会断裂。
-    ///
-    /// 定时调用（5 分钟间隔 + 连接时立即执行），不走 WS。
-    async fn sync_archived_orders_http(&mut self) -> Result<(), crate::utils::AppError> {
-        let binding = self.get_binding().await?;
+        let mut items: Vec<CloudSyncItem> = Vec::with_capacity(rows.len());
+        let mut changelog_ids: Vec<i64> = Vec::with_capacity(rows.len());
 
-        loop {
-            let ids =
-                order::list_unsynced_archived_ids(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
-                    .await
-                    .map_err(|e| {
-                        crate::utils::AppError::internal(format!(
-                            "List unsynced archived orders: {e}"
-                        ))
-                    })?;
-
-            if ids.is_empty() {
-                break;
-            }
-
-            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
-            let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
-            let mut skipped_ids: Vec<i64> = Vec::new();
-
-            for &id in &ids {
-                match order::build_order_detail_sync(&self.state.pool, id).await {
-                    Ok(detail_sync) => {
-                        let data = match serde_json::to_value(&detail_sync) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                tracing::error!(
-                                    order_id = id,
-                                    "Failed to serialize OrderDetailSync, skipping: {e}"
-                                );
-                                skipped_ids.push(id);
-                                continue;
-                            }
-                        };
-                        items.push(CloudSyncItem {
-                            resource: SyncResource::ArchivedOrder,
-                            version: id as u64,
-                            action: shared::cloud::SyncAction::Upsert,
-                            resource_id: id,
-                            data,
-                        });
-                        synced_ids.push(id);
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            order_id = id,
-                            "Failed to build OrderDetailSync, skipping: {e}"
-                        );
-                        skipped_ids.push(id);
-                    }
+        for (id, resource, resource_id, action, data, updated_at) in &rows {
+            let sync_resource = match serde_json::from_value::<SyncResource>(
+                serde_json::Value::String(resource.clone()),
+            ) {
+                Ok(r) => r,
+                Err(_) => {
+                    tracing::warn!(resource, "Unknown catalog_changelog resource, skipping");
+                    changelog_ids.push(*id);
+                    continue;
                 }
-            }
+            };
+            let sync_action = match action.as_str() {
+                "upsert" => shared::cloud::SyncAction::Upsert,
+                "delete" => shared::cloud::SyncAction::Delete,
+                _ => {
+                    changelog_ids.push(*id);
+                    continue;
+                }
+            };
+            let mut data_value: serde_json::Value = data
+                .as_ref()
+                .and_then(|d| serde_json::from_str(d).ok())
+                .unwrap_or(serde_json::Value::Null);
 
-            // Mark permanently failed orders as synced to unblock the queue
-            if !skipped_ids.is_empty() {
-                tracing::warn!(
-                    count = skipped_ids.len(),
-                    ids = ?skipped_ids,
-                    "Skipped unbuildable orders, marking as synced to prevent queue blockage"
+            // Inject updated_at into data so Cloud can use it for LWW comparison
+            if let serde_json::Value::Object(ref mut map) = data_value {
+                map.insert(
+                    "updated_at".to_string(),
+                    serde_json::Value::Number((*updated_at).into()),
                 );
-                if let Err(e) = order::mark_cloud_synced(&self.state.pool, &skipped_ids).await {
-                    tracing::error!("Failed to mark skipped orders as synced: {e}");
-                }
             }
 
-            if items.is_empty() {
-                if skipped_ids.is_empty() {
-                    break; // No more orders
-                }
-                continue; // All were skipped, try next batch
-            }
+            items.push(CloudSyncItem {
+                resource: sync_resource,
+                version: 0, // catalog changelog doesn't track versions
+                action: sync_action,
+                resource_id: *resource_id,
+                data: data_value,
+            });
+            changelog_ids.push(*id);
+        }
 
-            let batch_count = items.len();
-            let batch = CloudSyncBatch {
-                edge_id: self.cloud_service.edge_id().to_string(),
+        if !items.is_empty() {
+            let total = items.len();
+            let msg = CloudMessage::SyncBatch {
                 items,
                 sent_at: shared::util::now_millis(),
             };
-
-            // HTTP POST — synchronous request-response, cloud confirms storage
-            let response = self
-                .cloud_service
-                .push_batch(batch, &binding)
+            let json = serde_json::to_string(&msg).map_err(|e| {
+                crate::utils::AppError::internal(format!("Serialize catalog changelog: {e}"))
+            })?;
+            ws_sink
+                .send(Message::Text(json.into()))
                 .await
                 .map_err(|e| {
-                    crate::utils::AppError::internal(format!("HTTP sync archived orders: {e}"))
+                    crate::utils::AppError::internal(format!("WS send catalog changelog: {e}"))
                 })?;
+            tracing::info!("Catalog changelog sent: {total} items via WS");
+        }
 
-            if response.rejected > 0 {
-                // Separate duplicate-key rejections (already synced) from real errors
-                let mut dup_db_ids: Vec<i64> = Vec::new();
-                let mut real_errors = Vec::new();
-                for err in &response.errors {
-                    if err.message.contains("duplicate key") {
-                        // Use batch index to find the corresponding i64 database ID
-                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
-                            dup_db_ids.push(db_id);
-                        }
-                        tracing::info!(
-                            resource_id = %err.resource_id,
-                            index = err.index,
-                            "Already exists in cloud, marking as synced"
-                        );
-                    } else {
-                        real_errors.push(err);
-                        tracing::warn!(
-                            resource_id = %err.resource_id,
-                            "Rejected: {}", err.message
-                        );
-                    }
-                }
-
-                // Mark duplicate-key items as synced (they're already in cloud)
-                if !dup_db_ids.is_empty()
-                    && let Err(e) = order::mark_cloud_synced(&self.state.pool, &dup_db_ids).await
-                {
-                    tracing::error!("Failed to mark duplicate orders as synced: {e}");
-                }
-
-                if !real_errors.is_empty() {
-                    tracing::warn!(
-                        accepted = response.accepted,
-                        rejected = real_errors.len(),
-                        "Archived order sync has non-duplicate rejections, stopping catch-up"
-                    );
-                    break;
-                }
-            }
-
-            // Cloud confirmed all accepted — mark as synced
-            if let Err(e) = order::mark_cloud_synced(&self.state.pool, &synced_ids).await {
-                tracing::error!("Failed to mark orders as cloud_synced, stopping catch-up: {e}");
-                break;
-            }
-
-            tracing::info!(
-                batch_size = batch_count,
-                accepted = response.accepted,
-                "Archived orders synced and confirmed via HTTP"
-            );
-
-            // Stop if this was the last batch
-            if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
-                break;
-            }
+        // Mark all processed entries as synced
+        for id in &changelog_ids {
+            let _ = sqlx::query("UPDATE catalog_changelog SET cloud_synced = 1 WHERE id = ?")
+                .bind(id)
+                .execute(&self.state.pool)
+                .await;
         }
 
         Ok(())
     }
 
-    /// Catch-up sync for unsynced credit notes via HTTP POST.
+    /// Sync archives to cloud via HTTP.
     ///
-    /// Same pattern as archived orders: batch → POST → mark synced on confirm.
-    async fn sync_credit_notes_http(&mut self) -> Result<(), crate::utils::AppError> {
+    /// Order layer: unified chain_entry sync (ORDER + CREDIT_NOTE + ANULACION + UPGRADE + BREAK)
+    /// Invoice layer: independent invoice sync (huella chain)
+    async fn sync_archives_http(&mut self, trigger: &str) {
+        if let Err(e) = self.sync_chain_entries_http().await {
+            tracing::warn!("{trigger}: chain entry sync failed: {e}");
+        }
+        if let Err(e) = self.sync_invoices_http().await {
+            tracing::warn!("{trigger}: invoice sync failed: {e}");
+        }
+    }
+
+    /// Unified chain entry sync — processes all chain_entry types in strict id order.
+    ///
+    /// This is the single source of truth for order-layer sync ordering.
+    /// ORDER and CREDIT_NOTE entries build their full payloads (OrderDetailSync, CreditNoteSync).
+    /// ANULACION and UPGRADE entries sync as ChainEntry metadata only (data already on the order via re-sync).
+    /// BREAK entries sync the break marker to cloud.
+    ///
+    /// On build failure: inserts a BREAK chain_entry + marks the failed entry as processed.
+    /// This preserves chain continuity (cloud sees explicit breaks) without blocking sync.
+    async fn sync_chain_entries_http(&mut self) -> Result<(), crate::utils::AppError> {
         let binding = self.get_binding().await?;
 
         loop {
-            let ids = credit_note::list_unsynced_ids(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
+            let entries = chain_entry::list_unsynced(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
                 .await
                 .map_err(|e| {
-                    crate::utils::AppError::internal(format!("List unsynced credit notes: {e}"))
+                    crate::utils::AppError::internal(format!("List unsynced chain entries: {e}"))
                 })?;
 
-            if ids.is_empty() {
+            if entries.is_empty() {
                 break;
             }
 
-            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
-            let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
-            let mut skipped_ids: Vec<i64> = Vec::new();
+            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(entries.len());
+            let mut synced_entry_ids: Vec<i64> = Vec::with_capacity(entries.len());
 
-            for &id in &ids {
-                match credit_note::build_sync(&self.state.pool, id).await {
-                    Ok(cn_sync) => {
-                        let data = match serde_json::to_value(&cn_sync) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                tracing::error!(
-                                    credit_note_id = id,
-                                    "Failed to serialize CreditNoteSync, skipping: {e}"
-                                );
-                                skipped_ids.push(id);
-                                continue;
-                            }
-                        };
-                        items.push(CloudSyncItem {
-                            resource: SyncResource::CreditNote,
-                            version: id as u64,
-                            action: shared::cloud::SyncAction::Upsert,
-                            resource_id: id,
-                            data,
-                        });
-                        synced_ids.push(id);
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            credit_note_id = id,
-                            "Failed to build CreditNoteSync, skipping: {e}"
-                        );
-                        skipped_ids.push(id);
-                    }
+            for entry in &entries {
+                // Every chain entry is synced as ChainEntry metadata
+                let ce_sync = shared::cloud::ChainEntrySync {
+                    id: entry.id,
+                    entry_type: entry.entry_type.clone(),
+                    entry_pk: entry.entry_pk,
+                    prev_hash: entry.prev_hash.clone(),
+                    curr_hash: entry.curr_hash.clone(),
+                    created_at: entry.created_at,
+                };
+                if let Ok(ce_data) = serde_json::to_value(&ce_sync) {
+                    items.push(CloudSyncItem {
+                        resource: SyncResource::ChainEntry,
+                        version: entry.id as u64,
+                        action: shared::cloud::SyncAction::Upsert,
+                        resource_id: entry.id,
+                        data: ce_data,
+                    });
                 }
-            }
 
-            // Mark permanently failed credit notes as synced to unblock the queue
-            if !skipped_ids.is_empty() {
-                tracing::warn!(
-                    count = skipped_ids.len(),
-                    ids = ?skipped_ids,
-                    "Skipped unbuildable credit notes, marking as synced"
-                );
-                if let Err(e) = credit_note::mark_synced_batch(&self.state.pool, &skipped_ids).await
-                {
-                    tracing::error!("Failed to mark skipped credit notes as synced: {e}");
+                // Build resource-specific payload for types that carry data
+                match entry.entry_type.as_str() {
+                    "ORDER" => match self.build_order_sync_item(entry).await {
+                        Ok(item) => {
+                            items.push(item);
+                            synced_entry_ids.push(entry.id);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                chain_entry_id = entry.id,
+                                entry_pk = entry.entry_pk,
+                                "Failed to build OrderDetailSync: {e}"
+                            );
+                            self.handle_chain_break(entry, &e.to_string()).await;
+                            synced_entry_ids.push(entry.id);
+                        }
+                    },
+                    "CREDIT_NOTE" => match self.build_credit_note_sync_item(entry).await {
+                        Ok(item) => {
+                            items.push(item);
+                            synced_entry_ids.push(entry.id);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                chain_entry_id = entry.id,
+                                entry_pk = entry.entry_pk,
+                                "Failed to build CreditNoteSync: {e}"
+                            );
+                            self.handle_chain_break(entry, &e.to_string()).await;
+                            synced_entry_ids.push(entry.id);
+                        }
+                    },
+                    // ANULACION/UPGRADE: re-send full order payload (with updated
+                    // is_voided/is_upgraded/customer fields) so cloud can later
+                    // generate Verifactu invoices (baja / F3 sustitutiva).
+                    "ANULACION" | "UPGRADE" => match self.build_order_sync_item(entry).await {
+                        Ok(item) => {
+                            items.push(item);
+                            synced_entry_ids.push(entry.id);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                chain_entry_id = entry.id,
+                                entry_type = %entry.entry_type,
+                                entry_pk = entry.entry_pk,
+                                "Failed to build OrderDetailSync for {}: {e}",
+                                entry.entry_type
+                            );
+                            self.handle_chain_break(entry, &e.to_string()).await;
+                            synced_entry_ids.push(entry.id);
+                        }
+                    },
+                    // BREAK — chain entry metadata is sufficient
+                    _ => {
+                        synced_entry_ids.push(entry.id);
+                    }
                 }
             }
 
             if items.is_empty() {
-                if skipped_ids.is_empty() {
+                // All entries were metadata-only, just mark synced
+                if let Err(e) = chain_entry::mark_synced(&self.state.pool, &synced_entry_ids).await
+                {
+                    tracing::error!("Failed to mark chain entries as synced: {e}");
+                    break;
+                }
+                if entries.len() < ARCHIVED_ORDER_BATCH_SIZE as usize {
                     break;
                 }
                 continue;
@@ -754,66 +804,237 @@ impl CloudWorker {
                 .push_batch(batch, &binding)
                 .await
                 .map_err(|e| {
-                    crate::utils::AppError::internal(format!("HTTP sync credit notes: {e}"))
+                    crate::utils::AppError::internal(format!("HTTP sync chain entries: {e}"))
                 })?;
 
             if response.rejected > 0 {
-                let mut dup_db_ids: Vec<i64> = Vec::new();
-                let mut real_errors = Vec::new();
+                let mut has_real_errors = false;
                 for err in &response.errors {
                     if err.message.contains("duplicate key") {
-                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
-                            dup_db_ids.push(db_id);
-                        }
                         tracing::info!(
                             resource_id = %err.resource_id,
-                            "Credit note already exists in cloud, marking as synced"
+                            "Already exists in cloud (duplicate key)"
                         );
                     } else {
-                        real_errors.push(err);
+                        has_real_errors = true;
                         tracing::warn!(
                             resource_id = %err.resource_id,
-                            "Credit note rejected: {}", err.message
+                            "Rejected: {}", err.message
                         );
                     }
                 }
-
-                if !dup_db_ids.is_empty()
-                    && let Err(e) =
-                        credit_note::mark_synced_batch(&self.state.pool, &dup_db_ids).await
-                {
-                    tracing::error!("Failed to mark duplicate credit notes as synced: {e}");
-                }
-
-                if !real_errors.is_empty() {
+                if has_real_errors {
+                    // Still mark successfully-synced entries before stopping,
+                    // so we don't re-send them in the next cycle (infinite retry loop).
+                    if !synced_entry_ids.is_empty() {
+                        if let Err(e) =
+                            chain_entry::mark_synced(&self.state.pool, &synced_entry_ids).await
+                        {
+                            tracing::error!("Failed to mark accepted chain entries as synced: {e}");
+                        }
+                        self.mark_resource_tables_synced(&entries, &synced_entry_ids)
+                            .await;
+                    }
                     tracing::warn!(
                         accepted = response.accepted,
-                        rejected = real_errors.len(),
-                        "Credit note sync has non-duplicate rejections, stopping catch-up"
+                        rejected = response.rejected,
+                        "Chain entry sync has real rejections, stopping catch-up"
                     );
                     break;
                 }
             }
 
-            if let Err(e) = credit_note::mark_synced_batch(&self.state.pool, &synced_ids).await {
-                tracing::error!(
-                    "Failed to mark credit notes as cloud_synced, stopping catch-up: {e}"
-                );
+            // Mark chain entries as synced + also mark resource tables for consistency
+            if let Err(e) = chain_entry::mark_synced(&self.state.pool, &synced_entry_ids).await {
+                tracing::error!("Failed to mark chain entries as synced: {e}");
                 break;
             }
+            // Keep resource-level cloud_synced in sync for backward compatibility
+            self.mark_resource_tables_synced(&entries, &synced_entry_ids)
+                .await;
 
             tracing::info!(
                 batch_size = batch_count,
                 accepted = response.accepted,
-                "Credit notes synced and confirmed via HTTP"
+                "Chain entries synced via HTTP"
             );
 
-            if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
+            if entries.len() < ARCHIVED_ORDER_BATCH_SIZE as usize {
                 break;
             }
         }
 
         Ok(())
+    }
+
+    /// Build an ArchivedOrder CloudSyncItem from a chain entry
+    async fn build_order_sync_item(
+        &self,
+        entry: &chain_entry::ChainEntryRow,
+    ) -> Result<CloudSyncItem, crate::utils::AppError> {
+        let detail_sync = order::build_order_detail_sync(&self.state.pool, entry.entry_pk)
+            .await
+            .map_err(|e| {
+                crate::utils::AppError::internal(format!("build_order_detail_sync: {e}"))
+            })?;
+        let data = serde_json::to_value(&detail_sync).map_err(|e| {
+            crate::utils::AppError::internal(format!("serialize OrderDetailSync: {e}"))
+        })?;
+        Ok(CloudSyncItem {
+            resource: SyncResource::ArchivedOrder,
+            version: entry.entry_pk as u64,
+            action: shared::cloud::SyncAction::Upsert,
+            resource_id: entry.entry_pk,
+            data,
+        })
+    }
+
+    /// Build a CreditNote CloudSyncItem from a chain entry
+    async fn build_credit_note_sync_item(
+        &self,
+        entry: &chain_entry::ChainEntryRow,
+    ) -> Result<CloudSyncItem, crate::utils::AppError> {
+        let cn_sync = credit_note::build_sync(&self.state.pool, entry.entry_pk)
+            .await
+            .map_err(|e| {
+                crate::utils::AppError::internal(format!("build_credit_note_sync: {e}"))
+            })?;
+        let data = serde_json::to_value(&cn_sync).map_err(|e| {
+            crate::utils::AppError::internal(format!("serialize CreditNoteSync: {e}"))
+        })?;
+        Ok(CloudSyncItem {
+            resource: SyncResource::CreditNote,
+            version: entry.entry_pk as u64,
+            action: shared::cloud::SyncAction::Upsert,
+            resource_id: entry.entry_pk,
+            data,
+        })
+    }
+
+    /// Insert a BREAK chain_entry when a resource fails to build for sync.
+    /// Must acquire hash_chain_lock to prevent TOCTOU races with concurrent archiving.
+    async fn handle_chain_break(&self, failed_entry: &chain_entry::ChainEntryRow, reason: &str) {
+        // Acquire the shared hash chain lock to serialize with archive/credit_note writers
+        let hash_lock = match self.state.orders_manager.archive_service() {
+            Some(svc) => svc.hash_chain_lock().clone(),
+            None => {
+                tracing::error!(
+                    chain_entry_id = failed_entry.id,
+                    "Cannot insert BREAK: no archive_service (hash_chain_lock unavailable)"
+                );
+                return;
+            }
+        };
+        let _lock = hash_lock.lock().await;
+
+        let break_id = shared::util::snowflake_id();
+        let now = shared::util::now_millis();
+
+        // Use a transaction to atomically insert BREAK + update last_chain_hash
+        let mut tx = match sqlx::pool::Pool::begin(&self.state.pool).await {
+            Ok(tx) => tx,
+            Err(e) => {
+                tracing::error!(
+                    chain_entry_id = failed_entry.id,
+                    "Failed to begin transaction for BREAK: {e}"
+                );
+                return;
+            }
+        };
+
+        // INSERT OR IGNORE: prevent duplicate BREAK for the same failed entry
+        let result = sqlx::query(
+            "INSERT OR IGNORE INTO chain_entry (id, entry_type, entry_pk, prev_hash, curr_hash, created_at, cloud_synced) \
+             VALUES (?1, 'BREAK', ?2, ?3, 'CHAIN_BREAK', ?4, 0)",
+        )
+        .bind(break_id)
+        .bind(failed_entry.id)
+        .bind(&failed_entry.curr_hash)
+        .bind(now)
+        .execute(&mut *tx)
+        .await;
+
+        match result {
+            Ok(r) if r.rows_affected() > 0 => {
+                // Update system_state.last_chain_hash so the next real entry links correctly
+                if let Err(e) = sqlx::query(
+                    "UPDATE system_state SET last_chain_hash = 'CHAIN_BREAK', updated_at = ?1 WHERE id = ?2",
+                )
+                .bind(now)
+                .bind(1_i64)
+                .execute(&mut *tx)
+                .await
+                {
+                    tracing::error!(
+                        chain_entry_id = failed_entry.id,
+                        "Failed to update last_chain_hash for BREAK: {e}"
+                    );
+                    let _ = tx.rollback().await;
+                    return;
+                }
+
+                if let Err(e) = tx.commit().await {
+                    tracing::error!(
+                        chain_entry_id = failed_entry.id,
+                        "Failed to commit BREAK transaction: {e}"
+                    );
+                    return;
+                }
+
+                tracing::error!(
+                    chain_entry_id = failed_entry.id,
+                    entry_type = %failed_entry.entry_type,
+                    entry_pk = failed_entry.entry_pk,
+                    break_id,
+                    reason,
+                    "CHAIN BREAK: inserted break marker"
+                );
+            }
+            Ok(_) => {
+                // rows_affected == 0: BREAK already exists for this entry (INSERT OR IGNORE)
+                let _ = tx.rollback().await;
+                tracing::warn!(
+                    chain_entry_id = failed_entry.id,
+                    "BREAK already exists for this chain entry, skipping"
+                );
+            }
+            Err(e) => {
+                let _ = tx.rollback().await;
+                tracing::error!(
+                    chain_entry_id = failed_entry.id,
+                    "Failed to insert BREAK chain_entry: {e}"
+                );
+            }
+        }
+    }
+
+    /// Keep resource-level cloud_synced flags in sync with chain_entry.cloud_synced
+    async fn mark_resource_tables_synced(
+        &self,
+        entries: &[chain_entry::ChainEntryRow],
+        synced_ids: &[i64],
+    ) {
+        let mut order_ids = Vec::new();
+        let mut cn_ids = Vec::new();
+        for entry in entries {
+            if synced_ids.contains(&entry.id) {
+                match entry.entry_type.as_str() {
+                    "ORDER" | "ANULACION" | "UPGRADE" => order_ids.push(entry.entry_pk),
+                    "CREDIT_NOTE" => cn_ids.push(entry.entry_pk),
+                    _ => {}
+                }
+            }
+        }
+        if !order_ids.is_empty()
+            && let Err(e) = order::mark_cloud_synced(&self.state.pool, &order_ids).await
+        {
+            tracing::warn!("Failed to mark archived_order.cloud_synced: {e}");
+        }
+        if !cn_ids.is_empty()
+            && let Err(e) = credit_note::mark_synced_batch(&self.state.pool, &cn_ids).await
+        {
+            tracing::warn!("Failed to mark credit_note.cloud_synced: {e}");
+        }
     }
 
     /// Sync unsynced Verifactu invoices (F2/R5) to cloud via HTTP batch.
@@ -948,150 +1169,6 @@ impl CloudWorker {
                 batch_size = batch_count,
                 accepted = response.accepted,
                 "Invoices synced and confirmed via HTTP"
-            );
-
-            if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Sync unsynced invoice anulaciones to cloud via HTTP batch.
-    async fn sync_anulaciones_http(&mut self) -> Result<(), crate::utils::AppError> {
-        let binding = self.get_binding().await?;
-
-        loop {
-            let ids = anulacion::list_unsynced_ids(&self.state.pool, ARCHIVED_ORDER_BATCH_SIZE)
-                .await
-                .map_err(|e| {
-                    crate::utils::AppError::internal(format!("List unsynced anulaciones: {e}"))
-                })?;
-
-            if ids.is_empty() {
-                break;
-            }
-
-            let mut items: Vec<CloudSyncItem> = Vec::with_capacity(ids.len());
-            let mut synced_ids: Vec<i64> = Vec::with_capacity(ids.len());
-            let mut skipped_ids: Vec<i64> = Vec::new();
-
-            for &id in &ids {
-                match anulacion::build_sync(&self.state.pool, id).await {
-                    Ok(sync_payload) => {
-                        let data = match serde_json::to_value(&sync_payload) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                tracing::error!(
-                                    anulacion_id = id,
-                                    "Failed to serialize AnulacionSync, skipping: {e}"
-                                );
-                                skipped_ids.push(id);
-                                continue;
-                            }
-                        };
-                        items.push(CloudSyncItem {
-                            resource: SyncResource::Anulacion,
-                            version: id as u64,
-                            action: shared::cloud::SyncAction::Upsert,
-                            resource_id: id,
-                            data,
-                        });
-                        synced_ids.push(id);
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            anulacion_id = id,
-                            "Failed to build AnulacionSync, skipping: {e}"
-                        );
-                        skipped_ids.push(id);
-                    }
-                }
-            }
-
-            // Mark permanently failed anulaciones as synced to unblock the queue
-            if !skipped_ids.is_empty() {
-                tracing::warn!(
-                    count = skipped_ids.len(),
-                    ids = ?skipped_ids,
-                    "Skipped unbuildable anulaciones, marking as synced"
-                );
-                if let Err(e) = anulacion::mark_synced(&self.state.pool, &skipped_ids).await {
-                    tracing::error!("Failed to mark skipped anulaciones as synced: {e}");
-                }
-            }
-
-            if items.is_empty() {
-                if skipped_ids.is_empty() {
-                    break;
-                }
-                continue;
-            }
-
-            let batch_count = items.len();
-            let batch = CloudSyncBatch {
-                edge_id: self.cloud_service.edge_id().to_string(),
-                items,
-                sent_at: shared::util::now_millis(),
-            };
-
-            let response = self
-                .cloud_service
-                .push_batch(batch, &binding)
-                .await
-                .map_err(|e| {
-                    crate::utils::AppError::internal(format!("HTTP sync anulaciones: {e}"))
-                })?;
-
-            if response.rejected > 0 {
-                let mut dup_db_ids: Vec<i64> = Vec::new();
-                let mut real_errors = Vec::new();
-                for err in &response.errors {
-                    if err.message.contains("duplicate key") {
-                        if let Some(&db_id) = synced_ids.get(err.index as usize) {
-                            dup_db_ids.push(db_id);
-                        }
-                        tracing::info!(
-                            resource_id = %err.resource_id,
-                            "Anulacion already exists in cloud, marking as synced"
-                        );
-                    } else {
-                        real_errors.push(err);
-                        tracing::warn!(
-                            resource_id = %err.resource_id,
-                            "Anulacion rejected: {}", err.message
-                        );
-                    }
-                }
-
-                if !dup_db_ids.is_empty()
-                    && let Err(e) = anulacion::mark_synced(&self.state.pool, &dup_db_ids).await
-                {
-                    tracing::error!("Failed to mark duplicate anulaciones as synced: {e}");
-                }
-
-                if !real_errors.is_empty() {
-                    tracing::warn!(
-                        accepted = response.accepted,
-                        rejected = real_errors.len(),
-                        "Anulacion sync has non-duplicate rejections, stopping catch-up"
-                    );
-                    break;
-                }
-            }
-
-            if let Err(e) = anulacion::mark_synced(&self.state.pool, &synced_ids).await {
-                tracing::error!(
-                    "Failed to mark anulaciones as cloud_synced, stopping catch-up: {e}"
-                );
-                break;
-            }
-
-            tracing::info!(
-                batch_size = batch_count,
-                accepted = response.accepted,
-                "Anulaciones synced and confirmed via HTTP"
             );
 
             if (synced_ids.len() as i64) < ARCHIVED_ORDER_BATCH_SIZE {

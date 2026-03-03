@@ -22,10 +22,11 @@ export const ReportsScreen: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     (async () => {
       try {
-        setReports(await getStats(token, storeId));
+        setReports(await getStats(tk, storeId));
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); return; }
         setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
@@ -33,7 +34,8 @@ export const ReportsScreen: React.FC = () => {
         setLoading(false);
       }
     })();
-  }, [token, storeId, clearAuth, navigate, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner className="w-8 h-8 text-primary-500" /></div>;
   if (error) return <div className="max-w-5xl mx-auto px-6 py-8"><div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div></div>;

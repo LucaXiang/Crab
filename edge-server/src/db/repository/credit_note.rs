@@ -226,7 +226,7 @@ pub async fn build_sync(
          cn.subtotal_credit, cn.tax_credit, cn.total_credit, \
          cn.refund_method, cn.reason, cn.note, \
          cn.operator_name, cn.authorizer_name, cn.created_at, \
-         ao.order_id, \
+         ao.id AS order_id, \
          ce.prev_hash, ce.curr_hash \
          FROM credit_note cn \
          JOIN archived_order ao ON ao.id = cn.original_order_pk \

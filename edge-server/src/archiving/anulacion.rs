@@ -51,7 +51,7 @@ impl AnulacionService {
     /// - Validates order is COMPLETED, not already anulada, no credit notes
     /// - Creates chain_entry (entry_pk = order_pk, type = ANULACION)
     /// - Updates system_state.last_chain_hash
-    /// - Marks archived_order.is_anulada = 1
+    /// - Marks archived_order.is_voided = 1
     pub async fn create_anulacion(
         &self,
         request: &CreateAnulacionRequest,
@@ -65,7 +65,7 @@ impl AnulacionService {
 
         // 1. Validate order exists and is COMPLETED
         let order = sqlx::query_as::<_, OrderAnulRef>(
-            "SELECT id, status, is_anulada, receipt_number FROM archived_order WHERE id = ?",
+            "SELECT id, status, is_voided, receipt_number FROM archived_order WHERE id = ?",
         )
         .bind(request.original_order_pk)
         .fetch_optional(&self.pool)
@@ -82,7 +82,7 @@ impl AnulacionService {
             )));
         }
 
-        if order.is_anulada != 0 {
+        if order.is_voided != 0 {
             return Err(ArchiveError::Validation(
                 "Order already has an anulación".into(),
             ));
@@ -153,7 +153,7 @@ impl AnulacionService {
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 8. Mark archived_order as anulada + reset cloud_synced for re-sync
-        sqlx::query("UPDATE archived_order SET is_anulada = 1, cloud_synced = 0, updated_at = ?1 WHERE id = ?2")
+        sqlx::query("UPDATE archived_order SET is_voided = 1, cloud_synced = 0, updated_at = ?1 WHERE id = ?2")
             .bind(now)
             .bind(request.original_order_pk)
             .execute(&mut *tx)
@@ -182,7 +182,7 @@ impl AnulacionService {
     /// Check if an order can be anulled (order-layer eligibility).
     pub async fn check_anulacion_eligibility(&self, order_pk: i64) -> ArchiveResult<()> {
         let order = sqlx::query_as::<_, OrderAnulRef>(
-            "SELECT id, status, is_anulada, receipt_number FROM archived_order WHERE id = ?",
+            "SELECT id, status, is_voided, receipt_number FROM archived_order WHERE id = ?",
         )
         .bind(order_pk)
         .fetch_optional(&self.pool)
@@ -197,7 +197,7 @@ impl AnulacionService {
             )));
         }
 
-        if order.is_anulada != 0 {
+        if order.is_voided != 0 {
             return Err(ArchiveError::Validation(
                 "Order already has an anulación".into(),
             ));
@@ -229,6 +229,6 @@ struct OrderAnulRef {
     #[allow(dead_code)]
     id: i64,
     status: String,
-    is_anulada: i64,
+    is_voided: i64,
     receipt_number: Option<String>,
 }

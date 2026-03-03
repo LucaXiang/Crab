@@ -8,7 +8,7 @@ export interface OrderSummary {
   synced_at: number;
 }
 
-export type ChainEntryType = 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE';
+export type ChainEntryType = 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE' | 'BREAK';
 
 export interface ChainEntryItem {
   entry_type: ChainEntryType;
@@ -25,7 +25,7 @@ export interface AnulacionDetailResponse {
   order_id: number;
   receipt_number: string;
   total_amount: number;
-  is_anulada: boolean;
+  is_voided: boolean;
   created_at: number;
 }
 
@@ -61,6 +61,7 @@ export interface CreditNoteDetailResponse {
 }
 
 export interface CreditNoteItem {
+  original_instance_id: string;
   item_name: string;
   quantity: number;
   unit_price: number;
@@ -77,6 +78,7 @@ export interface OrderItemOption {
 }
 
 export interface OrderItem {
+  instance_id: string;
   name: string;
   spec_name: string | null;
   category_name: string | null;

@@ -11,15 +11,15 @@
 }
 
 (csp_portal) {
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
 }
 
 (csp_console) {
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://cloud.redcoral.app wss://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://cloud.redcoral.app wss://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
 }
 
 (csp_dev_console) {
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://dev-cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://dev-cloud.redcoral.app wss://dev-cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://dev-cloud.redcoral.app https://*.amazonaws.com; connect-src 'self' https://dev-cloud.redcoral.app wss://dev-cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
 }
 
 redcoral.app {

@@ -36,10 +36,11 @@ export const AuditScreen: React.FC = () => {
   const [error, setError] = useState('');
 
   const load = useCallback(async (p: number, append: boolean) => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     if (p === 1) setLoading(true); else setLoadingMore(true);
     try {
-      const data = await getAuditLog(token, p, 20);
+      const data = await getAuditLog(tk, p, 20);
       setEntries(prev => append ? [...prev, ...data] : data);
       setHasMore(data.length === 20);
     } catch (err) {
@@ -49,7 +50,8 @@ export const AuditScreen: React.FC = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [token, clearAuth, navigate, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { load(1, false); }, [load]);
 

@@ -121,71 +121,32 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
         }
     }
 
-    // Replay pending ops (Console edits queued while edge was offline)
-    // Fetch ordered, send one-by-one, delete after each successful send.
-    // On send failure: unsent ops remain in DB for next reconnect.
-    match crate::db::store::pending_ops::fetch_ordered(&state.pool, store_id).await {
-        Ok(ops) if !ops.is_empty() => {
-            let total = ops.len();
-            let mut sent = 0usize;
-            for (row_id, op, changed_at) in ops {
-                // For product ops with images, send EnsureImage with fresh presigned URL
-                if let Some(hash) = op.image_hash()
-                    && let Ok(presigned_url) =
-                        super::image::presigned_get_url(&state, identity.tenant_id, hash).await
-                {
-                    let ensure_msg = CloudMessage::Rpc {
-                        id: format!("img-{hash}"),
-                        payload: Box::new(shared::cloud::CloudRpc::StoreOp {
-                            op: Box::new(shared::cloud::store_op::StoreOp::EnsureImage {
-                                presigned_url,
-                                hash: hash.to_string(),
-                            }),
-                            changed_at: None,
-                        }),
-                    };
-                    if let Ok(json) = serde_json::to_string(&ensure_msg) {
-                        let _ = ws_sink.send(Message::Text(json.into())).await;
-                    }
-                }
-
-                let msg = CloudMessage::Rpc {
-                    id: format!("catchup-{}", uuid::Uuid::new_v4()),
-                    payload: Box::new(shared::cloud::CloudRpc::StoreOp {
-                        op: Box::new(op),
-                        changed_at: Some(changed_at),
-                    }),
-                };
-                let json = match serde_json::to_string(&msg) {
-                    Ok(j) => j,
-                    Err(e) => {
-                        tracing::warn!(store_id, row_id, "Failed to serialize pending op: {e}");
-                        continue;
-                    }
-                };
+    // Replay pending_ops: if Console made changes while edge was offline,
+    // push them as individual StoreOp RPCs. Edge requests full CatalogSyncData
+    // separately via RequestCatalogSync when needed (re-bind scenario).
+    if let Ok(ops) = crate::db::store::pending_ops::fetch_ordered(&state.pool, store_id).await
+        && !ops.is_empty()
+    {
+        let mut sent = 0usize;
+        for (row_id, op, changed_at) in ops {
+            let msg = CloudMessage::Rpc {
+                id: format!("catchup-{}", uuid::Uuid::new_v4()),
+                payload: Box::new(shared::cloud::CloudRpc::StoreOp {
+                    op: Box::new(op),
+                    changed_at: Some(changed_at),
+                }),
+            };
+            if let Ok(json) = serde_json::to_string(&msg) {
                 if ws_sink.send(Message::Text(json.into())).await.is_err() {
-                    tracing::warn!(
-                        store_id,
-                        sent,
-                        remaining = total - sent,
-                        "Failed to send pending op, disconnecting (unsent ops preserved)"
-                    );
+                    tracing::warn!(store_id, "Failed to send pending op, disconnecting");
                     state.edges.connected.remove(&store_id);
                     return;
                 }
-                // Successfully sent — delete from queue
-                if let Err(e) = crate::db::store::pending_ops::delete_one(&state.pool, row_id).await
-                {
-                    tracing::warn!(store_id, row_id, "Failed to delete sent pending op: {e}");
-                }
+                let _ = crate::db::store::pending_ops::delete_one(&state.pool, row_id).await;
                 sent += 1;
             }
-            tracing::info!(store_id, count = sent, "Pending ops replayed to edge");
         }
-        Ok(_) => {} // no pending ops
-        Err(e) => {
-            tracing::error!(store_id, "Failed to fetch pending ops: {e}");
-        }
+        tracing::info!(store_id, count = sent, "Pending ops replayed");
     }
 
     // 所有初始化发送完成后，标记 edge 上线（通知正在观看的 console）
@@ -462,6 +423,67 @@ async fn handle_edge_message<S>(
             state
                 .live_orders
                 .publish_remove(identity.tenant_id, order_id, store_id);
+        }
+
+        CloudMessage::RequestCatalogSync => {
+            tracing::info!(store_id, "Edge requested full catalog sync (re-bind)");
+
+            match super::store::data_transfer::build_catalog_export(&state.pool, store_id).await {
+                Ok(catalog) => {
+                    // Collect image hashes for EnsureImage
+                    let image_hashes: Vec<String> = catalog
+                        .products
+                        .iter()
+                        .filter(|p| !p.image.is_empty())
+                        .map(|p| p.image.clone())
+                        .collect();
+
+                    let msg = CloudMessage::CatalogSyncData {
+                        catalog: Box::new(catalog),
+                    };
+                    match serde_json::to_string(&msg) {
+                        Ok(json) => {
+                            if let Err(e) = ws_sink.send(Message::Text(json.into())).await {
+                                tracing::warn!(store_id, "Failed to send CatalogSyncData: {e}");
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(store_id, "Failed to serialize CatalogSyncData: {e}");
+                            return;
+                        }
+                    }
+
+                    // Send EnsureImage for product images
+                    for hash in &image_hashes {
+                        if let Ok(presigned_url) =
+                            super::image::presigned_get_url(state, identity.tenant_id, hash).await
+                        {
+                            let ensure_msg = CloudMessage::Rpc {
+                                id: format!("img-{hash}"),
+                                payload: Box::new(shared::cloud::CloudRpc::StoreOp {
+                                    op: Box::new(shared::cloud::store_op::StoreOp::EnsureImage {
+                                        presigned_url,
+                                        hash: hash.to_string(),
+                                    }),
+                                    changed_at: None,
+                                }),
+                            };
+                            if let Ok(json) = serde_json::to_string(&ensure_msg) {
+                                let _ = ws_sink.send(Message::Text(json.into())).await;
+                            }
+                        }
+                    }
+
+                    // Clear pending_ops since CatalogSyncData supersedes all queued ops
+                    let _ = crate::db::store::pending_ops::delete_all(&state.pool, store_id).await;
+
+                    tracing::info!(store_id, "CatalogSyncData sent to edge");
+                }
+                Err(e) => {
+                    tracing::error!(store_id, "Failed to build catalog export: {e}");
+                }
+            }
         }
 
         _ => {

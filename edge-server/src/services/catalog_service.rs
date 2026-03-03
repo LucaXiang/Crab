@@ -113,6 +113,12 @@ impl CatalogService {
         }
     }
 
+    /// Clear all cached products and categories (used before FullSync rebuild).
+    pub fn invalidate(&self) {
+        self.products.write().clear();
+        self.categories.write().clear();
+    }
+
     // =========================================================================
     // Warmup
     // =========================================================================
@@ -512,16 +518,34 @@ impl CatalogService {
             ));
         }
 
-        // Validate category is not virtual
+        // Validate category exists and is not virtual (DB is the authority)
         {
-            let categories = self.categories.read();
-            if let Some(cat) = categories.get(&data.category_id)
-                && cat.is_virtual
-            {
-                return Err(RepoError::Business(
-                    ErrorCode::ProductCategoryInvalid,
-                    "Product cannot belong to a virtual category".into(),
-                ));
+            let cat_row: Option<(bool, bool)> =
+                sqlx::query_as("SELECT is_virtual, is_active FROM category WHERE id = ?")
+                    .bind(data.category_id)
+                    .fetch_optional(&self.pool)
+                    .await?;
+
+            match cat_row {
+                Some((true, _)) => {
+                    return Err(RepoError::Business(
+                        ErrorCode::ProductCategoryInvalid,
+                        "Product cannot belong to a virtual category".into(),
+                    ));
+                }
+                Some((_, false)) => {
+                    return Err(RepoError::Business(
+                        ErrorCode::CategoryNotFound,
+                        format!("Category {} is deactivated", data.category_id),
+                    ));
+                }
+                None => {
+                    return Err(RepoError::Business(
+                        ErrorCode::CategoryNotFound,
+                        format!("Category {} not found", data.category_id),
+                    ));
+                }
+                _ => {} // exists, active, not virtual — proceed
             }
         }
 
@@ -532,8 +556,9 @@ impl CatalogService {
         let is_kitchen_print_enabled = data.is_kitchen_print_enabled.unwrap_or(-1);
         let is_label_print_enabled = data.is_label_print_enabled.unwrap_or(-1);
         let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+        let now = shared::util::now_millis();
         let product_id: i64 = sqlx::query_scalar(
-            r#"INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11) RETURNING id"#,
+            r#"INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11, ?12) RETURNING id"#,
         )
         .bind(id)
         .bind(&data.name)
@@ -546,6 +571,7 @@ impl CatalogService {
         .bind(is_kitchen_print_enabled)
         .bind(is_label_print_enabled)
         .bind(data.external_id)
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -623,23 +649,42 @@ impl CatalogService {
                 .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", id)));
         }
 
-        // Validate category if changing
+        // Validate category if changing (DB is the authority)
         if let Some(new_cat_id) = data.category_id {
-            let categories = self.categories.read();
-            if let Some(cat) = categories.get(&new_cat_id)
-                && cat.is_virtual
-            {
-                return Err(RepoError::Business(
-                    ErrorCode::ProductCategoryInvalid,
-                    "Product cannot belong to a virtual category".into(),
-                ));
+            let cat_row: Option<(bool, bool)> =
+                sqlx::query_as("SELECT is_virtual, is_active FROM category WHERE id = ?")
+                    .bind(new_cat_id)
+                    .fetch_optional(&self.pool)
+                    .await?;
+
+            match cat_row {
+                Some((true, _)) => {
+                    return Err(RepoError::Business(
+                        ErrorCode::ProductCategoryInvalid,
+                        "Product cannot belong to a virtual category".into(),
+                    ));
+                }
+                Some((_, false)) => {
+                    return Err(RepoError::Business(
+                        ErrorCode::CategoryNotFound,
+                        format!("Category {} is deactivated", new_cat_id),
+                    ));
+                }
+                None => {
+                    return Err(RepoError::Business(
+                        ErrorCode::CategoryNotFound,
+                        format!("Category {} not found", new_cat_id),
+                    ));
+                }
+                _ => {}
             }
         }
 
         // Execute update of scalar fields using COALESCE pattern
+        let now = shared::util::now_millis();
         if has_scalar_updates {
             sqlx::query!(
-                "UPDATE product SET name = COALESCE(?1, name), image = COALESCE(?2, image), category_id = COALESCE(?3, category_id), sort_order = COALESCE(?4, sort_order), tax_rate = COALESCE(?5, tax_rate), receipt_name = COALESCE(?6, receipt_name), kitchen_print_name = COALESCE(?7, kitchen_print_name), is_kitchen_print_enabled = COALESCE(?8, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?9, is_label_print_enabled), is_active = COALESCE(?10, is_active), external_id = COALESCE(?11, external_id) WHERE id = ?12",
+                "UPDATE product SET name = COALESCE(?1, name), image = COALESCE(?2, image), category_id = COALESCE(?3, category_id), sort_order = COALESCE(?4, sort_order), tax_rate = COALESCE(?5, tax_rate), receipt_name = COALESCE(?6, receipt_name), kitchen_print_name = COALESCE(?7, kitchen_print_name), is_kitchen_print_enabled = COALESCE(?8, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?9, is_label_print_enabled), is_active = COALESCE(?10, is_active), external_id = COALESCE(?11, external_id), updated_at = ?12 WHERE id = ?13",
                 data.name,
                 data.image,
                 data.category_id,
@@ -651,6 +696,7 @@ impl CatalogService {
                 data.is_label_print_enabled,
                 data.is_active,
                 data.external_id,
+                now,
                 id,
             )
             .execute(&self.pool)
@@ -733,9 +779,11 @@ impl CatalogService {
         &self,
         items: &[shared::cloud::store_op::SortOrderItem],
     ) -> RepoResult<()> {
+        let now = shared::util::now_millis();
         for item in items {
-            sqlx::query("UPDATE product SET sort_order = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE product SET sort_order = ?1, updated_at = ?2 WHERE id = ?3")
                 .bind(item.sort_order)
+                .bind(now)
                 .bind(item.id)
                 .execute(&self.pool)
                 .await?;
@@ -989,8 +1037,9 @@ impl CatalogService {
         let match_mode = data.match_mode.as_deref().unwrap_or("any");
         let is_display = data.is_display.unwrap_or(true);
         let cid = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+        let now = shared::util::now_millis();
         let category_id: i64 = sqlx::query_scalar(
-            r#"INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8) RETURNING id"#,
+            r#"INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id"#,
         )
         .bind(cid)
         .bind(&data.name)
@@ -1000,6 +1049,7 @@ impl CatalogService {
         .bind(is_virtual)
         .bind(match_mode)
         .bind(is_display)
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -1060,8 +1110,9 @@ impl CatalogService {
         }
 
         // Update scalar fields using COALESCE
+        let now = shared::util::now_millis();
         sqlx::query!(
-            "UPDATE category SET name = COALESCE(?1, name), sort_order = COALESCE(?2, sort_order), is_kitchen_print_enabled = COALESCE(?3, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?4, is_label_print_enabled), is_virtual = COALESCE(?5, is_virtual), match_mode = COALESCE(?6, match_mode), is_display = COALESCE(?7, is_display), is_active = COALESCE(?8, is_active) WHERE id = ?9",
+            "UPDATE category SET name = COALESCE(?1, name), sort_order = COALESCE(?2, sort_order), is_kitchen_print_enabled = COALESCE(?3, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?4, is_label_print_enabled), is_virtual = COALESCE(?5, is_virtual), match_mode = COALESCE(?6, match_mode), is_display = COALESCE(?7, is_display), is_active = COALESCE(?8, is_active), updated_at = ?9 WHERE id = ?10",
             data.name,
             data.sort_order,
             data.is_kitchen_print_enabled,
@@ -1070,6 +1121,7 @@ impl CatalogService {
             data.match_mode,
             data.is_display,
             data.is_active,
+            now,
             id,
         )
         .execute(&self.pool)
@@ -1132,9 +1184,11 @@ impl CatalogService {
         &self,
         items: &[shared::cloud::store_op::SortOrderItem],
     ) -> RepoResult<()> {
+        let now = shared::util::now_millis();
         for item in items {
-            sqlx::query("UPDATE category SET sort_order = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE category SET sort_order = ?1, updated_at = ?2 WHERE id = ?3")
                 .bind(item.sort_order)
+                .bind(now)
                 .bind(item.id)
                 .execute(&self.pool)
                 .await?;

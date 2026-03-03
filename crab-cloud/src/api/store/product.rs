@@ -32,6 +32,28 @@ pub async fn create_product(
     Json(data): Json<shared::models::product::ProductCreate>,
 ) -> ApiResult<StoreOpResult> {
     verify_store(&state, store_id, identity.tenant_id).await?;
+
+    // Validate external_id is provided (required)
+    let eid = data
+        .external_id
+        .ok_or_else(|| AppError::new(ErrorCode::ProductExternalIdRequired))?;
+
+    // Check duplicate external_id within this store
+    let dup: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM store_products WHERE store_id = $1 AND external_id = $2)",
+    )
+    .bind(store_id)
+    .bind(eid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| internal(e.into()))?;
+
+    if dup {
+        return Err(
+            AppError::new(ErrorCode::ProductExternalIdExists).with_detail("external_id", eid)
+        );
+    }
+
     fire_ensure_image(&state, store_id, identity.tenant_id, data.image.as_deref()).await;
 
     let (source_id, op_data) = store::create_product_direct(&state.pool, store_id, &data)

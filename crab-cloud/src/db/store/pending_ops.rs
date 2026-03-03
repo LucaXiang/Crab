@@ -73,3 +73,12 @@ pub async fn delete_one(pool: &PgPool, row_id: i64) -> Result<(), BoxError> {
         .await?;
     Ok(())
 }
+
+/// Delete all pending ops for a store (called after FullSync delivery).
+pub async fn delete_all(pool: &PgPool, store_id: i64) -> Result<(), BoxError> {
+    sqlx::query("DELETE FROM store_pending_ops WHERE store_id = $1")
+        .bind(store_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}

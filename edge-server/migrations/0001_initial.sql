@@ -30,7 +30,8 @@ CREATE TABLE employee (
     role_id      INTEGER NOT NULL REFERENCES role(id),
     is_system    INTEGER NOT NULL DEFAULT 0,
     is_active    INTEGER NOT NULL DEFAULT 1,
-    created_at   INTEGER NOT NULL DEFAULT 0
+    created_at   INTEGER NOT NULL DEFAULT 0,
+    updated_at   INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX idx_employee_username ON employee(username);
 
@@ -38,16 +39,18 @@ CREATE TABLE zone (
     id          INTEGER PRIMARY KEY,
     name        TEXT    NOT NULL,
     description TEXT,
-    is_active   INTEGER NOT NULL DEFAULT 1
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    updated_at  INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_zone_name ON zone(name);
 
 CREATE TABLE dining_table (
-    id        INTEGER PRIMARY KEY,
-    name      TEXT    NOT NULL,
-    zone_id   INTEGER NOT NULL REFERENCES zone(id),
-    capacity  INTEGER NOT NULL DEFAULT 4,
-    is_active INTEGER NOT NULL DEFAULT 1
+    id         INTEGER PRIMARY KEY,
+    name       TEXT    NOT NULL,
+    zone_id    INTEGER NOT NULL REFERENCES zone(id),
+    capacity   INTEGER NOT NULL DEFAULT 4,
+    is_active  INTEGER NOT NULL DEFAULT 1,
+    updated_at INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_dining_table_zone ON dining_table(zone_id);
 CREATE UNIQUE INDEX idx_dining_table_zone_name ON dining_table(zone_id, name);
@@ -58,7 +61,8 @@ CREATE TABLE tag (
     color         TEXT    NOT NULL DEFAULT '#3B82F6',
     display_order INTEGER NOT NULL DEFAULT 0,
     is_active     INTEGER NOT NULL DEFAULT 1,
-    is_system     INTEGER NOT NULL DEFAULT 0
+    is_system     INTEGER NOT NULL DEFAULT 0,
+    updated_at    INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX idx_tag_name ON tag(name);
 CREATE INDEX idx_tag_display_order ON tag(display_order);
@@ -98,7 +102,8 @@ CREATE TABLE category (
     is_active                INTEGER NOT NULL DEFAULT 1,
     is_virtual               INTEGER NOT NULL DEFAULT 0,
     match_mode               TEXT    NOT NULL DEFAULT 'any',
-    is_display               INTEGER NOT NULL DEFAULT 1
+    is_display               INTEGER NOT NULL DEFAULT 1,
+    updated_at               INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX idx_category_name ON category(name);
 CREATE INDEX idx_category_sort_order ON category(sort_order);
@@ -131,7 +136,8 @@ CREATE TABLE product (
     is_kitchen_print_enabled INTEGER NOT NULL DEFAULT -1,
     is_label_print_enabled   INTEGER NOT NULL DEFAULT -1,
     is_active                INTEGER NOT NULL DEFAULT 1,
-    external_id              INTEGER
+    external_id              INTEGER,
+    updated_at               INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_product_category ON product(category_id);
 CREATE INDEX idx_product_sort_order ON product(sort_order);
@@ -171,7 +177,8 @@ CREATE TABLE attribute (
     show_on_receipt        INTEGER NOT NULL DEFAULT 0,
     receipt_name           TEXT,
     show_on_kitchen_print  INTEGER NOT NULL DEFAULT 0,
-    kitchen_print_name     TEXT
+    kitchen_print_name     TEXT,
+    updated_at             INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_attribute_display_order ON attribute(display_order);
 
@@ -226,7 +233,8 @@ CREATE TABLE price_rule (
     active_end_time   TEXT,
     is_active         INTEGER NOT NULL DEFAULT 1,
     created_by        INTEGER REFERENCES employee(id),
-    created_at        INTEGER NOT NULL DEFAULT 0
+    created_at        INTEGER NOT NULL DEFAULT 0,
+    updated_at        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_price_rule_active ON price_rule(is_active, product_scope);
 
@@ -330,27 +338,37 @@ CREATE TABLE member_stamp_progress (
     UNIQUE(member_id, stamp_activity_id)
 );
 
--- ── Singleton Tables ─────────────────────────────────────────
+-- ============================================================
+-- Singleton Tables
+-- ============================================================
 
 CREATE TABLE store_info (
-    id                  INTEGER PRIMARY KEY,
-    name                TEXT    NOT NULL DEFAULT '',
-    address             TEXT    NOT NULL DEFAULT '',
-    nif                 TEXT    NOT NULL DEFAULT '',
-    logo_url            TEXT,
-    phone               TEXT,
-    email               TEXT,
-    website             TEXT,
-    business_day_cutoff INTEGER NOT NULL DEFAULT 0,
-    created_at          INTEGER,
-    updated_at          INTEGER
+    id                       INTEGER PRIMARY KEY,
+    name                     TEXT    NOT NULL DEFAULT '',
+    address                  TEXT    NOT NULL DEFAULT '',
+    nif                      TEXT    NOT NULL DEFAULT '',
+    logo_url                 TEXT,
+    phone                    TEXT,
+    email                    TEXT,
+    website                  TEXT,
+    business_day_cutoff      INTEGER NOT NULL DEFAULT 0,
+    currency_code            TEXT,
+    currency_symbol          TEXT,
+    currency_decimal_places  INTEGER,
+    timezone                 TEXT,
+    receipt_locale           TEXT,
+    receipt_header           TEXT,
+    receipt_footer           TEXT,
+    created_at               INTEGER,
+    updated_at               INTEGER
 );
 
 CREATE TABLE system_state (
     id                 INTEGER PRIMARY KEY,
     genesis_hash       TEXT,
     last_order_id      INTEGER,
-    last_order_hash    TEXT,
+    last_chain_hash    TEXT,
+    last_huella        TEXT,
     synced_up_to_id    TEXT,
     synced_up_to_hash  TEXT,
     last_sync_time     INTEGER,
@@ -390,7 +408,6 @@ CREATE TABLE label_template (
 CREATE INDEX idx_label_template_name ON label_template(name);
 CREATE INDEX idx_label_template_active ON label_template(is_active);
 
--- Label fields: extracted from embedded array
 CREATE TABLE label_field (
     id                   INTEGER PRIMARY KEY,
     template_id          INTEGER NOT NULL REFERENCES label_template(id) ON DELETE CASCADE,
@@ -412,7 +429,6 @@ CREATE TABLE label_field (
     visible              INTEGER NOT NULL DEFAULT 1,
     label                TEXT,
     template             TEXT,
-    data_key             TEXT,
     source_type          TEXT,
     maintain_aspect_ratio INTEGER,
     style                TEXT,
@@ -480,7 +496,6 @@ CREATE TABLE daily_report (
 );
 CREATE UNIQUE INDEX idx_daily_report_date ON daily_report(business_date);
 
--- Tax breakdowns: extracted from embedded array
 CREATE TABLE daily_report_tax_breakdown (
     id            INTEGER PRIMARY KEY,
     report_id     INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
@@ -492,7 +507,6 @@ CREATE TABLE daily_report_tax_breakdown (
 );
 CREATE INDEX idx_tax_breakdown_report ON daily_report_tax_breakdown(report_id);
 
--- Payment breakdowns: extracted from embedded array
 CREATE TABLE daily_report_payment_breakdown (
     id        INTEGER PRIMARY KEY,
     report_id INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
@@ -502,7 +516,6 @@ CREATE TABLE daily_report_payment_breakdown (
 );
 CREATE INDEX idx_payment_breakdown_report ON daily_report_payment_breakdown(report_id);
 
--- Shift breakdowns: per-shift stats within daily report
 CREATE TABLE daily_report_shift_breakdown (
     id              INTEGER PRIMARY KEY,
     report_id       INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
@@ -586,8 +599,9 @@ CREATE TABLE archived_order (
     loss_amount                     REAL,
     void_note                       TEXT,
     related_order_id                INTEGER,
-    prev_hash                       TEXT    NOT NULL,
-    curr_hash                       TEXT    NOT NULL,
+    service_type                    TEXT,
+    is_voided                       INTEGER NOT NULL DEFAULT 0,
+    is_upgraded                     INTEGER NOT NULL DEFAULT 0,
     queue_number                    INTEGER,
     shift_id                        INTEGER REFERENCES shift(id),
     cloud_synced                    INTEGER NOT NULL DEFAULT 0,
@@ -596,7 +610,6 @@ CREATE TABLE archived_order (
 CREATE UNIQUE INDEX idx_archived_order_receipt ON archived_order(receipt_number);
 CREATE INDEX idx_archived_order_status ON archived_order(status);
 CREATE INDEX idx_archived_order_end_time ON archived_order(end_time);
-CREATE INDEX idx_archived_order_hash ON archived_order(curr_hash);
 CREATE INDEX idx_archived_order_cloud_synced ON archived_order(cloud_synced);
 CREATE INDEX idx_archived_order_shift ON archived_order(shift_id);
 CREATE INDEX idx_archived_order_status_end ON archived_order(status, end_time);
@@ -703,6 +716,146 @@ CREATE INDEX idx_payment_order ON payment(order_id);
 CREATE INDEX idx_payment_timestamp ON payment(timestamp);
 CREATE INDEX idx_payment_operator ON payment(operator_id);
 
+-- ── Chain Entry (unified hash chain) ─────────────────────────
+
+CREATE TABLE chain_entry (
+    id              INTEGER PRIMARY KEY,
+    entry_type      TEXT    NOT NULL,         -- 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE' | 'BREAK'
+    entry_pk        INTEGER NOT NULL,         -- FK to resource id (or failed chain_entry.id for BREAK)
+    prev_hash       TEXT    NOT NULL,
+    curr_hash       TEXT    NOT NULL,
+    created_at      INTEGER NOT NULL,
+    cloud_synced    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_chain_entry_created ON chain_entry(created_at);
+CREATE INDEX idx_chain_entry_type ON chain_entry(entry_type);
+CREATE UNIQUE INDEX idx_chain_entry_entry ON chain_entry(entry_type, entry_pk);
+CREATE INDEX idx_chain_entry_cloud_synced ON chain_entry(cloud_synced);
+
+-- ── Credit Note (退款凭证) ───────────────────────────────────
+
+CREATE TABLE credit_note (
+    id                    INTEGER PRIMARY KEY,
+    credit_note_number    TEXT    NOT NULL,
+    original_order_pk     INTEGER NOT NULL REFERENCES archived_order(id),
+    original_receipt      TEXT    NOT NULL,
+    subtotal_credit       REAL    NOT NULL,
+    tax_credit            REAL    NOT NULL,
+    total_credit          REAL    NOT NULL,
+    refund_method         TEXT    NOT NULL,
+    reason                TEXT    NOT NULL,
+    note                  TEXT,
+    operator_id           INTEGER NOT NULL,
+    operator_name         TEXT    NOT NULL,
+    authorizer_id         INTEGER,
+    authorizer_name       TEXT,
+    shift_id              INTEGER REFERENCES shift(id),
+    cloud_synced          INTEGER NOT NULL DEFAULT 0,
+    created_at            INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX idx_cn_number ON credit_note(credit_note_number);
+CREATE INDEX idx_cn_original ON credit_note(original_order_pk);
+CREATE INDEX idx_cn_created ON credit_note(created_at);
+CREATE INDEX idx_cn_cloud_synced ON credit_note(cloud_synced);
+CREATE INDEX idx_cn_shift ON credit_note(shift_id);
+
+CREATE TABLE credit_note_item (
+    id                    INTEGER PRIMARY KEY,
+    credit_note_id        INTEGER NOT NULL REFERENCES credit_note(id),
+    original_instance_id  TEXT    NOT NULL,
+    item_name             TEXT    NOT NULL,
+    quantity              INTEGER NOT NULL,
+    unit_price            REAL    NOT NULL,
+    line_credit           REAL    NOT NULL,
+    tax_rate              INTEGER NOT NULL,
+    tax_credit            REAL    NOT NULL
+);
+CREATE INDEX idx_cni_credit_note ON credit_note_item(credit_note_id);
+
+-- ── Invoice (Verifactu) ──────────────────────────────────────
+
+CREATE TABLE invoice (
+    id                      INTEGER PRIMARY KEY,
+    invoice_number          TEXT NOT NULL UNIQUE,
+    serie                   TEXT NOT NULL,
+    tipo_factura            TEXT NOT NULL,
+    source_type             TEXT NOT NULL,
+    source_pk               INTEGER NOT NULL,
+    subtotal                REAL NOT NULL,
+    tax                     REAL NOT NULL,
+    total                   REAL NOT NULL,
+    huella                  TEXT NOT NULL,
+    prev_huella             TEXT,
+    fecha_expedicion        TEXT NOT NULL,
+    fecha_hora_registro     TEXT NOT NULL DEFAULT '',
+    nif                     TEXT NOT NULL,
+    nombre_razon            TEXT NOT NULL,
+    factura_rectificada_id  INTEGER,
+    factura_rectificada_num TEXT,
+    -- F3 Sustitutiva fields
+    customer_nif            TEXT,
+    customer_nombre         TEXT,
+    customer_address        TEXT,
+    customer_email          TEXT,
+    customer_phone          TEXT,
+    factura_sustituida_id   INTEGER REFERENCES invoice(id),
+    factura_sustituida_num  TEXT,
+    cloud_synced            INTEGER NOT NULL DEFAULT 0,
+    aeat_status             TEXT NOT NULL DEFAULT 'PENDING',
+    created_at              INTEGER NOT NULL
+);
+CREATE INDEX idx_invoice_source ON invoice(source_type, source_pk);
+CREATE INDEX idx_invoice_cloud_synced ON invoice(cloud_synced);
+CREATE INDEX idx_invoice_serie_number ON invoice(serie, invoice_number);
+
+CREATE TABLE invoice_desglose (
+    id          INTEGER PRIMARY KEY,
+    invoice_id  INTEGER NOT NULL REFERENCES invoice(id),
+    tax_rate    INTEGER NOT NULL,
+    base_amount REAL NOT NULL,
+    tax_amount  REAL NOT NULL,
+    UNIQUE(invoice_id, tax_rate)
+);
+
+CREATE TABLE invoice_counter (
+    serie       TEXT PRIMARY KEY,
+    date_str    TEXT NOT NULL,
+    last_number INTEGER NOT NULL
+);
+
+-- ── Invoice Anulación (Verifactu RegistroFacturaBaja) ────────
+
+CREATE TABLE invoice_anulacion (
+    id                       INTEGER PRIMARY KEY,
+    anulacion_number         TEXT    NOT NULL UNIQUE,
+    serie                    TEXT    NOT NULL,
+    original_invoice_id      INTEGER NOT NULL REFERENCES invoice(id),
+    original_invoice_number  TEXT    NOT NULL,
+    huella                   TEXT    NOT NULL,
+    prev_huella              TEXT,
+    fecha_expedicion         TEXT    NOT NULL,
+    fecha_hora_registro      TEXT    NOT NULL,
+    nif                      TEXT    NOT NULL,
+    nombre_razon             TEXT    NOT NULL,
+    original_order_pk        INTEGER NOT NULL REFERENCES archived_order(id),
+    reason                   TEXT    NOT NULL,
+    note                     TEXT,
+    operator_id              INTEGER NOT NULL,
+    operator_name            TEXT    NOT NULL,
+    cloud_synced             INTEGER NOT NULL DEFAULT 0,
+    aeat_status              TEXT    NOT NULL DEFAULT 'PENDING',
+    created_at               INTEGER NOT NULL
+);
+CREATE INDEX idx_anulacion_order ON invoice_anulacion(original_order_pk);
+CREATE INDEX idx_anulacion_invoice ON invoice_anulacion(original_invoice_id);
+CREATE INDEX idx_anulacion_cloud_synced ON invoice_anulacion(cloud_synced);
+
+CREATE TABLE anulacion_counter (
+    serie       TEXT PRIMARY KEY,
+    date_str    TEXT NOT NULL,
+    last_number INTEGER NOT NULL
+);
+
 -- ── Archive Verification ─────────────────────────────────────
 
 CREATE TABLE archive_verification (
@@ -723,6 +876,19 @@ CREATE INDEX idx_av_date ON archive_verification(date);
 CREATE INDEX idx_av_created ON archive_verification(created_at);
 CREATE INDEX idx_av_intact ON archive_verification(chain_intact);
 CREATE UNIQUE INDEX idx_av_type_date ON archive_verification(verification_type, date);
+
+-- ── Catalog Changelog (bidirectional sync tracking) ─────────
+
+CREATE TABLE catalog_changelog (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource     TEXT    NOT NULL,          -- 'product', 'category', 'tag', 'attribute', 'employee', 'zone', 'dining_table', 'price_rule', 'label_template', 'store_info'
+    resource_id  INTEGER NOT NULL,
+    action       TEXT    NOT NULL,          -- 'upsert' | 'delete'
+    data         TEXT,                      -- JSON snapshot (upsert) or NULL (delete)
+    updated_at   INTEGER NOT NULL,
+    cloud_synced INTEGER NOT NULL DEFAULT 0 -- 0=pending, 1=synced
+);
+CREATE INDEX idx_catalog_changelog_unsynced ON catalog_changelog(cloud_synced) WHERE cloud_synced = 0;
 
 -- ── Audit Log (append-only) ──────────────────────────────────
 
@@ -770,7 +936,7 @@ VALUES (1, 'admin', '$argon2id$v=19$m=19456,t=2,p=1$4K7SyBwr5d3uF4hroPQf2w$hPqq7
 
 -- Store info + system state
 INSERT INTO store_info (id, name, address, nif, business_day_cutoff, created_at, updated_at)
-VALUES (1, '', '', '', '00:00', 0, 0);
+VALUES (1, '', '', '', 0, 0, 0);
 
 INSERT INTO system_state (id, order_count, created_at, updated_at)
 VALUES (1, 0, 0, 0);

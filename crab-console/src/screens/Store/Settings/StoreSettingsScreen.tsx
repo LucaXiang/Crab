@@ -63,12 +63,13 @@ export const StoreSettingsScreen: React.FC = () => {
   useLiveOrders(token, storeId, handleStoreInfoUpdated);
 
   useEffect(() => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     (async () => {
       try {
         const [stores, info] = await Promise.all([
-          getStores(token),
-          getStoreInfo(token, storeId),
+          getStores(tk),
+          getStoreInfo(tk, storeId),
         ]);
         const s = stores.find(s => s.id === storeId);
         if (s) {
@@ -94,11 +95,12 @@ export const StoreSettingsScreen: React.FC = () => {
 
     // 并行加载设备列表（静默失败，设备列表是辅助信息）
     setDevicesLoading(true);
-    getStoreDevices(token, storeId)
+    getStoreDevices(tk, storeId)
       .then(data => setDevices(data))
       .catch(() => { /* 静默失败 */ })
       .finally(() => setDevicesLoading(false));
-  }, [token, storeId, clearAuth, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   const handleDeleteStore = async () => {
     if (!token) return;

@@ -50,25 +50,31 @@ pub async fn create(
     let color = data.color.unwrap_or_else(|| "#3B82F6".to_string());
     let display_order = data.display_order.unwrap_or(0);
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
-    sqlx::query("INSERT INTO tag (id, name, color, display_order) VALUES (?, ?, ?, ?)")
-        .bind(id)
-        .bind(&data.name)
-        .bind(&color)
-        .bind(display_order)
-        .execute(pool)
-        .await?;
+    let now = shared::util::now_millis();
+    sqlx::query(
+        "INSERT INTO tag (id, name, color, display_order, updated_at) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(id)
+    .bind(&data.name)
+    .bind(&color)
+    .bind(display_order)
+    .bind(now)
+    .execute(pool)
+    .await?;
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create tag".into()))
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, data: TagUpdate) -> RepoResult<Tag> {
+    let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE tag SET name = COALESCE(?1, name), color = COALESCE(?2, color), display_order = COALESCE(?3, display_order), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+        "UPDATE tag SET name = COALESCE(?1, name), color = COALESCE(?2, color), display_order = COALESCE(?3, display_order), is_active = COALESCE(?4, is_active), updated_at = ?5 WHERE id = ?6",
         data.name,
         data.color,
         data.display_order,
         data.is_active,
+        now,
         id
     )
     .execute(pool)

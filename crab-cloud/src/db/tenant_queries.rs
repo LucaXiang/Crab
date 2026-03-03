@@ -150,7 +150,7 @@ pub async fn list_orders(
     Ok(rows)
 }
 
-/// Unified chain entry item (orders + credit notes + anulaciones + upgrades in one timeline)
+/// Unified chain entry item — driven by store_chain_entries with JOINs for business data
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct ChainEntryItem {
     pub entry_type: String,
@@ -172,62 +172,49 @@ pub async fn list_chain_entries(
 ) -> Result<Vec<ChainEntryItem>, BoxError> {
     let rows: Vec<ChainEntryItem> = sqlx::query_as(
         r#"
-        (
-            SELECT
-                'ORDER'::TEXT AS entry_type,
-                o.order_id AS entry_id,
-                COALESCE(o.receipt_number, CAST(o.order_id AS TEXT)) AS display_number,
-                o.status,
-                o.total AS amount,
-                COALESCE(o.end_time, o.synced_at) AS created_at,
-                NULL::BIGINT AS original_order_id,
-                NULL::TEXT AS original_receipt
-            FROM store_archived_orders o
-            WHERE o.store_id = $1 AND o.tenant_id = $2
-        )
-        UNION ALL
-        (
-            SELECT
-                'CREDIT_NOTE'::TEXT AS entry_type,
-                cn.source_id AS entry_id,
-                cn.credit_note_number AS display_number,
-                'REFUND'::TEXT AS status,
-                cn.total_credit AS amount,
-                cn.created_at,
-                cn.original_order_id,
-                cn.original_receipt
-            FROM store_credit_notes cn
-            WHERE cn.store_id = $1 AND cn.tenant_id = $2
-        )
-        UNION ALL
-        (
-            SELECT
-                'ANULACION'::TEXT AS entry_type,
-                o.order_id AS entry_id,
-                COALESCE(o.receipt_number, CAST(o.order_id AS TEXT)) AS display_number,
-                'ANULADA'::TEXT AS status,
-                o.total AS amount,
-                COALESCE(o.end_time, o.synced_at) AS created_at,
-                NULL::BIGINT AS original_order_id,
-                NULL::TEXT AS original_receipt
-            FROM store_archived_orders o
-            WHERE o.store_id = $1 AND o.tenant_id = $2 AND o.is_anulada = true
-        )
-        UNION ALL
-        (
-            SELECT
-                'UPGRADE'::TEXT AS entry_type,
-                o.order_id AS entry_id,
-                COALESCE(o.receipt_number, CAST(o.order_id AS TEXT)) AS display_number,
-                'UPGRADED'::TEXT AS status,
-                o.total AS amount,
-                COALESCE(o.end_time, o.synced_at) AS created_at,
-                NULL::BIGINT AS original_order_id,
-                NULL::TEXT AS original_receipt
-            FROM store_archived_orders o
-            WHERE o.store_id = $1 AND o.tenant_id = $2 AND o.is_upgraded = true
-        )
-        ORDER BY created_at DESC
+        SELECT
+            ce.entry_type,
+            ce.entry_pk AS entry_id,
+            CASE
+                WHEN ce.entry_type = 'ORDER' OR ce.entry_type = 'ANULACION' OR ce.entry_type = 'UPGRADE'
+                    THEN COALESCE(o.receipt_number, CAST(ce.entry_pk AS TEXT))
+                WHEN ce.entry_type = 'CREDIT_NOTE'
+                    THEN COALESCE(cn.credit_note_number, CAST(ce.entry_pk AS TEXT))
+                WHEN ce.entry_type = 'BREAK'
+                    THEN 'BREAK'
+                ELSE CAST(ce.entry_pk AS TEXT)
+            END AS display_number,
+            CASE
+                WHEN ce.entry_type = 'ORDER' THEN COALESCE(o.status, 'UNKNOWN')
+                WHEN ce.entry_type = 'CREDIT_NOTE' THEN 'REFUND'
+                WHEN ce.entry_type = 'ANULACION' THEN 'ANULADA'
+                WHEN ce.entry_type = 'UPGRADE' THEN 'UPGRADED'
+                WHEN ce.entry_type = 'BREAK' THEN 'BREAK'
+                ELSE 'UNKNOWN'
+            END AS status,
+            CASE
+                WHEN ce.entry_type IN ('ORDER', 'ANULACION', 'UPGRADE') THEN o.total
+                WHEN ce.entry_type = 'CREDIT_NOTE' THEN cn.total_credit
+                ELSE NULL
+            END AS amount,
+            ce.created_at,
+            CASE
+                WHEN ce.entry_type = 'CREDIT_NOTE' THEN cn.original_order_id
+                ELSE NULL::BIGINT
+            END AS original_order_id,
+            CASE
+                WHEN ce.entry_type = 'CREDIT_NOTE' THEN cn.original_receipt
+                ELSE NULL::TEXT
+            END AS original_receipt
+        FROM store_chain_entries ce
+        LEFT JOIN store_archived_orders o
+            ON ce.entry_type IN ('ORDER', 'ANULACION', 'UPGRADE')
+            AND o.store_id = ce.store_id AND o.tenant_id = ce.tenant_id AND o.order_id = ce.entry_pk
+        LEFT JOIN store_credit_notes cn
+            ON ce.entry_type = 'CREDIT_NOTE'
+            AND cn.store_id = ce.store_id AND cn.tenant_id = ce.tenant_id AND cn.source_id = ce.entry_pk
+        WHERE ce.store_id = $1 AND ce.tenant_id = $2
+        ORDER BY ce.created_at DESC
         LIMIT $3 OFFSET $4
         "#,
     )
@@ -261,6 +248,7 @@ pub struct CreditNoteDetail {
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct CreditNoteItemDetail {
+    pub original_instance_id: String,
     pub item_name: String,
     pub quantity: i32,
     pub unit_price: Decimal,
@@ -315,7 +303,7 @@ pub async fn get_credit_note_detail(
 
     let items = sqlx::query_as::<_, CreditNoteItemDetail>(
         r#"
-        SELECT item_name, quantity, unit_price, line_credit, tax_rate, tax_credit
+        SELECT original_instance_id, item_name, quantity, unit_price, line_credit, tax_rate, tax_credit
         FROM store_credit_note_items
         WHERE credit_note_id = $1
         ORDER BY id
@@ -349,7 +337,7 @@ pub struct AnulacionDetail {
     pub order_id: i64,
     pub receipt_number: String,
     pub total_amount: f64,
-    pub is_anulada: bool,
+    pub is_voided: bool,
     pub created_at: i64,
 }
 
@@ -361,10 +349,10 @@ pub async fn get_anulacion_detail(
 ) -> Result<Option<AnulacionDetail>, BoxError> {
     let row: Option<AnulacionDetail> = sqlx::query_as(
         r#"
-        SELECT order_id, receipt_number, total AS total_amount, is_anulada,
+        SELECT order_id, receipt_number, total AS total_amount, is_voided,
                COALESCE(end_time, synced_at) AS created_at
         FROM store_archived_orders
-        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3 AND is_anulada = true
+        WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3 AND is_voided = true
         "#,
     )
     .bind(store_id)
@@ -671,7 +659,7 @@ pub async fn get_order_detail(
         discount_amount: Decimal,
         void_type: Option<String>,
         loss_amount: Option<Decimal>,
-        is_anulada: Option<bool>,
+        is_voided: Option<bool>,
         is_upgraded: Option<bool>,
         customer_nif: Option<String>,
         customer_nombre: Option<String>,
@@ -688,7 +676,7 @@ pub async fn get_order_detail(
                order_rule_discount_amount, order_rule_surcharge_amount,
                operator_name, loss_reason, void_note, member_name,
                guest_count, discount_amount, void_type, loss_amount,
-               is_anulada, is_upgraded, customer_nif, customer_nombre,
+               is_voided, is_upgraded, customer_nif, customer_nombre,
                customer_address, customer_email, customer_phone
         FROM store_archived_orders
         WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
@@ -710,6 +698,7 @@ pub async fn get_order_detail(
     #[derive(sqlx::FromRow)]
     struct ItemRow {
         id: i64,
+        instance_id: String,
         name: String,
         spec_name: Option<String>,
         category_name: Option<String>,
@@ -757,7 +746,7 @@ pub async fn get_order_detail(
     let (items_r, options_r, payments_r, events_r) = tokio::join!(
         sqlx::query_as::<_, ItemRow>(
             r#"
-            SELECT id, name, spec_name, category_name, product_source_id,
+            SELECT id, instance_id, name, spec_name, category_name, product_source_id,
                    price, quantity, unit_price, line_total, discount_amount,
                    surcharge_amount, tax, tax_rate, is_comped, note
             FROM store_order_items
@@ -824,6 +813,7 @@ pub async fn get_order_detail(
     let items: Vec<shared::cloud::OrderItemSync> = item_rows
         .into_iter()
         .map(|i| shared::cloud::OrderItemSync {
+            instance_id: i.instance_id,
             name: i.name,
             spec_name: i.spec_name,
             category_name: i.category_name,
@@ -898,7 +888,7 @@ pub async fn get_order_detail(
         items,
         payments,
         events,
-        is_anulada: header.is_anulada.unwrap_or(false),
+        is_voided: header.is_voided.unwrap_or(false),
         is_upgraded: header.is_upgraded.unwrap_or(false),
         customer_nif: header.customer_nif,
         customer_nombre: header.customer_nombre,

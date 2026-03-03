@@ -11,7 +11,7 @@ use super::{
 /// Catalog export payload — the content of `catalog.json` inside the ZIP.
 ///
 /// Used by both edge-server and crab-cloud for data transfer.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogExport {
     pub version: u32,
     pub exported_at: i64,

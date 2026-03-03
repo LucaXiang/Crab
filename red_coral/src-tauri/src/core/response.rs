@@ -135,6 +135,8 @@ fn tenant_error_to_code(err: &super::tenant_manager::TenantError) -> ErrorCode {
 /// 会自动提取服务端返回的 error code，非 API 错误映射到最匹配的 ErrorCode
 impl<T: Serialize> ApiResponse<T> {
     pub fn from_bridge_error(err: BridgeError) -> Self {
+        tracing::warn!(error = %err, "Bridge error");
+
         match &err {
             BridgeError::Client(client_err) => {
                 // API 错误：直接保留服务端的 error code + details

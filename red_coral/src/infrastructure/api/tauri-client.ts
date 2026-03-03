@@ -105,6 +105,8 @@ function localizeErrorCode(
   rawMessage?: string,
   details?: Record<string, unknown>
 ): string {
+  const suffix = ` [${code}]`;
+
   // 优先用错误码查 i18n
   const key = `errors.${code}`;
   // 将 details 转换为 t() 需要的参数格式
@@ -115,14 +117,14 @@ function localizeErrorCode(
     : undefined;
   const localized = t(key, params);
   if (localized !== key) {
-    return localized;
+    return localized + suffix;
   }
   // i18n 没有对应 key，用 rawMessage 做关键词匹配作为 fallback
   logger.warn(`Missing i18n for error code ${code}, add to zh-CN.json`, { component: 'invokeApi' });
   if (rawMessage) {
-    return friendlyError(rawMessage);
+    return friendlyError(rawMessage) + suffix;
   }
-  return `${t('error.friendly.unknown')} (${code})`;
+  return `${t('error.friendly.unknown')}${suffix}`;
 }
 
 export async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -143,7 +145,7 @@ export async function invokeApi<T>(command: string, args?: Record<string, unknow
       throw error;
     }
     const raw = error instanceof Error ? error.message : String(error);
-    throw new ApiError(9001, friendlyError(raw));
+    throw new ApiError(9001, `${friendlyError(raw)} [9001]`);
   }
 }
 

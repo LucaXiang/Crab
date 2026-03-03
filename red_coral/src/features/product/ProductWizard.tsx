@@ -20,6 +20,7 @@ interface ProductWizardProps {
 interface FormSpec {
   name: string;
   price: string;
+  receipt_name: string;
   is_default: boolean;
   is_root: boolean;
 }
@@ -38,14 +39,20 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
 
   // ── Form State ──
   const [name, setName] = useState('');
-  const [categoryId, setCategoryId] = useState<number | ''>(initialCategoryId || '');
+  const validInitialCategory = initialCategoryId && categories.some(c => c.id === initialCategoryId)
+    ? initialCategoryId
+    : '';
+  const [categoryId, setCategoryId] = useState<number | ''>(validInitialCategory);
   const [image, setImage] = useState('');
   const [price, setPrice] = useState('');
   const [rootSpecName, setRootSpecName] = useState('');
+  const [rootSpecReceiptName, setRootSpecReceiptName] = useState('');
 
   const [specs, setSpecs] = useState<FormSpec[]>([]);
 
   const [taxRate, setTaxRate] = useState('10');
+  const [receiptName, setReceiptName] = useState('');
+  const [kitchenPrintName, setKitchenPrintName] = useState('');
   const [isKitchenPrint, setIsKitchenPrint] = useState(true);
   const [isLabelPrint, setIsLabelPrint] = useState(false);
 
@@ -54,7 +61,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
 
   // ── Spec Helpers ──
   const addSpec = () => {
-    setSpecs([...specs, { name: '', price: '', is_default: false, is_root: false }]);
+    setSpecs([...specs, { name: '', price: '', receipt_name: '', is_default: false, is_root: false }]);
   };
 
   const removeSpec = (index: number) => {
@@ -96,6 +103,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
         is_default: specs.length === 0 || !specs.some(s => s.is_default),
         is_active: true,
         is_root: true,
+        receipt_name: rootSpecReceiptName.trim() || undefined,
       },
       ...specs.map((s, i) => ({
         name: s.name.trim(),
@@ -104,6 +112,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
         is_default: s.is_default,
         is_active: true,
         is_root: false,
+        receipt_name: s.receipt_name.trim() || undefined,
       })),
     ];
 
@@ -113,11 +122,11 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
       category_id: Number(categoryId),
       tax_rate: Number(taxRate) || 0,
       sort_order: 0,
-      receipt_name: name.trim(),
-      kitchen_print_name: name.trim(),
+      receipt_name: receiptName.trim() || name.trim(),
+      kitchen_print_name: kitchenPrintName.trim() || name.trim(),
       is_kitchen_print_enabled: isKitchenPrint ? 1 : 0,
       is_label_print_enabled: isLabelPrint ? 1 : 0,
-      external_id: externalId ? Number(externalId) : undefined,
+      external_id: Number(externalId),
       tags: tagIds.length > 0 ? tagIds : undefined,
       specs: allSpecs,
     });
@@ -136,7 +145,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
     return undefined;
   };
 
-  // ── Step 1: Basics ──
+  // ── Step 1: Basics + Pricing ──
 
   const step1: WizardStep = {
     id: 'basics',
@@ -168,7 +177,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
             <FormField label={t('settings.product.form.category')} required>
               <select value={categoryId} onChange={e => setCategoryId(Number(e.target.value))} className={selectClass}>
                 <option value="" disabled>{t('common.hint.select')}</option>
-                {categories.map(c => (
+                {categories.filter(c => !c.is_virtual).map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
@@ -209,6 +218,16 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
                   </div>
                 </FormField>
               </div>
+            </div>
+            <div className="mt-2">
+              <FormField label={t('settings.product.form.receipt_name')}>
+                <input
+                  value={rootSpecReceiptName}
+                  onChange={e => setRootSpecReceiptName(e.target.value)}
+                  className={inputClass}
+                  placeholder={rootSpecName || t('settings.product.wizard.spec_receipt_name_fallback')}
+                />
+              </FormField>
             </div>
           </div>
 
@@ -251,6 +270,16 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
                   </FormField>
                 </div>
               </div>
+              <div className="mt-2">
+                <FormField label={t('settings.product.form.receipt_name')}>
+                  <input
+                    value={spec.receipt_name}
+                    onChange={e => updateSpec(idx, 'receipt_name', e.target.value)}
+                    className={inputClass}
+                    placeholder={spec.name || t('settings.product.wizard.spec_receipt_name_fallback')}
+                  />
+                </FormField>
+              </div>
               <div className="mt-2 flex items-center">
                 <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
                   <input
@@ -278,7 +307,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
     ),
   };
 
-  // ── Step 2 ──
+  // ── Step 2: Operations ──
 
   const userTags = tags.filter(t => !t.is_system);
 
@@ -331,6 +360,16 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
           <p className="mt-1 text-xs text-slate-400">{t('settings.product.wizard.tax_rate_hint')}</p>
         </FormField>
 
+        <FormField label={t('settings.product.form.receipt_name')}>
+          <input
+            value={receiptName}
+            onChange={e => setReceiptName(e.target.value)}
+            className={inputClass}
+            placeholder={name || t('settings.product.wizard.receipt_name_fallback')}
+          />
+          <p className="mt-1 text-xs text-slate-400">{t('settings.product.wizard.receipt_name_hint')}</p>
+        </FormField>
+
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
           <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <Printer className="w-4 h-4" />
@@ -342,7 +381,18 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
             checked={isKitchenPrint}
             onChange={setIsKitchenPrint}
           />
-          <p className="text-xs text-slate-400 ml-6 -mt-1">{t('settings.product.wizard.kitchen_print_hint')}</p>
+          {isKitchenPrint && (
+            <div className="pl-6">
+              <FormField label={t('settings.product.form.kitchen_print_name')}>
+                <input
+                  value={kitchenPrintName}
+                  onChange={e => setKitchenPrintName(e.target.value)}
+                  className={inputClass}
+                  placeholder={t('settings.product.wizard.receipt_name_fallback')}
+                />
+              </FormField>
+            </div>
+          )}
           <CheckboxField
             id="is_label"
             label={t('settings.product.print.is_label_print_enabled')}

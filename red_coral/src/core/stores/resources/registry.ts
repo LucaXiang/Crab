@@ -71,15 +71,25 @@ export function getLoadedStores(): [string, RegistryStore][] {
 }
 
 /**
- * 刷新所有已加载的 Store
+ * 刷新所有已加载的 Store (强制从服务端重新获取)
  */
 export async function refreshAllLoadedStores(): Promise<void> {
   const loadedStores = getLoadedStores();
 
   await Promise.all(
-    loadedStores.map(([name, store]) => {
-      return store.getState().fetchAll();
+    loadedStores.map(([, store]) => {
+      return store.getState().fetchAll(true);
     })
   );
+}
+
+/**
+ * 清除所有 Store 的数据和加载状态
+ * 用于 logout/deactivate/exitTenant 时重置
+ */
+export function clearAllStores(): void {
+  for (const store of Object.values(storeRegistry)) {
+    store.getState().clear();
+  }
 }
 

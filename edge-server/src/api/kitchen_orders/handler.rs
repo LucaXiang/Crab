@@ -135,7 +135,7 @@ pub async fn reprint(
             // Get order metadata
             let order_meta =
                 sqlx::query_as::<_, (Option<String>, Option<String>, bool, Option<i32>, i64, String)>(
-                    "SELECT o.table_name, o.zone_name, o.is_retail, o.queue_number, o.order_id, o.receipt_number \
+                    "SELECT o.table_name, o.zone_name, o.is_retail, o.queue_number, o.id, o.receipt_number \
                  FROM archived_order o \
                  JOIN archived_order_event e ON e.order_pk = o.id \
                  WHERE e.id = ?",

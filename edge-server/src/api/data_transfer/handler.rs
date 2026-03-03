@@ -223,7 +223,10 @@ pub(super) async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<
 /// 1. DELETE all catalog data (reverse FK order, CASCADE handles children)
 /// 2. INSERT all exported data with original IDs
 /// 3. Attribute default_option_ids back-filled after options exist
-async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Result<(), AppError> {
+pub async fn import_catalog_data(
+    state: &ServerState,
+    catalog: &CatalogExport,
+) -> Result<(), AppError> {
     let mut tx = state
         .pool
         .begin()
@@ -264,10 +267,12 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
+    let now = shared::util::now_millis();
+
     // ── INSERT tags ──
     for tag in &catalog.tags {
         sqlx::query(
-            "INSERT INTO tag (id, name, color, display_order, is_active, is_system) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO tag (id, name, color, display_order, is_active, is_system, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(tag.id)
         .bind(&tag.name)
@@ -275,6 +280,7 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .bind(tag.display_order)
         .bind(tag.is_active)
         .bind(tag.is_system)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -283,8 +289,8 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
     // ── INSERT categories ──
     for cat in &catalog.categories {
         sqlx::query(
-            "INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO category (id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(cat.id)
         .bind(&cat.name)
@@ -295,6 +301,7 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .bind(cat.is_virtual)
         .bind(&cat.match_mode)
         .bind(cat.is_display)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -331,8 +338,8 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
     // ── INSERT products ──
     for product in &catalog.products {
         sqlx::query(
-            "INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO product (id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(product.id)
         .bind(&product.name)
@@ -346,6 +353,7 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .bind(product.is_label_print_enabled)
         .bind(product.is_active)
         .bind(product.external_id)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -384,8 +392,8 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
     // ── INSERT attributes (without default_option_ids first) ──
     for attr in &catalog.attributes {
         sqlx::query(
-            "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) \
-             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name, updated_at) \
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(attr.id)
         .bind(&attr.name)
@@ -397,6 +405,7 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .bind(&attr.receipt_name)
         .bind(attr.show_on_kitchen_print)
         .bind(&attr.kitchen_print_name)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -438,11 +447,12 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
 
     // ── INSERT zones ──
     for z in &catalog.zones {
-        sqlx::query("INSERT INTO zone (id, name, description, is_active) VALUES (?, ?, ?, ?)")
+        sqlx::query("INSERT INTO zone (id, name, description, is_active, updated_at) VALUES (?, ?, ?, ?, ?)")
             .bind(z.id)
             .bind(&z.name)
             .bind(&z.description)
             .bind(z.is_active)
+            .bind(now)
             .execute(&mut *tx)
             .await
             .map_err(|e| AppError::database(e.to_string()))?;
@@ -451,13 +461,14 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
     // ── INSERT dining_tables (after zones, FK → zone_id) ──
     for dt in &catalog.dining_tables {
         sqlx::query(
-            "INSERT INTO dining_table (id, name, zone_id, capacity, is_active) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO dining_table (id, name, zone_id, capacity, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(dt.id)
         .bind(&dt.name)
         .bind(dt.zone_id)
         .bind(dt.capacity)
         .bind(dt.is_active)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -471,8 +482,8 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
             .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "null".to_string()));
 
         sqlx::query(
-            "INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            "INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
         )
         .bind(pr.id)
         .bind(&pr.name)
@@ -494,6 +505,7 @@ async fn import_catalog_data(state: &ServerState, catalog: &CatalogExport) -> Re
         .bind(pr.is_active)
         .bind(pr.created_by)
         .bind(pr.created_at)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;

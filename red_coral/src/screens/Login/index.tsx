@@ -188,16 +188,16 @@ export const LoginScreen: React.FC = () => {
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl ${
-                  modeInfo?.tenant_id ? 'bg-orange-50 text-primary-500' : 'bg-gray-50 text-gray-400'
+                  modeInfo?.store_alias ? 'bg-orange-50 text-primary-500' : 'bg-gray-50 text-gray-400'
                 }`}>
-                  {modeInfo?.tenant_id ? <Building2 size={24} /> : <WifiOff size={24} />}
+                  {modeInfo?.store_alias ? <Building2 size={24} /> : <WifiOff size={24} />}
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">
-                    {modeInfo?.tenant_id || t('auth.login.tenant_no_tenant')}
+                    {modeInfo?.store_alias || t('auth.login.tenant_no_tenant')}
                   </h3>
                   <p className="text-xs text-gray-500">
-                    {modeInfo?.tenant_id ? t('auth.login.tenant_active') : t('auth.login.tenant_select_prompt')}
+                    {modeInfo?.store_alias ? t('auth.login.tenant_active') : t('auth.login.tenant_select_prompt')}
                   </p>
                 </div>
               </div>

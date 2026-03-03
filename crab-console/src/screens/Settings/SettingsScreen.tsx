@@ -39,10 +39,11 @@ export const SettingsScreen: React.FC = () => {
   const [lang, setLang] = useState<Locale>(getLocale());
 
   useEffect(() => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     (async () => {
       try {
-        const res = await getProfile(token);
+        const res = await getProfile(tk);
         setProfile(res.profile);
         setSubscription(res.subscription);
         setP12(res.p12);
@@ -53,7 +54,8 @@ export const SettingsScreen: React.FC = () => {
         setLoading(false);
       }
     })();
-  }, [token, clearAuth, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSaveProfile = async () => {
     if (!token) return;

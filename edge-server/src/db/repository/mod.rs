@@ -21,6 +21,7 @@ pub mod price_rule;
 
 // Orders
 pub mod anulacion;
+pub mod chain_entry;
 pub mod credit_note;
 pub mod invoice;
 pub mod order;
@@ -81,7 +82,8 @@ impl From<sqlx::Error> for RepoError {
                 if msg.contains("UNIQUE constraint failed") {
                     RepoError::Duplicate(msg)
                 } else if msg.contains("FOREIGN KEY constraint failed") {
-                    RepoError::Validation(msg)
+                    tracing::error!("FK constraint violation: {msg}");
+                    RepoError::Database(msg)
                 } else {
                     RepoError::Database(msg)
                 }

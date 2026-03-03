@@ -45,21 +45,33 @@ fn internal(e: Box<dyn std::error::Error + Send + Sync>) -> AppError {
     AppError::with_message(ErrorCode::InternalError, e.to_string())
 }
 
-/// Push StoreOp to edge: direct send if online, queue to pending_ops if offline.
+/// Push StoreOp to edge: direct send if online, queue to pending_ops if offline or channel full.
 pub async fn push_to_edge(state: &AppState, store_id: i64, tenant_id: i64, op: StoreOp) {
     let now = shared::util::now_millis();
 
-    if let Some(sender) = state.edges.connected.get(&store_id) {
+    let should_queue = if let Some(sender) = state.edges.connected.get(&store_id) {
         let msg = CloudMessage::Rpc {
             id: format!("push-{}", uuid::Uuid::new_v4()),
             payload: Box::new(CloudRpc::StoreOp {
-                op: Box::new(op),
+                op: Box::new(op.clone()),
                 changed_at: Some(now),
             }),
         };
-        let _ = sender.try_send(msg);
-    } else if let Err(e) =
-        crate::db::store::pending_ops::insert(&state.pool, store_id, tenant_id, &op, now).await
+        match sender.try_send(msg) {
+            Ok(()) => false,
+            Err(_) => {
+                // Channel full — fall through to pending_ops so the op is not lost
+                tracing::warn!(store_id, "WS channel full, queueing to pending_ops");
+                true
+            }
+        }
+    } else {
+        true
+    };
+
+    if should_queue
+        && let Err(e) =
+            crate::db::store::pending_ops::insert(&state.pool, store_id, tenant_id, &op, now).await
     {
         tracing::error!(store_id, "Failed to queue pending op: {e}");
     }

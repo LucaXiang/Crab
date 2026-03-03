@@ -56,9 +56,7 @@ export const ProductManagement: React.FC = React.memo(() => {
   // UI state from settings store
   const {
     productCategoryFilter: categoryFilter,
-    productsPage: page,
     setProductCategoryFilter: setCategoryFilter,
-    setProductsPagination: setPagination,
   } = useSettingsFilters();
 
   const { openModal } = useSettingsModal();
@@ -101,10 +99,6 @@ export const ProductManagement: React.FC = React.memo(() => {
     productStore.fetchAll();
   }, [dataVersion]);
 
-  // Update pagination when filtered products change
-  useEffect(() => {
-    setPagination(page, filteredProducts.length);
-  }, [filteredProducts.length]);
 
   const handleBatchDelete = (items: ProductItem[]) => {
     confirmDialog.show(
@@ -388,7 +382,6 @@ export const ProductManagement: React.FC = React.memo(() => {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setPagination(1, filteredProducts.length);
               }}
               placeholder={t('common.hint.search_placeholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
@@ -421,9 +414,6 @@ export const ProductManagement: React.FC = React.memo(() => {
         onBatchDelete={canManageMenu ? handleBatchDelete : undefined}
         emptyText={t('common.empty.no_data')}
         pageSize={5}
-        totalItems={filteredProducts.length}
-        currentPage={page}
-        onPageChange={(newPage) => setPagination(newPage, filteredProducts.length)}
         themeColor="orange"
         isSelectionMode={isSelectionMode}
         onSelectionModeChange={setIsSelectionMode}

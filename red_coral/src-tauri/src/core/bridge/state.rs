@@ -55,11 +55,14 @@ impl ClientBridge {
             is_connected
         };
 
+        let store_alias = tenant_manager.current_store_alias();
+
         ModeInfo {
             mode,
             is_connected: final_is_connected,
             is_authenticated,
             tenant_id: tenant_manager.current_tenant_id(),
+            store_alias,
             username: tenant_manager.current_session().map(|s| s.username.clone()),
         }
     }

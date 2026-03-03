@@ -64,13 +64,17 @@ pub async fn create(
 ) -> RepoResult<DiningTable> {
     let capacity = data.capacity.unwrap_or(4);
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
-    sqlx::query("INSERT INTO dining_table (id, name, zone_id, capacity) VALUES (?, ?, ?, ?)")
-        .bind(id)
-        .bind(&data.name)
-        .bind(data.zone_id)
-        .bind(capacity)
-        .execute(pool)
-        .await?;
+    let now = shared::util::now_millis();
+    sqlx::query(
+        "INSERT INTO dining_table (id, name, zone_id, capacity, updated_at) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(id)
+    .bind(&data.name)
+    .bind(data.zone_id)
+    .bind(capacity)
+    .bind(now)
+    .execute(pool)
+    .await?;
     find_by_id(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create dining table".into()))
@@ -81,12 +85,14 @@ pub async fn update(
     id: i64,
     data: DiningTableUpdate,
 ) -> RepoResult<DiningTable> {
+    let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE dining_table SET name = COALESCE(?1, name), zone_id = COALESCE(?2, zone_id), capacity = COALESCE(?3, capacity), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+        "UPDATE dining_table SET name = COALESCE(?1, name), zone_id = COALESCE(?2, zone_id), capacity = COALESCE(?3, capacity), is_active = COALESCE(?4, is_active), updated_at = ?5 WHERE id = ?6",
         data.name,
         data.zone_id,
         data.capacity,
         data.is_active,
+        now,
         id
     )
     .execute(pool)

@@ -1,4 +1,4 @@
-//! Invoice Anulación API Handlers
+//! Anulación API Handlers
 
 use crate::archiving::AnulacionService;
 use crate::auth::CurrentUser;
@@ -8,9 +8,8 @@ use axum::{
     Json,
     extract::{Path, State},
 };
-use shared::models::invoice::InvoiceAnulacion;
 
-use crate::archiving::anulacion::CreateAnulacionRequest;
+use crate::archiving::anulacion::{AnulacionResponse, CreateAnulacionRequest};
 
 /// Helper: construct AnulacionService from state
 fn anulacion_service(state: &ServerState) -> Result<AnulacionService, AppError> {
@@ -22,25 +21,24 @@ fn anulacion_service(state: &ServerState) -> Result<AnulacionService, AppError> 
     Ok(AnulacionService::new(
         state.pool.clone(),
         archive_service.hash_chain_lock().clone(),
-        archive_service.invoice_service().cloned(),
     ))
 }
 
-/// POST /api/anulacion - 创建发票作废
+/// POST /api/anulacion - 创建作废
 pub async fn create(
     State(state): State<ServerState>,
     current_user: CurrentUser,
     Json(request): Json<CreateAnulacionRequest>,
-) -> AppResult<Json<InvoiceAnulacion>> {
+) -> AppResult<Json<AnulacionResponse>> {
     let service = anulacion_service(&state)?;
-    let anulacion = service
+    let response = service
         .create_anulacion(&request, current_user.id, &current_user.name)
         .await?;
 
     // Notify cloud worker to sync
     state.archive_notify.notify_one();
 
-    Ok(Json(anulacion))
+    Ok(Json(response))
 }
 
 /// GET /api/anulacion/eligibility/:order_pk - 检查是否可以作废
@@ -62,7 +60,7 @@ pub async fn check_eligibility(
 pub async fn get_by_order(
     State(state): State<ServerState>,
     Path(order_pk): Path<i64>,
-) -> AppResult<Json<Option<InvoiceAnulacion>>> {
+) -> AppResult<Json<Option<shared::models::invoice::InvoiceAnulacion>>> {
     let anulacion = crate::db::repository::anulacion::find_by_order(&state.pool, order_pk)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;

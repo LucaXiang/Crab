@@ -1,4 +1,7 @@
-//! FullSync (initial store provisioning) + EnsureImage
+//! FullSync (store provisioning) + EnsureImage + CatalogSyncData
+//!
+//! FullSync: Cloud→Edge StoreOp with StoreSnapshot (Create types, no IDs).
+//! CatalogSyncData: Cloud→Edge full catalog with real IDs (re-bind scenario).
 
 use shared::cloud::store_op::{BindingOwner, FullSyncResult, StoreOpResult, StoreSnapshot};
 use shared::message::SyncChangeType;
@@ -6,6 +9,68 @@ use shared::message::SyncChangeType;
 use crate::core::state::ServerState;
 
 use super::attribute;
+
+/// Clear all catalog tables in SQLite before FullSync rebuild.
+/// Uses FK-safe deletion order: bindings → products → categories → attributes → tags
+async fn clear_catalog(state: &ServerState) -> Result<(), String> {
+    let pool = &state.pool;
+    // attribute_binding (references products/categories + attributes)
+    sqlx::query("DELETE FROM attribute_binding")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear attribute_binding: {e}"))?;
+    // product_spec (references products)
+    sqlx::query("DELETE FROM product_spec")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear product_spec: {e}"))?;
+    // product_tag (references products + tags)
+    sqlx::query("DELETE FROM product_tag")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear product_tag: {e}"))?;
+    // product
+    sqlx::query("DELETE FROM product")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear product: {e}"))?;
+    // category_print_destination (references categories)
+    sqlx::query("DELETE FROM category_print_destination")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear category_print_destination: {e}"))?;
+    // category_tag (references categories + tags)
+    sqlx::query("DELETE FROM category_tag")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear category_tag: {e}"))?;
+    // category
+    sqlx::query("DELETE FROM category")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear category: {e}"))?;
+    // attribute_option (references attributes)
+    sqlx::query("DELETE FROM attribute_option")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear attribute_option: {e}"))?;
+    // attribute
+    sqlx::query("DELETE FROM attribute")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear attribute: {e}"))?;
+    // tag
+    sqlx::query("DELETE FROM tag")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("clear tag: {e}"))?;
+
+    // Invalidate CatalogService cache since we cleared everything
+    state.catalog_service.invalidate();
+
+    tracing::info!("Catalog cleared for FullSync rebuild");
+    Ok(())
+}
 
 /// Fire-and-forget image download
 pub fn ensure_image(state: &ServerState, presigned_url: &str, hash: &str) -> StoreOpResult {
@@ -50,6 +115,11 @@ async fn do_full_sync(
         bindings_created: 0,
         errors: vec![],
     };
+
+    // 0. Clear existing catalog data (FK reverse order) before rebuilding
+    if let Err(e) = clear_catalog(state).await {
+        return Err(format!("Failed to clear catalog: {e}"));
+    }
 
     // 1. Tags first (products/categories may reference them)
     for tag_data in &snapshot.tags {
@@ -193,4 +263,40 @@ async fn do_full_sync(
     }
 
     Ok(result)
+}
+
+/// Apply CatalogSyncData from Cloud (re-bind scenario).
+///
+/// Clears local catalog and inserts all items from the CatalogExport with their
+/// original Cloud IDs. This ensures Edge and Cloud share the same IDs for
+/// bidirectional sync.
+pub async fn apply_catalog_sync_data(
+    state: &ServerState,
+    catalog: &shared::models::CatalogExport,
+) -> Result<(), String> {
+    // Validate referential integrity
+    shared::models::validate_catalog(catalog)
+        .map_err(|e| format!("CatalogSyncData validation failed: {e}"))?;
+
+    // Use the same import logic as data_transfer (clear + insert in transaction)
+    crate::api::data_transfer::import_catalog_data(state, catalog)
+        .await
+        .map_err(|e| format!("CatalogSyncData import failed: {e}"))?;
+
+    // Refresh catalog cache
+    state
+        .catalog_service
+        .warmup()
+        .await
+        .map_err(|e| format!("CatalogService warmup failed: {e}"))?;
+
+    tracing::info!(
+        tags = catalog.tags.len(),
+        categories = catalog.categories.len(),
+        products = catalog.products.len(),
+        attributes = catalog.attributes.len(),
+        "CatalogSyncData applied successfully"
+    );
+
+    Ok(())
 }

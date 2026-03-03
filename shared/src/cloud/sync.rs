@@ -43,6 +43,10 @@ pub enum SyncResource {
     Invoice,
     /// Invoice anulaciones (edge → cloud only)
     Anulacion,
+    /// Chain entry (edge → cloud, unified hash chain sync)
+    ChainEntry,
+    /// Chain break marker (edge → cloud, records broken chain link)
+    ChainBreak,
     /// Role resource (client-visible for sync status)
     Role,
 }
@@ -121,6 +125,8 @@ impl SyncResource {
             Self::Invoice => "invoice",
             Self::OrderSync => "order_sync",
             Self::Anulacion => "anulacion",
+            Self::ChainEntry => "chain_entry",
+            Self::ChainBreak => "chain_break",
             Self::Role => "role",
         }
     }
@@ -313,7 +319,7 @@ pub struct OrderDetailPayload {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<OrderEventSync>,
     #[serde(default)]
-    pub is_anulada: bool,
+    pub is_voided: bool,
     #[serde(default)]
     pub is_upgraded: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -330,6 +336,7 @@ pub struct OrderDetailPayload {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderItemSync {
+    pub instance_id: String,
     pub name: String,
     pub spec_name: Option<String>,
     pub category_name: Option<String>,
@@ -477,6 +484,31 @@ impl InvoiceSync {
             }
         }
     }
+}
+
+// ── Chain entry sync types ──
+
+/// Chain entry metadata synced to cloud (writes to store_chain_entries)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainEntrySync {
+    pub id: i64,
+    pub entry_type: String,
+    pub entry_pk: i64,
+    pub prev_hash: String,
+    pub curr_hash: String,
+    pub created_at: i64,
+}
+
+/// Chain break marker — records a broken link in the hash chain
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainBreakSync {
+    pub id: i64,
+    /// The chain_entry.id that failed to build
+    pub failed_entry_id: i64,
+    pub failed_entry_type: String,
+    pub prev_hash: String,
+    pub reason: String,
+    pub created_at: i64,
 }
 
 // ── Anulación sync types ──
@@ -1100,7 +1132,7 @@ mod tests {
                 items: vec![],
                 payments: vec![],
                 events: vec![],
-                is_anulada: false,
+                is_voided: false,
                 is_upgraded: false,
                 customer_nif: None,
                 customer_nombre: None,
@@ -1168,7 +1200,7 @@ mod tests {
                 items: vec![],
                 payments: vec![],
                 events: vec![],
-                is_anulada: false,
+                is_voided: false,
                 is_upgraded: false,
                 customer_nif: None,
                 customer_nombre: None,
@@ -1285,6 +1317,7 @@ mod tests {
                 queue_number: None,
                 shift_id: None,
                 items: vec![OrderItemSync {
+                    instance_id: "test-inst-1".to_string(),
                     name: "Paella".to_string(),
                     spec_name: None,
                     category_name: None,
@@ -1312,7 +1345,7 @@ mod tests {
                     change_amount: None,
                 }],
                 events: vec![],
-                is_anulada: false,
+                is_voided: false,
                 is_upgraded: false,
                 customer_nif: None,
                 customer_nombre: None,
@@ -1717,7 +1750,7 @@ mod tests {
                     items: vec![],
                     payments: vec![],
                     events: vec![],
-                    is_anulada: false,
+                    is_voided: false,
                     is_upgraded: false,
                     customer_nif: None,
                     customer_nombre: None,
@@ -1831,6 +1864,7 @@ mod tests {
     fn test_compute_desglose_multi_rate() {
         let items = vec![
             OrderItemSync {
+                instance_id: "inst-paella".to_string(),
                 name: "Paella".to_string(),
                 spec_name: None,
                 category_name: None,
@@ -1848,6 +1882,7 @@ mod tests {
                 options: vec![],
             },
             OrderItemSync {
+                instance_id: "inst-bread".to_string(),
                 name: "Bread".to_string(),
                 spec_name: None,
                 category_name: None,

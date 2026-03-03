@@ -111,6 +111,7 @@ pub struct ModeInfo {
     pub is_connected: bool,
     pub is_authenticated: bool,
     pub tenant_id: Option<i64>,
+    pub store_alias: Option<String>,
     pub username: Option<String>,
 }
 

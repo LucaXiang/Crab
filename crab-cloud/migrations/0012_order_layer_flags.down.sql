@@ -1,4 +1,4 @@
-ALTER TABLE store_archived_orders DROP COLUMN is_anulada;
+ALTER TABLE store_archived_orders DROP COLUMN is_voided;
 ALTER TABLE store_archived_orders DROP COLUMN is_upgraded;
 ALTER TABLE store_archived_orders DROP COLUMN customer_nif;
 ALTER TABLE store_archived_orders DROP COLUMN customer_nombre;

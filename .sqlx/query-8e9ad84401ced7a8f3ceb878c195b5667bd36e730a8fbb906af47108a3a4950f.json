@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE employee SET username = COALESCE(?1, username), name = COALESCE(?2, name), hash_pass = COALESCE(?3, hash_pass), role_id = COALESCE(?4, role_id), is_active = COALESCE(?5, is_active), updated_at = ?6 WHERE id = ?7",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "8e9ad84401ced7a8f3ceb878c195b5667bd36e730a8fbb906af47108a3a4950f"
+}

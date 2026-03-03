@@ -34,6 +34,169 @@ use crate::state::AppState;
 
 use super::{internal, push_to_edge, verify_store};
 
+// ── Reusable catalog builders for WS connect + CatalogSyncData ──
+
+/// Build a CatalogExport from PG catalog data (all resources with real source_ids).
+/// Used by ws.rs for RequestCatalogSync response.
+pub async fn build_catalog_export(
+    pool: &sqlx::PgPool,
+    store_id: i64,
+) -> Result<CatalogExport, Box<dyn std::error::Error + Send + Sync>> {
+    let store_tags = store::list_tags(pool, store_id).await?;
+    let store_categories = store::list_categories(pool, store_id).await?;
+    let store_products = store::list_products(pool, store_id).await?;
+    let store_attributes = store::list_attributes(pool, store_id).await?;
+    let store_bindings = store::list_all_bindings(pool, store_id).await?;
+    let zones: Vec<Zone> = store::list_zones(pool, store_id).await?;
+    let dining_tables: Vec<DiningTable> = store::list_tables(pool, store_id).await?;
+    let price_rules: Vec<PriceRule> = store::list_price_rules(pool, store_id).await?;
+
+    // Build tag lookup: source_id → Tag
+    let tag_map: HashMap<i64, Tag> = store_tags
+        .iter()
+        .map(|t| {
+            (
+                t.source_id,
+                Tag {
+                    id: t.source_id,
+                    name: t.name.clone(),
+                    color: t.color.clone(),
+                    display_order: t.display_order,
+                    is_active: t.is_active,
+                    is_system: t.is_system,
+                },
+            )
+        })
+        .collect();
+
+    let tags: Vec<Tag> = tag_map.values().cloned().collect();
+
+    let categories: Vec<Category> = store_categories
+        .iter()
+        .map(|c| Category {
+            id: c.source_id,
+            name: c.name.clone(),
+            sort_order: c.sort_order,
+            is_kitchen_print_enabled: c.is_kitchen_print_enabled,
+            is_label_print_enabled: c.is_label_print_enabled,
+            is_active: c.is_active,
+            is_virtual: c.is_virtual,
+            match_mode: c.match_mode.clone(),
+            is_display: c.is_display,
+            kitchen_print_destinations: c.kitchen_print_destinations.clone(),
+            label_print_destinations: c.label_print_destinations.clone(),
+            tag_ids: c.tag_ids.clone(),
+        })
+        .collect();
+
+    let products: Vec<ProductFull> = store_products
+        .iter()
+        .map(|p| {
+            let product_tags: Vec<Tag> = p
+                .tag_ids
+                .iter()
+                .filter_map(|tid| tag_map.get(tid).cloned())
+                .collect();
+            ProductFull {
+                id: p.source_id,
+                name: p.name.clone(),
+                image: p.image.clone(),
+                category_id: p.category_source_id,
+                sort_order: p.sort_order,
+                tax_rate: p.tax_rate,
+                receipt_name: p.receipt_name.clone(),
+                kitchen_print_name: p.kitchen_print_name.clone(),
+                is_kitchen_print_enabled: p.is_kitchen_print_enabled,
+                is_label_print_enabled: p.is_label_print_enabled,
+                is_active: p.is_active,
+                external_id: p.external_id,
+                specs: p
+                    .specs
+                    .iter()
+                    .map(|s| ProductSpec {
+                        id: s.source_id,
+                        product_id: p.source_id,
+                        name: s.name.clone(),
+                        price: s.price,
+                        display_order: s.display_order,
+                        is_default: s.is_default,
+                        is_active: s.is_active,
+                        receipt_name: s.receipt_name.clone(),
+                        is_root: s.is_root,
+                    })
+                    .collect(),
+                attributes: vec![],
+                tags: product_tags,
+            }
+        })
+        .collect();
+
+    let attributes: Vec<Attribute> = store_attributes
+        .iter()
+        .map(|a| Attribute {
+            id: a.source_id,
+            name: a.name.clone(),
+            is_multi_select: a.is_multi_select,
+            max_selections: a.max_selections,
+            default_option_ids: a.default_option_ids.clone(),
+            display_order: a.display_order,
+            is_active: a.is_active,
+            show_on_receipt: a.show_on_receipt,
+            receipt_name: a.receipt_name.clone(),
+            show_on_kitchen_print: a.show_on_kitchen_print,
+            kitchen_print_name: a.kitchen_print_name.clone(),
+            options: a
+                .options
+                .iter()
+                .map(|o| AttributeOption {
+                    id: o.source_id,
+                    attribute_id: a.source_id,
+                    name: o.name.clone(),
+                    price_modifier: o.price_modifier,
+                    display_order: o.display_order,
+                    is_active: o.is_active,
+                    receipt_name: o.receipt_name.clone(),
+                    kitchen_print_name: o.kitchen_print_name.clone(),
+                    enable_quantity: o.enable_quantity,
+                    max_quantity: o.max_quantity,
+                })
+                .collect(),
+        })
+        .collect();
+
+    let attribute_bindings: Vec<AttributeBinding> = store_bindings
+        .iter()
+        .map(|b| {
+            let default_ids: Option<Vec<i64>> = b
+                .default_option_ids
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
+            AttributeBinding {
+                id: b.source_id,
+                owner_type: b.owner_type.clone(),
+                owner_id: b.owner_source_id,
+                attribute_id: b.attribute_source_id,
+                is_required: b.is_required,
+                display_order: b.display_order,
+                default_option_ids: default_ids,
+            }
+        })
+        .collect();
+
+    Ok(CatalogExport {
+        version: 1,
+        exported_at: shared::util::now_millis(),
+        tags,
+        categories,
+        products,
+        attributes,
+        attribute_bindings,
+        price_rules,
+        zones,
+        dining_tables,
+    })
+}
+
 // ── Export handler ──
 
 pub async fn export_catalog(

@@ -4,7 +4,7 @@
  * 统一 hash 链时间线类型，与 edge-server chain_entries API 对齐。
  */
 
-export type ChainEntryType = 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE';
+export type ChainEntryType = 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE' | 'BREAK';
 
 /** chain_entry 列表项 (GET /api/chain-entries) */
 export interface ChainEntryItem {
@@ -39,20 +39,12 @@ export interface ChainCreditNoteItem {
   tax_credit: number;
 }
 
-/** 发票作废详情 (GET /api/chain-entries/anulacion/:id) */
+/** 作废详情 (GET /api/chain-entries/anulacion/:order_pk) */
 export interface ChainAnulacionDetail {
-  id: number;
-  anulacion_number: string;
-  serie: string;
-  original_invoice_id: number;
-  original_invoice_number: string;
-  original_order_pk: number;
-  reason: string;
-  note: string | null;
-  operator_id: number;
-  operator_name: string;
-  huella: string;
-  aeat_status: string;
+  order_pk: number;
+  receipt_number: string;
+  total_amount: number;
+  is_voided: boolean;
   created_at: number;
   prev_hash: string;
   curr_hash: string;
@@ -80,25 +72,18 @@ export interface ChainCreditNoteDetail {
   items: ChainCreditNoteItem[];
 }
 
-/** F3 发票升级详情 (GET /api/chain-entries/upgrade/:id) */
+/** 升级详情 (GET /api/chain-entries/upgrade/:order_pk) */
 export interface ChainUpgradeDetail {
-  id: number;
-  invoice_number: string;
-  serie: string;
-  tipo_factura: string;
-  source_pk: number;
-  subtotal: number;
+  order_pk: number;
+  receipt_number: string;
+  total_amount: number;
   tax: number;
-  total: number;
-  factura_sustituida_id: number | null;
-  factura_sustituida_num: string | null;
+  is_upgraded: boolean;
   customer_nif: string | null;
   customer_nombre: string | null;
   customer_address: string | null;
   customer_email: string | null;
   customer_phone: string | null;
-  huella: string;
-  aeat_status: string;
   created_at: number;
   prev_hash: string;
   curr_hash: string;

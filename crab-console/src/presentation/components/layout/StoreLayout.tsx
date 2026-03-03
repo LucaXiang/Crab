@@ -23,7 +23,6 @@ export const StoreLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const storeId = useStoreId();
-  const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
   const [storeName, setStoreName] = useState('');
   const [storeOnline, setStoreOnline] = useState(false);
@@ -31,8 +30,9 @@ export const StoreLayout: React.FC = () => {
   const [langOpen, setLangOpen] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    getStores(token).then(stores => {
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
+    getStores(tk).then(stores => {
       const store = stores.find(s => s.id === storeId);
       if (store) {
         setStoreName(store.alias);
@@ -41,10 +41,11 @@ export const StoreLayout: React.FC = () => {
     }).catch(err => {
       if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
     });
-    getStoreInfo(token, storeId).then(setStoreInfo).catch(err => {
+    getStoreInfo(tk, storeId).then(setStoreInfo).catch(err => {
       if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); }
     });
-  }, [token, storeId, clearAuth, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   const currencySymbol = storeInfo?.currency_symbol ?? '\u20ac';
   const currencyCode = storeInfo?.currency_code ?? 'EUR';

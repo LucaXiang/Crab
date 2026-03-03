@@ -34,7 +34,7 @@ pub struct OrderDetail {
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
     pub queue_number: Option<i32>,
-    pub is_anulada: bool,
+    pub is_voided: bool,
     pub is_upgraded: bool,
     pub items: Vec<OrderDetailItem>,
     pub payments: Vec<OrderDetailPayment>,
@@ -128,7 +128,7 @@ struct OrderRow {
     loss_amount: Option<f64>,
     void_note: Option<String>,
     queue_number: Option<i32>,
-    is_anulada: bool,
+    is_voided: bool,
     is_upgraded: bool,
 }
 
@@ -186,7 +186,7 @@ struct ItemRow {
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
     let order: OrderRow = sqlx::query_as::<_, OrderRow>(
-        "SELECT id AS order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_anulada, is_upgraded FROM archived_order WHERE id = ?",
+        "SELECT id AS order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_voided, is_upgraded FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -325,7 +325,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         loss_amount: order.loss_amount,
         void_note: order.void_note,
         queue_number: order.queue_number,
-        is_anulada: order.is_anulada,
+        is_voided: order.is_voided,
         is_upgraded: order.is_upgraded,
         items,
         payments,
@@ -436,7 +436,7 @@ pub async fn build_order_detail_sync(
         queue_number: Option<i32>,
         shift_id: Option<i64>,
         cloud_synced: bool,
-        is_anulada: bool,
+        is_voided: bool,
         is_upgraded: bool,
         customer_nif: Option<String>,
         customer_nombre: Option<String>,
@@ -453,7 +453,7 @@ pub async fn build_order_detail_sync(
          ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
          ao.operator_id, ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, \
          ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced, \
-         ao.is_anulada, ao.is_upgraded, ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone \
+         ao.is_voided, ao.is_upgraded, ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -467,6 +467,7 @@ pub async fn build_order_detail_sync(
     #[derive(sqlx::FromRow)]
     struct SyncItemRow {
         id: i64,
+        instance_id: String,
         spec: String,
         name: String,
         spec_name: Option<String>,
@@ -484,7 +485,7 @@ pub async fn build_order_detail_sync(
     }
 
     let item_rows: Vec<SyncItemRow> = sqlx::query_as::<_, SyncItemRow>(
-        "SELECT id, spec, name, spec_name, category_name, price, quantity, unit_price, \
+        "SELECT id, instance_id, spec, name, spec_name, category_name, price, quantity, unit_price, \
          line_total, discount_amount, surcharge_amount, tax, tax_rate, is_comped, note \
          FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
@@ -539,6 +540,7 @@ pub async fn build_order_detail_sync(
                 .next()
                 .and_then(|s| s.parse::<i64>().ok());
             OrderItemSync {
+                instance_id: row.instance_id,
                 name: row.name,
                 spec_name: row.spec_name,
                 category_name: row.category_name,
@@ -708,7 +710,7 @@ pub async fn build_order_detail_sync(
             items,
             payments,
             events,
-            is_anulada: order.is_anulada,
+            is_voided: order.is_voided,
             is_upgraded: order.is_upgraded,
             customer_nif: order.customer_nif,
             customer_nombre: order.customer_nombre,

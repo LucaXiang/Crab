@@ -29,19 +29,21 @@ export const RedFlagsScreen: React.FC = () => {
   const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
 
   const loadData = useCallback(async (dateStr: string) => {
-    if (!token) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk) return;
     setLoading(true);
     setError('');
     try {
       const { from, to } = getRange(dateStr);
-      setData(await getStoreRedFlags(token, storeId, from, to));
+      setData(await getStoreRedFlags(tk, storeId, from, to));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); return; }
       setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
     } finally {
       setLoading(false);
     }
-  }, [token, storeId, clearAuth, navigate, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
   useEffect(() => { loadData(dateInput); }, [loadData, dateInput]);
 

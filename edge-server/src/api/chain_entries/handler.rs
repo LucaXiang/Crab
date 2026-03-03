@@ -85,12 +85,14 @@ pub struct CreditNoteItemRow {
 ///
 /// 搜索参数需要绑定多次（SQLite 不支持参数复用），
 /// ORDER 分支绑定一次、CREDIT_NOTE 分支绑定一次、ANULACION 分支绑定一次、UPGRADE 分支绑定一次。
+///
+/// ANULACION/UPGRADE entry_pk 指向 archived_order.id（订单层）。
 const LIST_SQL: &str = "\
 SELECT
     ce.id          AS chain_id,
     ce.entry_type,
     ce.entry_pk,
-    COALESCE(ao.receipt_number, CAST(ao.order_id AS TEXT)) AS display_number,
+    COALESCE(ao.receipt_number, CAST(ao.id AS TEXT)) AS display_number,
     UPPER(ao.status) AS status,
     ao.total_amount AS amount,
     ce.created_at,
@@ -101,7 +103,7 @@ SELECT
 FROM chain_entry ce
 JOIN archived_order ao ON ao.id = ce.entry_pk
 WHERE ce.entry_type = 'ORDER'
-  AND (? IS NULL OR LOWER(COALESCE(ao.receipt_number, CAST(ao.order_id AS TEXT))) LIKE ?)
+  AND (? IS NULL OR LOWER(COALESCE(ao.receipt_number, CAST(ao.id AS TEXT))) LIKE ?)
 
 UNION ALL
 
@@ -129,19 +131,18 @@ SELECT
     ce.id          AS chain_id,
     ce.entry_type,
     ce.entry_pk,
-    ia.anulacion_number AS display_number,
+    COALESCE(ao2.receipt_number, CAST(ao2.id AS TEXT)) AS display_number,
     'ANULADA'      AS status,
-    0.0            AS amount,
+    ao2.total_amount AS amount,
     ce.created_at,
     ce.prev_hash,
     ce.curr_hash,
-    ia.original_order_pk,
-    ia.original_invoice_number AS original_receipt
+    ao2.id         AS original_order_pk,
+    ao2.receipt_number AS original_receipt
 FROM chain_entry ce
-JOIN invoice_anulacion ia ON ia.id = ce.entry_pk
+JOIN archived_order ao2 ON ao2.id = ce.entry_pk
 WHERE ce.entry_type = 'ANULACION'
-  AND (? IS NULL OR LOWER(ia.anulacion_number) LIKE ?
-       OR LOWER(ia.original_invoice_number) LIKE ?)
+  AND (? IS NULL OR LOWER(COALESCE(ao2.receipt_number, CAST(ao2.id AS TEXT))) LIKE ?)
 
 UNION ALL
 
@@ -149,19 +150,18 @@ SELECT
     ce.id          AS chain_id,
     ce.entry_type,
     ce.entry_pk,
-    inv.invoice_number AS display_number,
-    'F3'           AS status,
-    inv.total      AS amount,
+    COALESCE(ao3.receipt_number, CAST(ao3.id AS TEXT)) AS display_number,
+    'UPGRADED'     AS status,
+    ao3.total_amount AS amount,
     ce.created_at,
     ce.prev_hash,
     ce.curr_hash,
-    inv.source_pk  AS original_order_pk,
-    inv.factura_sustituida_num AS original_receipt
+    ao3.id         AS original_order_pk,
+    ao3.receipt_number AS original_receipt
 FROM chain_entry ce
-JOIN invoice inv ON inv.id = ce.entry_pk
+JOIN archived_order ao3 ON ao3.id = ce.entry_pk
 WHERE ce.entry_type = 'UPGRADE'
-  AND (? IS NULL OR LOWER(inv.invoice_number) LIKE ?
-       OR LOWER(inv.factura_sustituida_num) LIKE ?)
+  AND (? IS NULL OR LOWER(COALESCE(ao3.receipt_number, CAST(ao3.id AS TEXT))) LIKE ?)
 
 ORDER BY chain_id DESC
 LIMIT ? OFFSET ?";
@@ -171,7 +171,7 @@ SELECT COUNT(*) FROM (
     SELECT ce.id FROM chain_entry ce
     JOIN archived_order ao ON ao.id = ce.entry_pk
     WHERE ce.entry_type = 'ORDER'
-      AND (? IS NULL OR LOWER(COALESCE(ao.receipt_number, CAST(ao.order_id AS TEXT))) LIKE ?)
+      AND (? IS NULL OR LOWER(COALESCE(ao.receipt_number, CAST(ao.id AS TEXT))) LIKE ?)
     UNION ALL
     SELECT ce.id FROM chain_entry ce
     JOIN credit_note cn ON cn.id = ce.entry_pk
@@ -180,16 +180,14 @@ SELECT COUNT(*) FROM (
            OR LOWER(cn.original_receipt) LIKE ?)
     UNION ALL
     SELECT ce.id FROM chain_entry ce
-    JOIN invoice_anulacion ia ON ia.id = ce.entry_pk
+    JOIN archived_order ao2 ON ao2.id = ce.entry_pk
     WHERE ce.entry_type = 'ANULACION'
-      AND (? IS NULL OR LOWER(ia.anulacion_number) LIKE ?
-           OR LOWER(ia.original_invoice_number) LIKE ?)
+      AND (? IS NULL OR LOWER(COALESCE(ao2.receipt_number, CAST(ao2.id AS TEXT))) LIKE ?)
     UNION ALL
     SELECT ce.id FROM chain_entry ce
-    JOIN invoice inv ON inv.id = ce.entry_pk
+    JOIN archived_order ao3 ON ao3.id = ce.entry_pk
     WHERE ce.entry_type = 'UPGRADE'
-      AND (? IS NULL OR LOWER(inv.invoice_number) LIKE ?
-           OR LOWER(inv.factura_sustituida_num) LIKE ?)
+      AND (? IS NULL OR LOWER(COALESCE(ao3.receipt_number, CAST(ao3.id AS TEXT))) LIKE ?)
 )";
 
 /// 内部 row 映射（含 original_total 用于派生 CreditNoteType）
@@ -220,10 +218,8 @@ pub async fn list(
         .filter(|s| !s.is_empty())
         .map(|s| format!("%{}%", s.to_lowercase()));
 
-    // COUNT — 11 binds: (2) ORDER + (3) CREDIT_NOTE + (3) ANULACION + (3) UPGRADE
+    // COUNT — 9 binds: (2) ORDER + (3) CREDIT_NOTE + (2) ANULACION + (2) UPGRADE
     let total: i64 = sqlx::query_scalar(COUNT_SQL)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
         .bind(&search_pattern)
         .bind(&search_pattern)
         .bind(&search_pattern)
@@ -237,10 +233,8 @@ pub async fn list(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // LIST — 13 binds: (2) ORDER + (3) CREDIT_NOTE + (3) ANULACION + (3) UPGRADE + limit + offset
+    // LIST — 11 binds: (2) ORDER + (3) CREDIT_NOTE + (2) ANULACION + (2) UPGRADE + limit + offset
     let rows = sqlx::query_as::<_, ChainEntryRaw>(LIST_SQL)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
         .bind(&search_pattern)
         .bind(&search_pattern)
         .bind(&search_pattern)
@@ -354,21 +348,13 @@ pub async fn get_credit_note_detail(
 
 // ── Handler: get_anulacion_detail ────────────────────────────────────────────
 
-/// Anulación detail response for the chain timeline
+/// Anulación detail response — order-layer info with chain hashes
 #[derive(Debug, Serialize)]
 pub struct AnulacionDetailResponse {
-    pub id: i64,
-    pub anulacion_number: String,
-    pub serie: String,
-    pub original_invoice_id: i64,
-    pub original_invoice_number: String,
-    pub original_order_pk: i64,
-    pub reason: String,
-    pub note: Option<String>,
-    pub operator_id: i64,
-    pub operator_name: String,
-    pub huella: String,
-    pub aeat_status: String,
+    pub order_pk: i64,
+    pub receipt_number: String,
+    pub total_amount: f64,
+    pub is_voided: bool,
     pub created_at: i64,
     pub prev_hash: String,
     pub curr_hash: String,
@@ -376,56 +362,40 @@ pub struct AnulacionDetailResponse {
 
 #[derive(Debug, sqlx::FromRow)]
 struct AnulacionDetailRow {
-    id: i64,
-    anulacion_number: String,
-    serie: String,
-    original_invoice_id: i64,
-    original_invoice_number: String,
-    original_order_pk: i64,
-    reason: String,
-    note: Option<String>,
-    operator_id: i64,
-    operator_name: String,
-    huella: String,
-    aeat_status: String,
+    order_pk: i64,
+    receipt_number: String,
+    total_amount: f64,
+    is_voided: i64,
     created_at: i64,
     prev_hash: String,
     curr_hash: String,
 }
 
+/// GET /api/chain-entries/anulacion/:order_pk — entry_pk = order_pk
 pub async fn get_anulacion_detail(
     State(state): State<ServerState>,
-    Path(id): Path<i64>,
+    Path(order_pk): Path<i64>,
 ) -> AppResult<Json<AnulacionDetailResponse>> {
     let row = sqlx::query_as::<_, AnulacionDetailRow>(
-        "SELECT ia.id, ia.anulacion_number, ia.serie, \
-         ia.original_invoice_id, ia.original_invoice_number, ia.original_order_pk, \
-         ia.reason, ia.note, ia.operator_id, ia.operator_name, \
-         ia.huella, ia.aeat_status, ia.created_at, \
+        "SELECT ao.id AS order_pk, \
+         COALESCE(ao.receipt_number, CAST(ao.id AS TEXT)) AS receipt_number, \
+         ao.total_amount, ao.is_voided, ce.created_at, \
          ce.prev_hash, ce.curr_hash \
-         FROM invoice_anulacion ia \
-         JOIN chain_entry ce ON ce.entry_type = 'ANULACION' AND ce.entry_pk = ia.id \
-         WHERE ia.id = ?",
+         FROM chain_entry ce \
+         JOIN archived_order ao ON ao.id = ce.entry_pk \
+         WHERE ce.entry_type = 'ANULACION' AND ce.entry_pk = ?",
     )
-    .bind(id)
+    .bind(order_pk)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| AppError::database(e.to_string()))?
-    .ok_or_else(|| AppError::not_found(format!("Anulación {id} not found")))?;
+    .ok_or_else(|| AppError::not_found(format!("Anulación for order {order_pk} not found")))?;
 
     Ok(Json(AnulacionDetailResponse {
-        id: row.id,
-        anulacion_number: row.anulacion_number,
-        serie: row.serie,
-        original_invoice_id: row.original_invoice_id,
-        original_invoice_number: row.original_invoice_number,
-        original_order_pk: row.original_order_pk,
-        reason: row.reason,
-        note: row.note,
-        operator_id: row.operator_id,
-        operator_name: row.operator_name,
-        huella: row.huella,
-        aeat_status: row.aeat_status,
+        order_pk: row.order_pk,
+        receipt_number: row.receipt_number,
+        total_amount: row.total_amount,
+        is_voided: row.is_voided != 0,
         created_at: row.created_at,
         prev_hash: row.prev_hash,
         curr_hash: row.curr_hash,
@@ -434,26 +404,19 @@ pub async fn get_anulacion_detail(
 
 // ── Handler: get_upgrade_detail ──────────────────────────────────────────────
 
-/// Upgrade (F3) detail response for the chain timeline
+/// Upgrade detail response — order-layer info with customer data and chain hashes
 #[derive(Debug, Serialize)]
 pub struct UpgradeDetailResponse {
-    pub id: i64,
-    pub invoice_number: String,
-    pub serie: String,
-    pub tipo_factura: String,
-    pub source_pk: i64,
-    pub subtotal: f64,
+    pub order_pk: i64,
+    pub receipt_number: String,
+    pub total_amount: f64,
     pub tax: f64,
-    pub total: f64,
-    pub factura_sustituida_id: Option<i64>,
-    pub factura_sustituida_num: Option<String>,
+    pub is_upgraded: bool,
     pub customer_nif: Option<String>,
     pub customer_nombre: Option<String>,
     pub customer_address: Option<String>,
     pub customer_email: Option<String>,
     pub customer_phone: Option<String>,
-    pub huella: String,
-    pub aeat_status: String,
     pub created_at: i64,
     pub prev_hash: String,
     pub curr_hash: String,
@@ -461,68 +424,54 @@ pub struct UpgradeDetailResponse {
 
 #[derive(Debug, sqlx::FromRow)]
 struct UpgradeDetailRow {
-    id: i64,
-    invoice_number: String,
-    serie: String,
-    tipo_factura: String,
-    source_pk: i64,
-    subtotal: f64,
+    order_pk: i64,
+    receipt_number: String,
+    total_amount: f64,
     tax: f64,
-    total: f64,
-    factura_sustituida_id: Option<i64>,
-    factura_sustituida_num: Option<String>,
+    is_upgraded: i64,
     customer_nif: Option<String>,
     customer_nombre: Option<String>,
     customer_address: Option<String>,
     customer_email: Option<String>,
     customer_phone: Option<String>,
-    huella: String,
-    aeat_status: String,
     created_at: i64,
     prev_hash: String,
     curr_hash: String,
 }
 
+/// GET /api/chain-entries/upgrade/:order_pk — entry_pk = order_pk
 pub async fn get_upgrade_detail(
     State(state): State<ServerState>,
-    Path(id): Path<i64>,
+    Path(order_pk): Path<i64>,
 ) -> AppResult<Json<UpgradeDetailResponse>> {
     let row = sqlx::query_as::<_, UpgradeDetailRow>(
-        "SELECT inv.id, inv.invoice_number, inv.serie, inv.tipo_factura, inv.source_pk, \
-         inv.subtotal, inv.tax, inv.total, \
-         inv.factura_sustituida_id, inv.factura_sustituida_num, \
-         inv.customer_nif, inv.customer_nombre, inv.customer_address, \
-         inv.customer_email, inv.customer_phone, \
-         inv.huella, inv.aeat_status, inv.created_at, \
-         ce.prev_hash, ce.curr_hash \
-         FROM invoice inv \
-         JOIN chain_entry ce ON ce.entry_type = 'UPGRADE' AND ce.entry_pk = inv.id \
-         WHERE inv.id = ?",
+        "SELECT ao.id AS order_pk, \
+         COALESCE(ao.receipt_number, CAST(ao.id AS TEXT)) AS receipt_number, \
+         ao.total_amount, ao.tax, ao.is_upgraded, \
+         ao.customer_nif, ao.customer_nombre, ao.customer_address, \
+         ao.customer_email, ao.customer_phone, \
+         ce.created_at, ce.prev_hash, ce.curr_hash \
+         FROM chain_entry ce \
+         JOIN archived_order ao ON ao.id = ce.entry_pk \
+         WHERE ce.entry_type = 'UPGRADE' AND ce.entry_pk = ?",
     )
-    .bind(id)
+    .bind(order_pk)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| AppError::database(e.to_string()))?
-    .ok_or_else(|| AppError::not_found(format!("Upgrade invoice {id} not found")))?;
+    .ok_or_else(|| AppError::not_found(format!("Upgrade for order {order_pk} not found")))?;
 
     Ok(Json(UpgradeDetailResponse {
-        id: row.id,
-        invoice_number: row.invoice_number,
-        serie: row.serie,
-        tipo_factura: row.tipo_factura,
-        source_pk: row.source_pk,
-        subtotal: row.subtotal,
+        order_pk: row.order_pk,
+        receipt_number: row.receipt_number,
+        total_amount: row.total_amount,
         tax: row.tax,
-        total: row.total,
-        factura_sustituida_id: row.factura_sustituida_id,
-        factura_sustituida_num: row.factura_sustituida_num,
+        is_upgraded: row.is_upgraded != 0,
         customer_nif: row.customer_nif,
         customer_nombre: row.customer_nombre,
         customer_address: row.customer_address,
         customer_email: row.customer_email,
         customer_phone: row.customer_phone,
-        huella: row.huella,
-        aeat_status: row.aeat_status,
         created_at: row.created_at,
         prev_hash: row.prev_hash,
         curr_hash: row.curr_hash,

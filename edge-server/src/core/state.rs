@@ -905,12 +905,13 @@ impl ServerState {
         cloud_origin: bool,
     ) {
         let version = self.resource_versions.increment(resource);
+        let data_value = data.and_then(|d| serde_json::to_value(d).ok());
         let payload = SyncPayload {
             resource,
             version,
             action,
             id,
-            data: data.and_then(|d| serde_json::to_value(d).ok()),
+            data: data_value.clone(),
             cloud_origin,
         };
         tracing::debug!(resource = %resource, action = ?action, id = %id, cloud_origin, "Broadcasting sync event");
@@ -918,6 +919,56 @@ impl ServerState {
             Ok(_) => {}
             Err(e) => tracing::error!("Sync broadcast failed: {}", e),
         }
+
+        // Write catalog_changelog for local changes (not cloud-pushed) so Edge→Cloud sync works
+        if !cloud_origin && Self::is_catalog_resource(resource) {
+            let changelog_action = match action {
+                SyncChangeType::Created | SyncChangeType::Updated => "upsert",
+                SyncChangeType::Deleted => "delete",
+                _ => return, // SettlementRequired etc. are not catalog changes
+            };
+            let resource_str = serde_json::to_value(resource)
+                .ok()
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_default();
+            let data_json = if changelog_action == "upsert" {
+                data_value.map(|v| v.to_string())
+            } else {
+                None
+            };
+            let now = shared::util::now_millis();
+            if let Err(e) = sqlx::query(
+                "INSERT INTO catalog_changelog (resource, resource_id, action, data, updated_at) VALUES (?, ?, ?, ?, ?)"
+            )
+            .bind(&resource_str)
+            .bind(id)
+            .bind(changelog_action)
+            .bind(&data_json)
+            .bind(now)
+            .execute(&self.pool)
+            .await
+            {
+                tracing::error!(resource = %resource_str, id, "Failed to write catalog_changelog: {e}");
+            }
+        }
+    }
+
+    /// Whether this resource type participates in bidirectional catalog sync.
+    fn is_catalog_resource(resource: SyncResource) -> bool {
+        matches!(
+            resource,
+            SyncResource::Product
+                | SyncResource::Category
+                | SyncResource::Tag
+                | SyncResource::Attribute
+                | SyncResource::AttributeBinding
+                | SyncResource::Employee
+                | SyncResource::Zone
+                | SyncResource::DiningTable
+                | SyncResource::PriceRule
+                | SyncResource::LabelTemplate
+                | SyncResource::StoreInfo
+        )
     }
 
     /// 获取激活服务

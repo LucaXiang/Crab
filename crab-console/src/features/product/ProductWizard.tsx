@@ -45,7 +45,6 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   ]);
 
   const [taxRate, setTaxRate] = useState<number>(0);
-  const [sortOrder, setSortOrder] = useState<number>(0);
   const [receiptName, setReceiptName] = useState('');
   const [kitchenPrintName, setKitchenPrintName] = useState('');
   const [isKitchenPrint, setIsKitchenPrint] = useState(false);
@@ -79,6 +78,8 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   };
 
   const handleFinish = () => {
+    if (!name.trim() || categoryId === '' || !externalId.trim()) return;
+
     const specInputs: ProductSpecInput[] = specs.map((s, i) => ({
       name: s.name.trim(),
       price: s.price,
@@ -94,12 +95,12 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
       image: image || undefined,
       category_id: Number(categoryId),
       tax_rate: taxRate,
-      sort_order: sortOrder,
+      sort_order: 0,
       receipt_name: receiptName.trim() || name.trim(),
       kitchen_print_name: kitchenPrintName.trim() || name.trim(),
       is_kitchen_print_enabled: isKitchenPrint ? 1 : 0,
       is_label_print_enabled: isLabelPrint ? 1 : 0,
-      external_id: externalId ? Number(externalId) : undefined,
+      external_id: Number(externalId),
       tags: tagIds.length > 0 ? tagIds : undefined,
       specs: specInputs,
     });
@@ -129,7 +130,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
             className={selectClass}
           >
             <option value="" disabled>{t('common.hint.select_option')}</option>
-            {categories.map(c => (
+            {categories.filter(c => !c.is_virtual).map(c => (
               <option key={c.source_id} value={c.source_id}>{c.name}</option>
             ))}
           </select>
@@ -224,28 +225,18 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
     isValid: true,
     component: (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label={t('settings.product.tax_rate')}>
-            <div className="relative">
-              <input 
-                type="number" 
-                value={taxRate} 
-                onChange={e => setTaxRate(Number(e.target.value))} 
-                className={`${inputClass} pr-8`} 
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">%</div>
-            </div>
-          </FormField>
-          <FormField label={t('settings.product.sort_order')}>
-            <input 
-              type="number" 
-              value={sortOrder} 
-              onChange={e => setSortOrder(Number(e.target.value))} 
-              className={inputClass} 
+        <FormField label={t('settings.product.tax_rate')}>
+          <div className="relative">
+            <input
+              type="number"
+              value={taxRate}
+              onChange={e => setTaxRate(Number(e.target.value))}
+              className={`${inputClass} pr-8`}
             />
-          </FormField>
-        </div>
-        
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">%</div>
+          </div>
+        </FormField>
+
         <FormField label={t('settings.product.receipt_name')}>
           <input 
             value={receiptName} 
@@ -293,30 +284,31 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
     id: 'org',
     title: t('settings.product.step_org'),
     description: t('settings.product.step_org_desc'),
-    isValid: true,
+    isValid: !!externalId.trim(),
     component: (
       <div className="space-y-6">
+        <FormField label={t('settings.product.external_id')} required>
+          <input
+            type="number"
+            value={externalId}
+            onChange={e => setExternalId(e.target.value)}
+            className={inputClass}
+            placeholder="e.g. POS ID"
+            autoFocus
+          />
+        </FormField>
+
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
             <Tag className="w-4 h-4 text-slate-400" />
             {t('settings.product.tags')}
           </label>
-          <TagPicker 
-            tags={tags} 
-            selectedIds={tagIds} 
-            onToggle={toggleTag} 
+          <TagPicker
+            tags={tags}
+            selectedIds={tagIds}
+            onToggle={toggleTag}
           />
         </div>
-        
-        <FormField label={t('settings.product.external_id')}>
-          <input 
-            type="number" 
-            value={externalId} 
-            onChange={e => setExternalId(e.target.value)} 
-            className={inputClass} 
-            placeholder="e.g. POS ID" 
-          />
-        </FormField>
       </div>
     ),
   };

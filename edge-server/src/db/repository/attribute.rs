@@ -54,8 +54,9 @@ pub async fn create(
     let show_on_receipt = data.show_on_receipt.unwrap_or(false);
     let show_on_kitchen_print = data.show_on_kitchen_print.unwrap_or(true);
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
+    let now = shared::util::now_millis();
     sqlx::query(
-        "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10)",
+        "INSERT INTO attribute (id, name, is_multi_select, max_selections, default_option_ids, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10, ?11)",
     )
     .bind(id)
     .bind(&data.name)
@@ -67,6 +68,7 @@ pub async fn create(
     .bind(&data.receipt_name)
     .bind(show_on_kitchen_print)
     .bind(&data.kitchen_print_name)
+    .bind(now)
     .execute(&mut *tx)
     .await?;
 
@@ -104,8 +106,9 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
+    let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE attribute SET name = COALESCE(?1, name), is_multi_select = COALESCE(?2, is_multi_select), max_selections = COALESCE(?3, max_selections), default_option_ids = COALESCE(?4, default_option_ids), display_order = COALESCE(?5, display_order), show_on_receipt = COALESCE(?6, show_on_receipt), receipt_name = COALESCE(?7, receipt_name), show_on_kitchen_print = COALESCE(?8, show_on_kitchen_print), kitchen_print_name = COALESCE(?9, kitchen_print_name), is_active = COALESCE(?10, is_active) WHERE id = ?11",
+        "UPDATE attribute SET name = COALESCE(?1, name), is_multi_select = COALESCE(?2, is_multi_select), max_selections = COALESCE(?3, max_selections), default_option_ids = COALESCE(?4, default_option_ids), display_order = COALESCE(?5, display_order), show_on_receipt = COALESCE(?6, show_on_receipt), receipt_name = COALESCE(?7, receipt_name), show_on_kitchen_print = COALESCE(?8, show_on_kitchen_print), kitchen_print_name = COALESCE(?9, kitchen_print_name), is_active = COALESCE(?10, is_active), updated_at = ?11 WHERE id = ?12",
         data.name,
         data.is_multi_select,
         data.max_selections,
@@ -116,6 +119,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
         data.show_on_kitchen_print,
         data.kitchen_print_name,
         data.is_active,
+        now,
         id,
     )
     .execute(pool)

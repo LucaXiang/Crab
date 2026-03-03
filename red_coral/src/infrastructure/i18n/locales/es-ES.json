@@ -899,6 +899,7 @@
       "certificate": "Error de certificado. Reactive el dispositivo.",
       "port": "Puerto ocupado. Pruebe otro puerto.",
       "activation": "Dispositivo no activado. Active primero.",
+      "database": "Error de base de datos, reintente o contacte soporte",
       "unknown": "Operación fallida, reintente"
     }
   },
@@ -1287,7 +1288,10 @@
         "external_id": "Código",
         "external_id_placeholder": "Introducir código",
         "image": "Imagen",
-        "image_hint": "JPG, PNG, WEBP"
+        "image_hint": "JPG, PNG, WEBP",
+        "sort_order": "Orden",
+        "receipt_name": "Nombre en ticket",
+        "kitchen_print_name": "Nombre cocina"
       },
       "no_products": "Sin platos",
       "print": {
@@ -1357,7 +1361,10 @@
         "external_id_hint": "Para acceso rápido en el POS, único por plato",
         "tax_rate_hint": "Por defecto 10%, 0 para exento",
         "kitchen_print_hint": "Imprimir automáticamente en cocina al hacer pedido",
-        "tags_hint": "Etiquetas para agrupar y filtrar platos"
+        "tags_hint": "Etiquetas para agrupar y filtrar platos",
+        "receipt_name_fallback": "Vacío = nombre del plato",
+        "spec_receipt_name_fallback": "Vacío = nombre de la especificación",
+        "receipt_name_hint": "Nombre en el ticket, vacío = nombre del plato"
       },
       "header": {
         "category": "Categoría",
@@ -2233,6 +2240,9 @@
     "3026": "El archivo P12 no contiene certificado",
     "3027": "Fallo en la verificación de la cadena de certificados",
     "3028": "La CA raíz no es reconocida por la AEAT",
+    "3029": "El NIF del P12 no coincide con el certificado existente",
+    "3030": "El certificado P12 ha expirado",
+    "3031": "El certificado P12 aún no es válido",
     "4001": "Pedido no existe",
     "4002": "Pedido ya pagado",
     "4003": "Pedido completado",
@@ -2317,6 +2327,9 @@
     "9206": "Impresión de etiquetas no habilitada",
     "9207": "Sin destino de impresión configurado",
     "9301": "Cliente desconectado",
+    "9302": "Error de integridad en la cadena de hash del archivo",
+    "9303": "Error al asignar número de factura",
+    "9304": "Error de conversión de importe de factura",
     "9401": "Sin espacio",
     "9402": "Sin memoria",
     "9403": "Datos corruptos",
@@ -2843,7 +2856,9 @@
     "hash_info": "Información de integridad",
     "prev_hash": "Hash anterior",
     "curr_hash": "Hash actual",
-    "order_not_in_view": "El pedido no está en la vista actual"
+    "order_not_in_view": "El pedido no está en la vista actual",
+    "break": "Rotura de cadena",
+    "break_description": "Se produjo una rotura de cadena durante la sincronización. Las entradas posteriores inician una nueva cadena"
   },
   "anulacion": {
     "title": "Anulación",

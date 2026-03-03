@@ -201,10 +201,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   // UI state from settings store
   const {
     selectedZoneFilter: zoneFilter,
-    tablesPage: page,
-    tablesTotal: total,
     setSelectedZoneFilter: setZoneFilter,
-    setTablesPagination: setPagination,
   } = useSettingsFilters();
 
   const { openModal } = useSettingsModal();
@@ -217,11 +214,9 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   useEffect(() => {
     if (activeTab === 'tables') {
       zoneStore.fetchAll();
-      tableStore.fetchAll().then(() => {
-        setPagination(1, tableStore.items.length);
-      });
+      tableStore.fetchAll();
     }
-  }, [zoneFilter, page, searchQuery, dataVersion, activeTab]);
+  }, [zoneFilter, searchQuery, dataVersion, activeTab]);
 
   const zonesMap = useMemo(() => {
     const m = new Map<number, string>();
@@ -245,7 +240,6 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
           await Promise.all(items.map((item) => getApi().deleteTable(item.id)));
           toast.success(t('settings.batchDelete.tablesSuccess', { count: items.length }) || '批量删除成功');
           await tableStore.fetchAll();
-          setPagination(1, tableStore.items.length);
         } catch (e) {
           toast.error(getErrorMessage(e));
         }
@@ -398,7 +392,6 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
-                    setPagination(1, total);
                   }}
                   placeholder={t('common.hint.search_placeholder')}
                   className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -433,9 +426,6 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}
             emptyText={t('common.empty.no_data')}
             pageSize={5}
-            totalItems={filteredTables.length}
-            currentPage={page}
-            onPageChange={(newPage) => setPagination(newPage, filteredTables.length)}
             themeColor="blue"
             isSelectionMode={isTableSelectionMode}
             onSelectionModeChange={setIsTableSelectionMode}

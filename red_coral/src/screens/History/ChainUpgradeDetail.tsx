@@ -22,9 +22,9 @@ export const ChainUpgradeDetailView: React.FC<ChainUpgradeDetailProps> = ({ deta
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                 <FileUp className="text-blue-600" size={20} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 font-mono">{detail.invoice_number}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 font-mono">{detail.receipt_number}</h1>
               <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded uppercase">
-                {detail.tipo_factura}
+                {t('upgrade.title')}
               </span>
             </div>
             <div className="flex gap-4 text-sm text-gray-500 mt-2 flex-wrap">
@@ -48,22 +48,20 @@ export const ChainUpgradeDetailView: React.FC<ChainUpgradeDetailProps> = ({ deta
             <div className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">
               {t('checkout.amount.total')}
             </div>
-            <div className="text-3xl font-bold text-blue-600">{formatCurrency(detail.total)}</div>
+            <div className="text-3xl font-bold text-blue-600">{formatCurrency(detail.total_amount)}</div>
           </div>
         </div>
 
-        {/* 原始发票 */}
-        {detail.factura_sustituida_num && (
-          <button
-            onClick={() => onNavigateToOrder(detail.source_pk)}
-            className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:bg-gray-100 transition-colors w-full"
-          >
-            <FileText size={16} className="text-gray-400" />
-            <span className="text-gray-500">{t('upgrade.original_invoice')}:</span>
-            <span className="font-mono font-bold">{detail.factura_sustituida_num}</span>
-            <ChevronRight size={14} className="ml-auto text-gray-400" />
-          </button>
-        )}
+        {/* 跳转到原始订单 */}
+        <button
+          onClick={() => onNavigateToOrder(detail.order_pk)}
+          className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:bg-gray-100 transition-colors w-full"
+        >
+          <FileText size={16} className="text-gray-400" />
+          <span className="text-gray-500">{t('upgrade.original_invoice')}:</span>
+          <span className="font-mono font-bold">{detail.receipt_number}</span>
+          <ChevronRight size={14} className="ml-auto text-gray-400" />
+        </button>
       </div>
 
       {/* 客户信息 */}
@@ -102,29 +100,10 @@ export const ChainUpgradeDetailView: React.FC<ChainUpgradeDetailProps> = ({ deta
           <span>{t('upgrade.invoice_details')}</span>
         </div>
         <div className="divide-y divide-gray-100">
-          <DetailRow label={t('upgrade.field.serie')} value={detail.serie} />
-          <DetailRow label={t('upgrade.field.subtotal')} value={formatCurrency(detail.subtotal)} />
           <DetailRow label={t('upgrade.field.tax')} value={formatCurrency(detail.tax)} />
           <DetailRow label={t('checkout.amount.total')} value={
-            <span className="font-bold text-blue-600">{formatCurrency(detail.total)}</span>
+            <span className="font-bold text-blue-600">{formatCurrency(detail.total_amount)}</span>
           } />
-          <DetailRow label={t('anulacion.aeat_status_label')} value={
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-              detail.aeat_status === 'ACCEPTED' ? 'bg-green-100 text-green-700'
-              : detail.aeat_status === 'REJECTED' ? 'bg-red-100 text-red-700'
-              : 'bg-yellow-100 text-yellow-700'
-            }`}>
-              {detail.aeat_status}
-            </span>
-          } />
-        </div>
-      </div>
-
-      {/* Huella */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-        <div className="text-xs font-bold text-gray-500 uppercase mb-2">{t('anulacion.huella')}</div>
-        <div className="font-mono text-xs text-gray-600 break-all bg-gray-50 p-3 rounded-lg">
-          {detail.huella}
         </div>
       </div>
     </div>

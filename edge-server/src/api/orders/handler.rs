@@ -114,7 +114,7 @@ pub struct OrderDetail {
     pub loss_amount: Option<f64>,
     pub void_note: Option<String>,
     pub queue_number: Option<i32>,
-    pub is_anulada: bool,
+    pub is_voided: bool,
     pub is_upgraded: bool,
     pub items: Vec<OrderItemDetail>,
     pub payments: Vec<OrderPaymentDetail>,
@@ -154,7 +154,7 @@ pub async fn get_by_id(
         loss_amount: detail.loss_amount,
         void_note: detail.void_note,
         queue_number: detail.queue_number,
-        is_anulada: detail.is_anulada,
+        is_voided: detail.is_voided,
         is_upgraded: detail.is_upgraded,
         items: detail
             .items

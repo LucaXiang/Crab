@@ -87,7 +87,7 @@ pub async fn create(
     let is_exclusive = data.is_exclusive.unwrap_or(false);
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
     sqlx::query(
-        "INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19)",
+        "INSERT INTO price_rule (id, name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19, ?20)",
     )
     .bind(id)
     .bind(&data.name)
@@ -108,6 +108,7 @@ pub async fn create(
     .bind(&data.active_end_time)
     .bind(data.created_by)
     .bind(now)
+    .bind(now)
     .execute(pool)
     .await?;
 
@@ -122,8 +123,9 @@ pub async fn update(pool: &SqlitePool, id: i64, data: PriceRuleUpdate) -> RepoRe
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
+    let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE price_rule SET name = COALESCE(?1, name), receipt_name = COALESCE(?2, receipt_name), description = COALESCE(?3, description), rule_type = COALESCE(?4, rule_type), product_scope = COALESCE(?5, product_scope), target_id = COALESCE(?6, target_id), zone_scope = COALESCE(?7, zone_scope), adjustment_type = COALESCE(?8, adjustment_type), adjustment_value = COALESCE(?9, adjustment_value), is_stackable = COALESCE(?10, is_stackable), is_exclusive = COALESCE(?11, is_exclusive), valid_from = COALESCE(?12, valid_from), valid_until = COALESCE(?13, valid_until), active_days = COALESCE(?14, active_days), active_start_time = COALESCE(?15, active_start_time), active_end_time = COALESCE(?16, active_end_time), is_active = COALESCE(?17, is_active) WHERE id = ?18",
+        "UPDATE price_rule SET name = COALESCE(?1, name), receipt_name = COALESCE(?2, receipt_name), description = COALESCE(?3, description), rule_type = COALESCE(?4, rule_type), product_scope = COALESCE(?5, product_scope), target_id = COALESCE(?6, target_id), zone_scope = COALESCE(?7, zone_scope), adjustment_type = COALESCE(?8, adjustment_type), adjustment_value = COALESCE(?9, adjustment_value), is_stackable = COALESCE(?10, is_stackable), is_exclusive = COALESCE(?11, is_exclusive), valid_from = COALESCE(?12, valid_from), valid_until = COALESCE(?13, valid_until), active_days = COALESCE(?14, active_days), active_start_time = COALESCE(?15, active_start_time), active_end_time = COALESCE(?16, active_end_time), is_active = COALESCE(?17, is_active), updated_at = ?18 WHERE id = ?19",
         data.name,
         data.receipt_name,
         data.description,
@@ -141,6 +143,7 @@ pub async fn update(pool: &SqlitePool, id: i64, data: PriceRuleUpdate) -> RepoRe
         data.active_start_time,
         data.active_end_time,
         data.is_active,
+        now,
         id
     )
     .execute(pool)

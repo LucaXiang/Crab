@@ -106,13 +106,14 @@ pub async fn create(
 
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
     sqlx::query(
-        "INSERT INTO employee (id, username, hash_pass, name, role_id, is_system, is_active, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?)",
+        "INSERT INTO employee (id, username, hash_pass, name, role_id, is_system, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)",
     )
     .bind(id)
     .bind(&data.username)
     .bind(&hash_pass)
     .bind(&name)
     .bind(data.role_id)
+    .bind(now)
     .bind(now)
     .execute(pool)
     .await?;
@@ -150,13 +151,15 @@ pub async fn update(pool: &SqlitePool, id: i64, data: EmployeeUpdate) -> RepoRes
         None
     };
 
+    let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE employee SET username = COALESCE(?1, username), name = COALESCE(?2, name), hash_pass = COALESCE(?3, hash_pass), role_id = COALESCE(?4, role_id), is_active = COALESCE(?5, is_active) WHERE id = ?6",
+        "UPDATE employee SET username = COALESCE(?1, username), name = COALESCE(?2, name), hash_pass = COALESCE(?3, hash_pass), role_id = COALESCE(?4, role_id), is_active = COALESCE(?5, is_active), updated_at = ?6 WHERE id = ?7",
         data.username,
         data.name,
         hash_pass,
         data.role_id,
         data.is_active,
+        now,
         id
     )
     .execute(pool)

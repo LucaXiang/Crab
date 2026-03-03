@@ -590,9 +590,6 @@ export const ProductManagement: React.FC = () => {
                 {formSpecs.map((spec, idx) => (
                   <div key={idx} className={`rounded-xl p-3 space-y-2 ${spec.is_root ? 'bg-amber-50/50 ring-1 ring-amber-200' : 'bg-gray-50'}`}>
                     <div className="flex items-center gap-2">
-                      {spec.is_root && (
-                        <span className="px-1.5 py-0.5 text-[0.625rem] font-medium bg-amber-100 text-amber-700 rounded shrink-0">ROOT</span>
-                      )}
                       <input
                         type="text" value={spec.name}
                         onChange={(e) => updateSpec(idx, 'name', e.target.value)}

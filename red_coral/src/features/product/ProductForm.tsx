@@ -156,7 +156,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             label={t('settings.product.form.category')}
             value={formData.category_id ?? ''}
             onChange={(value) => onFieldChange('category_id', Number(value))}
-            options={categories.map(c => ({ value: c.id, label: c.name }))}
+            options={categories.filter(c => !c.is_virtual).map(c => ({ value: c.id, label: c.name }))}
             placeholder={t('settings.product.form.select_category')}
             required
           />

@@ -323,13 +323,29 @@ impl axum::response::IntoResponse for AppError {
         let status = self.http_status();
         let body = ApiResponse::<()>::error(&self);
 
-        // Log system errors
-        if matches!(self.code.category(), super::category::ErrorCategory::System) {
-            tracing::error!(
-                code = %self.code,
-                message = %self.message,
-                "System error occurred"
-            );
+        // Log all errors — level varies by category
+        match self.code.category() {
+            super::category::ErrorCategory::System => {
+                tracing::error!(
+                    code = %self.code,
+                    message = %self.message,
+                    "System error"
+                );
+            }
+            super::category::ErrorCategory::Auth | super::category::ErrorCategory::Permission => {
+                tracing::warn!(
+                    code = %self.code,
+                    message = %self.message,
+                    "Auth/permission error"
+                );
+            }
+            _ => {
+                tracing::info!(
+                    code = %self.code,
+                    message = %self.message,
+                    "Request error"
+                );
+            }
         }
 
         (status, Json(body)).into_response()

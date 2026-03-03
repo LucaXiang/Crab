@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { logger } from '@/utils/logger';
+import { clearAllStores } from '@/core/stores/resources/registry';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import type { ApiResponse } from '@/core/domain/types/api';
 import type {
   ActivationRequiredReason,
@@ -90,6 +92,7 @@ export interface ModeInfo {
   is_connected: boolean;
   is_authenticated: boolean;
   tenant_id: number | null;
+  store_alias: string | null;
   username: string | null;
 }
 
@@ -381,6 +384,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true, error: null });
           await invokeApi('deactivate_current_mode');
+          clearAllStores();
+          useActiveOrdersStore.getState()._reset();
           set({
             appState: { type: 'TenantReady' },
             modeInfo: null,
@@ -399,6 +404,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true, error: null });
           await invokeApi('exit_tenant');
+          clearAllStores();
+          useActiveOrdersStore.getState()._reset();
           set({
             appState: { type: 'NeedTenantLogin' },
             modeInfo: null,
@@ -455,6 +462,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           await invokeApi('logout_employee');
           set({ currentSession: null });
+          clearAllStores();
+          useActiveOrdersStore.getState()._reset();
           // 刷新 appState 以反映登出状态
           await get().fetchAppState();
         } catch (error: unknown) {

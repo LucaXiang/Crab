@@ -138,7 +138,6 @@ export const ReportDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const storeId = useStoreId();
   const { date: dateStr } = useParams<{ date: string }>();
-  const token = useAuthStore(s => s.token);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
   const [report, setReport] = useState<DailyReportDetail | null>(null);
@@ -146,10 +145,11 @@ export const ReportDetailScreen: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!token || !dateStr) return;
+    const tk = useAuthStore.getState().token;
+    if (!tk || !dateStr) return;
     (async () => {
       try {
-        setReport(await getReportDetail(token, storeId, dateStr));
+        setReport(await getReportDetail(tk, storeId, dateStr));
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) { clearAuth(); navigate('/login'); return; }
         setError(err instanceof ApiError ? err.message : t('auth.error_generic'));
@@ -157,7 +157,8 @@ export const ReportDetailScreen: React.FC = () => {
         setLoading(false);
       }
     })();
-  }, [token, storeId, dateStr, clearAuth, navigate, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, dateStr]);
 
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner className="w-8 h-8 text-primary-500" /></div>;
   if (error) return <div className="max-w-5xl mx-auto px-6 py-8"><div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div></div>;

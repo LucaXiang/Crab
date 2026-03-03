@@ -802,6 +802,16 @@ impl TenantManager {
         self.current_tenant
     }
 
+    /// 获取当前门店别名 (从 credential.json 的 store_number 派生)
+    pub fn current_store_alias(&self) -> Option<String> {
+        let paths = self.current_paths()?;
+        let cred_path = paths.credential_file();
+        let content = std::fs::read_to_string(&cred_path).ok()?;
+        let binding: edge_server::services::tenant_binding::TenantBinding =
+            serde_json::from_str(&content).ok()?;
+        Some(format!("Store{:02}", binding.store_number))
+    }
+
     /// 获取当前员工会话
     pub fn current_session(&self) -> Option<&EmployeeSession> {
         self.current_session.as_ref()

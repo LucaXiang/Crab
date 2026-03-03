@@ -1,8 +1,19 @@
 import React from 'react';
 import type { ChainEntryItem } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
-import { Search, Clock, ChevronRight, ArrowLeft, Undo2, Receipt, Ban, FileUp } from 'lucide-react';
+import { Search, Clock, ChevronRight, ArrowLeft, Undo2, Receipt, Ban, FileUp, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
+import type { ChainEntryType } from '@/core/domain/types';
+
+function formatChainNumber(displayNumber: string, entryType: ChainEntryType): string {
+  switch (entryType) {
+    case 'CREDIT_NOTE': return `DEV ${displayNumber}`;
+    case 'ANULACION': return `ANU ${displayNumber}`;
+    case 'UPGRADE': return `UPG ${displayNumber}`;
+    case 'BREAK': return `BRK ${displayNumber}`;
+    default: return `ORD ${displayNumber}`;
+  }
+}
 
 interface ChainEntrySidebarProps {
   entries: ChainEntryItem[];
@@ -99,63 +110,64 @@ const ChainEntryCard: React.FC<ChainEntryCardProps> = React.memo(({ entry, isSel
   const isCreditNote = entry.entry_type === 'CREDIT_NOTE';
   const isAnulacion = entry.entry_type === 'ANULACION';
   const isUpgrade = entry.entry_type === 'UPGRADE';
+  const isBreak = entry.entry_type === 'BREAK';
   const isVoid = entry.status === 'VOID';
   const isMerged = entry.status === 'MERGED';
-  const isAnulada = entry.status === 'ANULADA';
+
+  const statusBadge = isBreak ? 'bg-amber-100 text-amber-700'
+    : isAnulacion ? 'bg-gray-800 text-white'
+    : isUpgrade ? 'bg-blue-100 text-blue-700'
+    : isCreditNote ? 'bg-orange-100 text-orange-700'
+    : isVoid ? 'bg-red-100 text-red-600'
+    : isMerged ? 'bg-blue-100 text-blue-700'
+    : 'bg-green-100 text-green-700';
+
+  const statusLabel = isBreak ? t('chain_entry.break')
+    : isAnulacion ? t('anulacion.title')
+    : isUpgrade ? t('upgrade.title')
+    : isCreditNote ? t('credit_note.title')
+    : isVoid ? t('history.status.voided')
+    : isMerged ? t('history.status.merged')
+    : t('checkout.amount.paid_status');
+
+  const iconBg = isBreak ? 'bg-amber-100 text-amber-600'
+    : isAnulacion ? 'bg-gray-800 text-white'
+    : isUpgrade ? 'bg-blue-100 text-blue-600'
+    : isCreditNote ? 'bg-orange-100 text-orange-500'
+    : 'bg-gray-100 text-gray-500';
+
+  const icon = isBreak ? <AlertTriangle size={14} />
+    : isUpgrade ? <FileUp size={14} />
+    : isAnulacion ? <Ban size={14} />
+    : isCreditNote ? <Undo2 size={14} />
+    : <Receipt size={14} />;
 
   return (
     <button
-      onClick={() => onSelect(entry)}
+      onClick={() => !isBreak && onSelect(entry)}
       className={`w-full p-4 text-left transition-colors flex justify-between items-start group
-        ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+        ${isBreak ? 'cursor-default opacity-60' : isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
     >
       <div className="flex items-start gap-3 flex-1 min-w-0">
-        <div className="flex flex-col items-center gap-0.5 shrink-0">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center
-            ${isUpgrade ? 'bg-blue-100 text-blue-600' : isAnulacion ? 'bg-gray-800 text-white' : isCreditNote ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
-            {isUpgrade ? <FileUp size={14} /> : isAnulacion ? <Ban size={14} /> : isCreditNote ? <Undo2 size={14} /> : <Receipt size={14} />}
-          </div>
-          <span className="text-[0.55rem] text-gray-400 font-mono">#{String(entry.chain_id).padStart(4, '0')}</span>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
+          {icon}
         </div>
-
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`font-bold text-sm ${isSelected ? 'text-primary-600' : 'text-gray-800'}`}>
-              {entry.display_number}
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`font-bold text-sm ${isSelected ? 'text-primary-600' : isBreak ? 'text-amber-700' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-gray-800' : isUpgrade ? 'text-blue-700' : 'text-gray-800'}`}>
+              {formatChainNumber(entry.display_number, entry.entry_type)}
             </span>
           </div>
-
-          <div className="flex gap-1.5 flex-wrap text-[0.625rem] mb-1">
-            {isOrder && (
-              <span className={`px-1.5 py-0.5 rounded-full font-bold
-                ${isVoid ? 'bg-red-100 text-red-600' : isMerged ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                {isVoid ? t('history.status.voided').toUpperCase()
-                  : isMerged ? t('history.status.merged').toUpperCase()
-                  : t('checkout.amount.paid_status').toUpperCase()}
-              </span>
-            )}
-            {isCreditNote && (
-              <span className="px-1.5 py-0.5 rounded-full font-bold bg-red-100 text-red-700">
-                {t('credit_note.title')}
-              </span>
-            )}
-            {isAnulacion && (
-              <span className="px-1.5 py-0.5 rounded-full font-bold bg-gray-800 text-white">
-                {t('anulacion.title')}
-              </span>
-            )}
-            {isUpgrade && (
-              <span className="px-1.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700">
-                {t('upgrade.title')}
-              </span>
-            )}
+          <div className="flex gap-1.5 flex-wrap text-[0.625rem] items-center mb-1">
+            <span className={`px-1.5 py-0.5 rounded-full font-bold ${statusBadge}`}>
+              {statusLabel}
+            </span>
             {(isCreditNote || isAnulacion) && entry.original_receipt && (
-              <span className="text-gray-400 truncate">
+              <span className="text-gray-400 font-mono text-[0.6rem]">
                 ← {entry.original_receipt}
               </span>
             )}
           </div>
-
           <div className="text-xs text-gray-400 font-mono">
             {new Date(entry.created_at).toLocaleString([], { hour12: false })}
           </div>
@@ -163,12 +175,13 @@ const ChainEntryCard: React.FC<ChainEntryCardProps> = React.memo(({ entry, isSel
       </div>
 
       <div className="text-right shrink-0 pl-2">
-        <div className={`font-bold text-sm
-          ${isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion || isAnulada ? 'text-gray-400 line-through' : isVoid || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-          {isCreditNote ? '-' : ''}{formatCurrency(entry.amount)}
+        <div className={`font-bold text-sm ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-gray-400' : isVoid || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+          {isBreak ? '\u2014' : entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </div>
-        <ChevronRight size={16} className={`ml-auto mt-1 transition-opacity
-          ${isSelected ? 'text-primary-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`} />
+        {!isBreak && (
+          <ChevronRight size={16} className={`ml-auto mt-1 transition-opacity
+            ${isSelected ? 'text-primary-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`} />
+        )}
       </div>
     </button>
   );

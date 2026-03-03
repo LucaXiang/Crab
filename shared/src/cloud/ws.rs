@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::CatalogExport;
 use crate::order::{OrderEvent, OrderSnapshot};
 
 use super::store_op::{StoreOp, StoreOpResult};
@@ -43,6 +44,13 @@ pub enum CloudMessage {
 
     /// RPC 响应（与 Rpc.id 匹配）
     RpcResult { id: String, result: CloudRpcResult },
+
+    // === edge → cloud: catalog sync (re-bind) ===
+    /// Edge → Cloud: 请求全量 catalog (re-bind 后发送)
+    RequestCatalogSync,
+
+    /// Cloud → Edge: 全量 catalog 响应 (re-bind 时使用)
+    CatalogSyncData { catalog: Box<CatalogExport> },
 
     // === edge → cloud: 活跃订单推送 ===
     /// 单个活跃订单快照更新（新建 or 变更）+ 事件历史

@@ -852,7 +852,7 @@ impl OrderArchiveService {
     pub async fn verify_order(&self, receipt_number: &str) -> ArchiveResult<OrderVerification> {
         // 1. 查询订单 PK（用于委托给 verify_order_events）
         let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
-            "SELECT ao.id, ao.receipt_number, ao.order_id, ce.prev_hash, ce.curr_hash \
+            "SELECT ao.id, ao.receipt_number, ao.id AS order_id, ce.prev_hash, ce.curr_hash \
              FROM archived_order ao \
              JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
              WHERE ao.receipt_number = ?",
@@ -973,7 +973,7 @@ impl OrderArchiveService {
     async fn verify_order_events(&self, order_pk: i64) -> ArchiveResult<OrderVerification> {
         // 获取订单信息和 chain_entry hash
         let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
-            "SELECT ao.id, ao.receipt_number, ao.order_id, ce.prev_hash, ce.curr_hash \
+            "SELECT ao.id, ao.receipt_number, ao.id AS order_id, ce.prev_hash, ce.curr_hash \
              FROM archived_order ao \
              JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
              WHERE ao.id = ?",

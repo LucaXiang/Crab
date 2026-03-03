@@ -48,10 +48,12 @@ pub async fn create(
     data: ZoneCreate,
 ) -> RepoResult<Zone> {
     let id = assigned_id.unwrap_or_else(shared::util::snowflake_id);
-    sqlx::query("INSERT INTO zone (id, name, description) VALUES (?, ?, ?)")
+    let now = shared::util::now_millis();
+    sqlx::query("INSERT INTO zone (id, name, description, updated_at) VALUES (?, ?, ?, ?)")
         .bind(id)
         .bind(&data.name)
         .bind(&data.description)
+        .bind(now)
         .execute(pool)
         .await?;
     find_by_id(pool, id)
@@ -60,11 +62,13 @@ pub async fn create(
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, data: ZoneUpdate) -> RepoResult<Zone> {
+    let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE zone SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active) WHERE id = ?4",
+        "UPDATE zone SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active), updated_at = ?4 WHERE id = ?5",
         data.name,
         data.description,
         data.is_active,
+        now,
         id
     )
     .execute(pool)

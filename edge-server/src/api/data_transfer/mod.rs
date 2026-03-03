@@ -33,3 +33,12 @@ pub async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError> {
 pub async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<(), AppError> {
     handler::import_zip(state, zip_bytes).await
 }
+
+/// Import catalog data from CatalogExport (clear + insert, no ZIP).
+/// Used by CatalogSyncData handler for re-bind scenario.
+pub async fn import_catalog_data(
+    state: &ServerState,
+    catalog: &shared::models::CatalogExport,
+) -> Result<(), AppError> {
+    handler::import_catalog_data(state, catalog).await
+}
