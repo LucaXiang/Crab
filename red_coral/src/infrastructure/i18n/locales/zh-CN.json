@@ -698,8 +698,9 @@
     "load_more": "加载更多",
     "no_more": "没有更多了",
     "status": {
-      "voided": "已作废",
-      "merged": "已合并"
+      "voided": "已取消",
+      "merged": "已合并",
+      "loss": "损失"
     },
     "void_type": {
       "CANCELLED": "取消",
@@ -740,11 +741,17 @@
       "title": "数据统计",
       "overview": "概览",
       "analytics": "数据统计",
+      "invoices": "发票明细",
+      "reports_shifts": "日报 & 班次",
       "daily_report": "日结报告",
       "audit_log": "审计日志"
     },
     "time": {
       "today": "今天",
+      "yesterday": "昨天",
+      "this_week": "本周",
+      "this_month": "本月",
+      "last_month": "上月",
       "week": "本周",
       "month": "本月",
       "custom": "自定义"
@@ -802,6 +809,41 @@
       "completed": "已完成",
       "voided": "已作废",
       "merged": "已合并"
+    },
+    "red_flags": {
+      "item_removals": "删除菜品",
+      "item_comps": "赠送",
+      "order_voids": "作废订单",
+      "order_discounts": "整单折扣",
+      "price_modifications": "改价",
+      "operator": "操作员"
+    },
+    "invoices": {
+      "number": "发票号",
+      "type": "类型",
+      "type_sale": "销售发票",
+      "type_correction": "更正发票",
+      "amount": "金额",
+      "tax": "税额",
+      "aeat_status": "AEAT 状态",
+      "date": "日期",
+      "all_types": "全部类型",
+      "all_statuses": "全部状态",
+      "total_count": "条记录"
+    },
+    "shifts": {
+      "title": "班次记录",
+      "operator": "操作员",
+      "status": "状态",
+      "start": "开始",
+      "end": "结束",
+      "duration": "时长",
+      "starting_cash": "初始现金",
+      "expected_cash": "预期现金",
+      "actual_cash": "实际现金",
+      "variance": "差异",
+      "open": "营业中",
+      "closed": "已关闭"
     }
   },
   "timeline": {
@@ -1663,11 +1705,17 @@
         "label": "标签打印"
       },
       "defaults": {
-        "title": "全局默认",
-        "description": "选择各类型的默认打印站，未选择则该类型打印关闭",
-        "kitchen": "默认厨房打印站",
-        "label": "默认标签打印站",
-        "none": "无（关闭）"
+        "title": "全局打印配置",
+        "description": "控制厨房和标签打印的全局开关和默认打印站",
+        "kitchen_enabled": "启用厨房打印",
+        "kitchen_enabled_description": "关闭后全系统不打厨房单",
+        "label_enabled": "启用标签打印",
+        "label_enabled_description": "关闭后全系统不打标签",
+        "kitchen": "兜底厨房打印站",
+        "kitchen_description": "分类未配置打印站时使用此默认",
+        "label": "兜底标签打印站",
+        "label_description": "分类未配置打印站时使用此默认",
+        "none": "无"
       },
       "kitchen_station": {
         "title": "厨房工位",
@@ -1714,6 +1762,10 @@
         "create_template": "创建新模板",
         "edit_design": "编辑设计",
         "duplicate_template": "复制",
+        "active_hint": "选择一个模板作为当前打印使用的标签样式",
+        "set_active": "设为当前使用",
+        "in_use": "使用中",
+        "fields": "个字段",
         "form": {
           "name": "模板名称",
           "name_placeholder": "例如：菜品标签 50x30mm",
@@ -2253,13 +2305,12 @@
     "4005": "订单存在支付记录",
     "4006": "订单项不存在",
     "4007": "订单为空",
-    "4008": "订单已作废，无法操作",
-    "4009": "订单未完成，无法操作",
-    "4010": "订单已升级为正式发票",
-    "4011": "订单无 F2 发票，无法升级",
-    "4012": "退款金额超出剩余可退金额",
-    "4013": "退款项在原订单中不存在",
-    "4014": "退款数量无效",
+    "4008": "订单未完成，无法操作",
+    "4009": "订单存在退款凭证，无法执行此操作",
+    "4010": "退款金额超出剩余可退金额",
+    "4011": "退款数量超出可退数量",
+    "4012": "订单已作废，无法操作",
+    "4013": "订单已升级为正式发票",
     "5001": "支付失败",
     "5002": "支付金额不足",
     "5003": "无效的支付方式",

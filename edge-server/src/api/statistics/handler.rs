@@ -8,7 +8,7 @@ use chrono::{Datelike, Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
-use crate::db::repository::store_info;
+use crate::db::repository::{invoice, store_info};
 use crate::utils::time;
 use crate::utils::{AppError, AppResult};
 
@@ -219,7 +219,11 @@ fn calculate_time_range(
             cutoff_millis(today),
             cutoff_millis(today + Duration::days(1)),
         ),
-        "week" => {
+        "yesterday" => {
+            let yesterday = today - Duration::days(1);
+            (cutoff_millis(yesterday), cutoff_millis(today))
+        }
+        "this_week" | "week" => {
             let weekday = today.weekday().num_days_from_monday();
             let week_start = today - Duration::days(weekday as i64);
             (
@@ -227,11 +231,21 @@ fn calculate_time_range(
                 cutoff_millis(today + Duration::days(1)),
             )
         }
-        "month" => {
+        "this_month" | "month" => {
             let month_start = today.with_day(1).unwrap_or(today);
             (
                 cutoff_millis(month_start),
                 cutoff_millis(today + Duration::days(1)),
+            )
+        }
+        "last_month" => {
+            let this_month_start = today.with_day(1).unwrap_or(today);
+            let last_month_start = (this_month_start - Duration::days(1))
+                .with_day(1)
+                .unwrap_or(this_month_start - Duration::days(28));
+            (
+                cutoff_millis(last_month_start),
+                cutoff_millis(this_month_start),
             )
         }
         "custom" => {
@@ -629,5 +643,218 @@ pub async fn get_sales_report(
         page,
         page_size,
         total_pages,
+    }))
+}
+
+// ============================================================================
+// Red Flags
+// ============================================================================
+
+#[derive(Debug, Serialize)]
+pub struct RedFlagsSummary {
+    pub item_removals: i64,
+    pub item_comps: i64,
+    pub order_voids: i64,
+    pub order_discounts: i64,
+    pub price_modifications: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OperatorRedFlags {
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub item_removals: i64,
+    pub item_comps: i64,
+    pub order_voids: i64,
+    pub order_discounts: i64,
+    pub price_modifications: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RedFlagsResponse {
+    pub summary: RedFlagsSummary,
+    pub operator_breakdown: Vec<OperatorRedFlags>,
+}
+
+/// GET /api/statistics/red-flags
+pub async fn get_red_flags(
+    State(state): State<ServerState>,
+    Query(query): Query<StatisticsQuery>,
+) -> AppResult<Json<RedFlagsResponse>> {
+    let cutoff = store_info::get(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .map(|s| s.business_day_cutoff)
+        .unwrap_or(0);
+
+    let (start, end) = if let (Some(from), Some(to)) = (query.from, query.to) {
+        (from, to)
+    } else {
+        let time_range = query.time_range.as_deref().unwrap_or("today");
+        calculate_time_range(
+            time_range,
+            cutoff,
+            query.start_date.as_deref(),
+            query.end_date.as_deref(),
+            state.config.timezone,
+        )
+    };
+
+    // Summary: count events by type within time range
+    let summary_rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT ae.event_type, COUNT(*) as cnt
+         FROM archived_order_event ae
+         JOIN archived_order o ON ae.order_pk = o.id
+         WHERE o.end_time >= ?1 AND o.end_time < ?2
+           AND ae.event_type IN ('ITEM_REMOVED', 'ITEM_COMPED', 'ORDER_VOIDED', 'ORDER_DISCOUNT_APPLIED', 'ITEM_MODIFIED')
+         GROUP BY ae.event_type"
+    )
+    .bind(start)
+    .bind(end)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    let mut summary = RedFlagsSummary {
+        item_removals: 0,
+        item_comps: 0,
+        order_voids: 0,
+        order_discounts: 0,
+        price_modifications: 0,
+    };
+    for (event_type, count) in &summary_rows {
+        match event_type.as_str() {
+            "ITEM_REMOVED" => summary.item_removals = *count,
+            "ITEM_COMPED" => summary.item_comps = *count,
+            "ORDER_VOIDED" => summary.order_voids = *count,
+            "ORDER_DISCOUNT_APPLIED" => summary.order_discounts = *count,
+            "ITEM_MODIFIED" => summary.price_modifications = *count,
+            _ => {}
+        }
+    }
+
+    // Operator breakdown
+    let operator_rows: Vec<(i64, String, String, i64)> = sqlx::query_as(
+        "SELECT COALESCE(ae.operator_id, 0), COALESCE(ae.operator_name, ''), ae.event_type, COUNT(*) as cnt
+         FROM archived_order_event ae
+         JOIN archived_order o ON ae.order_pk = o.id
+         WHERE o.end_time >= ?1 AND o.end_time < ?2
+           AND ae.event_type IN ('ITEM_REMOVED', 'ITEM_COMPED', 'ORDER_VOIDED', 'ORDER_DISCOUNT_APPLIED', 'ITEM_MODIFIED')
+         GROUP BY ae.operator_id, ae.operator_name, ae.event_type"
+    )
+    .bind(start)
+    .bind(end)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    let mut op_map: std::collections::HashMap<i64, OperatorRedFlags> =
+        std::collections::HashMap::new();
+    for (op_id, op_name, event_type, count) in operator_rows {
+        let entry = op_map.entry(op_id).or_insert_with(|| OperatorRedFlags {
+            operator_id: op_id,
+            operator_name: op_name.clone(),
+            item_removals: 0,
+            item_comps: 0,
+            order_voids: 0,
+            order_discounts: 0,
+            price_modifications: 0,
+        });
+        match event_type.as_str() {
+            "ITEM_REMOVED" => entry.item_removals = count,
+            "ITEM_COMPED" => entry.item_comps = count,
+            "ORDER_VOIDED" => entry.order_voids = count,
+            "ORDER_DISCOUNT_APPLIED" => entry.order_discounts = count,
+            "ITEM_MODIFIED" => entry.price_modifications = count,
+            _ => {}
+        }
+    }
+
+    Ok(Json(RedFlagsResponse {
+        summary,
+        operator_breakdown: op_map.into_values().collect(),
+    }))
+}
+
+// ============================================================================
+// Invoice List
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct InvoiceListQuery {
+    /// Unix millis start
+    pub from: Option<i64>,
+    /// Unix millis end
+    pub to: Option<i64>,
+    #[serde(rename = "timeRange")]
+    pub time_range: Option<String>,
+    #[serde(rename = "startDate")]
+    pub start_date: Option<String>,
+    #[serde(rename = "endDate")]
+    pub end_date: Option<String>,
+    pub tipo: Option<String>,
+    pub aeat_status: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i32,
+    #[serde(default = "default_page_size")]
+    pub page_size: i32,
+}
+
+fn default_page_size() -> i32 {
+    20
+}
+
+#[derive(Debug, Serialize)]
+pub struct InvoiceListResponse {
+    pub invoices: Vec<invoice::InvoiceListRow>,
+    pub total: i64,
+    pub page: i32,
+    pub page_size: i32,
+}
+
+/// GET /api/statistics/invoices
+pub async fn list_invoices(
+    State(state): State<ServerState>,
+    Query(query): Query<InvoiceListQuery>,
+) -> AppResult<Json<InvoiceListResponse>> {
+    let cutoff = store_info::get(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .map(|s| s.business_day_cutoff)
+        .unwrap_or(0);
+
+    let (start, end) = if let (Some(from), Some(to)) = (query.from, query.to) {
+        (from, to)
+    } else {
+        let time_range = query.time_range.as_deref().unwrap_or("today");
+        calculate_time_range(
+            time_range,
+            cutoff,
+            query.start_date.as_deref(),
+            query.end_date.as_deref(),
+            state.config.timezone,
+        )
+    };
+
+    let offset = (query.page - 1) * query.page_size;
+    let (invoices, total) = invoice::list_paginated(
+        &state.pool,
+        start,
+        end,
+        query.tipo.as_deref(),
+        query.aeat_status.as_deref(),
+        query.page_size,
+        offset,
+    )
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    Ok(Json(InvoiceListResponse {
+        invoices,
+        total,
+        page: query.page,
+        page_size: query.page_size,
     }))
 }

@@ -420,6 +420,81 @@ pub async fn update_aeat_status(
     Ok(result.rows_affected() > 0)
 }
 
+// ---------------------------------------------------------------------------
+// Invoice list (paginated, with filters)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct InvoiceListRow {
+    pub id: i64,
+    pub invoice_number: String,
+    pub tipo_factura: String,
+    pub source_type: String,
+    pub source_pk: i64,
+    pub total: f64,
+    pub tax: f64,
+    pub aeat_status: String,
+    pub created_at: i64,
+}
+
+/// List invoices with optional filters, paginated. Returns (rows, total_count).
+pub async fn list_paginated(
+    pool: &SqlitePool,
+    from: i64,
+    to: i64,
+    tipo: Option<&str>,
+    aeat_status: Option<&str>,
+    limit: i32,
+    offset: i32,
+) -> RepoResult<(Vec<InvoiceListRow>, i64)> {
+    let mut where_clauses = vec!["created_at >= ?1 AND created_at < ?2".to_string()];
+    let mut bind_idx = 3;
+
+    if tipo.is_some() {
+        where_clauses.push(format!("tipo_factura = ?{bind_idx}"));
+        bind_idx += 1;
+    }
+    if aeat_status.is_some() {
+        where_clauses.push(format!("aeat_status = ?{bind_idx}"));
+        bind_idx += 1;
+    }
+
+    let where_clause = where_clauses.join(" AND ");
+
+    let count_sql = format!("SELECT COUNT(*) FROM invoice WHERE {where_clause}");
+    let list_sql = format!(
+        "SELECT id, invoice_number, tipo_factura, source_type, source_pk, \
+         total, tax, aeat_status, created_at \
+         FROM invoice WHERE {where_clause} ORDER BY id DESC LIMIT ?{bind_idx} OFFSET ?{}",
+        bind_idx + 1
+    );
+
+    // Build count query
+    let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql).bind(from).bind(to);
+    if let Some(t) = tipo {
+        count_q = count_q.bind(t);
+    }
+    if let Some(s) = aeat_status {
+        count_q = count_q.bind(s);
+    }
+    let total = count_q.fetch_one(pool).await?;
+
+    // Build list query
+    let mut list_q = sqlx::query_as::<_, InvoiceListRow>(&list_sql)
+        .bind(from)
+        .bind(to);
+    if let Some(t) = tipo {
+        list_q = list_q.bind(t);
+    }
+    if let Some(s) = aeat_status {
+        list_q = list_q.bind(s);
+    }
+    list_q = list_q.bind(limit).bind(offset);
+    let rows = list_q.fetch_all(pool).await?;
+
+    Ok((rows, total))
+}
+
 /// Find all invoices linked to a given order (F2 for the order + R5 for its credit notes).
 pub async fn find_by_order(pool: &SqlitePool, order_pk: i64) -> RepoResult<Vec<Invoice>> {
     // Get direct F2 invoice + any R5 invoices whose source is a credit_note of this order

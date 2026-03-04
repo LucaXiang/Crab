@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './components/Overview';
-import { SalesReport } from './components/SalesReport';
-import { DailyReportManagement } from '@/features/daily-report/DailyReportManagement';
+import { InvoiceList } from './components/InvoiceList';
+import { ReportsAndShifts } from './components/ReportsAndShifts';
 import { AuditLog } from './components/AuditLog';
+import type { RedFlagsData } from './components/RedFlagsBar';
 import type { TimeRange, ActiveTab, StoreOverview } from '@/core/domain/types';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { WheelDateTimePicker } from '@/shared/components/FormField';
@@ -35,22 +36,43 @@ function computeRange(range: TimeRange, cutoffMinutes: number, customStart?: str
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
-  // Shift by cutoff
   const cutoffMs = cutoffMinutes * 60_000;
+  const DAY = 86_400_000;
   const bizDayStart = todayStart.getTime() + cutoffMs;
-  // If we haven't reached the cutoff yet, roll back one day
-  const effectiveStart = now.getTime() < bizDayStart ? bizDayStart - 86_400_000 : bizDayStart;
+  const todayBiz = now.getTime() < bizDayStart ? bizDayStart - DAY : bizDayStart;
 
-  if (range === 'today') {
-    return { from: effectiveStart, to: effectiveStart + 86_400_000 };
+  switch (range) {
+    case 'today':
+      return { from: todayBiz, to: todayBiz + DAY };
+    case 'yesterday':
+      return { from: todayBiz - DAY, to: todayBiz };
+    case 'this_week': {
+      const day = now.getDay(); // 0=Sun
+      const daysSinceMonday = day === 0 ? 6 : day - 1;
+      const weekStart = todayBiz - daysSinceMonday * DAY;
+      return { from: weekStart, to: todayBiz + DAY };
+    }
+    case 'this_month': {
+      const d = new Date(todayBiz);
+      d.setDate(1);
+      d.setHours(0, 0, 0, 0);
+      const monthStart = d.getTime() + cutoffMs;
+      return { from: monthStart, to: todayBiz + DAY };
+    }
+    case 'last_month': {
+      const d = new Date(todayBiz);
+      d.setDate(1);
+      d.setHours(0, 0, 0, 0);
+      const thisMonthStart = d.getTime() + cutoffMs;
+      const d2 = new Date(thisMonthStart - DAY);
+      d2.setDate(1);
+      d2.setHours(0, 0, 0, 0);
+      const lastMonthStart = d2.getTime() + cutoffMs;
+      return { from: lastMonthStart, to: thisMonthStart };
+    }
+    default:
+      return null;
   }
-  if (range === 'week') {
-    return { from: effectiveStart - 6 * 86_400_000, to: effectiveStart + 86_400_000 };
-  }
-  if (range === 'month') {
-    return { from: effectiveStart - 29 * 86_400_000, to: effectiveStart + 86_400_000 };
-  }
-  return null;
 }
 
 /** Compute the previous period (same duration, immediately before). */
@@ -81,34 +103,38 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
   const [data, setData] = useState<StoreOverview>(EMPTY_OVERVIEW);
   const [prevData, setPrevData] = useState<StoreOverview | null>(null);
   const [lastWeekData, setLastWeekData] = useState<StoreOverview | null>(null);
+  const [redFlags, setRedFlags] = useState<RedFlagsData | null>(null);
 
   const cutoffMinutes = storeInfo.business_day_cutoff ?? 0;
+  const range = useMemo(
+    () => computeRange(timeRange, cutoffMinutes, customStartDate, customEndDate),
+    [timeRange, cutoffMinutes, customStartDate, customEndDate]
+  );
 
   const fetchOverview = useCallback(async (from: number, to: number): Promise<StoreOverview> => {
     return invokeApi<StoreOverview>('get_statistics', { from, to });
   }, []);
 
   useEffect(() => {
-    if (!isVisible) return;
-
-    const range = computeRange(timeRange, cutoffMinutes, customStartDate, customEndDate);
-    if (!range) return;
+    if (!isVisible || !range) return;
 
     let cancelled = false;
 
     const load = async () => {
       try {
-        const [current, prev, lw] = await Promise.all([
+        const [current, prev, lw, flags] = await Promise.all([
           fetchOverview(range.from, range.to),
           fetchOverview(previousRange(range).from, previousRange(range).to).catch(() => null),
           timeRange === 'today'
             ? fetchOverview(lastWeekRange(range).from, lastWeekRange(range).to).catch(() => null)
             : Promise.resolve(null),
+          invokeApi<RedFlagsData>('get_red_flags', { from: range.from, to: range.to }).catch(() => null),
         ]);
         if (cancelled) return;
         setData(current);
         setPrevData(prev);
         setLastWeekData(lw);
+        setRedFlags(flags);
       } catch (error) {
         if (cancelled) return;
         logger.error('Failed to fetch statistics', error);
@@ -118,7 +144,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
 
     load();
     return () => { cancelled = true; };
-  }, [isVisible, timeRange, customStartDate, customEndDate, cutoffMinutes, fetchOverview, t]);
+  }, [isVisible, range, timeRange, fetchOverview, t]);
 
   if (!isVisible) return null;
 
@@ -139,8 +165,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-bold text-gray-800">
               {activeTab === 'overview' && t('statistics.sidebar.overview')}
-              {activeTab === 'sales' && t('statistics.report.sales')}
-              {activeTab === 'daily_report' && t('statistics.sidebar.daily_report')}
+              {activeTab === 'invoices' && t('statistics.sidebar.invoices')}
+              {activeTab === 'reports_shifts' && t('statistics.sidebar.reports_shifts')}
               {activeTab === 'audit_log' && t('statistics.sidebar.audit_log')}
             </h1>
 
@@ -165,9 +191,11 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
                 className="text-sm border-gray-200 rounded-md text-gray-500 focus:ring-blue-500 focus:border-blue-500 bg-white py-2 pl-3 pr-8 shadow-sm cursor-pointer"
               >
                 <option value="today">{t('statistics.time.today')}</option>
-                <option value="week">{t('statistics.time.week')}</option>
-                <option value="month">{t('statistics.time.month')}</option>
-                <option value="custom">{t('statistics.time.custom') || 'Custom'}</option>
+                <option value="yesterday">{t('statistics.time.yesterday')}</option>
+                <option value="this_week">{t('statistics.time.this_week')}</option>
+                <option value="this_month">{t('statistics.time.this_month')}</option>
+                <option value="last_month">{t('statistics.time.last_month')}</option>
+                <option value="custom">{t('statistics.time.custom')}</option>
               </select>
             </div>
           </div>
@@ -178,19 +206,16 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
               previousOverview={prevData}
               lastWeekOverview={lastWeekData}
               cutoffMinutes={cutoffMinutes}
+              redFlags={redFlags}
             />
           )}
 
-          {activeTab === 'sales' && (
-            <SalesReport
-              timeRange={timeRange}
-              customStartDate={customStartDate}
-              customEndDate={customEndDate}
-            />
+          {activeTab === 'invoices' && range && (
+            <InvoiceList from={range.from} to={range.to} />
           )}
 
-          {activeTab === 'daily_report' && (
-            <DailyReportManagement />
+          {activeTab === 'reports_shifts' && range && (
+            <ReportsAndShifts from={range.from} to={range.to} />
           )}
 
           {activeTab === 'audit_log' && (

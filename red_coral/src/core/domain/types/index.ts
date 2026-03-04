@@ -92,8 +92,8 @@ export const Permission = {
 } as const;
 
 // Statistics types
-export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
-export type ActiveTab = 'overview' | 'sales' | 'daily_report' | 'audit_log';
+export type TimeRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month' | 'custom';
+export type ActiveTab = 'overview' | 'invoices' | 'reports_shifts' | 'audit_log';
 
 // ── StoreOverview — flat response aligned with edge-server ──
 

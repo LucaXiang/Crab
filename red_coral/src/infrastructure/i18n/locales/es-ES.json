@@ -698,8 +698,9 @@
     "load_more": "Cargar más",
     "no_more": "No hay más",
     "status": {
-      "voided": "Anulado",
-      "merged": "Unido"
+      "voided": "Cancelado",
+      "merged": "Unido",
+      "loss": "Pérdida"
     },
     "void_type": {
       "CANCELLED": "Cancelado",
@@ -740,11 +741,17 @@
       "title": "Estadísticas",
       "overview": "Resumen",
       "analytics": "Análisis",
+      "invoices": "Facturas",
+      "reports_shifts": "Informes y turnos",
       "daily_report": "Informe diario",
       "audit_log": "Auditoría"
     },
     "time": {
       "today": "Hoy",
+      "yesterday": "Ayer",
+      "this_week": "Esta semana",
+      "this_month": "Este mes",
+      "last_month": "Mes anterior",
       "week": "Semana",
       "month": "Mes",
       "custom": "Personalizado"
@@ -802,6 +809,41 @@
       "completed": "Completado",
       "voided": "Anulado",
       "merged": "Unido"
+    },
+    "red_flags": {
+      "item_removals": "Eliminaciones",
+      "item_comps": "Invitaciones",
+      "order_voids": "Anulaciones",
+      "order_discounts": "Descuentos",
+      "price_modifications": "Cambios de precio",
+      "operator": "Operador"
+    },
+    "invoices": {
+      "number": "Nº factura",
+      "type": "Tipo",
+      "type_sale": "Venta",
+      "type_correction": "Rectificativa",
+      "amount": "Importe",
+      "tax": "Impuestos",
+      "aeat_status": "Estado AEAT",
+      "date": "Fecha",
+      "all_types": "Todos los tipos",
+      "all_statuses": "Todos los estados",
+      "total_count": "registros"
+    },
+    "shifts": {
+      "title": "Turnos",
+      "operator": "Operador",
+      "status": "Estado",
+      "start": "Inicio",
+      "end": "Fin",
+      "duration": "Duración",
+      "starting_cash": "Efectivo inicial",
+      "expected_cash": "Efectivo esperado",
+      "actual_cash": "Efectivo real",
+      "variance": "Diferencia",
+      "open": "Abierto",
+      "closed": "Cerrado"
     }
   },
   "timeline": {
@@ -1662,11 +1704,17 @@
         "label": "Etiqueta"
       },
       "defaults": {
-        "title": "Predeterminados",
-        "description": "Seleccione la estación predeterminada para cada tipo. Sin selección = desactivado",
-        "kitchen": "Estación cocina predeterminada",
-        "label": "Estación etiquetas predeterminada",
-        "none": "Ninguna (desactivado)"
+        "title": "Configuración global de impresión",
+        "description": "Controle los interruptores globales y las estaciones predeterminadas de impresión",
+        "kitchen_enabled": "Activar impresión de cocina",
+        "kitchen_enabled_description": "Al desactivar, no se imprimirán tickets de cocina",
+        "label_enabled": "Activar impresión de etiquetas",
+        "label_enabled_description": "Al desactivar, no se imprimirán etiquetas",
+        "kitchen": "Estación cocina por defecto",
+        "kitchen_description": "Se usa cuando la categoría no tiene estación configurada",
+        "label": "Estación etiquetas por defecto",
+        "label_description": "Se usa cuando la categoría no tiene estación configurada",
+        "none": "Ninguna"
       },
       "kitchen_station": {
         "title": "Estaciones cocina",
@@ -1713,6 +1761,10 @@
         "create_template": "Crear plantilla",
         "edit_design": "Editar diseño",
         "duplicate_template": "Duplicar",
+        "active_hint": "Seleccione una plantilla como estilo de etiqueta actual",
+        "set_active": "Usar esta plantilla",
+        "in_use": "En uso",
+        "fields": "campos",
         "form": {
           "name": "Nombre",
           "name_placeholder": "Ej: Etiqueta 50x30mm",
@@ -2253,13 +2305,12 @@
     "4005": "Pedido tiene pagos",
     "4006": "Plato no existe",
     "4007": "Pedido vacío",
-    "4008": "Pedido ya anulado, no se puede operar",
-    "4009": "Pedido no completado, no se puede operar",
-    "4010": "Pedido ya tiene factura F3 sustitutiva",
-    "4011": "Pedido sin factura F2, no se puede sustituir",
-    "4012": "El importe de devolución supera el disponible",
-    "4013": "Artículo no encontrado en el pedido original",
-    "4014": "Cantidad de devolución inválida",
+    "4008": "Pedido no completado, no se puede operar",
+    "4009": "El pedido tiene notas de crédito, no se puede anular",
+    "4010": "El importe de devolución supera el disponible",
+    "4011": "Cantidad de devolución supera el disponible",
+    "4012": "Pedido anulado, no se puede operar",
+    "4013": "El pedido ya tiene factura sustitutiva",
     "5001": "Pago fallido",
     "5002": "Importe insuficiente",
     "5003": "Método pago inválido",

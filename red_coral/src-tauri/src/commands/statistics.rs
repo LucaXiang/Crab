@@ -16,6 +16,7 @@ use crate::core::ClientBridge;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreOverview {
     pub revenue: f64,
+    pub net_revenue: f64,
     pub orders: i32,
     pub guests: i32,
     pub average_order_value: f64,
@@ -29,6 +30,8 @@ pub struct StoreOverview {
     pub voided_amount: f64,
     pub loss_orders: i32,
     pub loss_amount: f64,
+    pub anulacion_count: i32,
+    pub anulacion_amount: f64,
     pub refund_count: i32,
     pub refund_amount: f64,
     pub revenue_trend: Vec<RevenueTrendPoint>,
@@ -200,6 +203,101 @@ pub async fn get_sales_report(
     }
 
     match bridge.get::<SalesReportResponse>(&path).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+    }
+}
+
+// ============================================================================
+// Red Flags
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedFlagsSummary {
+    pub item_removals: i64,
+    pub item_comps: i64,
+    pub order_voids: i64,
+    pub order_discounts: i64,
+    pub price_modifications: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperatorRedFlags {
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub item_removals: i64,
+    pub item_comps: i64,
+    pub order_voids: i64,
+    pub order_discounts: i64,
+    pub price_modifications: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedFlagsResponse {
+    pub summary: RedFlagsSummary,
+    pub operator_breakdown: Vec<OperatorRedFlags>,
+}
+
+/// 获取 Red Flags 数据
+#[tauri::command]
+pub async fn get_red_flags(
+    bridge: State<'_, Arc<ClientBridge>>,
+    from: i64,
+    to: i64,
+) -> Result<ApiResponse<RedFlagsResponse>, String> {
+    let path = format!("/api/statistics/red-flags?from={}&to={}", from, to);
+    match bridge.get::<RedFlagsResponse>(&path).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+    }
+}
+
+// ============================================================================
+// Invoice List
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InvoiceListRow {
+    pub id: i64,
+    pub invoice_number: String,
+    pub tipo_factura: String,
+    pub source_type: String,
+    pub source_pk: i64,
+    pub total: f64,
+    pub tax: f64,
+    pub aeat_status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InvoiceListResponse {
+    pub invoices: Vec<InvoiceListRow>,
+    pub total: i64,
+    pub page: i32,
+    pub page_size: i32,
+}
+
+/// 获取发票列表（分页）
+#[tauri::command]
+pub async fn list_invoices(
+    bridge: State<'_, Arc<ClientBridge>>,
+    from: i64,
+    to: i64,
+    tipo: Option<String>,
+    aeat_status: Option<String>,
+    page: Option<i32>,
+) -> Result<ApiResponse<InvoiceListResponse>, String> {
+    let mut path = format!("/api/statistics/invoices?from={}&to={}", from, to);
+    if let Some(t) = tipo {
+        path.push_str(&format!("&tipo={}", urlencoding::encode(&t)));
+    }
+    if let Some(s) = aeat_status {
+        path.push_str(&format!("&aeat_status={}", urlencoding::encode(&s)));
+    }
+    if let Some(p) = page {
+        path.push_str(&format!("&page={}", p));
+    }
+    match bridge.get::<InvoiceListResponse>(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }

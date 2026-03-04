@@ -335,6 +335,8 @@ pub async fn run() {
             // Statistics commands (数据统计)
             commands::get_statistics,
             commands::get_sales_report,
+            commands::get_red_flags,
+            commands::list_invoices,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { StoreOverviewDisplay } from './StoreOverviewDisplay';
+import { RedFlagsBar, type RedFlagsData } from './RedFlagsBar';
 import type { StoreOverview } from '@/core/domain/types';
 
 interface OverviewProps {
@@ -8,6 +9,7 @@ interface OverviewProps {
   previousOverview?: StoreOverview | null;
   lastWeekOverview?: StoreOverview | null;
   cutoffMinutes?: number;
+  redFlags?: RedFlagsData | null;
 }
 
 export const Overview: React.FC<OverviewProps> = ({
@@ -15,6 +17,7 @@ export const Overview: React.FC<OverviewProps> = ({
   previousOverview,
   lastWeekOverview,
   cutoffMinutes,
+  redFlags,
 }) => {
   const { t } = useI18n();
   const hasData = overview.orders > 0 || overview.revenue_trend.length > 0;
@@ -34,11 +37,14 @@ export const Overview: React.FC<OverviewProps> = ({
   }
 
   return (
-    <StoreOverviewDisplay
-      overview={overview}
-      previousOverview={previousOverview}
-      lastWeekOverview={lastWeekOverview}
-      cutoffMinutes={cutoffMinutes}
-    />
+    <>
+      {redFlags && <RedFlagsBar data={redFlags} />}
+      <StoreOverviewDisplay
+        overview={overview}
+        previousOverview={previousOverview}
+        lastWeekOverview={lastWeekOverview}
+        cutoffMinutes={cutoffMinutes}
+      />
+    </>
   );
 };

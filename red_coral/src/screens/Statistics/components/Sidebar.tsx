@@ -3,9 +3,9 @@ import {
   ArrowLeft,
   Activity,
   TrendingUp,
-  BarChart as BarChartIcon,
   Calendar,
   FileText,
+  ClipboardList,
   ShieldCheck
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t, locale } = useI18n();
 
   const getDateRangeLabel = () => {
-    const today = new Date();
+    const now = new Date();
     const formatDate = (date: Date) => {
       return date.toLocaleDateString(locale, { month: '2-digit', day: '2-digit' });
     };
@@ -41,23 +41,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (timeRange === 'custom' && customStartDate && customEndDate) {
       return `${customStartDate} - ${customEndDate}`;
     }
-    
+
     if (timeRange === 'today') {
-      return `${t('statistics.time.today')}, ${formatDate(today)}`;
+      return `${t('statistics.time.today')}, ${formatDate(now)}`;
     }
 
-    if (timeRange === 'week') {
-      const day = today.getDay();
-      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(today.setDate(diff));
-      // Reset today for end date (since setDate modifies it)
-      const endDate = new Date(); 
-      return `${formatDate(monday)} - ${formatDate(endDate)}`;
+    if (timeRange === 'yesterday') {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return `${t('statistics.time.yesterday')}, ${formatDate(yesterday)}`;
     }
 
-    if (timeRange === 'month') {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      return `${formatDate(firstDay)} - ${formatDate(today)}`;
+    if (timeRange === 'this_week') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(now.getFullYear(), now.getMonth(), diff);
+      return `${formatDate(monday)} - ${formatDate(now)}`;
+    }
+
+    if (timeRange === 'this_month') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      return `${formatDate(firstDay)} - ${formatDate(now)}`;
+    }
+
+    if (timeRange === 'last_month') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+      return `${formatDate(firstDay)} - ${formatDate(lastDay)}`;
     }
 
     return t(`statistics.time.${timeRange}`);
@@ -65,8 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { id: 'overview' as const, icon: TrendingUp, label: t('statistics.sidebar.overview') },
-    { id: 'sales' as const, icon: BarChartIcon, label: t('statistics.report.sales') },
-    { id: 'daily_report' as const, icon: FileText, label: t('statistics.sidebar.daily_report') },
+    { id: 'invoices' as const, icon: FileText, label: t('statistics.sidebar.invoices') },
+    { id: 'reports_shifts' as const, icon: ClipboardList, label: t('statistics.sidebar.reports_shifts') },
     { id: 'audit_log' as const, icon: ShieldCheck, label: t('statistics.sidebar.audit_log') },
   ];
 

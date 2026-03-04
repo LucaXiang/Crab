@@ -16,5 +16,7 @@ fn routes() -> Router<ServerState> {
     Router::new()
         .route("/", get(handler::get_statistics))
         .route("/sales-report", get(handler::get_sales_report))
+        .route("/red-flags", get(handler::get_red_flags))
+        .route("/invoices", get(handler::list_invoices))
         .layer(middleware::from_fn(require_permission("reports:view")))
 }

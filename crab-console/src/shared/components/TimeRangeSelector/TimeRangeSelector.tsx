@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 
-export type TimeRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
+export type TimeRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month' | 'custom';
 
 export interface TimeRange {
   from: number;
@@ -80,6 +80,13 @@ export function getPresetRange(preset: TimeRangePreset, t: (key: string) => stri
       monthStart.setHours(cutoffH, cutoffM, 0, 0);
       return { from: monthStart.getTime(), to: endOfNow(), preset, label: t('stats.this_month') };
     }
+    case 'last_month': {
+      const thisMonthStart = startOfMonth(now);
+      thisMonthStart.setHours(cutoffH, cutoffM, 0, 0);
+      const lastMonthStart = new Date(thisMonthStart);
+      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+      return { from: lastMonthStart.getTime(), to: thisMonthStart.getTime(), preset, label: t('stats.last_month') };
+    }
     case 'custom':
       return {
         from: customFrom ?? sod(now, cutoffMinutes).getTime(),
@@ -120,6 +127,12 @@ export function getPreviousRange(range: TimeRange): { from: number; to: number }
       prevMonthEnd.setMonth(prevMonthEnd.getMonth() - 1);
       return { from: prevMonth.getTime(), to: prevMonthEnd.getTime() };
     }
+    case 'last_month': {
+      // Compare vs the month before last
+      const twoMonthsAgo = new Date(range.from);
+      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 1);
+      return { from: twoMonthsAgo.getTime(), to: range.from };
+    }
     case 'custom': {
       // Compare vs same-length period immediately before
       return { from: range.from - duration, to: range.from };
@@ -136,7 +149,7 @@ export function getLastWeekSameDayRange(range: TimeRange): { from: number; to: n
   return { from: from.getTime(), to: to.getTime() };
 }
 
-const PRESETS: TimeRangePreset[] = ['today', 'yesterday', 'this_week', 'this_month'];
+const PRESETS: TimeRangePreset[] = ['today', 'yesterday', 'this_week', 'this_month', 'last_month'];
 
 export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinutes = 0 }) => {
   const { t } = useI18n();
@@ -184,6 +197,7 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinu
     yesterday: t('stats.yesterday'),
     this_week: t('stats.this_week'),
     this_month: t('stats.this_month'),
+    last_month: t('stats.last_month'),
     custom: t('stats.custom_range'),
   };
 
