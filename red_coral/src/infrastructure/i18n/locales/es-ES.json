@@ -2309,6 +2309,7 @@
     "4011": "Cantidad de devolución supera el disponible",
     "4012": "Pedido anulado, no se puede operar",
     "4013": "El pedido ya tiene factura sustitutiva",
+    "4014": "No se puede importar datos con pedidos activos",
     "5001": "Pago fallido",
     "5002": "Importe insuficiente",
     "5003": "Método pago inválido",

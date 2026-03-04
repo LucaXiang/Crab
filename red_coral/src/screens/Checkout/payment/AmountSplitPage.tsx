@@ -4,6 +4,7 @@ import { CreditCard, ArrowLeft, Minus, Plus, Banknote, Users, PieChart, Lock as 
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { useRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { openCashDrawer } from '@/core/services/order/paymentService';
@@ -45,7 +46,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
   const [splitMode, setSplitMode] = useState<'CUSTOM' | 'AA'>('CUSTOM');
   const [activeInput, setActiveInput] = useState<'CUSTOM' | 'AA_TOTAL' | 'AA_PAY'>('CUSTOM');
   const replaceMode = React.useRef(true);
-  const [aaTotalStr, setAATotalStr] = useState<string>(String(order.guest_count || 2));
+  const [aaTotalStr, setAATotalStr] = useState<string>(String(Math.max(2, order.guest_count || 2)));
   const [aaPayStr, setAAPayStr] = useState<string>('1');
 
   const handleComplete_cb = useCallback(() => {
@@ -61,7 +62,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
       setActiveInput('AA_PAY');
       replaceMode.current = true;
       setAATotalStr(order.aa_total_shares!.toString());
-      const pay = parseInt(aaPayStr) || 1;
+      const pay = parseInt(aaPayStr) || 0;
       const maxPay = aaRemainingShares;
       if (pay > maxPay && maxPay > 0) {
         setAAPayStr(maxPay.toString());
@@ -72,7 +73,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
   // Sync amountSplitValue with AA state
   React.useEffect(() => {
     if (splitMode === 'AA') {
-      const total = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 1);
+      const total = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 2);
       const remainingSharesForCalc = isAALocked ? aaRemainingShares : total;
       let pay = parseInt(aaPayStr) || 0;
 
@@ -126,7 +127,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
       } else if (activeInput === 'AA_PAY') {
         setAAPayStr(prev => {
           const next = (shouldReplace ? '' : prev) + value;
-          const total = parseInt(aaTotalStr) || 1;
+          const total = parseInt(aaTotalStr) || 2;
           const maxPay = isAALocked ? aaRemainingShares : total;
           if (parseInt(next) > maxPay) return shouldReplace ? value : prev;
           if (parseInt(next) > 999) return prev;
@@ -152,12 +153,12 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
     if (field === 'TOTAL') {
       setActiveInput('AA_TOTAL');
       const current = parseInt(aaTotalStr) || 0;
-      const next = Math.max(1, current + delta);
+      const next = Math.max(2, current + delta);
       setAATotalStr(next.toString());
     } else {
       setActiveInput('AA_PAY');
       const current = parseInt(aaPayStr) || 0;
-      const total = parseInt(aaTotalStr) || 1;
+      const total = parseInt(aaTotalStr) || 2;
       const maxPay = isAALocked ? aaRemainingShares : total;
       const next = Math.max(1, Math.min(maxPay, current + delta));
       setAAPayStr(next.toString());
@@ -229,7 +230,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
         return true;
       } catch (err) {
         logger.error('Amount split failed', err);
-        toast.error(`${t('checkout.amount_split.failed')}: ${err}`);
+        toast.error(localizedErrorMessage(err));
         return false;
       } finally {
         setIsProcessingAmountSplit(false);
@@ -250,7 +251,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
 
   const parsedAmount = parseFloat(amountSplitValue) || 0;
 
-  const totalShares = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 1);
+  const totalShares = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 2);
   const paidSharesExact = isAALocked ? (order.aa_paid_shares ?? 0) : (() => {
     const sharePrice = Currency.div(order.total, totalShares).toNumber();
     return Math.abs(sharePrice) < 0.01 ? 0 : Currency.div(order.paid_amount, sharePrice).toNumber();
@@ -399,7 +400,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
                                 </button>
                             )}
                             <div className={`text-4xl font-bold tabular-nums w-20 text-center ${isAALocked ? 'text-purple-700' : activeInput === 'AA_TOTAL' ? 'text-gray-800' : 'text-gray-500'}`}>
-                                {isAALocked ? order.aa_total_shares : (aaTotalStr || <span className="text-gray-300">1</span>)}
+                                {isAALocked ? order.aa_total_shares : (aaTotalStr || <span className="text-gray-300">2</span>)}
                             </div>
                             {!isAALocked && activeInput === 'AA_TOTAL' && (
                                 <button
@@ -461,7 +462,7 @@ export const AmountSplitPage: React.FC<AmountSplitPageProps> = ({ order, onBack,
                             <span>{t('checkout.aa_split.calculation')}</span>
                             <span className="text-sm">
                                 {splitMode === 'AA'
-                                    ? `(${formatCurrency(remaining)} / ${isAALocked ? aaRemainingShares : (parseInt(aaTotalStr)||1)}) × ${parseInt(aaPayStr)||1}`
+                                    ? `(${formatCurrency(remaining)} / ${isAALocked ? aaRemainingShares : (parseInt(aaTotalStr)||2)}) × ${parseInt(aaPayStr)||1}`
                                     : t('checkout.amount_split.custom_amount')
                                 }
                             </span>

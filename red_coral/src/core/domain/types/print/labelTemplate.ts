@@ -40,7 +40,7 @@ export interface LabelField {
   label?: string;
   /** Custom format template for text (e.g. "€{price}"), or image hash for image fields */
   template?: string;
-  source_type?: 'productImage' | 'qrCode' | 'barcode' | 'image';
+  source_type?: 'qrCode' | 'barcode' | 'image';
   maintain_aspect_ratio?: boolean;
   /** Temporary local file path for pending image upload (editor only, not persisted) */
   _pending_image_path?: string;
@@ -131,8 +131,6 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     padding: 1,
     is_default: true,
     is_active: true,
-    created_at: Date.now(),
-    updated_at: Date.now(),
     // Field coordinates are in pixels (base 203 DPI ≈ 8 px/mm)
     // 30mm × 8 = 240px wide, 20mm × 8 = 160px tall
     fields: [
@@ -200,8 +198,6 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     padding: 2,
     is_default: false,
     is_active: true,
-    created_at: Date.now(),
-    updated_at: Date.now(),
     // 40mm × 8 = 320px wide, 30mm × 8 = 240px tall
     fields: [
       {
@@ -268,8 +264,6 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     padding: 3,
     is_default: false,
     is_active: true,
-    created_at: Date.now(),
-    updated_at: Date.now(),
     // 50mm × 8 = 400px wide, 40mm × 8 = 320px tall
     fields: [
       {
@@ -442,28 +436,45 @@ export interface SupportedLabelField {
   category: string;
   description: string;
   example: string;
-  source_type?: 'productImage' | 'qrCode' | 'barcode';
+  source_type?: 'qrCode' | 'barcode' | 'image';
 }
 
 // key 必须与 edge-server/src/printing/executor.rs 的 build_label_data 一致。
 // 添加新字段：1) build_label_data 加 key  2) 这里加条目  3) PrintItemContext 扩展
 export const SUPPORTED_LABEL_FIELDS: SupportedLabelField[] = [
   // Product
+  { key: 'product_id', type: 'text', label: '商品ID', category: 'Product', description: '商品内部ID', example: '100001' },
   { key: 'product_name', type: 'text', label: '商品名称', category: 'Product', description: '商品原始名称', example: 'Coffee' },
   { key: 'kitchen_name', type: 'text', label: '厨房显示名', category: 'Product', description: '厨房打印名(=商品名)', example: 'Coffee' },
+  { key: 'category_id', type: 'text', label: '分类ID', category: 'Product', description: '分类内部ID', example: '200001' },
   { key: 'category_name', type: 'text', label: '分类名称', category: 'Product', description: '商品分类', example: 'Drinks' },
   { key: 'external_id', type: 'text', label: '外部ID', category: 'Product', description: '商品外部ID', example: '10042' },
   // Specification
   { key: 'spec_name', type: 'text', label: '规格名称', category: 'Product', description: '商品规格', example: 'Large' },
   // Item
+  { key: 'price', type: 'text', label: '价格', category: 'Item', description: '商品单价', example: '12.50' },
   { key: 'quantity', type: 'text', label: '数量', category: 'Item', description: '商品数量', example: '2' },
+  { key: 'subtotal', type: 'text', label: '小计', category: 'Item', description: '单价×数量', example: '25.00' },
   { key: 'index', type: 'text', label: '序号', category: 'Item', description: '商品在订单中的序号', example: '1/3' },
-  { key: 'options', type: 'text', label: '选项', category: 'Item', description: '商品选项/加料', example: 'No sugar' },
+  { key: 'options', type: 'text', label: '选项', category: 'Item', description: '标签选项(receipt_name)', example: 'No sugar' },
+  { key: 'kitchen_options', type: 'text', label: '厨房做法', category: 'Item', description: '厨房选项(kitchen_print_name)', example: '辣度: 微辣' },
   { key: 'note', type: 'text', label: '备注', category: 'Item', description: '商品备注', example: '少辣' },
   // Order
+  { key: 'order_id', type: 'text', label: '订单ID', category: 'Order', description: '订单唯一标识', example: '1234567890' },
+  { key: 'receipt_number', type: 'text', label: '单号', category: 'Order', description: '人类可读订单号', example: 'ORD202601010001' },
   { key: 'table_name', type: 'text', label: '桌号', category: 'Order', description: '桌号名称', example: 'Mesa 5' },
+  { key: 'zone_name', type: 'text', label: '区域', category: 'Order', description: '区域名称', example: 'Terraza' },
   { key: 'queue_number', type: 'text', label: '叫号', category: 'Order', description: '零售叫号(#001格式)', example: '#001' },
+  { key: 'is_retail', type: 'text', label: '零售模式', category: 'Order', description: '是否零售模式', example: 'true' },
+  // Store
+  { key: 'store_name', type: 'text', label: '门店名', category: 'Store', description: '门店名称', example: 'Red Coral Café' },
+  { key: 'store_address', type: 'text', label: '门店地址', category: 'Store', description: '门店地址', example: 'Calle Mayor 1' },
+  { key: 'store_phone', type: 'text', label: '门店电话', category: 'Store', description: '门店联系电话', example: '+34 600 000 000' },
+  { key: 'store_nif', type: 'text', label: '税号', category: 'Store', description: '门店税号(NIF)', example: 'B12345678' },
+  { key: 'store_logo', type: 'image', label: '门店Logo', category: 'Store', description: '门店Logo图片', example: '', source_type: 'image' },
   // Print
+  { key: 'print_count', type: 'text', label: '打印次数', category: 'Print', description: '已打印次数(0=首次)', example: '0' },
+  { key: 'weekday', type: 'text', label: '星期', category: 'Print', description: '打印日星期几', example: 'Monday' },
   { key: 'time', type: 'text', label: '时间', category: 'Print', description: '打印时间(HH:MM)', example: '14:30' },
   { key: 'date', type: 'text', label: '日期', category: 'Print', description: '打印日期(YYYY-MM-DD)', example: '2026-02-26' },
   { key: 'datetime', type: 'text', label: '日期时间', category: 'Print', description: '打印日期时间', example: '2026-02-26 14:30' },

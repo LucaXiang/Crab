@@ -8,6 +8,7 @@ import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate'
 import { compItem, uncompItem } from '@/core/stores/order/commands';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useProductStore } from '@/features/product';
 import { useCategoryStore } from '@/features/category';
@@ -174,7 +175,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
       setCompQty(1);
     } catch (err) {
       logger.error('Comp item failed', err);
-      toast.error(String(err));
+      toast.error(localizedErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }
@@ -187,7 +188,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
       toast.success(t('checkout.comp.uncomp'));
     } catch (err) {
       logger.error('Uncomp item failed', err);
-      toast.error(String(err));
+      toast.error(localizedErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }

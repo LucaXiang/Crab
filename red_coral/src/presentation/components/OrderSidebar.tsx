@@ -147,14 +147,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
               <span className="text-base font-bold">{t('pos.quick_add.title')}</span>
             </button>
 
-            <button
-              onClick={() => { setNoteText(order.note ?? ''); setShowNoteModal(true); }}
-              className={`p-2.5 rounded-lg transition-colors ${order.note ? 'bg-amber-100 hover:bg-amber-200 text-amber-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
-              title={t('checkout.order_note.title')}
-            >
-              <StickyNote size={24} />
-            </button>
-
             {onManage && !order.is_retail && (
             <button
               onClick={onManage}

@@ -4,6 +4,7 @@ import { Receipt, ArrowLeft, Coins, CreditCard, Trash2, ChevronRight } from 'luc
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/currency';
@@ -50,8 +51,7 @@ export const PaymentRecordsPage: React.FC<PaymentRecordsPageProps> = ({ order, o
       toast.success(t('checkout.payment.cancel_success'));
     } catch (error) {
       logger.error('Failed to cancel payment', error);
-      const message = error instanceof Error ? error.message : t('checkout.payment.cancel_failed');
-      toast.error(message);
+      toast.error(localizedErrorMessage(error));
     } finally {
       setCancellingPaymentId(null);
       setCancelAuthorizer(null);

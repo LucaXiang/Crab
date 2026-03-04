@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { Numpad } from '@/presentation/components/ui/Numpad';
 import { useCurrencySymbol } from '@/core/stores/settings/useStoreInfoStore';
 
@@ -164,7 +165,7 @@ export const PriceAdjustmentModal: React.FC<PriceAdjustmentModalProps> = ({
       onClose();
     } catch (err) {
       logger.error(`Apply ${config.type} failed`, err);
-      toast.error(String(err));
+      toast.error(localizedErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }
@@ -178,7 +179,7 @@ export const PriceAdjustmentModal: React.FC<PriceAdjustmentModalProps> = ({
       onClose();
     } catch (err) {
       logger.error(`Clear ${config.type} failed`, err);
-      toast.error(String(err));
+      toast.error(localizedErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }

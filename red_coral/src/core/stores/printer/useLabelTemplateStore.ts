@@ -24,13 +24,10 @@ function normalizeTemplate(t: LabelTemplate): LabelTemplate {
     padding: t.padding || 2,
     fields: (t.fields || []).map(f => ({
       ...f,
-      // 后端 LabelField 有 id/template_id (DB 行号)，前端不关心，但不需要剥离
       field_type: f.field_type || 'text',
     })),
     is_default: t.is_default || false,
     is_active: t.is_active ?? true,
-    created_at: t.created_at || Date.now(),
-    updated_at: t.updated_at || Date.now(),
     width_mm: t.width_mm ?? t.width,
     height_mm: t.height_mm ?? t.height,
   };
@@ -41,13 +38,14 @@ function stripEditorFields(fields: LabelTemplate['fields']) {
   return fields.map(({ _pending_image_path, ...rest }) => rest);
 }
 
-// 构造 Create payload
+// 构造 Create payload — 显式列举字段，确保自动/手动/复制创建一致
 function toCreatePayload(template: Partial<LabelTemplate>): LabelTemplateCreate {
   return {
     name: template.name || '',
     description: template.description,
     width: template.width_mm || template.width || 40,
     height: template.height_mm || template.height || 30,
+    padding: template.padding,
     fields: stripEditorFields(template.fields || []),
     is_default: template.is_default || false,
     is_active: template.is_active ?? true,
@@ -205,9 +203,20 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
 
   duplicateTemplate: async (template) => {
     const duplicateData: Partial<LabelTemplate> = {
-      ...template,
       name: `${template.name} (Copy)`,
+      description: template.description,
+      width: template.width,
+      height: template.height,
+      width_mm: template.width_mm,
+      height_mm: template.height_mm,
+      padding: template.padding,
+      fields: template.fields,
       is_default: false,
+      is_active: true,
+      padding_mm_x: template.padding_mm_x,
+      padding_mm_y: template.padding_mm_y,
+      render_dpi: template.render_dpi,
+      test_data: template.test_data,
     };
     return get().createTemplate(duplicateData);
   },

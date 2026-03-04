@@ -12,6 +12,7 @@ import { formatCurrency } from '@/utils/currency';
 import { TableCard } from '../TableCard';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 
@@ -134,7 +135,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             toast.success(t('checkout.split.success'));
         } catch (err) {
             logger.error('Split failed', err);
-            toast.error(t('checkout.split.failed') + ": " + err);
+            toast.error(localizedErrorMessage(err));
         } finally {
             setIsProcessingSplit(false);
         }

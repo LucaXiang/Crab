@@ -360,11 +360,10 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                </label>
                <select
                  value={field.source_type || 'image'}
-                 onChange={(e) => handleUpdate({ source_type: e.target.value as 'productImage' | 'qrCode' | 'barcode' | 'image', template: '' })}
+                 onChange={(e) => handleUpdate({ source_type: e.target.value as 'qrCode' | 'barcode' | 'image', template: '' })}
                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                >
                  <option value="image">{t("settings.label.source_type_image")}</option>
-                 <option value="productImage">{t("settings.label.source_type_product_image")}</option>
                  <option value="qrCode">{t("settings.label.source_type_qrcode")}</option>
                  <option value="barcode">{t("settings.label.source_type_barcode")}</option>
                </select>
@@ -429,7 +428,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     value={field.template || ''}
                     onChange={(e) => handleUpdate({ template: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                    placeholder={field.source_type === 'productImage' ? '{product_image}' : field.source_type === 'qrCode' ? '{product_code}' : '{barcode}'}
+                    placeholder={field.source_type === 'qrCode' ? '{product_code}' : '{barcode}'}
                  />
                  <p className="mt-1 text-xs text-gray-500">
                     {t("settings.label.image_template_hint")}

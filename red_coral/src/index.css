@@ -69,8 +69,6 @@ body {
   /* Enable font smoothing for better rendering */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Global bold text for POS systems */
-  font-weight: 700;
   /* Disable scrolling on body to create an app-like feel */
   overflow: hidden;
   user-select: none;

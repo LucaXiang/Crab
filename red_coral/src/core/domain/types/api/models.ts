@@ -354,7 +354,9 @@ export interface PrintDestinationUpdate {
 // ============ Print Config ============
 
 export interface PrintConfig {
+  kitchen_enabled: boolean;
   default_kitchen_printer: string | null;
+  label_enabled: boolean;
   default_label_printer: string | null;
 }
 
@@ -942,6 +944,7 @@ export interface LabelTemplateCreate {
   description?: string;
   width: number;
   height: number;
+  padding?: number;
   fields?: Omit<import('../print/labelTemplate').LabelField, '_pending_image_path'>[];
   is_default?: boolean;
   is_active?: boolean;

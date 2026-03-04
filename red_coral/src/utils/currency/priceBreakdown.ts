@@ -21,15 +21,24 @@ export interface PriceBreakdown {
   manualItemDiscount: number;
 }
 
-export function computePriceBreakdown(items: BreakdownItem[], order: BreakdownOrder): PriceBreakdown {
+/**
+ * @param isLineTotal - true when rule_discount_amount / rule_surcharge_amount
+ *   are already line totals (archived orders). false (default) when they are
+ *   per-unit amounts (active orders) and need to be multiplied by quantity.
+ */
+export function computePriceBreakdown(
+  items: BreakdownItem[],
+  order: BreakdownOrder,
+  isLineTotal = false,
+): PriceBreakdown {
   const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
 
   const activeItems = items.filter(i => !i._removed);
   const itemRuleDiscount = activeItems.reduce(
-    (sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount, item.quantity)).toNumber(), 0,
+    (sum, item) => Currency.add(sum, isLineTotal ? item.rule_discount_amount : Currency.mul(item.rule_discount_amount, item.quantity).toNumber()).toNumber(), 0,
   );
   const itemRuleSurcharge = activeItems.reduce(
-    (sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount, item.quantity)).toNumber(), 0,
+    (sum, item) => Currency.add(sum, isLineTotal ? item.rule_surcharge_amount : Currency.mul(item.rule_surcharge_amount, item.quantity).toNumber()).toNumber(), 0,
   );
   const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
   const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();

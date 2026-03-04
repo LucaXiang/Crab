@@ -6,6 +6,7 @@ import { useProductStore } from '@/features/product';
 import { EscalatableGate } from '../auth/EscalatableGate';
 import { toast } from '../Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 import { compItem, uncompItem } from '@/core/stores/order/commands';
 
@@ -52,7 +53,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       onClose();
     } catch (err) {
       logger.error('Comp item failed', err);
-      toast.error(String(err));
+      toast.error(localizedErrorMessage(err));
     }
   };
 
@@ -64,7 +65,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       onClose();
     } catch (err) {
       logger.error('Uncomp item failed', err);
-      toast.error(String(err));
+      toast.error(localizedErrorMessage(err));
     }
   };
 

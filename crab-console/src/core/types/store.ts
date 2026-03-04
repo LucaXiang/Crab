@@ -375,7 +375,7 @@ export enum LabelVerticalAlign {
   Bottom = 'bottom',
 }
 
-export type LabelImageSourceType = 'productImage' | 'qrCode' | 'barcode' | 'image';
+export type LabelImageSourceType = 'qrCode' | 'barcode' | 'image';
 export type LabelLineStyle = 'solid' | 'dashed' | 'dotted';
 
 export interface LabelField {

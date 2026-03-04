@@ -515,20 +515,23 @@ export const OrdersScreen: React.FC = () => {
 function entryIcon(type: ChainEntryType) {
   switch (type) {
     case 'CREDIT_NOTE': return <Undo2 className="w-3.5 h-3.5 text-orange-500" />;
-    case 'ANULACION': return <Ban className="w-3.5 h-3.5 text-white" />;
+    case 'ANULACION': return <Ban className="w-3.5 h-3.5 text-red-600" />;
     case 'UPGRADE': return <FileUp className="w-3.5 h-3.5 text-blue-600" />;
     case 'BREAK': return <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />;
-    default: return <Receipt className="w-3.5 h-3.5 text-slate-500" />;
+    default: return <Receipt className="w-3.5 h-3.5 text-green-600" />;
   }
 }
 
-function entryIconBg(type: ChainEntryType) {
+function entryIconBg(type: ChainEntryType, status: string) {
   switch (type) {
     case 'CREDIT_NOTE': return 'bg-orange-100';
-    case 'ANULACION': return 'bg-slate-800';
+    case 'ANULACION': return 'bg-red-100';
     case 'UPGRADE': return 'bg-blue-100';
     case 'BREAK': return 'bg-amber-100';
-    default: return 'bg-slate-100';
+    default:
+      if (status === 'LOSS') return 'bg-orange-100';
+      if (status === 'ANULADA' || status === 'VOID' || status === 'MERGED') return 'bg-slate-100';
+      return 'bg-green-100';
   }
 }
 
@@ -544,13 +547,17 @@ const ChainEntryRow: React.FC<{
   const isUpgrade = entry.entry_type === 'UPGRADE';
   const isBreak = entry.entry_type === 'BREAK';
   const isVoid = entry.status === 'VOID';
+  const isLoss = entry.status === 'LOSS';
   const isMerged = entry.status === 'MERGED';
+  const isAnulada = isOrder && entry.status === 'ANULADA';
 
   const statusBadge = isBreak ? 'bg-amber-100 text-amber-700'
-    : isAnulacion ? 'bg-slate-800 text-white'
+    : isAnulacion ? 'bg-red-100 text-red-700'
     : isUpgrade ? 'bg-blue-100 text-blue-700'
     : isCreditNote ? 'bg-orange-100 text-orange-700'
-    : isVoid ? 'bg-red-100 text-red-600'
+    : isAnulada ? 'bg-red-100 text-red-600'
+    : isLoss ? 'bg-orange-100 text-orange-700'
+    : isVoid ? 'bg-slate-200 text-slate-600'
     : isMerged ? 'bg-blue-100 text-blue-700'
     : 'bg-green-100 text-green-700';
 
@@ -558,7 +565,9 @@ const ChainEntryRow: React.FC<{
     : isAnulacion ? t('orders.anulacion')
     : isUpgrade ? t('orders.upgrade')
     : isCreditNote ? t('orders.credit_note')
-    : isVoid ? t('orders.void')
+    : isAnulada ? t('orders.anulada')
+    : isLoss ? t('orders.loss')
+    : isVoid ? t('orders.cancelled')
     : isMerged ? t('orders.merged')
     : t('orders.completed');
 
@@ -570,12 +579,12 @@ const ChainEntryRow: React.FC<{
       className={`w-full p-4 text-left transition-colors flex justify-between items-start group ${isBreak ? 'cursor-default opacity-60' : 'cursor-pointer'} ${isSelected ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
     >
       <div className="flex items-start gap-3 flex-1 min-w-0">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${entryIconBg(entry.entry_type)}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${entryIconBg(entry.entry_type, entry.status)}`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`font-bold ${isSelected ? 'text-primary-600' : isBreak ? 'text-amber-700' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-slate-800' : isUpgrade ? 'text-blue-700' : 'text-slate-800'}`}>
+            <span className={`font-bold ${isSelected ? 'text-primary-600' : isBreak ? 'text-amber-700' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-red-700' : isUpgrade ? 'text-blue-700' : 'text-slate-800'}`}>
               {formatChainNumber(entry.display_number, entry.entry_type)}
             </span>
           </div>
@@ -595,7 +604,7 @@ const ChainEntryRow: React.FC<{
         </div>
       </div>
       <div className="text-right shrink-0 pl-2">
-        <div className={`font-bold ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+        <div className={`font-bold ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-red-400 line-through' : isAnulada || isVoid || isMerged ? 'text-slate-400 line-through' : isLoss ? 'text-orange-400 line-through' : 'text-slate-800'}`}>
           {isBreak ? '\u2014' : entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </div>
         {!isBreak && <ChevronRight className={`w-4 h-4 ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />}
@@ -617,11 +626,14 @@ const MobileChainEntryCard: React.FC<{
   const isAnulacion = entry.entry_type === 'ANULACION';
   const isUpgrade = entry.entry_type === 'UPGRADE';
   const isBreak = entry.entry_type === 'BREAK';
+  const isOrder = entry.entry_type === 'ORDER';
   const isVoid = entry.status === 'VOID';
+  const isLoss = entry.status === 'LOSS';
   const isMerged = entry.status === 'MERGED';
+  const isAnulada = isOrder && entry.status === 'ANULADA';
 
   const borderStyle = isBreak ? 'bg-amber-50/50 border-amber-200'
-    : isAnulacion ? 'bg-slate-50 border-slate-300'
+    : isAnulacion ? 'bg-red-50/50 border-red-200'
     : isUpgrade ? 'bg-blue-50/50 border-blue-200'
     : isCreditNote ? 'bg-orange-50/50 border-orange-200'
     : 'bg-white border-slate-200';
@@ -630,15 +642,19 @@ const MobileChainEntryCard: React.FC<{
     : isAnulacion ? t('orders.anulacion')
     : isUpgrade ? t('orders.upgrade')
     : isCreditNote ? t('orders.credit_note')
-    : isVoid ? t('orders.void')
+    : isAnulada ? t('orders.anulada')
+    : isLoss ? t('orders.loss')
+    : isVoid ? t('orders.cancelled')
     : isMerged ? t('orders.merged')
     : t('orders.completed');
 
   const statusBadge = isBreak ? 'bg-amber-100 text-amber-700'
-    : isAnulacion ? 'bg-slate-800 text-white'
+    : isAnulacion ? 'bg-red-100 text-red-700'
     : isUpgrade ? 'bg-blue-100 text-blue-700'
     : isCreditNote ? 'bg-orange-100 text-orange-700'
-    : isVoid ? 'bg-red-100 text-red-600'
+    : isAnulada ? 'bg-red-100 text-red-600'
+    : isLoss ? 'bg-orange-100 text-orange-700'
+    : isVoid ? 'bg-slate-200 text-slate-600'
     : isMerged ? 'bg-blue-100 text-blue-700'
     : 'bg-green-100 text-green-700';
 
@@ -665,7 +681,7 @@ const MobileChainEntryCard: React.FC<{
             <span className="text-slate-400 font-mono">← {entry.original_receipt}</span>
           )}
         </div>
-        <span className={`text-lg font-bold ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-slate-400' : isVoid || isMerged ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+        <span className={`text-lg font-bold ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-red-400 line-through' : isAnulada || isVoid || isMerged ? 'text-slate-400 line-through' : isLoss ? 'text-orange-400 line-through' : 'text-slate-900'}`}>
           {isBreak ? '\u2014' : entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </span>
       </div>
@@ -898,12 +914,21 @@ const CreditNoteDetailView: React.FC<{
               {detail.items.map((item, i) => (
                 <div key={i} className="px-4 py-3 flex justify-between items-center">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm shrink-0">
+                    <div className="w-8 h-8 rounded bg-red-100 text-red-600 flex items-center justify-center font-bold text-sm shrink-0">
                       x{item.quantity}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium text-slate-800">{item.item_name}</span>
-                      <div className="text-xs text-slate-400">{item.tax_rate}% · {formatCurrency(item.unit_price)}</div>
+                      <div className="font-medium text-slate-800 flex items-center gap-2 flex-wrap">
+                        <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                          #{item.original_instance_id.slice(-5)}
+                        </span>
+                        <span>{item.item_name}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 flex items-center gap-2">
+                        <span>{formatCurrency(item.unit_price)}</span>
+                        <span>/ unit</span>
+                        {item.tax_rate > 0 && <span className="text-slate-300">IVA {item.tax_rate}%</span>}
+                      </div>
                     </div>
                   </div>
                   <span className="font-bold text-red-500 shrink-0 pl-4">-{formatCurrency(item.line_credit)}</span>
@@ -971,12 +996,20 @@ const MobileCreditNoteDetail: React.FC<{
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('orders.refund_items')}</h3>
           <div className="space-y-2">
             {detail.items.map((item, i) => (
-              <div key={i} className="flex items-start justify-between text-sm gap-2">
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium text-slate-900">{item.quantity}x</span>
-                  <span className="text-slate-800 ml-1">{item.item_name}</span>
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <div className="w-7 h-7 rounded bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                  x{item.quantity}
                 </div>
-                <span className="text-red-500 font-medium shrink-0">-{formatCurrency(item.line_credit)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-slate-800 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[0.6rem] text-blue-600 bg-blue-100 font-bold font-mono px-1 py-0.5 rounded border border-blue-200 shrink-0">
+                      #{item.original_instance_id.slice(-5)}
+                    </span>
+                    <span>{item.item_name}</span>
+                  </div>
+                  <div className="text-xs text-slate-400">{formatCurrency(item.unit_price)} / unit</div>
+                </div>
+                <span className="text-red-500 font-bold shrink-0">-{formatCurrency(item.line_credit)}</span>
               </div>
             ))}
           </div>

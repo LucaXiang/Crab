@@ -316,7 +316,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             } catch (genError) {
               logger.warn(`Failed to generate ${source_type} for field`, { component: 'LabelEditor', fieldId: field.field_id, detail: String(genError) });
             }
-          } else if (source_type === 'image' || source_type === 'productimage') {
+          } else if (source_type === 'image') {
             // Load regular image and convert to Base64
             const imagePath = field.template || field.data_source || '';
             if (!imagePath) continue;
