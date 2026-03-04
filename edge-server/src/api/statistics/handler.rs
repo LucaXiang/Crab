@@ -771,9 +771,24 @@ pub async fn get_red_flags(
         }
     }
 
+    let mut operator_breakdown: Vec<OperatorRedFlags> = op_map.into_values().collect();
+    operator_breakdown.sort_by(|a, b| {
+        let total_a = a.item_removals
+            + a.item_comps
+            + a.order_voids
+            + a.order_discounts
+            + a.price_modifications;
+        let total_b = b.item_removals
+            + b.item_comps
+            + b.order_voids
+            + b.order_discounts
+            + b.price_modifications;
+        total_b.cmp(&total_a)
+    });
+
     Ok(Json(RedFlagsResponse {
         summary,
-        operator_breakdown: op_map.into_values().collect(),
+        operator_breakdown,
     }))
 }
 

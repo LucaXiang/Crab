@@ -52,7 +52,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ from, to }) => {
         from,
         to,
         tipo: tipoFilter || undefined,
-        aeatStatus: statusFilter || undefined,
+        aeat_status: statusFilter || undefined,
         page,
       });
       setData(result);

@@ -75,8 +75,15 @@ function computeRange(range: TimeRange, cutoffMinutes: number, customStart?: str
   }
 }
 
-/** Compute the previous period (same duration, immediately before). */
-function previousRange(r: { from: number; to: number }): { from: number; to: number } {
+/** Compute the previous period for comparison. Uses calendar-aware logic for months. */
+function previousRange(r: { from: number; to: number }, preset: TimeRange): { from: number; to: number } {
+  if (preset === 'this_month' || preset === 'last_month') {
+    const prevStart = new Date(r.from);
+    prevStart.setMonth(prevStart.getMonth() - 1);
+    const prevEnd = new Date(r.to);
+    prevEnd.setMonth(prevEnd.getMonth() - 1);
+    return { from: prevStart.getTime(), to: prevEnd.getTime() };
+  }
   const duration = r.to - r.from;
   return { from: r.from - duration, to: r.from };
 }
@@ -116,15 +123,16 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
   }, []);
 
   useEffect(() => {
-    if (!isVisible || !range) return;
+    if (!isVisible || !range || activeTab !== 'overview') return;
 
     let cancelled = false;
 
     const load = async () => {
       try {
-        const [current, prev, lw, flags] = await Promise.all([
+        const prev = previousRange(range, timeRange);
+        const [current, prevData, lw, flags] = await Promise.all([
           fetchOverview(range.from, range.to),
-          fetchOverview(previousRange(range).from, previousRange(range).to).catch(() => null),
+          fetchOverview(prev.from, prev.to).catch(() => null),
           timeRange === 'today'
             ? fetchOverview(lastWeekRange(range).from, lastWeekRange(range).to).catch(() => null)
             : Promise.resolve(null),
@@ -132,7 +140,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
         ]);
         if (cancelled) return;
         setData(current);
-        setPrevData(prev);
+        setPrevData(prevData);
         setLastWeekData(lw);
         setRedFlags(flags);
       } catch (error) {
@@ -144,7 +152,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
 
     load();
     return () => { cancelled = true; };
-  }, [isVisible, range, timeRange, fetchOverview, t]);
+  }, [isVisible, range, timeRange, activeTab, fetchOverview, t]);
 
   if (!isVisible) return null;
 
