@@ -29,10 +29,8 @@ type SelectedEntry =
   | { type: 'UPGRADE'; chainId: number; entryPk: number }
   | { type: 'BREAK'; chainId: number; entryPk: number };
 
-const PAGE_SIZE = 50;
-
 export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack }) => {
-  const { entries, total, page, setPage, search, setSearch, loading, refresh } =
+  const { entries, total, hasMore, loadMore, search, setSearch, loading, refresh } =
     useChainEntryList(isVisible);
 
   const [selected, setSelected] = useState<SelectedEntry | null>(null);
@@ -105,7 +103,6 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack 
     : selected?.type === 'CREDIT_NOTE' ? cnLoading
     : selected?.type === 'UPGRADE' ? upgradeLoading
     : anulacionLoading;
-  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
   const receiptPrinter = usePrinterStore(state => state.receiptPrinter);
 
@@ -141,9 +138,8 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack 
         onSelect={selectEntry}
         search={search}
         setSearch={setSearch}
-        page={page}
-        totalPages={totalPages}
-        setPage={setPage}
+        hasMore={hasMore}
+        loadMore={loadMore}
         loading={loading}
         onBack={onBack}
       />

@@ -21,16 +21,15 @@ interface ChainEntrySidebarProps {
   onSelect: (entry: ChainEntryItem) => void;
   search: string;
   setSearch: (term: string) => void;
-  page: number;
-  totalPages: number;
-  setPage: (p: number) => void;
+  hasMore: boolean;
+  loadMore: () => void;
   loading: boolean;
   onBack: () => void;
 }
 
 export const ChainEntrySidebar: React.FC<ChainEntrySidebarProps> = ({
   entries, selectedChainId, onSelect, search, setSearch,
-  page, totalPages, setPage, loading, onBack,
+  hasMore, loadMore, loading, onBack,
 }) => {
   const { t } = useI18n();
 
@@ -84,12 +83,12 @@ export const ChainEntrySidebar: React.FC<ChainEntrySidebarProps> = ({
 
       <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-center items-center text-sm">
         <button
-          onClick={() => setPage(page + 1)}
-          disabled={page >= totalPages || loading}
+          onClick={loadMore}
+          disabled={!hasMore || loading}
           className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-default flex items-center gap-2"
         >
-          <span>{page < totalPages ? t('history.load_more') : t('history.no_more')}</span>
-          {page < totalPages && <ChevronRight size={16} />}
+          <span>{hasMore ? t('history.load_more') : t('history.no_more')}</span>
+          {hasMore && <ChevronRight size={16} />}
         </button>
       </div>
     </div>
@@ -112,13 +111,17 @@ const ChainEntryCard: React.FC<ChainEntryCardProps> = React.memo(({ entry, isSel
   const isUpgrade = entry.entry_type === 'UPGRADE';
   const isBreak = entry.entry_type === 'BREAK';
   const isVoid = entry.status === 'VOID';
+  const isLoss = entry.status === 'LOSS';
   const isMerged = entry.status === 'MERGED';
+  const isAnulada = isOrder && entry.status === 'ANULADA';
 
   const statusBadge = isBreak ? 'bg-amber-100 text-amber-700'
-    : isAnulacion ? 'bg-gray-800 text-white'
+    : isAnulacion ? 'bg-red-100 text-red-700'
     : isUpgrade ? 'bg-blue-100 text-blue-700'
     : isCreditNote ? 'bg-orange-100 text-orange-700'
-    : isVoid ? 'bg-red-100 text-red-600'
+    : isAnulada ? 'bg-red-100 text-red-600'
+    : isLoss ? 'bg-orange-100 text-orange-700'
+    : isVoid ? 'bg-gray-200 text-gray-600'
     : isMerged ? 'bg-blue-100 text-blue-700'
     : 'bg-green-100 text-green-700';
 
@@ -126,15 +129,19 @@ const ChainEntryCard: React.FC<ChainEntryCardProps> = React.memo(({ entry, isSel
     : isAnulacion ? t('anulacion.title')
     : isUpgrade ? t('upgrade.title')
     : isCreditNote ? t('credit_note.title')
+    : isAnulada ? t('anulacion.status.anulada')
+    : isLoss ? t('history.status.loss')
     : isVoid ? t('history.status.voided')
     : isMerged ? t('history.status.merged')
     : t('checkout.amount.paid_status');
 
   const iconBg = isBreak ? 'bg-amber-100 text-amber-600'
-    : isAnulacion ? 'bg-gray-800 text-white'
+    : isAnulacion ? 'bg-red-100 text-red-600'
     : isUpgrade ? 'bg-blue-100 text-blue-600'
     : isCreditNote ? 'bg-orange-100 text-orange-500'
-    : 'bg-gray-100 text-gray-500';
+    : isLoss ? 'bg-orange-100 text-orange-500'
+    : isAnulada || isVoid || isMerged ? 'bg-gray-100 text-gray-500'
+    : 'bg-green-100 text-green-600';
 
   const icon = isBreak ? <AlertTriangle size={14} />
     : isUpgrade ? <FileUp size={14} />
@@ -154,7 +161,7 @@ const ChainEntryCard: React.FC<ChainEntryCardProps> = React.memo(({ entry, isSel
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`font-bold text-sm ${isSelected ? 'text-primary-600' : isBreak ? 'text-amber-700' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-gray-800' : isUpgrade ? 'text-blue-700' : 'text-gray-800'}`}>
+            <span className={`font-bold text-sm ${isSelected ? 'text-primary-600' : isBreak ? 'text-amber-700' : isCreditNote ? 'text-orange-700' : isAnulacion ? 'text-red-700' : isUpgrade ? 'text-blue-700' : 'text-gray-800'}`}>
               {formatChainNumber(entry.display_number, entry.entry_type)}
             </span>
           </div>
@@ -175,7 +182,7 @@ const ChainEntryCard: React.FC<ChainEntryCardProps> = React.memo(({ entry, isSel
       </div>
 
       <div className="text-right shrink-0 pl-2">
-        <div className={`font-bold text-sm ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-gray-400' : isVoid || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+        <div className={`font-bold text-sm ${isBreak ? 'text-amber-500' : isCreditNote ? 'text-red-500' : isUpgrade ? 'text-blue-600' : isAnulacion ? 'text-red-400 line-through' : isAnulada || isVoid || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
           {isBreak ? '\u2014' : entry.amount != null ? (isCreditNote ? `-${formatCurrency(entry.amount)}` : formatCurrency(entry.amount)) : '\u2014'}
         </div>
         {!isBreak && (

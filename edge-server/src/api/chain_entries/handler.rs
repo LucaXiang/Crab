@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 pub struct ChainEntryQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// Cursor: only return entries with chain_id < before (for stable pagination)
+    pub before: Option<i64>,
     pub search: Option<String>,
 }
 
@@ -72,6 +74,8 @@ pub struct CreditNoteItemRow {
     pub id: i64,
     pub original_instance_id: String,
     pub item_name: String,
+    pub spec_name: Option<String>,
+    pub is_comped: bool,
     pub quantity: i64,
     pub unit_price: f64,
     pub line_credit: f64,
@@ -81,19 +85,24 @@ pub struct CreditNoteItemRow {
 
 // ── Handler: list ────────────────────────────────────────────────────────────
 
-/// SQL: UNION ALL 查询 ORDER + CREDIT_NOTE + ANULACION + UPGRADE，按 chain_id DESC 排序
+/// SQL: UNION ALL 查询 ORDER + CREDIT_NOTE + ANULACION + UPGRADE + BREAK，按 chain_id DESC 排序
 ///
 /// 搜索参数需要绑定多次（SQLite 不支持参数复用），
-/// ORDER 分支绑定一次、CREDIT_NOTE 分支绑定一次、ANULACION 分支绑定一次、UPGRADE 分支绑定一次。
+/// ORDER/CREDIT_NOTE/ANULACION/UPGRADE/BREAK 各分支分别绑定。
 ///
 /// ANULACION/UPGRADE entry_pk 指向 archived_order.id（订单层）。
+/// BREAK entry_pk 指向失败的 chain_entry.id，不 JOIN 其他表。
 const LIST_SQL: &str = "\
 SELECT
     ce.id          AS chain_id,
     ce.entry_type,
     ce.entry_pk,
     COALESCE(ao.receipt_number, CAST(ao.id AS TEXT)) AS display_number,
-    UPPER(ao.status) AS status,
+    CASE
+      WHEN ao.is_voided = 1 THEN 'ANULADA'
+      WHEN ao.status = 'VOID' AND ao.void_type = 'LOSS_SETTLED' THEN 'LOSS'
+      ELSE UPPER(ao.status)
+    END AS status,
     ao.total_amount AS amount,
     ce.created_at,
     ce.prev_hash,
@@ -163,8 +172,25 @@ JOIN archived_order ao3 ON ao3.id = ce.entry_pk
 WHERE ce.entry_type = 'UPGRADE'
   AND (? IS NULL OR LOWER(COALESCE(ao3.receipt_number, CAST(ao3.id AS TEXT))) LIKE ?)
 
-ORDER BY chain_id DESC
-LIMIT ? OFFSET ?";
+UNION ALL
+
+SELECT
+    ce.id          AS chain_id,
+    ce.entry_type,
+    ce.entry_pk,
+    '#' || CAST(ce.id % 10000 AS TEXT) AS display_number,
+    NULL           AS status,
+    0.0            AS amount,
+    ce.created_at,
+    ce.prev_hash,
+    ce.curr_hash,
+    NULL           AS original_order_pk,
+    NULL           AS original_receipt
+FROM chain_entry ce
+WHERE ce.entry_type = 'BREAK'
+  AND (? IS NULL OR 'break' LIKE ?)
+
+ORDER BY chain_id DESC";
 
 const COUNT_SQL: &str = "\
 SELECT COUNT(*) FROM (
@@ -188,6 +214,10 @@ SELECT COUNT(*) FROM (
     JOIN archived_order ao3 ON ao3.id = ce.entry_pk
     WHERE ce.entry_type = 'UPGRADE'
       AND (? IS NULL OR LOWER(COALESCE(ao3.receipt_number, CAST(ao3.id AS TEXT))) LIKE ?)
+    UNION ALL
+    SELECT ce.id FROM chain_entry ce
+    WHERE ce.entry_type = 'BREAK'
+      AND (? IS NULL OR 'break' LIKE ?)
 )";
 
 /// 内部 row 映射（含 original_total 用于派生 CreditNoteType）
@@ -211,15 +241,16 @@ pub async fn list(
     Query(params): Query<ChainEntryQuery>,
 ) -> AppResult<Json<ChainEntryListResponse>> {
     let limit = params.limit.unwrap_or(50).min(200);
-    let offset = params.offset.unwrap_or(0);
     let search_pattern = params
         .search
         .as_deref()
         .filter(|s| !s.is_empty())
         .map(|s| format!("%{}%", s.to_lowercase()));
 
-    // COUNT — 9 binds: (2) ORDER + (3) CREDIT_NOTE + (2) ANULACION + (2) UPGRADE
+    // COUNT — 11 binds: (2) ORDER + (3) CREDIT_NOTE + (2) ANULACION + (2) UPGRADE + (2) BREAK
     let total: i64 = sqlx::query_scalar(COUNT_SQL)
+        .bind(&search_pattern)
+        .bind(&search_pattern)
         .bind(&search_pattern)
         .bind(&search_pattern)
         .bind(&search_pattern)
@@ -233,22 +264,50 @@ pub async fn list(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // LIST — 11 binds: (2) ORDER + (3) CREDIT_NOTE + (2) ANULACION + (2) UPGRADE + limit + offset
-    let rows = sqlx::query_as::<_, ChainEntryRaw>(LIST_SQL)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+    // Cursor-based or offset-based pagination
+    let rows = if let Some(before) = params.before {
+        let sql = format!(
+            "SELECT * FROM ({base}) WHERE chain_id < ? LIMIT ?",
+            base = LIST_SQL
+        );
+        sqlx::query_as::<_, ChainEntryRaw>(&sql)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(before)
+            .bind(limit)
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| AppError::database(e.to_string()))?
+    } else {
+        let offset = params.offset.unwrap_or(0);
+        let sql = format!("{} LIMIT ? OFFSET ?", LIST_SQL);
+        sqlx::query_as::<_, ChainEntryRaw>(&sql)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(&search_pattern)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| AppError::database(e.to_string()))?
+    };
 
     let entries = rows
         .into_iter()
@@ -315,9 +374,14 @@ pub async fn get_credit_note_detail(
     .ok_or_else(|| AppError::not_found(format!("Credit note {id} not found")))?;
 
     let items = sqlx::query_as::<_, CreditNoteItemRow>(
-        "SELECT id, original_instance_id, item_name, quantity, unit_price, \
-         line_credit, tax_rate, tax_credit \
-         FROM credit_note_item WHERE credit_note_id = ? ORDER BY id",
+        "SELECT cni.id, cni.original_instance_id, cni.item_name, \
+         aoi.spec_name, COALESCE(aoi.is_comped, 0) AS is_comped, \
+         cni.quantity, cni.unit_price, \
+         cni.line_credit, cni.tax_rate, cni.tax_credit \
+         FROM credit_note_item cni \
+         LEFT JOIN archived_order_item aoi ON aoi.instance_id = cni.original_instance_id \
+           AND aoi.order_pk = (SELECT original_order_pk FROM credit_note WHERE id = cni.credit_note_id) \
+         WHERE cni.credit_note_id = ? ORDER BY cni.id",
     )
     .bind(id)
     .fetch_all(&state.pool)
@@ -355,9 +419,23 @@ pub struct AnulacionDetailResponse {
     pub receipt_number: String,
     pub total_amount: f64,
     pub is_voided: bool,
+    pub operator_name: Option<String>,
     pub created_at: i64,
     pub prev_hash: String,
     pub curr_hash: String,
+    pub items: Vec<AnulacionItemRow>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AnulacionItemRow {
+    pub instance_id: String,
+    pub name: String,
+    pub spec_name: Option<String>,
+    pub quantity: i64,
+    pub unit_price: f64,
+    pub line_total: f64,
+    pub is_comped: bool,
+    pub tax_rate: i64,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -366,6 +444,7 @@ struct AnulacionDetailRow {
     receipt_number: String,
     total_amount: f64,
     is_voided: i64,
+    operator_name: Option<String>,
     created_at: i64,
     prev_hash: String,
     curr_hash: String,
@@ -379,7 +458,7 @@ pub async fn get_anulacion_detail(
     let row = sqlx::query_as::<_, AnulacionDetailRow>(
         "SELECT ao.id AS order_pk, \
          COALESCE(ao.receipt_number, CAST(ao.id AS TEXT)) AS receipt_number, \
-         ao.total_amount, ao.is_voided, ce.created_at, \
+         ao.total_amount, ao.is_voided, ao.operator_name, ce.created_at, \
          ce.prev_hash, ce.curr_hash \
          FROM chain_entry ce \
          JOIN archived_order ao ON ao.id = ce.entry_pk \
@@ -391,14 +470,26 @@ pub async fn get_anulacion_detail(
     .map_err(|e| AppError::database(e.to_string()))?
     .ok_or_else(|| AppError::not_found(format!("Anulación for order {order_pk} not found")))?;
 
+    let items = sqlx::query_as::<_, AnulacionItemRow>(
+        "SELECT instance_id, name, spec_name, quantity, unit_price, line_total, \
+         is_comped, tax_rate \
+         FROM archived_order_item WHERE order_pk = ? ORDER BY id",
+    )
+    .bind(order_pk)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
     Ok(Json(AnulacionDetailResponse {
         order_pk: row.order_pk,
         receipt_number: row.receipt_number,
         total_amount: row.total_amount,
         is_voided: row.is_voided != 0,
+        operator_name: row.operator_name,
         created_at: row.created_at,
         prev_hash: row.prev_hash,
         curr_hash: row.curr_hash,
+        items,
     }))
 }
 
