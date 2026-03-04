@@ -35,41 +35,46 @@ export const useChainEntryList = (
   const [loading, setLoading] = useState(false);
   // Trigger counter for loading more pages
   const [loadMoreTrigger, setLoadMoreTrigger] = useState(0);
-  const isFirstPage = useRef(true);
+  // Track whether we need a fresh first-page fetch
+  const [fetchGeneration, setFetchGeneration] = useState(0);
+  const cursorRef = useRef<number | null>(null);
 
+  // Debounce search: only reset when search actually changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      // Reset to first page on search change
-      setEntries([]);
-      setTotal(0);
-      setHasMore(true);
-      isFirstPage.current = true;
-      setLoadMoreTrigger(0);
+      setDebouncedSearch(prev => {
+        if (prev === search) return prev; // no change, skip reset
+        // Search changed: reset pagination
+        cursorRef.current = null;
+        setEntries([]);
+        setTotal(0);
+        setHasMore(true);
+        setFetchGeneration(g => g + 1);
+        return search;
+      });
     }, 400);
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Fetch entries (first page or cursor page)
   const fetchEntries = useCallback(async () => {
     if (!enabled) return;
     setLoading(true);
     try {
       const searchParam = debouncedSearch || undefined;
+      const cursor = cursorRef.current;
 
       let response: ChainEntryListResponse;
-      if (isFirstPage.current) {
-        // First page: use offset=0
+      if (cursor === null) {
+        // First page
         response = await invokeApi<ChainEntryListResponse>('fetch_chain_entries', {
           params: { limit: PAGE_SIZE, offset: 0, search: searchParam },
         });
         setEntries(response.entries);
-        isFirstPage.current = false;
       } else {
-        // Subsequent pages: use cursor (before = last entry's chain_id)
-        const lastEntry = entries[entries.length - 1];
-        if (!lastEntry) return;
+        // Cursor page
         response = await invokeApi<ChainEntryListResponse>('fetch_chain_entries', {
-          params: { limit: PAGE_SIZE, before: lastEntry.chain_id, search: searchParam },
+          params: { limit: PAGE_SIZE, before: cursor, search: searchParam },
         });
         setEntries(prev => {
           const existingIds = new Set(prev.map(e => e.chain_id));
@@ -77,16 +82,20 @@ export const useChainEntryList = (
           return [...prev, ...newEntries];
         });
       }
+
+      // Update cursor for next page
+      if (response.entries.length > 0) {
+        cursorRef.current = response.entries[response.entries.length - 1].chain_id;
+      }
       setTotal(response.total);
       setHasMore(response.entries.length >= PAGE_SIZE);
     } catch (err) {
       logger.error('Failed to fetch chain entries', err, { component: 'useChainEntryList' });
-      if (isFirstPage.current) { setEntries([]); setTotal(0); }
+      if (cursorRef.current === null) { setEntries([]); setTotal(0); }
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, debouncedSearch, loadMoreTrigger]);
+  }, [enabled, debouncedSearch, fetchGeneration, loadMoreTrigger]);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
@@ -97,11 +106,8 @@ export const useChainEntryList = (
   }, [loading, hasMore]);
 
   const refresh = useCallback(() => {
-    setEntries([]);
-    setTotal(0);
-    setHasMore(true);
-    isFirstPage.current = true;
-    setLoadMoreTrigger(0);
+    cursorRef.current = null;
+    setFetchGeneration(g => g + 1);
   }, []);
 
   // Real-time: listen for terminal order events and prepend new chain entries
