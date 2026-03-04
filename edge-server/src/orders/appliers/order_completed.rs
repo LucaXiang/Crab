@@ -2,6 +2,7 @@
 //!
 //! Applies the OrderCompleted event to mark the order as completed.
 
+use crate::order_money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, OrderStatus};
 
@@ -39,6 +40,9 @@ impl EventApplier for OrderCompletedApplier {
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
+
+            // Recalculate totals to ensure consistency
+            order_money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();

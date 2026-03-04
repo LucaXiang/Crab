@@ -150,14 +150,12 @@ impl OrdersManager {
     pub fn set_archive_service(
         &mut self,
         pool: sqlx::SqlitePool,
-        data_dir: &std::path::Path,
         invoice_service: Option<crate::archiving::InvoiceService>,
     ) {
         self.pool = Some(pool.clone());
         self.archive_service = Some(crate::archiving::OrderArchiveService::new(
             pool,
             self.tz,
-            data_dir,
             invoice_service,
         ));
     }
@@ -167,12 +165,15 @@ impl OrdersManager {
     /// Shared counter for both orders (receipt_number) and credit notes (credit_note_number).
     /// Format: `{store_number:02}-{YYYYMMDD}-{daily_seq:04}`
     /// Example: `01-20260226-0001`
-    pub fn next_chain_number(&self) -> String {
+    pub fn next_chain_number(&self) -> ManagerResult<String> {
         let cutoff = *self.business_day_cutoff.read();
         let business_date = crate::utils::time::current_business_date(cutoff, self.tz);
         let date_str = business_date.format("%Y%m%d").to_string();
-        let count = self.storage.next_daily_count(&date_str).unwrap_or(1);
-        format!("{:02}-{}-{:04}", self.store_number, date_str, count)
+        let count = self.storage.next_daily_count(&date_str)?;
+        Ok(format!(
+            "{:02}-{}-{:04}",
+            self.store_number, date_str, count
+        ))
     }
 
     /// Update the cached business_day_cutoff (called when store_info changes)
@@ -649,7 +650,7 @@ impl OrdersManager {
         // 3. Pre-generate receipt_number and queue_number for OpenTable
         let pre_generated_receipt = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable { .. } => {
-                let receipt = self.next_chain_number();
+                let receipt = self.next_chain_number()?;
                 tracing::debug!(receipt_number = %receipt, "Pre-generated receipt number");
                 Some(receipt)
             }

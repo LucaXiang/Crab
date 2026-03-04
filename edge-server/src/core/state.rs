@@ -270,7 +270,7 @@ impl ServerState {
             tracing::info!("No StoreInfo found, Verifactu invoicing disabled");
             None
         };
-        orders_manager.set_archive_service(pool.clone(), &config.data_dir(), invoice_service);
+        orders_manager.set_archive_service(pool.clone(), invoice_service);
 
         // Initialize business_day_cutoff from store_info
         if let Some(ref info) = store_info {

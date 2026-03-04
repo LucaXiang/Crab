@@ -5,7 +5,7 @@
 //! - OrderMergedOut: Source order is marked as Merged status
 
 use super::items_added::add_or_merge_item;
-use crate::order_money;
+use crate::order_money::{self, to_decimal, to_f64};
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, OrderStatus};
 
@@ -45,8 +45,9 @@ impl EventApplier for OrderMergedApplier {
                     .or_insert(0) += qty;
             }
 
-            // Accumulate paid amount
-            snapshot.paid_amount += paid_amount;
+            // Accumulate paid amount using Decimal for precision
+            snapshot.paid_amount =
+                to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*paid_amount));
 
             // Recalculate totals after merging items (updates subtotal, total, remaining, etc.)
             order_money::recalculate_totals(snapshot);
@@ -80,6 +81,13 @@ impl EventApplier for OrderMergedOutApplier {
         if let EventPayload::OrderMergedOut { .. } = &event.payload {
             // Mark order as merged
             snapshot.status = OrderStatus::Merged;
+
+            // Clear all items, payments, and derived data (they moved to target order)
+            snapshot.items.clear();
+            snapshot.payments.clear();
+            snapshot.comps.clear();
+            snapshot.paid_item_quantities.clear();
+            order_money::recalculate_totals(snapshot);
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;

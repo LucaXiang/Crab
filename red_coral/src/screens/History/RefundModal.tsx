@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { invokeApi } from '@/infrastructure/api';
 import { formatCurrency } from '@/utils/currency';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { useI18n } from '@/hooks/useI18n';
 import { X, AlertTriangle } from 'lucide-react';
 import { toast } from '@/presentation/components/Toast';
@@ -76,7 +77,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
           .filter((item) => item.max_quantity > 0); // hide fully refunded items
         setItems(refundItems);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to load refundable info');
+        toast.error(localizedErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -129,7 +130,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
           quantity: item.quantity,
         })),
         refund_method: refundMethod,
-        reason: t(`credit_note.reason.${reason}`),
+        reason,
         note: note.trim() || undefined,
       };
 
@@ -137,7 +138,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ order, onClose, onCrea
       toast.success(t('credit_note.created'));
       onCreated();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create credit note');
+      toast.error(localizedErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

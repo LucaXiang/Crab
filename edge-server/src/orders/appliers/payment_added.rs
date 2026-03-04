@@ -50,21 +50,20 @@ impl EventApplier for PaymentAddedApplier {
 
             // When fully paid, mark all items as paid for reliable tracking
             // 金额分单不跟踪商品数量，跳过填充 paid_item_quantities
-            if paid >= total - MONEY_TOLERANCE {
-                if !snapshot.has_amount_split {
-                    let item_quantities: Vec<(String, i32)> = snapshot
-                        .items
-                        .iter()
-                        .filter(|item| !item.is_comped)
-                        .map(|item| (item.instance_id.clone(), item.quantity))
-                        .collect();
-                    for (instance_id, quantity) in item_quantities {
-                        snapshot.paid_item_quantities.insert(instance_id, quantity);
-                    }
+            if paid >= total - MONEY_TOLERANCE && !snapshot.has_amount_split {
+                let item_quantities: Vec<(String, i32)> = snapshot
+                    .items
+                    .iter()
+                    .filter(|item| !item.is_comped)
+                    .map(|item| (item.instance_id.clone(), item.quantity))
+                    .collect();
+                for (instance_id, quantity) in item_quantities {
+                    snapshot.paid_item_quantities.insert(instance_id, quantity);
                 }
-                // Recalculate to update unpaid_quantity per item
-                order_money::recalculate_totals(snapshot);
             }
+
+            // Always recalculate to update unpaid_quantity per item
+            order_money::recalculate_totals(snapshot);
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;

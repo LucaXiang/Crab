@@ -3,7 +3,7 @@
 //! Creates credit notes (退款凭证) with hash chain integrity.
 //! Shares the same hash chain lock as OrderArchiveService to prevent TOCTOU races.
 
-use crate::db::repository::{credit_note as cn_repo, system_state};
+use crate::db::repository::credit_note as cn_repo;
 use crate::orders::OrdersManager;
 use shared::models::{
     CreateCreditNoteRequest, CreditNote, CreditNoteDetail, CreditNoteItem, RefundableInfo,
@@ -12,6 +12,8 @@ use shared::util::snowflake_id;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+use shared::error::ErrorCode;
 
 use super::service::{ArchiveError, ArchiveResult};
 
@@ -113,10 +115,10 @@ impl CreditNoteService {
                 .iter()
                 .find(|i| i.instance_id == req_item.instance_id)
                 .ok_or_else(|| {
-                    ArchiveError::Validation(format!(
-                        "Item not found in original order: {}",
-                        req_item.instance_id
-                    ))
+                    ArchiveError::BusinessRule(
+                        ErrorCode::OrderItemNotFound,
+                        format!("Item not found in original order: {}", req_item.instance_id),
+                    )
                 })?;
 
             let already_refunded_qty = refunded_items
@@ -127,14 +129,17 @@ impl CreditNoteService {
             let remaining_qty = original.quantity as i64 - already_refunded_qty;
 
             if req_item.quantity <= 0 || req_item.quantity > remaining_qty {
-                return Err(ArchiveError::Validation(format!(
-                    "Invalid quantity {} for item {} (original: {}, already refunded: {}, remaining: {})",
-                    req_item.quantity,
-                    req_item.instance_id,
-                    original.quantity,
-                    already_refunded_qty,
-                    remaining_qty
-                )));
+                return Err(ArchiveError::BusinessRule(
+                    ErrorCode::CreditNoteItemOverRefund,
+                    format!(
+                        "Invalid quantity {} for item {} (original: {}, already refunded: {}, remaining: {})",
+                        req_item.quantity,
+                        req_item.instance_id,
+                        original.quantity,
+                        already_refunded_qty,
+                        remaining_qty
+                    ),
+                ));
             }
 
             let dec_unit_price = rust_decimal::Decimal::try_from(original.unit_price)
@@ -180,11 +185,14 @@ impl CreditNoteService {
             .map_err(|e| ArchiveError::Validation(format!("already_refunded f64→Decimal: {e}")))?;
         let dec_remaining = dec_order_total - dec_already_refunded;
         if dec_total > dec_remaining {
-            return Err(ArchiveError::Validation(format!(
-                "Refund amount {:.2} exceeds remaining refundable {:.2} \
-                 (original: {:.2}, already refunded: {:.2})",
-                dec_total, dec_remaining, dec_order_total, dec_already_refunded
-            )));
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::CreditNoteOverRefund,
+                format!(
+                    "Refund amount {:.2} exceeds remaining refundable {:.2} \
+                     (original: {:.2}, already refunded: {:.2})",
+                    dec_total, dec_remaining, dec_order_total, dec_already_refunded
+                ),
+            ));
         }
 
         let subtotal_credit = dec_subtotal.to_f64().unwrap_or(0.0);
@@ -194,16 +202,22 @@ impl CreditNoteService {
         // 6. Generate credit note number
         let cn_number = self.generate_credit_note_number()?;
 
-        // 7. Get last chain hash
-        let system_state = system_state::get_or_create(&self.pool)
+        // 7. Begin transaction — all writes atomic (read last_chain_hash inside tx for consistency)
+        let mut tx = self
+            .pool
+            .begin()
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        let prev_hash = system_state
-            .last_chain_hash
-            .unwrap_or_else(|| "genesis".to_string());
+        // 8. Get last chain hash (inside transaction)
+        let prev_hash: String = sqlx::query_scalar(
+            "SELECT COALESCE(last_chain_hash, 'genesis') FROM system_state WHERE id = 1",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 8. Compute chain hash
+        // 9. Compute chain hash
         let cn_hash = shared::order::compute_credit_note_chain_hash(
             &prev_hash,
             &cn_number,
@@ -214,13 +228,6 @@ impl CreditNoteService {
             operator_name,
             &request.refund_method,
         );
-
-        // 9. Begin transaction — all writes atomic
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 9a. Insert credit_note
         let cn_pk = snowflake_id();
@@ -422,7 +429,9 @@ impl CreditNoteService {
     ///
     /// Returns the same format as receipt_number: `{store_number:02}-{YYYYMMDD}-{daily_seq:04}`
     fn generate_credit_note_number(&self) -> ArchiveResult<String> {
-        Ok(self.orders_manager.next_chain_number())
+        self.orders_manager
+            .next_chain_number()
+            .map_err(|e| ArchiveError::Database(e.to_string()))
     }
 }
 

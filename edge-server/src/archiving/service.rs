@@ -11,7 +11,6 @@ use serde::Serialize;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use shared::util::snowflake_id;
 use sqlx::SqlitePool;
-use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{Mutex, Semaphore};
@@ -26,6 +25,9 @@ pub enum ArchiveError {
     Conversion(String),
     #[error("Validation error: {0}")]
     Validation(String),
+    /// Business rule violation with a specific ErrorCode for i18n
+    #[error("{1}")]
+    BusinessRule(shared::error::ErrorCode, String),
     #[error("Invoice number error: {0}")]
     InvoiceNumber(String),
     #[error("Invoice conversion error: {0}")]
@@ -47,6 +49,7 @@ impl From<ArchiveError> for shared::error::AppError {
                 AppError::with_message(ErrorCode::InvoiceConversionError, msg)
             }
             ArchiveError::Validation(_) => AppError::with_message(ErrorCode::ValidationFailed, msg),
+            ArchiveError::BusinessRule(code, _) => AppError::with_message(code, msg),
             ArchiveError::InvoiceNumber(_) => {
                 AppError::with_message(ErrorCode::InvoiceNumberError, msg)
             }
@@ -171,10 +174,6 @@ struct VerifyEventRow {
     curr_hash: String,
 }
 
-/// Maximum retry attempts for archiving
-const MAX_RETRY_ATTEMPTS: u32 = 3;
-/// Base delay between retries (exponential backoff)
-const RETRY_BASE_DELAY_MS: u64 = 1000;
 /// Maximum concurrent archive tasks
 const MAX_CONCURRENT_ARCHIVES: usize = 5;
 
@@ -186,8 +185,6 @@ pub struct OrderArchiveService {
     archive_semaphore: Arc<Semaphore>,
     /// Mutex to ensure hash chain updates are serialized (prevents race conditions)
     hash_chain_lock: Arc<Mutex<()>>,
-    /// Directory for storing failed archives
-    bad_archive_dir: PathBuf,
     /// 业务时区 (用于收据编号日期)
     tz: chrono_tz::Tz,
     /// Optional Verifactu invoice service (F2 invoices for completed orders)
@@ -198,16 +195,12 @@ impl OrderArchiveService {
     pub fn new(
         pool: SqlitePool,
         tz: chrono_tz::Tz,
-        data_dir: &std::path::Path,
         invoice_service: Option<super::invoice::InvoiceService>,
     ) -> Self {
-        let bad_archive_dir = data_dir.join("bad_archives");
-
         Self {
             pool,
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
             hash_chain_lock: Arc::new(Mutex::new(())),
-            bad_archive_dir,
             tz,
             invoice_service,
         }
@@ -239,10 +232,9 @@ impl OrderArchiveService {
         Ok(format!("ORD{}{}", date_str, sequence))
     }
 
-    /// Archive a completed order with its events (with retry logic and concurrency limit)
-    /// Uses a single atomic transaction - either everything succeeds or nothing is written.
-    /// On complete failure, saves data to bad archive file for manual recovery.
-    /// Archive an order. Returns `Ok(true)` if newly archived, `Ok(false)` if already existed (idempotency).
+    /// Archive a completed order with its events (single attempt, concurrency limited).
+    /// ArchiveWorker handles retry logic and dead letter queue externally.
+    /// Returns `Ok(true)` if newly archived, `Ok(false)` if already existed (idempotency).
     pub async fn archive_order(
         &self,
         snapshot: &OrderSnapshot,
@@ -256,89 +248,8 @@ impl OrderArchiveService {
             .await
             .map_err(|_| ArchiveError::Database("Archive semaphore closed".to_string()))?;
 
-        let mut last_error = None;
-
-        for attempt in 0..MAX_RETRY_ATTEMPTS {
-            match self
-                .archive_order_internal(snapshot, &events, shift_id)
-                .await
-            {
-                Ok(newly_archived) => return Ok(newly_archived),
-                Err(e) => {
-                    tracing::error!(
-                        order_id = %snapshot.order_id,
-                        error = %e,
-                        attempt = attempt + 1,
-                        "Archive failed"
-                    );
-                    last_error = Some(e);
-                    if attempt + 1 < MAX_RETRY_ATTEMPTS {
-                        let delay_ms = RETRY_BASE_DELAY_MS * 2u64.pow(attempt);
-                        tracing::warn!(
-                            order_id = %snapshot.order_id,
-                            delay_ms = delay_ms,
-                            "Retrying..."
-                        );
-                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-                    }
-                }
-            }
-        }
-
-        // All retries failed - save to bad archive file
-        let error =
-            last_error.unwrap_or_else(|| ArchiveError::Database("Unknown error".to_string()));
-        self.save_to_bad_archive_sync(snapshot, &events, &error);
-        Err(error)
-    }
-
-    /// Save failed archive data to a JSON file for manual recovery
-    fn save_to_bad_archive_sync(
-        &self,
-        snapshot: &OrderSnapshot,
-        events: &[OrderEvent],
-        error: &ArchiveError,
-    ) {
-        #[derive(serde::Serialize)]
-        struct BadArchive {
-            snapshot: OrderSnapshot,
-            events: Vec<OrderEvent>,
-            error: String,
-            timestamp: i64,
-        }
-
-        let bad_archive = BadArchive {
-            snapshot: snapshot.clone(),
-            events: events.to_vec(),
-            error: error.to_string(),
-            timestamp: shared::util::now_millis(),
-        };
-
-        // Create directory if needed
-        if let Err(e) = std::fs::create_dir_all(&self.bad_archive_dir) {
-            tracing::error!(error = %e, "Failed to create bad archive directory");
-            return;
-        }
-
-        let filename = format!("{}-{}.json", shared::util::now_millis(), snapshot.order_id);
-        let path = self.bad_archive_dir.join(&filename);
-
-        match serde_json::to_string_pretty(&bad_archive) {
-            Ok(json) => {
-                if let Err(e) = std::fs::write(&path, &json) {
-                    tracing::error!(error = %e, path = ?path, "Failed to write bad archive file");
-                } else {
-                    tracing::warn!(
-                        order_id = %snapshot.order_id,
-                        path = ?path,
-                        "Order saved to bad archive file for manual recovery"
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to serialize bad archive");
-            }
-        }
+        self.archive_order_internal(snapshot, &events, shift_id)
+            .await
     }
 
     /// Internal archive implementation (single attempt, atomic transaction)
@@ -932,7 +843,8 @@ impl OrderArchiveService {
 
             if entry.prev_hash != expected_prev {
                 chain_intact = false;
-                if entry.prev_hash == "genesis" {
+                if entry.prev_hash == "genesis" || entry.prev_hash == "CHAIN_BREAK" {
+                    // genesis = first entry or DB reset; CHAIN_BREAK = system incident recovery
                     chain_resets.push(ChainReset {
                         receipt_number: label.clone(),
                         prev_chain_hash: expected_prev.clone(),

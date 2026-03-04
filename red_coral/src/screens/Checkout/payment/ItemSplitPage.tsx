@@ -4,6 +4,7 @@ import { ArrowLeft, Split, Minus, Plus, Banknote, ShoppingBag, CreditCard } from
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { useRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { getSpecName } from '@/utils/pricing';
@@ -180,11 +181,6 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
       setIsProcessingSplit(true);
 
       try {
-        let total = 0;
-        itemsToSplit.forEach((splitItem) => {
-          total += splitItem.unit_price * splitItem.quantity;
-        });
-
         if (method === 'CASH') {
           await openCashDrawer();
         }
@@ -201,7 +197,7 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
           method === 'CASH' ? cashDetails?.tendered : undefined,
         );
 
-        const willComplete = Currency.sub(remaining, total).toNumber() <= 0.01;
+        const willComplete = Currency.sub(remaining, splitTotal).toNumber() <= 0.01;
 
         if (willComplete) {
           await completeOrder(order.order_id, [], order.is_retail ? toBackendServiceType(serviceType) : null);
@@ -211,7 +207,7 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
-            change: Currency.sub(cashDetails.tendered, total).toNumber(),
+            change: Currency.sub(cashDetails.tendered, splitTotal).toNumber(),
             onClose: willComplete ? handleComplete : () => setSuccessModal(null),
             autoCloseDelay: willComplete && order.is_retail ? 0 : 10000,
           });
@@ -230,7 +226,7 @@ export const ItemSplitPage: React.FC<ItemSplitPageProps> = ({ order, onBack, onC
         return true;
       } catch (err) {
         logger.error('Split failed', err);
-        toast.error(`${t('checkout.split.failed')}: ${err}`);
+        toast.error(localizedErrorMessage(err));
         return false;
       } finally {
         setIsProcessingSplit(false);

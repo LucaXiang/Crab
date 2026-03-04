@@ -38,6 +38,13 @@ const ARCHIVED_ORDER_SYNC_INTERVAL_SECS: u64 = 300; // 5 minutes
 /// WebSocket keepalive ping interval
 const WS_PING_INTERVAL_SECS: u64 = 30;
 
+/// Add random jitter (0..50% of delay) to prevent thundering herd
+fn with_jitter(delay: Duration) -> Duration {
+    use rand::Rng;
+    let jitter_ms = rand::thread_rng().gen_range(0..=delay.as_millis() as u64 / 2);
+    delay + Duration::from_millis(jitter_ms)
+}
+
 /// Timeout for receiving Welcome message after WS connect
 const WELCOME_TIMEOUT_SECS: u64 = 5;
 
@@ -77,7 +84,7 @@ impl CloudWorker {
                     tracing::error!("CloudWorker: failed to get binding: {e}");
                     tokio::select! {
                         _ = self.shutdown.cancelled() => break,
-                        _ = tokio::time::sleep(reconnect_delay) => {},
+                        _ = tokio::time::sleep(with_jitter(reconnect_delay)) => {},
                     }
                     reconnect_delay =
                         (reconnect_delay * 2).min(Duration::from_secs(MAX_RECONNECT_DELAY_SECS));
@@ -113,10 +120,10 @@ impl CloudWorker {
                 }
             };
 
-            // Wait before reconnecting
+            // Wait before reconnecting (with jitter to prevent thundering herd)
             tokio::select! {
                 _ = self.shutdown.cancelled() => break,
-                _ = tokio::time::sleep(reconnect_delay) => {},
+                _ = tokio::time::sleep(with_jitter(reconnect_delay)) => {},
             }
             reconnect_delay = (reconnect_delay * 2).min(Duration::from_secs(max_delay));
         }
@@ -597,7 +604,6 @@ impl CloudWorker {
                 Ok(r) => r,
                 Err(_) => {
                     tracing::warn!(resource, "Unknown catalog_changelog resource, skipping");
-                    changelog_ids.push(*id);
                     continue;
                 }
             };
@@ -605,7 +611,7 @@ impl CloudWorker {
                 "upsert" => shared::cloud::SyncAction::Upsert,
                 "delete" => shared::cloud::SyncAction::Delete,
                 _ => {
-                    changelog_ids.push(*id);
+                    tracing::warn!(action, "Unknown catalog_changelog action, skipping");
                     continue;
                 }
             };
@@ -1151,12 +1157,25 @@ impl CloudWorker {
                 }
 
                 if !real_errors.is_empty() {
-                    tracing::warn!(
-                        accepted = response.accepted,
-                        rejected = real_errors.len(),
-                        "Invoice sync has non-duplicate rejections, stopping catch-up"
-                    );
-                    break;
+                    // Mark permanently rejected invoices (e.g. huella mismatch) as synced
+                    // to unblock the queue — these can't be fixed by retrying
+                    let rejected_db_ids: Vec<i64> = real_errors
+                        .iter()
+                        .filter_map(|err| synced_ids.get(err.index as usize).copied())
+                        .collect();
+                    if !rejected_db_ids.is_empty() {
+                        tracing::error!(
+                            count = rejected_db_ids.len(),
+                            ids = ?rejected_db_ids,
+                            errors = ?real_errors.iter().map(|e| &e.message).collect::<Vec<_>>(),
+                            "Invoices permanently rejected by cloud, marking as synced to unblock queue"
+                        );
+                        if let Err(e) =
+                            invoice::mark_synced(&self.state.pool, &rejected_db_ids).await
+                        {
+                            tracing::error!("Failed to mark rejected invoices as synced: {e}");
+                        }
+                    }
                 }
             }
 
