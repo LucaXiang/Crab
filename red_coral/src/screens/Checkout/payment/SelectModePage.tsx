@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { HeldOrder } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid, Tag, MoreHorizontal } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Banknote, Utensils, ShoppingBag, Receipt, Check, Gift, Percent, TrendingUp, ClipboardList, Archive, UserCheck, Stamp, X, Crown, LayoutGrid, Tag, MoreHorizontal, StickyNote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { CommandFailedError } from '@/core/stores/order/commands/sendCommand';
-import { commandErrorMessage } from '@/utils/error/commandError';
+import { commandErrorMessage, localizedErrorMessage } from '@/utils/error/commandError';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission, Table, Zone } from '@/core/domain/types';
 import { setRetailServiceType } from '@/core/stores/order/useCheckoutStore';
@@ -31,6 +31,7 @@ import { useStampProgress } from './useStampProgress';
 import { usePaymentActions } from './usePaymentActions';
 import { KitchenReprintModal } from '../KitchenReprintModal';
 import { LabelReprintModal } from '../LabelReprintModal';
+import * as orderOps from '@/core/stores/order/commands';
 
 type PaymentMode = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL' | 'MEMBER_DETAIL';
 
@@ -47,7 +48,9 @@ const MoreActionsDropdown: React.FC<{
   onKitchenReprint: () => void;
   onLabelReprint: () => void;
   onOpenCashDrawer: () => void;
-}> = ({ onKitchenReprint, onLabelReprint, onOpenCashDrawer }) => {
+  onOrderNote: () => void;
+  hasNote?: boolean;
+}> = ({ onKitchenReprint, onLabelReprint, onOpenCashDrawer, onOrderNote, hasNote }) => {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -71,6 +74,13 @@ const MoreActionsDropdown: React.FC<{
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 min-w-[200px]">
+          <button
+            onClick={() => { setOpen(false); onOrderNote(); }}
+            className="w-full px-4 py-3 text-left hover:bg-amber-50 text-gray-700 flex items-center gap-3 transition-colors"
+          >
+            <StickyNote size={18} className={hasNote ? 'text-amber-600' : 'text-gray-500'} />
+            {t('checkout.order_note.title')}
+          </button>
           <button
             onClick={() => { setOpen(false); onKitchenReprint(); }}
             className="w-full px-4 py-3 text-left hover:bg-amber-50 text-gray-700 flex items-center gap-3 transition-colors"
@@ -131,6 +141,8 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
   const [showMergeTableModal, setShowMergeTableModal] = useState(false);
   const [showKitchenReprintModal, setShowKitchenReprintModal] = useState(false);
   const [showLabelReprintModal, setShowLabelReprintModal] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
 
   const handleBackClick = useCallback(() => {
     if (order.is_retail) {
@@ -205,6 +217,16 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-800">{t('checkout.payment.method')}</h2>
               <div className="flex gap-2 items-center">
+                <MoreActionsDropdown
+                  onKitchenReprint={() => setShowKitchenReprintModal(true)}
+                  onLabelReprint={() => setShowLabelReprintModal(true)}
+                  onOpenCashDrawer={() => {
+                    openCashDrawer();
+                    toast.success(t('app.action.cash_drawer_opened'));
+                  }}
+                  onOrderNote={() => { setNoteText(order.note ?? ''); setShowNoteModal(true); }}
+                  hasNote={!!order.note}
+                />
                 {order.is_retail && (
                   <div className="flex bg-gray-100 p-1 rounded-lg h-[2.5rem] items-center mr-2">
                     <button
@@ -245,14 +267,6 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                     {t('checkout.complete_order')}
                   </button>
                 )}
-                <MoreActionsDropdown
-                  onKitchenReprint={() => setShowKitchenReprintModal(true)}
-                  onLabelReprint={() => setShowLabelReprintModal(true)}
-                  onOpenCashDrawer={() => {
-                    openCashDrawer();
-                    toast.success(t('app.action.cash_drawer_opened'));
-                  }}
-                />
                 {order.is_retail && (
                   <button
                     onClick={() => setShowMergeTableModal(true)}
@@ -272,7 +286,7 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
                       if (onVoid) onVoid();
                     }}
                   >
-                    <button onClick={onVoid} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                    <button className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors flex items-center gap-2">
                       <Trash2 size={20} />
                       {t('checkout.void.title')}
                     </button>
@@ -605,6 +619,62 @@ export const SelectModePage: React.FC<SelectModePageProps> = ({ order, onComplet
         orderId={order.order_id}
         onClose={() => setShowLabelReprintModal(false)}
       />
+
+      {/* Order Note Modal */}
+      {showNoteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowNoteModal(false)}>
+          <div className="bg-white rounded-2xl w-[400px] p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">{t('checkout.order_note.title')}</h3>
+            <textarea
+              value={noteText}
+              onChange={e => setNoteText(e.target.value.slice(0, 200))}
+              placeholder={t('checkout.order_note.placeholder')}
+              className="w-full h-32 px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+              autoFocus
+              maxLength={200}
+            />
+            <div className="text-xs text-gray-400 text-right mt-1">{noteText.length}/200</div>
+            <div className="flex gap-3 mt-4">
+              {order.note && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await orderOps.addOrderNote(order.order_id, '');
+                      setShowNoteModal(false);
+                    } catch (err) {
+                      toast.error(localizedErrorMessage(err));
+                    }
+                  }}
+                  className="px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                >
+                  {t('checkout.order_note.clear')}
+                </button>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={() => setShowNoteModal(false)}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await orderOps.addOrderNote(order.order_id, noteText.trim());
+                    setShowNoteModal(false);
+                  } catch (err) {
+                    toast.error(localizedErrorMessage(err));
+                  }
+                }}
+                disabled={!noteText.trim() && !order.note}
+                className="px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 disabled:opacity-50 rounded-xl transition-colors"
+              >
+                {t('checkout.order_note.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {stamp.stampRedeemActivity && (() => {
         const spa = stamp.stampRedeemActivity;

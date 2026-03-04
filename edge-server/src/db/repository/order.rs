@@ -438,6 +438,11 @@ pub async fn build_order_detail_sync(
         cloud_synced: bool,
         is_voided: bool,
         is_upgraded: bool,
+        customer_nif: Option<String>,
+        customer_nombre: Option<String>,
+        customer_address: Option<String>,
+        customer_email: Option<String>,
+        customer_phone: Option<String>,
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
@@ -448,7 +453,8 @@ pub async fn build_order_detail_sync(
          ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
          ao.operator_id, ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, \
          ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced, \
-         ao.is_voided, ao.is_upgraded \
+         ao.is_voided, ao.is_upgraded, \
+         ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -707,11 +713,11 @@ pub async fn build_order_detail_sync(
             events,
             is_voided: order.is_voided,
             is_upgraded: order.is_upgraded,
-            customer_nif: None,
-            customer_nombre: None,
-            customer_address: None,
-            customer_email: None,
-            customer_phone: None,
+            customer_nif: order.customer_nif,
+            customer_nombre: order.customer_nombre,
+            customer_address: order.customer_address,
+            customer_email: order.customer_email,
+            customer_phone: order.customer_phone,
         },
     })
 }

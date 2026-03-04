@@ -90,7 +90,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
   }, [order?.timeline]);
 
   const breakdown = useMemo(
-    () => order ? computePriceBreakdown(order.items, order) : null, [order],
+    () => order ? computePriceBreakdown(order.items, order, true) : null, [order],
   );
 
   // Sort items: category sort_order → paid/comped sink → name
@@ -191,7 +191,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
               </span>
             )}
             {order.is_voided && (
-              <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase">
+              <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded uppercase">
                 {t('anulacion.status.anulada')}
               </span>
             )}

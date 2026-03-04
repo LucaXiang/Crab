@@ -10,6 +10,8 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use shared::error::ErrorCode;
+
 use super::service::{ArchiveError, ArchiveResult};
 
 /// Request to create an order upgrade
@@ -77,24 +79,32 @@ impl UpgradeService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?
         .ok_or_else(|| {
-            ArchiveError::Validation(format!("Order not found: {}", request.order_pk))
+            ArchiveError::BusinessRule(
+                ErrorCode::OrderNotFound,
+                format!("Order not found: {}", request.order_pk),
+            )
         })?;
 
         if order.status != "COMPLETED" {
-            return Err(ArchiveError::Validation(format!(
-                "Order status is '{}', only COMPLETED orders can be upgraded",
-                order.status
-            )));
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderNotCompleted,
+                format!(
+                    "Order status is '{}', only COMPLETED orders can be upgraded",
+                    order.status
+                ),
+            ));
         }
 
         if order.is_voided != 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderVoidedNoCreditNote,
                 "Order is voided — cannot upgrade".into(),
             ));
         }
 
         if order.is_upgraded != 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderAlreadyUpgraded,
                 "Order already has an upgrade".into(),
             ));
         }
@@ -154,15 +164,14 @@ impl UpgradeService {
         sqlx::query(
             "UPDATE archived_order SET is_upgraded = 1, cloud_synced = 0, \
              customer_nif = ?1, customer_nombre = ?2, customer_address = ?3, \
-             customer_email = ?4, customer_phone = ?5, updated_at = ?6 \
-             WHERE id = ?7",
+             customer_email = ?4, customer_phone = ?5 \
+             WHERE id = ?6",
         )
         .bind(&request.customer_nif)
         .bind(&request.customer_nombre)
         .bind(&request.customer_address)
         .bind(&request.customer_email)
         .bind(&request.customer_phone)
-        .bind(now)
         .bind(request.order_pk)
         .execute(&mut *tx)
         .await
@@ -197,23 +206,33 @@ impl UpgradeService {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?
-        .ok_or_else(|| ArchiveError::Validation(format!("Order not found: {order_pk}")))?;
+        .ok_or_else(|| {
+            ArchiveError::BusinessRule(
+                ErrorCode::OrderNotFound,
+                format!("Order not found: {order_pk}"),
+            )
+        })?;
 
         if order.status != "COMPLETED" {
-            return Err(ArchiveError::Validation(format!(
-                "Order status is '{}', only COMPLETED orders can be upgraded",
-                order.status
-            )));
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderNotCompleted,
+                format!(
+                    "Order status is '{}', only COMPLETED orders can be upgraded",
+                    order.status
+                ),
+            ));
         }
 
         if order.is_voided != 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderVoidedNoCreditNote,
                 "Order is voided — cannot upgrade".into(),
             ));
         }
 
         if order.is_upgraded != 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderAlreadyUpgraded,
                 "Order already has an upgrade".into(),
             ));
         }

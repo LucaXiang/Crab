@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invokeApi } from '@/infrastructure/api';
 import { useI18n } from '@/hooks/useI18n';
+import { localizedErrorMessage } from '@/utils/error/commandError';
 import { X, AlertTriangle } from 'lucide-react';
 import { toast } from '@/presentation/components/Toast';
 import type { ArchivedOrderDetail } from '@/core/domain/types';
@@ -46,7 +47,7 @@ export const AnulacionModal: React.FC<AnulacionModalProps> = ({ order, onClose, 
           setIneligibleReason(result.reason ?? null);
         }
       } catch (err) {
-        setIneligibleReason(err instanceof Error ? err.message : 'Failed to check eligibility');
+        setIneligibleReason(localizedErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -68,7 +69,7 @@ export const AnulacionModal: React.FC<AnulacionModalProps> = ({ order, onClose, 
       toast.success(t('anulacion.created'));
       onCreated();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create anulación');
+      toast.error(localizedErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

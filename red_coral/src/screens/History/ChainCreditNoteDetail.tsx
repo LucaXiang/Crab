@@ -2,7 +2,7 @@ import React from 'react';
 import type { ChainCreditNoteDetail } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
-import { Undo2, Calendar, Clock, CreditCard, Coins, ChevronRight, Hash } from 'lucide-react';
+import { Undo2, Calendar, Clock, CreditCard, Coins, ChevronRight, Hash, Gift } from 'lucide-react';
 
 interface ChainCreditNoteDetailProps {
   detail: ChainCreditNoteDetail;
@@ -74,14 +74,34 @@ export const ChainCreditNoteDetailView: React.FC<ChainCreditNoteDetailProps> = (
         <div className="divide-y divide-gray-100">
           {detail.items.map(item => (
             <div key={item.id} className="px-4 py-3 flex justify-between items-center">
-              <div>
-                <div className="font-medium text-gray-800">{item.item_name}</div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  x{item.quantity} @ {formatCurrency(item.unit_price)}
-                  {item.tax_rate > 0 && <span className="ml-2 text-gray-300">IVA {item.tax_rate}%</span>}
+              <div className="flex items-center gap-3 flex-1">
+                <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm shrink-0 ${item.is_comped ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                  x{item.quantity}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
+                    <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                      #{item.original_instance_id.slice(-5)}
+                    </span>
+                    <span>{item.item_name}</span>
+                    {item.spec_name && item.spec_name !== 'default' && (
+                      <span className="text-xs text-gray-500">({item.spec_name})</span>
+                    )}
+                    {item.is_comped && (
+                      <span className="text-[0.625rem] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <Gift size={10} />
+                        {t('checkout.comp.badge')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-400 flex items-center gap-2">
+                    <span>{formatCurrency(item.unit_price)}</span>
+                    <span>/ {t('checkout.amount.unit_price')}</span>
+                    {item.tax_rate > 0 && <span className="text-gray-300">IVA {item.tax_rate}%</span>}
+                  </div>
                 </div>
               </div>
-              <div className="font-bold text-red-500">-{formatCurrency(item.line_credit)}</div>
+              <div className="font-bold text-red-500 pl-4">-{formatCurrency(item.line_credit)}</div>
             </div>
           ))}
         </div>

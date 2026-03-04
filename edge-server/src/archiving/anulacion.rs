@@ -11,6 +11,8 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use shared::error::ErrorCode;
+
 use super::service::{ArchiveError, ArchiveResult};
 
 /// Request to create an anulación
@@ -72,18 +74,25 @@ impl AnulacionService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?
         .ok_or_else(|| {
-            ArchiveError::Validation(format!("Order not found: {}", request.original_order_pk))
+            ArchiveError::BusinessRule(
+                ErrorCode::OrderNotFound,
+                format!("Order not found: {}", request.original_order_pk),
+            )
         })?;
 
         if order.status != "COMPLETED" {
-            return Err(ArchiveError::Validation(format!(
-                "Order status is '{}', only COMPLETED orders can be anulled",
-                order.status
-            )));
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderNotCompleted,
+                format!(
+                    "Order status is '{}', only COMPLETED orders can be anulled",
+                    order.status
+                ),
+            ));
         }
 
         if order.is_voided != 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderAlreadyVoided,
                 "Order already has an anulación".into(),
             ));
         }
@@ -97,7 +106,8 @@ impl AnulacionService {
                 .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         if cn_count > 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderHasCreditNotes,
                 "Cannot create anulación: order has credit notes (use R5 refund instead)".into(),
             ));
         }
@@ -153,8 +163,7 @@ impl AnulacionService {
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 8. Mark archived_order as anulada + reset cloud_synced for re-sync
-        sqlx::query("UPDATE archived_order SET is_voided = 1, cloud_synced = 0, updated_at = ?1 WHERE id = ?2")
-            .bind(now)
+        sqlx::query("UPDATE archived_order SET is_voided = 1, cloud_synced = 0 WHERE id = ?1")
             .bind(request.original_order_pk)
             .execute(&mut *tx)
             .await
@@ -188,17 +197,26 @@ impl AnulacionService {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?
-        .ok_or_else(|| ArchiveError::Validation(format!("Order not found: {order_pk}")))?;
+        .ok_or_else(|| {
+            ArchiveError::BusinessRule(
+                ErrorCode::OrderNotFound,
+                format!("Order not found: {order_pk}"),
+            )
+        })?;
 
         if order.status != "COMPLETED" {
-            return Err(ArchiveError::Validation(format!(
-                "Order status is '{}', only COMPLETED orders can be anulled",
-                order.status
-            )));
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderNotCompleted,
+                format!(
+                    "Order status is '{}', only COMPLETED orders can be anulled",
+                    order.status
+                ),
+            ));
         }
 
         if order.is_voided != 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderAlreadyVoided,
                 "Order already has an anulación".into(),
             ));
         }
@@ -211,7 +229,8 @@ impl AnulacionService {
                 .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         if cn_count > 0 {
-            return Err(ArchiveError::Validation(
+            return Err(ArchiveError::BusinessRule(
+                ErrorCode::OrderHasCreditNotes,
                 "Order has credit notes — cannot create anulación".into(),
             ));
         }
