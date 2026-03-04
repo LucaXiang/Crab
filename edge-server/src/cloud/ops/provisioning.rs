@@ -3,6 +3,7 @@
 //! FullSync: Cloud→Edge StoreOp with StoreSnapshot (Create types, no IDs).
 //! CatalogSyncData: Cloud→Edge full catalog with real IDs (re-bind scenario).
 
+use shared::cloud::SyncResource;
 use shared::cloud::store_op::{BindingOwner, FullSyncResult, StoreOpResult, StoreSnapshot};
 use shared::message::SyncChangeType;
 
@@ -70,6 +71,24 @@ async fn clear_catalog(state: &ServerState) -> Result<(), String> {
 
     tracing::info!("Catalog cleared for FullSync rebuild");
     Ok(())
+}
+
+async fn broadcast_catalog_refresh(state: &ServerState) {
+    let resources = [
+        SyncResource::Tag,
+        SyncResource::Category,
+        SyncResource::Product,
+        SyncResource::Attribute,
+        SyncResource::Zone,
+        SyncResource::DiningTable,
+        SyncResource::PriceRule,
+    ];
+
+    for resource in resources {
+        state
+            .broadcast_sync::<()>(resource, SyncChangeType::Updated, 0, None, true)
+            .await;
+    }
 }
 
 /// Fire-and-forget image download
@@ -262,6 +281,7 @@ async fn do_full_sync(
         }
     }
 
+    broadcast_catalog_refresh(state).await;
     Ok(result)
 }
 
@@ -274,6 +294,18 @@ pub async fn apply_catalog_sync_data(
     state: &ServerState,
     catalog: &shared::models::CatalogExport,
 ) -> Result<(), String> {
+    // Block import when active orders exist
+    let active = state
+        .orders_manager
+        .get_active_orders()
+        .map_err(|e| format!("Failed to check active orders: {e}"))?;
+    if !active.is_empty() {
+        return Err(format!(
+            "Cannot import catalog: {} active orders exist",
+            active.len()
+        ));
+    }
+
     // Validate referential integrity
     shared::models::validate_catalog(catalog)
         .map_err(|e| format!("CatalogSyncData validation failed: {e}"))?;
@@ -289,6 +321,8 @@ pub async fn apply_catalog_sync_data(
         .warmup()
         .await
         .map_err(|e| format!("CatalogService warmup failed: {e}"))?;
+
+    broadcast_catalog_refresh(state).await;
 
     tracing::info!(
         tags = catalog.tags.len(),

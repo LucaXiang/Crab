@@ -45,8 +45,23 @@ pub async fn import(
     State(state): State<ServerState>,
     body: Bytes,
 ) -> Result<impl IntoResponse, AppError> {
+    reject_if_active_orders(&state)?;
     import_zip(&state, body.as_ref()).await?;
     Ok(axum::Json(shared::error::ApiResponse::<()>::ok()))
+}
+
+/// Block import when active orders exist — catalog replacement would orphan live order items.
+fn reject_if_active_orders(state: &ServerState) -> Result<(), AppError> {
+    let orders = state
+        .orders_manager
+        .get_active_orders()
+        .map_err(|e| AppError::internal(e.to_string()))?;
+    if !orders.is_empty() {
+        return Err(AppError::new(
+            shared::error::ErrorCode::ImportBlockedActiveOrders,
+        ));
+    }
+    Ok(())
 }
 
 // =============================================================================

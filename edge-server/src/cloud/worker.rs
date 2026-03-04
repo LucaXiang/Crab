@@ -630,7 +630,7 @@ impl CloudWorker {
 
             items.push(CloudSyncItem {
                 resource: sync_resource,
-                version: 0, // catalog changelog doesn't track versions
+                version: *id as u64, // use changelog row id as version for cursor tracking
                 action: sync_action,
                 resource_id: *resource_id,
                 data: data_value,

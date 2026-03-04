@@ -192,6 +192,18 @@ jobs:
             --draft \
             "${{ steps.upload.outputs.INSTALLER_PATH }}#${{ steps.upload.outputs.INSTALLER_NAME }}"
 
+      - name: Discord notification
+        if: success()
+        shell: bash
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"RedCoral POS ${VERSION} 构建成功\",\"description\":\"Windows 安装包已上传至 S3 并创建 GitHub Release (Draft)\",\"color\":5763719,\"fields\":[{\"name\":\"安装包\",\"value\":\"\`${{ steps.upload.outputs.INSTALLER_NAME }}\`\",\"inline\":true},{\"name\":\"Commit\",\"value\":\"\`${GITHUB_SHA::7}\`\",\"inline\":true}]}]}" \
+            "$DISCORD_WEBHOOK"
+
   # ============================================================
   # Cache warming: main branch push only
   # ============================================================

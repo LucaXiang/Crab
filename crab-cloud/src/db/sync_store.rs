@@ -175,7 +175,12 @@ pub async fn upsert_resource(
     now: i64,
 ) -> Result<SyncEffect, BoxError> {
     if item.action == shared::cloud::SyncAction::Delete {
-        delete_resource(pool, store_id, item.resource, item.resource_id).await?;
+        let edge_ts = item
+            .data
+            .get("updated_at")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        delete_resource(pool, store_id, item.resource, item.resource_id, edge_ts).await?;
         return Ok(SyncEffect::None);
     }
 
@@ -860,18 +865,31 @@ async fn delete_resource(
     store_id: i64,
     resource: SyncResource,
     resource_id: i64,
+    edge_ts: i64,
 ) -> Result<(), BoxError> {
     let table = deletable_table(resource)
         .ok_or_else(|| format!("Cannot delete resource type: {resource}"))?;
 
-    // All deletable resources use the same (store_id, source_id) key pattern.
+    // LWW guard: only delete if edge timestamp >= cloud's updated_at.
+    // Prevents stale edge deletes from overwriting newer Console updates.
     // FK CASCADE handles child rows (e.g. product specs, category tags).
-    let sql = format!("DELETE FROM {table} WHERE store_id = $1 AND source_id = $2");
-    sqlx::query(&sql)
+    let sql =
+        format!("DELETE FROM {table} WHERE store_id = $1 AND source_id = $2 AND updated_at <= $3");
+    let result = sqlx::query(&sql)
         .bind(store_id)
         .bind(resource_id)
+        .bind(edge_ts)
         .execute(pool)
         .await?;
+
+    if result.rows_affected() == 0 {
+        tracing::debug!(
+            %resource,
+            resource_id,
+            edge_ts,
+            "Delete skipped by LWW guard (cloud has newer version)"
+        );
+    }
     Ok(())
 }
 

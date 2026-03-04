@@ -49,10 +49,23 @@ pub struct LabelPrintConfig {
 }
 
 /// System default print destinations
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PrintDefaults {
+    pub kitchen_enabled: bool,
     pub kitchen_destination: Option<String>,
+    pub label_enabled: bool,
     pub label_destination: Option<String>,
+}
+
+impl Default for PrintDefaults {
+    fn default() -> Self {
+        Self {
+            kitchen_enabled: true,
+            kitchen_destination: None,
+            label_enabled: true,
+            label_destination: None,
+        }
+    }
 }
 
 // =============================================================================
@@ -291,11 +304,13 @@ impl CatalogService {
         let products_count = self.products.read().len();
         tracing::debug!(count = products_count, "CatalogService loaded products");
 
-        // 6. Load persisted print defaults + validate + auto-fix
+        // 6. Load persisted print defaults + validate stale references
         match crate::db::repository::print_config::get(&self.pool).await {
             Ok(row) => {
                 let mut kitchen = row.default_kitchen_printer;
                 let mut label = row.default_label_printer;
+                let kitchen_enabled = row.kitchen_enabled;
+                let label_enabled = row.label_enabled;
                 let mut changed = false;
 
                 // Validate: if stored default points to a non-existent/inactive destination, clear it
@@ -348,51 +363,28 @@ impl CatalogService {
                     }
                 }
 
-                // Auto-fix: if defaults are NULL but active destinations exist, auto-set them
-                if kitchen.is_none()
-                    && let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
-                        "SELECT id FROM print_destination WHERE purpose = 'kitchen' AND is_active = 1 LIMIT 1",
-                    )
-                    .fetch_optional(&self.pool)
-                    .await
-                {
-                    kitchen = Some(id.to_string());
-                    changed = true;
-                }
-                if label.is_none()
-                    && let Ok(Some(id)) = sqlx::query_scalar::<_, i64>(
-                        "SELECT id FROM print_destination WHERE purpose = 'label' AND is_active = 1 LIMIT 1",
-                    )
-                    .fetch_optional(&self.pool)
-                    .await
-                {
-                    label = Some(id.to_string());
-                    changed = true;
-                }
-
-                if changed {
-                    if let Err(e) = crate::db::repository::print_config::update(
+                if changed
+                    && let Err(e) = crate::db::repository::print_config::update(
                         &self.pool,
+                        kitchen_enabled,
                         kitchen.as_deref(),
+                        label_enabled,
                         label.as_deref(),
                     )
                     .await
-                    {
-                        tracing::warn!(error = ?e, "Failed to auto-fix print_config defaults");
-                    } else {
-                        tracing::info!(
-                            kitchen = ?kitchen,
-                            label = ?label,
-                            "Auto-fixed print_config defaults from existing destinations"
-                        );
-                    }
+                {
+                    tracing::warn!(error = ?e, "Failed to auto-fix print_config defaults");
                 }
 
                 let mut defaults = self.print_defaults.write();
+                defaults.kitchen_enabled = kitchen_enabled;
                 defaults.kitchen_destination = kitchen;
+                defaults.label_enabled = label_enabled;
                 defaults.label_destination = label;
                 tracing::info!(
+                    kitchen_enabled,
                     kitchen = ?defaults.kitchen_destination,
+                    label_enabled,
                     label = ?defaults.label_destination,
                     "CatalogService loaded print defaults"
                 );
@@ -406,9 +398,17 @@ impl CatalogService {
     }
 
     /// Set system default print destinations
-    pub fn set_print_defaults(&self, kitchen: Option<String>, label: Option<String>) {
+    pub fn set_print_defaults(
+        &self,
+        kitchen_enabled: bool,
+        kitchen: Option<String>,
+        label_enabled: bool,
+        label: Option<String>,
+    ) {
         let mut defaults = self.print_defaults.write();
+        defaults.kitchen_enabled = kitchen_enabled;
         defaults.kitchen_destination = kitchen;
+        defaults.label_enabled = label_enabled;
         defaults.label_destination = label;
     }
 
@@ -1346,6 +1346,15 @@ impl CatalogService {
     /// Priority: product.is_kitchen_print_enabled > category.is_kitchen_print_enabled
     /// Destinations: category.destinations > global default
     pub fn get_kitchen_print_config(&self, product_id: i64) -> Option<KitchenPrintConfig> {
+        // Global toggle — highest priority
+        if !self.print_defaults.read().kitchen_enabled {
+            return Some(KitchenPrintConfig {
+                enabled: false,
+                destinations: vec![],
+                kitchen_name: None,
+            });
+        }
+
         let products = self.products.read();
         let product = products.get(&product_id)?;
 
@@ -1391,6 +1400,14 @@ impl CatalogService {
 
     /// Get label print configuration for a product (with fallback chain)
     pub fn get_label_print_config(&self, product_id: i64) -> Option<LabelPrintConfig> {
+        // Global toggle — highest priority
+        if !self.print_defaults.read().label_enabled {
+            return Some(LabelPrintConfig {
+                enabled: false,
+                destinations: vec![],
+            });
+        }
+
         let products = self.products.read();
         let product = products.get(&product_id)?;
 
@@ -1445,33 +1462,13 @@ impl CatalogService {
         }
     }
 
-    /// Check if kitchen printing is enabled (system level)
-    ///
-    /// True if there's a default kitchen destination OR any category has kitchen destinations configured.
+    /// Check if kitchen printing is enabled (system level — global toggle)
     pub fn is_kitchen_print_enabled(&self) -> bool {
-        let defaults = self.print_defaults.read();
-        if defaults.kitchen_destination.is_some() {
-            return true;
-        }
-        drop(defaults);
-        let categories = self.categories.read();
-        categories
-            .values()
-            .any(|c| !c.kitchen_print_destinations.is_empty())
+        self.print_defaults.read().kitchen_enabled
     }
 
-    /// Check if label printing is enabled (system level)
-    ///
-    /// True if there's a default label destination OR any category has label destinations configured.
+    /// Check if label printing is enabled (system level — global toggle)
     pub fn is_label_print_enabled(&self) -> bool {
-        let defaults = self.print_defaults.read();
-        if defaults.label_destination.is_some() {
-            return true;
-        }
-        drop(defaults);
-        let categories = self.categories.read();
-        categories
-            .values()
-            .any(|c| !c.label_print_destinations.is_empty())
+        self.print_defaults.read().label_enabled
     }
 }
