@@ -72,7 +72,7 @@ export function generateCartKey(
   specId?: number,
 ): string {
   let key = `${productId}:${price}`;
-  if (discount && Math.abs(discount) > 0.01) key += `:d${discount}`;
+  if (discount && discount > 0) key += `:d${Math.round(discount * 100)}`;
   if (options && options.length > 0) {
     const sorted = [...options].sort((a, b) => a.attribute_id - b.attribute_id || a.option_id - b.option_id);
     key += `:o${sorted.map(o => `${o.attribute_id}-${o.option_id}-${o.quantity ?? 1}`).join(',')}`;

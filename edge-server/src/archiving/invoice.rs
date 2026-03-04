@@ -81,10 +81,9 @@ impl InvoiceService {
         // Caller must hold hash_chain_lock to serialize concurrent chain updates.
         let prev_huella: Option<String> =
             sqlx::query_scalar("SELECT last_huella FROM system_state WHERE id = 1")
-                .fetch_optional(&mut **tx)
+                .fetch_one(&mut **tx)
                 .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?
-                .flatten();
+                .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // Allocate invoice number
         let invoice_number = inv_repo::next_invoice_number(tx, &self.serie, &date_str)
@@ -208,10 +207,9 @@ impl InvoiceService {
         // Read prev huella inside the transaction
         let prev_huella: Option<String> =
             sqlx::query_scalar("SELECT last_huella FROM system_state WHERE id = 1")
-                .fetch_optional(&mut **tx)
+                .fetch_one(&mut **tx)
                 .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?
-                .flatten();
+                .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // Allocate invoice number
         let invoice_number = inv_repo::next_invoice_number(tx, &self.serie, &date_str)

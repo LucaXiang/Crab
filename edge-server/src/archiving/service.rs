@@ -721,8 +721,8 @@ impl OrderArchiveService {
 
         let rows = sqlx::query_as::<_, DesgloseItemRow>(
             "SELECT tax_rate, \
-                    SUM(line_total - tax) as base_amount, \
-                    SUM(tax) as tax_amount \
+                    ROUND(SUM(line_total - tax), 2) as base_amount, \
+                    ROUND(SUM(tax), 2) as tax_amount \
              FROM archived_order_item \
              WHERE order_pk = ? \
              GROUP BY tax_rate",

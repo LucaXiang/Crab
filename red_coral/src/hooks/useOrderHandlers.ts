@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { logger } from '@/utils/logger';
+import { localizedErrorMessage } from '@/utils/error/commandError';
+import { CommandFailedError } from '@/core/stores/order/commands/sendCommand';
 import { CartItem, HeldOrder, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
@@ -66,12 +68,10 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           useCartStore.getState().clearCart();
         }
       } catch (error) {
-        // Handle TABLE_OCCUPIED and other errors
-        const message = error instanceof Error ? error.message : t('common.message.operation_failed');
-        if (message.includes('occupied') || message.includes('7002')) {
+        if (error instanceof CommandFailedError && error.code === 'TABLE_OCCUPIED') {
           toast.error(t('common.message.table_occupied_refresh', { table: table.name || table.id }));
         } else {
-          toast.error(message);
+          toast.error(localizedErrorMessage(error));
         }
         logger.error('Table select failed', error);
       }

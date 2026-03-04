@@ -316,6 +316,13 @@ impl OrderSnapshot {
         mix(self.paid_amount.to_bits());
         mix(self.last_sequence);
         mix(self.status as u8 as u64);
+        // Extended coverage: member, splits, comps, stamps
+        mix(self.member_id.unwrap_or(0) as u64);
+        mix(self.has_amount_split as u64);
+        mix(self.aa_total_shares.unwrap_or(0) as u64);
+        mix(self.stamp_redemptions.len() as u64);
+        mix(self.comps.len() as u64);
+        mix(self.paid_item_quantities.len() as u64);
 
         format!("{:016x}", h)
     }

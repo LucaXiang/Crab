@@ -6,13 +6,15 @@
 
 export type ChainEntryType = 'ORDER' | 'CREDIT_NOTE' | 'ANULACION' | 'UPGRADE' | 'BREAK';
 
+export type ChainEntryStatus = 'VOID' | 'LOSS' | 'MERGED' | 'ANULADA' | 'COMPLETED' | null;
+
 /** chain_entry 列表项 (GET /api/chain-entries) */
 export interface ChainEntryItem {
   chain_id: number;
   entry_type: ChainEntryType;
   entry_pk: number;
   display_number: string;
-  status: string | null;
+  status: ChainEntryStatus;
   amount: number;
   created_at: number;
   prev_hash: string;
@@ -32,11 +34,25 @@ export interface ChainCreditNoteItem {
   id: number;
   original_instance_id: string;
   item_name: string;
+  spec_name: string | null;
+  is_comped: boolean;
   quantity: number;
   unit_price: number;
   line_credit: number;
   tax_rate: number;
   tax_credit: number;
+}
+
+/** 作废条目的原始订单菜品 */
+export interface ChainAnulacionItem {
+  instance_id: string;
+  name: string;
+  spec_name: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  is_comped: boolean;
+  tax_rate: number;
 }
 
 /** 作废详情 (GET /api/chain-entries/anulacion/:order_pk) */
@@ -45,9 +61,11 @@ export interface ChainAnulacionDetail {
   receipt_number: string;
   total_amount: number;
   is_voided: boolean;
+  operator_name: string | null;
   created_at: number;
   prev_hash: string;
   curr_hash: string;
+  items: ChainAnulacionItem[];
 }
 
 /** 退款凭证详情 (GET /api/chain-entries/credit-note/:id) */
