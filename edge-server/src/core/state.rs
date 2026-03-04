@@ -700,6 +700,7 @@ impl ServerState {
             self.catalog_service.clone(),
             self.pool.clone(),
             self.config.timezone,
+            Some(self.config.images_dir()),
         );
 
         let shutdown = tasks.shutdown_token();

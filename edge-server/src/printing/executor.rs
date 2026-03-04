@@ -258,12 +258,13 @@ impl PrintExecutor {
 
     /// Print label records (Windows: GDI+ rendering via crab-printer)
     #[cfg(windows)]
-    #[instrument(skip(self, records, destinations, template), fields(record_count = records.len()))]
+    #[instrument(skip(self, records, destinations, template, label_ctx), fields(record_count = records.len()))]
     pub async fn print_label_records(
         &self,
         records: &[super::types::LabelPrintRecord],
         destinations: &HashMap<String, PrintDestination>,
         template: &crab_printer::label::LabelTemplate,
+        label_ctx: &LabelContext,
     ) -> PrintExecutorResult<()> {
         for record in records {
             tracing::debug!(
@@ -301,7 +302,7 @@ impl PrintExecutor {
                     }
                 };
 
-                let data = build_label_data(record);
+                let data = build_label_data(record, label_ctx);
 
                 let options = crab_printer::label::PrintOptions {
                     printer_name: Some(driver_name),
@@ -357,9 +358,62 @@ impl PrintExecutor {
         &self,
         _records: &[super::types::LabelPrintRecord],
         _destinations: &HashMap<String, PrintDestination>,
+        _label_ctx: &LabelContext,
     ) -> PrintExecutorResult<()> {
         warn!("Label printing requires Windows (GDI+)");
         Ok(())
+    }
+}
+
+/// Extra context for label data rendering (store info, image paths)
+pub struct LabelContext {
+    pub store_name: String,
+    pub store_address: String,
+    pub store_phone: String,
+    pub store_nif: String,
+    /// Base64 data URI of store logo (pre-loaded)
+    pub store_logo: Option<String>,
+}
+
+impl LabelContext {
+    /// Build from StoreInfo + images directory
+    pub fn from_store_info(
+        info: Option<&shared::models::StoreInfo>,
+        images_dir: Option<&std::path::Path>,
+    ) -> Self {
+        let (name, address, phone, nif, logo_url) = match info {
+            Some(i) => (
+                i.name.clone(),
+                i.address.clone(),
+                i.phone.clone().unwrap_or_default(),
+                i.nif.clone(),
+                i.logo_url.clone(),
+            ),
+            None => Default::default(),
+        };
+
+        // Pre-load store logo as base64 data URI
+        let store_logo = logo_url.filter(|u| !u.is_empty()).and_then(|url| {
+            let path = images_dir?.join(&url);
+            let bytes = std::fs::read(&path).ok()?;
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("png");
+            let mime = match ext {
+                "jpg" | "jpeg" => "image/jpeg",
+                "webp" => "image/webp",
+                _ => "image/png",
+            };
+            use base64::Engine;
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            Some(format!("data:{};base64,{}", mime, b64))
+        });
+
+        Self {
+            store_name: name,
+            store_address: address,
+            store_phone: phone,
+            store_nif: nif,
+            store_logo,
+        }
     }
 }
 
@@ -372,30 +426,54 @@ impl PrintExecutor {
 /// 2. Add to `SUPPORTED_LABEL_FIELDS` in `labelTemplate.ts`
 /// 3. Populate from `PrintItemContext` (extend if needed)
 #[cfg(windows)]
-fn build_label_data(record: &super::types::LabelPrintRecord) -> serde_json::Value {
+fn build_label_data(
+    record: &super::types::LabelPrintRecord,
+    label_ctx: &LabelContext,
+) -> serde_json::Value {
     let ctx = &record.context;
     let now = chrono::Local::now();
-    serde_json::json!({
+    let mut data = serde_json::json!({
         // Product
+        "product_id": ctx.product_id,
         "product_name": ctx.product_name,
         "kitchen_name": ctx.kitchen_name,
+        "category_id": ctx.category_id,
         "category_name": ctx.category_name,
         "external_id": ctx.external_id.unwrap_or(0),
         // Specification
         "spec_name": ctx.spec_name.as_deref().unwrap_or(""),
         // Item
+        "price": ctx.price,
         "quantity": ctx.quantity,
+        "subtotal": ctx.price * ctx.quantity as f64,
         "index": ctx.index.as_deref().unwrap_or(""),
         "options": ctx.label_options.join(", "),
+        "kitchen_options": ctx.options.join(", "),
         "note": ctx.note.as_deref().unwrap_or(""),
         // Order
+        "order_id": record.order_id,
+        "receipt_number": record.receipt_number,
         "table_name": record.table_name.as_deref().unwrap_or(""),
+        "zone_name": record.zone_name.as_deref().unwrap_or(""),
         "queue_number": record.queue_number.map(|n| format!("#{:03}", n)).unwrap_or_default(),
+        "is_retail": record.is_retail,
+        // Store
+        "store_name": label_ctx.store_name,
+        "store_address": label_ctx.store_address,
+        "store_phone": label_ctx.store_phone,
+        "store_nif": label_ctx.store_nif,
         // Print
+        "print_count": record.print_count,
+        "weekday": now.format("%A").to_string(),
         "time": now.format("%H:%M").to_string(),
         "date": now.format("%Y-%m-%d").to_string(),
         "datetime": now.format("%Y-%m-%d %H:%M").to_string(),
-    })
+    });
+    // Store logo (image, only if loaded)
+    if let Some(ref logo) = label_ctx.store_logo {
+        data["store_logo"] = serde_json::Value::String(logo.clone());
+    }
+    data
 }
 
 /// Convert DB LabelTemplate to crab-printer LabelTemplate
@@ -503,6 +581,7 @@ mod tests {
                     kitchen_name: "宫保鸡丁".to_string(),
                     product_name: "宫保鸡丁".to_string(),
                     spec_name: None,
+                    price: 38.0,
                     quantity: 2,
                     index: None,
                     options: vec![],

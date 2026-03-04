@@ -18,6 +18,9 @@ pub struct PrintItemContext {
     // 规格
     pub spec_name: Option<String>,
 
+    // 价格
+    pub price: f64,
+
     // 数量
     pub quantity: i32,
     pub index: Option<String>, // 标签用："2/5"
@@ -45,7 +48,6 @@ pub struct KitchenOrderItem {
 pub struct KitchenOrder {
     pub id: i64, // = event_id (snowflake)
     pub order_id: i64,
-    #[serde(default)]
     pub receipt_number: String, // 人类可读订单号
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
@@ -61,8 +63,10 @@ pub struct KitchenOrder {
 pub struct LabelPrintRecord {
     pub id: i64, // snowflake
     pub order_id: i64,
-    pub kitchen_order_id: i64, // 关联的 KitchenOrder (= event_id)
+    pub kitchen_order_id: i64,  // 关联的 KitchenOrder (= event_id)
+    pub receipt_number: String, // 人类可读订单号
     pub table_name: Option<String>,
+    pub zone_name: Option<String>,
     pub queue_number: Option<u32>,
     pub is_retail: bool,
     pub created_at: i64,

@@ -203,6 +203,8 @@ pub async fn delete(
 async fn auto_set_default_if_missing(state: &ServerState, dest: &PrintDestination) {
     let defaults = state.catalog_service.get_print_defaults();
     let id_str = dest.id.to_string();
+    let kitchen_enabled = defaults.kitchen_enabled;
+    let label_enabled = defaults.label_enabled;
 
     let (kitchen, label) = match dest.purpose.as_str() {
         "kitchen" if defaults.kitchen_destination.is_none() => {
@@ -214,14 +216,25 @@ async fn auto_set_default_if_missing(state: &ServerState, dest: &PrintDestinatio
         _ => return,
     };
 
-    if let Err(e) = print_config::update(&state.pool, kitchen.as_deref(), label.as_deref()).await {
+    if let Err(e) = print_config::update(
+        &state.pool,
+        kitchen_enabled,
+        kitchen.as_deref(),
+        label_enabled,
+        label.as_deref(),
+    )
+    .await
+    {
         tracing::error!(error = ?e, "Failed to auto-set print_config default");
         return;
     }
 
-    state
-        .catalog_service
-        .set_print_defaults(kitchen.clone(), label.clone());
+    state.catalog_service.set_print_defaults(
+        kitchen_enabled,
+        kitchen.clone(),
+        label_enabled,
+        label.clone(),
+    );
 
     tracing::info!(
         kitchen = ?kitchen,
@@ -229,7 +242,8 @@ async fn auto_set_default_if_missing(state: &ServerState, dest: &PrintDestinatio
         "Auto-set print_config default for new destination"
     );
 
-    broadcast_print_config(state, kitchen, label).await;
+    let broadcast_defaults = state.catalog_service.get_print_defaults();
+    broadcast_print_config(state, &broadcast_defaults, kitchen, label).await;
 }
 
 /// After deleting a PrintDestination, clear or fall back the global default
@@ -237,6 +251,8 @@ async fn auto_set_default_if_missing(state: &ServerState, dest: &PrintDestinatio
 async fn clear_default_if_deleted(state: &ServerState, deleted_id: i64) {
     let defaults = state.catalog_service.get_print_defaults();
     let deleted_str = deleted_id.to_string();
+    let kitchen_enabled = defaults.kitchen_enabled;
+    let label_enabled = defaults.label_enabled;
 
     let mut kitchen = defaults.kitchen_destination;
     let mut label = defaults.label_destination;
@@ -255,14 +271,25 @@ async fn clear_default_if_deleted(state: &ServerState, deleted_id: i64) {
         return;
     }
 
-    if let Err(e) = print_config::update(&state.pool, kitchen.as_deref(), label.as_deref()).await {
+    if let Err(e) = print_config::update(
+        &state.pool,
+        kitchen_enabled,
+        kitchen.as_deref(),
+        label_enabled,
+        label.as_deref(),
+    )
+    .await
+    {
         tracing::error!(error = ?e, "Failed to update print_config after deletion");
         return;
     }
 
-    state
-        .catalog_service
-        .set_print_defaults(kitchen.clone(), label.clone());
+    state.catalog_service.set_print_defaults(
+        kitchen_enabled,
+        kitchen.clone(),
+        label_enabled,
+        label.clone(),
+    );
 
     tracing::info!(
         kitchen = ?kitchen,
@@ -270,7 +297,8 @@ async fn clear_default_if_deleted(state: &ServerState, deleted_id: i64) {
         "Updated print_config default after destination deletion"
     );
 
-    broadcast_print_config(state, kitchen, label).await;
+    let broadcast_defaults = state.catalog_service.get_print_defaults();
+    broadcast_print_config(state, &broadcast_defaults, kitchen, label).await;
 }
 
 /// Find the next active PrintDestination with the given purpose, excluding `excluded_id`.
@@ -294,11 +322,14 @@ async fn find_next_active_destination(
 /// Broadcast a print_config update to connected clients.
 async fn broadcast_print_config(
     state: &ServerState,
+    defaults: &crate::services::catalog_service::PrintDefaults,
     kitchen: Option<String>,
     label: Option<String>,
 ) {
     let config = serde_json::json!({
+        "kitchen_enabled": defaults.kitchen_enabled,
         "default_kitchen_printer": kitchen,
+        "label_enabled": defaults.label_enabled,
         "default_label_printer": label,
     });
     state

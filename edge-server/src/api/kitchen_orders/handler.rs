@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::ServerState;
 use crate::db::repository::{order as order_repo, print_destination};
 use crate::printing::{
-    KitchenOrder, KitchenOrderItem, LabelPrintRecord, PrintExecutor, PrintItemContext,
+    KitchenOrder, KitchenOrderItem, LabelContext, LabelPrintRecord, PrintExecutor, PrintItemContext,
 };
 use crate::utils::{AppError, AppResult};
 use shared::error::ErrorCode;
@@ -273,7 +273,9 @@ pub async fn reprint_label(
         id: shared::util::snowflake_id(),
         order_id: record.order_id,
         kitchen_order_id: record.kitchen_order_id,
+        receipt_number: record.receipt_number.clone(),
         table_name: record.table_name,
+        zone_name: record.zone_name,
         queue_number: record.queue_number,
         is_retail: record.is_retail,
         created_at: chrono::Utc::now().timestamp_millis(),
@@ -289,13 +291,17 @@ pub async fn reprint_label(
         .map(|d| (d.id.to_string(), d))
         .collect();
 
-    let locale = crate::db::repository::store_info::get(&state.pool)
+    let store_info = crate::db::repository::store_info::get(&state.pool)
         .await
         .ok()
-        .flatten()
-        .and_then(|i| i.receipt_locale)
+        .flatten();
+    let locale = store_info
+        .as_ref()
+        .and_then(|i| i.receipt_locale.clone())
         .unwrap_or_else(|| "es-ES".to_string());
     let executor = PrintExecutor::with_config(48, state.config.timezone, locale);
+    let label_ctx =
+        LabelContext::from_store_info(store_info.as_ref(), Some(&state.config.images_dir()));
 
     #[cfg(windows)]
     {
@@ -308,7 +314,7 @@ pub async fn reprint_label(
             }
         };
         if let Err(e) = executor
-            .print_label_records(&[reprint_record], &destinations, &template)
+            .print_label_records(&[reprint_record], &destinations, &template, &label_ctx)
             .await
         {
             tracing::warn!(label_record_id = %id, error = %e, "Label reprint failed");
@@ -319,7 +325,7 @@ pub async fn reprint_label(
     #[cfg(not(windows))]
     {
         if let Err(e) = executor
-            .print_label_records(&[reprint_record], &destinations)
+            .print_label_records(&[reprint_record], &destinations, &label_ctx)
             .await
         {
             tracing::warn!(label_record_id = %id, error = %e, "Label reprint failed");
@@ -430,7 +436,9 @@ async fn rebuild_label_records_from_archive(
                     id: shared::util::snowflake_id(),
                     order_id: meta.order_id,
                     kitchen_order_id: event.event_id,
+                    receipt_number: meta.receipt_number.clone(),
                     table_name: meta.table_name.clone(),
+                    zone_name: meta.zone_name.clone(),
                     queue_number: meta.queue_number.map(|n| n as u32),
                     is_retail: meta.is_retail,
                     created_at: event.timestamp,
@@ -589,6 +597,7 @@ fn build_print_context_from_catalog(
         kitchen_name,
         product_name: item.name.clone(),
         spec_name,
+        price: item.price,
         quantity: item.quantity,
         index: None,
         options,

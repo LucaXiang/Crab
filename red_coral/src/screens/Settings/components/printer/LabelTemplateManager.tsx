@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutTemplate, Plus, Copy, Trash2, Edit2, Check, Loader2 } from 'lucide-react';
+import { LayoutTemplate, Plus, Copy, Trash2, Edit2, Loader2, CircleDot, Circle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useActiveLabelTemplateId, usePrinterActions } from '@/core/stores/ui';
 import {
@@ -156,62 +156,98 @@ export const LabelTemplateManager: React.FC = () => {
   }
 
   return (
-    <div className="animate-in fade-in duration-300">
-      <div className="flex justify-end items-center mb-6">
+    <div className="animate-in fade-in duration-300 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{t('settings.printer.template.active_hint')}</p>
         <button
           onClick={() => setShowNewTemplateDialog(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl hover:bg-black transition-colors shadow-lg shadow-gray-200"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl hover:bg-black transition-colors shadow-lg shadow-gray-200 text-sm font-medium"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           {t('settings.printer.template.new')}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* Template list */}
+      <div className="space-y-3">
         {templates.map((template) => {
-          const is_active = template.id === activeTemplateId;
+          const isActive = template.id === activeTemplateId;
+          const fieldCount = template.fields?.length ?? 0;
           return (
             <div
               key={template.id}
-              onClick={() => setActiveLabelTemplateId(template.id)}
-              className={`group bg-white rounded-2xl border p-5 transition-all duration-300 flex flex-col cursor-pointer relative ${
-                is_active
-                  ? 'border-blue-500 shadow-md ring-2 ring-blue-100'
-                  : 'border-gray-200 hover:shadow-lg hover:border-blue-200'
+              className={`bg-white rounded-xl border transition-all ${
+                isActive
+                  ? 'border-blue-300 ring-1 ring-blue-100'
+                  : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              {is_active && (
-                <div className="absolute top-4 right-4 bg-blue-500 text-white p-1 rounded-full shadow-sm">
-                  <Check size={14} strokeWidth={3} />
-                </div>
-              )}
-
-              <div className="flex justify-between items-start mb-4">
-                <div
-                  className={`p-3 rounded-xl transition-colors ${
-                    is_active
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'
-                  }`}
+              <div className="flex items-center gap-4 px-4 py-3">
+                {/* Radio-style selection */}
+                <button
+                  onClick={() => setActiveLabelTemplateId(template.id)}
+                  className="shrink-0"
+                  title={t('settings.printer.template.set_active')}
                 >
-                  <LayoutTemplate size={24} />
+                  {isActive ? (
+                    <CircleDot size={22} className="text-blue-500" />
+                  ) : (
+                    <Circle size={22} className="text-gray-300 hover:text-gray-400 transition-colors" />
+                  )}
+                </button>
+
+                {/* Template info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold text-sm ${isActive ? 'text-blue-900' : 'text-gray-800'}`}>
+                      {template.name}
+                    </span>
+                    {isActive && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {t('settings.printer.template.in_use')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <span className="text-xs text-gray-400">
+                      {template.width}mm × {template.height}mm
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {fieldCount} {t('settings.printer.template.fields')}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                {/* Size preview */}
+                <div
+                  className="shrink-0 border border-gray-200 rounded bg-gray-50 flex items-center justify-center"
+                  style={{
+                    width: Math.min(template.width * 1.2, 60),
+                    height: Math.min(template.height * 1.2, 45),
+                  }}
+                >
+                  <LayoutTemplate size={14} className="text-gray-300" />
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDuplicateTemplate(template);
-                    }}
+                    onClick={() => handleEditTemplate(template)}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title={t('settings.printer.template.edit_design')}
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDuplicateTemplate(template)}
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title={t('settings.printer.template.duplicate_template')}
                   >
                     <Copy size={16} />
                   </button>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTemplate(template.id);
-                    }}
+                    onClick={() => handleDeleteTemplate(template.id)}
                     className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                     title={t('common.action.delete')}
                   >
@@ -219,44 +255,17 @@ export const LabelTemplateManager: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              <h4 className={`font-bold mb-1 ${is_active ? 'text-blue-900' : 'text-gray-800'}`}>
-                {template.name}
-              </h4>
-              <p className="text-sm text-gray-500 mb-6 flex items-center gap-2">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${is_active ? 'bg-blue-400' : 'bg-gray-300'}`}
-                ></span>
-                {template.width}mm × {template.height}mm
-              </p>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditTemplate(template);
-                }}
-                className={`mt-auto w-full py-2.5 border font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
-                  is_active
-                    ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                    : 'border-gray-200 text-gray-700 hover:bg-blue-600 hover:border-blue-600 hover:text-white'
-                }`}
-              >
-                <Edit2 size={16} />
-                {t('settings.printer.template.edit_design')}
-              </button>
             </div>
           );
         })}
 
-        {/* New Template Card */}
+        {/* New template row */}
         <button
           onClick={() => setShowNewTemplateDialog(true)}
-          className="bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-5 hover:bg-gray-100 hover:border-gray-300 transition-all flex flex-col items-center justify-center text-gray-400 gap-3 min-h-[12.5rem]"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-100 transition-all text-gray-400 hover:text-gray-500"
         >
-          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm">
-            <Plus size={24} />
-          </div>
-          <span className="font-medium">{t('settings.printer.template.create_template')}</span>
+          <Plus size={18} />
+          <span className="text-sm font-medium">{t('settings.printer.template.create_template')}</span>
         </button>
       </div>
 

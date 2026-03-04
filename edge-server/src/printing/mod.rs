@@ -13,7 +13,7 @@ pub mod types;
 pub mod worker;
 
 pub use credit_note_renderer::CreditNoteReceiptRenderer;
-pub use executor::{PrintExecutor, PrintExecutorError, PrintExecutorResult};
+pub use executor::{LabelContext, PrintExecutor, PrintExecutorError, PrintExecutorResult};
 pub use renderer::KitchenTicketRenderer;
 pub use service::{KitchenPrintService, PrintServiceError, PrintServiceResult};
 pub use storage::{PrintStorage, PrintStorageError, PrintStorageResult};

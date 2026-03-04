@@ -5,12 +5,13 @@
 
 use crate::db::repository::print_destination;
 use crate::orders::OrdersManager;
-use crate::printing::{KitchenPrintService, PrintExecutor};
+use crate::printing::{KitchenPrintService, LabelContext, PrintExecutor};
 use crate::services::CatalogService;
 use chrono_tz::Tz;
 use shared::order::{OrderEvent, OrderEventType};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -29,6 +30,7 @@ pub struct KitchenPrintWorker {
     catalog_service: Arc<CatalogService>,
     pool: SqlitePool,
     timezone: Tz,
+    images_dir: Option<PathBuf>,
 }
 
 impl KitchenPrintWorker {
@@ -38,6 +40,7 @@ impl KitchenPrintWorker {
         catalog_service: Arc<CatalogService>,
         pool: SqlitePool,
         timezone: Tz,
+        images_dir: Option<PathBuf>,
     ) -> Self {
         Self {
             orders_manager,
@@ -45,6 +48,7 @@ impl KitchenPrintWorker {
             catalog_service,
             pool,
             timezone,
+            images_dir,
         }
     }
 
@@ -57,11 +61,17 @@ impl KitchenPrintWorker {
         shutdown: CancellationToken,
     ) {
         tracing::info!("Kitchen print worker started");
-        let locale = match crate::db::repository::store_info::get(&self.pool).await {
-            Ok(Some(info)) => info.receipt_locale.unwrap_or_else(|| "es-ES".to_string()),
-            _ => "es-ES".to_string(),
-        };
+        let store_info = crate::db::repository::store_info::get(&self.pool)
+            .await
+            .ok()
+            .flatten();
+        let locale = store_info
+            .as_ref()
+            .and_then(|i| i.receipt_locale.clone())
+            .unwrap_or_else(|| "es-ES".to_string());
         let executor = PrintExecutor::with_config(48, self.timezone, locale);
+        let label_ctx =
+            LabelContext::from_store_info(store_info.as_ref(), self.images_dir.as_deref());
 
         loop {
             tokio::select! {
@@ -76,10 +86,10 @@ impl KitchenPrintWorker {
                     };
                     match event.event_type {
                         OrderEventType::ItemsAdded => {
-                            self.handle_items_added(&event, &executor).await;
+                            self.handle_items_added(&event, &executor, &label_ctx).await;
                         }
                         OrderEventType::OrderCompleted => {
-                            self.handle_order_completed(&event, &executor).await;
+                            self.handle_order_completed(&event, &executor, &label_ctx).await;
                         }
                         _ => {}
                     }
@@ -89,7 +99,12 @@ impl KitchenPrintWorker {
     }
 
     /// 处理 ItemsAdded 事件
-    async fn handle_items_added(&self, event: &OrderEvent, executor: &PrintExecutor) {
+    async fn handle_items_added(
+        &self,
+        event: &OrderEvent,
+        executor: &PrintExecutor,
+        label_ctx: &LabelContext,
+    ) {
         tracing::debug!(
             order_id = %event.order_id,
             event_id = %event.event_id,
@@ -141,7 +156,7 @@ impl KitchenPrintWorker {
 
                 // 堂食模式：立即打印
                 self.execute_print(kitchen_order_id, executor).await;
-                self.execute_label_print(event.order_id, kitchen_order_id, executor)
+                self.execute_label_print(event.order_id, kitchen_order_id, executor, label_ctx)
                     .await;
             }
             Ok(None) => {
@@ -161,7 +176,12 @@ impl KitchenPrintWorker {
     }
 
     /// 处理 OrderCompleted 事件（零售订单延迟打印）
-    async fn handle_order_completed(&self, event: &OrderEvent, executor: &PrintExecutor) {
+    async fn handle_order_completed(
+        &self,
+        event: &OrderEvent,
+        executor: &PrintExecutor,
+        label_ctx: &LabelContext,
+    ) {
         // 读取该订单所有 KitchenOrder
         let kitchen_orders = match self
             .kitchen_print_service
@@ -196,7 +216,7 @@ impl KitchenPrintWorker {
 
         for ko in pending {
             self.execute_print(ko.id, executor).await;
-            self.execute_label_print(event.order_id, ko.id, executor)
+            self.execute_label_print(event.order_id, ko.id, executor, label_ctx)
                 .await;
         }
     }
@@ -249,6 +269,7 @@ impl KitchenPrintWorker {
         order_id: i64,
         kitchen_order_id: i64,
         executor: &PrintExecutor,
+        label_ctx: &LabelContext,
     ) {
         use crate::db::repository::label_template;
 
@@ -306,7 +327,7 @@ impl KitchenPrintWorker {
         };
 
         if let Err(e) = executor
-            .print_label_records(&records, &destinations, &template)
+            .print_label_records(&records, &destinations, &template, label_ctx)
             .await
         {
             tracing::error!(order_id = %order_id, error = %e, "Failed to print labels");
@@ -320,6 +341,7 @@ impl KitchenPrintWorker {
         order_id: i64,
         kitchen_order_id: i64,
         executor: &PrintExecutor,
+        label_ctx: &LabelContext,
     ) {
         // 获取该 kitchen order 关联的标签记录
         let records = match self
@@ -349,7 +371,10 @@ impl KitchenPrintWorker {
             }
         };
 
-        if let Err(e) = executor.print_label_records(&records, &destinations).await {
+        if let Err(e) = executor
+            .print_label_records(&records, &destinations, label_ctx)
+            .await
+        {
             tracing::error!(order_id = %order_id, error = %e, "Failed to print labels");
         }
     }
