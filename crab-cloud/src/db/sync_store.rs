@@ -5,11 +5,23 @@
 
 use std::collections::HashMap;
 
+use rust_decimal::Decimal;
 use shared::cloud::{CloudSyncItem, SyncResource};
 use shared::models::store_info::StoreInfo;
 use sqlx::PgPool;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Convert f64 to Decimal for NUMERIC column binding.
+/// Uses `try_from` with fallback to `Decimal::ZERO` for NaN/Infinity.
+fn dec(f: f64) -> Decimal {
+    Decimal::try_from(f).unwrap_or(Decimal::ZERO)
+}
+
+/// Convert Option<f64> to Option<Decimal>.
+fn dec_opt(f: Option<f64>) -> Option<Decimal> {
+    f.map(dec)
+}
 
 /// Side-effect produced by `upsert_resource` that callers should handle.
 pub enum SyncEffect {
@@ -391,9 +403,9 @@ async fn upsert_credit_note(
     .bind(&cn.credit_note_number)
     .bind(cn.original_order_id)
     .bind(&cn.original_receipt)
-    .bind(cn.subtotal_credit)
-    .bind(cn.tax_credit)
-    .bind(cn.total_credit)
+    .bind(dec(cn.subtotal_credit))
+    .bind(dec(cn.tax_credit))
+    .bind(dec(cn.total_credit))
     .bind(&cn.refund_method)
     .bind(&cn.reason)
     .bind(&cn.note)
@@ -428,17 +440,17 @@ async fn upsert_credit_note(
             .collect();
         let names: Vec<&str> = cn.items.iter().map(|i| i.item_name.as_str()).collect();
         let quantities: Vec<i64> = cn.items.iter().map(|i| i.quantity).collect();
-        let unit_prices: Vec<f64> = cn.items.iter().map(|i| i.unit_price).collect();
-        let line_credits: Vec<f64> = cn.items.iter().map(|i| i.line_credit).collect();
+        let unit_prices: Vec<Decimal> = cn.items.iter().map(|i| dec(i.unit_price)).collect();
+        let line_credits: Vec<Decimal> = cn.items.iter().map(|i| dec(i.line_credit)).collect();
         let tax_rates: Vec<i64> = cn.items.iter().map(|i| i.tax_rate).collect();
-        let tax_credits: Vec<f64> = cn.items.iter().map(|i| i.tax_credit).collect();
+        let tax_credits: Vec<Decimal> = cn.items.iter().map(|i| dec(i.tax_credit)).collect();
 
         sqlx::query(
             r#"
             INSERT INTO store_credit_note_items (
                 credit_note_id, original_instance_id, item_name, quantity, unit_price, line_credit, tax_rate, tax_credit
             )
-            SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::bigint[], $5::float8[], $6::float8[], $7::bigint[], $8::float8[])
+            SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::bigint[], $5::numeric[], $6::numeric[], $7::bigint[], $8::numeric[])
             "#,
         )
         .bind(&cn_ids)
@@ -563,28 +575,28 @@ async fn upsert_archived_order(
     .bind(&detail_sync.receipt_number)       // $5
     .bind(&detail_sync.status)               // $6
     .bind(detail_sync.end_time)              // $7
-    .bind(detail_sync.total_amount)          // $8
-    .bind(detail_sync.tax)                   // $9
+    .bind(dec(detail_sync.total_amount))      // $8
+    .bind(dec(detail_sync.tax))               // $9
     .bind(&detail_sync.prev_hash)            // $10
     .bind(&detail_sync.curr_hash)            // $11
     .bind(&detail_sync.last_event_hash)      // $12
     .bind(d.guest_count)                     // $13
-    .bind(d.discount_amount)                 // $14
+    .bind(dec(d.discount_amount))            // $14
     .bind(d.void_type.as_ref().map(|v| v.as_str())) // $15
-    .bind(d.loss_amount)                     // $16
+    .bind(dec_opt(d.loss_amount))            // $16
     .bind(d.start_time)                      // $17
     .bind(&d.zone_name)                      // $18
     .bind(&d.table_name)                     // $19
     .bind(d.is_retail)                       // $20
-    .bind(d.original_total)                  // $21
-    .bind(d.subtotal)                        // $22
-    .bind(d.paid_amount)                     // $23
-    .bind(d.surcharge_amount)                // $24
-    .bind(d.comp_total_amount)               // $25
-    .bind(d.order_manual_discount_amount)    // $26
-    .bind(d.order_manual_surcharge_amount)   // $27
-    .bind(d.order_rule_discount_amount)      // $28
-    .bind(d.order_rule_surcharge_amount)     // $29
+    .bind(dec(d.original_total))             // $21
+    .bind(dec(d.subtotal))                   // $22
+    .bind(dec(d.paid_amount))                // $23
+    .bind(dec(d.surcharge_amount))           // $24
+    .bind(dec(d.comp_total_amount))          // $25
+    .bind(dec(d.order_manual_discount_amount))  // $26
+    .bind(dec(d.order_manual_surcharge_amount)) // $27
+    .bind(dec(d.order_rule_discount_amount))    // $28
+    .bind(dec(d.order_rule_surcharge_amount))   // $29
     .bind(&d.operator_name)                  // $30
     .bind(d.loss_reason.as_ref().map(|v| v.as_str())) // $31
     .bind(&d.void_note)                      // $32
@@ -643,13 +655,13 @@ async fn upsert_archived_order(
         let cat_names: Vec<Option<&str>> =
             d.items.iter().map(|i| i.category_name.as_deref()).collect();
         let prod_ids: Vec<Option<i64>> = d.items.iter().map(|i| i.product_source_id).collect();
-        let prices: Vec<f64> = d.items.iter().map(|i| i.price).collect();
+        let prices: Vec<Decimal> = d.items.iter().map(|i| dec(i.price)).collect();
         let quantities: Vec<i32> = d.items.iter().map(|i| i.quantity).collect();
-        let unit_prices: Vec<f64> = d.items.iter().map(|i| i.unit_price).collect();
-        let line_totals: Vec<f64> = d.items.iter().map(|i| i.line_total).collect();
-        let discounts: Vec<f64> = d.items.iter().map(|i| i.discount_amount).collect();
-        let surcharges: Vec<f64> = d.items.iter().map(|i| i.surcharge_amount).collect();
-        let taxes: Vec<f64> = d.items.iter().map(|i| i.tax).collect();
+        let unit_prices: Vec<Decimal> = d.items.iter().map(|i| dec(i.unit_price)).collect();
+        let line_totals: Vec<Decimal> = d.items.iter().map(|i| dec(i.line_total)).collect();
+        let discounts: Vec<Decimal> = d.items.iter().map(|i| dec(i.discount_amount)).collect();
+        let surcharges: Vec<Decimal> = d.items.iter().map(|i| dec(i.surcharge_amount)).collect();
+        let taxes: Vec<Decimal> = d.items.iter().map(|i| dec(i.tax)).collect();
         let tax_rates: Vec<i32> = d.items.iter().map(|i| i.tax_rate).collect();
         let comped: Vec<bool> = d.items.iter().map(|i| i.is_comped).collect();
         let notes: Vec<Option<&str>> = d.items.iter().map(|i| i.note.as_deref()).collect();
@@ -663,8 +675,8 @@ async fn upsert_archived_order(
             )
             SELECT * FROM UNNEST(
                 $1::bigint[], $2::text[], $3::text[], $4::text[], $5::text[], $6::bigint[],
-                $7::float8[], $8::int[], $9::float8[], $10::float8[],
-                $11::float8[], $12::float8[], $13::float8[], $14::int[], $15::bool[], $16::text[]
+                $7::numeric[], $8::int[], $9::numeric[], $10::numeric[],
+                $11::numeric[], $12::numeric[], $13::numeric[], $14::int[], $15::bool[], $16::text[]
             )
             RETURNING id
             "#,
@@ -692,7 +704,7 @@ async fn upsert_archived_order(
         let mut opt_item_ids: Vec<i64> = Vec::new();
         let mut opt_attr_names: Vec<String> = Vec::new();
         let mut opt_option_names: Vec<String> = Vec::new();
-        let mut opt_prices: Vec<f64> = Vec::new();
+        let mut opt_prices: Vec<Decimal> = Vec::new();
         let mut opt_quantities: Vec<i32> = Vec::new();
 
         for (idx, sync_item) in d.items.iter().enumerate() {
@@ -701,7 +713,7 @@ async fn upsert_archived_order(
                 opt_item_ids.push(item_pk);
                 opt_attr_names.push(opt.attribute_name.clone());
                 opt_option_names.push(opt.option_name.clone());
-                opt_prices.push(opt.price);
+                opt_prices.push(dec(opt.price));
                 opt_quantities.push(opt.quantity);
             }
         }
@@ -710,7 +722,7 @@ async fn upsert_archived_order(
             sqlx::query(
                 r#"
                 INSERT INTO store_order_item_options (item_id, attribute_name, option_name, price, quantity)
-                SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::float8[], $5::int[])
+                SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::numeric[], $5::int[])
                 "#,
             )
             .bind(&opt_item_ids)
@@ -728,7 +740,7 @@ async fn upsert_archived_order(
         let oids: Vec<i64> = d.payments.iter().map(|_| order_pk).collect();
         let seqs: Vec<i32> = d.payments.iter().map(|p| p.seq).collect();
         let methods: Vec<&str> = d.payments.iter().map(|p| p.method.as_str()).collect();
-        let amounts: Vec<f64> = d.payments.iter().map(|p| p.amount).collect();
+        let amounts: Vec<Decimal> = d.payments.iter().map(|p| dec(p.amount)).collect();
         let timestamps: Vec<i64> = d.payments.iter().map(|p| p.timestamp).collect();
         let cancelled: Vec<bool> = d.payments.iter().map(|p| p.cancelled).collect();
         let cancel_reasons: Vec<Option<&str>> = d
@@ -736,13 +748,18 @@ async fn upsert_archived_order(
             .iter()
             .map(|p| p.cancel_reason.as_deref())
             .collect();
-        let tendereds: Vec<Option<f64>> = d.payments.iter().map(|p| p.tendered).collect();
-        let change_amounts: Vec<Option<f64>> = d.payments.iter().map(|p| p.change_amount).collect();
+        let tendereds: Vec<Option<Decimal>> =
+            d.payments.iter().map(|p| dec_opt(p.tendered)).collect();
+        let change_amounts: Vec<Option<Decimal>> = d
+            .payments
+            .iter()
+            .map(|p| dec_opt(p.change_amount))
+            .collect();
 
         sqlx::query(
             r#"
             INSERT INTO store_order_payments (order_id, seq, method, amount, timestamp, cancelled, cancel_reason, tendered, change_amount)
-            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::text[], $4::float8[], $5::bigint[], $6::bool[], $7::text[], $8::float8[], $9::float8[])
+            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::text[], $4::numeric[], $5::bigint[], $6::bool[], $7::text[], $8::numeric[], $9::numeric[])
             "#,
         )
         .bind(&oids)
@@ -1052,9 +1069,9 @@ async fn upsert_invoice(
     .bind(inv.tipo_factura.as_str())
     .bind(inv.source_type.as_str())
     .bind(inv.source_pk)
-    .bind(inv.subtotal)
-    .bind(inv.tax)
-    .bind(inv.total)
+    .bind(dec(inv.subtotal))
+    .bind(dec(inv.tax))
+    .bind(dec(inv.total))
     .bind(&inv.huella)
     .bind(&inv.prev_huella)
     .bind(&inv.fecha_expedicion)

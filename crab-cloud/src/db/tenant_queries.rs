@@ -181,10 +181,12 @@ pub async fn list_chain_entries(
                 WHEN ce.entry_type = 'CREDIT_NOTE'
                     THEN COALESCE(cn.credit_note_number, CAST(ce.entry_pk AS TEXT))
                 WHEN ce.entry_type = 'BREAK'
-                    THEN 'BREAK'
+                    THEN '#' || CAST(ce.id % 10000 AS TEXT)
                 ELSE CAST(ce.entry_pk AS TEXT)
             END AS display_number,
             CASE
+                WHEN ce.entry_type = 'ORDER' AND o.is_voided IS TRUE THEN 'ANULADA'
+                WHEN ce.entry_type = 'ORDER' AND o.status = 'VOID' AND o.void_type = 'LOSS_SETTLED' THEN 'LOSS'
                 WHEN ce.entry_type = 'ORDER' THEN COALESCE(o.status, 'UNKNOWN')
                 WHEN ce.entry_type = 'CREDIT_NOTE' THEN 'REFUND'
                 WHEN ce.entry_type = 'ANULACION' THEN 'ANULADA'
@@ -200,10 +202,12 @@ pub async fn list_chain_entries(
             ce.created_at,
             CASE
                 WHEN ce.entry_type = 'CREDIT_NOTE' THEN cn.original_order_id
+                WHEN ce.entry_type = 'ANULACION' THEN ce.entry_pk
                 ELSE NULL::BIGINT
             END AS original_order_id,
             CASE
                 WHEN ce.entry_type = 'CREDIT_NOTE' THEN cn.original_receipt
+                WHEN ce.entry_type = 'ANULACION' THEN o.receipt_number
                 ELSE NULL::TEXT
             END AS original_receipt
         FROM store_chain_entries ce
@@ -336,7 +340,7 @@ pub async fn get_credit_note_detail(
 pub struct AnulacionDetail {
     pub order_id: i64,
     pub receipt_number: String,
-    pub total_amount: f64,
+    pub total_amount: Decimal,
     pub is_voided: bool,
     pub created_at: i64,
 }
@@ -368,8 +372,8 @@ pub async fn get_anulacion_detail(
 pub struct UpgradeDetail {
     pub order_id: i64,
     pub receipt_number: String,
-    pub total_amount: f64,
-    pub tax: f64,
+    pub total_amount: Decimal,
+    pub tax: Decimal,
     pub is_upgraded: bool,
     pub customer_nif: Option<String>,
     pub customer_nombre: Option<String>,
@@ -1254,7 +1258,7 @@ async fn get_overview(
                 AND o.end_time >= $3 AND o.end_time < $4
                 AND o.status = 'COMPLETED'
                 AND o.is_voided IS NOT TRUE
-            GROUP BY name
+            GROUP BY i.category_name
             ORDER BY revenue DESC
             LIMIT 10
             "#,
