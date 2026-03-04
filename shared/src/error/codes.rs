@@ -149,6 +149,20 @@ pub enum ErrorCode {
     OrderItemNotFound = 4006,
     /// Order is empty
     OrderEmpty = 4007,
+    /// Order status is not COMPLETED (required for anulación/credit note)
+    OrderNotCompleted = 4008,
+    /// Order has credit notes — cannot create anulación
+    OrderHasCreditNotes = 4009,
+    /// Credit note refund exceeds remaining refundable amount
+    CreditNoteOverRefund = 4010,
+    /// Credit note item quantity exceeds remaining refundable quantity
+    CreditNoteItemOverRefund = 4011,
+    /// Order has been voided — cannot create credit note
+    OrderVoidedNoCreditNote = 4012,
+    /// Order already has an upgrade invoice
+    OrderAlreadyUpgraded = 4013,
+    /// Import blocked: active orders exist
+    ImportBlockedActiveOrders = 4014,
 
     // ==================== 5xxx: Payment ====================
     /// Payment processing failed
@@ -408,6 +422,17 @@ impl ErrorCode {
             ErrorCode::OrderHasPayments => "Order has existing payments",
             ErrorCode::OrderItemNotFound => "Order item not found",
             ErrorCode::OrderEmpty => "Order is empty",
+            ErrorCode::OrderNotCompleted => "Order status is not COMPLETED",
+            ErrorCode::OrderHasCreditNotes => "Order has credit notes, cannot create anulación",
+            ErrorCode::CreditNoteOverRefund => "Refund amount exceeds remaining refundable",
+            ErrorCode::CreditNoteItemOverRefund => "Item refund quantity exceeds remaining",
+            ErrorCode::OrderVoidedNoCreditNote => {
+                "Order has been voided, cannot create credit note"
+            }
+            ErrorCode::OrderAlreadyUpgraded => "Order already has an upgrade invoice",
+            ErrorCode::ImportBlockedActiveOrders => {
+                "Cannot import catalog while active orders exist"
+            }
 
             // Payment
             ErrorCode::PaymentFailed => "Payment processing failed",
@@ -600,6 +625,13 @@ impl TryFrom<u16> for ErrorCode {
             4005 => Ok(ErrorCode::OrderHasPayments),
             4006 => Ok(ErrorCode::OrderItemNotFound),
             4007 => Ok(ErrorCode::OrderEmpty),
+            4008 => Ok(ErrorCode::OrderNotCompleted),
+            4009 => Ok(ErrorCode::OrderHasCreditNotes),
+            4010 => Ok(ErrorCode::CreditNoteOverRefund),
+            4011 => Ok(ErrorCode::CreditNoteItemOverRefund),
+            4012 => Ok(ErrorCode::OrderVoidedNoCreditNote),
+            4013 => Ok(ErrorCode::OrderAlreadyUpgraded),
+            4014 => Ok(ErrorCode::ImportBlockedActiveOrders),
 
             // Payment
             5001 => Ok(ErrorCode::PaymentFailed),
@@ -1001,7 +1033,8 @@ mod tests {
             3001, 3002, 3003, 3004, 3005, 3006, 3007, 3009, 3010, // 3xxx Tenant
             3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, 3023, 3024,
             3025, 3026, 3027, 3028, 3029, 3030, 3031, // P12 errors (30)
-            4001, 4002, 4003, 4004, 4005, 4006, 4007, // 4xxx Order (7)
+            4001, 4002, 4003, 4004, 4005, 4006, 4007, 4008, 4009, 4010, 4011, 4012, 4013,
+            4014, // 4xxx Order (14)
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
             6101, 6102, 6103, // 61xx Category
@@ -1026,7 +1059,7 @@ mod tests {
             9401, 9402, 9403, 9404, // 94xx Storage
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 135;
+        const EXPECTED_VARIANT_COUNT: usize = 142;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

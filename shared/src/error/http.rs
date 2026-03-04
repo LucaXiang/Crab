@@ -23,6 +23,9 @@ impl ErrorCode {
             | Self::PasswordTooShort
             | Self::P12Required
             | Self::OrderEmpty
+            | Self::OrderNotCompleted
+            | Self::CreditNoteOverRefund
+            | Self::CreditNoteItemOverRefund
             | Self::PaymentInvalidMethod
             | Self::ProductInvalidPrice
             | Self::ProductExternalIdRequired
@@ -104,6 +107,10 @@ impl ErrorCode {
             | Self::OrderAlreadyCompleted
             | Self::OrderAlreadyVoided
             | Self::OrderHasPayments
+            | Self::OrderHasCreditNotes
+            | Self::OrderAlreadyUpgraded
+            | Self::OrderVoidedNoCreditNote
+            | Self::ImportBlockedActiveOrders
             | Self::PaymentAlreadyRefunded
             | Self::ProductOutOfStock
             | Self::ProductExternalIdExists

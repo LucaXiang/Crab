@@ -56,6 +56,9 @@ export const ErrorCode = {
   P12MissingCertificate: 3026,
   P12ChainVerifyFailed: 3027,
   P12UntrustedCa: 3028,
+  P12NifMismatch: 3029,
+  P12CertExpired: 3030,
+  P12CertNotYetValid: 3031,
 
   // 4xxx: Order
   OrderNotFound: 4001,
@@ -65,6 +68,13 @@ export const ErrorCode = {
   OrderHasPayments: 4005,
   OrderItemNotFound: 4006,
   OrderEmpty: 4007,
+  OrderNotCompleted: 4008,
+  OrderHasCreditNotes: 4009,
+  CreditNoteOverRefund: 4010,
+  CreditNoteItemOverRefund: 4011,
+  OrderVoidedNoCreditNote: 4012,
+  OrderAlreadyUpgraded: 4013,
+  ImportBlockedActiveOrders: 4014,
 
   // 5xxx: Payment
   PaymentFailed: 5001,
@@ -81,6 +91,7 @@ export const ErrorCode = {
   CategoryHasProducts: 6102,
   CategoryNameExists: 6103,
   SpecNotFound: 6201,
+  SpecRootRequired: 6205,
   ProductExternalIdExists: 6202,
   ProductExternalIdRequired: 6203,
   ProductCategoryInvalid: 6204,
@@ -146,6 +157,9 @@ export const ErrorCode = {
   PrintLabelDisabled: 9206,
   PrintDestinationNotConfigured: 9207,
   ClientDisconnected: 9301,
+  ArchiveHashChainError: 9302,
+  InvoiceNumberError: 9303,
+  InvoiceConversionError: 9304,
 
   // 94xx: Storage
   StorageFull: 9401,
