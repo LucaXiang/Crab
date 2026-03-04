@@ -294,16 +294,13 @@ impl<'a> ReceiptRenderer<'a> {
 
         // ── Rule adjustments (整单级价格规则) ──
         for rule in &self.receipt.rule_adjustments {
-            let (sign, prefix) = if rule.rule_type == "DISCOUNT" {
-                ("-", "")
-            } else {
-                ("+", "+")
-            };
+            let is_discount = rule.rule_type == "DISCOUNT";
+            let sign = if is_discount { "-" } else { "+" };
 
             let desc = if rule.adjustment_type == "PERCENTAGE" {
-                format!("{} ({}{}%)", rule.name, prefix, rule.value)
+                format!("{} {} ({}%)", sign, rule.name, rule.value)
             } else {
-                format!("{} ({}{:.2} {cur})", rule.name, prefix, rule.value)
+                format!("{} {} ({:.2} {cur})", sign, rule.name, rule.value)
                     .replace('.', txt.decimal_separator)
             };
 
@@ -319,10 +316,10 @@ impl<'a> ReceiptRenderer<'a> {
         // ── Manual order discount (整单手动折扣) ──
         if let Some(discount) = &self.receipt.discount {
             let desc = if discount.type_ == "percentage" {
-                format!("{} (-{}%)", txt.order_discount_label, discount.value)
+                format!("- {} ({}%)", txt.order_discount_label, discount.value)
             } else {
                 format!(
-                    "{} (-{:.2} {cur})",
+                    "- {} ({:.2} {cur})",
                     txt.order_discount_label, discount.value
                 )
                 .replace('.', txt.decimal_separator)
@@ -339,10 +336,10 @@ impl<'a> ReceiptRenderer<'a> {
         // ── Manual order surcharge (整单手动附加费) ──
         if let Some(surcharge) = &self.receipt.surcharge {
             let desc = if surcharge.type_ == "percentage" {
-                format!("{} (+{}%)", txt.order_surcharge_label, surcharge.value)
+                format!("+ {} ({}%)", txt.order_surcharge_label, surcharge.value)
             } else {
                 format!(
-                    "{} (+{:.2} {cur})",
+                    "+ {} ({:.2} {cur})",
                     txt.order_surcharge_label, surcharge.value
                 )
                 .replace('.', txt.decimal_separator)
