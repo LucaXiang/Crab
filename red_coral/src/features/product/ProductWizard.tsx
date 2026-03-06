@@ -135,13 +135,15 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   // ── Step 1 Validation ──
   const step1Valid = !!name.trim() && categoryId !== ''
     && specs.every(s => !!s.name.trim())
-    && (price === '' || Number(price) >= 0)
-    && specs.every(s => s.price === '' || Number(s.price) >= 0);
+    && !!price && Number(price) > 0
+    && specs.every(s => !!s.price && Number(s.price) > 0);
 
   const getStep1Hint = (): string | undefined => {
     if (!name.trim()) return t('settings.product.wizard.hint_name_required');
     if (categoryId === '') return t('settings.product.wizard.hint_category_required');
     if (specs.some(s => !s.name.trim())) return t('settings.product.wizard.hint_variant_name_required');
+    if (!price || Number(price) <= 0) return t('settings.product.wizard.hint_price_required');
+    if (specs.some(s => !s.price || Number(s.price) <= 0)) return t('settings.product.wizard.hint_price_required');
     return undefined;
   };
 

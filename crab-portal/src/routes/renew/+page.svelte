@@ -6,6 +6,7 @@
 
 <svelte:head>
 	<title>{$t('renew.page_title')} — RedCoral</title>
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <AuthLayout title={$t('renew.title')} subtitle={$t('renew.subtitle')}>

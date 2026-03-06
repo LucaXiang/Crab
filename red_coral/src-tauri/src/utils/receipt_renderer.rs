@@ -235,15 +235,23 @@ impl<'a> ReceiptRenderer<'a> {
                     b.bold_off();
                 }
             }
-            // Manual discount sub-line
-            else if let Some(dp) = item.discount_percent {
-                if dp > 0.0 {
+            // Discount sub-line (manual and/or rule discount)
+            else if let Some(orig) = item.original_price {
+                if orig > item.price + 0.001 {
                     b.bold_on();
-                    let before = item.original_price.unwrap_or(item.price);
                     let before_str =
-                        format!("{:.2} {cur}", before).replace('.', txt.decimal_separator);
+                        format!("{:.2} {cur}", orig).replace('.', txt.decimal_separator);
 
-                    let discount_text = format!("{} -{}%", txt.discount_prefix, dp.round() as i32);
+                    // Show percentage if manual discount was applied
+                    let discount_text = if let Some(dp) = item.discount_percent {
+                        if dp > 0.0 {
+                            format!("{} -{}%", txt.discount_prefix, dp.round() as i32)
+                        } else {
+                            txt.discount_prefix.to_string()
+                        }
+                    } else {
+                        txt.discount_prefix.to_string()
+                    };
 
                     let pvp_col_end_len = 37;
                     let before_width = get_gbk_width(&before_str);
@@ -275,42 +283,19 @@ impl<'a> ReceiptRenderer<'a> {
 
         b.eq_sep();
 
-        // ── Subtotal (items sum, before order-level adjustments) ──
+        // ── Subtotal (items sum, after item-level adjustments) ──
         let items_subtotal: f64 = self.receipt.items.iter().map(|i| i.total).sum();
 
         // Check if there are any order-level adjustments
-        let has_rule_adjustments = !self.receipt.rule_adjustments.is_empty();
         let has_manual_discount = self.receipt.discount.is_some();
         let has_manual_surcharge = self.receipt.surcharge.is_some();
-        let has_adjustments = has_rule_adjustments || has_manual_discount || has_manual_surcharge;
+        let has_adjustments = has_manual_discount || has_manual_surcharge;
 
         if has_adjustments {
-            // Show subtotal line
             let subtotal_str =
                 format!("{:.2} {cur}", items_subtotal).replace('.', txt.decimal_separator);
             b.line_lr(txt.subtotal_label, &subtotal_str);
             b.dash_sep();
-        }
-
-        // ── Rule adjustments (整单级价格规则) ──
-        for rule in &self.receipt.rule_adjustments {
-            let is_discount = rule.rule_type == "DISCOUNT";
-            let sign = if is_discount { "-" } else { "+" };
-
-            let desc = if rule.adjustment_type == "PERCENTAGE" {
-                format!("{} {} ({}%)", sign, rule.name, rule.value)
-            } else {
-                format!("{} {} ({:.2} {cur})", sign, rule.name, rule.value)
-                    .replace('.', txt.decimal_separator)
-            };
-
-            let amount_str =
-                format!("{}{:.2} {cur}", sign, rule.amount).replace('.', txt.decimal_separator);
-            b.write_line(&format!(
-                "{:<36}{:>10}",
-                pad_to_gbk_width(&desc, 36, false),
-                amount_str
-            ));
         }
 
         // ── Manual order discount (整单手动折扣) ──
@@ -396,22 +381,13 @@ impl<'a> ReceiptRenderer<'a> {
         let left_text = format!("{} {}", txt.total_units_label, qty_display);
         let left_header = pad_to_gbk_width(&left_text, 23, false);
 
-        // Calculate total savings (manual discounts + rule discounts)
+        // Calculate total savings (item discounts + order discount)
         let mut total_savings = 0.0;
         for item in &self.receipt.items {
-            if let Some(dp) = item.discount_percent {
-                if dp > 0.0 {
-                    let original = item.original_price.unwrap_or(item.price);
-                    if original > item.price {
-                        total_savings += (original - item.price) * item.quantity as f64;
-                    }
+            if let Some(orig) = item.original_price {
+                if orig > item.price {
+                    total_savings += (orig - item.price) * item.quantity as f64;
                 }
-            }
-        }
-        // Add rule discount savings
-        for rule in &self.receipt.rule_adjustments {
-            if rule.rule_type == "DISCOUNT" {
-                total_savings += rule.amount;
             }
         }
         // Add manual order discount

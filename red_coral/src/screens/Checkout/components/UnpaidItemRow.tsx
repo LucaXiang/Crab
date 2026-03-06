@@ -38,8 +38,6 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
   const specName = getSpecName(item.selected_specification);
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
-  const totalRuleDiscount = item.rule_discount_amount;
-  const totalRuleSurcharge = item.rule_surcharge_amount;
 
   const clickHandlers = useLongPress(
     () => {},
@@ -87,24 +85,24 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
               </span>
             )
           )}
-          {discountPercent > 0 && (
+          {!isComped && discountPercent > 0 && (
             <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
               -{discountPercent}%
             </span>
           )}
-          {totalRuleDiscount > 0 && (
+          {!isComped && item.rule_discount_amount > 0 && (
             <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-              -{formatCurrency(totalRuleDiscount)}
+              -{formatCurrency(item.rule_discount_amount)}
             </span>
           )}
-          {item.mg_discount_amount > 0 && (
+          {!isComped && item.rule_surcharge_amount > 0 && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+              +{formatCurrency(item.rule_surcharge_amount)}
+            </span>
+          )}
+          {!isComped && item.mg_discount_amount > 0 && (
             <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">
               -{formatCurrency(item.mg_discount_amount)}
-            </span>
-          )}
-          {totalRuleSurcharge > 0 && (
-            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
-              +{formatCurrency(totalRuleSurcharge)}
             </span>
           )}
           <div className="font-bold text-xl tabular-nums text-gray-900">

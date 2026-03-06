@@ -132,11 +132,11 @@ export function buildReceiptData(
     }
   }
 
-  // 价格规则（整单聚合）
-  const rule_adjustments = aggregateRuleAdjustments(order);
+  // 规则已含在 PVP (unit_price) 中，不再单独显示
+  const rule_adjustments: ReceiptRuleAdjustment[] = [];
 
-  // PVP = 规格价格 + 属性价格 + 手动折扣（不含规则调整）
-  // IMPORTE = PVP × 数量
+  // PVP = unit_price (含手动折扣 + 规则折扣，服务端计算)
+  // IMPORTE = line_total (= PVP × 数量)
   // 赠送菜品保留在列表中，price/total 设为 0，original_price 记录原价
   const items: ReceiptItem[] = order.items
     .filter((item) => !item._removed)
@@ -146,6 +146,22 @@ export function buildReceiptData(
         ? item.selected_options.reduce((sum, opt) => Currency.add(sum, opt.price_modifier ?? 0).toNumber(), 0)
         : 0;
       const priceBeforeDiscount = Currency.add(basePrice, optionsTotal).toNumber();
+
+      const mapOptions = () => item.selected_options
+        ? item.selected_options
+            .filter((opt) => opt.show_on_receipt)
+            .map((opt) => ({
+              attribute_name: opt.attribute_name,
+              option_name: opt.option_name,
+              receipt_name: opt.receipt_name ?? null,
+              price_modifier: opt.price_modifier ?? 0,
+              show_on_receipt: opt.show_on_receipt,
+            }))
+        : null;
+
+      const specName = item.selected_specification?.receipt_name
+        || item.selected_specification?.name
+        || null;
 
       // 赠送菜品: price=0, total=0, original_price=原价
       if (item.is_comped) {
@@ -157,52 +173,27 @@ export function buildReceiptData(
           tax_rate: item.tax_rate / 100,
           discount_percent: null,
           original_price: priceBeforeDiscount,
-          selected_options: item.selected_options
-            ? item.selected_options
-                .filter((opt) => opt.show_on_receipt)
-                .map((opt) => ({
-                  attribute_name: opt.attribute_name,
-                  option_name: opt.option_name,
-                  receipt_name: opt.receipt_name ?? null,
-                  price_modifier: opt.price_modifier ?? 0,
-                  show_on_receipt: opt.show_on_receipt,
-                }))
-            : null,
-          spec_name: item.selected_specification?.receipt_name
-            || item.selected_specification?.name
-            || null,
+          selected_options: mapOptions(),
+          spec_name: specName,
           is_comped: true,
         };
       }
 
-      const discountPct = item.manual_discount_percent ?? 0;
-      const pvp = discountPct > 0
-        ? Currency.mul(priceBeforeDiscount, Currency.div(Currency.sub(100, discountPct), 100).toNumber()).toNumber()
-        : priceBeforeDiscount;
-      const importe = Currency.mul(pvp, item.quantity).toNumber();
+      // PVP = unit_price (after manual + rule adjustments)
+      const pvp = item.unit_price;
+      const importe = item.line_total;
+      const hasAnyDiscount = priceBeforeDiscount > pvp + 0.005;
 
       return {
         name: item.name,
         quantity: item.quantity,
         price: pvp,
         total: importe,
-        tax_rate: item.tax_rate / 100, // 21 -> 0.21
+        tax_rate: item.tax_rate / 100,
         discount_percent: item.manual_discount_percent ?? null,
-        original_price: discountPct > 0 ? priceBeforeDiscount : null,
-        selected_options: item.selected_options
-          ? item.selected_options
-              .filter((opt) => opt.show_on_receipt)
-              .map((opt) => ({
-                attribute_name: opt.attribute_name,
-                option_name: opt.option_name,
-                receipt_name: opt.receipt_name ?? null,
-                price_modifier: opt.price_modifier ?? 0,
-                show_on_receipt: opt.show_on_receipt,
-              }))
-          : null,
-        spec_name: item.selected_specification?.receipt_name
-          || item.selected_specification?.name
-          || null,
+        original_price: hasAnyDiscount ? priceBeforeDiscount : null,
+        selected_options: mapOptions(),
+        spec_name: specName,
         is_comped: false,
       };
     });
@@ -260,35 +251,8 @@ export function buildArchivedReceiptData(
     };
   }
 
-  // 归档订单的规则调整：从 items 的 applied_rules 聚合
-  const ruleMap = new Map<number, { name: string; rule_type: string; adjustment_type: string; value: number; totalAmount: number }>();
-  for (const item of order.items) {
-    if (item.is_comped) continue;
-    for (const rule of item.applied_rules ?? []) {
-      const lineAmount = Currency.mul(rule.calculated_amount, item.quantity).toNumber();
-      const existing = ruleMap.get(rule.rule_id);
-      if (existing) {
-        existing.totalAmount = Currency.add(existing.totalAmount, lineAmount).toNumber();
-      } else {
-        ruleMap.set(rule.rule_id, {
-          name: rule.receipt_name || rule.name,
-          rule_type: rule.rule_type,
-          adjustment_type: rule.adjustment_type,
-          value: rule.adjustment_value,
-          totalAmount: lineAmount,
-        });
-      }
-    }
-  }
-  const rule_adjustments: ReceiptRuleAdjustment[] = Array.from(ruleMap.values())
-    .filter((entry) => Currency.gt(Currency.abs(entry.totalAmount), 0.005))
-    .map((entry) => ({
-      name: entry.name,
-      rule_type: entry.rule_type,
-      adjustment_type: entry.adjustment_type,
-      value: entry.value,
-      amount: Currency.abs(entry.totalAmount).toNumber(),
-    }));
+  // 规则已含在 PVP 中，不再单独显示
+  const rule_adjustments: ReceiptRuleAdjustment[] = [];
 
   // PVP = 规格价格 + 属性价格 + 手动折扣（不含规则调整）
   // IMPORTE = PVP × 数量

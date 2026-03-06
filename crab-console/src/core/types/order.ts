@@ -77,6 +77,16 @@ export interface OrderItemOption {
   quantity: number;
 }
 
+export interface AppliedRule {
+  rule_id: number;
+  name: string;
+  receipt_name: string | null;
+  rule_type: string;
+  adjustment_type: string;
+  calculated_amount: number;
+  skipped: boolean;
+}
+
 export interface OrderItem {
   instance_id: string;
   name: string;
@@ -88,6 +98,10 @@ export interface OrderItem {
   line_total: number;
   discount_amount: number;
   surcharge_amount: number;
+  rule_discount_amount: number;
+  rule_surcharge_amount: number;
+  mg_discount_amount: number;
+  applied_rules: AppliedRule[];
   tax: number;
   tax_rate: number;
   is_comped: boolean;
@@ -133,6 +147,9 @@ export interface OrderDetailPayload {
   order_manual_surcharge_amount: number;
   order_rule_discount_amount: number;
   order_rule_surcharge_amount: number;
+  order_applied_rules: AppliedRule[];
+  mg_discount_amount: number;
+  marketing_group_name: string | null;
   start_time: number;
   operator_name: string | null;
   void_type: string | null;

@@ -89,20 +89,9 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
   const handleSaveGroup = async (data: { name: string; description?: string }) => {
     try {
       if (editingGroup) {
-        const updated = await updateMarketingGroup(editingGroup.id, data);
-        useMarketingGroupStore.setState((s) => ({
-          items: s.items.map((g) => (g.id === editingGroup.id ? updated : g)),
-        }));
+        await updateMarketingGroup(editingGroup.id, data);
       } else {
         const created = await createMarketingGroup(data);
-        useMarketingGroupStore.setState((s) => {
-          const exists = s.items.some((g) => g.id === created.id);
-          return {
-            items: exists
-              ? s.items.map((g) => (g.id === created.id ? created : g))
-              : [...s.items, created],
-          };
-        });
         setSelectedGroupId(created.id);
       }
       toast.success(t('common.message.save_success'));
@@ -121,9 +110,6 @@ export const MarketingGroupManagement: React.FC = React.memo(() => {
     try {
       if (deleteConfirm.type === 'group') {
         await deleteMarketingGroup(deleteConfirm.id);
-        useMarketingGroupStore.setState((s) => ({
-          items: s.items.filter((g) => g.id !== deleteConfirm.id),
-        }));
         if (selectedGroupId === deleteConfirm.id) setSelectedGroupId(null);
       } else if (deleteConfirm.type === 'rule' && selectedGroupId) {
         await deleteDiscountRule(selectedGroupId, deleteConfirm.id);

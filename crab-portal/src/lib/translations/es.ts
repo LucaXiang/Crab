@@ -428,7 +428,7 @@ export const es: Record<string, string> = {
 
 	'cookies.page_title': 'Política de Cookies',
 	'cookies.title': 'Política de Cookies',
-	'cookies.last_updated': 'Última actualización: 22 de febrero de 2026',
+	'cookies.last_updated': 'Última actualización: 6 de marzo de 2026',
 	'cookies.content': `
 <h2>1. ¿Qué son las cookies?</h2>
 <p>Las cookies son pequeños archivos de texto que los sitios web almacenan en su dispositivo cuando los visita. Se utilizan ampliamente para hacer que los sitios web funcionen de manera más eficiente y proporcionar información a los propietarios del sitio.</p>
@@ -447,7 +447,15 @@ export const es: Record<string, string> = {
 </table>
 
 <h3>Cookies analíticas</h3>
-<p>Actualmente, RedCoral no utiliza cookies analíticas de terceros. Si en el futuro incorporamos herramientas de análisis, actualizaremos esta política y solicitaremos su consentimiento.</p>
+<p>Si usted acepta las cookies analíticas a través del banner de consentimiento, utilizamos Google Analytics 4 para comprender cómo los usuarios interactúan con nuestro sitio web. Estas cookies solo se activan con su consentimiento explícito.</p>
+<table>
+<thead><tr><th>Cookie</th><th>Proveedor</th><th>Finalidad</th><th>Duración</th></tr></thead>
+<tbody>
+<tr><td>_ga</td><td>Google</td><td>Distinguir usuarios únicos</td><td>2 años</td></tr>
+<tr><td>_ga_T73VF6HT10</td><td>Google</td><td>Mantener el estado de la sesión</td><td>2 años</td></tr>
+</tbody>
+</table>
+<p>Para más información sobre cómo Google procesa los datos, consulte la <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Política de privacidad de Google</a>.</p>
 
 <h2>3. Gestión de cookies</h2>
 <p>Puede gestionar las cookies a través del banner de consentimiento que aparece al visitar el sitio por primera vez. También puede configurar su navegador para bloquear o eliminar cookies, aunque esto podría afectar al funcionamiento del sitio.</p>

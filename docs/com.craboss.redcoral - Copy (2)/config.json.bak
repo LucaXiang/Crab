@@ -1,0 +1,16 @@
+{
+  "current_mode": "Server",
+  "current_tenant": "29ea1538-9b93-44a9-a250-aec37cc5cd1f",
+  "active_entity_id": "edge-server-95fd0dbb-d944-4f73-ab01-e8494d06c336",
+  "server_config": {
+    "http_port": 9625,
+    "message_port": 9626,
+    "cloud_url": "https://sync.redcoral.app:8443"
+  },
+  "client_config": null,
+  "known_tenants": [
+    "29ea1538-9b93-44a9-a250-aec37cc5cd1f"
+  ],
+  "auth_url": "https://cloud.redcoral.app",
+  "refresh_token": "2feb2428-a271-424a-b71a-fe80bf20438f"
+}

@@ -17,7 +17,9 @@ pub struct OrderDetail {
     pub status: String,
     pub is_retail: bool,
     pub guest_count: Option<i32>,
+    pub original_total: f64,
     pub total: f64,
+    pub subtotal: f64,
     pub paid_amount: f64,
     pub total_discount: f64,
     pub total_surcharge: f64,
@@ -26,6 +28,10 @@ pub struct OrderDetail {
     pub order_manual_surcharge_amount: f64,
     pub order_rule_discount_amount: f64,
     pub order_rule_surcharge_amount: f64,
+    pub member_id: Option<i64>,
+    pub member_name: Option<String>,
+    pub mg_discount_amount: f64,
+    pub marketing_group_name: Option<String>,
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub operator_name: Option<String>,
@@ -58,6 +64,7 @@ pub struct OrderDetailItem {
     pub surcharge_amount: f64,
     pub rule_discount_amount: f64,
     pub rule_surcharge_amount: f64,
+    pub mg_discount_amount: f64,
     pub applied_rules: Option<String>,
     pub note: Option<String>,
     pub is_comped: bool,
@@ -111,7 +118,9 @@ struct OrderRow {
     status: String,
     is_retail: bool,
     guest_count: Option<i32>,
+    original_total: f64,
     total_amount: f64,
+    subtotal: f64,
     paid_amount: f64,
     discount_amount: f64,
     surcharge_amount: f64,
@@ -120,6 +129,10 @@ struct OrderRow {
     order_manual_surcharge_amount: f64,
     order_rule_discount_amount: f64,
     order_rule_surcharge_amount: f64,
+    member_id: Option<i64>,
+    member_name: Option<String>,
+    mg_discount_amount: f64,
+    marketing_group_name: Option<String>,
     start_time: i64,
     end_time: Option<i64>,
     operator_name: Option<String>,
@@ -175,6 +188,7 @@ struct ItemRow {
     surcharge_amount: f64,
     rule_discount_amount: f64,
     rule_surcharge_amount: f64,
+    mg_discount_amount: f64,
     applied_rules: Option<String>,
     note: Option<String>,
     is_comped: bool,
@@ -186,7 +200,7 @@ struct ItemRow {
 pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<OrderDetail> {
     // 1. Get order
     let order: OrderRow = sqlx::query_as::<_, OrderRow>(
-        "SELECT id AS order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, total_amount, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_voided, is_upgraded FROM archived_order WHERE id = ?",
+        "SELECT id AS order_id, receipt_number, table_name, zone_name, status, is_retail, guest_count, original_total, total_amount, subtotal, paid_amount, discount_amount, surcharge_amount, comp_total_amount, order_manual_discount_amount, order_manual_surcharge_amount, order_rule_discount_amount, order_rule_surcharge_amount, member_id, member_name, mg_discount_amount, marketing_group_name, start_time, end_time, operator_name, void_type, loss_reason, loss_amount, void_note, queue_number, is_voided, is_upgraded FROM archived_order WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(pool)
@@ -195,7 +209,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
 
     // 2. Get items
     let item_rows: Vec<ItemRow> = sqlx::query_as::<_, ItemRow>(
-        "SELECT id, instance_id, name, spec_name, category_id, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, applied_rules, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
+        "SELECT id, instance_id, name, spec_name, category_id, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, mg_discount_amount, applied_rules, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_id)
     .fetch_all(pool)
@@ -248,6 +262,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
                 surcharge_amount: row.surcharge_amount,
                 rule_discount_amount: row.rule_discount_amount,
                 rule_surcharge_amount: row.rule_surcharge_amount,
+                mg_discount_amount: row.mg_discount_amount,
                 applied_rules: row.applied_rules,
                 note: row.note,
                 is_comped: row.is_comped,
@@ -308,7 +323,9 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         status: order.status,
         is_retail: order.is_retail,
         guest_count: order.guest_count,
+        original_total: order.original_total,
         total: order.total_amount,
+        subtotal: order.subtotal,
         paid_amount: order.paid_amount,
         total_discount: order.discount_amount,
         total_surcharge: order.surcharge_amount,
@@ -317,6 +334,10 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         order_manual_surcharge_amount: order.order_manual_surcharge_amount,
         order_rule_discount_amount: order.order_rule_discount_amount,
         order_rule_surcharge_amount: order.order_rule_surcharge_amount,
+        member_id: order.member_id,
+        member_name: order.member_name,
+        mg_discount_amount: order.mg_discount_amount,
+        marketing_group_name: order.marketing_group_name,
         start_time: order.start_time,
         end_time: order.end_time,
         operator_name: order.operator_name,
@@ -423,6 +444,8 @@ pub async fn build_order_detail_sync(
         order_manual_surcharge_amount: f64,
         order_rule_discount_amount: f64,
         order_rule_surcharge_amount: f64,
+        mg_discount_amount: f64,
+        marketing_group_name: Option<String>,
         start_time: i64,
         operator_id: Option<i64>,
         operator_name: Option<String>,
@@ -443,6 +466,7 @@ pub async fn build_order_detail_sync(
         customer_address: Option<String>,
         customer_email: Option<String>,
         customer_phone: Option<String>,
+        order_applied_rules: Option<String>,
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
@@ -450,11 +474,12 @@ pub async fn build_order_detail_sync(
          ce.prev_hash, ce.curr_hash, ao.created_at, ao.zone_name, ao.table_name, ao.is_retail, ao.guest_count, \
          ao.original_total, ao.subtotal, ao.paid_amount, ao.discount_amount, ao.surcharge_amount, \
          ao.comp_total_amount, ao.order_manual_discount_amount, ao.order_manual_surcharge_amount, \
-         ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.start_time, \
+         ao.order_rule_discount_amount, ao.order_rule_surcharge_amount, ao.mg_discount_amount, ao.marketing_group_name, ao.start_time, \
          ao.operator_id, ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, \
          ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced, \
          ao.is_voided, ao.is_upgraded, \
-         ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone \
+         ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone, \
+         ao.order_applied_rules \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -483,11 +508,16 @@ pub async fn build_order_detail_sync(
         tax_rate: i32,
         is_comped: bool,
         note: Option<String>,
+        rule_discount_amount: f64,
+        rule_surcharge_amount: f64,
+        mg_discount_amount: f64,
+        applied_rules: Option<String>,
     }
 
     let item_rows: Vec<SyncItemRow> = sqlx::query_as::<_, SyncItemRow>(
         "SELECT id, instance_id, spec, name, spec_name, category_name, price, quantity, unit_price, \
-         line_total, discount_amount, surcharge_amount, tax, tax_rate, is_comped, note \
+         line_total, discount_amount, surcharge_amount, tax, tax_rate, is_comped, note, \
+         rule_discount_amount, rule_surcharge_amount, mg_discount_amount, applied_rules \
          FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_pk)
@@ -552,6 +582,13 @@ pub async fn build_order_detail_sync(
                 line_total: row.line_total,
                 discount_amount: row.discount_amount,
                 surcharge_amount: row.surcharge_amount,
+                rule_discount_amount: row.rule_discount_amount,
+                rule_surcharge_amount: row.rule_surcharge_amount,
+                mg_discount_amount: row.mg_discount_amount,
+                applied_rules: row
+                    .applied_rules
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default(),
                 tax: row.tax,
                 tax_rate: row.tax_rate,
                 is_comped: row.is_comped,
@@ -696,6 +733,12 @@ pub async fn build_order_detail_sync(
             order_manual_surcharge_amount: order.order_manual_surcharge_amount,
             order_rule_discount_amount: order.order_rule_discount_amount,
             order_rule_surcharge_amount: order.order_rule_surcharge_amount,
+            order_applied_rules: order
+                .order_applied_rules
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default(),
+            mg_discount_amount: order.mg_discount_amount,
+            marketing_group_name: order.marketing_group_name,
             start_time: order.start_time,
             operator_id: order.operator_id,
             operator_name: order.operator_name,

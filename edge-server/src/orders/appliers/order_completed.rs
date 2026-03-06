@@ -199,13 +199,44 @@ mod tests {
 
     #[test]
     fn test_order_completed_preserves_existing_data() {
+        use shared::order::CartItemSnapshot;
+
         let mut snapshot = OrderSnapshot::new(1001);
         snapshot.status = OrderStatus::Active;
         snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
-        snapshot.total = 150.0;
-        snapshot.subtotal = 150.0;
         snapshot.guest_count = 4;
+        // Add real items so recalculate_totals computes total=150
+        snapshot.items.push(CartItemSnapshot {
+            id: 1,
+            instance_id: "i1".to_string(),
+            name: "Steak".to_string(),
+            price: 150.0,
+            original_price: 150.0,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            applied_mg_rules: vec![],
+            mg_discount_amount: 0.0,
+            unit_price: 150.0,
+            line_total: 150.0,
+            tax: 0.0,
+            tax_rate: 0,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_id: None,
+            category_name: None,
+            is_comped: false,
+        });
+        // Recalculate to set total/subtotal correctly
+        crate::order_money::recalculate_totals(&mut snapshot);
+        assert_eq!(snapshot.total, 150.0);
 
         let event = create_order_completed_event(1001, 1, "RCP-001", 150.0, vec![]);
 

@@ -99,10 +99,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
 
   const handleToggleActive = async (id: number, isActive: boolean) => {
     try {
-      const updated = await getApi().updatePriceRule(id, { is_active: isActive });
-      usePriceRuleStore.setState((state) => ({
-        items: state.items.map((item) => (item.id === id ? updated : item)),
-      }));
+      await getApi().updatePriceRule(id, { is_active: isActive });
     } catch (e) {
       logger.error('Failed to toggle price rule', e);
       toast.error(t('common.message.save_failed'));

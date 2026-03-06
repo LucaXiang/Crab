@@ -7,6 +7,7 @@
 </script>
 
 <svelte:head>
+	<meta name="robots" content="noindex, nofollow" />
 	<meta http-equiv="refresh" content="0;url=https://console.redcoral.app/login" />
 </svelte:head>
 

@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::models::invoice::AnulacionReason;
+use crate::order::applied_rule::AppliedRule;
 use crate::order::types::{LossReason, ServiceType, VoidType};
 
 /// All syncable resource types across the system.
@@ -292,6 +293,9 @@ pub struct OrderDetailPayload {
     pub order_manual_surcharge_amount: f64,
     pub order_rule_discount_amount: f64,
     pub order_rule_surcharge_amount: f64,
+    pub order_applied_rules: Vec<AppliedRule>,
+    pub mg_discount_amount: f64,
+    pub marketing_group_name: Option<String>,
     pub start_time: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_id: Option<i64>,
@@ -318,9 +322,7 @@ pub struct OrderDetailPayload {
     pub payments: Vec<OrderPaymentSync>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<OrderEventSync>,
-    #[serde(default)]
     pub is_voided: bool,
-    #[serde(default)]
     pub is_upgraded: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customer_nif: Option<String>,
@@ -347,6 +349,10 @@ pub struct OrderItemSync {
     pub line_total: f64,
     pub discount_amount: f64,
     pub surcharge_amount: f64,
+    pub rule_discount_amount: f64,
+    pub rule_surcharge_amount: f64,
+    pub mg_discount_amount: f64,
+    pub applied_rules: Vec<AppliedRule>,
     pub tax: f64,
     pub tax_rate: i32,
     pub is_comped: bool,
@@ -1117,6 +1123,7 @@ mod tests {
                 order_manual_surcharge_amount: 0.0,
                 order_rule_discount_amount: 0.0,
                 order_rule_surcharge_amount: 0.0,
+                order_applied_rules: vec![],
                 start_time: 1709020800000,
                 operator_name: None,
                 void_type: None,
@@ -1139,6 +1146,8 @@ mod tests {
                 customer_address: None,
                 customer_email: None,
                 customer_phone: None,
+                mg_discount_amount: 0.0,
+                marketing_group_name: None,
             },
         };
 
@@ -1185,6 +1194,7 @@ mod tests {
                 order_manual_surcharge_amount: 0.0,
                 order_rule_discount_amount: 0.0,
                 order_rule_surcharge_amount: 0.0,
+                order_applied_rules: vec![],
                 start_time: 0,
                 operator_name: None,
                 void_type: None,
@@ -1207,6 +1217,8 @@ mod tests {
                 customer_address: None,
                 customer_email: None,
                 customer_phone: None,
+                mg_discount_amount: 0.0,
+                marketing_group_name: None,
             },
         };
         assert!(
@@ -1304,6 +1316,7 @@ mod tests {
                 order_manual_surcharge_amount: 0.0,
                 order_rule_discount_amount: 0.0,
                 order_rule_surcharge_amount: 0.0,
+                order_applied_rules: vec![],
                 start_time: 1709020800000,
                 operator_name: None,
                 void_type: None,
@@ -1333,6 +1346,10 @@ mod tests {
                     is_comped: false,
                     note: None,
                     options: vec![],
+                    rule_discount_amount: 0.0,
+                    rule_surcharge_amount: 0.0,
+                    mg_discount_amount: 0.0,
+                    applied_rules: vec![],
                 }],
                 payments: vec![OrderPaymentSync {
                     seq: 1,
@@ -1352,6 +1369,8 @@ mod tests {
                 customer_address: None,
                 customer_email: None,
                 customer_phone: None,
+                mg_discount_amount: 0.0,
+                marketing_group_name: None,
             },
         }
     }
@@ -1735,6 +1754,7 @@ mod tests {
                     order_manual_surcharge_amount: 0.0,
                     order_rule_discount_amount: 0.0,
                     order_rule_surcharge_amount: 0.0,
+                    order_applied_rules: vec![],
                     start_time: 0,
                     operator_name: None,
                     void_type: None,
@@ -1757,6 +1777,8 @@ mod tests {
                     customer_address: None,
                     customer_email: None,
                     customer_phone: None,
+                    mg_discount_amount: 0.0,
+                    marketing_group_name: None,
                 },
             };
 
@@ -1880,6 +1902,10 @@ mod tests {
                 is_comped: false,
                 note: None,
                 options: vec![],
+                rule_discount_amount: 0.0,
+                rule_surcharge_amount: 0.0,
+                mg_discount_amount: 0.0,
+                applied_rules: vec![],
             },
             OrderItemSync {
                 instance_id: "inst-bread".to_string(),
@@ -1898,6 +1924,10 @@ mod tests {
                 is_comped: false,
                 note: None,
                 options: vec![],
+                rule_discount_amount: 0.0,
+                rule_surcharge_amount: 0.0,
+                mg_discount_amount: 0.0,
+                applied_rules: vec![],
             },
         ];
         let desglose = compute_desglose(&items);

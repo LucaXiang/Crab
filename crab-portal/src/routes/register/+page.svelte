@@ -57,6 +57,7 @@
 
 <svelte:head>
 	<title>{$t('register.page_title')} — RedCoral</title>
+	<meta name="description" content="Crea tu cuenta de RedCoral y empieza tu prueba gratuita de 14 días. TPV para hostelería con Verifactu incluido." />
 </svelte:head>
 
 <AuthLayout title={$t('register.title')} subtitle={$t('register.subtitle')}>

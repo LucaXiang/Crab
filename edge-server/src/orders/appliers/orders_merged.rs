@@ -441,18 +441,19 @@ mod tests {
     }
 
     #[test]
-    fn test_order_merged_out_preserves_items() {
+    fn test_order_merged_out_clears_items() {
         let mut snapshot = create_test_snapshot(3001);
         snapshot.items.push(create_test_item("item-1", "Coffee"));
+        assert_eq!(snapshot.items.len(), 1);
 
         let event = create_order_merged_out_event(3001, 2, 2, "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
 
-        // Items should be preserved (not cleared)
-        assert_eq!(snapshot.items.len(), 1);
-        assert_eq!(snapshot.items[0].instance_id, "item-1");
+        // Items should be cleared (moved to target order)
+        assert_eq!(snapshot.items.len(), 0);
+        assert_eq!(snapshot.total, 0.0);
     }
 
     #[test]

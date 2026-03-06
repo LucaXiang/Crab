@@ -66,6 +66,8 @@ html {
 }
 
 body {
+  /* POS touch screen: bold base for readability */
+  font-weight: bold;
   /* Enable font smoothing for better rendering */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

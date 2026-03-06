@@ -190,7 +190,13 @@
     "refunds": "Devoluciones",
     "net": "Neto",
     "method_cash": "Efectivo",
-    "method_card": "Tarjeta"
+    "method_card": "Tarjeta",
+    "mg_discount": "Descuento de miembro",
+    "cancelled": "Cancelado",
+    "anulada": "Anulada",
+    "loss": "Liquidación de pérdida",
+    "details": "Detalles",
+    "view_order": "Ver pedido"
   },
   "stats": {
     "title": "Estadísticas",
@@ -259,7 +265,17 @@
     "ago": "hace",
     "refresh": "Actualizar datos",
     "max_range_exceeded": "El rango no puede superar 90 días",
-    "invalid_range": "La fecha final debe ser posterior a la inicial"
+    "invalid_range": "La fecha final debe ser posterior a la inicial",
+    "adjustment_breakdown": "Descuentos y recargos",
+    "adj_source": "Fuente",
+    "adj_type": "Tipo",
+    "adj_discount": "Descuento",
+    "adj_surcharge": "Recargo",
+    "adj_src_price_rule": "Regla de precio",
+    "adj_src_manual": "Manual",
+    "adj_src_member_group": "Grupo de miembro",
+    "adj_src_comp": "Cortesía",
+    "no_breakdown_data": "No hay datos detallados para este período"
   },
   "reports": {
     "abnormal_close": "Cierre anormal",

@@ -5,6 +5,7 @@ interface BreakdownItem {
   rule_surcharge_amount: number;
   quantity: number;
   _removed?: boolean;
+  is_comped?: boolean;
 }
 
 interface BreakdownOrder {
@@ -33,7 +34,7 @@ export function computePriceBreakdown(
 ): PriceBreakdown {
   const displayItemDiscount = Currency.sub(order.total_discount, order.order_manual_discount_amount).toNumber();
 
-  const activeItems = items.filter(i => !i._removed);
+  const activeItems = items.filter(i => !i._removed && !i.is_comped);
   const itemRuleDiscount = activeItems.reduce(
     (sum, item) => Currency.add(sum, isLineTotal ? item.rule_discount_amount : Currency.mul(item.rule_discount_amount, item.quantity).toNumber()).toNumber(), 0,
   );

@@ -428,7 +428,7 @@ export const en: Record<string, string> = {
 
 	'cookies.page_title': 'Cookie Policy',
 	'cookies.title': 'Cookie Policy',
-	'cookies.last_updated': 'Last updated: February 22, 2026',
+	'cookies.last_updated': 'Last updated: March 6, 2026',
 	'cookies.content': `
 <h2>1. What are cookies?</h2>
 <p>Cookies are small text files that websites store on your device when you visit them. They are widely used to make websites work more efficiently and provide information to site owners.</p>
@@ -447,7 +447,15 @@ export const en: Record<string, string> = {
 </table>
 
 <h3>Analytical cookies</h3>
-<p>Currently, RedCoral does not use third-party analytical cookies. If we incorporate analytics tools in the future, we will update this policy and request your consent.</p>
+<p>If you accept analytical cookies through the consent banner, we use Google Analytics 4 to understand how users interact with our website. These cookies are only activated with your explicit consent.</p>
+<table>
+<thead><tr><th>Cookie</th><th>Provider</th><th>Purpose</th><th>Duration</th></tr></thead>
+<tbody>
+<tr><td>_ga</td><td>Google</td><td>Distinguish unique users</td><td>2 years</td></tr>
+<tr><td>_ga_T73VF6HT10</td><td>Google</td><td>Maintain session state</td><td>2 years</td></tr>
+</tbody>
+</table>
+<p>For more information on how Google processes data, see <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</p>
 
 <h2>3. Managing cookies</h2>
 <p>You can manage cookies through the consent banner that appears when you first visit the site. You can also configure your browser to block or delete cookies, although this may affect site functionality.</p>

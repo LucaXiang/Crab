@@ -11,7 +11,7 @@
 }
 
 (csp_portal) {
-	header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cloud.redcoral.app; font-src 'self'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cloud.redcoral.app https://www.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; font-src 'self'; frame-ancestors 'none'"
 }
 
 (csp_console) {
@@ -35,7 +35,7 @@ redcoral.app {
 	root * /srv/portal
 	file_server
 	try_files {path} {path}.html {path}/index.html /200.html
-	encode gzip
+	encode zstd gzip
 
 	# Immutable assets (hashed filenames) — cache aggressively
 	@immutable path /_app/immutable/*

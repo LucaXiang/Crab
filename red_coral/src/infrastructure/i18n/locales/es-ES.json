@@ -381,7 +381,8 @@
       "remaining": "Pendiente",
       "total": "Total",
       "paid_status": "Pagado",
-      "unit_price": "P. unitario"
+      "unit_price": "P. unitario",
+      "subtotal": "Subtotal"
     },
     "split": {
       "title": "Dividir",
@@ -627,6 +628,7 @@
       "add_new_desc": "Agregar un nuevo producto gratuito al pedido"
     },
     "breakdown": {
+      "original_total": "Total original",
       "comp": "Invitaciones",
       "manual_discount": "Dto. manual",
       "rule_discount": "Dto. regla",
@@ -734,6 +736,10 @@
         "amount": "Por importe",
         "aa": "A partes iguales"
       }
+    },
+    "member": {
+      "deleted": "Este miembro ha sido eliminado",
+      "snapshot_only": "Solo se muestra la info del momento del pedido"
     }
   },
   "statistics": {
@@ -1398,6 +1404,7 @@
         "hint_name_required": "Introduce el nombre del plato",
         "hint_category_required": "Selecciona una categoría",
         "hint_variant_name_required": "Las variantes deben tener nombre",
+        "hint_price_required": "El precio debe ser mayor que 0",
         "hint_price_invalid": "El precio no puede ser negativo",
         "variant_root_placeholder": "Dejar vacío",
         "hint_external_id_required": "Introduce el código del plato",
@@ -2010,11 +2017,9 @@
       "style_bold": "Negrita",
       "text_align": "Alinear horizontal",
       "vertical_align": "Alinear vertical",
-      "data_source": "Fuente datos",
-      "data_source_none": "Ninguna (plantilla libre)",
-      "data_source_hint": "Seleccione campo de datos",
-      "content_template": "Plantilla personalizada",
-      "template_advanced_hint": "Combine campos: €{price} o {product_name} ({spec_name})",
+      "content_template": "Plantilla",
+      "insert_field": "Insertar campo",
+      "template_hint": "Use {campo} para datos, pulse + para insertar",
       "text_template_hint": "Use {campo} para datos, ej: {product_name}",
       "image_template_hint": "Use {campo} para datos",
       "source_type": "Origen",
@@ -2290,7 +2295,7 @@
     "4004": "Pedido anulado",
     "4006": "Plato no existe",
     "4008": "Pedido no completado, no se puede operar",
-    "4009": "El pedido tiene notas de crédito, no se puede anular",
+    "4009": "El pedido tiene devoluciones, no se puede anular",
     "4010": "El importe de devolución supera el disponible",
     "4011": "Cantidad de devolución supera el disponible",
     "4012": "Pedido anulado, no se puede operar",
@@ -2833,9 +2838,9 @@
     }
   },
   "credit_note": {
-    "title": "Notas de crédito",
-    "empty": "Sin notas de crédito",
-    "created": "Nota de crédito creada",
+    "title": "Devoluciones",
+    "empty": "Sin devoluciones",
+    "created": "Devolución creada",
     "remaining": "Saldo reembolsable",
     "action": {
       "create": "Reembolso",
@@ -2846,7 +2851,7 @@
       "card": "Tarjeta"
     },
     "modal": {
-      "title": "Crear nota de crédito",
+      "title": "Crear devolución",
       "select_items": "Seleccionar artículos",
       "refund_method": "Método de reembolso",
       "reason": "Motivo",

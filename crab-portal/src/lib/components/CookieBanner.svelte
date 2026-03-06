@@ -13,6 +13,19 @@
 	function accept(value: 'all' | 'necessary') {
 		localStorage.setItem('cookie_consent', value);
 		visible = false;
+		if (value === 'all') loadGA();
+	}
+
+	function loadGA() {
+		if (document.querySelector('script[src*="googletagmanager"]')) return;
+		const s = document.createElement('script');
+		s.async = true;
+		s.src = 'https://www.googletagmanager.com/gtag/js?id=G-T73VF6HT10';
+		document.head.appendChild(s);
+		window.dataLayer = window.dataLayer || [];
+		function gtag(...args: unknown[]) { window.dataLayer.push(args); }
+		gtag('js', new Date());
+		gtag('config', 'G-T73VF6HT10');
 	}
 </script>
 

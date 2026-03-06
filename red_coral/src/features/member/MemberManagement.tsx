@@ -50,15 +50,9 @@ export const MemberManagement: React.FC = React.memo(() => {
   const handleSave = async (data: MemberCreate | MemberUpdate, id?: number) => {
     try {
       if (id) {
-        const updated = await updateMember(id, data);
-        useMemberStore.setState((s) => ({
-          items: s.items.map((i) => (i.id === id ? updated : i)),
-        }));
+        await updateMember(id, data);
       } else {
-        const created = await createMember(data as MemberCreate);
-        useMemberStore.setState((s) => ({
-          items: [...s.items, created],
-        }));
+        await createMember(data as MemberCreate);
       }
       toast.success(t('common.message.save_success'));
       memberForm.close();
@@ -72,9 +66,6 @@ export const MemberManagement: React.FC = React.memo(() => {
     if (!deleteConfirm) return;
     try {
       await deleteMember(deleteConfirm.id);
-      useMemberStore.setState((s) => ({
-        items: s.items.filter((i) => i.id !== deleteConfirm.id),
-      }));
       toast.success(t('common.message.delete_success'));
       setDeleteConfirm(null);
     } catch (e) {

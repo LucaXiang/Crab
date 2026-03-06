@@ -4,6 +4,19 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
+		<script>
+			// GA4 — only load if user accepted all cookies (RGPD compliant)
+			if (localStorage.getItem('cookie_consent') === 'all') {
+				var s = document.createElement('script');
+				s.async = true;
+				s.src = 'https://www.googletagmanager.com/gtag/js?id=G-T73VF6HT10';
+				document.head.appendChild(s);
+				window.dataLayer = window.dataLayer || [];
+				function gtag(){dataLayer.push(arguments);}
+				gtag('js', new Date());
+				gtag('config', 'G-T73VF6HT10');
+			}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body class="bg-white text-slate-800 antialiased font-body" data-sveltekit-preload-data="hover">

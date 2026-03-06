@@ -84,6 +84,7 @@
 
 <svelte:head>
 	<title>{$t('verify.page_title')} — RedCoral</title>
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <AuthLayout title={$t('verify.title')} subtitle={$t('verify.subtitle')}>

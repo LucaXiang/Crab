@@ -3,6 +3,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { TimeRangeSelector, useTimeRange } from './TimeRangeSelector';
 
 interface InvoiceRow {
   id: number;
@@ -23,11 +24,6 @@ interface InvoiceListResponse {
   page_size: number;
 }
 
-interface InvoiceListProps {
-  from: number;
-  to: number;
-}
-
 const PAGE_SIZE = 20;
 
 const AEAT_STATUS_COLORS: Record<string, string> = {
@@ -37,7 +33,9 @@ const AEAT_STATUS_COLORS: Record<string, string> = {
   REJECTED: 'bg-red-100 text-red-800',
 };
 
-export const InvoiceList: React.FC<InvoiceListProps> = ({ from, to }) => {
+export const InvoiceList: React.FC = () => {
+  const [range, setRange] = useTimeRange();
+  const { from, to } = range;
   const { t } = useI18n();
   const [data, setData] = useState<InvoiceListResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -77,6 +75,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({ from, to }) => {
 
   return (
     <div className="space-y-4">
+      <TimeRangeSelector value={range} onChange={setRange} />
       {/* Filters */}
       <div className="flex items-center gap-3">
         <select

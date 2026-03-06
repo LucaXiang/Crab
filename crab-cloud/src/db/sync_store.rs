@@ -522,9 +522,10 @@ async fn upsert_archived_order(
             operator_id, member_id, queue_number, shift_id, created_at,
             version, synced_at,
             is_voided, is_upgraded, customer_nif, customer_nombre,
-            customer_address, customer_email, customer_phone
+            customer_address, customer_email, customer_phone,
+            mg_discount_amount, marketing_group_name
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50)
         ON CONFLICT (tenant_id, store_id, order_id)
         DO UPDATE SET receipt_number = EXCLUDED.receipt_number,
                       status = EXCLUDED.status,
@@ -568,7 +569,9 @@ async fn upsert_archived_order(
                       customer_nombre = EXCLUDED.customer_nombre,
                       customer_address = EXCLUDED.customer_address,
                       customer_email = EXCLUDED.customer_email,
-                      customer_phone = EXCLUDED.customer_phone
+                      customer_phone = EXCLUDED.customer_phone,
+                      mg_discount_amount = EXCLUDED.mg_discount_amount,
+                      marketing_group_name = EXCLUDED.marketing_group_name
         WHERE store_archived_orders.version <= EXCLUDED.version
         RETURNING id
         "#,
@@ -621,6 +624,8 @@ async fn upsert_archived_order(
     .bind(&d.customer_address)               // $46
     .bind(&d.customer_email)                 // $47
     .bind(&d.customer_phone)                 // $48
+    .bind(dec(d.mg_discount_amount))         // $49
+    .bind(&d.marketing_group_name)           // $50
     .fetch_optional(&mut *tx)
     .await?;
 
@@ -651,6 +656,7 @@ async fn upsert_archived_order(
         .await?;
 
     // ── Items + Options ──
+    let mut item_pks: Vec<i64> = Vec::new();
     if !d.items.is_empty() {
         let oids: Vec<i64> = d.items.iter().map(|_| order_pk).collect();
         let instance_ids: Vec<&str> = d.items.iter().map(|i| i.instance_id.as_str()).collect();
@@ -670,18 +676,32 @@ async fn upsert_archived_order(
         let tax_rates: Vec<i32> = d.items.iter().map(|i| i.tax_rate).collect();
         let comped: Vec<bool> = d.items.iter().map(|i| i.is_comped).collect();
         let notes: Vec<Option<&str>> = d.items.iter().map(|i| i.note.as_deref()).collect();
+        let rule_discounts: Vec<Decimal> = d
+            .items
+            .iter()
+            .map(|i| dec(i.rule_discount_amount))
+            .collect();
+        let rule_surcharges: Vec<Decimal> = d
+            .items
+            .iter()
+            .map(|i| dec(i.rule_surcharge_amount))
+            .collect();
+        let mg_discounts: Vec<Decimal> =
+            d.items.iter().map(|i| dec(i.mg_discount_amount)).collect();
 
         let item_rows: Vec<(i64,)> = sqlx::query_as(
             r#"
             INSERT INTO store_order_items (
                 order_id, instance_id, name, spec_name, category_name, product_source_id,
                 price, quantity, unit_price, line_total,
-                discount_amount, surcharge_amount, tax, tax_rate, is_comped, note
+                discount_amount, surcharge_amount, tax, tax_rate, is_comped, note,
+                rule_discount_amount, rule_surcharge_amount, mg_discount_amount
             )
             SELECT * FROM UNNEST(
                 $1::bigint[], $2::text[], $3::text[], $4::text[], $5::text[], $6::bigint[],
                 $7::numeric[], $8::int[], $9::numeric[], $10::numeric[],
-                $11::numeric[], $12::numeric[], $13::numeric[], $14::int[], $15::bool[], $16::text[]
+                $11::numeric[], $12::numeric[], $13::numeric[], $14::int[], $15::bool[], $16::text[],
+                $17::numeric[], $18::numeric[], $19::numeric[]
             )
             RETURNING id
             "#,
@@ -702,8 +722,12 @@ async fn upsert_archived_order(
         .bind(&tax_rates)
         .bind(&comped)
         .bind(&notes)
+        .bind(&rule_discounts)
+        .bind(&rule_surcharges)
+        .bind(&mg_discounts)
         .fetch_all(&mut *tx)
         .await?;
+        item_pks = item_rows.iter().map(|r| r.0).collect();
 
         // Insert item options (batch across all items)
         let mut opt_item_ids: Vec<i64> = Vec::new();
@@ -735,6 +759,186 @@ async fn upsert_archived_order(
             .bind(&opt_option_names)
             .bind(&opt_prices)
             .bind(&opt_quantities)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
+    // ── Adjustments (unified tracking: price rules + manual + MG + comp) ──
+    sqlx::query("DELETE FROM store_order_adjustments WHERE order_id = $1")
+        .bind(order_pk)
+        .execute(&mut *tx)
+        .await?;
+
+    {
+        let mut adj_oids: Vec<i64> = Vec::new();
+        let mut adj_item_ids: Vec<Option<i64>> = Vec::new();
+        let mut adj_source_types: Vec<String> = Vec::new();
+        let mut adj_directions: Vec<String> = Vec::new();
+        let mut adj_rule_ids: Vec<Option<i64>> = Vec::new();
+        let mut adj_rule_names: Vec<Option<String>> = Vec::new();
+        let mut adj_rule_receipt_names: Vec<Option<String>> = Vec::new();
+        let mut adj_adjustment_types: Vec<Option<String>> = Vec::new();
+        let mut adj_amounts: Vec<Decimal> = Vec::new();
+        let mut adj_skipped: Vec<bool> = Vec::new();
+
+        // Item-level adjustments
+        for (idx, sync_item) in d.items.iter().enumerate() {
+            let item_pk = item_pks.get(idx).copied();
+
+            // Price rules from applied_rules
+            for rule in &sync_item.applied_rules {
+                adj_oids.push(order_pk);
+                adj_item_ids.push(item_pk);
+                adj_source_types.push("PRICE_RULE".to_string());
+                adj_directions.push(format!("{:?}", rule.rule_type).to_uppercase());
+                adj_rule_ids.push(Some(rule.rule_id));
+                adj_rule_names.push(Some(rule.name.clone()));
+                adj_rule_receipt_names.push(rule.receipt_name.clone());
+                adj_adjustment_types
+                    .push(Some(format!("{:?}", rule.adjustment_type).to_uppercase()));
+                adj_amounts.push(dec(rule.calculated_amount));
+                adj_skipped.push(rule.skipped);
+            }
+
+            // Item-level manual discount
+            if sync_item.discount_amount > 0.0 {
+                adj_oids.push(order_pk);
+                adj_item_ids.push(item_pk);
+                adj_source_types.push("MANUAL".to_string());
+                adj_directions.push("DISCOUNT".to_string());
+                adj_rule_ids.push(None);
+                adj_rule_names.push(None);
+                adj_rule_receipt_names.push(None);
+                adj_adjustment_types.push(None);
+                adj_amounts.push(dec(sync_item.discount_amount));
+                adj_skipped.push(false);
+            }
+
+            // Item-level manual surcharge
+            if sync_item.surcharge_amount > 0.0 {
+                adj_oids.push(order_pk);
+                adj_item_ids.push(item_pk);
+                adj_source_types.push("MANUAL".to_string());
+                adj_directions.push("SURCHARGE".to_string());
+                adj_rule_ids.push(None);
+                adj_rule_names.push(None);
+                adj_rule_receipt_names.push(None);
+                adj_adjustment_types.push(None);
+                adj_amounts.push(dec(sync_item.surcharge_amount));
+                adj_skipped.push(false);
+            }
+
+            // MG discount
+            if sync_item.mg_discount_amount > 0.0 {
+                adj_oids.push(order_pk);
+                adj_item_ids.push(item_pk);
+                adj_source_types.push("MEMBER_GROUP".to_string());
+                adj_directions.push("DISCOUNT".to_string());
+                adj_rule_ids.push(None);
+                adj_rule_names.push(d.marketing_group_name.clone());
+                adj_rule_receipt_names.push(None);
+                adj_adjustment_types.push(None);
+                adj_amounts.push(dec(sync_item.mg_discount_amount));
+                adj_skipped.push(false);
+            }
+
+            // Comp
+            if sync_item.is_comped {
+                adj_oids.push(order_pk);
+                adj_item_ids.push(item_pk);
+                adj_source_types.push("COMP".to_string());
+                adj_directions.push("DISCOUNT".to_string());
+                adj_rule_ids.push(None);
+                adj_rule_names.push(None);
+                adj_rule_receipt_names.push(None);
+                adj_adjustment_types.push(None);
+                adj_amounts.push(dec(sync_item.price * sync_item.quantity as f64));
+                adj_skipped.push(false);
+            }
+        }
+
+        // Order-level manual discount
+        if d.order_manual_discount_amount > 0.0 {
+            adj_oids.push(order_pk);
+            adj_item_ids.push(None);
+            adj_source_types.push("MANUAL".to_string());
+            adj_directions.push("DISCOUNT".to_string());
+            adj_rule_ids.push(None);
+            adj_rule_names.push(None);
+            adj_rule_receipt_names.push(None);
+            adj_adjustment_types.push(None);
+            adj_amounts.push(dec(d.order_manual_discount_amount));
+            adj_skipped.push(false);
+        }
+
+        // Order-level manual surcharge
+        if d.order_manual_surcharge_amount > 0.0 {
+            adj_oids.push(order_pk);
+            adj_item_ids.push(None);
+            adj_source_types.push("MANUAL".to_string());
+            adj_directions.push("SURCHARGE".to_string());
+            adj_rule_ids.push(None);
+            adj_rule_names.push(None);
+            adj_rule_receipt_names.push(None);
+            adj_adjustment_types.push(None);
+            adj_amounts.push(dec(d.order_manual_surcharge_amount));
+            adj_skipped.push(false);
+        }
+
+        // Order-level price rules (discount + surcharge)
+        for rule in &d.order_applied_rules {
+            adj_oids.push(order_pk);
+            adj_item_ids.push(None);
+            adj_source_types.push("PRICE_RULE".to_string());
+            adj_directions.push(format!("{:?}", rule.rule_type).to_uppercase());
+            adj_rule_ids.push(Some(rule.rule_id));
+            adj_rule_names.push(Some(rule.name.clone()));
+            adj_rule_receipt_names.push(rule.receipt_name.clone());
+            adj_adjustment_types.push(Some(format!("{:?}", rule.adjustment_type).to_uppercase()));
+            adj_amounts.push(dec(rule.calculated_amount));
+            adj_skipped.push(rule.skipped);
+        }
+
+        // Order-level MG discount
+        if d.mg_discount_amount > 0.0 {
+            adj_oids.push(order_pk);
+            adj_item_ids.push(None);
+            adj_source_types.push("MEMBER_GROUP".to_string());
+            adj_directions.push("DISCOUNT".to_string());
+            adj_rule_ids.push(None);
+            adj_rule_names.push(d.marketing_group_name.clone());
+            adj_rule_receipt_names.push(None);
+            adj_adjustment_types.push(None);
+            adj_amounts.push(dec(d.mg_discount_amount));
+            adj_skipped.push(false);
+        }
+
+        if !adj_oids.is_empty() {
+            sqlx::query(
+                r#"
+                INSERT INTO store_order_adjustments (
+                    order_id, item_id, source_type, direction,
+                    rule_id, rule_name, rule_receipt_name, adjustment_type,
+                    amount, skipped
+                )
+                SELECT * FROM UNNEST(
+                    $1::bigint[], $2::bigint[], $3::text[], $4::text[],
+                    $5::bigint[], $6::text[], $7::text[], $8::text[],
+                    $9::numeric[], $10::bool[]
+                )
+                "#,
+            )
+            .bind(&adj_oids)
+            .bind(&adj_item_ids)
+            .bind(&adj_source_types)
+            .bind(&adj_directions)
+            .bind(&adj_rule_ids)
+            .bind(&adj_rule_names)
+            .bind(&adj_rule_receipt_names)
+            .bind(&adj_adjustment_types)
+            .bind(&adj_amounts)
+            .bind(&adj_skipped)
             .execute(&mut *tx)
             .await?;
         }

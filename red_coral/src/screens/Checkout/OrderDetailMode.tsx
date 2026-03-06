@@ -251,8 +251,6 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, accentColor, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
-  const totalRuleDiscount = item.rule_discount_amount;
-  const totalRuleSurcharge = item.rule_surcharge_amount;
   const discountPercent = item.manual_discount_percent || 0;
   const isFullyPaid = item.unpaid_quantity === 0;
   const isPartiallyPaid = !isFullyPaid && item.unpaid_quantity < item.quantity;
@@ -294,19 +292,19 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                   </span>
                 )
               )}
-              {discountPercent > 0 && (
+              {!item.is_comped && discountPercent > 0 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                   -{discountPercent}%
                 </span>
               )}
-              {totalRuleDiscount > 0 && (
+              {!item.is_comped && item.rule_discount_amount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                  -{formatCurrency(totalRuleDiscount)}
+                  -{formatCurrency(item.rule_discount_amount)}
                 </span>
               )}
-              {totalRuleSurcharge > 0 && (
+              {!item.is_comped && item.rule_surcharge_amount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                  +{formatCurrency(totalRuleSurcharge)}
+                  +{formatCurrency(item.rule_surcharge_amount)}
                 </span>
               )}
             </div>

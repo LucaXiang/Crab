@@ -76,6 +76,15 @@ export interface StoreOverview {
   zone_sales: ZoneSaleEntry[];
   total_surcharge: number;
   avg_items_per_order: number;
+  adjustment_breakdown: AdjustmentBreakdown[];
+}
+
+export interface AdjustmentBreakdown {
+  source_type: string;
+  direction: string;
+  rule_name: string | null;
+  amount: number;
+  count: number;
 }
 
 export interface ServiceTypeEntry {

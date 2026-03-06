@@ -603,6 +603,8 @@ pub async fn get_order_detail(
         customer_address: Option<String>,
         customer_email: Option<String>,
         customer_phone: Option<String>,
+        mg_discount_amount: Decimal,
+        marketing_group_name: Option<String>,
     }
 
     let header = sqlx::query_as::<_, HeaderRow>(
@@ -614,7 +616,8 @@ pub async fn get_order_detail(
                operator_name, loss_reason, void_note, member_name,
                guest_count, discount_amount, void_type, loss_amount,
                is_voided, is_upgraded, customer_nif, customer_nombre,
-               customer_address, customer_email, customer_phone
+               customer_address, customer_email, customer_phone,
+               mg_discount_amount, marketing_group_name
         FROM store_archived_orders
         WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
         "#,
@@ -650,6 +653,9 @@ pub async fn get_order_detail(
         tax_rate: i32,
         is_comped: bool,
         note: Option<String>,
+        rule_discount_amount: Decimal,
+        rule_surcharge_amount: Decimal,
+        mg_discount_amount: Decimal,
     }
 
     #[derive(sqlx::FromRow)]
@@ -680,12 +686,26 @@ pub async fn get_order_detail(
         data: Option<String>,
     }
 
-    let (items_r, options_r, payments_r, events_r) = tokio::join!(
+    #[derive(sqlx::FromRow)]
+    struct AdjustmentRow {
+        item_id: Option<i64>,
+        source_type: String,
+        direction: String,
+        rule_id: Option<i64>,
+        rule_name: Option<String>,
+        rule_receipt_name: Option<String>,
+        adjustment_type: Option<String>,
+        amount: Decimal,
+        skipped: bool,
+    }
+
+    let (items_r, options_r, payments_r, events_r, adjustments_r) = tokio::join!(
         sqlx::query_as::<_, ItemRow>(
             r#"
             SELECT id, instance_id, name, spec_name, category_name, product_source_id,
                    price, quantity, unit_price, line_total, discount_amount,
-                   surcharge_amount, tax, tax_rate, is_comped, note
+                   surcharge_amount, tax, tax_rate, is_comped, note,
+                   rule_discount_amount, rule_surcharge_amount, mg_discount_amount
             FROM store_order_items
             WHERE order_id = $1
             ORDER BY id
@@ -724,12 +744,24 @@ pub async fn get_order_detail(
         )
         .bind(order_pk)
         .fetch_all(pool),
+        sqlx::query_as::<_, AdjustmentRow>(
+            r#"
+            SELECT item_id, source_type, direction, rule_id, rule_name,
+                   rule_receipt_name, adjustment_type, amount, skipped
+            FROM store_order_adjustments
+            WHERE order_id = $1
+            ORDER BY id
+            "#,
+        )
+        .bind(order_pk)
+        .fetch_all(pool),
     );
 
     let item_rows = items_r?;
     let option_rows = options_r?;
     let payments = payments_r?;
     let event_rows = events_r?;
+    let adjustment_rows = adjustments_r?;
 
     // Group options by item_id
     let mut options_map: std::collections::HashMap<i64, Vec<shared::cloud::OrderItemOptionSync>> =
@@ -746,26 +778,79 @@ pub async fn get_order_detail(
             });
     }
 
-    // Assemble items with options
+    // Group PRICE_RULE adjustments by item_id → Vec<AppliedRule>
+    // item_id = Some → item-level, item_id = None → order-level
+    use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+    let mut rules_map: std::collections::HashMap<
+        i64,
+        Vec<shared::order::applied_rule::AppliedRule>,
+    > = std::collections::HashMap::new();
+    let mut order_applied_rules: Vec<shared::order::applied_rule::AppliedRule> = Vec::new();
+
+    let build_applied_rule = |adj: &AdjustmentRow| -> shared::order::applied_rule::AppliedRule {
+        shared::order::applied_rule::AppliedRule {
+            rule_id: adj.rule_id.unwrap_or(0),
+            name: adj.rule_name.clone().unwrap_or_default(),
+            receipt_name: adj.rule_receipt_name.clone(),
+            rule_type: if adj.direction == "SURCHARGE" {
+                RuleType::Surcharge
+            } else {
+                RuleType::Discount
+            },
+            adjustment_type: match adj.adjustment_type.as_deref() {
+                Some("FIXED_AMOUNT") => AdjustmentType::FixedAmount,
+                _ => AdjustmentType::Percentage,
+            },
+            product_scope: ProductScope::Global,
+            zone_scope: "all".to_string(),
+            adjustment_value: 0.0,
+            calculated_amount: d(adj.amount),
+            is_stackable: true,
+            is_exclusive: false,
+            skipped: adj.skipped,
+        }
+    };
+
+    for adj in &adjustment_rows {
+        if adj.source_type == "PRICE_RULE" {
+            if let Some(item_id) = adj.item_id {
+                rules_map
+                    .entry(item_id)
+                    .or_default()
+                    .push(build_applied_rule(adj));
+            } else {
+                order_applied_rules.push(build_applied_rule(adj));
+            }
+        }
+    }
+
+    // Assemble items with options + applied_rules
     let items: Vec<shared::cloud::OrderItemSync> = item_rows
         .into_iter()
-        .map(|i| shared::cloud::OrderItemSync {
-            instance_id: i.instance_id,
-            name: i.name,
-            spec_name: i.spec_name,
-            category_name: i.category_name,
-            product_source_id: i.product_source_id,
-            price: d(i.price),
-            quantity: i.quantity,
-            unit_price: d(i.unit_price),
-            line_total: d(i.line_total),
-            discount_amount: d(i.discount_amount),
-            surcharge_amount: d(i.surcharge_amount),
-            tax: d(i.tax),
-            tax_rate: i.tax_rate,
-            is_comped: i.is_comped,
-            note: i.note,
-            options: options_map.remove(&i.id).unwrap_or_default(),
+        .map(|i| {
+            let item_id = i.id;
+            shared::cloud::OrderItemSync {
+                instance_id: i.instance_id,
+                name: i.name,
+                spec_name: i.spec_name,
+                category_name: i.category_name,
+                product_source_id: i.product_source_id,
+                price: d(i.price),
+                quantity: i.quantity,
+                unit_price: d(i.unit_price),
+                line_total: d(i.line_total),
+                discount_amount: d(i.discount_amount),
+                surcharge_amount: d(i.surcharge_amount),
+                rule_discount_amount: d(i.rule_discount_amount),
+                rule_surcharge_amount: d(i.rule_surcharge_amount),
+                mg_discount_amount: d(i.mg_discount_amount),
+                applied_rules: rules_map.remove(&item_id).unwrap_or_default(),
+                tax: d(i.tax),
+                tax_rate: i.tax_rate,
+                is_comped: i.is_comped,
+                note: i.note,
+                options: options_map.remove(&item_id).unwrap_or_default(),
+            }
         })
         .collect();
 
@@ -810,6 +895,9 @@ pub async fn get_order_detail(
         order_manual_surcharge_amount: d(header.order_manual_surcharge_amount),
         order_rule_discount_amount: d(header.order_rule_discount_amount),
         order_rule_surcharge_amount: d(header.order_rule_surcharge_amount),
+        order_applied_rules,
+        mg_discount_amount: d(header.mg_discount_amount),
+        marketing_group_name: header.marketing_group_name,
         start_time: header.start_time.unwrap_or(0),
         operator_name: header.operator_name,
         void_type: header.void_type.and_then(|s| s.parse().ok()),
@@ -908,6 +996,7 @@ pub struct StoreOverview {
     pub zone_sales: Vec<ZoneSaleEntry>,
     pub total_surcharge: f64,
     pub avg_items_per_order: f64,
+    pub adjustment_breakdown: Vec<AdjustmentBreakdownEntry>,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -979,6 +1068,15 @@ pub struct ZoneSaleEntry {
     pub revenue: f64,
     pub orders: i64,
     pub guests: i64,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct AdjustmentBreakdownEntry {
+    pub source_type: String,
+    pub direction: String,
+    pub rule_name: Option<String>,
+    pub amount: f64,
+    pub count: i64,
 }
 
 /// Compute store overview for a single store
@@ -1084,6 +1182,7 @@ async fn get_overview(
         surcharge_r,
         avg_items_r,
         anulacion_agg_r,
+        adjustment_breakdown_r,
     ) = tokio::join!(
         // 2. Revenue trend (by hour of day)
         sqlx::query_as::<_, RevenueTrendPoint>(
@@ -1407,6 +1506,32 @@ async fn get_overview(
         .bind(from)
         .bind(to)
         .fetch_one(pool),
+        // 16. Adjustment breakdown from store_order_adjustments
+        sqlx::query_as::<_, AdjustmentBreakdownEntry>(
+            r#"
+            SELECT
+                a.source_type,
+                a.direction,
+                a.rule_name,
+                COALESCE(SUM(a.amount), 0)::DOUBLE PRECISION AS amount,
+                COUNT(*)::BIGINT AS count
+            FROM store_order_adjustments a
+            JOIN store_archived_orders o ON o.id = a.order_id
+            WHERE o.tenant_id = $1
+                AND ($2::BIGINT IS NULL OR o.store_id = $2)
+                AND o.end_time >= $3 AND o.end_time < $4
+                AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
+                AND a.skipped IS NOT TRUE
+            GROUP BY a.source_type, a.direction, a.rule_name
+            ORDER BY amount DESC
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(store_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool),
     );
 
     let revenue_trend = revenue_trend_r?;
@@ -1423,6 +1548,7 @@ async fn get_overview(
     let total_surcharge = surcharge_r.map(|(v,)| v).unwrap_or(0.0);
     let avg_items_per_order = avg_items_r.map(|(v,)| v).unwrap_or(0.0);
     let (anulacion_count, anulacion_amount) = anulacion_agg_r.unwrap_or((0, 0.0));
+    let adjustment_breakdown = adjustment_breakdown_r.unwrap_or_default();
     let net_revenue = revenue - refund_amount - anulacion_amount;
 
     Ok(StoreOverview {
@@ -1455,6 +1581,7 @@ async fn get_overview(
         zone_sales,
         total_surcharge,
         avg_items_per_order,
+        adjustment_breakdown,
     })
 }
 

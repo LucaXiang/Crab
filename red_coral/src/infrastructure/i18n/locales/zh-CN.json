@@ -381,7 +381,8 @@
       "remaining": "待付金额",
       "total": "订单总额",
       "paid_status": "已付",
-      "unit_price": "单价"
+      "unit_price": "单价",
+      "subtotal": "小计"
     },
     "split": {
       "title": "分单",
@@ -627,6 +628,7 @@
       "add_new_desc": "向订单添加新的赠送商品"
     },
     "breakdown": {
+      "original_total": "原价合计",
       "comp": "赠送减免",
       "manual_discount": "手动折扣",
       "rule_discount": "规则折扣",
@@ -734,6 +736,10 @@
         "amount": "金额分单",
         "aa": "AA分账"
       }
+    },
+    "member": {
+      "deleted": "该会员已被删除",
+      "snapshot_only": "仅显示归档时的快照信息"
     }
   },
   "statistics": {
@@ -1398,6 +1404,7 @@
         "hint_name_required": "请输入菜品名称",
         "hint_category_required": "请选择分类",
         "hint_variant_name_required": "非主规格必须填写名称",
+        "hint_price_required": "规格价格必须大于 0",
         "hint_price_invalid": "价格不能为负数",
         "variant_root_placeholder": "可留空",
         "hint_external_id_required": "请输入菜品编号",
@@ -2010,11 +2017,9 @@
       "style_bold": "粗体",
       "text_align": "水平对齐",
       "vertical_align": "垂直对齐",
-      "data_source": "数据源",
-      "data_source_none": "无 (自定义模板)",
-      "data_source_hint": "选择要显示的数据字段",
-      "content_template": "自定义模板",
-      "template_advanced_hint": "可组合多个字段，如 €{price} 或 {product_name} ({spec_name})",
+      "content_template": "模板",
+      "insert_field": "插入字段",
+      "template_hint": "用 {字段名} 引用数据，点 + 插入",
       "text_template_hint": "使用 {字段名} 引用数据，如 {product_name}",
       "image_template_hint": "使用 {字段名} 引用数据",
       "source_type": "来源类型",

@@ -78,7 +78,41 @@ impl EventApplier for PaymentAddedApplier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::order::OrderEventType;
+    use shared::order::{CartItemSnapshot, OrderEventType};
+
+    /// Create a snapshot with a single item of given price (so recalculate_totals produces correct total)
+    fn snapshot_with_total(order_id: i64, total: f64) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id);
+        snapshot.items.push(CartItemSnapshot {
+            id: 1,
+            instance_id: "test-item".to_string(),
+            name: "Item".to_string(),
+            price: total,
+            original_price: total,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: 0.0,
+            rule_surcharge_amount: 0.0,
+            applied_rules: vec![],
+            applied_mg_rules: vec![],
+            mg_discount_amount: 0.0,
+            unit_price: total,
+            line_total: total,
+            tax: 0.0,
+            tax_rate: 0,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_id: None,
+            category_name: None,
+            is_comped: false,
+        });
+        order_money::recalculate_totals(&mut snapshot);
+        snapshot
+    }
 
     fn create_payment_added_event(
         order_id: i64,
@@ -111,8 +145,7 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_basic() {
-        let mut snapshot = OrderSnapshot::new(1001);
-        snapshot.total = 100.0;
+        let mut snapshot = snapshot_with_total(1001, 100.0);
         snapshot.last_sequence = 0;
 
         let event = create_payment_added_event(1001, 1, 4001, "CARD", 50.0, None, None, None);
@@ -131,8 +164,7 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_cash_with_change() {
-        let mut snapshot = OrderSnapshot::new(1001);
-        snapshot.total = 85.0;
+        let mut snapshot = snapshot_with_total(1001, 85.0);
         snapshot.last_sequence = 0;
 
         let event =
@@ -175,8 +207,7 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_multiple_payments() {
-        let mut snapshot = OrderSnapshot::new(1001);
-        snapshot.total = 100.0;
+        let mut snapshot = snapshot_with_total(1001, 100.0);
 
         // First payment
         let event1 = create_payment_added_event(1001, 1, 4001, "CARD", 30.0, None, None, None);
@@ -246,8 +277,7 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_partial_payment() {
-        let mut snapshot = OrderSnapshot::new(1001);
-        snapshot.total = 100.0;
+        let mut snapshot = snapshot_with_total(1001, 100.0);
 
         // Partial payment
         let event = create_payment_added_event(1001, 1, 4001, "CARD", 40.0, None, None, None);
@@ -262,8 +292,7 @@ mod tests {
 
     #[test]
     fn test_payment_added_applier_full_payment() {
-        let mut snapshot = OrderSnapshot::new(1001);
-        snapshot.total = 100.0;
+        let mut snapshot = snapshot_with_total(1001, 100.0);
 
         let event = create_payment_added_event(1001, 1, 4001, "CARD", 100.0, None, None, None);
 

@@ -350,7 +350,9 @@ impl OrderArchiveService {
                 operator_id, operator_name, \
                 void_type, loss_reason, loss_amount, void_note, \
                 member_id, member_name, \
-                created_at, queue_number, shift_id, service_type\
+                mg_discount_amount, marketing_group_name, \
+                created_at, queue_number, shift_id, service_type, \
+                order_applied_rules\
             ) VALUES (\
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
                 ?8, ?9, ?10, ?11, \
@@ -361,7 +363,9 @@ impl OrderArchiveService {
                 ?22, ?23, \
                 ?24, ?25, ?26, ?27, \
                 ?28, ?29, \
-                ?30, ?31, ?32, ?33\
+                ?30, ?31, \
+                ?32, ?33, ?34, ?35, \
+                ?36\
             )",
         )
         .bind(order_pk)
@@ -403,15 +407,17 @@ impl OrderArchiveService {
         .bind(&snapshot.void_note)
         .bind(snapshot.member_id)
         .bind(&snapshot.member_name)
+        .bind(snapshot.mg_discount_amount)
+        .bind(&snapshot.marketing_group_name)
         .bind(now)
         .bind(snapshot.queue_number.map(|q| q as i64))
         .bind(shift_id)
-        .bind(snapshot.service_type.as_ref().map(|st| {
-            serde_json::to_value(st)
-                .ok()
-                .and_then(|val| val.as_str().map(String::from))
-                .unwrap_or_default()
-        }))
+        .bind(snapshot.service_type.as_ref().map(|st| st.as_str()))
+        .bind(if snapshot.order_applied_rules.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&snapshot.order_applied_rules).ok()
+        })
         .execute(&mut *tx)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
@@ -466,13 +472,15 @@ impl OrderArchiveService {
                     quantity, unpaid_quantity, unit_price, line_total, \
                     discount_amount, surcharge_amount, \
                     rule_discount_amount, rule_surcharge_amount, \
-                    tax, tax_rate, category_id, category_name, applied_rules, note, is_comped\
+                    tax, tax_rate, category_id, category_name, applied_rules, note, is_comped, \
+                    mg_discount_amount\
                 ) VALUES (\
                     ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
                     ?8, ?9, ?10, ?11, \
                     ?12, ?13, \
                     ?14, ?15, \
-                    ?16, ?17, ?18, ?19, ?20, ?21, ?22\
+                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, \
+                    ?23\
                 )",
             )
             .bind(item_pk)
@@ -501,6 +509,8 @@ impl OrderArchiveService {
             })
             .bind(&item.note)
             .bind(item.is_comped)
+            // mg_discount_amount: per-unit from snapshot (consistent with existing data)
+            .bind(item.mg_discount_amount)
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;

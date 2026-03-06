@@ -55,6 +55,7 @@
 
 <svelte:head>
 	<title>{$t('reset.page_title')} — RedCoral</title>
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <AuthLayout title={$t('reset.title')} subtitle={$t('reset.subtitle')}>

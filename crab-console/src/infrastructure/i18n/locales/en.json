@@ -187,7 +187,13 @@
     "refunds": "Refunds",
     "net": "Net",
     "method_cash": "Cash",
-    "method_card": "Card"
+    "method_card": "Card",
+    "mg_discount": "Member Discount",
+    "cancelled": "Cancelled",
+    "anulada": "Anulada",
+    "loss": "Loss Settlement",
+    "details": "Details",
+    "view_order": "View Order"
   },
   "stats": {
     "title": "Statistics",
@@ -255,7 +261,17 @@
     "ago": "ago",
     "refresh": "Refresh data",
     "max_range_exceeded": "Date range cannot exceed 90 days",
-    "invalid_range": "End date must be after start date"
+    "invalid_range": "End date must be after start date",
+    "adjustment_breakdown": "Discounts & Surcharges",
+    "adj_source": "Source",
+    "adj_type": "Type",
+    "adj_discount": "Discount",
+    "adj_surcharge": "Surcharge",
+    "adj_src_price_rule": "Price Rule",
+    "adj_src_manual": "Manual",
+    "adj_src_member_group": "Member Group",
+    "adj_src_comp": "Comp",
+    "no_breakdown_data": "Detailed breakdown not available for this period"
   },
   "reports": {
     "abnormal_close": "Abnormal close",

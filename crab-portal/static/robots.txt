@@ -1,5 +1,9 @@
-# allow crawling everything by default
+# RedCoral - https://redcoral.app
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /verify
+Disallow: /reset-password
+Disallow: /registration/
+Disallow: /renew
 
 Sitemap: https://redcoral.app/sitemap.xml

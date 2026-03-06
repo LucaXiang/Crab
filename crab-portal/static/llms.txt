@@ -1,0 +1,51 @@
+# RedCoral
+
+> RedCoral is a modern POS (Point of Sale) system designed for restaurants and hospitality businesses in Spain. It works fully offline, includes Verifactu compliance (Spain's anti-fraud invoicing regulation), and provides tamper-proof audit trails for every transaction.
+
+## Key Facts
+
+- **Product type**: Desktop POS software for Windows
+- **Target market**: Restaurants, bars, and hospitality businesses in Spain
+- **Offline-first**: All core functions (orders, payments, receipt printing) work without internet
+- **Verifactu compliance**: Built-in digital signatures and immutable records meeting Spain's 2027 anti-fraud regulation
+- **Anti-fraud audit trail**: Every operation is cryptographically chained — impossible to delete or alter
+- **Multi-device sync**: Connect multiple terminals over local network, real-time synchronization
+- **Cloud dashboard**: Manage all locations from a single web panel with automatic backups
+- **Architecture**: Rust backend (edge computing), React frontend via Tauri, SQLite local storage, PostgreSQL cloud
+
+## Pricing
+
+- **Starter**: €31/month (annual) or €39/month — 1 location, up to 3 devices
+- **Professional**: €55/month (annual) or €69/month — up to 5 locations, unlimited devices
+- **Enterprise**: Custom pricing — unlimited locations, private cloud deployment, dedicated SLA
+- All plans include 14-day free trial, no credit card required
+
+## Verifactu Compliance
+
+RedCoral includes full Verifactu compliance out of the box:
+- Digitally signed invoices (F2 sales invoices, R5 correction invoices)
+- Immutable hash chain for all financial records
+- Automatic submission to AEAT (Spain's tax authority)
+- No additional modules or costs required
+- Ready before the 2027 mandatory deadline
+
+## Technology
+
+- **Offline architecture**: Local SQLite database with event sourcing ensures zero downtime
+- **Security**: mTLS (mutual TLS) encrypted communication, per-device certificates
+- **Data integrity**: Cryptographic hash chain (SHA-256) linking all orders and credit notes
+- **Cloud sync**: Automatic background synchronization when connectivity is available
+
+## Contact
+
+- Website: https://redcoral.app
+- Support email: soporte@redcoral.app
+- Legal entity: RedCoral Software S.L. (Spain)
+
+## Links
+
+- [Homepage](https://redcoral.app)
+- [Register](https://redcoral.app/register)
+- [Support](https://redcoral.app/support)
+- [Terms of Service](https://redcoral.app/terms)
+- [Privacy Policy](https://redcoral.app/privacy)

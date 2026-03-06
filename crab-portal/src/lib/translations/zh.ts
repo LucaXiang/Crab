@@ -426,7 +426,7 @@ export const zh: Record<string, string> = {
 
 	'cookies.page_title': 'Cookie 政策',
 	'cookies.title': 'Cookie 政策',
-	'cookies.last_updated': '最后更新：2026 年 2 月 22 日',
+	'cookies.last_updated': '最后更新：2026 年 3 月 6 日',
 	'cookies.content': `
 <h2>1. 什么是 Cookie？</h2>
 <p>Cookie 是网站在您访问时存储在您设备上的小型文本文件。它们被广泛用于提高网站运行效率并向网站所有者提供信息。</p>
@@ -445,7 +445,15 @@ export const zh: Record<string, string> = {
 </table>
 
 <h3>分析性 Cookie</h3>
-<p>目前，RedCoral 不使用第三方分析性 Cookie。如果将来引入分析工具，我们将更新本政策并征求您的同意。</p>
+<p>如果您通过同意横幅接受了分析性 Cookie，我们将使用 Google Analytics 4 来了解用户如何与我们的网站互动。这些 Cookie 仅在您明确同意后才会激活。</p>
+<table>
+<thead><tr><th>Cookie</th><th>提供方</th><th>用途</th><th>有效期</th></tr></thead>
+<tbody>
+<tr><td>_ga</td><td>Google</td><td>区分唯一用户</td><td>2 年</td></tr>
+<tr><td>_ga_T73VF6HT10</td><td>Google</td><td>维持会话状态</td><td>2 年</td></tr>
+</tbody>
+</table>
+<p>如需了解 Google 如何处理数据，请参阅 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google 隐私政策</a>。</p>
 
 <h2>3. Cookie 管理</h2>
 <p>您可以通过首次访问网站时出现的同意横幅来管理 Cookie。您也可以在浏览器中设置阻止或删除 Cookie，但这可能会影响网站功能。</p>

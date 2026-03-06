@@ -6,6 +6,8 @@
 
 <svelte:head>
 	<title>{$t('support.page_title')} — RedCoral</title>
+	<meta name="description" content="¿Necesitas ayuda con RedCoral? Contacta con nuestro equipo de soporte por email o WhatsApp." />
+	<link rel="canonical" href="https://redcoral.app/support" />
 </svelte:head>
 
 <AuthLayout title={$t('support.title')} subtitle={$t('support.subtitle')}>

@@ -14,9 +14,14 @@ import type { StoreOverview } from '@/core/domain/types';
 
 const PIE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
-const PAYMENT_LABELS: Record<string, string> = {
-  CASH: '现金',
-  CARD: '银行卡',
+const PAYMENT_I18N_KEYS: Record<string, string> = {
+  CASH: 'checkout.method.cash',
+  CARD: 'checkout.method.card',
+};
+
+const SERVICE_TYPE_I18N_KEYS: Record<string, string> = {
+  DINE_IN: 'checkout.order_type.dine_in',
+  TAKEOUT: 'checkout.order_type.takeout',
 };
 
 interface Props {
@@ -32,12 +37,18 @@ function pctChange(current: number, previous: number): number | null {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-function paymentLabel(method: string): string {
-  return PAYMENT_LABELS[method.toUpperCase()] ?? method;
-}
-
 export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOverview, lastWeekOverview, cutoffMinutes = 0 }) => {
   const { t } = useI18n();
+
+  const paymentLabel = (method: string): string => {
+    const key = PAYMENT_I18N_KEYS[method.toUpperCase()];
+    return key ? t(key) : method;
+  };
+
+  const serviceTypeLabel = (type: string): string => {
+    const key = SERVICE_TYPE_I18N_KEYS[type.toUpperCase()];
+    return key ? t(key) : type;
+  };
   const prev = previousOverview ?? null;
   const lastWeek = lastWeekOverview ?? null;
 
@@ -206,12 +217,12 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 
       {/* Two columns: Payment Breakdown Pie + Tax Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {overview.payment_breakdown.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <CreditCard className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('statistics.metric.payment_breakdown')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CreditCard className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('statistics.metric.payment_breakdown')}</h3>
+          </div>
+          {overview.payment_breakdown.length > 0 ? (
             <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
               <div className="w-36 h-36 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
@@ -242,15 +253,15 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 })}
               </div>
             </div>
-          </div>
-        )}
+          ) : <EmptySection />}
+        </div>
 
-        {overview.tax_breakdown.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Receipt className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('statistics.metric.tax_breakdown')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Receipt className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('statistics.metric.tax_breakdown')}</h3>
+          </div>
+          {overview.tax_breakdown.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -271,80 +282,44 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          ) : <EmptySection />}
+        </div>
       </div>
 
       {/* Service Type & Zone Sales */}
-      {(overview.service_type_breakdown.length > 1 || overview.zone_sales.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {overview.service_type_breakdown.length > 1 && (() => {
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <UtensilsCrossed className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('statistics.metric.service_type')}</h3>
+          </div>
+          {overview.service_type_breakdown.length > 0 ? (() => {
             const totalSvcOrders = overview.service_type_breakdown.reduce((sum, s) => sum + s.orders, 0);
             return (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <UtensilsCrossed className="w-5 h-5 text-slate-400" />
-                  <h3 className="font-bold text-slate-900">{t('statistics.metric.service_type')}</h3>
+              <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
+                <div className="w-36 h-36 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={overview.service_type_breakdown} dataKey="orders" nameKey="service_type" cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2}>
+                        {overview.service_type_breakdown.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
-                  <div className="w-36 h-36 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={overview.service_type_breakdown} dataKey="orders" nameKey="service_type" cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2}>
-                          {overview.service_type_breakdown.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    {overview.service_type_breakdown.map((st, i) => {
-                      const pct = totalSvcOrders > 0 ? ((st.orders / totalSvcOrders) * 100).toFixed(1) : '0';
-                      return (
-                        <div key={st.service_type} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-slate-700 truncate">{st.service_type}</span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0 ml-2">
-                            <span className="text-xs text-slate-400">{pct}% · {st.orders}</span>
-                            <span className="font-semibold text-slate-900 w-20 text-right">{formatCurrency(st.revenue)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {overview.zone_sales.length > 0 && (() => {
-            const totalZoneRev = overview.zone_sales.reduce((sum, z) => sum + z.revenue, 0);
-            return (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <MapIcon className="w-5 h-5 text-slate-400" />
-                  <h3 className="font-bold text-slate-900">{t('statistics.metric.zone_sales')}</h3>
-                </div>
-                <div className="space-y-3">
-                  {overview.zone_sales.map((zone, i) => {
-                    const pct = totalZoneRev > 0 ? (zone.revenue / totalZoneRev) * 100 : 0;
+                <div className="flex-1 space-y-2">
+                  {overview.service_type_breakdown.map((st, i) => {
+                    const pct = totalSvcOrders > 0 ? ((st.orders / totalSvcOrders) * 100).toFixed(1) : '0';
                     return (
-                      <div key={zone.zone_name}>
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-slate-700">{zone.zone_name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">{zone.orders} · {zone.guests}p</span>
-                            <span className="font-semibold text-slate-900">{formatCurrency(zone.revenue)}</span>
-                          </div>
+                      <div key={st.service_type} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="text-slate-700 truncate">{serviceTypeLabel(st.service_type)}</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <div className="flex items-center gap-3 shrink-0 ml-2">
+                          <span className="text-xs text-slate-400">{pct}% · {st.orders}</span>
+                          <span className="font-semibold text-slate-900 w-20 text-right">{formatCurrency(st.revenue)}</span>
                         </div>
                       </div>
                     );
@@ -352,17 +327,51 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 </div>
               </div>
             );
-          })()}
+          })() : <EmptySection />}
         </div>
-      )}
 
-      {/* Refund Method Breakdown */}
-      {overview.refund_method_breakdown.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <RotateCcw className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('statistics.metric.refund_methods')}</h3>
+            <MapIcon className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('statistics.metric.zone_sales')}</h3>
           </div>
+          {overview.zone_sales.length > 0 ? (() => {
+            const totalZoneRev = overview.zone_sales.reduce((sum, z) => sum + z.revenue, 0);
+            return (
+              <div className="space-y-3">
+                {overview.zone_sales.map((zone, i) => {
+                  const pct = totalZoneRev > 0 ? (zone.revenue / totalZoneRev) * 100 : 0;
+                  return (
+                    <div key={zone.zone_name}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="text-slate-700">{zone.zone_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">{zone.orders} · {zone.guests}p</span>
+                          <span className="font-semibold text-slate-900">{formatCurrency(zone.revenue)}</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })() : <EmptySection />}
+        </div>
+      </div>
+
+      {/* Refund Method Breakdown */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <RotateCcw className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('statistics.metric.refund_methods')}</h3>
+        </div>
+        {overview.refund_method_breakdown.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -383,16 +392,16 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : <EmptySection />}
+      </div>
 
       {/* Tag Sales */}
-      {overview.tag_sales.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Tag className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('statistics.metric.tag_sales')}</h3>
-          </div>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Tag className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('statistics.metric.tag_sales')}</h3>
+        </div>
+        {overview.tag_sales.length > 0 ? (
           <div className="flex flex-wrap gap-3">
             {overview.tag_sales.map((tag, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-slate-50">
@@ -403,17 +412,17 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : <EmptySection />}
+      </div>
 
       {/* Two columns: Top Products + Category Sales */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {overview.top_products.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Award className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('statistics.top_products')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Award className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('statistics.top_products')}</h3>
+          </div>
+          {overview.top_products.length > 0 ? (
             <div className="space-y-2">
               {overview.top_products.map((product, i) => {
                 const maxQty = overview.top_products[0]?.quantity ?? 1;
@@ -435,15 +444,15 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : <EmptySection />}
+        </div>
 
-        {overview.category_sales.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('statistics.chart.sales_by_category')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('statistics.chart.sales_by_category')}</h3>
+          </div>
+          {overview.category_sales.length > 0 ? (
             <div className="space-y-3">
               {overview.category_sales.map((cat, i) => {
                 const pct = totalCategorySales > 0 ? (cat.revenue / totalCategorySales) * 100 : 0;
@@ -466,12 +475,16 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : <EmptySection />}
+        </div>
       </div>
     </div>
   );
 };
+
+const EmptySection: React.FC = () => (
+  <p className="text-sm text-slate-400 py-4 text-center">-</p>
+);
 
 const KpiCard: React.FC<{
   icon: React.FC<{ className?: string }>;

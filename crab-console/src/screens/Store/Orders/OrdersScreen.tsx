@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Clock, ChevronRight, Receipt, Calendar, CreditCard, Coins,
   Gift, Ban, ChevronDown, ChevronUp, Cloud, Wifi, X, Users,
-  ArrowLeft, FileUp, FileText, User, Mail, Phone, MapPin, AlertTriangle,
+  ArrowLeft, FileUp, FileText, User, Mail, Phone, MapPin, AlertTriangle, Crown,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { tEnum } from '@/infrastructure/i18n';
@@ -21,7 +21,7 @@ import type { TimelineEvent } from '@/shared/components/Timeline';
 import { Undo2 } from 'lucide-react';
 import type {
   ChainEntryItem, ChainEntryType, OrderDetailResponse, OrderItem, OrderPayment, OrderEvent,
-  CreditNoteSummary, CreditNoteDetailResponse, AnulacionDetailResponse, UpgradeDetailResponse,
+  CreditNoteSummary, CreditNoteDetailResponse, AnulacionDetailResponse, UpgradeDetailResponse, AppliedRule,
 } from '@/core/types/order';
 
 /** Format display number with type prefix */
@@ -1105,6 +1105,7 @@ const MobileOrderDetail: React.FC<{
           <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
             {d.zone_name && <span>{d.zone_name}{d.table_name ? ` · ${d.table_name}` : ''}</span>}
             {d.guest_count != null && d.guest_count > 0 && <span className="flex items-center gap-1"><Users className="w-3 h-3" />{d.guest_count}</span>}
+            {d.member_name && <span className="flex items-center gap-1"><Crown className="w-3 h-3" />{d.member_name}</span>}
             {detail.source === 'cache'
               ? <span className="flex items-center gap-1"><Cloud className="w-3 h-3" />{t('orders.source_cache')}</span>
               : <span className="flex items-center gap-1"><Wifi className="w-3 h-3" />{t('orders.source_edge')}</span>
@@ -1138,6 +1139,18 @@ const MobileOrderDetail: React.FC<{
                   <span className="text-slate-800">{item.name}</span>
                   {item.spec_name && <span className="text-xs text-slate-500">({item.spec_name})</span>}
                   {item.is_comped && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded">{t('orders.comped')}</span>}
+                  {!item.is_comped && item.discount_amount > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full">-{formatCurrency(item.discount_amount)}</span>
+                  )}
+                  {!item.is_comped && item.rule_discount_amount > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full">-{formatCurrency(item.rule_discount_amount)}</span>
+                  )}
+                  {!item.is_comped && item.rule_surcharge_amount > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 rounded-full">+{formatCurrency(item.rule_surcharge_amount)}</span>
+                  )}
+                  {!item.is_comped && item.mg_discount_amount > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">-{formatCurrency(item.mg_discount_amount)}</span>
+                  )}
                 </div>
                 {item.options.length > 0 && (
                   <div className="ml-5 text-xs text-slate-500">
@@ -1159,8 +1172,22 @@ const MobileOrderDetail: React.FC<{
       {/* Price summary */}
       <div className="border-t border-slate-100 pt-3 space-y-1.5 text-sm">
         {d.comp_total_amount > 0 && <SummaryRow label={t('orders.comped')} value={`-${formatCurrency(d.comp_total_amount)}`} color="text-emerald-600" />}
-        {d.discount_amount > 0 && <SummaryRow label={t('orders.discount')} value={`-${formatCurrency(d.discount_amount)}`} color="text-orange-500" />}
-        {d.surcharge_amount > 0 && <SummaryRow label={t('orders.surcharge')} value={`+${formatCurrency(d.surcharge_amount)}`} color="text-purple-500" />}
+        {d.order_manual_discount_amount > 0 && <SummaryRow label={t('orders.discount')} value={`-${formatCurrency(d.order_manual_discount_amount)}`} color="text-orange-500" />}
+        {d.order_manual_surcharge_amount > 0 && <SummaryRow label={t('orders.surcharge')} value={`+${formatCurrency(d.order_manual_surcharge_amount)}`} color="text-purple-500" />}
+        {d.mg_discount_amount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-red-500 flex items-center gap-1"><Crown size={12} />{d.marketing_group_name ?? t('orders.mg_discount')}</span>
+            <span className="text-red-500">-{formatCurrency(d.mg_discount_amount)}</span>
+          </div>
+        )}
+        {aggregateRules(d.items, d.order_applied_rules).map(rule => (
+          <SummaryRow
+            key={rule.rule_id}
+            label={rule.name}
+            value={`${rule.direction === 'discount' ? '-' : '+'}${formatCurrency(rule.total)}`}
+            color={rule.direction === 'discount' ? 'text-amber-600' : 'text-purple-500'}
+          />
+        ))}
         <div className="flex justify-between pt-2 border-t border-slate-100 font-bold">
           <span className="text-slate-900">{t('orders.total')}</span>
           <span className="text-primary-500">{formatCurrency(d.paid_amount)}</span>
@@ -1360,8 +1387,22 @@ const ItemsCard: React.FC<{
       </div>
       <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-2">
         {d.comp_total_amount > 0 && <SummaryRow label={t('orders.comped')} value={`-${formatCurrency(d.comp_total_amount)}`} color="text-emerald-600" />}
-        {d.discount_amount > 0 && <SummaryRow label={t('orders.discount')} value={`-${formatCurrency(d.discount_amount)}`} color="text-orange-500" />}
-        {d.surcharge_amount > 0 && <SummaryRow label={t('orders.surcharge')} value={`+${formatCurrency(d.surcharge_amount)}`} color="text-purple-500" />}
+        {d.order_manual_discount_amount > 0 && <SummaryRow label={t('orders.discount')} value={`-${formatCurrency(d.order_manual_discount_amount)}`} color="text-orange-500" />}
+        {d.order_manual_surcharge_amount > 0 && <SummaryRow label={t('orders.surcharge')} value={`+${formatCurrency(d.order_manual_surcharge_amount)}`} color="text-purple-500" />}
+        {d.mg_discount_amount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-red-500 flex items-center gap-1"><Crown size={12} />{d.marketing_group_name ?? t('orders.mg_discount')}</span>
+            <span className="text-red-500">-{formatCurrency(d.mg_discount_amount)}</span>
+          </div>
+        )}
+        {aggregateRules(items, d.order_applied_rules).map(rule => (
+          <SummaryRow
+            key={rule.rule_id}
+            label={rule.name}
+            value={`${rule.direction === 'discount' ? '-' : '+'}${formatCurrency(rule.total)}`}
+            color={rule.direction === 'discount' ? 'text-amber-600' : 'text-purple-500'}
+          />
+        ))}
         <div className="flex justify-between items-end pt-3 mt-1 border-t border-slate-200">
           <span className="text-slate-800 font-bold">{t('orders.total')}</span>
           <span className="text-xl font-bold text-primary-500">{formatCurrency(d.paid_amount)}</span>
@@ -1485,14 +1526,24 @@ const ItemRow: React.FC<{ item: OrderItem; accentColor: string; t: (k: string) =
                   <Gift size={10} /> {t('orders.comped')}
                 </span>
               )}
-              {item.discount_amount > 0 && (
+              {!item.is_comped && item.discount_amount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                   -{formatCurrency(item.discount_amount)}
                 </span>
               )}
-              {item.surcharge_amount > 0 && (
+              {!item.is_comped && item.rule_discount_amount > 0 && (
+                <span className="text-[0.625rem] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  -{formatCurrency(item.rule_discount_amount)}
+                </span>
+              )}
+              {!item.is_comped && item.rule_surcharge_amount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                  +{formatCurrency(item.surcharge_amount)}
+                  +{formatCurrency(item.rule_surcharge_amount)}
+                </span>
+              )}
+              {!item.is_comped && item.mg_discount_amount > 0 && (
+                <span className="text-[0.625rem] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                  -{formatCurrency(item.mg_discount_amount)}
                 </span>
               )}
             </div>
@@ -1563,6 +1614,26 @@ const PaymentRow: React.FC<{ payment: OrderPayment; t: (k: string) => string }> 
 };
 
 /* ── Helpers ── */
+
+/** Aggregate applied_rules across all items by rule_id */
+function aggregateRules(items: OrderItem[], orderRules: AppliedRule[] = []): { rule_id: number; name: string; total: number; direction: 'discount' | 'surcharge' }[] {
+  const map = new Map<number, { name: string; total: number; direction: 'discount' | 'surcharge' }>();
+  const addRule = (rule: AppliedRule) => {
+    if (rule.skipped) return;
+    const existing = map.get(rule.rule_id);
+    const direction = rule.adjustment_type === 'Surcharge' ? 'surcharge' : 'discount';
+    if (existing) {
+      existing.total += Math.abs(rule.calculated_amount);
+    } else {
+      map.set(rule.rule_id, { name: rule.name, total: Math.abs(rule.calculated_amount), direction });
+    }
+  };
+  for (const item of items) {
+    for (const rule of item.applied_rules) addRule(rule);
+  }
+  for (const rule of orderRules) addRule(rule);
+  return Array.from(map.entries()).map(([rule_id, v]) => ({ rule_id, ...v }));
+}
 
 const SummaryRow: React.FC<{ label: string; value: string; color: string }> = ({ label, value, color }) => (
   <div className="flex justify-between text-sm">

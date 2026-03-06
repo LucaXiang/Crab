@@ -521,22 +521,30 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .unwrap_or(Decimal::ZERO);
         let after_manual = base_with_options - manual_discount;
         let rule_discount = effective_rule_discount(item, after_manual);
-        if !item.is_comped {
-            item_discount_total += (manual_discount + rule_discount) * quantity;
-        }
 
         // Calculate item-level surcharge (from rules only)
         let rule_surcharge = effective_rule_surcharge(item, base_with_options);
-        if !item.is_comped {
-            item_surcharge_total += rule_surcharge * quantity;
-        }
 
         // Calculate MG discount (applied after price rules)
         let after_rules = base_with_options - manual_discount - rule_discount + rule_surcharge;
         let mg_discount = effective_mg_discount(item, after_rules);
         item.mg_discount_amount = to_f64(mg_discount);
+
+        // Accumulate totals using rounded per-unit values × quantity.
+        // This ensures totals are consistent with unit_price (which also rounds to 2dp).
+        // Without this, precise Decimal accumulation diverges from rounded unit_price × qty.
         if !item.is_comped {
-            item_mg_discount_total += mg_discount * quantity;
+            let manual_rounded = manual_discount
+                .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero);
+            let rule_disc_rounded = rule_discount
+                .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero);
+            let rule_sur_rounded = rule_surcharge
+                .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero);
+            let mg_rounded = mg_discount
+                .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero);
+            item_discount_total += (manual_rounded + rule_disc_rounded) * quantity;
+            item_surcharge_total += rule_sur_rounded * quantity;
+            item_mg_discount_total += mg_rounded * quantity;
         }
 
         // Sync calculated_amount in applied_mg_rules
@@ -637,8 +645,18 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     // Order-level adjustments (rule amounts respect skipped flag, dynamically recalculated)
     let eff_order_rule_discount = effective_order_rule_discount(snapshot, subtotal);
     let eff_order_rule_surcharge = effective_order_rule_surcharge(snapshot, subtotal);
-    let order_discount = eff_order_rule_discount + order_manual_discount;
-    let order_surcharge = eff_order_rule_surcharge + order_manual_surcharge;
+
+    // Round each order-level component to 2dp BEFORE computing total.
+    // This ensures: displayed_subtotal - displayed_discount + displayed_surcharge = displayed_total
+    let round = |d: Decimal| -> Decimal {
+        d.round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
+    };
+    let order_manual_discount_r = round(order_manual_discount);
+    let order_manual_surcharge_r = round(order_manual_surcharge);
+    let eff_order_rule_discount_r = round(eff_order_rule_discount);
+    let eff_order_rule_surcharge_r = round(eff_order_rule_surcharge);
+    let order_discount = order_manual_discount_r + eff_order_rule_discount_r;
+    let order_surcharge = order_manual_surcharge_r + eff_order_rule_surcharge_r;
 
     // Sync calculated_amount in order_applied_rules so snapshot stays consistent
     for rule in snapshot.order_applied_rules.iter_mut() {
@@ -646,9 +664,9 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             continue;
         }
         rule.calculated_amount = to_f64(match rule.adjustment_type {
-            AdjustmentType::Percentage => (subtotal * to_decimal(rule.adjustment_value)
-                / Decimal::ONE_HUNDRED)
-                .round_dp(DECIMAL_PLACES),
+            AdjustmentType::Percentage => {
+                round(subtotal * to_decimal(rule.adjustment_value) / Decimal::ONE_HUNDRED)
+            }
             AdjustmentType::FixedAmount => to_decimal(rule.adjustment_value),
         });
     }
@@ -659,11 +677,12 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
 
     // Final total (Spanish IVA: tax is already included in subtotal)
     // Clamp to zero — extreme discounts must not produce negative totals
+    // Uses rounded order components so total = subtotal - displayed_discount + displayed_surcharge
     let total = (subtotal - order_discount + order_surcharge).max(Decimal::ZERO);
     let paid = to_decimal(snapshot.paid_amount);
     let remaining = (total - paid).max(Decimal::ZERO);
 
-    // Update snapshot
+    // Update snapshot — all order-level amounts already rounded
     snapshot.original_total = to_f64(original_total.max(Decimal::ZERO));
     snapshot.subtotal = to_f64(subtotal.max(Decimal::ZERO));
     snapshot.total_discount = to_f64(total_discount);
@@ -671,10 +690,10 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.tax = to_f64(total_tax);
     snapshot.discount = to_f64(order_discount);
     snapshot.comp_total_amount = to_f64(comp_total);
-    snapshot.order_manual_discount_amount = to_f64(order_manual_discount);
-    snapshot.order_manual_surcharge_amount = to_f64(order_manual_surcharge);
-    snapshot.order_rule_discount_amount = to_f64(eff_order_rule_discount);
-    snapshot.order_rule_surcharge_amount = to_f64(eff_order_rule_surcharge);
+    snapshot.order_manual_discount_amount = to_f64(order_manual_discount_r);
+    snapshot.order_manual_surcharge_amount = to_f64(order_manual_surcharge_r);
+    snapshot.order_rule_discount_amount = to_f64(eff_order_rule_discount_r);
+    snapshot.order_rule_surcharge_amount = to_f64(eff_order_rule_surcharge_r);
     snapshot.mg_discount_amount = to_f64(item_mg_discount_total);
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);

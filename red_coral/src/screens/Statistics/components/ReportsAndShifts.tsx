@@ -3,14 +3,12 @@ import { useI18n } from '@/hooks/useI18n';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { DailyReportManagement } from '@/features/daily-report/DailyReportManagement';
+import { TimeRangeSelector, useTimeRange } from './TimeRangeSelector';
 import type { Shift } from '@/core/domain/types/api/models';
 
-interface ReportsAndShiftsProps {
-  from: number;
-  to: number;
-}
-
-export const ReportsAndShifts: React.FC<ReportsAndShiftsProps> = ({ from, to }) => {
+export const ReportsAndShifts: React.FC = () => {
+  const [range, setRange] = useTimeRange();
+  const { from, to } = range;
   const { t } = useI18n();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +52,7 @@ export const ReportsAndShifts: React.FC<ReportsAndShiftsProps> = ({ from, to }) 
 
   return (
     <div className="space-y-8">
+      <TimeRangeSelector value={range} onChange={setRange} />
       {/* Daily Reports Section */}
       <DailyReportManagement />
 

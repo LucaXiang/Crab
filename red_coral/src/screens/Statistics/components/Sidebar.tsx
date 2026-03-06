@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Activity,
   TrendingUp,
-  Calendar,
   FileText,
   ClipboardList,
   ShieldCheck
@@ -11,67 +10,14 @@ import {
 import { useI18n } from '@/hooks/useI18n';
 import { ActiveTab } from '@/core/domain/types';
 
-import { TimeRange } from '@/core/domain/types';
-
 interface SidebarProps {
   onBack: () => void;
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
-  timeRange: TimeRange;
-  customStartDate?: string;
-  customEndDate?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ 
-  onBack, 
-  activeTab, 
-  onTabChange,
-  timeRange,
-  customStartDate,
-  customEndDate
-}) => {
-  const { t, locale } = useI18n();
-
-  const getDateRangeLabel = () => {
-    const now = new Date();
-    const formatDate = (date: Date) => {
-      return date.toLocaleDateString(locale, { month: '2-digit', day: '2-digit' });
-    };
-
-    if (timeRange === 'custom' && customStartDate && customEndDate) {
-      return `${customStartDate} - ${customEndDate}`;
-    }
-
-    if (timeRange === 'today') {
-      return `${t('statistics.time.today')}, ${formatDate(now)}`;
-    }
-
-    if (timeRange === 'yesterday') {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return `${t('statistics.time.yesterday')}, ${formatDate(yesterday)}`;
-    }
-
-    if (timeRange === 'this_week') {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(now.getFullYear(), now.getMonth(), diff);
-      return `${formatDate(monday)} - ${formatDate(now)}`;
-    }
-
-    if (timeRange === 'this_month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      return `${formatDate(firstDay)} - ${formatDate(now)}`;
-    }
-
-    if (timeRange === 'last_month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-      return `${formatDate(firstDay)} - ${formatDate(lastDay)}`;
-    }
-
-    return t(`statistics.time.${timeRange}`);
-  };
+export const Sidebar: React.FC<SidebarProps> = ({ onBack, activeTab, onTabChange }) => {
+  const { t } = useI18n();
 
   const menuItems = [
     { id: 'overview' as const, icon: TrendingUp, label: t('statistics.sidebar.overview') },
@@ -100,16 +46,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Stats Menu */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-1">
           {menuItems.map((item) => (
-            <button 
+            <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
               className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3 ${
-                activeTab === item.id 
-                  ? 'bg-blue-50 text-blue-600' 
+                activeTab === item.id
+                  ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -117,18 +62,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {item.label}
             </button>
           ))}
-        </div>
-      </div>
-      
-      <div className="p-4 border-t border-gray-100">
-         <div className="bg-gray-50 rounded-lg p-4">
-           <div className="flex items-center gap-2 text-gray-600 mb-2">
-            <Calendar size={16} />
-            <span className="text-sm font-medium">{t('statistics.date_range')}</span>
-          </div>
-          <div className="text-sm text-gray-500" suppressHydrationWarning>
-            {getDateRangeLabel()}
-          </div>
         </div>
       </div>
     </div>

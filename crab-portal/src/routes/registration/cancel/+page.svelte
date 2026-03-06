@@ -6,6 +6,7 @@
 
 <svelte:head>
 	<title>{$t('reg_cancel.page_title')} — RedCoral</title>
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <AuthLayout title={$t('reg_cancel.title')} subtitle="">

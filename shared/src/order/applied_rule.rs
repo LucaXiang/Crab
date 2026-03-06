@@ -31,7 +31,6 @@ pub struct AppliedRule {
 
     // === Control ===
     /// Whether this rule is skipped
-    #[serde(default)]
     pub skipped: bool,
 }
 
@@ -125,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn test_applied_rule_skipped_default() {
+    fn test_applied_rule_requires_skipped_field() {
         let json = r#"{
             "rule_id": 1,
             "name": "test",
@@ -140,7 +139,7 @@ mod tests {
             "is_exclusive": false
         }"#;
 
-        let applied: AppliedRule = serde_json::from_str(json).unwrap();
-        assert!(!applied.skipped);
+        // Without `skipped` field, deserialization should fail
+        assert!(serde_json::from_str::<AppliedRule>(json).is_err());
     }
 }

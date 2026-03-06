@@ -3,6 +3,9 @@
 declare global {
 	const __APP_VERSION__: string;
 	const __GIT_HASH__: string;
+	interface Window {
+		dataLayer: unknown[];
+	}
 	namespace App {
 		// interface Error {}
 		// interface Locals {}

@@ -74,6 +74,7 @@ export interface ArchivedOrderItem {
   rule_surcharge_amount: number;
   applied_rules: AppliedRule[] | null;
   note: string | null;
+  mg_discount_amount: number;
   is_comped: boolean;
   tax: number;
   tax_rate: number;
@@ -121,7 +122,9 @@ export interface ArchivedOrderDetail {
   status: string;
   is_retail: boolean;
   guest_count: number | null;
+  original_total: number;
   total: number;
+  subtotal: number;
   paid_amount: number;
   total_discount: number;
   total_surcharge: number;
@@ -130,6 +133,10 @@ export interface ArchivedOrderDetail {
   order_manual_surcharge_amount: number;
   order_rule_discount_amount: number;
   order_rule_surcharge_amount: number;
+  member_id: number | null;
+  member_name: string | null;
+  mg_discount_amount: number;
+  marketing_group_name: string | null;
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
   operator_name: string | null;

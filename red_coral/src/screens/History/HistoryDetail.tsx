@@ -3,11 +3,13 @@ import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedE
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { useCategoryStore } from '@/core/stores/resources';
-import { formatCurrency, Currency, computePriceBreakdown } from '@/utils/currency';
+import { formatCurrency, Currency } from '@/utils/currency';
 import { CATEGORY_ACCENT } from '@/utils/categoryColors';
-import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp, Tag, Hash, Undo2, FileUp } from 'lucide-react';
+import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift, Stamp, Tag, Hash, Undo2, FileUp, Crown, Phone, CreditCard as CardIcon, Star, ShoppingBag, UserX } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
+import type { MemberWithGroup } from '@/core/domain/types/api';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
+import { getMemberDetail } from '@/features/member/mutations';
 import { TimelineList } from '@/shared/components/TimelineList';
 import { calculateItemSink } from '@/utils/itemSorting';
 import { KitchenReprintModal } from '@/screens/Checkout/KitchenReprintModal';
@@ -66,6 +68,10 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showAnulacionModal, setShowAnulacionModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [memberDetail, setMemberDetail] = useState<MemberWithGroup | null>(null);
+  const [memberDeleted, setMemberDeleted] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const categories = useCategoryStore((s) => s.items);
@@ -88,10 +94,6 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
     if (!order?.timeline) return [];
     return order.timeline.map((event, index) => convertArchivedEventToOrderEvent(event, index));
   }, [order?.timeline]);
-
-  const breakdown = useMemo(
-    () => order ? computePriceBreakdown(order.items, order, true) : null, [order],
-  );
 
   // Sort items: category sort_order → paid/comped sink → name
   const sortedItems = useMemo(() => {
@@ -125,8 +127,11 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
     return map;
   }, [order]);
 
+  // Reset member state when order changes
   useEffect(() => {
     setExpandedItems(new Set());
+    setMemberDetail(null);
+    setMemberDeleted(false);
   }, [order?.order_id]);
 
   const toggleItem = useCallback((idx: number) => {
@@ -150,6 +155,22 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
     [sortedItems],
   );
   const allExpanded = expandableIndices.length > 0 && expandableIndices.every((i) => expandedItems.has(i));
+
+  const handleMemberClick = useCallback(async () => {
+    if (!order?.member_id) return;
+    setShowMemberModal(true);
+    if (memberDetail || memberDeleted) return; // already fetched
+    setMemberLoading(true);
+    try {
+      const detail = await getMemberDetail(order.member_id);
+      setMemberDetail(detail);
+      if (!detail.is_active) setMemberDeleted(true);
+    } catch {
+      setMemberDeleted(true);
+    } finally {
+      setMemberLoading(false);
+    }
+  }, [order?.member_id, memberDetail, memberDeleted]);
 
   const toggleAll = () => {
     if (!order) return;
@@ -385,46 +406,159 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
               ))}
             </div>
             <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-2">
-              {order.comp_total_amount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-emerald-600">{t('checkout.breakdown.comp')}</span>
-                  <span className="text-emerald-600">-{formatCurrency(order.comp_total_amount)}</span>
-                </div>
-              )}
-              {breakdown && breakdown.manualItemDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-orange-500">{t('checkout.breakdown.manual_discount')}</span>
-                  <span className="text-orange-500">-{formatCurrency(breakdown.manualItemDiscount)}</span>
-                </div>
-              )}
-              {breakdown && breakdown.totalRuleDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-amber-600">{t('checkout.breakdown.rule_discount')}</span>
-                  <span className="text-amber-600">-{formatCurrency(breakdown.totalRuleDiscount)}</span>
-                </div>
-              )}
-              {breakdown && breakdown.totalRuleSurcharge > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-purple-500">{t('checkout.breakdown.rule_surcharge')}</span>
-                  <span className="text-purple-500">+{formatCurrency(breakdown.totalRuleSurcharge)}</span>
-                </div>
-              )}
-              {order.order_manual_discount_amount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-orange-500">{t('checkout.breakdown.order_discount')}</span>
-                  <span className="text-orange-500">-{formatCurrency(order.order_manual_discount_amount)}</span>
-                </div>
-              )}
-              {order.order_manual_surcharge_amount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-purple-500">{t('checkout.breakdown.order_surcharge')}</span>
-                  <span className="text-purple-500">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
-                <span className="text-gray-800 font-bold">{t('checkout.amount.total')}</span>
-                <span className="text-xl font-bold text-primary-500">{formatCurrency(order.total)}</span>
-              </div>
+              {(() => {
+                // ─────────────────────────────────────────────────────────────
+                // Price Breakdown Calculation
+                //
+                // Backend field semantics (archived_order_item):
+                //   rule_discount_amount  = per-LINE total (per_unit * qty)
+                //   rule_surcharge_amount = per-LINE total (per_unit * qty)
+                //   mg_discount_amount    = per-UNIT amount (NOT multiplied by qty)
+                //
+                // Backend field semantics (archived_order):
+                //   original_total = sum of (base_with_options * qty) for ALL items
+                //   subtotal       = sum of (unit_price * qty) — final item totals
+                //   comp_total_amount = sum of (base_with_options * qty) for comped items
+                //
+                // Price waterfall per non-comped item:
+                //   base_with_options
+                //   - manual_discount (percentage of base)
+                //   - rule_discount (pricing rules)
+                //   + rule_surcharge (pricing rules)
+                //   - mg_discount (marketing group rules, applied after price rules)
+                //   = unit_price
+                //
+                // Therefore:
+                //   (original_total - comp) - subtotal
+                //   = manual + ruleDisc - ruleSur + mgDisc  (all per-line, summed)
+                // ─────────────────────────────────────────────────────────────
+
+                // Sum per-line totals across non-comped items
+                const totalRuleDiscount = order.items.reduce((sum, i) =>
+                  i.is_comped ? sum : Currency.add(sum, i.rule_discount_amount).toNumber(), 0);
+                const totalRuleSurcharge = order.items.reduce((sum, i) =>
+                  i.is_comped ? sum : Currency.add(sum, i.rule_surcharge_amount).toNumber(), 0);
+                const originalTotal = order.original_total;
+                const subtotal = order.subtotal;
+                // Use order-level mg_discount_amount (Decimal-precision from backend)
+                const totalMgDiscount = order.mg_discount_amount;
+
+                // Derive manual item discount as residual:
+                //   manual = (original - comp) - subtotal - ruleDisc + ruleSur - mgDisc
+                const totalManualDiscount = Currency.sub(
+                  Currency.sub(Currency.sub(originalTotal, subtotal).toNumber(), order.comp_total_amount).toNumber(),
+                  Currency.add(Currency.sub(totalRuleDiscount, totalRuleSurcharge).toNumber(), totalMgDiscount).toNumber(),
+                ).toNumber();
+
+                // Aggregate applied pricing rules by rule_id (for named breakdown rows)
+                // applied_rules[].calculated_amount is per-unit → multiply by qty
+                const ruleBreakdown = new Map<number, { name: string; ruleType: string; total: number }>();
+                for (const item of order.items) {
+                  if (item.is_comped || !item.applied_rules) continue;
+                  for (const rule of item.applied_rules) {
+                    if (rule.skipped) continue;
+                    const lineAmount = Currency.mul(rule.calculated_amount, item.quantity).toNumber();
+                    const existing = ruleBreakdown.get(rule.rule_id);
+                    if (existing) {
+                      existing.total = Currency.add(existing.total, lineAmount).toNumber();
+                    } else {
+                      ruleBreakdown.set(rule.rule_id, {
+                        name: rule.receipt_name || rule.name,
+                        ruleType: rule.rule_type,
+                        total: lineAmount,
+                      });
+                    }
+                  }
+                }
+
+                const hasItemAdjustments = order.comp_total_amount > 0 || totalManualDiscount > 0 || totalRuleDiscount > 0 || totalRuleSurcharge > 0 || totalMgDiscount > 0;
+                const hasOrderAdjustments = order.order_manual_discount_amount > 0 || order.order_manual_surcharge_amount > 0;
+
+                if (!hasItemAdjustments && !hasOrderAdjustments) {
+                  return (
+                    <div className="flex justify-between items-end">
+                      <span className="text-gray-800 font-bold">{t('checkout.amount.total')}</span>
+                      <span className="text-xl font-bold text-primary-500">{formatCurrency(order.total)}</span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {/* Item-level: original_total → adjustments */}
+                    {hasItemAdjustments && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">{t('checkout.breakdown.original_total')}</span>
+                          <span className="text-gray-500">{formatCurrency(originalTotal)}</span>
+                        </div>
+                        {order.comp_total_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-emerald-600">{t('checkout.breakdown.comp')}</span>
+                            <span className="text-emerald-600">-{formatCurrency(order.comp_total_amount)}</span>
+                          </div>
+                        )}
+                        {totalManualDiscount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-orange-500">{t('checkout.breakdown.manual_discount')}</span>
+                            <span className="text-orange-500">-{formatCurrency(totalManualDiscount)}</span>
+                          </div>
+                        )}
+                        {[...ruleBreakdown.values()].map((rule, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className={rule.ruleType === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-500'}>
+                              {rule.name}
+                            </span>
+                            <span className={rule.ruleType === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-500'}>
+                              {rule.ruleType === 'DISCOUNT' ? '-' : '+'}{formatCurrency(rule.total)}
+                            </span>
+                          </div>
+                        ))}
+                        {totalMgDiscount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-red-500 flex items-center gap-1">
+                              <Crown size={14} />
+                              {order.marketing_group_name ?? t('checkout.member.link')}
+                            </span>
+                            <span className="text-red-500">-{formatCurrency(totalMgDiscount)}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Subtotal: always show after item adjustments */}
+                    {hasItemAdjustments && (
+                      <div className="flex justify-between text-sm font-medium pt-1 border-t border-dashed border-gray-300">
+                        <span className="text-gray-700">{t('checkout.amount.subtotal')}</span>
+                        <span className="text-gray-700">{formatCurrency(subtotal)}</span>
+                      </div>
+                    )}
+
+                    {/* Order-level: manual discount/surcharge */}
+                    {hasOrderAdjustments && (
+                      <>
+                        {order.order_manual_discount_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-orange-500">{t('checkout.breakdown.order_discount')}</span>
+                            <span className="text-orange-500">-{formatCurrency(order.order_manual_discount_amount)}</span>
+                          </div>
+                        )}
+                        {order.order_manual_surcharge_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-purple-500">{t('checkout.breakdown.order_surcharge')}</span>
+                            <span className="text-purple-500">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
+                      <span className="text-gray-800 font-bold">{t('checkout.amount.total')}</span>
+                      <span className="text-xl font-bold text-primary-500">{formatCurrency(order.total)}</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -452,8 +586,31 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
           <InvoiceSection order={order} />
         </div>
 
-        {/* Timeline */}
-        <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-fit">
+        {/* Right column: Member Card + Timeline */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Member Card */}
+          {order.member_name && (
+            <button
+              onClick={handleMemberClick}
+              className="w-full bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-3 hover:border-primary-300 hover:shadow-md transition-all text-left group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
+                <Crown size={20} className="text-primary-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-gray-800 truncate">{order.member_name}</div>
+                {order.marketing_group_name && (
+                  <div className="text-xs text-violet-600 font-medium truncate">{order.marketing_group_name}</div>
+                )}
+              </div>
+              {order.mg_discount_amount > 0 && (
+                <div className="text-sm font-bold text-red-500 shrink-0">-{formatCurrency(order.mg_discount_amount)}</div>
+              )}
+              <ChevronDown size={16} className="text-gray-300 shrink-0 group-hover:text-gray-500 transition-colors" />
+            </button>
+          )}
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-fit">
           <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2 font-bold text-gray-700">
             <Clock size={18} />
             <span>{t('checkout.timeline.label')}</span>
@@ -468,8 +625,23 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
             )}
           </div>
         </div>
+        </div>
 
       </div>
+
+      {/* Member Detail Modal */}
+      {showMemberModal && order.member_name && (
+        <MemberDetailModal
+          memberName={order.member_name}
+          marketingGroupName={order.marketing_group_name}
+          mgDiscountAmount={order.mg_discount_amount}
+          detail={memberDetail}
+          isDeleted={memberDeleted}
+          isLoading={memberLoading}
+          onClose={() => setShowMemberModal(false)}
+          t={t}
+        />
+      )}
 
       {order && (
         <>
@@ -534,8 +706,6 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, accentColor, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
-  const totalRuleDiscount = item.rule_discount_amount;
-  const totalRuleSurcharge = item.rule_surcharge_amount;
   const manualDiscount = Currency.sub(item.discount_amount, item.rule_discount_amount).toNumber();
   const isFullyPaid = item.unpaid_quantity === 0;
   const isPartiallyPaid = !isFullyPaid && item.unpaid_quantity < item.quantity;
@@ -575,19 +745,24 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                   </span>
                 )
               )}
-              {manualDiscount > 0 && (
+              {!item.is_comped && manualDiscount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                   -{formatCurrency(manualDiscount)}
                 </span>
               )}
-              {totalRuleDiscount > 0 && (
+              {!item.is_comped && item.rule_discount_amount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                  -{formatCurrency(totalRuleDiscount)}
+                  -{formatCurrency(item.rule_discount_amount)}
                 </span>
               )}
-              {totalRuleSurcharge > 0 && (
+              {!item.is_comped && item.rule_surcharge_amount > 0 && (
                 <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                  +{formatCurrency(totalRuleSurcharge)}
+                  +{formatCurrency(item.rule_surcharge_amount)}
+                </span>
+              )}
+              {!item.is_comped && item.mg_discount_amount > 0 && (
+                <span className="text-[0.625rem] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                  -{formatCurrency(Currency.mul(item.mg_discount_amount, item.quantity).toNumber())}
                 </span>
               )}
             </div>
@@ -757,3 +932,113 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
 });
 
 PaymentRow.displayName = 'PaymentRow';
+
+// =============================================================================
+// Member Detail Modal
+// =============================================================================
+
+interface MemberDetailModalProps {
+  memberName: string;
+  marketingGroupName: string | null;
+  mgDiscountAmount: number;
+  detail: MemberWithGroup | null;
+  isDeleted: boolean;
+  isLoading: boolean;
+  onClose: () => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}
+
+function MemberDetailModal({ memberName, marketingGroupName, mgDiscountAmount, detail, isDeleted, isLoading, onClose, t }: MemberDetailModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-6 bg-gradient-to-br from-primary-50 to-violet-50 border-b border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
+              <Crown size={28} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xl font-bold text-gray-800 truncate">{detail?.name ?? memberName}</div>
+              {(detail?.marketing_group_name ?? marketingGroupName) && (
+                <div className="mt-1 inline-flex items-center gap-1.5 text-sm bg-violet-100 text-violet-700 px-2.5 py-0.5 rounded-full font-medium">
+                  <Crown size={12} />
+                  {detail?.marketing_group_name ?? marketingGroupName}
+                </div>
+              )}
+            </div>
+          </div>
+          {isDeleted && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
+              <UserX size={14} />
+              <span>{t('history.member.deleted')}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : detail && !isDeleted ? (
+            <div className="grid grid-cols-2 gap-3">
+              {detail.phone && (
+                <InfoItem icon={Phone} label={t('settings.member.field.phone')} value={detail.phone} />
+              )}
+              {detail.card_number && (
+                <InfoItem icon={CardIcon} label={t('settings.member.field.card_number')} value={detail.card_number} />
+              )}
+              <InfoItem icon={Star} label={t('settings.member.field.points')} value={String(detail.points_balance)} />
+              <InfoItem icon={ShoppingBag} label={t('settings.member.field.total_spent')} value={formatCurrency(detail.total_spent)} />
+              {detail.email && (
+                <InfoItem icon={Crown} label={t('settings.member.field.email')} value={detail.email} span2 />
+              )}
+              {detail.notes && (
+                <InfoItem icon={Crown} label={t('settings.member.field.notes')} value={detail.notes} span2 />
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-gray-400 text-sm py-4">
+              {t('history.member.snapshot_only')}
+            </div>
+          )}
+
+          {/* MG Discount on this order */}
+          {mgDiscountAmount > 0 && (
+            <div className="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
+              <span className="text-sm font-medium text-gray-600">{t('checkout.member.order_mg_discount')}</span>
+              <span className="text-lg font-bold text-red-500">-{formatCurrency(mgDiscountAmount)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+          >
+            {t('common.action.close')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoItem({ icon: Icon, label, value, span2 }: { icon: React.ElementType; label: string; value: string; span2?: boolean }) {
+  return (
+    <div className={`flex items-start gap-2.5 p-3 bg-gray-50 rounded-xl ${span2 ? 'col-span-2' : ''}`}>
+      <Icon size={16} className="text-gray-400 mt-0.5 shrink-0" />
+      <div className="min-w-0">
+        <div className="text-xs text-gray-400 font-medium">{label}</div>
+        <div className="text-sm font-medium text-gray-800 truncate">{value}</div>
+      </div>
+    </div>
+  );
+}
