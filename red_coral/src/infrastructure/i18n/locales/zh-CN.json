@@ -810,7 +810,8 @@
       "amount": "金额",
       "line_today": "今天",
       "line_yesterday": "昨天",
-      "line_last_week": "上周同日"
+      "line_last_week": "上周同日",
+      "retail": "零售"
     },
     "discount_breakdown": "折扣明细",
     "surcharge_breakdown": "附加费明细",

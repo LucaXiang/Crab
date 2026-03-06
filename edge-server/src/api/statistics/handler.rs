@@ -117,6 +117,7 @@ pub struct ServiceTypeEntry {
 #[derive(Debug, Clone, Serialize)]
 pub struct ZoneSaleEntry {
     pub zone_name: String,
+    pub is_retail: bool,
     pub revenue: f64,
     pub orders: i32,
     pub guests: i32,
@@ -547,12 +548,12 @@ pub async fn get_statistics(
     .collect();
 
     // ── Zone sales ──
-    let zone_sales: Vec<ZoneSaleEntry> = sqlx::query_as::<_, (String, f64, i32, i32)>(
-        "SELECT COALESCE(zone_name, 'Unknown'), COALESCE(SUM(total_amount), 0.0), \
+    let zone_sales: Vec<ZoneSaleEntry> = sqlx::query_as::<_, (String, bool, f64, i32, i32)>(
+        "SELECT COALESCE(zone_name, 'Unknown'), is_retail, COALESCE(SUM(total_amount), 0.0), \
             CAST(COUNT(*) AS INTEGER), CAST(COALESCE(SUM(guest_count), 0) AS INTEGER) \
          FROM archived_order \
          WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 AND zone_name IS NOT NULL \
-         GROUP BY zone_name ORDER BY SUM(total_amount) DESC",
+         GROUP BY zone_name, is_retail ORDER BY SUM(total_amount) DESC",
     )
     .bind(start_dt)
     .bind(end_dt)
@@ -560,8 +561,9 @@ pub async fn get_statistics(
     .await
     .map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
-    .map(|(zone_name, revenue, orders, guests)| ZoneSaleEntry {
+    .map(|(zone_name, is_retail, revenue, orders, guests)| ZoneSaleEntry {
         zone_name,
+        is_retail,
         revenue,
         orders,
         guests,

@@ -95,6 +95,7 @@ export interface ServiceTypeEntry {
 
 export interface ZoneSaleEntry {
   zone_name: string;
+  is_retail: boolean;
   revenue: number;
   orders: number;
   guests: number;

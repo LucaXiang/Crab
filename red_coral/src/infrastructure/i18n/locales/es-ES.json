@@ -810,7 +810,8 @@
       "amount": "Importe",
       "line_today": "Hoy",
       "line_yesterday": "Ayer",
-      "line_last_week": "Misma semana ant."
+      "line_last_week": "Misma semana ant.",
+      "retail": "Venta"
     },
     "discount_breakdown": "Desglose de descuentos",
     "surcharge_breakdown": "Desglose de recargos",

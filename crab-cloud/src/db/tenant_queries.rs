@@ -1077,6 +1077,7 @@ pub struct ServiceTypeEntry {
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct ZoneSaleEntry {
     pub zone_name: String,
+    pub is_retail: bool,
     pub revenue: f64,
     pub orders: i64,
     pub guests: i64,
@@ -1436,6 +1437,7 @@ async fn get_overview(
             r#"
             SELECT
                 COALESCE(zone_name, '') AS zone_name,
+                COALESCE(BOOL_OR(is_retail), false) AS is_retail,
                 COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
                 COUNT(*) AS orders,
                 COALESCE(SUM(guest_count), 0)::BIGINT AS guests
@@ -1519,14 +1521,23 @@ async fn get_overview(
         .bind(to)
         .fetch_one(pool),
         // 16. Adjustment breakdown from store_order_adjustments
+        // Map raw source_type + item-level/order-level to frontend keys
         sqlx::query_as::<_, AdjustmentBreakdownEntry>(
             r#"
             SELECT
-                a.source_type,
+                CASE
+                    WHEN a.source_type = 'MANUAL' AND a.item_id IS NULL THEN 'order_manual'
+                    WHEN a.source_type = 'MANUAL' AND a.item_id IS NOT NULL THEN 'item_manual'
+                    WHEN a.source_type = 'PRICE_RULE' AND a.item_id IS NULL THEN 'order_rule'
+                    WHEN a.source_type = 'PRICE_RULE' AND a.item_id IS NOT NULL THEN 'item_rule'
+                    WHEN a.source_type = 'MEMBER_GROUP' THEN 'mg'
+                    WHEN a.source_type = 'COMP' THEN 'comp'
+                    ELSE a.source_type
+                END AS source_type,
                 a.direction,
                 a.rule_name,
                 COALESCE(SUM(a.amount), 0)::DOUBLE PRECISION AS amount,
-                COUNT(*)::BIGINT AS count
+                COUNT(DISTINCT a.order_id)::BIGINT AS count
             FROM store_order_adjustments a
             JOIN store_archived_orders o ON o.id = a.order_id
             WHERE o.tenant_id = $1
@@ -1535,7 +1546,7 @@ async fn get_overview(
                 AND o.status = 'COMPLETED'
                 AND o.is_voided IS NOT TRUE
                 AND a.skipped IS NOT TRUE
-            GROUP BY a.source_type, a.direction, a.rule_name
+            GROUP BY 1, a.direction, a.rule_name
             ORDER BY amount DESC
             "#,
         )
@@ -1954,18 +1965,18 @@ pub async fn get_red_flag_log(
     // 2. Refunds from credit_notes
     if event_type.is_none_or(|et| et == "REFUND") {
         let mut sql = String::from(
-            r#"SELECT cn.created_at, COALESCE(cn.operator_id, 0),
+            r#"SELECT cn.created_at, 0::BIGINT AS operator_id,
                       COALESCE(cn.operator_name, '') AS operator_name,
                       COALESCE(o.receipt_number, '') AS receipt_number,
                       o.source_id AS order_id,
                       cn.total_credit, cn.reason
                FROM store_credit_notes cn
-               JOIN store_archived_orders o ON o.id = cn.order_id
+               JOIN store_archived_orders o ON o.id = cn.original_order_id
                WHERE cn.store_id = $1 AND cn.tenant_id = $2
                  AND cn.created_at >= $3 AND cn.created_at < $4"#,
         );
         if let Some(op) = operator_id {
-            sql.push_str(&format!(" AND cn.operator_id = {op}"));
+            sql.push_str(&format!(" AND cn.operator_name = (SELECT name FROM store_employees WHERE source_id = {op} LIMIT 1)"));
         }
 
         let rows: Vec<(i64, i64, String, String, i64, f64, String)> = sqlx::query_as(&sql)

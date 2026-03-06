@@ -370,6 +370,7 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                             <span className="text-slate-700">{zone.zone_name}</span>
+                            {zone.is_retail && <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-50 text-blue-600">{t('stats.retail')}</span>}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-slate-400">{zone.orders} · {zone.guests}p</span>
