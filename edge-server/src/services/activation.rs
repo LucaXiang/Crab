@@ -310,8 +310,6 @@ impl ActivationService {
             return Err(e);
         }
 
-        tracing::info!("Self-check passed!");
-
         // 3. Update last_verified_at timestamp (防止时钟篡改)
         self.update_last_verified_at().await;
 
@@ -363,8 +361,6 @@ impl ActivationService {
                 .await
             {
                 Ok(()) => {
-                    tracing::info!("Self-check passed!");
-
                     // 3. Update last_verified_at timestamp (防止时钟篡改)
                     self.update_last_verified_at().await;
 
@@ -608,8 +604,6 @@ impl ActivationService {
     /// Sync subscription status (Local Cache -> Remote Fetch -> Update Cache)
     /// integrated into check_activation flow.
     pub async fn sync_subscription(&self) {
-        tracing::info!("Running subscription synchronization...");
-
         // Use cache to get current credential
         let mut credential = match self.get_credential().await {
             Ok(Some(c)) => c,
@@ -682,7 +676,7 @@ impl ActivationService {
                     } else {
                         let remaining_hours =
                             (sub.signature_valid_until - shared::util::now_millis()) / 3_600_000;
-                        tracing::info!(
+                        tracing::debug!(
                             "Subscription sync failed but signature still valid \
                              (expires in {}h). Using cached data.",
                             remaining_hours

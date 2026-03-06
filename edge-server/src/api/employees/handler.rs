@@ -144,7 +144,13 @@ pub async fn delete(
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     // 删除前查信息用于审计
-    let emp_for_audit = employee::find_by_id(&state.pool, id).await.ok().flatten();
+    let emp_for_audit = match employee::find_by_id(&state.pool, id).await {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::warn!(employee_id = %id, "Failed to fetch employee for audit log before delete: {e}");
+            None
+        }
+    };
     let result = employee::delete(&state.pool, id).await?;
 
     if result {

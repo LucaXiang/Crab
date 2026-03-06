@@ -796,7 +796,6 @@ impl OrderStorage {
         }
 
         txn.commit()?;
-        tracing::debug!(order_id = %order_id, "Archive completed, cleaned up from redb");
         Ok(())
     }
 

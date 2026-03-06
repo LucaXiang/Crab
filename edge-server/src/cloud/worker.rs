@@ -658,10 +658,14 @@ impl CloudWorker {
 
         // Mark all processed entries as synced
         for id in &changelog_ids {
-            let _ = sqlx::query("UPDATE catalog_changelog SET cloud_synced = 1 WHERE id = ?")
-                .bind(id)
-                .execute(&self.state.pool)
-                .await;
+            if let Err(e) =
+                sqlx::query("UPDATE catalog_changelog SET cloud_synced = 1 WHERE id = ?")
+                    .bind(id)
+                    .execute(&self.state.pool)
+                    .await
+            {
+                tracing::error!(changelog_id = %id, "Failed to mark catalog_changelog entry as synced: {e}");
+            }
         }
 
         Ok(())
@@ -716,14 +720,23 @@ impl CloudWorker {
                     curr_hash: entry.curr_hash.clone(),
                     created_at: entry.created_at,
                 };
-                if let Ok(ce_data) = serde_json::to_value(&ce_sync) {
-                    items.push(CloudSyncItem {
-                        resource: SyncResource::ChainEntry,
-                        version: entry.id as u64,
-                        action: shared::cloud::SyncAction::Upsert,
-                        resource_id: entry.id,
-                        data: ce_data,
-                    });
+                match serde_json::to_value(&ce_sync) {
+                    Ok(ce_data) => {
+                        items.push(CloudSyncItem {
+                            resource: SyncResource::ChainEntry,
+                            version: entry.id as u64,
+                            action: shared::cloud::SyncAction::Upsert,
+                            resource_id: entry.id,
+                            data: ce_data,
+                        });
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            chain_entry_id = entry.id,
+                            entry_type = %entry.entry_type,
+                            "Failed to serialize chain_entry for cloud sync, skipping: {e}"
+                        );
+                    }
                 }
 
                 // Build resource-specific payload for types that carry data
@@ -975,7 +988,9 @@ impl CloudWorker {
                         chain_entry_id = failed_entry.id,
                         "Failed to update last_chain_hash for BREAK: {e}"
                     );
-                    let _ = tx.rollback().await;
+                    if let Err(rb_err) = tx.rollback().await {
+                        tracing::warn!(chain_entry_id = failed_entry.id, "Rollback failed: {rb_err}");
+                    }
                     return;
                 }
 
@@ -998,14 +1013,24 @@ impl CloudWorker {
             }
             Ok(_) => {
                 // rows_affected == 0: BREAK already exists for this entry (INSERT OR IGNORE)
-                let _ = tx.rollback().await;
+                if let Err(rb_err) = tx.rollback().await {
+                    tracing::warn!(
+                        chain_entry_id = failed_entry.id,
+                        "Rollback failed: {rb_err}"
+                    );
+                }
                 tracing::warn!(
                     chain_entry_id = failed_entry.id,
                     "BREAK already exists for this chain entry, skipping"
                 );
             }
             Err(e) => {
-                let _ = tx.rollback().await;
+                if let Err(rb_err) = tx.rollback().await {
+                    tracing::warn!(
+                        chain_entry_id = failed_entry.id,
+                        "Rollback failed: {rb_err}"
+                    );
+                }
                 tracing::error!(
                     chain_entry_id = failed_entry.id,
                     "Failed to insert BREAK chain_entry: {e}"

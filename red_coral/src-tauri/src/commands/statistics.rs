@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
+use tracing::warn;
 
 use crate::core::response::ApiResponse;
 use crate::core::ClientBridge;
@@ -176,7 +177,10 @@ pub async fn get_statistics(
 
     match bridge.get::<StoreOverview>(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "get_statistics failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -204,7 +208,10 @@ pub async fn get_sales_report(
 
     match bridge.get::<SalesReportResponse>(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "get_sales_report failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -248,7 +255,10 @@ pub async fn get_red_flags(
     let path = format!("/api/statistics/red-flags?from={}&to={}", from, to);
     match bridge.get::<RedFlagsResponse>(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(from, to, error = %e, "get_red_flags failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -299,6 +309,9 @@ pub async fn list_invoices(
     }
     match bridge.get::<InvoiceListResponse>(&path).await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(from, to, error = %e, "list_invoices failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }

@@ -443,7 +443,6 @@ pub async fn batch_update_sort_order(
 
         match &result {
             Ok(_) => {
-                tracing::debug!(id = %update.id, "Product sort order updated successfully");
                 updated_count += 1;
             }
             Err(e) => {

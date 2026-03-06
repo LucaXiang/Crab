@@ -110,6 +110,8 @@ export const ErrorCode = {
   CreditNoteItemOverRefund: 4011,
   OrderVoidedNoCreditNote: 4012,
   OrderAlreadyUpgraded: 4013,
+  ImportInvalidFormat: 4015,
+  ExportFailed: 4016,
 
   // 5xxx: Payment
   PaymentFailed: 5001,
@@ -152,6 +154,7 @@ export const ErrorCode = {
   MarketingGroupNotFound: 6601,
   LabelTemplateNotFound: 6701,
   PriceRuleNotFound: 6801,
+  PriceRuleValueOutOfRange: 6802,
 
   // 7xxx: Table
   TableNotFound: 7001,
@@ -181,6 +184,7 @@ export const ErrorCode = {
   NetworkError: 9003,
   TimeoutError: 9004,
   ConfigError: 9005,
+  PasswordHashingFailed: 9006,
   BridgeNotInitialized: 9101,
   BridgeNotConnected: 9102,
   BridgeConnectionFailed: 9103,

@@ -342,7 +342,7 @@ impl BackgroundTasks {
     async fn await_all(tasks: Vec<RegisteredTask>) {
         for task in tasks {
             match task.handle.await {
-                Ok(()) => tracing::debug!(task = %task.name, "Task completed"),
+                Ok(()) => {}
                 Err(e) if e.is_cancelled() => {
                     tracing::debug!(task = %task.name, "Task cancelled")
                 }

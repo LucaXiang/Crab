@@ -295,7 +295,12 @@ impl ClientBridge {
                 Err(e) => {
                     tracing::warn!("Failed to restore session: {}", e);
                     let mut tenant_manager = self.tenant_manager.write().await;
-                    let _ = tenant_manager.clear_current_session();
+                    if let Err(e) = tenant_manager.clear_current_session() {
+                        tracing::warn!(
+                            "Failed to clear session after restore failure (server mode): {}",
+                            e
+                        );
+                    }
                     let client = CrabClient::local()
                         .with_router(state_arc.https_service().router().ok_or_else(|| {
                             BridgeError::Server("Router not initialized".to_string())
@@ -587,7 +592,12 @@ impl ClientBridge {
                 Err((e, connected)) => {
                     tracing::warn!("Failed to restore session (client mode): {}", e);
                     let mut tm = self.tenant_manager.write().await;
-                    let _ = tm.clear_current_session();
+                    if let Err(e) = tm.clear_current_session() {
+                        tracing::warn!(
+                            "Failed to clear session after restore failure (client mode): {}",
+                            e
+                        );
+                    }
                     RemoteClientState::Connected(connected)
                 }
             }
@@ -720,7 +730,9 @@ impl ClientBridge {
         // 0. 先清除员工 session
         {
             let mut tm = self.tenant_manager.write().await;
-            let _ = tm.clear_current_session();
+            if let Err(e) = tm.clear_current_session() {
+                tracing::warn!("Failed to clear session during exit_tenant: {}", e);
+            }
         }
 
         // 1. 停止当前模式（内联 stop 逻辑，因为 lifecycle_lock 已持有）

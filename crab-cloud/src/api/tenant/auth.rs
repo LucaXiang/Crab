@@ -130,7 +130,7 @@ pub async fn forgot_password(
     let now = shared::util::now_millis();
     let expires_at = now + 5 * 60 * 1000;
 
-    let _ = db::email_verifications::upsert(
+    if let Err(e) = db::email_verifications::upsert(
         &state.pool,
         &email_addr,
         &code_hash,
@@ -139,7 +139,14 @@ pub async fn forgot_password(
         "password_reset",
         None,
     )
-    .await;
+    .await
+    {
+        tracing::error!(error = %e, "Failed to upsert password reset code, skipping email send");
+        // Return OK to prevent email enumeration — do not send email if code wasn't stored
+        return Ok(Json(serde_json::json!({
+            "message": "If the email exists, a reset code has been sent"
+        })));
+    }
 
     let _ = state
         .email

@@ -23,7 +23,20 @@ pub enum ServiceError {
 
 impl From<sqlx::Error> for ServiceError {
     fn from(e: sqlx::Error) -> Self {
-        ServiceError::Db(e.into())
+        // Map well-known sqlx errors to specific ErrorCode
+        let code = match &e {
+            sqlx::Error::RowNotFound => Some(ErrorCode::NotFound),
+            sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
+                Some("23505") => Some(ErrorCode::AlreadyExists), // unique violation
+                Some("23503") => Some(ErrorCode::ValidationFailed), // foreign key violation
+                _ => Some(ErrorCode::DatabaseError),
+            },
+            _ => None,
+        };
+        match code {
+            Some(c) => ServiceError::App(AppError::new(c)),
+            None => ServiceError::Db(e.into()),
+        }
     }
 }
 

@@ -162,7 +162,10 @@ async fn check_quota(pool: &PgPool, identity: &EdgeIdentity) -> Option<ErrorCode
     .await
     {
         Ok((count,)) => count > 0,
-        Err(_) => false,
+        Err(e) => {
+            tracing::warn!(entity_id = %identity.entity_id, error = %e, "DB error checking registration status, assuming not registered");
+            false
+        }
     };
 
     if !already_registered && current_count >= max_stores as i64 {

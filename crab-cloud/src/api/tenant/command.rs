@@ -83,7 +83,11 @@ pub async fn create_command(
     };
 
     let result_json = serde_json::json!({ "success": success, "data": data, "error": error });
-    let _ = commands::complete_command(&state.pool, command_id, success, &result_json, now).await;
+    if let Err(e) =
+        commands::complete_command(&state.pool, command_id, success, &result_json, now).await
+    {
+        tracing::warn!(command_id = command_id, error = %e, "Failed to record command completion in DB");
+    }
 
     let detail = serde_json::json!({
         "command_type": req.command_type,

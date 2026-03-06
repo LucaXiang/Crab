@@ -38,7 +38,8 @@ impl ErrorCode {
             | Self::InvalidFileExtension
             | Self::PrintKitchenDisabled
             | Self::PrintLabelDisabled
-            | Self::PrintDestinationNotConfigured => StatusCode::BAD_REQUEST,
+            | Self::PrintDestinationNotConfigured
+            | Self::PriceRuleValueOutOfRange => StatusCode::BAD_REQUEST,
 
             // ==================== 401 Unauthorized ====================
             // Authentication missing or invalid
@@ -152,7 +153,8 @@ impl ErrorCode {
             | Self::P12CertExpired
             | Self::P12CertNotYetValid
             | Self::PaymentFailed
-            | Self::PaymentRefundExceedsAmount => StatusCode::UNPROCESSABLE_ENTITY,
+            | Self::PaymentRefundExceedsAmount
+            | Self::ImportInvalidFormat => StatusCode::UNPROCESSABLE_ENTITY,
 
             // ==================== 429 Too Many Requests ====================
             Self::TooManyAttempts => StatusCode::TOO_MANY_REQUESTS,
@@ -177,7 +179,9 @@ impl ErrorCode {
             | Self::StorageCorrupted
             | Self::ArchiveHashChainError
             | Self::InvoiceNumberError
-            | Self::InvoiceConversionError => StatusCode::INTERNAL_SERVER_ERROR,
+            | Self::InvoiceConversionError
+            | Self::ExportFailed
+            | Self::PasswordHashingFailed => StatusCode::INTERNAL_SERVER_ERROR,
 
             // ==================== 502 Bad Gateway ====================
             Self::PaymentSetupFailed => StatusCode::BAD_GATEWAY,

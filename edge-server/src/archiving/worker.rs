@@ -578,20 +578,26 @@ impl ArchiveWorker {
             );
 
             // Broadcast shift update so frontend stores stay current
-            if let Ok(Some(updated_shift)) = shift::find_any_open(&self.pool).await {
-                let version = self
-                    .resource_versions
-                    .increment(shared::cloud::SyncResource::Shift);
-                let payload = SyncPayload {
-                    resource: shared::cloud::SyncResource::Shift,
-                    version,
-                    action: shared::message::SyncChangeType::Updated,
-                    id: updated_shift.id,
-                    data: serde_json::to_value(&updated_shift).ok(),
-                    cloud_origin: false,
-                };
-                if let Err(e) = self.message_bus.publish(BusMessage::sync(&payload)).await {
-                    tracing::error!("Shift sync broadcast failed: {}", e);
+            match shift::find_any_open(&self.pool).await {
+                Ok(Some(updated_shift)) => {
+                    let version = self
+                        .resource_versions
+                        .increment(shared::cloud::SyncResource::Shift);
+                    let payload = SyncPayload {
+                        resource: shared::cloud::SyncResource::Shift,
+                        version,
+                        action: shared::message::SyncChangeType::Updated,
+                        id: updated_shift.id,
+                        data: serde_json::to_value(&updated_shift).ok(),
+                        cloud_origin: false,
+                    };
+                    if let Err(e) = self.message_bus.publish(BusMessage::sync(&payload)).await {
+                        tracing::error!("Shift sync broadcast failed: {}", e);
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!("Failed to fetch open shift for broadcast after archive: {e}");
                 }
             }
         }

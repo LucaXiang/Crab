@@ -266,13 +266,18 @@ pub async fn bind(
             // Refresh affected product/category caches
             match owner {
                 BindingOwner::Product(pid) => {
-                    let _ = state.catalog_service.refresh_product_cache(*pid).await;
+                    if let Err(e) = state.catalog_service.refresh_product_cache(*pid).await {
+                        tracing::warn!(product_id = %pid, "Failed to refresh product cache after binding: {e}");
+                    }
                 }
                 BindingOwner::Category(cid) => {
-                    let _ = state
+                    if let Err(e) = state
                         .catalog_service
                         .refresh_products_in_category(*cid)
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(category_id = %cid, "Failed to refresh category product caches after binding: {e}");
+                    }
                 }
             }
 
@@ -307,16 +312,22 @@ pub async fn unbind(state: &ServerState, binding_id: i64) -> StoreOpResult {
     if let Some(b) = binding {
         match b.owner_type.as_str() {
             "product" => {
-                let _ = state
+                if let Err(e) = state
                     .catalog_service
                     .refresh_product_cache(b.owner_id)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(product_id = %b.owner_id, "Failed to refresh product cache after unbind: {e}");
+                }
             }
             "category" => {
-                let _ = state
+                if let Err(e) = state
                     .catalog_service
                     .refresh_products_in_category(b.owner_id)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(category_id = %b.owner_id, "Failed to refresh category product caches after unbind: {e}");
+                }
             }
             _ => {}
         }

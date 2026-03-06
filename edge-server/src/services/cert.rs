@@ -75,7 +75,6 @@ impl CertService {
         // 保存 Root CA
         self.save_root_ca(root_ca_pem).await?;
 
-        tracing::info!("Root CA downloaded and saved successfully");
         Ok(root_ca_pem.to_string())
     }
 
@@ -94,7 +93,6 @@ impl CertService {
         crab_cert::verify_chain_against_root(edge_cert_pem, tenant_ca_pem)
             .map_err(|e| AppError::validation(format!("Edge cert validation failed: {}", e)))?;
 
-        tracing::info!("Certificate chain verification passed: Root CA -> Tenant CA -> Edge Cert");
         Ok(())
     }
 
@@ -269,7 +267,6 @@ impl CertService {
         &self,
         cached_binding: Option<&crate::services::tenant_binding::TenantBinding>,
     ) -> Result<(), AppError> {
-        tracing::info!("Running CertService self-check...");
         let (cert_pem, ca_pem) = self.read_certs()?;
 
         // Step 1: 验证证书对 (链 + 硬件绑定)
@@ -279,7 +276,6 @@ impl CertService {
         // - Hardware ID match
         verify_cert_pair(&cert_pem, &ca_pem)
             .map_err(|e| AppError::validation(format!("Certificate check failed: {}", e)))?;
-        tracing::info!("Certificate chain and hardware binding verified.");
 
         // Step 2: 检查证书过期时间
         let metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
@@ -324,13 +320,11 @@ impl CertService {
         if let Some(binding) = binding_to_check {
             // Step 3a: 检测时钟篡改
             binding.check_clock_tampering()?;
-            tracing::info!("Clock integrity verified.");
 
             // Step 3b: 验证签名
             if binding.is_signed() {
                 // 使用本地的 tenant_ca.pem 验证签名
                 binding.validate(&ca_pem)?;
-                tracing::info!("Credential.json signature and device binding verified.");
             } else {
                 tracing::warn!("Credential.json is not signed (legacy format).");
             }
@@ -356,13 +350,11 @@ impl CertService {
         if edge_cert_path.exists() {
             std::fs::remove_file(&edge_cert_path)
                 .map_err(|e| AppError::internal(format!("Failed to remove edge cert: {}", e)))?;
-            tracing::info!("Removed edge certificate file");
         }
 
         if tenant_ca_path.exists() {
             std::fs::remove_file(&tenant_ca_path)
                 .map_err(|e| AppError::internal(format!("Failed to remove tenant CA: {}", e)))?;
-            tracing::info!("Removed tenant CA certificate file");
         }
 
         tracing::warn!("Certificate cleanup completed. Server will wait for reactivation.");

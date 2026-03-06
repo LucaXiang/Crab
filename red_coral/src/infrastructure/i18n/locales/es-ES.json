@@ -2164,11 +2164,9 @@
       "header": {
         "date": "Fecha",
         "orders": "Pedidos",
-        "sales": "Ventas",
-        "paid": "Cobrado",
-        "unpaid": "Pendiente",
-        "void": "Anulado",
-        "tax": "IVA"
+        "revenue": "Ingresos",
+        "refunds": "Devoluciones",
+        "source": "Origen"
       },
       "no_today_report": "Sin informe de hoy",
       "no_today_report_hint": "Genere al cerrar",
@@ -2189,29 +2187,27 @@
       "generate_today": "Generar hoy",
       "detail_title": "Detalle informe",
       "summary": {
-        "total_sales": "Total ventas",
-        "total_paid": "Cobrado",
-        "total_unpaid": "Pendiente"
+        "net_revenue": "Ingresos netos",
+        "total_orders": "Pedidos",
+        "refunds": "Devoluciones"
+      },
+      "refund_count_unit": "devoluciones",
+      "auto_generated": "Auto-generado",
+      "source": {
+        "auto": "Auto",
+        "manual": "Manual"
       },
       "section": {
-        "orders": "Pedidos",
-        "tax": "IVA",
-        "payment": "Pagos",
+        "shifts": "Turnos",
         "additional": "Adicional"
       },
-      "stat": {
-        "total": "Total",
-        "completed": "Completados",
-        "void": "Anulados",
-        "void_amount": "Importe anulado"
+      "shift": {
+        "orders": "Pedidos",
+        "sales": "Ventas",
+        "expected_cash": "Efectivo esperado",
+        "cash_variance": "Diferencia",
+        "abnormal": "Cierre anormal"
       },
-      "orders_count": "pedidos",
-      "payments_count": "pagos",
-      "tax_amount": "IVA",
-      "no_tax_data": "Sin datos IVA",
-      "no_payment_data": "Sin datos pago",
-      "total_discount": "Descuentos",
-      "total_surcharge": "Suplementos",
       "generated_by": "Generado por",
       "generated_at": "Fecha generación",
       "note": "Nota",

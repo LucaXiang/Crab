@@ -172,9 +172,24 @@ impl ClientBridge {
                         };
 
                         // Build RequestCommand message with full command (preserves command_id, operator info)
+                        let params = match serde_json::to_value(&command) {
+                            Ok(v) => Some(v),
+                            Err(e) => {
+                                tracing::warn!(
+                                    command_id = %command.command_id,
+                                    action = action,
+                                    error = %e,
+                                    "Failed to serialize order command, sending without params"
+                                );
+                                return Err(BridgeError::Server(format!(
+                                    "Failed to serialize command: {}",
+                                    e
+                                )));
+                            }
+                        };
                         let request_payload = shared::message::RequestCommandPayload {
                             action: action.to_string(),
-                            params: serde_json::to_value(&command).ok(),
+                            params,
                         };
                         let request_msg =
                             shared::message::BusMessage::request_command(&request_payload);
@@ -193,13 +208,28 @@ impl ClientBridge {
                         if response_payload.success {
                             // Extract CommandResponse from data if present
                             if let Some(data) = response_payload.data {
-                                let cmd_response: CommandResponse = serde_json::from_value(data)
-                                    .unwrap_or(CommandResponse {
-                                        command_id: command.command_id,
-                                        success: true,
-                                        order_id: None,
-                                        error: None,
-                                    });
+                                let cmd_response: CommandResponse = match serde_json::from_value(
+                                    data,
+                                ) {
+                                    Ok(r) => r,
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            command_id = %command.command_id,
+                                            action = action,
+                                            error = %e,
+                                            "Failed to deserialize CommandResponse, returning failure"
+                                        );
+                                        CommandResponse {
+                                            command_id: command.command_id,
+                                            success: false,
+                                            order_id: None,
+                                            error: Some(shared::order::CommandError::new(
+                                                shared::order::CommandErrorCode::InternalError,
+                                                format!("Failed to parse server response: {}", e),
+                                            )),
+                                        }
+                                    }
+                                };
                                 Ok(cmd_response)
                             } else {
                                 Ok(CommandResponse {

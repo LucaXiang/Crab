@@ -163,6 +163,10 @@ pub enum ErrorCode {
     OrderAlreadyUpgraded = 4013,
     /// Import blocked: active orders exist
     ImportBlockedActiveOrders = 4014,
+    /// Import failed: invalid ZIP or catalog format
+    ImportInvalidFormat = 4015,
+    /// Export failed: internal error during export
+    ExportFailed = 4016,
 
     // ==================== 5xxx: Payment ====================
     /// Payment processing failed
@@ -244,6 +248,8 @@ pub enum ErrorCode {
 
     /// Price rule not found
     PriceRuleNotFound = 6801,
+    /// Price rule value out of range (percentage/amount)
+    PriceRuleValueOutOfRange = 6802,
 
     // ==================== 7xxx: Table ====================
     /// Table not found
@@ -297,6 +303,8 @@ pub enum ErrorCode {
     TimeoutError = 9004,
     /// Configuration error
     ConfigError = 9005,
+    /// Password hashing failed (internal bcrypt/argon2 error)
+    PasswordHashingFailed = 9006,
     /// Bridge not initialized
     BridgeNotInitialized = 9101,
     /// Bridge not connected
@@ -433,6 +441,8 @@ impl ErrorCode {
             ErrorCode::ImportBlockedActiveOrders => {
                 "Cannot import catalog while active orders exist"
             }
+            ErrorCode::ImportInvalidFormat => "Import failed: invalid ZIP or catalog format",
+            ErrorCode::ExportFailed => "Export failed: internal error during export",
 
             // Payment
             ErrorCode::PaymentFailed => "Payment processing failed",
@@ -466,6 +476,9 @@ impl ErrorCode {
             ErrorCode::MarketingGroupNotFound => "Marketing group not found",
             ErrorCode::LabelTemplateNotFound => "Label template not found",
             ErrorCode::PriceRuleNotFound => "Price rule not found",
+            ErrorCode::PriceRuleValueOutOfRange => {
+                "Price rule value is out of range (percentage or amount)"
+            }
 
             // File Upload
             ErrorCode::FileTooLarge => "File too large",
@@ -508,6 +521,7 @@ impl ErrorCode {
             ErrorCode::NetworkError => "Network error",
             ErrorCode::TimeoutError => "Operation timed out",
             ErrorCode::ConfigError => "Configuration error",
+            ErrorCode::PasswordHashingFailed => "Password hashing failed",
             ErrorCode::BridgeNotInitialized => "Bridge is not initialized",
             ErrorCode::BridgeNotConnected => "Bridge is not connected",
             ErrorCode::BridgeConnectionFailed => "Bridge connection failed",
@@ -632,6 +646,8 @@ impl TryFrom<u16> for ErrorCode {
             4012 => Ok(ErrorCode::OrderVoidedNoCreditNote),
             4013 => Ok(ErrorCode::OrderAlreadyUpgraded),
             4014 => Ok(ErrorCode::ImportBlockedActiveOrders),
+            4015 => Ok(ErrorCode::ImportInvalidFormat),
+            4016 => Ok(ErrorCode::ExportFailed),
 
             // Payment
             5001 => Ok(ErrorCode::PaymentFailed),
@@ -674,6 +690,7 @@ impl TryFrom<u16> for ErrorCode {
             6601 => Ok(ErrorCode::MarketingGroupNotFound),
             6701 => Ok(ErrorCode::LabelTemplateNotFound),
             6801 => Ok(ErrorCode::PriceRuleNotFound),
+            6802 => Ok(ErrorCode::PriceRuleValueOutOfRange),
 
             // Table
             7001 => Ok(ErrorCode::TableNotFound),
@@ -703,6 +720,7 @@ impl TryFrom<u16> for ErrorCode {
             9003 => Ok(ErrorCode::NetworkError),
             9004 => Ok(ErrorCode::TimeoutError),
             9005 => Ok(ErrorCode::ConfigError),
+            9006 => Ok(ErrorCode::PasswordHashingFailed),
             9101 => Ok(ErrorCode::BridgeNotInitialized),
             9102 => Ok(ErrorCode::BridgeNotConnected),
             9103 => Ok(ErrorCode::BridgeConnectionFailed),
@@ -1033,8 +1051,8 @@ mod tests {
             3001, 3002, 3003, 3004, 3005, 3006, 3007, 3009, 3010, // 3xxx Tenant
             3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, 3023, 3024,
             3025, 3026, 3027, 3028, 3029, 3030, 3031, // P12 errors (30)
-            4001, 4002, 4003, 4004, 4005, 4006, 4007, 4008, 4009, 4010, 4011, 4012, 4013,
-            4014, // 4xxx Order (14)
+            4001, 4002, 4003, 4004, 4005, 4006, 4007, 4008, 4009, 4010, 4011, 4012, 4013, 4014,
+            4015, 4016, // 4xxx Order (16)
             5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
             6001, 6002, 6003, // 6xxx Product
             6101, 6102, 6103, // 61xx Category
@@ -1045,21 +1063,21 @@ mod tests {
             6511, 6512, // 65xx Print Dest
             6601, // 66xx Marketing
             6701, // 67xx Label Template
-            6801, // 68xx Price Rule (28)
+            6801, 6802, // 68xx Price Rule (29)
             7001, 7002, 7003, // 7xxx Table
             7101, 7102, 7103, 7104, // 71xx Zone
             7201, // 72xx Shift
             7301, // 73xx Daily Report (9)
             8001, 8002, 8003, 8004, 8005, // 8xxx Employee+Member
             8101, 8102, 8103, 8104, // 81xx Role (9)
-            9001, 9002, 9003, 9004, 9005, // 9xxx System
+            9001, 9002, 9003, 9004, 9005, 9006, // 9xxx System
             9101, 9102, 9103, // 91xx Bridge
             9201, 9202, 9203, 9204, 9205, 9206, 9207, // 92xx Printer
             9301, 9302, 9303, 9304, // 93xx Client + Archive/Invoice
             9401, 9402, 9403, 9404, // 94xx Storage
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 142;
+        const EXPECTED_VARIANT_COUNT: usize = 146;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

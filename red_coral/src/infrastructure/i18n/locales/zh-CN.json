@@ -2164,11 +2164,9 @@
       "header": {
         "date": "营业日期",
         "orders": "订单",
-        "sales": "销售额",
-        "paid": "已收款",
-        "unpaid": "未收款",
-        "void": "作废",
-        "tax": "税额"
+        "revenue": "净营收",
+        "refunds": "退款",
+        "source": "来源"
       },
       "no_today_report": "今日尚未生成日结报告",
       "no_today_report_hint": "建议在每日营业结束后生成日结报告",
@@ -2176,29 +2174,27 @@
       "generate_today": "生成今日报告",
       "detail_title": "日结报告详情",
       "summary": {
-        "total_sales": "销售总额",
-        "total_paid": "已收款",
-        "total_unpaid": "未收款"
+        "net_revenue": "净营收",
+        "total_orders": "订单数",
+        "refunds": "退款总额"
+      },
+      "refund_count_unit": "笔退款",
+      "auto_generated": "自动生成",
+      "source": {
+        "auto": "自动",
+        "manual": "手动"
       },
       "section": {
-        "orders": "订单统计",
-        "tax": "税率分类",
-        "payment": "支付方式",
+        "shifts": "班次明细",
         "additional": "附加信息"
       },
-      "stat": {
-        "total": "总计",
-        "completed": "完成",
-        "void": "作废",
-        "void_amount": "作废金额"
+      "shift": {
+        "orders": "订单",
+        "sales": "销售",
+        "expected_cash": "应收现金",
+        "cash_variance": "现金差异",
+        "abnormal": "异常关闭"
       },
-      "orders_count": "笔订单",
-      "payments_count": "笔",
-      "tax_amount": "税额",
-      "no_tax_data": "暂无税率数据",
-      "no_payment_data": "暂无支付数据",
-      "total_discount": "总折扣",
-      "total_surcharge": "总附加费",
       "generated_by": "生成人",
       "generated_at": "生成时间",
       "note": "备注",

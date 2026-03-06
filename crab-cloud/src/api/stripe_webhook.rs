@@ -246,12 +246,22 @@ async fn handle_subscription_updated(state: &AppState, event: &serde_json::Value
                 TenantStatus::Suspended
             }
         };
-        let _ = db::tenants::update_status(&state.pool, tenant_id, tenant_status.as_db()).await;
-        tracing::info!(
-            tenant_id = tenant_id,
-            tenant_status = tenant_status.as_db(),
-            "Tenant status synced from subscription"
-        );
+        if let Err(e) =
+            db::tenants::update_status(&state.pool, tenant_id, tenant_status.as_db()).await
+        {
+            tracing::error!(
+                tenant_id = tenant_id,
+                tenant_status = tenant_status.as_db(),
+                error = %e,
+                "Failed to sync tenant status from subscription"
+            );
+        } else {
+            tracing::info!(
+                tenant_id = tenant_id,
+                tenant_status = tenant_status.as_db(),
+                "Tenant status synced from subscription"
+            );
+        }
     }
 
     tracing::info!(
@@ -283,12 +293,20 @@ async fn handle_subscription_deleted(state: &AppState, event: &serde_json::Value
     // Find and cancel tenant
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ = db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Canceled.as_db())
-            .await;
-        tracing::info!(
-            tenant_id = tenant_id,
-            "Tenant canceled (subscription deleted)"
-        );
+        if let Err(e) =
+            db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Canceled.as_db()).await
+        {
+            tracing::error!(
+                tenant_id = tenant_id,
+                error = %e,
+                "Failed to cancel tenant (subscription deleted)"
+            );
+        } else {
+            tracing::info!(
+                tenant_id = tenant_id,
+                "Tenant canceled (subscription deleted)"
+            );
+        }
 
         if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, tenant_id).await {
             let _ = state.email.send_subscription_canceled(&tenant.email).await;
@@ -330,9 +348,14 @@ async fn handle_payment_failed(state: &AppState, event: &serde_json::Value) -> S
     // Suspend tenant
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ = db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Suspended.as_db())
-            .await;
-        tracing::info!(tenant_id = tenant_id, "Tenant suspended (payment failed)");
+        if let Err(e) =
+            db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Suspended.as_db())
+                .await
+        {
+            tracing::error!(tenant_id = tenant_id, error = %e, "Failed to suspend tenant (payment failed)");
+        } else {
+            tracing::info!(tenant_id = tenant_id, "Tenant suspended (payment failed)");
+        }
 
         if let Ok(Some(tenant)) = db::tenants::find_by_id(&state.pool, tenant_id).await {
             let _ = state.email.send_payment_failed(&tenant.email).await;
@@ -384,24 +407,34 @@ async fn handle_invoice_paid(state: &AppState, event: &serde_json::Value) -> Sta
         .and_then(|p| p["end"].as_i64())
     {
         let period_end_ms = period_end * 1000; // Stripe uses seconds
-        let _ = sqlx::query("UPDATE subscriptions SET current_period_end = $1 WHERE id = $2")
-            .bind(period_end_ms)
-            .bind(sub_id)
-            .execute(&state.pool)
-            .await;
+        if let Err(e) =
+            sqlx::query("UPDATE subscriptions SET current_period_end = $1 WHERE id = $2")
+                .bind(period_end_ms)
+                .bind(sub_id)
+                .execute(&state.pool)
+                .await
+        {
+            tracing::error!(subscription_id = sub_id, error = %e, "Failed to update current_period_end (invoice paid)");
+        }
     }
 
     // Restore subscription to active + restore suspended tenant
-    let _ = db::subscriptions::update_status(&state.pool, sub_id, "active").await;
+    if let Err(e) = db::subscriptions::update_status(&state.pool, sub_id, "active").await {
+        tracing::error!(subscription_id = sub_id, error = %e, "Failed to restore subscription to active (invoice paid)");
+    }
 
     if let Ok(Some(tenant_id)) = db::subscriptions::find_tenant_by_sub_id(&state.pool, sub_id).await
     {
-        let _ =
-            db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Active.as_db()).await;
-        tracing::info!(
-            tenant_id = tenant_id,
-            "Tenant restored to active (invoice paid)"
-        );
+        if let Err(e) =
+            db::tenants::update_status(&state.pool, tenant_id, TenantStatus::Active.as_db()).await
+        {
+            tracing::error!(tenant_id = tenant_id, error = %e, "Failed to restore tenant to active (invoice paid)");
+        } else {
+            tracing::info!(
+                tenant_id = tenant_id,
+                "Tenant restored to active (invoice paid)"
+            );
+        }
     }
 
     tracing::info!(subscription_id = sub_id, "Invoice paid, period updated");

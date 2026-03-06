@@ -32,6 +32,7 @@ use shared::models::{
     TagCreate,
     TagUpdate,
 };
+use tracing::warn;
 
 // ============ Tags ============
 
@@ -63,7 +64,10 @@ pub async fn create_tag(
 ) -> Result<ApiResponse<Tag>, String> {
     match bridge.post::<Tag, _>("/api/tags", &data).await {
         Ok(tag) => Ok(ApiResponse::success(tag)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "create_tag failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -78,7 +82,10 @@ pub async fn update_tag(
         .await
     {
         Ok(tag) => Ok(ApiResponse::success(tag)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "update_tag failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -89,7 +96,10 @@ pub async fn delete_tag(
 ) -> Result<ApiResponse<DeleteData>, String> {
     match bridge.delete::<bool>(&format!("/api/tags/{}", id)).await {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "delete_tag failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -126,7 +136,10 @@ pub async fn create_category(
 ) -> Result<ApiResponse<Category>, String> {
     match bridge.post::<Category, _>("/api/categories", &data).await {
         Ok(cat) => Ok(ApiResponse::success(cat)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "create_category failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -141,7 +154,10 @@ pub async fn update_category(
         .await
     {
         Ok(cat) => Ok(ApiResponse::success(cat)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "update_category failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -155,7 +171,10 @@ pub async fn delete_category(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "delete_category failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -207,7 +226,10 @@ pub async fn create_product(
 ) -> Result<ApiResponse<ProductFull>, String> {
     match bridge.post::<ProductFull, _>("/api/products", &data).await {
         Ok(prod) => Ok(ApiResponse::success(prod)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "create_product failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -222,7 +244,10 @@ pub async fn update_product(
         .await
     {
         Ok(prod) => Ok(ApiResponse::success(prod)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "update_product failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -236,7 +261,10 @@ pub async fn delete_product(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "delete_product failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -273,7 +301,10 @@ pub async fn create_attribute(
 ) -> Result<ApiResponse<Attribute>, String> {
     match bridge.post::<Attribute, _>("/api/attributes", &data).await {
         Ok(template) => Ok(ApiResponse::success(template)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "create_attribute failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -288,7 +319,10 @@ pub async fn update_attribute(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(template)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "update_attribute failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -302,7 +336,10 @@ pub async fn delete_attribute(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "delete_attribute failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -319,7 +356,10 @@ pub async fn add_attribute_option(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(template)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(attribute_id, error = %e, "add_attribute_option failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -338,7 +378,10 @@ pub async fn update_attribute_option(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(template)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(attribute_id, index, error = %e, "update_attribute_option failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -356,7 +399,10 @@ pub async fn delete_attribute_option(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(template)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(attribute_id, index, error = %e, "delete_attribute_option failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -386,7 +432,10 @@ pub async fn bind_product_attribute(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "bind_product_attribute failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -400,7 +449,10 @@ pub async fn unbind_product_attribute(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "unbind_product_attribute failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -454,7 +506,15 @@ pub async fn bind_category_attribute(
         .await
     {
         Ok(binding) => Ok(ApiResponse::success(binding)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(
+                category_id = data.category_id,
+                attribute_id = data.attribute_id,
+                error = %e,
+                "bind_category_attribute failed"
+            );
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -473,7 +533,10 @@ pub async fn unbind_category_attribute(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(category_id, attribute_id, error = %e, "unbind_category_attribute failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -501,7 +564,10 @@ pub async fn batch_update_category_sort_order(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "batch_update_category_sort_order failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -523,7 +589,10 @@ pub async fn batch_update_product_sort_order(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "batch_update_product_sort_order failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -566,7 +635,10 @@ pub async fn create_print_destination(
         .await
     {
         Ok(print_destination) => Ok(ApiResponse::success(print_destination)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(error = %e, "create_print_destination failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -581,7 +653,10 @@ pub async fn update_print_destination(
         .await
     {
         Ok(print_destination) => Ok(ApiResponse::success(print_destination)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "update_print_destination failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }
 
@@ -595,6 +670,9 @@ pub async fn delete_print_destination(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+        Err(e) => {
+            warn!(id, error = %e, "delete_print_destination failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
     }
 }

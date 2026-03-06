@@ -126,8 +126,11 @@ pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError>
         dining_tables,
     };
 
-    let catalog_json =
-        serde_json::to_vec_pretty(&catalog).map_err(|e| AppError::internal(e.to_string()))?;
+    let export_err = |e: &dyn std::fmt::Display| {
+        AppError::with_message(shared::error::ErrorCode::ExportFailed, format!("{e}"))
+    };
+
+    let catalog_json = serde_json::to_vec_pretty(&catalog).map_err(|e| export_err(&e))?;
 
     // Build ZIP in memory
     let mut buf = Cursor::new(Vec::new());
@@ -138,9 +141,8 @@ pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError>
 
         // Write catalog.json
         zip.start_file("catalog.json", options)
-            .map_err(|e| AppError::internal(e.to_string()))?;
-        zip.write_all(&catalog_json)
-            .map_err(|e| AppError::internal(e.to_string()))?;
+            .map_err(|e| export_err(&e))?;
+        zip.write_all(&catalog_json).map_err(|e| export_err(&e))?;
 
         // Write images
         let images_dir = state.work_dir().join("images");
@@ -154,17 +156,14 @@ pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError>
                 {
                     let zip_path = format!("images/{name}");
                     zip.start_file(&zip_path, options)
-                        .map_err(|e| AppError::internal(e.to_string()))?;
-                    let data =
-                        std::fs::read(&path).map_err(|e| AppError::internal(e.to_string()))?;
-                    zip.write_all(&data)
-                        .map_err(|e| AppError::internal(e.to_string()))?;
+                        .map_err(|e| export_err(&e))?;
+                    let data = std::fs::read(&path).map_err(|e| export_err(&e))?;
+                    zip.write_all(&data).map_err(|e| export_err(&e))?;
                 }
             }
         }
 
-        zip.finish()
-            .map_err(|e| AppError::internal(e.to_string()))?;
+        zip.finish().map_err(|e| export_err(&e))?;
     }
 
     Ok(buf.into_inner())
@@ -172,30 +171,34 @@ pub(super) async fn export_zip(state: &ServerState) -> Result<Vec<u8>, AppError>
 
 /// Parse ZIP and import catalog data + images
 pub(super) async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<(), AppError> {
+    let import_fmt_err =
+        |msg: String| AppError::with_message(shared::error::ErrorCode::ImportInvalidFormat, msg);
+
     let cursor = Cursor::new(zip_bytes);
     let mut archive =
-        ZipArchive::new(cursor).map_err(|e| AppError::validation(format!("Invalid ZIP: {e}")))?;
+        ZipArchive::new(cursor).map_err(|e| import_fmt_err(format!("Invalid ZIP: {e}")))?;
 
     // Read catalog.json
     let catalog: CatalogExport = {
         let mut file = archive
             .by_name("catalog.json")
-            .map_err(|_| AppError::validation("ZIP missing catalog.json"))?;
+            .map_err(|_| import_fmt_err("ZIP missing catalog.json".to_string()))?;
         let mut json_bytes = Vec::new();
         file.read_to_end(&mut json_bytes)
-            .map_err(|e| AppError::internal(e.to_string()))?;
+            .map_err(|e| import_fmt_err(format!("Failed to read catalog.json: {e}")))?;
         serde_json::from_slice(&json_bytes)
-            .map_err(|e| AppError::validation(format!("Invalid catalog.json: {e}")))?
+            .map_err(|e| import_fmt_err(format!("Invalid catalog.json: {e}")))?
     };
 
     // Extract images
     let images_dir = state.work_dir().join("images");
-    std::fs::create_dir_all(&images_dir).map_err(|e| AppError::internal(e.to_string()))?;
+    std::fs::create_dir_all(&images_dir)
+        .map_err(|e| AppError::internal(format!("Failed to create images dir: {e}")))?;
 
     for i in 0..archive.len() {
         let mut file = archive
             .by_index(i)
-            .map_err(|e| AppError::internal(e.to_string()))?;
+            .map_err(|e| import_fmt_err(format!("Failed to read ZIP entry {i}: {e}")))?;
         let name = file.name().to_string();
         if let Some(image_name) = name.strip_prefix("images/")
             && !image_name.is_empty()
@@ -204,14 +207,16 @@ pub(super) async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<
             let dest = images_dir.join(image_name);
             let mut data = Vec::new();
             file.read_to_end(&mut data)
-                .map_err(|e| AppError::internal(e.to_string()))?;
-            std::fs::write(&dest, &data).map_err(|e| AppError::internal(e.to_string()))?;
+                .map_err(|e| import_fmt_err(format!("Failed to read image {image_name}: {e}")))?;
+            std::fs::write(&dest, &data).map_err(|e| {
+                AppError::internal(format!("Failed to write image {image_name}: {e}"))
+            })?;
         }
     }
 
     // Validate referential integrity before touching the database
     validate_catalog(&catalog)
-        .map_err(|e| AppError::validation(format!("Catalog validation failed: {e}")))?;
+        .map_err(|e| import_fmt_err(format!("Catalog validation failed: {e}")))?;
 
     // Import data within a transaction
     import_catalog_data(state, &catalog).await?;
@@ -221,7 +226,7 @@ pub(super) async fn import_zip(state: &ServerState, zip_bytes: &[u8]) -> Result<
         .catalog_service
         .warmup()
         .await
-        .map_err(|e| AppError::internal(e.to_string()))?;
+        .map_err(|e| AppError::internal(format!("Catalog cache warmup failed: {e}")))?;
 
     // Broadcast sync events from actual DB data (IDs are remapped during import)
     // CloudSyncWorker debounces (500ms) and batches these for cloud push
@@ -678,112 +683,133 @@ async fn export_all_products(
 /// CloudSyncWorker picks these up and pushes to cloud.
 async fn broadcast_catalog_sync(state: &ServerState) {
     // Tags
-    if let Ok(tags) = tag::find_all(&state.pool).await {
-        for t in &tags {
-            state
-                .broadcast_sync(
-                    SyncResource::Tag,
-                    SyncChangeType::Updated,
-                    t.id,
-                    Some(t),
-                    false,
-                )
-                .await;
+    match tag::find_all(&state.pool).await {
+        Ok(tags) => {
+            for t in &tags {
+                state
+                    .broadcast_sync(
+                        SyncResource::Tag,
+                        SyncChangeType::Updated,
+                        t.id,
+                        Some(t),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch tags: {e}"),
     }
 
     // Categories (direct DB — includes inactive after import)
-    if let Ok(categories) = export_all_categories(&state.pool).await {
-        for c in &categories {
-            state
-                .broadcast_sync(
-                    SyncResource::Category,
-                    SyncChangeType::Updated,
-                    c.id,
-                    Some(c),
-                    false,
-                )
-                .await;
+    match export_all_categories(&state.pool).await {
+        Ok(categories) => {
+            for c in &categories {
+                state
+                    .broadcast_sync(
+                        SyncResource::Category,
+                        SyncChangeType::Updated,
+                        c.id,
+                        Some(c),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch categories: {e}"),
     }
 
     // Products (direct DB — includes inactive after import)
-    if let Ok(products) = export_all_products(&state.pool).await {
-        for p in &products {
-            state
-                .broadcast_sync(
-                    SyncResource::Product,
-                    SyncChangeType::Updated,
-                    p.id,
-                    Some(p),
-                    false,
-                )
-                .await;
+    match export_all_products(&state.pool).await {
+        Ok(products) => {
+            for p in &products {
+                state
+                    .broadcast_sync(
+                        SyncResource::Product,
+                        SyncChangeType::Updated,
+                        p.id,
+                        Some(p),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch products: {e}"),
     }
 
     // Attributes (includes inactive after import)
-    if let Ok(attrs) = attribute::find_all_with_inactive(&state.pool).await {
-        for a in &attrs {
-            state
-                .broadcast_sync(
-                    SyncResource::Attribute,
-                    SyncChangeType::Updated,
-                    a.id,
-                    Some(a),
-                    false,
-                )
-                .await;
+    match attribute::find_all_with_inactive(&state.pool).await {
+        Ok(attrs) => {
+            for a in &attrs {
+                state
+                    .broadcast_sync(
+                        SyncResource::Attribute,
+                        SyncChangeType::Updated,
+                        a.id,
+                        Some(a),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch attributes: {e}"),
     }
 
     // Zones
-    if let Ok(zones) = zone::find_all_with_inactive(&state.pool).await {
-        for z in &zones {
-            state
-                .broadcast_sync(
-                    SyncResource::Zone,
-                    SyncChangeType::Updated,
-                    z.id,
-                    Some(z),
-                    false,
-                )
-                .await;
+    match zone::find_all_with_inactive(&state.pool).await {
+        Ok(zones) => {
+            for z in &zones {
+                state
+                    .broadcast_sync(
+                        SyncResource::Zone,
+                        SyncChangeType::Updated,
+                        z.id,
+                        Some(z),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch zones: {e}"),
     }
 
     // Dining tables
-    if let Ok(tables) = dining_table::find_all_with_inactive(&state.pool).await {
-        for dt in &tables {
-            state
-                .broadcast_sync(
-                    SyncResource::DiningTable,
-                    SyncChangeType::Updated,
-                    dt.id,
-                    Some(dt),
-                    false,
-                )
-                .await;
+    match dining_table::find_all_with_inactive(&state.pool).await {
+        Ok(tables) => {
+            for dt in &tables {
+                state
+                    .broadcast_sync(
+                        SyncResource::DiningTable,
+                        SyncChangeType::Updated,
+                        dt.id,
+                        Some(dt),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch dining tables: {e}"),
     }
 
     // Price rules
-    if let Ok(rules) = price_rule::find_all_with_inactive(&state.pool).await {
-        for pr in &rules {
-            state
-                .broadcast_sync(
-                    SyncResource::PriceRule,
-                    SyncChangeType::Updated,
-                    pr.id,
-                    Some(pr),
-                    false,
-                )
-                .await;
+    match price_rule::find_all_with_inactive(&state.pool).await {
+        Ok(rules) => {
+            for pr in &rules {
+                state
+                    .broadcast_sync(
+                        SyncResource::PriceRule,
+                        SyncChangeType::Updated,
+                        pr.id,
+                        Some(pr),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch price rules: {e}"),
     }
 
     // Attribute bindings
-    if let Ok(bindings) = sqlx::query_as::<_, AttributeBinding>(
+    match sqlx::query_as::<_, AttributeBinding>(
         "SELECT id, owner_type, owner_id, attribute_id, is_required, display_order, \
          COALESCE(default_option_ids, 'null') as default_option_ids \
          FROM attribute_binding ORDER BY display_order",
@@ -791,16 +817,19 @@ async fn broadcast_catalog_sync(state: &ServerState) {
     .fetch_all(&state.pool)
     .await
     {
-        for b in &bindings {
-            state
-                .broadcast_sync(
-                    SyncResource::AttributeBinding,
-                    SyncChangeType::Updated,
-                    b.id,
-                    Some(b),
-                    false,
-                )
-                .await;
+        Ok(bindings) => {
+            for b in &bindings {
+                state
+                    .broadcast_sync(
+                        SyncResource::AttributeBinding,
+                        SyncChangeType::Updated,
+                        b.id,
+                        Some(b),
+                        false,
+                    )
+                    .await;
+            }
         }
+        Err(e) => tracing::warn!("broadcast_catalog_sync: failed to fetch attribute bindings: {e}"),
     }
 }

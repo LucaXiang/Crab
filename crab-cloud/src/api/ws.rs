@@ -124,7 +124,12 @@ async fn handle_ws_connection(socket: WebSocket, state: AppState, identity: Edge
     // Replay pending_ops: if Console made changes while edge was offline,
     // push them as individual StoreOp RPCs. Edge requests full CatalogSyncData
     // separately via RequestCatalogSync when needed (re-bind scenario).
-    if let Ok(ops) = crate::db::store::pending_ops::fetch_ordered(&state.pool, store_id).await
+    let pending_ops_result =
+        crate::db::store::pending_ops::fetch_ordered(&state.pool, store_id).await;
+    if let Err(ref e) = pending_ops_result {
+        tracing::warn!(store_id, error = %e, "Failed to fetch pending ops for replay");
+    }
+    if let Ok(ops) = pending_ops_result
         && !ops.is_empty()
     {
         let mut sent = 0usize;
@@ -354,6 +359,14 @@ async fn handle_edge_message<S>(
                         }
                     }
                     Err(e) => {
+                        tracing::warn!(
+                            store_id,
+                            entity_id = %identity.entity_id,
+                            resource_type = %item.resource.as_str(),
+                            resource_id = item.resource_id,
+                            error = %e,
+                            "Sync upsert failed"
+                        );
                         rejected += 1;
                         errors.push(shared::cloud::CloudSyncError {
                             index: u32::try_from(idx).unwrap_or(u32::MAX),
@@ -456,9 +469,12 @@ async fn handle_edge_message<S>(
 
                     // Send EnsureImage for product images
                     for hash in &image_hashes {
-                        if let Ok(presigned_url) =
-                            super::image::presigned_get_url(state, identity.tenant_id, hash).await
-                        {
+                        let presigned_result =
+                            super::image::presigned_get_url(state, identity.tenant_id, hash).await;
+                        if let Err(ref e) = presigned_result {
+                            tracing::warn!(store_id, hash = %hash, error = %e, "Failed to generate presigned URL for image sync");
+                        }
+                        if let Ok(presigned_url) = presigned_result {
                             let ensure_msg = CloudMessage::Rpc {
                                 id: format!("img-{hash}"),
                                 payload: Box::new(shared::cloud::CloudRpc::StoreOp {

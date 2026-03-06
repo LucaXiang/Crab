@@ -138,10 +138,15 @@ pub async fn create(
         .ok_or_else(|| RepoError::Database("Failed to create label template".into()))?;
 
     let image_hashes = extract_image_hashes(&template.fields);
-    if !image_hashes.is_empty() {
-        let _ =
+    if !image_hashes.is_empty()
+        && let Err(e) =
             super::image_ref::sync_refs(pool, ImageRefEntityType::LabelTemplate, id, image_hashes)
-                .await;
+                .await
+    {
+        tracing::warn!(
+            label_template_id = id,
+            "Failed to sync label template image references: {e}"
+        );
     }
 
     Ok(template)
@@ -239,15 +244,28 @@ pub async fn update(
 
     // Sync image refs
     let image_hashes = extract_image_hashes(&updated.fields);
-    let _ = super::image_ref::sync_refs(pool, ImageRefEntityType::LabelTemplate, id, image_hashes)
-        .await;
+    if let Err(e) =
+        super::image_ref::sync_refs(pool, ImageRefEntityType::LabelTemplate, id, image_hashes).await
+    {
+        tracing::warn!(
+            label_template_id = id,
+            "Failed to sync label template image references on update: {e}"
+        );
+    }
 
     Ok(updated)
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
     // Clean up image refs
-    let _ = super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await;
+    if let Err(e) =
+        super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await
+    {
+        tracing::warn!(
+            label_template_id = id,
+            "Failed to delete label template image refs on soft delete: {e}"
+        );
+    }
 
     // Soft delete
     let result = sqlx::query!("UPDATE label_template SET is_active = 0 WHERE id = ?", id)
@@ -257,7 +275,14 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
 }
 
 pub async fn hard_delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
-    let _ = super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await;
+    if let Err(e) =
+        super::image_ref::delete_entity_refs(pool, ImageRefEntityType::LabelTemplate, id).await
+    {
+        tracing::warn!(
+            label_template_id = id,
+            "Failed to delete label template image refs on hard delete: {e}"
+        );
+    }
 
     // Fields cascade via FK
     let result = sqlx::query!("DELETE FROM label_template WHERE id = ?", id)

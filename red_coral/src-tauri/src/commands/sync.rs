@@ -7,6 +7,7 @@ use tauri::State;
 
 use crate::core::response::{ApiResponse, ErrorCode};
 use crate::core::ClientBridge;
+use tracing::warn;
 
 /// 同步状态响应
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -22,9 +23,12 @@ pub async fn get_sync_status(
 ) -> Result<ApiResponse<SyncStatusResponse>, String> {
     match bridge.get::<SyncStatusResponse>("/api/sync/status").await {
         Ok(data) => Ok(ApiResponse::success(data)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NetworkError,
-            e.to_string(),
-        )),
+        Err(e) => {
+            warn!(error = %e, "get_sync_status failed");
+            Ok(ApiResponse::error_with_code(
+                ErrorCode::NetworkError,
+                e.to_string(),
+            ))
+        }
     }
 }

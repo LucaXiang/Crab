@@ -105,7 +105,10 @@ pub async fn create_employee_direct(
         let salt = SaltString::generate(&mut OsRng);
         Argon2::default()
             .hash_password(data.password.as_bytes(), &salt)
-            .map_err(|e| format!("Failed to hash password: {e}"))?
+            .map_err(|e| -> BoxError {
+                tracing::error!(error = %e, "Argon2 password hashing failed");
+                format!("Failed to hash password: {e}").into()
+            })?
             .to_string()
     };
 
@@ -183,10 +186,8 @@ pub async fn update_employee_direct(
             Argon2::default()
                 .hash_password(password.as_bytes(), &salt)
                 .map_err(|e| {
-                    shared::error::AppError::with_message(
-                        shared::ErrorCode::InternalError,
-                        format!("Failed to hash password: {e}"),
-                    )
+                    tracing::error!(error = %e, "Argon2 password hashing failed during employee update");
+                    shared::error::AppError::new(shared::ErrorCode::InternalError)
                 })?
                 .to_string(),
         )

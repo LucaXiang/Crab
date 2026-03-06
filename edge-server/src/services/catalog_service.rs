@@ -202,27 +202,34 @@ impl CatalogService {
         let mut product_bindings: HashMap<i64, Vec<AttributeBindingFull>> = HashMap::new();
         let mut category_bindings: HashMap<i64, Vec<AttributeBindingFull>> = HashMap::new();
 
-        if let Ok(bindings) = all_bindings {
-            for (binding, attr) in bindings {
-                let full = AttributeBindingFull {
-                    id: binding.id,
-                    attribute: attr,
-                    is_required: binding.is_required,
-                    display_order: binding.display_order,
-                    default_option_ids: binding.default_option_ids,
-                    is_inherited: false,
-                };
-                if binding.owner_type == "product" {
-                    product_bindings
-                        .entry(binding.owner_id)
-                        .or_default()
-                        .push(full);
-                } else if binding.owner_type == "category" {
-                    category_bindings
-                        .entry(binding.owner_id)
-                        .or_default()
-                        .push(full);
+        match all_bindings {
+            Ok(bindings) => {
+                for (binding, attr) in bindings {
+                    let full = AttributeBindingFull {
+                        id: binding.id,
+                        attribute: attr,
+                        is_required: binding.is_required,
+                        display_order: binding.display_order,
+                        default_option_ids: binding.default_option_ids,
+                        is_inherited: false,
+                    };
+                    if binding.owner_type == "product" {
+                        product_bindings
+                            .entry(binding.owner_id)
+                            .or_default()
+                            .push(full);
+                    } else if binding.owner_type == "category" {
+                        category_bindings
+                            .entry(binding.owner_id)
+                            .or_default()
+                            .push(full);
+                    }
                 }
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to load attribute bindings (price calculation may be incomplete): {e}"
+                );
             }
         }
 
@@ -611,13 +618,16 @@ impl CatalogService {
 
         // Sync image references
         let image_hashes = Self::extract_product_image_hashes(&full);
-        let _ = image_ref::sync_refs(
+        if let Err(e) = image_ref::sync_refs(
             &self.pool,
             ImageRefEntityType::Product,
             product_id,
             image_hashes,
         )
-        .await;
+        .await
+        {
+            tracing::warn!(product_id, "Failed to sync product image references: {e}");
+        }
 
         // Update cache
         {

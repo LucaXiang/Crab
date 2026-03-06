@@ -333,7 +333,6 @@ pub async fn reprint_label(
         }
     }
 
-    tracing::info!(label_record_id = %id, "Label reprinted successfully");
     Ok(Json(true))
 }
 
@@ -359,7 +358,10 @@ async fn rebuild_kitchen_orders_from_archive(
         let Some(data) = event.data else { continue };
         let payload: EventPayload = match serde_json::from_str(&data) {
             Ok(p) => p,
-            Err(_) => continue,
+            Err(e) => {
+                tracing::warn!(event_id = %event.event_id, "Failed to deserialize archived event payload: {e}");
+                continue;
+            }
         };
         let EventPayload::ItemsAdded { items } = payload else {
             continue;
@@ -415,7 +417,10 @@ async fn rebuild_label_records_from_archive(
         let Some(data) = event.data else { continue };
         let payload: EventPayload = match serde_json::from_str(&data) {
             Ok(p) => p,
-            Err(_) => continue,
+            Err(e) => {
+                tracing::warn!(event_id = %event.event_id, "Failed to deserialize archived event payload for label records: {e}");
+                continue;
+            }
         };
         let EventPayload::ItemsAdded { items } = payload else {
             continue;

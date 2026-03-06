@@ -117,13 +117,18 @@ pub async fn upload_image(
         .max_keys(MAX_IMAGES_PER_TENANT)
         .send()
         .await;
-    if let Ok(output) = list_result {
-        let count = output.key_count().unwrap_or(0);
-        if count >= MAX_IMAGES_PER_TENANT {
-            return Err(AppError::with_message(
-                ErrorCode::ResourceLimitExceeded,
-                format!("Image limit reached ({count}/{MAX_IMAGES_PER_TENANT})"),
-            ));
+    match list_result {
+        Ok(output) => {
+            let count = output.key_count().unwrap_or(0);
+            if count >= MAX_IMAGES_PER_TENANT {
+                return Err(AppError::with_message(
+                    ErrorCode::ResourceLimitExceeded,
+                    format!("Image limit reached ({count}/{MAX_IMAGES_PER_TENANT})"),
+                ));
+            }
+        }
+        Err(e) => {
+            tracing::warn!(tenant_id = identity.tenant_id, error = %e, "S3 list objects failed for image count check, skipping limit enforcement");
         }
     }
 
