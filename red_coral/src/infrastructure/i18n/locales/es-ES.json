@@ -809,6 +809,15 @@
       "line_yesterday": "Ayer",
       "line_last_week": "Misma semana ant."
     },
+    "discount_breakdown": "Desglose de descuentos",
+    "surcharge_breakdown": "Desglose de recargos",
+    "adj_src": {
+      "item_manual": "Dto. manual (artículo)",
+      "item_rule": "Regla de artículo",
+      "mg": "Dto. de miembro",
+      "order_manual": "Dto. manual (pedido)",
+      "order_rule": "Regla de pedido"
+    },
     "status": {
       "completed": "Completado",
       "voided": "Anulado",

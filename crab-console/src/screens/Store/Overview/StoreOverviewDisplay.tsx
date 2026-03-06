@@ -11,7 +11,7 @@ import {
 import { useI18n } from '@/hooks/useI18n';
 import { tEnum } from '@/infrastructure/i18n';
 import { formatCurrency } from '@/utils/format';
-import type { StoreOverview } from '@/core/types/stats';
+import type { StoreOverview, AdjustmentEntry } from '@/core/types/stats';
 
 const PIE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
@@ -419,57 +419,27 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         </div>
       )}
 
-      {/* Adjustment Breakdown — Discounts & Surcharges by source/rule */}
-      {overview.adjustment_breakdown.length > 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Tag className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('stats.adjustment_breakdown')}</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('stats.adj_source')}</th>
-                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('stats.adj_type')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.count')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.amount')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.adjustment_breakdown.map((adj, i) => {
-                  const isDiscount = adj.direction === 'DISCOUNT';
-                  const label = adj.rule_name
-                    ? adj.rule_name
-                    : t(`stats.adj_src_${adj.source_type.toLowerCase()}`);
-                  return (
-                    <tr key={i} className="border-b border-slate-50 last:border-0">
-                      <td className="py-2 text-slate-700 font-medium">{label}</td>
-                      <td className="py-2">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${isDiscount ? 'bg-amber-50 text-amber-700' : 'bg-purple-50 text-purple-700'}`}>
-                          {isDiscount ? t('stats.adj_discount') : t('stats.adj_surcharge')}
-                        </span>
-                      </td>
-                      <td className="py-2 text-right text-slate-500">{adj.count}</td>
-                      <td className={`py-2 text-right font-semibold ${isDiscount ? 'text-amber-600' : 'text-purple-600'}`}>
-                        {isDiscount ? '-' : '+'}{formatCurrency(adj.amount)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (overview.total_discount > 0 || overview.total_surcharge > 0) ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Tag className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('stats.adjustment_breakdown')}</h3>
-          </div>
-          <p className="text-sm text-slate-400">{t('stats.no_breakdown_data')}</p>
-        </div>
-      ) : null}
+      {/* Discount Breakdown */}
+      {overview.discount_breakdown.length > 0 && (
+        <AdjustmentCard
+          title={t('stats.discount_breakdown')}
+          entries={overview.discount_breakdown}
+          color="amber"
+          prefix="-"
+          t={t}
+        />
+      )}
+
+      {/* Surcharge Breakdown */}
+      {overview.surcharge_breakdown.length > 0 && (
+        <AdjustmentCard
+          title={t('stats.surcharge_breakdown')}
+          entries={overview.surcharge_breakdown}
+          color="purple"
+          prefix="+"
+          t={t}
+        />
+      )}
 
       {/* Tag Sales */}
       {overview.tag_sales.length > 0 && (
@@ -553,6 +523,69 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const SOURCE_I18N: Record<string, string> = {
+  item_manual: 'stats.adj_src_manual',
+  item_rule: 'stats.adj_src_price_rule',
+  mg: 'stats.adj_src_member_group',
+  order_manual: 'stats.adj_src_order_manual',
+  order_rule: 'stats.adj_src_order_rule',
+};
+
+const AdjustmentCard: React.FC<{
+  title: string;
+  entries: AdjustmentEntry[];
+  color: 'amber' | 'purple';
+  prefix: string;
+  t: (key: string) => string;
+}> = ({ title, entries, color, prefix, t }) => {
+  const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
+  const isAmber = color === 'amber';
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Tag className={`w-5 h-5 ${isAmber ? 'text-amber-400' : 'text-purple-400'}`} />
+          <h3 className="font-bold text-slate-900">{title}</h3>
+        </div>
+        <span className={`text-lg font-bold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+          {prefix}{formatCurrency(totalAmount)}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {entries.map((entry, i) => {
+          const pct = totalAmount > 0 ? (entry.amount / totalAmount) * 100 : 0;
+          const label = entry.source === 'item_rule' || entry.source === 'order_rule'
+            ? entry.name
+            : t(SOURCE_I18N[entry.source] ?? entry.source);
+          const barColor = isAmber ? PIE_COLORS[3] : PIE_COLORS[4];
+          return (
+            <div key={i}>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
+                  <span className="text-slate-700">{label}</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
+                    {t(`stats.adj_src_${entry.source}`)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">{entry.order_count} {t('stats.orders_unit')}</span>
+                  <span className={`font-semibold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+                    {prefix}{formatCurrency(entry.amount)}
+                  </span>
+                </div>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

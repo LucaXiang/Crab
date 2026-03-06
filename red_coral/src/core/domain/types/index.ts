@@ -127,6 +127,17 @@ export interface StoreOverview {
   refund_method_breakdown: RefundMethodEntry[];
   service_type_breakdown: ServiceTypeEntry[];
   zone_sales: ZoneSaleEntry[];
+  discount_breakdown: AdjustmentEntry[];
+  surcharge_breakdown: AdjustmentEntry[];
+}
+
+export interface AdjustmentEntry {
+  /** Rule name or source key (e.g. "item_manual", "mg", "order_manual") */
+  name: string;
+  /** "item_manual" | "item_rule" | "mg" | "order_manual" | "order_rule" */
+  source: string;
+  amount: number;
+  order_count: number;
 }
 
 export interface RevenueTrendPoint {

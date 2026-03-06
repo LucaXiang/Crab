@@ -633,8 +633,10 @@
       "manual_discount": "手动折扣",
       "rule_discount": "规则折扣",
       "rule_surcharge": "规则附加费",
-      "order_discount": "整单折扣",
-      "order_surcharge": "整单附加费"
+      "order_discount": "整单手动折扣",
+      "order_rule_discount": "整单规则折扣",
+      "order_surcharge": "整单手动附加费",
+      "order_rule_surcharge": "整单规则附加费"
     },
     "order_detail": {
       "title": "订单详情",
@@ -808,6 +810,15 @@
       "line_today": "今天",
       "line_yesterday": "昨天",
       "line_last_week": "上周同日"
+    },
+    "discount_breakdown": "折扣明细",
+    "surcharge_breakdown": "附加费明细",
+    "adj_src": {
+      "item_manual": "商品手动折扣",
+      "item_rule": "商品规则",
+      "mg": "会员折扣",
+      "order_manual": "整单手动",
+      "order_rule": "整单规则"
     },
     "status": {
       "completed": "已完成",

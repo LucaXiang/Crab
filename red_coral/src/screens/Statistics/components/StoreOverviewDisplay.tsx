@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
-import type { StoreOverview } from '@/core/domain/types';
+import type { StoreOverview, AdjustmentEntry } from '@/core/domain/types';
 
 const PIE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
@@ -395,6 +395,28 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         ) : <EmptySection />}
       </div>
 
+      {/* Discount & Surcharge Breakdowns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {overview.discount_breakdown?.length > 0 && (
+          <AdjustmentCard
+            title={t('statistics.discount_breakdown')}
+            entries={overview.discount_breakdown}
+            color="amber"
+            prefix="-"
+            t={t}
+          />
+        )}
+        {overview.surcharge_breakdown?.length > 0 && (
+          <AdjustmentCard
+            title={t('statistics.surcharge_breakdown')}
+            entries={overview.surcharge_breakdown}
+            color="purple"
+            prefix="+"
+            t={t}
+          />
+        )}
+      </div>
+
       {/* Tag Sales */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -485,6 +507,69 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 const EmptySection: React.FC = () => (
   <p className="text-sm text-slate-400 py-4 text-center">-</p>
 );
+
+const SOURCE_I18N: Record<string, string> = {
+  item_manual: 'statistics.adj_src.item_manual',
+  item_rule: 'statistics.adj_src.item_rule',
+  mg: 'statistics.adj_src.mg',
+  order_manual: 'statistics.adj_src.order_manual',
+  order_rule: 'statistics.adj_src.order_rule',
+};
+
+const AdjustmentCard: React.FC<{
+  title: string;
+  entries: AdjustmentEntry[];
+  color: 'amber' | 'purple';
+  prefix: string;
+  t: (key: string) => string;
+}> = ({ title, entries, color, prefix, t }) => {
+  const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
+  const isAmber = color === 'amber';
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Tag className={`w-5 h-5 ${isAmber ? 'text-amber-400' : 'text-purple-400'}`} />
+          <h3 className="font-bold text-slate-900">{title}</h3>
+        </div>
+        <span className={`text-lg font-bold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+          {prefix}{formatCurrency(totalAmount)}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {entries.map((entry, i) => {
+          const pct = totalAmount > 0 ? (entry.amount / totalAmount) * 100 : 0;
+          const label = entry.source === 'item_rule' || entry.source === 'order_rule'
+            ? entry.name
+            : t(SOURCE_I18N[entry.source] ?? entry.source);
+          const barColor = isAmber ? PIE_COLORS[3] : PIE_COLORS[4];
+          return (
+            <div key={i}>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
+                  <span className="text-slate-700 truncate">{label}</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded shrink-0 ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
+                    {t(SOURCE_I18N[entry.source] ?? entry.source)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <span className="text-xs text-slate-400">{entry.order_count}</span>
+                  <span className={`font-semibold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+                    {prefix}{formatCurrency(entry.amount)}
+                  </span>
+                </div>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const KpiCard: React.FC<{
   icon: React.FC<{ className?: string }>;

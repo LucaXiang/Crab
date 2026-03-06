@@ -127,6 +127,13 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
     return map;
   }, [order]);
 
+  // MG discount: item-level sum (consistent with breakdown)
+  const totalMgDiscount = useMemo(() => {
+    if (!order) return 0;
+    return order.items.reduce((sum, i) =>
+      i.is_comped ? sum : Currency.add(sum, Currency.mul(i.mg_discount_amount, i.quantity).toNumber()).toNumber(), 0);
+  }, [order]);
+
   // Reset member state when order changes
   useEffect(() => {
     setExpandedItems(new Set());
@@ -408,47 +415,31 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
             <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-2">
               {(() => {
                 // ─────────────────────────────────────────────────────────────
-                // Price Breakdown Calculation
+                // Price Breakdown — all values from ITEM-LEVEL sums
                 //
-                // Backend field semantics (archived_order_item):
-                //   rule_discount_amount  = per-LINE total (per_unit * qty)
-                //   rule_surcharge_amount = per-LINE total (per_unit * qty)
-                //   mg_discount_amount    = per-UNIT amount (NOT multiplied by qty)
+                // Using item-level fields ensures consistency with item badges.
+                // Never derive as residual — that amplifies rounding gaps.
                 //
-                // Backend field semantics (archived_order):
-                //   original_total = sum of (base_with_options * qty) for ALL items
-                //   subtotal       = sum of (unit_price * qty) — final item totals
-                //   comp_total_amount = sum of (base_with_options * qty) for comped items
-                //
-                // Price waterfall per non-comped item:
-                //   base_with_options
-                //   - manual_discount (percentage of base)
-                //   - rule_discount (pricing rules)
-                //   + rule_surcharge (pricing rules)
-                //   - mg_discount (marketing group rules, applied after price rules)
-                //   = unit_price
-                //
-                // Therefore:
-                //   (original_total - comp) - subtotal
-                //   = manual + ruleDisc - ruleSur + mgDisc  (all per-line, summed)
+                // Item fields:
+                //   discount_amount       = manual discount per-LINE
+                //   rule_discount_amount  = rule discount per-LINE
+                //   rule_surcharge_amount = rule surcharge per-LINE
+                //   mg_discount_amount    = MG discount per-UNIT (× qty for line)
                 // ─────────────────────────────────────────────────────────────
 
-                // Sum per-line totals across non-comped items
+                const originalTotal = order.original_total;
+                const subtotal = order.subtotal;
+
+                // Manual discount = discount_amount (manual+rule aggregate) minus rule portion
+                const totalManualDiscount = order.items.reduce((sum, i) => {
+                  if (i.is_comped) return sum;
+                  const manual = Currency.sub(i.discount_amount, i.rule_discount_amount).toNumber();
+                  return manual > 0 ? Currency.add(sum, manual).toNumber() : sum;
+                }, 0);
                 const totalRuleDiscount = order.items.reduce((sum, i) =>
                   i.is_comped ? sum : Currency.add(sum, i.rule_discount_amount).toNumber(), 0);
                 const totalRuleSurcharge = order.items.reduce((sum, i) =>
                   i.is_comped ? sum : Currency.add(sum, i.rule_surcharge_amount).toNumber(), 0);
-                const originalTotal = order.original_total;
-                const subtotal = order.subtotal;
-                // Use order-level mg_discount_amount (Decimal-precision from backend)
-                const totalMgDiscount = order.mg_discount_amount;
-
-                // Derive manual item discount as residual:
-                //   manual = (original - comp) - subtotal - ruleDisc + ruleSur - mgDisc
-                const totalManualDiscount = Currency.sub(
-                  Currency.sub(Currency.sub(originalTotal, subtotal).toNumber(), order.comp_total_amount).toNumber(),
-                  Currency.add(Currency.sub(totalRuleDiscount, totalRuleSurcharge).toNumber(), totalMgDiscount).toNumber(),
-                ).toNumber();
 
                 // Aggregate applied pricing rules by rule_id (for named breakdown rows)
                 // applied_rules[].calculated_amount is per-unit → multiply by qty
@@ -472,7 +463,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                 }
 
                 const hasItemAdjustments = order.comp_total_amount > 0 || totalManualDiscount > 0 || totalRuleDiscount > 0 || totalRuleSurcharge > 0 || totalMgDiscount > 0;
-                const hasOrderAdjustments = order.order_manual_discount_amount > 0 || order.order_manual_surcharge_amount > 0;
+                const hasOrderAdjustments = order.order_manual_discount_amount > 0 || order.order_manual_surcharge_amount > 0 || order.order_rule_discount_amount > 0 || order.order_rule_surcharge_amount > 0;
 
                 if (!hasItemAdjustments && !hasOrderAdjustments) {
                   return (
@@ -534,7 +525,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                       </div>
                     )}
 
-                    {/* Order-level: manual discount/surcharge */}
+                    {/* Order-level adjustments */}
                     {hasOrderAdjustments && (
                       <>
                         {order.order_manual_discount_amount > 0 && (
@@ -543,10 +534,22 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                             <span className="text-orange-500">-{formatCurrency(order.order_manual_discount_amount)}</span>
                           </div>
                         )}
+                        {order.order_rule_discount_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-amber-600">{t('checkout.breakdown.order_rule_discount')}</span>
+                            <span className="text-amber-600">-{formatCurrency(order.order_rule_discount_amount)}</span>
+                          </div>
+                        )}
                         {order.order_manual_surcharge_amount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-purple-500">{t('checkout.breakdown.order_surcharge')}</span>
                             <span className="text-purple-500">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
+                          </div>
+                        )}
+                        {order.order_rule_surcharge_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-purple-500">{t('checkout.breakdown.order_rule_surcharge')}</span>
+                            <span className="text-purple-500">+{formatCurrency(order.order_rule_surcharge_amount)}</span>
                           </div>
                         )}
                       </>
@@ -603,8 +606,8 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                   <div className="text-xs text-violet-600 font-medium truncate">{order.marketing_group_name}</div>
                 )}
               </div>
-              {order.mg_discount_amount > 0 && (
-                <div className="text-sm font-bold text-red-500 shrink-0">-{formatCurrency(order.mg_discount_amount)}</div>
+              {totalMgDiscount > 0 && (
+                <div className="text-sm font-bold text-red-500 shrink-0">-{formatCurrency(totalMgDiscount)}</div>
               )}
               <ChevronDown size={16} className="text-gray-300 shrink-0 group-hover:text-gray-500 transition-colors" />
             </button>
@@ -634,7 +637,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
         <MemberDetailModal
           memberName={order.member_name}
           marketingGroupName={order.marketing_group_name}
-          mgDiscountAmount={order.mg_discount_amount}
+          mgDiscountAmount={totalMgDiscount}
           detail={memberDetail}
           isDeleted={memberDeleted}
           isLoading={memberLoading}

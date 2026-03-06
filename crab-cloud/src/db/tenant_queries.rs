@@ -996,7 +996,19 @@ pub struct StoreOverview {
     pub zone_sales: Vec<ZoneSaleEntry>,
     pub total_surcharge: f64,
     pub avg_items_per_order: f64,
-    pub adjustment_breakdown: Vec<AdjustmentBreakdownEntry>,
+    pub discount_breakdown: Vec<AdjustmentEntry>,
+    pub surcharge_breakdown: Vec<AdjustmentEntry>,
+}
+
+/// Discount or surcharge line item in the breakdown
+#[derive(Debug, serde::Serialize)]
+pub struct AdjustmentEntry {
+    /// Display name (rule name, or source key like "item_manual")
+    pub name: String,
+    /// Source type: "item_manual", "item_rule", "mg", "order_manual", "order_rule"
+    pub source: String,
+    pub amount: f64,
+    pub order_count: i64,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -1548,7 +1560,22 @@ async fn get_overview(
     let total_surcharge = surcharge_r.map(|(v,)| v).unwrap_or(0.0);
     let avg_items_per_order = avg_items_r.map(|(v,)| v).unwrap_or(0.0);
     let (anulacion_count, anulacion_amount) = anulacion_agg_r.unwrap_or((0, 0.0));
-    let adjustment_breakdown = adjustment_breakdown_r.unwrap_or_default();
+    let raw_adjustments = adjustment_breakdown_r.unwrap_or_default();
+    let mut discount_breakdown = Vec::new();
+    let mut surcharge_breakdown = Vec::new();
+    for a in raw_adjustments {
+        let entry = AdjustmentEntry {
+            name: a.rule_name.unwrap_or_else(|| a.source_type.clone()),
+            source: a.source_type,
+            amount: a.amount,
+            order_count: a.count,
+        };
+        if a.direction == "SURCHARGE" {
+            surcharge_breakdown.push(entry);
+        } else {
+            discount_breakdown.push(entry);
+        }
+    }
     let net_revenue = revenue - refund_amount - anulacion_amount;
 
     Ok(StoreOverview {
@@ -1581,36 +1608,59 @@ async fn get_overview(
         zone_sales,
         total_surcharge,
         avg_items_per_order,
-        adjustment_breakdown,
+        discount_breakdown,
+        surcharge_breakdown,
     })
 }
 
-// ── Red Flags 监控 ──
+// ── Red Flags 监控 (Grouped) ──
 
 #[derive(Debug, serde::Serialize)]
-pub struct RedFlagsSummary {
-    pub item_removals: i64,
-    pub item_comps: i64,
-    pub order_voids: i64,
-    pub order_discounts: i64,
+pub struct ItemFlags {
+    pub removals: i64,
+    pub comps: i64,
+    pub uncomps: i64,
     pub price_modifications: i64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct OrderFlags {
+    pub voids: i64,
+    pub discounts: i64,
+    pub surcharges: i64,
+    pub rule_skips: i64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct PaymentFlags {
+    pub cancellations: i64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct OperatorRedFlags {
-    pub operator_id: Option<i64>,
-    pub operator_name: Option<String>,
-    pub item_removals: i64,
-    pub item_comps: i64,
-    pub order_voids: i64,
-    pub order_discounts: i64,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub removals: i64,
+    pub comps: i64,
+    pub uncomps: i64,
     pub price_modifications: i64,
+    pub voids: i64,
+    pub discounts: i64,
+    pub surcharges: i64,
+    pub rule_skips: i64,
+    pub cancellations: i64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
     pub total_flags: i64,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct RedFlagsResponse {
-    pub summary: RedFlagsSummary,
+    pub item_flags: ItemFlags,
+    pub order_flags: OrderFlags,
+    pub payment_flags: PaymentFlags,
     pub operator_breakdown: Vec<OperatorRedFlags>,
 }
 
@@ -1621,32 +1671,45 @@ pub async fn get_red_flags(
     from: i64,
     to: i64,
 ) -> Result<RedFlagsResponse, BoxError> {
+    // 1. Event counts by operator (9 event types)
     #[derive(sqlx::FromRow)]
-    struct Row {
+    struct EventRow {
         operator_id: Option<i64>,
         operator_name: Option<String>,
-        item_removals: i64,
-        item_comps: i64,
-        order_voids: i64,
-        order_discounts: i64,
+        removals: i64,
+        comps: i64,
+        uncomps: i64,
         price_modifications: i64,
+        voids: i64,
+        discounts: i64,
+        surcharges: i64,
+        rule_skips: i64,
+        cancellations: i64,
     }
 
-    let rows: Vec<Row> = sqlx::query_as(
+    let event_rows: Vec<EventRow> = sqlx::query_as(
         r#"
         SELECT
             e.operator_id,
             e.operator_name,
-            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_REMOVED') AS item_removals,
-            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_COMPED') AS item_comps,
-            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_VOIDED') AS order_voids,
-            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_DISCOUNT_APPLIED') AS order_discounts,
-            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_MODIFIED') AS price_modifications
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_REMOVED') AS removals,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_COMPED') AS comps,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_UNCOMPED') AS uncomps,
+            COUNT(*) FILTER (WHERE e.event_type = 'ITEM_MODIFIED') AS price_modifications,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_VOIDED') AS voids,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_DISCOUNT_APPLIED') AS discounts,
+            COUNT(*) FILTER (WHERE e.event_type = 'ORDER_SURCHARGE_APPLIED') AS surcharges,
+            COUNT(*) FILTER (WHERE e.event_type = 'RULE_SKIP_TOGGLED') AS rule_skips,
+            COUNT(*) FILTER (WHERE e.event_type = 'PAYMENT_CANCELLED') AS cancellations
         FROM store_order_events e
         JOIN store_archived_orders o ON o.id = e.order_id
         WHERE o.store_id = $1 AND o.tenant_id = $2
             AND o.end_time >= $3 AND o.end_time < $4
-            AND e.event_type IN ('ITEM_REMOVED','ITEM_COMPED','ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ITEM_MODIFIED')
+            AND e.event_type IN (
+                'ITEM_REMOVED','ITEM_COMPED','ITEM_UNCOMPED','ITEM_MODIFIED',
+                'ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ORDER_SURCHARGE_APPLIED',
+                'RULE_SKIP_TOGGLED','PAYMENT_CANCELLED'
+            )
         GROUP BY e.operator_id, e.operator_name
         ORDER BY COUNT(*) DESC
         "#,
@@ -1658,42 +1721,288 @@ pub async fn get_red_flags(
     .fetch_all(pool)
     .await?;
 
-    let mut summary = RedFlagsSummary {
-        item_removals: 0,
-        item_comps: 0,
-        order_voids: 0,
-        order_discounts: 0,
-        price_modifications: 0,
-    };
-
-    let mut operator_breakdown = Vec::new();
-    for row in rows {
-        summary.item_removals += row.item_removals;
-        summary.item_comps += row.item_comps;
-        summary.order_voids += row.order_voids;
-        summary.order_discounts += row.order_discounts;
-        summary.price_modifications += row.price_modifications;
-
-        let total_flags = row.item_removals
-            + row.item_comps
-            + row.order_voids
-            + row.order_discounts
-            + row.price_modifications;
-        operator_breakdown.push(OperatorRedFlags {
-            operator_id: row.operator_id,
-            operator_name: row.operator_name,
-            item_removals: row.item_removals,
-            item_comps: row.item_comps,
-            order_voids: row.order_voids,
-            order_discounts: row.order_discounts,
-            price_modifications: row.price_modifications,
-            total_flags,
-        });
+    // 2. Refund counts by operator_name (credit_notes have operator_name but not always operator_id)
+    #[derive(sqlx::FromRow)]
+    struct RefundRow {
+        operator_name: String,
+        refund_count: i64,
+        refund_amount: f64,
     }
 
+    let refund_rows: Vec<RefundRow> = sqlx::query_as(
+        r#"
+        SELECT
+            COALESCE(cn.operator_name, '') AS operator_name,
+            COUNT(*) AS refund_count,
+            COALESCE(SUM(cn.total_credit), 0.0) AS refund_amount
+        FROM store_credit_notes cn
+        WHERE cn.store_id = $1 AND cn.tenant_id = $2
+            AND cn.created_at >= $3 AND cn.created_at < $4
+        GROUP BY cn.operator_name
+        "#,
+    )
+    .bind(store_id)
+    .bind(tenant_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await?;
+
+    // 3. Build grouped summary + operator breakdown
+    let mut item_flags = ItemFlags {
+        removals: 0,
+        comps: 0,
+        uncomps: 0,
+        price_modifications: 0,
+    };
+    let mut order_flags = OrderFlags {
+        voids: 0,
+        discounts: 0,
+        surcharges: 0,
+        rule_skips: 0,
+    };
+    let mut payment_flags = PaymentFlags {
+        cancellations: 0,
+        refund_count: 0,
+        refund_amount: 0.0,
+    };
+
+    // Map: operator_name → OperatorRedFlags (use name as key since credit_notes may lack operator_id)
+    use std::collections::HashMap;
+    let mut op_map: HashMap<String, OperatorRedFlags> = HashMap::new();
+
+    for row in &event_rows {
+        item_flags.removals += row.removals;
+        item_flags.comps += row.comps;
+        item_flags.uncomps += row.uncomps;
+        item_flags.price_modifications += row.price_modifications;
+        order_flags.voids += row.voids;
+        order_flags.discounts += row.discounts;
+        order_flags.surcharges += row.surcharges;
+        order_flags.rule_skips += row.rule_skips;
+        payment_flags.cancellations += row.cancellations;
+
+        let name = row.operator_name.clone().unwrap_or_default();
+        let entry = op_map
+            .entry(name.clone())
+            .or_insert_with(|| OperatorRedFlags {
+                operator_id: row.operator_id.unwrap_or(0),
+                operator_name: name,
+                removals: 0,
+                comps: 0,
+                uncomps: 0,
+                price_modifications: 0,
+                voids: 0,
+                discounts: 0,
+                surcharges: 0,
+                rule_skips: 0,
+                cancellations: 0,
+                refund_count: 0,
+                refund_amount: 0.0,
+                total_flags: 0,
+            });
+        entry.removals += row.removals;
+        entry.comps += row.comps;
+        entry.uncomps += row.uncomps;
+        entry.price_modifications += row.price_modifications;
+        entry.voids += row.voids;
+        entry.discounts += row.discounts;
+        entry.surcharges += row.surcharges;
+        entry.rule_skips += row.rule_skips;
+        entry.cancellations += row.cancellations;
+    }
+
+    for row in &refund_rows {
+        payment_flags.refund_count += row.refund_count;
+        payment_flags.refund_amount += row.refund_amount;
+
+        let entry = op_map
+            .entry(row.operator_name.clone())
+            .or_insert_with(|| OperatorRedFlags {
+                operator_id: 0,
+                operator_name: row.operator_name.clone(),
+                removals: 0,
+                comps: 0,
+                uncomps: 0,
+                price_modifications: 0,
+                voids: 0,
+                discounts: 0,
+                surcharges: 0,
+                rule_skips: 0,
+                cancellations: 0,
+                refund_count: 0,
+                refund_amount: 0.0,
+                total_flags: 0,
+            });
+        entry.refund_count += row.refund_count;
+        entry.refund_amount += row.refund_amount;
+    }
+
+    // Calculate total_flags and collect
+    let mut operator_breakdown: Vec<OperatorRedFlags> = op_map
+        .into_values()
+        .map(|mut op| {
+            op.total_flags = op.removals
+                + op.comps
+                + op.uncomps
+                + op.price_modifications
+                + op.voids
+                + op.discounts
+                + op.surcharges
+                + op.rule_skips
+                + op.cancellations
+                + op.refund_count;
+            op
+        })
+        .collect();
+    operator_breakdown.sort_by(|a, b| b.total_flags.cmp(&a.total_flags));
+
     Ok(RedFlagsResponse {
-        summary,
+        item_flags,
+        order_flags,
+        payment_flags,
         operator_breakdown,
+    })
+}
+
+// ── Red Flags Event Log ──
+
+#[derive(Debug, serde::Serialize)]
+pub struct RedFlagLogEntry {
+    pub timestamp: i64,
+    pub event_type: String,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub receipt_number: String,
+    pub order_id: i64,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RedFlagLogResponse {
+    pub entries: Vec<RedFlagLogEntry>,
+    pub total: i64,
+    pub page: i32,
+    pub per_page: i32,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn get_red_flag_log(
+    pool: &PgPool,
+    store_id: i64,
+    tenant_id: i64,
+    from: i64,
+    to: i64,
+    event_type: Option<&str>,
+    operator_id: Option<i64>,
+    page: i32,
+) -> Result<RedFlagLogResponse, BoxError> {
+    let per_page: i32 = 50;
+    let offset = (page.max(1) - 1) * per_page;
+
+    let mut entries: Vec<RedFlagLogEntry> = Vec::new();
+
+    // 1. Order events (unless only REFUND requested)
+    if event_type.is_none_or(|et| et != "REFUND") {
+        let mut sql = String::from(
+            r#"SELECT e.timestamp, e.event_type,
+                      COALESCE(e.operator_id, 0) AS operator_id,
+                      COALESCE(e.operator_name, '') AS operator_name,
+                      COALESCE(o.receipt_number, '') AS receipt_number,
+                      o.source_id AS order_id,
+                      e.data AS detail
+               FROM store_order_events e
+               JOIN store_archived_orders o ON o.id = e.order_id
+               WHERE o.store_id = $1 AND o.tenant_id = $2
+                 AND o.end_time >= $3 AND o.end_time < $4
+                 AND e.event_type IN (
+                     'ITEM_REMOVED','ITEM_COMPED','ITEM_UNCOMPED','ITEM_MODIFIED',
+                     'ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ORDER_SURCHARGE_APPLIED',
+                     'RULE_SKIP_TOGGLED','PAYMENT_CANCELLED'
+                 )"#,
+        );
+        if let Some(et) = event_type {
+            sql.push_str(&format!(" AND e.event_type = '{et}'"));
+        }
+        if let Some(op) = operator_id {
+            sql.push_str(&format!(" AND e.operator_id = {op}"));
+        }
+
+        #[allow(clippy::type_complexity)]
+        let rows: Vec<(i64, String, i64, String, String, i64, Option<String>)> =
+            sqlx::query_as(&sql)
+                .bind(store_id)
+                .bind(tenant_id)
+                .bind(from)
+                .bind(to)
+                .fetch_all(pool)
+                .await?;
+
+        for (ts, etype, op_id, op_name, receipt, oid, data) in rows {
+            entries.push(RedFlagLogEntry {
+                timestamp: ts,
+                event_type: etype,
+                operator_id: op_id,
+                operator_name: op_name,
+                receipt_number: receipt,
+                order_id: oid,
+                detail: data,
+            });
+        }
+    }
+
+    // 2. Refunds from credit_notes
+    if event_type.is_none_or(|et| et == "REFUND") {
+        let mut sql = String::from(
+            r#"SELECT cn.created_at, COALESCE(cn.operator_id, 0),
+                      COALESCE(cn.operator_name, '') AS operator_name,
+                      COALESCE(o.receipt_number, '') AS receipt_number,
+                      o.source_id AS order_id,
+                      cn.total_credit, cn.reason
+               FROM store_credit_notes cn
+               JOIN store_archived_orders o ON o.id = cn.order_id
+               WHERE cn.store_id = $1 AND cn.tenant_id = $2
+                 AND cn.created_at >= $3 AND cn.created_at < $4"#,
+        );
+        if let Some(op) = operator_id {
+            sql.push_str(&format!(" AND cn.operator_id = {op}"));
+        }
+
+        let rows: Vec<(i64, i64, String, String, i64, f64, String)> = sqlx::query_as(&sql)
+            .bind(store_id)
+            .bind(tenant_id)
+            .bind(from)
+            .bind(to)
+            .fetch_all(pool)
+            .await?;
+
+        for (ts, op_id, op_name, receipt, oid, amount, reason) in rows {
+            entries.push(RedFlagLogEntry {
+                timestamp: ts,
+                event_type: "REFUND".to_string(),
+                operator_id: op_id,
+                operator_name: op_name,
+                receipt_number: receipt,
+                order_id: oid,
+                detail: Some(format!("{amount:.2} - {reason}")),
+            });
+        }
+    }
+
+    // Sort by timestamp DESC, then paginate
+    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    let total = entries.len() as i64;
+    let paginated: Vec<RedFlagLogEntry> = entries
+        .into_iter()
+        .skip(offset as usize)
+        .take(per_page as usize)
+        .collect();
+
+    Ok(RedFlagLogResponse {
+        entries: paginated,
+        total,
+        page: page.max(1),
+        per_page,
     })
 }
 

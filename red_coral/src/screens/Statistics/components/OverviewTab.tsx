@@ -18,7 +18,7 @@ const EMPTY_OVERVIEW: StoreOverview = {
   revenue_trend: [], daily_trend: [], payment_breakdown: [],
   tax_breakdown: [], category_sales: [], top_products: [],
   tag_sales: [], refund_method_breakdown: [], service_type_breakdown: [],
-  zone_sales: [],
+  zone_sales: [], discount_breakdown: [], surcharge_breakdown: [],
 };
 
 export const OverviewTab: React.FC = () => {

@@ -1171,27 +1171,63 @@ const MobileOrderDetail: React.FC<{
 
       {/* Price summary */}
       <div className="border-t border-slate-100 pt-3 space-y-1.5 text-sm">
-        {d.comp_total_amount > 0 && <SummaryRow label={t('orders.comped')} value={`-${formatCurrency(d.comp_total_amount)}`} color="text-emerald-600" />}
-        {d.order_manual_discount_amount > 0 && <SummaryRow label={t('orders.discount')} value={`-${formatCurrency(d.order_manual_discount_amount)}`} color="text-orange-500" />}
-        {d.order_manual_surcharge_amount > 0 && <SummaryRow label={t('orders.surcharge')} value={`+${formatCurrency(d.order_manual_surcharge_amount)}`} color="text-purple-500" />}
-        {d.mg_discount_amount > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className="text-red-500 flex items-center gap-1"><Crown size={12} />{d.marketing_group_name ?? t('orders.mg_discount')}</span>
-            <span className="text-red-500">-{formatCurrency(d.mg_discount_amount)}</span>
-          </div>
-        )}
-        {aggregateRules(d.items, d.order_applied_rules).map(rule => (
-          <SummaryRow
-            key={rule.rule_id}
-            label={rule.name}
-            value={`${rule.direction === 'discount' ? '-' : '+'}${formatCurrency(rule.total)}`}
-            color={rule.direction === 'discount' ? 'text-amber-600' : 'text-purple-500'}
-          />
-        ))}
-        <div className="flex justify-between pt-2 border-t border-slate-100 font-bold">
-          <span className="text-slate-900">{t('orders.total')}</span>
-          <span className="text-primary-500">{formatCurrency(d.paid_amount)}</span>
-        </div>
+        {(() => {
+          const totalManualDiscount = d.items.reduce((sum, i) => {
+            if (i.is_comped) return sum;
+            const manual = i.discount_amount - i.rule_discount_amount;
+            return manual > 0 ? sum + manual : sum;
+          }, 0);
+          const totalMgDiscount = d.items.reduce((sum, i) =>
+            i.is_comped ? sum : sum + i.mg_discount_amount * i.quantity, 0);
+          const rules = aggregateRules(d.items, d.order_applied_rules);
+          const hasItemAdj = d.comp_total_amount > 0 || totalManualDiscount > 0 || rules.length > 0 || totalMgDiscount > 0;
+          const hasOrderAdj = d.order_manual_discount_amount > 0 || d.order_manual_surcharge_amount > 0 || d.order_rule_discount_amount > 0 || d.order_rule_surcharge_amount > 0;
+
+          if (!hasItemAdj && !hasOrderAdj) {
+            return (
+              <div className="flex justify-between font-bold">
+                <span className="text-slate-900">{t('orders.total')}</span>
+                <span className="text-primary-500">{formatCurrency(d.paid_amount)}</span>
+              </div>
+            );
+          }
+          return (
+            <>
+              {hasItemAdj && (
+                <>
+                  <SummaryRow label={t('orders.original_total')} value={formatCurrency(d.original_total)} color="text-slate-500" />
+                  {d.comp_total_amount > 0 && <SummaryRow label={t('orders.comped')} value={`-${formatCurrency(d.comp_total_amount)}`} color="text-emerald-600" />}
+                  {totalManualDiscount > 0 && <SummaryRow label={t('orders.manual_discount')} value={`-${formatCurrency(totalManualDiscount)}`} color="text-orange-500" />}
+                  {rules.map(rule => (
+                    <SummaryRow key={rule.rule_id} label={rule.name} value={`${rule.direction === 'discount' ? '-' : '+'}${formatCurrency(rule.total)}`} color={rule.direction === 'discount' ? 'text-amber-600' : 'text-purple-500'} />
+                  ))}
+                  {totalMgDiscount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-red-500 flex items-center gap-1"><Crown size={12} />{d.marketing_group_name ?? t('orders.mg_discount')}</span>
+                      <span className="text-red-500">-{formatCurrency(totalMgDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-medium pt-1 border-t border-dashed border-slate-200">
+                    <span className="text-slate-700">{t('orders.subtotal')}</span>
+                    <span className="text-slate-700">{formatCurrency(d.subtotal)}</span>
+                  </div>
+                </>
+              )}
+              {hasOrderAdj && (
+                <>
+                  {d.order_manual_discount_amount > 0 && <SummaryRow label={t('orders.order_discount')} value={`-${formatCurrency(d.order_manual_discount_amount)}`} color="text-orange-500" />}
+                  {d.order_rule_discount_amount > 0 && <SummaryRow label={t('orders.order_rule_discount')} value={`-${formatCurrency(d.order_rule_discount_amount)}`} color="text-amber-600" />}
+                  {d.order_manual_surcharge_amount > 0 && <SummaryRow label={t('orders.order_surcharge')} value={`+${formatCurrency(d.order_manual_surcharge_amount)}`} color="text-purple-500" />}
+                  {d.order_rule_surcharge_amount > 0 && <SummaryRow label={t('orders.order_rule_surcharge')} value={`+${formatCurrency(d.order_rule_surcharge_amount)}`} color="text-purple-500" />}
+                </>
+              )}
+              <div className="flex justify-between pt-2 border-t border-slate-100 font-bold">
+                <span className="text-slate-900">{t('orders.total')}</span>
+                <span className="text-primary-500">{formatCurrency(d.paid_amount)}</span>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Payments */}
@@ -1386,27 +1422,76 @@ const ItemsCard: React.FC<{
         ))}
       </div>
       <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-2">
-        {d.comp_total_amount > 0 && <SummaryRow label={t('orders.comped')} value={`-${formatCurrency(d.comp_total_amount)}`} color="text-emerald-600" />}
-        {d.order_manual_discount_amount > 0 && <SummaryRow label={t('orders.discount')} value={`-${formatCurrency(d.order_manual_discount_amount)}`} color="text-orange-500" />}
-        {d.order_manual_surcharge_amount > 0 && <SummaryRow label={t('orders.surcharge')} value={`+${formatCurrency(d.order_manual_surcharge_amount)}`} color="text-purple-500" />}
-        {d.mg_discount_amount > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className="text-red-500 flex items-center gap-1"><Crown size={12} />{d.marketing_group_name ?? t('orders.mg_discount')}</span>
-            <span className="text-red-500">-{formatCurrency(d.mg_discount_amount)}</span>
-          </div>
-        )}
-        {aggregateRules(items, d.order_applied_rules).map(rule => (
-          <SummaryRow
-            key={rule.rule_id}
-            label={rule.name}
-            value={`${rule.direction === 'discount' ? '-' : '+'}${formatCurrency(rule.total)}`}
-            color={rule.direction === 'discount' ? 'text-amber-600' : 'text-purple-500'}
-          />
-        ))}
-        <div className="flex justify-between items-end pt-3 mt-1 border-t border-slate-200">
-          <span className="text-slate-800 font-bold">{t('orders.total')}</span>
-          <span className="text-xl font-bold text-primary-500">{formatCurrency(d.paid_amount)}</span>
-        </div>
+        {(() => {
+          // Item-level sums for consistency (avoid order-level rounding gaps)
+          const totalManualDiscount = items.reduce((sum, i) => {
+            if (i.is_comped) return sum;
+            const manual = i.discount_amount - i.rule_discount_amount;
+            return manual > 0 ? sum + manual : sum;
+          }, 0);
+          const totalMgDiscount = items.reduce((sum, i) =>
+            i.is_comped ? sum : sum + i.mg_discount_amount * i.quantity, 0);
+
+          const rules = aggregateRules(items, d.order_applied_rules);
+          const hasItemAdjustments = d.comp_total_amount > 0 || totalManualDiscount > 0 || rules.some(r => r.direction === 'discount' || r.direction === 'surcharge') || totalMgDiscount > 0;
+          const hasOrderAdjustments = d.order_manual_discount_amount > 0 || d.order_manual_surcharge_amount > 0 || d.order_rule_discount_amount > 0 || d.order_rule_surcharge_amount > 0;
+
+          if (!hasItemAdjustments && !hasOrderAdjustments) {
+            return (
+              <div className="flex justify-between items-end">
+                <span className="text-slate-800 font-bold">{t('orders.total')}</span>
+                <span className="text-xl font-bold text-primary-500">{formatCurrency(d.paid_amount)}</span>
+              </div>
+            );
+          }
+
+          return (
+            <>
+              {hasItemAdjustments && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">{t('orders.original_total')}</span>
+                    <span className="text-slate-500">{formatCurrency(d.original_total)}</span>
+                  </div>
+                  {d.comp_total_amount > 0 && <SummaryRow label={t('orders.comped')} value={`-${formatCurrency(d.comp_total_amount)}`} color="text-emerald-600" />}
+                  {totalManualDiscount > 0 && <SummaryRow label={t('orders.manual_discount')} value={`-${formatCurrency(totalManualDiscount)}`} color="text-orange-500" />}
+                  {rules.map(rule => (
+                    <SummaryRow
+                      key={rule.rule_id}
+                      label={rule.name}
+                      value={`${rule.direction === 'discount' ? '-' : '+'}${formatCurrency(rule.total)}`}
+                      color={rule.direction === 'discount' ? 'text-amber-600' : 'text-purple-500'}
+                    />
+                  ))}
+                  {totalMgDiscount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-red-500 flex items-center gap-1"><Crown size={12} />{d.marketing_group_name ?? t('orders.mg_discount')}</span>
+                      <span className="text-red-500">-{formatCurrency(totalMgDiscount)}</span>
+                    </div>
+                  )}
+                </>
+              )}
+              {hasItemAdjustments && (
+                <div className="flex justify-between text-sm font-medium pt-1 border-t border-dashed border-slate-300">
+                  <span className="text-slate-700">{t('orders.subtotal')}</span>
+                  <span className="text-slate-700">{formatCurrency(d.subtotal)}</span>
+                </div>
+              )}
+              {hasOrderAdjustments && (
+                <>
+                  {d.order_manual_discount_amount > 0 && <SummaryRow label={t('orders.order_discount')} value={`-${formatCurrency(d.order_manual_discount_amount)}`} color="text-orange-500" />}
+                  {d.order_rule_discount_amount > 0 && <SummaryRow label={t('orders.order_rule_discount')} value={`-${formatCurrency(d.order_rule_discount_amount)}`} color="text-amber-600" />}
+                  {d.order_manual_surcharge_amount > 0 && <SummaryRow label={t('orders.order_surcharge')} value={`+${formatCurrency(d.order_manual_surcharge_amount)}`} color="text-purple-500" />}
+                  {d.order_rule_surcharge_amount > 0 && <SummaryRow label={t('orders.order_rule_surcharge')} value={`+${formatCurrency(d.order_rule_surcharge_amount)}`} color="text-purple-500" />}
+                </>
+              )}
+              <div className="flex justify-between items-end pt-3 mt-1 border-t border-slate-200">
+                <span className="text-slate-800 font-bold">{t('orders.total')}</span>
+                <span className="text-xl font-bold text-primary-500">{formatCurrency(d.paid_amount)}</span>
+              </div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );
@@ -1618,20 +1703,22 @@ const PaymentRow: React.FC<{ payment: OrderPayment; t: (k: string) => string }> 
 /** Aggregate applied_rules across all items by rule_id */
 function aggregateRules(items: OrderItem[], orderRules: AppliedRule[] = []): { rule_id: number; name: string; total: number; direction: 'discount' | 'surcharge' }[] {
   const map = new Map<number, { name: string; total: number; direction: 'discount' | 'surcharge' }>();
-  const addRule = (rule: AppliedRule) => {
+  const addRule = (rule: AppliedRule, qty: number) => {
     if (rule.skipped) return;
+    const lineAmount = Math.abs(rule.calculated_amount) * qty;
     const existing = map.get(rule.rule_id);
     const direction = rule.adjustment_type === 'Surcharge' ? 'surcharge' : 'discount';
     if (existing) {
-      existing.total += Math.abs(rule.calculated_amount);
+      existing.total += lineAmount;
     } else {
-      map.set(rule.rule_id, { name: rule.name, total: Math.abs(rule.calculated_amount), direction });
+      map.set(rule.rule_id, { name: rule.receipt_name || rule.name, total: lineAmount, direction });
     }
   };
   for (const item of items) {
-    for (const rule of item.applied_rules) addRule(rule);
+    if (item.is_comped) continue;
+    for (const rule of item.applied_rules) addRule(rule, item.quantity);
   }
-  for (const rule of orderRules) addRule(rule);
+  for (const rule of orderRules) addRule(rule, 1);
   return Array.from(map.entries()).map(([rule_id, v]) => ({ rule_id, ...v }));
 }
 

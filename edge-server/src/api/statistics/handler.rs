@@ -47,6 +47,8 @@ pub struct StoreOverview {
     pub refund_method_breakdown: Vec<RefundMethodEntry>,
     pub service_type_breakdown: Vec<ServiceTypeEntry>,
     pub zone_sales: Vec<ZoneSaleEntry>,
+    pub discount_breakdown: Vec<AdjustmentEntry>,
+    pub surcharge_breakdown: Vec<AdjustmentEntry>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -118,6 +120,17 @@ pub struct ZoneSaleEntry {
     pub revenue: f64,
     pub orders: i32,
     pub guests: i32,
+}
+
+/// Discount or surcharge line item in the breakdown
+#[derive(Debug, Clone, Serialize)]
+pub struct AdjustmentEntry {
+    /// Display name (rule name, or i18n key like "item_manual")
+    pub name: String,
+    /// Source type: "item_manual", "item_rule", "mg", "order_manual", "order_rule"
+    pub source: String,
+    pub amount: f64,
+    pub order_count: i32,
 }
 
 /// Sales report item
@@ -513,11 +526,11 @@ pub async fn get_statistics(
 
     // ── Service type breakdown ──
     let service_type_breakdown: Vec<ServiceTypeEntry> = sqlx::query_as::<_, (String, f64, i32)>(
-        "SELECT COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'DineIn' END), \
+        "SELECT COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'TAKEOUT' ELSE 'DINE_IN' END), \
             COALESCE(SUM(total_amount), 0.0), CAST(COUNT(*) AS INTEGER) \
          FROM archived_order \
          WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 \
-         GROUP BY COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'DineIn' END) \
+         GROUP BY COALESCE(service_type, CASE WHEN is_retail = 1 THEN 'TAKEOUT' ELSE 'DINE_IN' END) \
          ORDER BY SUM(total_amount) DESC",
     )
     .bind(start_dt)
@@ -555,6 +568,164 @@ pub async fn get_statistics(
     })
     .collect();
 
+    // ── Discount & Surcharge Breakdown ──
+    // 1. Order-level aggregates (manual + MG)
+    let (
+        order_manual_disc,
+        order_manual_sur,
+        order_mg_disc,
+        order_manual_disc_cnt,
+        order_manual_sur_cnt,
+        order_mg_cnt,
+    ): (f64, f64, f64, i32, i32, i32) = sqlx::query_as(
+        "SELECT \
+            COALESCE(SUM(order_manual_discount_amount), 0.0), \
+            COALESCE(SUM(order_manual_surcharge_amount), 0.0), \
+            COALESCE(SUM(mg_discount_amount), 0.0), \
+            CAST(COUNT(CASE WHEN order_manual_discount_amount > 0 THEN 1 END) AS INTEGER), \
+            CAST(COUNT(CASE WHEN order_manual_surcharge_amount > 0 THEN 1 END) AS INTEGER), \
+            CAST(COUNT(CASE WHEN mg_discount_amount > 0 THEN 1 END) AS INTEGER) \
+         FROM archived_order \
+         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    // 2. Item-level manual discount
+    let (item_manual_disc, item_manual_disc_cnt): (f64, i32) = sqlx::query_as(
+        "SELECT COALESCE(SUM(i.discount_amount), 0.0), \
+            CAST(COUNT(DISTINCT o.id) AS INTEGER) \
+         FROM archived_order_item i \
+         JOIN archived_order o ON i.order_pk = o.id \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
+           AND i.discount_amount > 0 AND i.is_comped = 0",
+    )
+    .bind(start_dt)
+    .bind(end_dt)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    // 3. Item-level rule breakdown (per rule_id from applied_rules JSON)
+    let item_rules: Vec<(String, String, f64, i32)> = sqlx::query_as(
+        "SELECT \
+            COALESCE(json_extract(rule.value, '$.receipt_name'), json_extract(rule.value, '$.name')), \
+            json_extract(rule.value, '$.rule_type'), \
+            COALESCE(SUM(json_extract(rule.value, '$.calculated_amount') * i.quantity), 0.0), \
+            CAST(COUNT(DISTINCT o.id) AS INTEGER) \
+         FROM archived_order_item i \
+         JOIN archived_order o ON i.order_pk = o.id, \
+              json_each(i.applied_rules) AS rule \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 \
+           AND o.end_time >= ?1 AND o.end_time < ?2 \
+           AND i.applied_rules IS NOT NULL AND i.applied_rules != '[]' \
+           AND (json_extract(rule.value, '$.skipped') = 0 OR json_extract(rule.value, '$.skipped') IS NULL) \
+         GROUP BY json_extract(rule.value, '$.rule_id'), json_extract(rule.value, '$.rule_type') \
+         ORDER BY SUM(json_extract(rule.value, '$.calculated_amount') * i.quantity) DESC",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
+
+    // 4. Order-level rule breakdown (per rule_id from order_applied_rules JSON)
+    let order_rules: Vec<(String, String, f64, i32)> = sqlx::query_as(
+        "SELECT \
+            COALESCE(json_extract(rule.value, '$.receipt_name'), json_extract(rule.value, '$.name')), \
+            json_extract(rule.value, '$.rule_type'), \
+            COALESCE(SUM(json_extract(rule.value, '$.calculated_amount')), 0.0), \
+            CAST(COUNT(DISTINCT o.id) AS INTEGER) \
+         FROM archived_order o, \
+              json_each(o.order_applied_rules) AS rule \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 \
+           AND o.end_time >= ?1 AND o.end_time < ?2 \
+           AND o.order_applied_rules IS NOT NULL AND o.order_applied_rules != '[]' \
+           AND (json_extract(rule.value, '$.skipped') = 0 OR json_extract(rule.value, '$.skipped') IS NULL) \
+         GROUP BY json_extract(rule.value, '$.rule_id'), json_extract(rule.value, '$.rule_type') \
+         ORDER BY SUM(json_extract(rule.value, '$.calculated_amount')) DESC",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
+
+    // Assemble discount_breakdown
+    let mut discount_breakdown = Vec::new();
+    if item_manual_disc > 0.0 {
+        discount_breakdown.push(AdjustmentEntry {
+            name: "item_manual".into(),
+            source: "item_manual".into(),
+            amount: item_manual_disc,
+            order_count: item_manual_disc_cnt,
+        });
+    }
+    for (name, rule_type, amount, cnt) in &item_rules {
+        if rule_type == "DISCOUNT" && *amount > 0.0 {
+            discount_breakdown.push(AdjustmentEntry {
+                name: name.clone(),
+                source: "item_rule".into(),
+                amount: *amount,
+                order_count: *cnt,
+            });
+        }
+    }
+    if order_mg_disc > 0.0 {
+        discount_breakdown.push(AdjustmentEntry {
+            name: "mg".into(),
+            source: "mg".into(),
+            amount: order_mg_disc,
+            order_count: order_mg_cnt,
+        });
+    }
+    if order_manual_disc > 0.0 {
+        discount_breakdown.push(AdjustmentEntry {
+            name: "order_manual".into(),
+            source: "order_manual".into(),
+            amount: order_manual_disc,
+            order_count: order_manual_disc_cnt,
+        });
+    }
+    for (name, rule_type, amount, cnt) in &order_rules {
+        if rule_type == "DISCOUNT" && *amount > 0.0 {
+            discount_breakdown.push(AdjustmentEntry {
+                name: name.clone(),
+                source: "order_rule".into(),
+                amount: *amount,
+                order_count: *cnt,
+            });
+        }
+    }
+
+    // Assemble surcharge_breakdown
+    let mut surcharge_breakdown = Vec::new();
+    for (name, rule_type, amount, cnt) in &item_rules {
+        if rule_type == "SURCHARGE" && *amount > 0.0 {
+            surcharge_breakdown.push(AdjustmentEntry {
+                name: name.clone(),
+                source: "item_rule".into(),
+                amount: *amount,
+                order_count: *cnt,
+            });
+        }
+    }
+    if order_manual_sur > 0.0 {
+        surcharge_breakdown.push(AdjustmentEntry {
+            name: "order_manual".into(),
+            source: "order_manual".into(),
+            amount: order_manual_sur,
+            order_count: order_manual_sur_cnt,
+        });
+    }
+    for (name, rule_type, amount, cnt) in &order_rules {
+        if rule_type == "SURCHARGE" && *amount > 0.0 {
+            surcharge_breakdown.push(AdjustmentEntry {
+                name: name.clone(),
+                source: "order_rule".into(),
+                amount: *amount,
+                order_count: *cnt,
+            });
+        }
+    }
+
     Ok(Json(StoreOverview {
         revenue,
         net_revenue: revenue - refund_amount,
@@ -585,6 +756,8 @@ pub async fn get_statistics(
         refund_method_breakdown,
         service_type_breakdown,
         zone_sales,
+        discount_breakdown,
+        surcharge_breakdown,
     }))
 }
 
@@ -647,32 +820,55 @@ pub async fn get_sales_report(
 }
 
 // ============================================================================
-// Red Flags
+// Red Flags — Grouped Summary
 // ============================================================================
 
 #[derive(Debug, Serialize)]
-pub struct RedFlagsSummary {
-    pub item_removals: i64,
-    pub item_comps: i64,
-    pub order_voids: i64,
-    pub order_discounts: i64,
+pub struct ItemFlags {
+    pub removals: i64,
+    pub comps: i64,
+    pub uncomps: i64,
     pub price_modifications: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrderFlags {
+    pub voids: i64,
+    pub discounts: i64,
+    pub surcharges: i64,
+    pub rule_skips: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaymentFlags {
+    pub cancellations: i64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
 }
 
 #[derive(Debug, Serialize)]
 pub struct OperatorRedFlags {
     pub operator_id: i64,
     pub operator_name: String,
-    pub item_removals: i64,
-    pub item_comps: i64,
-    pub order_voids: i64,
-    pub order_discounts: i64,
+    pub removals: i64,
+    pub comps: i64,
+    pub uncomps: i64,
     pub price_modifications: i64,
+    pub voids: i64,
+    pub discounts: i64,
+    pub surcharges: i64,
+    pub rule_skips: i64,
+    pub cancellations: i64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
+    pub total_flags: i64,
 }
 
 #[derive(Debug, Serialize)]
 pub struct RedFlagsResponse {
-    pub summary: RedFlagsSummary,
+    pub item_flags: ItemFlags,
+    pub order_flags: OrderFlags,
+    pub payment_flags: PaymentFlags,
     pub operator_breakdown: Vec<OperatorRedFlags>,
 }
 
@@ -701,94 +897,324 @@ pub async fn get_red_flags(
         )
     };
 
-    // Summary: count events by type within time range
-    let summary_rows: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT ae.event_type, COUNT(*) as cnt
-         FROM archived_order_event ae
-         JOIN archived_order o ON ae.order_pk = o.id
-         WHERE o.end_time >= ?1 AND o.end_time < ?2
-           AND ae.event_type IN ('ITEM_REMOVED', 'ITEM_COMPED', 'ORDER_VOIDED', 'ORDER_DISCOUNT_APPLIED', 'ITEM_MODIFIED')
-         GROUP BY ae.event_type"
+    let pool = &state.pool;
+
+    // Query event counts by type within time range
+    let event_rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT ae.event_type, COUNT(*) as cnt \
+         FROM archived_order_event ae \
+         JOIN archived_order o ON ae.order_pk = o.id \
+         WHERE o.end_time >= ?1 AND o.end_time < ?2 \
+           AND ae.event_type IN (\
+               'ITEM_REMOVED', 'ITEM_COMPED', 'ITEM_UNCOMPED', 'ITEM_MODIFIED', \
+               'ORDER_VOIDED', 'ORDER_DISCOUNT_APPLIED', 'ORDER_SURCHARGE_APPLIED', \
+               'RULE_SKIP_TOGGLED', 'PAYMENT_CANCELLED') \
+         GROUP BY ae.event_type",
     )
     .bind(start)
     .bind(end)
-    .fetch_all(&state.pool)
+    .fetch_all(pool)
     .await
     .map_err(|e| AppError::database(e.to_string()))?;
 
-    let mut summary = RedFlagsSummary {
-        item_removals: 0,
-        item_comps: 0,
-        order_voids: 0,
-        order_discounts: 0,
+    let mut item_flags = ItemFlags {
+        removals: 0,
+        comps: 0,
+        uncomps: 0,
         price_modifications: 0,
     };
-    for (event_type, count) in &summary_rows {
+    let mut order_flags = OrderFlags {
+        voids: 0,
+        discounts: 0,
+        surcharges: 0,
+        rule_skips: 0,
+    };
+    let mut payment_flags = PaymentFlags {
+        cancellations: 0,
+        refund_count: 0,
+        refund_amount: 0.0,
+    };
+
+    for (event_type, count) in &event_rows {
         match event_type.as_str() {
-            "ITEM_REMOVED" => summary.item_removals = *count,
-            "ITEM_COMPED" => summary.item_comps = *count,
-            "ORDER_VOIDED" => summary.order_voids = *count,
-            "ORDER_DISCOUNT_APPLIED" => summary.order_discounts = *count,
-            "ITEM_MODIFIED" => summary.price_modifications = *count,
+            "ITEM_REMOVED" => item_flags.removals = *count,
+            "ITEM_COMPED" => item_flags.comps = *count,
+            "ITEM_UNCOMPED" => item_flags.uncomps = *count,
+            "ITEM_MODIFIED" => item_flags.price_modifications = *count,
+            "ORDER_VOIDED" => order_flags.voids = *count,
+            "ORDER_DISCOUNT_APPLIED" => order_flags.discounts = *count,
+            "ORDER_SURCHARGE_APPLIED" => order_flags.surcharges = *count,
+            "RULE_SKIP_TOGGLED" => order_flags.rule_skips = *count,
+            "PAYMENT_CANCELLED" => payment_flags.cancellations = *count,
             _ => {}
         }
     }
 
-    // Operator breakdown
-    let operator_rows: Vec<(i64, String, String, i64)> = sqlx::query_as(
-        "SELECT COALESCE(ae.operator_id, 0), COALESCE(ae.operator_name, ''), ae.event_type, COUNT(*) as cnt
-         FROM archived_order_event ae
-         JOIN archived_order o ON ae.order_pk = o.id
-         WHERE o.end_time >= ?1 AND o.end_time < ?2
-           AND ae.event_type IN ('ITEM_REMOVED', 'ITEM_COMPED', 'ORDER_VOIDED', 'ORDER_DISCOUNT_APPLIED', 'ITEM_MODIFIED')
-         GROUP BY ae.operator_id, ae.operator_name, ae.event_type"
+    // Query refunds from credit_note
+    let refund_rows: Vec<(i64, String, i64, f64)> = sqlx::query_as(
+        "SELECT COALESCE(operator_id, 0), COALESCE(operator_name, ''), \
+                COUNT(*), COALESCE(SUM(total_credit), 0.0) \
+         FROM credit_note \
+         WHERE created_at >= ?1 AND created_at < ?2 \
+         GROUP BY operator_id, operator_name",
     )
     .bind(start)
     .bind(end)
-    .fetch_all(&state.pool)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
+
+    // Aggregate refund totals for summary
+    for (_, _, cnt, amt) in &refund_rows {
+        payment_flags.refund_count += cnt;
+        payment_flags.refund_amount += amt;
+    }
+
+    // Operator breakdown from events
+    let operator_event_rows: Vec<(i64, String, String, i64)> = sqlx::query_as(
+        "SELECT COALESCE(ae.operator_id, 0), COALESCE(ae.operator_name, ''), \
+                ae.event_type, COUNT(*) as cnt \
+         FROM archived_order_event ae \
+         JOIN archived_order o ON ae.order_pk = o.id \
+         WHERE o.end_time >= ?1 AND o.end_time < ?2 \
+           AND ae.event_type IN (\
+               'ITEM_REMOVED', 'ITEM_COMPED', 'ITEM_UNCOMPED', 'ITEM_MODIFIED', \
+               'ORDER_VOIDED', 'ORDER_DISCOUNT_APPLIED', 'ORDER_SURCHARGE_APPLIED', \
+               'RULE_SKIP_TOGGLED', 'PAYMENT_CANCELLED') \
+         GROUP BY ae.operator_id, ae.operator_name, ae.event_type",
+    )
+    .bind(start)
+    .bind(end)
+    .fetch_all(pool)
     .await
     .map_err(|e| AppError::database(e.to_string()))?;
 
     let mut op_map: std::collections::HashMap<i64, OperatorRedFlags> =
         std::collections::HashMap::new();
-    for (op_id, op_name, event_type, count) in operator_rows {
+
+    for (op_id, op_name, event_type, count) in operator_event_rows {
         let entry = op_map.entry(op_id).or_insert_with(|| OperatorRedFlags {
             operator_id: op_id,
             operator_name: op_name.clone(),
-            item_removals: 0,
-            item_comps: 0,
-            order_voids: 0,
-            order_discounts: 0,
+            removals: 0,
+            comps: 0,
+            uncomps: 0,
             price_modifications: 0,
+            voids: 0,
+            discounts: 0,
+            surcharges: 0,
+            rule_skips: 0,
+            cancellations: 0,
+            refund_count: 0,
+            refund_amount: 0.0,
+            total_flags: 0,
         });
         match event_type.as_str() {
-            "ITEM_REMOVED" => entry.item_removals = count,
-            "ITEM_COMPED" => entry.item_comps = count,
-            "ORDER_VOIDED" => entry.order_voids = count,
-            "ORDER_DISCOUNT_APPLIED" => entry.order_discounts = count,
+            "ITEM_REMOVED" => entry.removals = count,
+            "ITEM_COMPED" => entry.comps = count,
+            "ITEM_UNCOMPED" => entry.uncomps = count,
             "ITEM_MODIFIED" => entry.price_modifications = count,
+            "ORDER_VOIDED" => entry.voids = count,
+            "ORDER_DISCOUNT_APPLIED" => entry.discounts = count,
+            "ORDER_SURCHARGE_APPLIED" => entry.surcharges = count,
+            "RULE_SKIP_TOGGLED" => entry.rule_skips = count,
+            "PAYMENT_CANCELLED" => entry.cancellations = count,
             _ => {}
         }
     }
 
-    let mut operator_breakdown: Vec<OperatorRedFlags> = op_map.into_values().collect();
-    operator_breakdown.sort_by(|a, b| {
-        let total_a = a.item_removals
-            + a.item_comps
-            + a.order_voids
-            + a.order_discounts
-            + a.price_modifications;
-        let total_b = b.item_removals
-            + b.item_comps
-            + b.order_voids
-            + b.order_discounts
-            + b.price_modifications;
-        total_b.cmp(&total_a)
-    });
+    // Merge refund data into operator map
+    for (op_id, op_name, cnt, amt) in refund_rows {
+        let entry = op_map.entry(op_id).or_insert_with(|| OperatorRedFlags {
+            operator_id: op_id,
+            operator_name: op_name.clone(),
+            removals: 0,
+            comps: 0,
+            uncomps: 0,
+            price_modifications: 0,
+            voids: 0,
+            discounts: 0,
+            surcharges: 0,
+            rule_skips: 0,
+            cancellations: 0,
+            refund_count: 0,
+            refund_amount: 0.0,
+            total_flags: 0,
+        });
+        entry.refund_count = cnt;
+        entry.refund_amount = amt;
+    }
+
+    // Calculate total_flags and sort
+    let mut operator_breakdown: Vec<OperatorRedFlags> = op_map
+        .into_values()
+        .map(|mut op| {
+            op.total_flags = op.removals
+                + op.comps
+                + op.uncomps
+                + op.price_modifications
+                + op.voids
+                + op.discounts
+                + op.surcharges
+                + op.rule_skips
+                + op.cancellations
+                + op.refund_count;
+            op
+        })
+        .collect();
+    operator_breakdown.sort_by(|a, b| b.total_flags.cmp(&a.total_flags));
 
     Ok(Json(RedFlagsResponse {
-        summary,
+        item_flags,
+        order_flags,
+        payment_flags,
         operator_breakdown,
+    }))
+}
+
+// ============================================================================
+// Red Flags — Event Log
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct RedFlagLogQuery {
+    pub from: i64,
+    pub to: i64,
+    pub event_type: Option<String>,
+    pub operator_id: Option<i64>,
+    #[serde(default = "default_page")]
+    pub page: i32,
+    #[serde(rename = "perPage", default = "default_log_per_page")]
+    pub per_page: i32,
+}
+
+fn default_log_per_page() -> i32 {
+    50
+}
+
+#[derive(Debug, Serialize)]
+pub struct RedFlagLogEntry {
+    pub timestamp: i64,
+    pub event_type: String,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub receipt_number: String,
+    pub order_id: i64,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RedFlagLogResponse {
+    pub entries: Vec<RedFlagLogEntry>,
+    pub total: i64,
+    pub page: i32,
+    pub per_page: i32,
+}
+
+/// GET /api/statistics/red-flags/log
+pub async fn get_red_flag_log(
+    State(state): State<ServerState>,
+    Query(query): Query<RedFlagLogQuery>,
+) -> AppResult<Json<RedFlagLogResponse>> {
+    let per_page = query.per_page.clamp(1, 100);
+    let offset = (query.page.max(1) - 1) * per_page;
+    let pool = &state.pool;
+
+    let event_filter = query.event_type.as_deref().unwrap_or("");
+    let mut entries: Vec<RedFlagLogEntry> = Vec::new();
+
+    // 1. Order events (skip if only REFUND requested)
+    if event_filter != "REFUND" {
+        let mut sql = String::from(
+            "SELECT ae.timestamp, ae.event_type, \
+                    COALESCE(ae.operator_id, 0), COALESCE(ae.operator_name, ''), \
+                    COALESCE(o.receipt_number, ''), o.order_id, ae.data \
+             FROM archived_order_event ae \
+             JOIN archived_order o ON ae.order_pk = o.id \
+             WHERE o.end_time >= ?1 AND o.end_time < ?2 \
+               AND ae.event_type IN (\
+                   'ITEM_REMOVED','ITEM_COMPED','ITEM_UNCOMPED','ITEM_MODIFIED',\
+                   'ORDER_VOIDED','ORDER_DISCOUNT_APPLIED','ORDER_SURCHARGE_APPLIED',\
+                   'RULE_SKIP_TOGGLED','PAYMENT_CANCELLED')",
+        );
+        if !event_filter.is_empty() {
+            sql.push_str(&format!(" AND ae.event_type = '{event_filter}'"));
+        }
+        if let Some(op_id) = query.operator_id {
+            sql.push_str(&format!(" AND ae.operator_id = {op_id}"));
+        }
+
+        #[allow(clippy::type_complexity)]
+        let rows: Vec<(i64, String, i64, String, String, i64, Option<String>)> =
+            sqlx::query_as(&sql)
+                .bind(query.from)
+                .bind(query.to)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| AppError::database(e.to_string()))?;
+
+        for (ts, etype, op_id, op_name, receipt, order_id, data) in rows {
+            entries.push(RedFlagLogEntry {
+                timestamp: ts,
+                event_type: etype,
+                operator_id: op_id,
+                operator_name: op_name,
+                receipt_number: receipt,
+                order_id,
+                detail: data,
+            });
+        }
+    }
+
+    // 2. Refunds (unless filtering by a specific non-REFUND event type)
+    if event_filter.is_empty() || event_filter == "REFUND" {
+        let mut refund_sql = String::from(
+            "SELECT cn.created_at, cn.operator_id, cn.operator_name, \
+                    COALESCE(o.receipt_number, ''), o.order_id, \
+                    cn.total_credit, cn.reason \
+             FROM credit_note cn \
+             JOIN archived_order o ON cn.original_order_pk = o.id \
+             WHERE cn.created_at >= ?1 AND cn.created_at < ?2",
+        );
+        if let Some(op_id) = query.operator_id {
+            refund_sql.push_str(&format!(" AND cn.operator_id = {op_id}"));
+        }
+
+        let refund_rows: Vec<(i64, i64, String, String, i64, f64, String)> =
+            sqlx::query_as(&refund_sql)
+                .bind(query.from)
+                .bind(query.to)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| AppError::database(e.to_string()))?;
+
+        for (ts, op_id, op_name, receipt, order_id, amount, reason) in refund_rows {
+            entries.push(RedFlagLogEntry {
+                timestamp: ts,
+                event_type: "REFUND".to_string(),
+                operator_id: op_id,
+                operator_name: op_name,
+                receipt_number: receipt,
+                order_id,
+                detail: Some(format!("{:.2} - {}", amount, reason)),
+            });
+        }
+    }
+
+    // Sort by timestamp DESC, then paginate
+    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    let total = entries.len() as i64;
+    let paginated: Vec<RedFlagLogEntry> = entries
+        .into_iter()
+        .skip(offset as usize)
+        .take(per_page as usize)
+        .collect();
+
+    Ok(Json(RedFlagLogResponse {
+        entries: paginated,
+        total,
+        page: query.page.max(1),
+        per_page,
     }))
 }
 
