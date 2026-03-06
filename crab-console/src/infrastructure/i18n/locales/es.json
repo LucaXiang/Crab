@@ -257,7 +257,9 @@
     "anulacion": "Anulaciones",
     "just_now": "Recién actualizado",
     "ago": "hace",
-    "refresh": "Actualizar datos"
+    "refresh": "Actualizar datos",
+    "max_range_exceeded": "El rango no puede superar 90 días",
+    "invalid_range": "La fecha final debe ser posterior a la inicial"
   },
   "reports": {
     "abnormal_close": "Cierre anormal",

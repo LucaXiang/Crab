@@ -258,12 +258,13 @@ impl PrintExecutor {
 
     /// Print label records (Windows: GDI+ rendering via crab-printer)
     #[cfg(windows)]
-    #[instrument(skip(self, records, destinations, template, label_ctx), fields(record_count = records.len()))]
+    #[instrument(skip(self, records, destinations, template, db_fields, label_ctx), fields(record_count = records.len()))]
     pub async fn print_label_records(
         &self,
         records: &[super::types::LabelPrintRecord],
         destinations: &HashMap<String, PrintDestination>,
         template: &crab_printer::label::LabelTemplate,
+        db_fields: &[shared::models::LabelField],
         label_ctx: &LabelContext,
     ) -> PrintExecutorResult<()> {
         for record in records {
@@ -302,13 +303,15 @@ impl PrintExecutor {
                     }
                 };
 
-                let data = build_label_data(record, label_ctx);
+                let mut data = build_label_data(record, label_ctx);
+                inject_static_images(&mut data, db_fields, label_ctx.images_dir.as_deref());
 
+                // Paper size must include padding for correct positioning
                 let options = crab_printer::label::PrintOptions {
                     printer_name: Some(driver_name),
                     doc_name: "label".to_string(),
-                    label_width_mm: template.width_mm,
-                    label_height_mm: template.height_mm,
+                    label_width_mm: template.width_mm + template.padding_mm_x,
+                    label_height_mm: template.height_mm + template.padding_mm_y,
                     copies: 1,
                     fit: crab_printer::label::FitMode::Contain,
                     rotate: crab_printer::label::Rotation::R0,
@@ -351,18 +354,6 @@ impl PrintExecutor {
         }
         Ok(())
     }
-
-    /// Print label records (non-Windows: not supported, GDI+ required)
-    #[cfg(not(windows))]
-    pub async fn print_label_records(
-        &self,
-        _records: &[super::types::LabelPrintRecord],
-        _destinations: &HashMap<String, PrintDestination>,
-        _label_ctx: &LabelContext,
-    ) -> PrintExecutorResult<()> {
-        warn!("Label printing requires Windows (GDI+)");
-        Ok(())
-    }
 }
 
 /// Extra context for label data rendering (store info, image paths)
@@ -373,6 +364,8 @@ pub struct LabelContext {
     pub store_nif: String,
     /// Base64 data URI of store logo (pre-loaded)
     pub store_logo: Option<String>,
+    /// Images directory for loading static image fields
+    pub images_dir: Option<std::path::PathBuf>,
 }
 
 impl LabelContext {
@@ -413,6 +406,7 @@ impl LabelContext {
             store_phone: phone,
             store_nif: nif,
             store_logo,
+            images_dir: images_dir.map(|p| p.to_path_buf()),
         }
     }
 }
@@ -474,6 +468,63 @@ fn build_label_data(
         data["store_logo"] = serde_json::Value::String(logo.clone());
     }
     data
+}
+
+/// Inject static image fields into label data.
+///
+/// For image fields with `source_type == "image"` and a non-empty `template` (image hash),
+/// load the image from disk and inject as Base64 data URI into the data JSON.
+/// This enables user-uploaded static images (e.g. custom logos) to print correctly.
+#[cfg(windows)]
+fn inject_static_images(
+    data: &mut serde_json::Value,
+    db_fields: &[shared::models::LabelField],
+    images_dir: Option<&std::path::Path>,
+) {
+    use base64::Engine;
+
+    let Some(images_dir) = images_dir else { return };
+
+    for field in db_fields {
+        // Only process static image fields (source_type=image with a hash in template)
+        if field.source_type.as_deref() != Some("image") {
+            continue;
+        }
+        let Some(hash) = field.template.as_deref().filter(|h| !h.is_empty()) else {
+            continue;
+        };
+
+        // The data_key is what the printer will look for in the JSON
+        let data_key = field.resolve_image_data_key();
+
+        // Skip if already populated (e.g. store_logo)
+        if data.get(&data_key).is_some() {
+            continue;
+        }
+
+        // Load image file by hash from images directory
+        let path = images_dir.join(hash);
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                // Detect MIME by magic bytes (hash filenames may lack extension)
+                let mime = if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+                    "image/jpeg"
+                } else if bytes.len() > 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP"
+                {
+                    "image/webp"
+                } else {
+                    "image/png"
+                };
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                data[&data_key] =
+                    serde_json::Value::String(format!("data:{};base64,{}", mime, b64));
+                tracing::debug!(field_id = %field.field_id, data_key, "Injected static image");
+            }
+            Err(e) => {
+                warn!(field_id = %field.field_id, hash, error = %e, "Failed to load static image");
+            }
+        }
+    }
 }
 
 /// Convert DB LabelTemplate to crab-printer LabelTemplate

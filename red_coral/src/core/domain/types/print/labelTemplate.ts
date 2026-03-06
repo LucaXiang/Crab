@@ -102,21 +102,6 @@ export interface UpdateLabelTemplateParams extends Partial<CreateLabelTemplatePa
 }
 
 /**
- * Label print job
- */
-export interface LabelPrintJob {
-  id: number;
-  template_id: number;
-  data: Record<string, unknown>;
-  quantity: number;
-  status: 'pending' | 'printing' | 'completed' | 'failed';
-  printer_id?: number;
-  created_at: number;
-  printed_at?: number;
-  error?: string;
-}
-
-/**
  * Predefined label templates
  */
 export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
@@ -338,92 +323,6 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     ],
   },
 ];
-
-/**
- * Label field helper functions
- */
-export const LabelFieldHelpers = {
-  /**
-   * Create a new label field
-   */
-  createField(overrides: Partial<LabelField> = {}): LabelField {
-    return {
-      field_id: crypto.randomUUID(),
-      name: '',
-      field_type: 'text',
-      x: 0,
-      y: 0,
-      width: 20,
-      height: 10,
-      font_size: 10,
-      font_weight: 'normal',
-      font_family: 'Arial',
-      color: '#000000',
-      rotate: 0,
-      alignment: 'left',
-      data_source: '',
-      format: '',
-      visible: true,
-      ...overrides,
-    };
-  },
-
-  /**
-   * Get default fields for a label size
-   */
-  getDefaultFields(width: number, height: number): LabelField[] {
-    if (width <= 30) {
-      return [
-        this.createField({
-          name: '商品名称',
-          field_type: 'text',
-          x: 1,
-          y: 2,
-          width: 28,
-          height: 6,
-          font_size: 10,
-          font_weight: 'bold',
-          data_source: 'product_name',
-        }),
-        this.createField({
-          name: '规格',
-          field_type: 'text',
-          x: 1,
-          y: 10,
-          width: 28,
-          height: 5,
-          font_size: 9,
-          data_source: 'spec_name',
-        }),
-      ];
-    }
-    return [
-      this.createField({
-        name: '商品名称',
-        field_type: 'text',
-        x: 2,
-        y: 2,
-        width: width - 4,
-        height: 8,
-        font_size: 14,
-        font_weight: 'bold',
-        data_source: 'product_name',
-        alignment: 'center',
-      }),
-      this.createField({
-        name: '规格',
-        field_type: 'text',
-        x: 2,
-        y: 14,
-        width: width - 4,
-        height: 6,
-        font_size: 10,
-        data_source: 'spec_name',
-        alignment: 'center',
-      }),
-    ];
-  },
-};
 
 export type TextAlign = 'left' | 'center' | 'right';
 export type VerticalAlign = 'top' | 'middle' | 'bottom';

@@ -13,6 +13,26 @@ use crate::state::AppState;
 
 use super::{ApiResult, verify_store};
 
+/// Maximum query range: 90 days in milliseconds
+const MAX_RANGE_MS: i64 = 90 * 24 * 3600 * 1000;
+
+/// Validate that a time range does not exceed 90 days.
+fn validate_range(from: i64, to: i64) -> Result<(), AppError> {
+    if to <= from {
+        return Err(AppError::with_message(
+            ErrorCode::ValidationFailed,
+            "End date must be after start date",
+        ));
+    }
+    if to - from > MAX_RANGE_MS {
+        return Err(AppError::with_message(
+            ErrorCode::ValidationFailed,
+            "Query range cannot exceed 90 days",
+        ));
+    }
+    Ok(())
+}
+
 /// GET /api/tenant/stores/:id/stats?from=YYYY-MM-DD&to=YYYY-MM-DD
 #[derive(Deserialize)]
 pub struct StatsQuery {
@@ -56,6 +76,8 @@ pub async fn get_tenant_overview(
     Extension(identity): Extension<TenantIdentity>,
     Query(query): Query<OverviewQuery>,
 ) -> ApiResult<tenant_queries::StoreOverview> {
+    validate_range(query.from, query.to)?;
+
     let overview =
         tenant_queries::get_tenant_overview(&state.pool, identity.tenant_id, query.from, query.to)
             .await
@@ -74,6 +96,7 @@ pub async fn get_store_overview(
     Path(store_id): Path<i64>,
     Query(query): Query<OverviewQuery>,
 ) -> ApiResult<tenant_queries::StoreOverview> {
+    validate_range(query.from, query.to)?;
     verify_store(&state, store_id, identity.tenant_id).await?;
 
     let overview = tenant_queries::get_store_overview(
@@ -99,6 +122,7 @@ pub async fn get_store_red_flags(
     Path(store_id): Path<i64>,
     Query(query): Query<OverviewQuery>,
 ) -> ApiResult<tenant_queries::RedFlagsResponse> {
+    validate_range(query.from, query.to)?;
     verify_store(&state, store_id, identity.tenant_id).await?;
 
     let red_flags = tenant_queries::get_red_flags(

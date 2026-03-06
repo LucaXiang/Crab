@@ -253,7 +253,9 @@
     "anulacion": "Voided (Post-Archive)",
     "just_now": "Just updated",
     "ago": "ago",
-    "refresh": "Refresh data"
+    "refresh": "Refresh data",
+    "max_range_exceeded": "Date range cannot exceed 90 days",
+    "invalid_range": "End date must be after start date"
   },
   "reports": {
     "abnormal_close": "Abnormal close",

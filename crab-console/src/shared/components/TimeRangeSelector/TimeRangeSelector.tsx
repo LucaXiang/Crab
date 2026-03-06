@@ -180,6 +180,9 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinu
     onChange(getPresetRange(preset, t, undefined, undefined, cutoffMinutes));
   };
 
+  const MAX_DAYS = 90;
+  const [customError, setCustomError] = useState('');
+
   const handleCustomApply = () => {
     const cutoffH = Math.floor(cutoffMinutes / 60);
     const cutoffM = cutoffMinutes % 60;
@@ -188,6 +191,18 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinu
     const toDate = new Date(customTo);
     toDate.setDate(toDate.getDate() + 1);
     toDate.setHours(cutoffH, cutoffM, 0, 0);
+
+    const days = Math.round((toDate.getTime() - from.getTime()) / 86_400_000);
+    if (days > MAX_DAYS) {
+      setCustomError(t('stats.max_range_exceeded'));
+      return;
+    }
+    if (days <= 0) {
+      setCustomError(t('stats.invalid_range'));
+      return;
+    }
+
+    setCustomError('');
     onChange(getPresetRange('custom', t, from.getTime(), toDate.getTime(), cutoffMinutes));
     setShowCustom(false);
   };
@@ -243,7 +258,7 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinu
               <input
                 type="date"
                 value={customFrom}
-                onChange={e => setCustomFrom(e.target.value)}
+                onChange={e => { setCustomFrom(e.target.value); setCustomError(''); }}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
               />
             </div>
@@ -252,7 +267,7 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinu
               <input
                 type="date"
                 value={customTo}
-                onChange={e => setCustomTo(e.target.value)}
+                onChange={e => { setCustomTo(e.target.value); setCustomError(''); }}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
               />
             </div>
@@ -263,6 +278,7 @@ export const TimeRangeSelector: React.FC<Props> = ({ value, onChange, cutoffMinu
               {t('common.label.apply')}
             </button>
           </div>
+          {customError && <p className="text-xs text-red-500 mt-2">{customError}</p>}
         </div>
       )}
     </div>

@@ -363,7 +363,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       ctx.rect(field.x, field.y, field.width, field.height);
       ctx.clip();
 
-      if (field.field_type === 'text') {
+      if (field.field_type === 'text' || field.field_type === 'datetime' || field.field_type === 'price' || field.field_type === 'counter') {
         const font_size = field.font_size;
         const fontStyle = field.font_weight === 'bold' ? 'bold' : 'normal';
         const font_family = field.font_family || 'Arial';

@@ -306,15 +306,24 @@ pub async fn reprint_label(
     #[cfg(windows)]
     {
         use crate::db::repository::label_template;
-        let template = match label_template::get_default(&state.pool).await {
-            Ok(Some(db_tmpl)) => crate::printing::executor::convert_label_template(&db_tmpl),
+        let (template, db_fields) = match label_template::get_default(&state.pool).await {
+            Ok(Some(db_tmpl)) => {
+                let converted = crate::printing::executor::convert_label_template(&db_tmpl);
+                (converted, db_tmpl.fields)
+            }
             _ => {
                 tracing::warn!("No default label template for reprint, using built-in");
-                crab_printer::label::LabelTemplate::default()
+                (crab_printer::label::LabelTemplate::default(), vec![])
             }
         };
         if let Err(e) = executor
-            .print_label_records(&[reprint_record], &destinations, &template, &label_ctx)
+            .print_label_records(
+                &[reprint_record],
+                &destinations,
+                &template,
+                &db_fields,
+                &label_ctx,
+            )
             .await
         {
             tracing::warn!(label_record_id = %id, error = %e, "Label reprint failed");
@@ -324,13 +333,8 @@ pub async fn reprint_label(
 
     #[cfg(not(windows))]
     {
-        if let Err(e) = executor
-            .print_label_records(&[reprint_record], &destinations, &label_ctx)
-            .await
-        {
-            tracing::warn!(label_record_id = %id, error = %e, "Label reprint failed");
-            return Ok(Json(false));
-        }
+        let _ = (&reprint_record, &destinations, &executor, &label_ctx);
+        tracing::warn!("Label printing requires Windows (GDI+)");
     }
 
     Ok(Json(true))

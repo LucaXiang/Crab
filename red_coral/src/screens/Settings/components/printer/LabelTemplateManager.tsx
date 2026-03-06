@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutTemplate, Plus, Copy, Trash2, Edit2, Loader2, CircleDot, Circle } from 'lucide-react';
+import { Plus, Copy, Trash2, Edit2, Loader2, CircleDot, Circle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useActiveLabelTemplateId, usePrinterActions } from '@/core/stores/ui';
 import {
@@ -217,17 +217,6 @@ export const LabelTemplateManager: React.FC = () => {
                       {fieldCount} {t('settings.printer.template.fields')}
                     </span>
                   </div>
-                </div>
-
-                {/* Size preview */}
-                <div
-                  className="shrink-0 border border-gray-200 rounded bg-gray-50 flex items-center justify-center"
-                  style={{
-                    width: Math.min(template.width * 1.2, 60),
-                    height: Math.min(template.height * 1.2, 45),
-                  }}
-                >
-                  <LayoutTemplate size={14} className="text-gray-300" />
                 </div>
 
                 {/* Actions */}

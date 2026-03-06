@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { invokeApi } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
-import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle, Loader2, Barcode, QrCode, Clock } from 'lucide-react';
 import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
 import { FieldPropertiesPanel } from './FieldPropertiesPanel';
@@ -163,44 +163,82 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     handleTemplateChange({ ...template, fields: updatedFields });
   };
 
-  const handleAddField = (type: 'text' | 'image' | 'separator') => {
+  const handleAddField = (type: LabelField['field_type']) => {
     const generateId = () => `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    const base = { field_id: generateId(), field_type: type, visible: true, data_source: '' } as const;
     let newField: LabelField;
 
-    if (type === 'text') {
-      newField = {
-        field_id: generateId(),
-        field_type: 'text',
-        name: t("settings.label.field.new_text"),
-        x: 10, y: 10, width: 100, height: 20,
-        font_size: 12, font_weight: 'normal', alignment: 'left',
-        template: t("settings.label.field.default_text"),
-        data_source: '',
-        visible: true,
-      };
-    } else if (type === 'image') {
-      newField = {
-        field_id: generateId(),
-        field_type: 'image',
-        name: t("settings.label.field.new_image"),
-        x: 10, y: 10, width: 80, height: 80,
-        font_size: 12,
-        maintain_aspect_ratio: true,
-        source_type: 'image',
-        data_source: '',
-        visible: true,
-      };
-    } else {
-       newField = {
-         field_id: generateId(),
-         field_type: 'separator',
-         name: t("settings.label.field.default_separator"),
-         x: 8, y: 50, width: 100, height: 2,
-         font_size: 12,
-         data_source: '',
-         visible: true,
-       };
+    switch (type) {
+      case 'text':
+        newField = {
+          ...base,
+          name: t("settings.label.field.new_text"),
+          x: 10, y: 10, width: 100, height: 20,
+          font_size: 12, font_weight: 'normal', alignment: 'left',
+          template: t("settings.label.field.default_text"),
+        };
+        break;
+      case 'barcode':
+        newField = {
+          ...base,
+          name: t("settings.label.field.barcode"),
+          x: 10, y: 10, width: 160, height: 50,
+          font_size: 8,
+          data_source: 'external_id',
+          format: 'CODE128',
+          source_type: 'barcode',
+        };
+        break;
+      case 'qrcode':
+        newField = {
+          ...base,
+          name: t("settings.label.field.qrcode"),
+          x: 10, y: 10, width: 80, height: 80,
+          font_size: 8,
+          data_source: 'external_id',
+          source_type: 'qrCode',
+          maintain_aspect_ratio: true,
+        };
+        break;
+      case 'datetime':
+        newField = {
+          ...base,
+          name: t("settings.label.field.datetime"),
+          x: 10, y: 10, width: 120, height: 20,
+          font_size: 8,
+          data_source: 'datetime',
+          alignment: 'center',
+        };
+        break;
+      case 'price':
+      case 'counter':
+        newField = {
+          ...base,
+          name: type,
+          x: 10, y: 10, width: 100, height: 20,
+          font_size: 10, alignment: 'left',
+          data_source: type === 'price' ? 'unit_price' : 'quantity',
+        };
+        break;
+      case 'image':
+        newField = {
+          ...base,
+          name: t("settings.label.field.new_image"),
+          x: 10, y: 10, width: 80, height: 80,
+          font_size: 12,
+          maintain_aspect_ratio: true,
+          source_type: 'image',
+        };
+        break;
+      case 'separator':
+        newField = {
+          ...base,
+          name: t("settings.label.field.default_separator"),
+          x: 8, y: 50, width: 100, height: 2,
+          font_size: 12,
+        };
+        break;
     }
 
     handleTemplateChange({ ...template, fields: [...template.fields, newField] });
@@ -390,7 +428,10 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   
   const renderLayerIcon = (field: LabelField) => {
       switch (field.field_type) {
-          case 'text': return <Type size={14} />;
+          case 'text': case 'price': case 'counter': return <Type size={14} />;
+          case 'barcode': return <Barcode size={14} />;
+          case 'qrcode': return <QrCode size={14} />;
+          case 'datetime': return <Clock size={14} />;
           case 'image': return <ImageIcon size={14} />;
           case 'separator': return <Minus size={14} />;
           default: return null;
@@ -399,10 +440,10 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
   const renderLayerInfo = (field: LabelField) => {
       switch (field.field_type) {
-          case 'text': return field.template || field.name;
-          case 'image': return field.data_source || field.field_id;
-          case 'barcode': return field.data_source || field.field_id;
-          case 'qrcode': return field.data_source || field.field_id;
+          case 'text': case 'datetime': case 'price': case 'counter':
+            return field.template || field.data_source || field.name;
+          case 'image': case 'barcode': case 'qrcode':
+            return field.data_source || field.field_id;
           case 'separator': return t("settings.label.horizontal_line");
           default: return '';
       }
@@ -522,6 +563,27 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             >
               <Type size={16} />
               {t("settings.label.field.text")}
+            </button>
+            <button
+              onClick={() => handleAddField('barcode')}
+              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[0.625rem] font-medium transition-all"
+            >
+              <Barcode size={16} />
+              {t("settings.label.field.barcode")}
+            </button>
+            <button
+              onClick={() => handleAddField('qrcode')}
+              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[0.625rem] font-medium transition-all"
+            >
+              <QrCode size={16} />
+              {t("settings.label.field.qrcode")}
+            </button>
+            <button
+              onClick={() => handleAddField('datetime')}
+              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[0.625rem] font-medium transition-all"
+            >
+              <Clock size={16} />
+              {t("settings.label.field.datetime")}
             </button>
             <button
               onClick={() => handleAddField('image')}

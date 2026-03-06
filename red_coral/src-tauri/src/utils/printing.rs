@@ -100,11 +100,20 @@ mod platform {
         // Convert shared → crab_printer types (same logic as edge-server executor)
         let printer_template = shared_template.as_ref().map(convert_label_template);
 
+        // Paper size must include padding for correct positioning
+        let pad_x = shared_template
+            .as_ref()
+            .and_then(|t| t.padding_mm_x)
+            .unwrap_or(0.0);
+        let pad_y = shared_template
+            .as_ref()
+            .and_then(|t| t.padding_mm_y)
+            .unwrap_or(0.0);
         let options = PrintOptions {
             printer_name: request.printer_name,
             doc_name: "label".to_string(),
-            label_width_mm: request.label_width_mm.unwrap_or(40.0),
-            label_height_mm: request.label_height_mm.unwrap_or(30.0),
+            label_width_mm: request.label_width_mm.unwrap_or(40.0) + pad_x,
+            label_height_mm: request.label_height_mm.unwrap_or(30.0) + pad_y,
             copies: 1,
             fit: crate::utils::label_printer::FitMode::Contain,
             rotate: crate::utils::label_printer::Rotation::R0,

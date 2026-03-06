@@ -715,8 +715,11 @@ pub fn render_label_gdiplus(
     template: &LabelTemplate,
     dpi: f32,
 ) -> WinResult<(Vec<u8>, u32, u32)> {
-    let width_px = (template.width_mm * dpi / 25.4).round() as u32;
-    let height_px = (template.height_mm * dpi / 25.4).round() as u32;
+    // Bitmap must include padding so field offsets don't overflow
+    let total_width_mm = template.width_mm + template.padding_mm_x;
+    let total_height_mm = template.height_mm + template.padding_mm_y;
+    let width_px = (total_width_mm * dpi / 25.4).round() as u32;
+    let height_px = (total_height_mm * dpi / 25.4).round() as u32;
     debug!(
         width_px,
         height_px, "render_label_gdiplus: bitmap dimensions"

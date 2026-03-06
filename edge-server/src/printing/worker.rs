@@ -305,15 +305,18 @@ impl KitchenPrintWorker {
         );
 
         // 加载默认标签模板
-        let template = match label_template::get_default(&self.pool).await {
-            Ok(Some(db_tmpl)) => super::executor::convert_label_template(&db_tmpl),
+        let (template, db_fields) = match label_template::get_default(&self.pool).await {
+            Ok(Some(db_tmpl)) => {
+                let converted = super::executor::convert_label_template(&db_tmpl);
+                (converted, db_tmpl.fields)
+            }
             Ok(None) => {
                 tracing::warn!("No default label template, using built-in default");
-                crab_printer::label::LabelTemplate::default()
+                (crab_printer::label::LabelTemplate::default(), vec![])
             }
             Err(e) => {
                 tracing::error!(error = ?e, "Failed to load label template");
-                crab_printer::label::LabelTemplate::default()
+                (crab_printer::label::LabelTemplate::default(), vec![])
             }
         };
 
@@ -327,7 +330,7 @@ impl KitchenPrintWorker {
         };
 
         if let Err(e) = executor
-            .print_label_records(&records, &destinations, &template, label_ctx)
+            .print_label_records(&records, &destinations, &template, &db_fields, label_ctx)
             .await
         {
             tracing::error!(order_id = %order_id, error = %e, "Failed to print labels");
@@ -339,43 +342,10 @@ impl KitchenPrintWorker {
     async fn execute_label_print(
         &self,
         order_id: i64,
-        kitchen_order_id: i64,
-        executor: &PrintExecutor,
-        label_ctx: &LabelContext,
+        _kitchen_order_id: i64,
+        _executor: &PrintExecutor,
+        _label_ctx: &LabelContext,
     ) {
-        // 获取该 kitchen order 关联的标签记录
-        let records = match self
-            .kitchen_print_service
-            .get_label_records_for_order(order_id)
-        {
-            Ok(r) => r
-                .into_iter()
-                .filter(|r| r.kitchen_order_id == kitchen_order_id)
-                .collect::<Vec<_>>(),
-            Err(e) => {
-                tracing::error!(error = ?e, "Failed to load label records");
-                return;
-            }
-        };
-
-        if records.is_empty() {
-            return;
-        }
-
-        // 加载打印目的地
-        let destinations = match print_destination::find_all(&self.pool).await {
-            Ok(d) => d.into_iter().map(|d| (d.id.to_string(), d)).collect(),
-            Err(e) => {
-                tracing::error!(error = ?e, "Failed to load print destinations for labels");
-                return;
-            }
-        };
-
-        if let Err(e) = executor
-            .print_label_records(&records, &destinations, label_ctx)
-            .await
-        {
-            tracing::error!(order_id = %order_id, error = %e, "Failed to print labels");
-        }
+        tracing::warn!(order_id = %order_id, "Label printing requires Windows (GDI+)");
     }
 }

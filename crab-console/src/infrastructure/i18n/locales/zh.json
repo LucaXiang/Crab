@@ -259,7 +259,9 @@
     "anulacion": "作废撤销",
     "just_now": "刚刚更新",
     "ago": "前",
-    "refresh": "刷新数据"
+    "refresh": "刷新数据",
+    "max_range_exceeded": "时间范围不能超过90天",
+    "invalid_range": "结束日期必须晚于开始日期"
   },
   "reports": {
     "abnormal_close": "异常收班",

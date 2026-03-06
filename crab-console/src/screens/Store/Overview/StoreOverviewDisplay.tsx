@@ -109,14 +109,14 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 
       {/* KPI Row 2 — Secondary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
+        <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('stats.avg_dining_time')} />
         {overview.payment_breakdown.slice(0, 2).map(pb => {
           const isCash = pb.method.toUpperCase() === 'CASH';
           return (
             <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${tEnum('common.paymentMethod', pb.method)} (${pb.count})`} />
           );
         })}
-        <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
-        <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('stats.avg_dining_time')} />
       </div>
 
       {/* KPI Row 3 — Losses, Discounts & Refunds */}
