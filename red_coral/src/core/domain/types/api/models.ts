@@ -1039,62 +1039,50 @@ export interface ShiftUpdate {
 
 // ============ Daily Report (日结报告) ============
 
-/** Tax breakdown by rate (Spain: 0%, 4%, 10%, 21%) */
-export interface TaxBreakdown {
-  /** Tax rate (0, 4, 10, 21) */
-  tax_rate: number;
-  /** Net amount (before tax) */
-  net_amount: number;
-  /** Tax amount */
-  tax_amount: number;
-  /** Gross amount (after tax) */
-  gross_amount: number;
-  /** Number of orders with this tax rate */
-  order_count: number;
-}
-
-/** Payment method breakdown */
-export interface PaymentMethodBreakdown {
-  /** Payment method name */
-  method: string;
-  /** Total amount */
-  amount: number;
-  /** Number of payments */
-  count: number;
+/** Shift breakdown within a daily report */
+export interface ShiftBreakdown {
+  id: number;
+  report_id: number;
+  shift_id: number;
+  operator_id: number;
+  operator_name: string;
+  status: string;
+  start_time: number;
+  end_time: number | null;
+  starting_cash: number;
+  expected_cash: number;
+  actual_cash: number | null;
+  cash_variance: number | null;
+  abnormal_close: boolean;
+  total_orders: number;
+  completed_orders: number;
+  void_orders: number;
+  total_sales: number;
+  total_paid: number;
+  void_amount: number;
+  total_tax: number;
+  total_discount: number;
+  total_surcharge: number;
 }
 
 /**
- * Daily Report - end-of-day settlement report
- * Contains aggregated sales data for a business date
+ * Daily Report - shift settlement record
+ * Summary snapshot for list display + shift breakdowns for detail
  */
 export interface DailyReport {
   id: number;
   /** Business date (YYYY-MM-DD format) */
   business_date: string;
-  /** Total number of orders */
+  /** Net revenue (total_sales - refund_amount) */
+  net_revenue: number;
+  /** Total completed orders */
   total_orders: number;
-  /** Completed orders count */
-  completed_orders: number;
-  /** Voided orders count */
-  void_orders: number;
-  /** Total sales amount */
-  total_sales: number;
-  /** Total paid amount */
-  total_paid: number;
-  /** Total unpaid amount */
-  total_unpaid: number;
-  /** Voided order total amount */
-  void_amount: number;
-  /** Total tax collected */
-  total_tax: number;
-  /** Total discount applied */
-  total_discount: number;
-  /** Total surcharge applied */
-  total_surcharge: number;
-  /** Tax breakdown by rate */
-  tax_breakdowns: TaxBreakdown[];
-  /** Payment breakdown by method */
-  payment_breakdowns: PaymentMethodBreakdown[];
+  /** Total refund amount from credit notes */
+  refund_amount: number;
+  /** Number of credit notes issued */
+  refund_count: number;
+  /** Whether this report was auto-generated */
+  auto_generated: boolean;
   /** When the report was generated (Unix millis) */
   generated_at: number | null;
   /** Who generated the report (employee ID) */
@@ -1103,6 +1091,8 @@ export interface DailyReport {
   generated_by_name: string | null;
   /** Notes */
   note: string | null;
+  /** Shift breakdowns */
+  shift_breakdowns: ShiftBreakdown[];
 }
 
 export interface DailyReportGenerate {

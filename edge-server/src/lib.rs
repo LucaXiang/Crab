@@ -33,6 +33,7 @@ pub mod audit;
 pub mod auth;
 pub mod cloud;
 pub mod core;
+pub mod daily_reports;
 pub mod db;
 pub mod marketing;
 pub mod message;

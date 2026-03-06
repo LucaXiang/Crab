@@ -22,23 +22,23 @@ pub async fn upsert_daily_report_from_sync(
         r#"
         INSERT INTO store_daily_reports (
             store_id, tenant_id, source_id, business_date,
-            total_orders, completed_orders, void_orders,
-            total_sales, total_paid, total_unpaid, void_amount,
-            total_tax, total_discount, total_surcharge,
-            generated_at, generated_by_id, generated_by_name, note, updated_at
+            net_revenue, total_orders, refund_amount, refund_count,
+            auto_generated, generated_at, generated_by_id, generated_by_name,
+            note, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (store_id, source_id)
         DO UPDATE SET
             business_date = EXCLUDED.business_date,
-            total_orders = EXCLUDED.total_orders, completed_orders = EXCLUDED.completed_orders,
-            void_orders = EXCLUDED.void_orders,
-            total_sales = EXCLUDED.total_sales, total_paid = EXCLUDED.total_paid,
-            total_unpaid = EXCLUDED.total_unpaid, void_amount = EXCLUDED.void_amount,
-            total_tax = EXCLUDED.total_tax, total_discount = EXCLUDED.total_discount,
-            total_surcharge = EXCLUDED.total_surcharge,
-            generated_at = EXCLUDED.generated_at, generated_by_id = EXCLUDED.generated_by_id,
-            generated_by_name = EXCLUDED.generated_by_name, note = EXCLUDED.note,
+            net_revenue = EXCLUDED.net_revenue,
+            total_orders = EXCLUDED.total_orders,
+            refund_amount = EXCLUDED.refund_amount,
+            refund_count = EXCLUDED.refund_count,
+            auto_generated = EXCLUDED.auto_generated,
+            generated_at = EXCLUDED.generated_at,
+            generated_by_id = EXCLUDED.generated_by_id,
+            generated_by_name = EXCLUDED.generated_by_name,
+            note = EXCLUDED.note,
             updated_at = EXCLUDED.updated_at
         WHERE store_daily_reports.updated_at <= EXCLUDED.updated_at
         RETURNING id
@@ -48,16 +48,11 @@ pub async fn upsert_daily_report_from_sync(
     .bind(tenant_id)
     .bind(source_id)
     .bind(&report.business_date)
+    .bind(report.net_revenue)
     .bind(report.total_orders)
-    .bind(report.completed_orders)
-    .bind(report.void_orders)
-    .bind(report.total_sales)
-    .bind(report.total_paid)
-    .bind(report.total_unpaid)
-    .bind(report.void_amount)
-    .bind(report.total_tax)
-    .bind(report.total_discount)
-    .bind(report.total_surcharge)
+    .bind(report.refund_amount)
+    .bind(report.refund_count)
+    .bind(report.auto_generated)
     .bind(report.generated_at)
     .bind(report.generated_by_id)
     .bind(&report.generated_by_name)
@@ -71,75 +66,6 @@ pub async fn upsert_daily_report_from_sync(
         tx.commit().await?;
         return Ok(());
     };
-
-    // Replace tax breakdowns
-    sqlx::query("DELETE FROM store_daily_report_tax_breakdown WHERE report_id = $1")
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    if !report.tax_breakdowns.is_empty() {
-        let rids: Vec<i64> = report.tax_breakdowns.iter().map(|_| pg_id).collect();
-        let rates: Vec<i32> = report.tax_breakdowns.iter().map(|t| t.tax_rate).collect();
-        let nets: Vec<f64> = report.tax_breakdowns.iter().map(|t| t.net_amount).collect();
-        let taxes: Vec<f64> = report.tax_breakdowns.iter().map(|t| t.tax_amount).collect();
-        let grosses: Vec<f64> = report
-            .tax_breakdowns
-            .iter()
-            .map(|t| t.gross_amount)
-            .collect();
-        let counts: Vec<i64> = report
-            .tax_breakdowns
-            .iter()
-            .map(|t| t.order_count)
-            .collect();
-        sqlx::query(
-            r#"INSERT INTO store_daily_report_tax_breakdown (
-                report_id, tax_rate, net_amount, tax_amount, gross_amount, order_count
-            ) SELECT * FROM UNNEST(
-                $1::bigint[], $2::integer[], $3::double precision[],
-                $4::double precision[], $5::double precision[], $6::bigint[]
-            )"#,
-        )
-        .bind(&rids)
-        .bind(&rates)
-        .bind(&nets)
-        .bind(&taxes)
-        .bind(&grosses)
-        .bind(&counts)
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    // Replace payment breakdowns
-    sqlx::query("DELETE FROM store_daily_report_payment_breakdown WHERE report_id = $1")
-        .bind(pg_id)
-        .execute(&mut *tx)
-        .await?;
-
-    if !report.payment_breakdowns.is_empty() {
-        let rids: Vec<i64> = report.payment_breakdowns.iter().map(|_| pg_id).collect();
-        let methods: Vec<String> = report
-            .payment_breakdowns
-            .iter()
-            .map(|p| p.method.clone())
-            .collect();
-        let amounts: Vec<f64> = report.payment_breakdowns.iter().map(|p| p.amount).collect();
-        let counts: Vec<i64> = report.payment_breakdowns.iter().map(|p| p.count).collect();
-        sqlx::query(
-            r#"INSERT INTO store_daily_report_payment_breakdown (
-                report_id, method, amount, count
-            ) SELECT * FROM UNNEST(
-                $1::bigint[], $2::text[], $3::double precision[], $4::bigint[]
-            )"#,
-        )
-        .bind(&rids)
-        .bind(&methods)
-        .bind(&amounts)
-        .bind(&counts)
-        .execute(&mut *tx)
-        .await?;
-    }
 
     // Replace shift breakdowns
     sqlx::query("DELETE FROM store_daily_report_shift_breakdown WHERE report_id = $1")

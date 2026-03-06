@@ -121,6 +121,7 @@ pub async fn generate(
         end_millis,
         operator_id,
         operator_name,
+        false, // manual generation
     )
     .await?;
 

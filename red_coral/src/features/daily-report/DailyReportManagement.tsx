@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { FileText, Plus, Calendar, TrendingUp, CreditCard, Receipt } from 'lucide-react';
+import { FileText, Plus, Calendar, TrendingUp, AlertTriangle, Receipt } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
@@ -109,68 +109,60 @@ export const DailyReportManagement: React.FC = React.memo(() => {
         width: '100px',
         align: 'center',
         render: (item) => (
-          <div className="text-center">
-            <span className="text-lg font-bold text-gray-800">{item.completed_orders}</span>
-            <span className="text-xs text-gray-500">/{item.total_orders}</span>
-          </div>
+          <span className="text-lg font-bold text-gray-800">{item.total_orders}</span>
         ),
       },
       {
-        key: 'total_sales',
-        header: t('settings.daily_report.header.sales'),
+        key: 'net_revenue',
+        header: t('settings.daily_report.header.revenue'),
         width: '140px',
         align: 'right',
         render: (item) => (
           <div className="flex items-center justify-end gap-2">
             <TrendingUp size={16} className="text-emerald-500" />
             <span className="font-mono font-bold text-emerald-600">
-              {formatCurrency(item.total_sales)}
+              {formatCurrency(item.net_revenue)}
             </span>
           </div>
         ),
       },
       {
-        key: 'total_paid',
-        header: t('settings.daily_report.header.paid'),
+        key: 'refund_amount',
+        header: t('settings.daily_report.header.refunds'),
         width: '120px',
         align: 'right',
         render: (item) => (
-          <span className="font-mono text-gray-700">{formatCurrency(item.total_paid)}</span>
+          <div className="text-right">
+            <span
+              className={`font-mono ${
+                item.refund_amount > 0 ? 'text-red-600 font-medium' : 'text-gray-500'
+              }`}
+            >
+              {formatCurrency(item.refund_amount)}
+            </span>
+            {item.refund_count > 0 && (
+              <p className="text-xs text-gray-400">{item.refund_count}x</p>
+            )}
+          </div>
         ),
       },
       {
-        key: 'total_unpaid',
-        header: t('settings.daily_report.header.unpaid'),
-        width: '120px',
-        align: 'right',
-        render: (item) => (
-          <span
-            className={`font-mono ${
-              item.total_unpaid > 0 ? 'text-red-600 font-medium' : 'text-gray-500'
-            }`}
-          >
-            {formatCurrency(item.total_unpaid)}
-          </span>
-        ),
-      },
-      {
-        key: 'void_orders',
-        header: t('settings.daily_report.header.void'),
-        width: '100px',
+        key: 'auto_generated',
+        header: t('settings.daily_report.header.source'),
+        width: '80px',
         align: 'center',
         render: (item) => (
-          <span className={item.void_orders > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}>
-            {item.void_orders}
+          <span
+            className={`px-2 py-0.5 rounded text-xs font-medium ${
+              item.auto_generated
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-purple-100 text-purple-700'
+            }`}
+          >
+            {item.auto_generated
+              ? t('settings.daily_report.source.auto')
+              : t('settings.daily_report.source.manual')}
           </span>
-        ),
-      },
-      {
-        key: 'total_tax',
-        header: t('settings.daily_report.header.tax'),
-        width: '120px',
-        align: 'right',
-        render: (item) => (
-          <span className="font-mono text-gray-600">{formatCurrency(item.total_tax)}</span>
         ),
       },
     ],

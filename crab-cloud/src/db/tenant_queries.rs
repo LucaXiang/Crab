@@ -412,16 +412,11 @@ pub async fn get_upgrade_detail(
 pub struct DailyReportEntry {
     pub id: i64,
     pub business_date: String,
+    pub net_revenue: f64,
     pub total_orders: i64,
-    pub completed_orders: i64,
-    pub void_orders: i64,
-    pub total_sales: f64,
-    pub total_paid: f64,
-    pub total_unpaid: f64,
-    pub void_amount: f64,
-    pub total_tax: f64,
-    pub total_discount: f64,
-    pub total_surcharge: f64,
+    pub refund_amount: f64,
+    pub refund_count: i64,
+    pub auto_generated: bool,
     pub updated_at: i64,
 }
 
@@ -434,9 +429,8 @@ pub async fn list_daily_reports(
 ) -> Result<Vec<DailyReportEntry>, BoxError> {
     let rows: Vec<DailyReportEntry> = sqlx::query_as(
         r#"
-        SELECT dr.id, dr.business_date, dr.total_orders, dr.completed_orders, dr.void_orders,
-               dr.total_sales, dr.total_paid, dr.total_unpaid, dr.void_amount,
-               dr.total_tax, dr.total_discount, dr.total_surcharge, dr.updated_at
+        SELECT dr.id, dr.business_date, dr.net_revenue, dr.total_orders,
+               dr.refund_amount, dr.refund_count, dr.auto_generated, dr.updated_at
         FROM store_daily_reports dr
         WHERE dr.store_id = $1 AND dr.tenant_id = $2
             AND ($3::TEXT IS NULL OR dr.business_date >= $3)
@@ -453,44 +447,21 @@ pub async fn list_daily_reports(
     Ok(rows)
 }
 
-/// Daily report detail with all breakdowns
+/// Daily report detail with shift breakdowns
 #[derive(Debug, serde::Serialize)]
 pub struct DailyReportDetail {
     pub id: i64,
     pub business_date: String,
+    pub net_revenue: f64,
     pub total_orders: i64,
-    pub completed_orders: i64,
-    pub void_orders: i64,
-    pub total_sales: f64,
-    pub total_paid: f64,
-    pub total_unpaid: f64,
-    pub void_amount: f64,
-    pub total_tax: f64,
-    pub total_discount: f64,
-    pub total_surcharge: f64,
+    pub refund_amount: f64,
+    pub refund_count: i64,
+    pub auto_generated: bool,
     pub generated_at: Option<i64>,
     pub generated_by_id: Option<i64>,
     pub generated_by_name: Option<String>,
     pub note: Option<String>,
-    pub tax_breakdowns: Vec<TaxBreakdownDetail>,
-    pub payment_breakdowns: Vec<PaymentBreakdownDetail>,
     pub shift_breakdowns: Vec<ShiftBreakdownDetail>,
-}
-
-#[derive(Debug, serde::Serialize, sqlx::FromRow)]
-pub struct TaxBreakdownDetail {
-    pub tax_rate: i32,
-    pub net_amount: f64,
-    pub tax_amount: f64,
-    pub gross_amount: f64,
-    pub order_count: i64,
-}
-
-#[derive(Debug, serde::Serialize, sqlx::FromRow)]
-pub struct PaymentBreakdownDetail {
-    pub method: String,
-    pub amount: f64,
-    pub count: i64,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -528,16 +499,11 @@ pub async fn get_daily_report_detail(
     struct ReportRow {
         id: i64,
         business_date: String,
+        net_revenue: f64,
         total_orders: i64,
-        completed_orders: i64,
-        void_orders: i64,
-        total_sales: f64,
-        total_paid: f64,
-        total_unpaid: f64,
-        void_amount: f64,
-        total_tax: f64,
-        total_discount: f64,
-        total_surcharge: f64,
+        refund_amount: f64,
+        refund_count: i64,
+        auto_generated: bool,
         generated_at: Option<i64>,
         generated_by_id: Option<i64>,
         generated_by_name: Option<String>,
@@ -546,9 +512,8 @@ pub async fn get_daily_report_detail(
 
     let report: Option<ReportRow> = sqlx::query_as(
         r#"
-        SELECT dr.id, dr.business_date, dr.total_orders, dr.completed_orders, dr.void_orders,
-               dr.total_sales, dr.total_paid, dr.total_unpaid, dr.void_amount,
-               dr.total_tax, dr.total_discount, dr.total_surcharge,
+        SELECT dr.id, dr.business_date, dr.net_revenue, dr.total_orders,
+               dr.refund_amount, dr.refund_count, dr.auto_generated,
                dr.generated_at, dr.generated_by_id, dr.generated_by_name, dr.note
         FROM store_daily_reports dr
         WHERE dr.store_id = $1 AND dr.tenant_id = $2 AND dr.business_date = $3
@@ -565,67 +530,35 @@ pub async fn get_daily_report_detail(
         None => return Ok(None),
     };
 
-    // Fetch all breakdowns concurrently
-    let (tax_breakdowns, payment_breakdowns, shift_breakdowns) = tokio::join!(
-        sqlx::query_as::<_, TaxBreakdownDetail>(
-            r#"
-            SELECT tax_rate, net_amount, tax_amount, gross_amount, order_count
-            FROM store_daily_report_tax_breakdown
-            WHERE report_id = $1
-            ORDER BY tax_rate
-            "#,
-        )
-        .bind(report.id)
-        .fetch_all(pool),
-        sqlx::query_as::<_, PaymentBreakdownDetail>(
-            r#"
-            SELECT method, amount, count
-            FROM store_daily_report_payment_breakdown
-            WHERE report_id = $1
-            ORDER BY amount DESC
-            "#,
-        )
-        .bind(report.id)
-        .fetch_all(pool),
-        sqlx::query_as::<_, ShiftBreakdownDetail>(
-            r#"
-            SELECT shift_source_id, operator_id, operator_name, status,
-                   start_time, end_time, starting_cash, expected_cash,
-                   actual_cash, cash_variance, abnormal_close,
-                   total_orders, completed_orders, void_orders,
-                   total_sales, total_paid, void_amount,
-                   total_tax, total_discount, total_surcharge
-            FROM store_daily_report_shift_breakdown
-            WHERE report_id = $1
-            ORDER BY start_time
-            "#,
-        )
-        .bind(report.id)
-        .fetch_all(pool),
-    );
-    let tax_breakdowns = tax_breakdowns?;
-    let payment_breakdowns = payment_breakdowns?;
-    let shift_breakdowns = shift_breakdowns?;
+    let shift_breakdowns = sqlx::query_as::<_, ShiftBreakdownDetail>(
+        r#"
+        SELECT shift_source_id, operator_id, operator_name, status,
+               start_time, end_time, starting_cash, expected_cash,
+               actual_cash, cash_variance, abnormal_close,
+               total_orders, completed_orders, void_orders,
+               total_sales, total_paid, void_amount,
+               total_tax, total_discount, total_surcharge
+        FROM store_daily_report_shift_breakdown
+        WHERE report_id = $1
+        ORDER BY start_time
+        "#,
+    )
+    .bind(report.id)
+    .fetch_all(pool)
+    .await?;
 
     Ok(Some(DailyReportDetail {
         id: report.id,
         business_date: report.business_date,
+        net_revenue: report.net_revenue,
         total_orders: report.total_orders,
-        completed_orders: report.completed_orders,
-        void_orders: report.void_orders,
-        total_sales: report.total_sales,
-        total_paid: report.total_paid,
-        total_unpaid: report.total_unpaid,
-        void_amount: report.void_amount,
-        total_tax: report.total_tax,
-        total_discount: report.total_discount,
-        total_surcharge: report.total_surcharge,
+        refund_amount: report.refund_amount,
+        refund_count: report.refund_count,
+        auto_generated: report.auto_generated,
         generated_at: report.generated_at,
         generated_by_id: report.generated_by_id,
         generated_by_name: report.generated_by_name,
         note: report.note,
-        tax_breakdowns,
-        payment_breakdowns,
         shift_breakdowns,
     }))
 }
@@ -1347,8 +1280,8 @@ async fn get_overview(
                 r#"
                 SELECT
                     dr.business_date AS date,
-                    COALESCE(SUM(dr.total_sales), 0)::DOUBLE PRECISION AS revenue,
-                    COALESCE(SUM(dr.completed_orders), 0)::BIGINT AS orders
+                    COALESCE(SUM(dr.net_revenue), 0)::DOUBLE PRECISION AS revenue,
+                    COALESCE(SUM(dr.total_orders), 0)::BIGINT AS orders
                 FROM store_daily_reports dr
                 WHERE dr.tenant_id = $1
                     AND ($2::BIGINT IS NULL OR dr.store_id = $2)

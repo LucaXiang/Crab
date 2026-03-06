@@ -88,3 +88,43 @@ pub fn current_business_date(cutoff: NaiveTime, tz: Tz) -> NaiveDate {
         now.date_naive()
     }
 }
+
+/// 计算距离下一次 cutoff 时间点的 Duration
+///
+/// 用于定时调度器 (班次检测、日报自动生成等)。
+pub fn duration_until_next_cutoff(cutoff_time: NaiveTime, tz: Tz) -> std::time::Duration {
+    let now = chrono::Utc::now().with_timezone(&tz);
+    let today = now.date_naive();
+
+    let target_date = if now.time() >= cutoff_time {
+        today + chrono::Duration::days(1)
+    } else {
+        today
+    };
+
+    let target_datetime = target_date
+        .and_time(cutoff_time)
+        .and_local_timezone(tz)
+        .single()
+        .unwrap_or_else(|| {
+            // DST edge case: fallback to +1 min
+            (target_date.and_time(cutoff_time) + chrono::Duration::minutes(1))
+                .and_local_timezone(tz)
+                .latest()
+                .unwrap_or_else(|| {
+                    tracing::error!(
+                        "Cannot resolve local time for cutoff scheduler, using fallback"
+                    );
+                    now + chrono::Duration::hours(1)
+                })
+        });
+
+    let duration = target_datetime.signed_duration_since(now);
+    if duration.num_seconds() <= 0 {
+        std::time::Duration::from_secs(60)
+    } else {
+        duration
+            .to_std()
+            .unwrap_or(std::time::Duration::from_secs(60))
+    }
+}

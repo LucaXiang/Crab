@@ -1,16 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Percent, Tag, Settings2, Clock } from 'lucide-react';
+import { 
+  Percent, 
+  Tag, 
+  Settings2, 
+  Clock, 
+  DollarSign, 
+  Globe, 
+  Layers, 
+  Package, 
+  Check 
+} from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useStoreName } from '@/hooks/useStoreName';
 import { useAuthStore } from '@/core/stores/useAuthStore';
+import { useStoreInfo } from '@/core/context/StoreInfoContext';
 import { listPriceRules, createPriceRule, updatePriceRule, deletePriceRule } from '@/infrastructure/api/store';
 import { ApiError } from '@/infrastructure/api/client';
 import { MasterDetail } from '@/shared/components/MasterDetail';
 import { DetailPanel } from '@/shared/components/DetailPanel';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormField, FormSection, inputClass, CheckboxField } from '@/shared/components/FormField';
-import { SelectField } from '@/shared/components/FormField/SelectField';
 import { formatCurrency } from '@/utils/format';
 import { PriceRuleWizard } from './PriceRuleWizard';
 import type {
@@ -18,32 +28,9 @@ import type {
   RuleType, ProductScope, AdjustmentType,
 } from '@/core/types/store';
 
-function useRuleTypeOptions(t: (key: string) => string) {
-  return [
-    { value: 'DISCOUNT' as RuleType, label: t('settings.price_rule.type_discount') },
-    { value: 'SURCHARGE' as RuleType, label: t('settings.price_rule.type_surcharge') },
-  ];
-}
-
-function useProductScopeOptions(t: (key: string) => string) {
-  return [
-    { value: 'GLOBAL' as ProductScope, label: t('settings.price_rule.scope_global') },
-    { value: 'CATEGORY' as ProductScope, label: t('settings.price_rule.scope_category') },
-    { value: 'TAG' as ProductScope, label: t('settings.price_rule.scope_tag') },
-    { value: 'PRODUCT' as ProductScope, label: t('settings.price_rule.scope_product') },
-  ];
-}
-
-function useAdjustmentTypeOptions(t: (key: string) => string) {
-  return [
-    { value: 'PERCENTAGE' as AdjustmentType, label: t('settings.price_rule.adjustment_percentage') },
-    { value: 'FIXED_AMOUNT' as AdjustmentType, label: t('settings.price_rule.adjustment_fixed') },
-  ];
-}
-
-function formatAdjustment(type: AdjustmentType, value: number): string {
+function formatAdjustment(type: AdjustmentType, value: number, currencyCode: string): string {
   if (type === 'PERCENTAGE') return `${value}%`;
-  return formatCurrency(value);
+  return formatCurrency(value, { currency: currencyCode });
 }
 
 const DAY_INDICES = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun display order
@@ -58,11 +45,8 @@ export const PriceRuleManagement: React.FC = () => {
   const { t } = useI18n();
   const storeId = useStoreId();
   const storeName = useStoreName();
+  const { currencySymbol, currencyCode } = useStoreInfo();
   const token = useAuthStore(s => s.token);
-
-  const ruleTypeOptions = useRuleTypeOptions(t);
-  const productScopeOptions = useProductScopeOptions(t);
-  const adjustmentTypeOptions = useAdjustmentTypeOptions(t);
 
   const [rules, setRules] = useState<PriceRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,6 +192,13 @@ export const PriceRuleManagement: React.FC = () => {
     finally { setSaving(false); }
   };
 
+  const SCOPES = [
+    { value: 'GLOBAL' as ProductScope, label: t('settings.price_rule.scope_global'), icon: Globe },
+    { value: 'CATEGORY' as ProductScope, label: t('settings.price_rule.scope_category'), icon: Layers },
+    { value: 'TAG' as ProductScope, label: t('settings.price_rule.scope_tag'), icon: Tag },
+    { value: 'PRODUCT' as ProductScope, label: t('settings.price_rule.scope_product'), icon: Package },
+  ];
+
   const renderItem = (rule: PriceRule, isSelected: boolean) => (
     <div className={`px-4 py-3.5 ${isSelected ? 'font-medium' : ''}`}>
       <div className="flex items-center justify-between">
@@ -215,7 +206,7 @@ export const PriceRuleManagement: React.FC = () => {
           {rule.name}
         </span>
         <span className="text-xs font-semibold tabular-nums shrink-0 ml-2 text-gray-500">
-          {formatAdjustment(rule.adjustment_type, rule.adjustment_value)}
+          {formatAdjustment(rule.adjustment_type, rule.adjustment_value, currencyCode)}
         </span>
       </div>
       <div className="flex items-center gap-1.5 mt-1">
@@ -225,7 +216,7 @@ export const PriceRuleManagement: React.FC = () => {
           {rule.rule_type === 'DISCOUNT' ? t('settings.price_rule.type_discount') : t('settings.price_rule.type_surcharge')}
         </span>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
-          {productScopeOptions.find(o => o.value === rule.product_scope)?.label ?? rule.product_scope}
+          {SCOPES.find(s => s.value === rule.product_scope)?.label ?? rule.product_scope}
         </span>
       </div>
     </div>
@@ -237,25 +228,133 @@ export const PriceRuleManagement: React.FC = () => {
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{formError}</div>
       )}
 
-      <FormField label={t('settings.price_rule.name')} required>
-        <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} autoFocus />
-      </FormField>
-      <FormField label={t('settings.price_rule.receipt_name')}>
-        <input value={formReceiptName} onChange={e => setFormReceiptName(e.target.value)} className={inputClass} />
-      </FormField>
-      <FormField label={t('settings.price_rule.description')}>
-        <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)} className={`${inputClass} resize-none`} rows={2} />
-      </FormField>
+      {/* Rule Type Selector */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <button
+          type="button"
+          onClick={() => setFormRuleType('DISCOUNT')}
+          className={`relative p-3 rounded-xl border-2 transition-all text-left group ${
+            formRuleType === 'DISCOUNT'
+              ? 'border-amber-500 bg-amber-50'
+              : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <div className={`w-6 h-6 rounded flex items-center justify-center ${
+              formRuleType === 'DISCOUNT' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'
+            }`}>
+              <Percent className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold text-sm text-slate-900">{t('settings.price_rule.type_discount')}</span>
+          </div>
+          {formRuleType === 'DISCOUNT' && <Check className="absolute top-3 right-3 w-4 h-4 text-amber-500" />}
+        </button>
 
-      <SelectField label={t('settings.price_rule.type')} value={formRuleType} onChange={v => setFormRuleType(v as RuleType)} options={ruleTypeOptions} required />
-      <SelectField label={t('settings.price_rule.adjustment_type')} value={formAdjustmentType} onChange={v => setFormAdjustmentType(v as AdjustmentType)} options={adjustmentTypeOptions} required />
+        <button
+          type="button"
+          onClick={() => setFormRuleType('SURCHARGE')}
+          className={`relative p-3 rounded-xl border-2 transition-all text-left group ${
+            formRuleType === 'SURCHARGE'
+              ? 'border-purple-500 bg-purple-50'
+              : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <div className={`w-6 h-6 rounded flex items-center justify-center ${
+              formRuleType === 'SURCHARGE' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'
+            }`}>
+              <DollarSign className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold text-sm text-slate-900">{t('settings.price_rule.type_surcharge')}</span>
+          </div>
+          {formRuleType === 'SURCHARGE' && <Check className="absolute top-3 right-3 w-4 h-4 text-purple-500" />}
+        </button>
+      </div>
 
-      <FormField label={t('settings.price_rule.adjustment_value')} required>
-        <input type="number" value={formAdjustmentValue} onChange={e => setFormAdjustmentValue(Number(e.target.value))} className={inputClass} step={formAdjustmentType === 'PERCENTAGE' ? '1' : '0.01'} min={0} />
-      </FormField>
+      <FormSection title={t('settings.price_rule.section_basics')} icon={Settings2}>
+        <FormField label={t('settings.price_rule.name')} required>
+          <input value={formName} onChange={e => setFormName(e.target.value)} className={inputClass} />
+        </FormField>
+        <FormField label={t('settings.price_rule.receipt_name')}>
+          <input value={formReceiptName} onChange={e => setFormReceiptName(e.target.value)} className={inputClass} />
+        </FormField>
+        <FormField label={t('settings.price_rule.description')}>
+          <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)} className={`${inputClass} resize-none`} rows={2} />
+        </FormField>
+      </FormSection>
+
+      <FormSection title={t('settings.price_rule.adjustment')} icon={DollarSign}>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+            {t('settings.price_rule.adjustment_value')}
+          </label>
+          <div className="flex bg-slate-100 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => setFormAdjustmentType('PERCENTAGE')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                formAdjustmentType === 'PERCENTAGE'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              %
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormAdjustmentType('FIXED_AMOUNT')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                formAdjustmentType === 'FIXED_AMOUNT'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {currencySymbol}
+            </button>
+          </div>
+        </div>
+        
+        <div className="relative">
+          <input 
+            type="number" 
+            value={formAdjustmentValue} 
+            onChange={e => setFormAdjustmentValue(Number(e.target.value))} 
+            className={`w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-lg font-semibold ${
+              formRuleType === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-600'
+            }`}
+            step={formAdjustmentType === 'PERCENTAGE' ? '1' : '0.01'} 
+            min={0} 
+          />
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+            {formAdjustmentType === 'PERCENTAGE' ? '%' : currencySymbol}
+          </div>
+        </div>
+      </FormSection>
 
       <FormSection title={t('settings.price_rule.scope')} icon={Tag}>
-        <SelectField label={t('settings.price_rule.scope')} value={formProductScope} onChange={v => setFormProductScope(v as ProductScope)} options={productScopeOptions} required />
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {SCOPES.map((scope) => {
+            const Icon = scope.icon;
+            const isSelected = formProductScope === scope.value;
+            return (
+              <button
+                key={scope.value}
+                type="button"
+                onClick={() => setFormProductScope(scope.value)}
+                className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${
+                  isSelected
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+                title={scope.label}
+              >
+                <Icon className={`w-4 h-4 mb-1 ${isSelected ? 'text-primary-600' : 'text-slate-400'}`} />
+                <span className="text-[10px] font-medium truncate w-full text-center">{scope.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        
         {formProductScope !== 'GLOBAL' && (
           <FormField label={t('settings.price_rule.target_id')}>
             <input type="number" value={formTargetId} onChange={e => setFormTargetId(e.target.value)} className={inputClass} placeholder={t('settings.price_rule.target_id_placeholder')} />
@@ -271,10 +370,12 @@ export const PriceRuleManagement: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             {DAY_INDICES.map(day => (
               <button key={day} type="button" onClick={() => toggleDay(day)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                  formActiveDays.includes(day) ? 'bg-orange-50 text-orange-700 border-orange-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${
+                  formActiveDays.includes(day) 
+                    ? 'bg-primary-600 text-white shadow-sm' 
+                    : 'bg-white text-slate-500 border border-slate-200 hover:border-primary-300 hover:text-primary-600'
                 }`}>
-                {t(`settings.price_rule.day_${day}`)}
+                {t(`settings.price_rule.day_${day}_short`)}
               </button>
             ))}
           </div>
@@ -297,11 +398,13 @@ export const PriceRuleManagement: React.FC = () => {
         </div>
       </FormSection>
 
-      <FormSection title={t('settings.price_rule.adjustment')} icon={Settings2}>
+      <FormSection title={t('settings.price_rule.behavior')} icon={Settings2}>
         <CheckboxField id="is_stackable" label={t('settings.price_rule.is_stackable')} description={t('settings.price_rule.is_stackable_desc')} checked={formIsStackable} onChange={setFormIsStackable} />
         <CheckboxField id="is_exclusive" label={t('settings.price_rule.is_exclusive')} description={t('settings.price_rule.is_exclusive_desc')} checked={formIsExclusive} onChange={setFormIsExclusive} />
         {panel.type === 'edit' && (
-          <CheckboxField id="is_active" label={t('settings.common.active')} checked={formIsActive} onChange={setFormIsActive} />
+          <div className="pt-4 mt-4 border-t border-slate-100">
+            <CheckboxField id="is_active" label={t('settings.common.active')} checked={formIsActive} onChange={setFormIsActive} />
+          </div>
         )}
       </FormSection>
     </>

@@ -1,18 +1,17 @@
 /**
  * Daily Report Detail Modal (日结报告详情)
  *
- * 显示日结报告的详细信息:
- * - 销售汇总
- * - 税率分类 (Spain: 0%, 4%, 10%, 21%)
- * - 支付方式分类
+ * 显示日结报告的精简信息:
+ * - 营收/退款汇总
+ * - 各班次交接明细
  */
 
 import React from 'react';
-import { X, Calendar, TrendingUp, Receipt, CreditCard, Percent } from 'lucide-react';
+import { X, Calendar, TrendingUp, Receipt, Users, AlertTriangle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
 import { getLocale } from '@/infrastructure/i18n';
-import type { DailyReport, TaxBreakdown, PaymentMethodBreakdown } from '@/core/domain/types/api';
+import type { DailyReport, ShiftBreakdown } from '@/core/domain/types/api';
 
 interface DailyReportDetailModalProps {
   open: boolean;
@@ -42,32 +41,11 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
     }
   };
 
-  // Tax rate colors (Spain IVA)
-  const getTaxRateColor = (rate: number) => {
-    switch (rate) {
-      case 0:
-        return 'bg-gray-100 text-gray-700';
-      case 4:
-        return 'bg-green-100 text-green-700';
-      case 10:
-        return 'bg-blue-100 text-blue-700';
-      case 21:
-        return 'bg-violet-100 text-violet-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  // Payment method colors
-  const getPaymentMethodColor = (method: string) => {
-    const methodLower = method.toLowerCase();
-    if (methodLower.includes('cash') || methodLower.includes('efectivo')) {
-      return 'bg-emerald-100 text-emerald-700';
-    }
-    if (methodLower.includes('card') || methodLower.includes('tarjeta')) {
-      return 'bg-blue-100 text-blue-700';
-    }
-    return 'bg-gray-100 text-gray-700';
+  const formatTime = (millis: number) => {
+    return new Date(millis).toLocaleTimeString(getLocale(), {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -86,6 +64,11 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
               <p className="text-sm text-violet-100 flex items-center gap-1">
                 <Calendar size={14} />
                 {formatDate(report.business_date)}
+                {report.auto_generated && (
+                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded text-xs">
+                    {t('settings.daily_report.auto_generated')}
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -105,146 +88,122 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
               <div className="flex items-center gap-2 text-emerald-600 mb-2">
                 <TrendingUp size={18} />
                 <span className="text-sm font-medium">
-                  {t('settings.daily_report.summary.total_sales')}
+                  {t('settings.daily_report.summary.net_revenue')}
                 </span>
               </div>
               <p className="text-2xl font-bold text-emerald-700">
-                {formatCurrency(report.total_sales)}
+                {formatCurrency(report.net_revenue)}
               </p>
             </div>
 
             <div className="bg-blue-50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-blue-600 mb-2">
-                <CreditCard size={18} />
+                <Receipt size={18} />
                 <span className="text-sm font-medium">
-                  {t('settings.daily_report.summary.total_paid')}
+                  {t('settings.daily_report.summary.total_orders')}
                 </span>
               </div>
-              <p className="text-2xl font-bold text-blue-700">
-                {formatCurrency(report.total_paid)}
-              </p>
+              <p className="text-2xl font-bold text-blue-700">{report.total_orders}</p>
             </div>
 
             <div className="bg-red-50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-red-600 mb-2">
-                <Receipt size={18} />
+                <AlertTriangle size={18} />
                 <span className="text-sm font-medium">
-                  {t('settings.daily_report.summary.total_unpaid')}
+                  {t('settings.daily_report.summary.refunds')}
                 </span>
               </div>
               <p className="text-2xl font-bold text-red-700">
-                {formatCurrency(report.total_unpaid)}
+                {formatCurrency(report.refund_amount)}
+              </p>
+              <p className="text-xs text-red-500">
+                {report.refund_count} {t('settings.daily_report.refund_count_unit')}
               </p>
             </div>
           </div>
 
-          {/* Order Stats */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              {t('settings.daily_report.section.orders')}
-            </h3>
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-gray-800">{report.total_orders}</p>
-                <p className="text-xs text-gray-500">{t('settings.daily_report.stat.total')}</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-emerald-600">{report.completed_orders}</p>
-                <p className="text-xs text-gray-500">{t('settings.daily_report.stat.completed')}</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-orange-600">{report.void_orders}</p>
-                <p className="text-xs text-gray-500">{t('settings.daily_report.stat.void')}</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-600">
-                  {formatCurrency(report.void_amount)}
-                </p>
-                <p className="text-xs text-gray-500">{t('settings.daily_report.stat.void_amount')}</p>
+          {/* Shift Breakdowns */}
+          {report.shift_breakdowns && report.shift_breakdowns.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Users size={16} />
+                {t('settings.daily_report.section.shifts')}
+              </h3>
+              <div className="space-y-3">
+                {report.shift_breakdowns.map((shift: ShiftBreakdown) => (
+                  <div
+                    key={shift.id}
+                    className={`bg-white rounded-lg p-4 border ${
+                      shift.abnormal_close ? 'border-red-200' : 'border-gray-100'
+                    }`}
+                  >
+                    {/* Shift header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-800">{shift.operator_name}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            shift.status === 'CLOSED'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {shift.status}
+                        </span>
+                        {shift.abnormal_close && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                            {t('settings.daily_report.shift.abnormal')}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm text-gray-500">
+                        {formatTime(shift.start_time)}
+                        {shift.end_time ? ` - ${formatTime(shift.end_time)}` : ''}
+                      </span>
+                    </div>
+
+                    {/* Shift stats */}
+                    <div className="grid grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <p className="text-gray-500">{t('settings.daily_report.shift.orders')}</p>
+                        <p className="font-mono font-medium">{shift.completed_orders}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">{t('settings.daily_report.shift.sales')}</p>
+                        <p className="font-mono font-medium text-emerald-600">
+                          {formatCurrency(shift.total_sales)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">
+                          {t('settings.daily_report.shift.expected_cash')}
+                        </p>
+                        <p className="font-mono font-medium">{formatCurrency(shift.expected_cash)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">
+                          {t('settings.daily_report.shift.cash_variance')}
+                        </p>
+                        <p
+                          className={`font-mono font-medium ${
+                            shift.cash_variance != null && shift.cash_variance !== 0
+                              ? shift.cash_variance > 0
+                                ? 'text-emerald-600'
+                                : 'text-red-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {shift.cash_variance != null
+                            ? formatCurrency(shift.cash_variance)
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-
-          {/* Tax Breakdown */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <Percent size={16} />
-              {t('settings.daily_report.section.tax')}
-            </h3>
-            {report.tax_breakdowns && report.tax_breakdowns.length > 0 ? (
-              <div className="space-y-2">
-                {report.tax_breakdowns.map((tax: TaxBreakdown, index: number) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-white rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`px-2 py-1 rounded text-sm font-bold ${getTaxRateColor(
-                          tax.tax_rate
-                        )}`}
-                      >
-                        {tax.tax_rate}%
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {tax.order_count} {t('settings.daily_report.orders_count')}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono font-medium text-gray-800">
-                        {formatCurrency(tax.gross_amount)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {t('settings.daily_report.tax_amount')}: {formatCurrency(tax.tax_amount)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
-                {t('settings.daily_report.no_tax_data')}
-              </p>
-            )}
-          </div>
-
-          {/* Payment Breakdown */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <CreditCard size={16} />
-              {t('settings.daily_report.section.payment')}
-            </h3>
-            {report.payment_breakdowns && report.payment_breakdowns.length > 0 ? (
-              <div className="space-y-2">
-                {report.payment_breakdowns.map((payment: PaymentMethodBreakdown, index: number) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-white rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${getPaymentMethodColor(
-                          payment.method
-                        )}`}
-                      >
-                        {payment.method}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {payment.count} {t('settings.daily_report.payments_count')}
-                      </span>
-                    </div>
-                    <p className="font-mono font-medium text-gray-800">
-                      {formatCurrency(payment.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
-                {t('settings.daily_report.no_payment_data')}
-              </p>
-            )}
-          </div>
+          )}
 
           {/* Additional Info */}
           <div className="bg-gray-50 rounded-xl p-4">
@@ -252,14 +211,6 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
               {t('settings.daily_report.section.additional')}
             </h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">{t('settings.daily_report.total_discount')}</span>
-                <span className="font-mono">{formatCurrency(report.total_discount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">{t('settings.daily_report.total_surcharge')}</span>
-                <span className="font-mono">{formatCurrency(report.total_surcharge)}</span>
-              </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">{t('settings.daily_report.generated_by')}</span>
                 <span>{report.generated_by_name || '-'}</span>

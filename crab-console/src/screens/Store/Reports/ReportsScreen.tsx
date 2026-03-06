@@ -53,11 +53,10 @@ export const ReportsScreen: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-2 text-xs font-medium text-slate-400">{t('stats.business_date')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.total_sales')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.completed_orders')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.void_orders')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.total_paid')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.total_discount')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.net_revenue')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.total_orders')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.refunds')}</th>
+                  <th className="text-center py-2 text-xs font-medium text-slate-400">{t('stats.source')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -68,11 +67,17 @@ export const ReportsScreen: React.FC = () => {
                           {entry.business_date}
                         </Link>
                       </td>
-                      <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(entry.total_sales)}</td>
-                      <td className="py-2 text-right text-slate-700">{entry.completed_orders}</td>
-                      <td className="py-2 text-right text-slate-700">{entry.void_orders}</td>
-                      <td className="py-2 text-right text-slate-700">{formatCurrency(entry.total_paid)}</td>
-                      <td className="py-2 text-right text-orange-500">{formatCurrency(entry.total_discount)}</td>
+                      <td className="py-2 text-right font-semibold text-emerald-600">{formatCurrency(entry.net_revenue)}</td>
+                      <td className="py-2 text-right text-slate-700">{entry.total_orders}</td>
+                      <td className="py-2 text-right">
+                        <span className={entry.refund_amount > 0 ? 'text-red-600 font-medium' : 'text-slate-400'}>{formatCurrency(entry.refund_amount)}</span>
+                        {entry.refund_count > 0 && <span className="text-xs text-slate-400 ml-1">({entry.refund_count})</span>}
+                      </td>
+                      <td className="py-2 text-center">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${entry.auto_generated ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                          {entry.auto_generated ? t('stats.source_auto') : t('stats.source_manual')}
+                        </span>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -85,25 +90,25 @@ export const ReportsScreen: React.FC = () => {
           {reports.map(entry => (
               <Link key={entry.id} to={`/stores/${storeId}/reports/${entry.business_date}`} className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-all active:scale-[0.99]">
                 <div className="flex justify-between items-center mb-3 pb-3 border-b border-slate-50">
-                  <div className="text-slate-900 font-bold">{entry.business_date}</div>
-                  <div className="text-primary-600 font-bold text-lg">{formatCurrency(entry.total_sales)}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-900 font-bold">{entry.business_date}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${entry.auto_generated ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                      {entry.auto_generated ? t('stats.source_auto') : t('stats.source_manual')}
+                    </span>
+                  </div>
+                  <div className="text-emerald-600 font-bold text-lg">{formatCurrency(entry.net_revenue)}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.completed_orders')}</p>
-                    <p className="font-semibold text-slate-800">{entry.completed_orders}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.total_orders')}</p>
+                    <p className="font-semibold text-slate-800">{entry.total_orders}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.total_paid')}</p>
-                    <p className="font-semibold text-emerald-600">{formatCurrency(entry.total_paid)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.total_discount')}</p>
-                    <p className="font-medium text-orange-500">{formatCurrency(entry.total_discount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.void_orders')}</p>
-                    <p className="font-medium text-red-500">{entry.void_orders}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">{t('stats.refunds')}</p>
+                    <p className={`font-medium ${entry.refund_amount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                      {formatCurrency(entry.refund_amount)}
+                      {entry.refund_count > 0 && <span className="text-xs text-slate-400 ml-1">({entry.refund_count})</span>}
+                    </p>
                   </div>
                 </div>
               </Link>

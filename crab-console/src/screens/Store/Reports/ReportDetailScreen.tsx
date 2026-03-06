@@ -5,7 +5,6 @@ import {
   Banknote, ShoppingBag, XCircle, Receipt,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { tEnum } from '@/infrastructure/i18n';
 import { useStoreId } from '@/hooks/useStoreId';
 import { useAuthStore } from '@/core/stores/useAuthStore';
 import { getReportDetail } from '@/infrastructure/api/stats';
@@ -200,21 +199,28 @@ export const ReportDetailScreen: React.FC = () => {
 
       {/* Daily Summary */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">{t('reports.daily_summary')}</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-slate-900">{t('reports.daily_summary')}</h2>
+          <span className={`px-2 py-0.5 rounded text-xs font-medium ${report.auto_generated ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+            {report.auto_generated ? t('stats.source_auto') : t('stats.source_manual')}
+          </span>
+        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-xs text-slate-400">{t('reports.total_sales')}</p>
-            <p className="text-lg font-bold text-slate-900">{formatCurrency(report.total_sales)}</p>
+            <p className="text-xs text-slate-400">{t('stats.net_revenue')}</p>
+            <p className="text-lg font-bold text-emerald-600">{formatCurrency(report.net_revenue)}</p>
           </div>
           <div>
             <p className="text-xs text-slate-400">{t('reports.orders')}</p>
-            <p className="text-lg font-bold text-slate-900">{report.completed_orders}</p>
-            {report.void_orders > 0 && <p className="text-xs text-red-500">{report.void_orders} {t('reports.voided')}</p>}
+            <p className="text-lg font-bold text-slate-900">{report.total_orders}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400">{t('reports.total_paid')}</p>
-            <p className="text-lg font-bold text-slate-900">{formatCurrency(report.total_paid)}</p>
+            <p className="text-xs text-slate-400">{t('stats.refunds')}</p>
+            <p className={`text-lg font-bold ${report.refund_amount > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+              {formatCurrency(report.refund_amount)}
+            </p>
+            {report.refund_count > 0 && <p className="text-xs text-slate-400">{report.refund_count} {t('reports.refund_count_unit')}</p>}
           </div>
           <div>
             <p className="text-xs text-slate-400">{t('reports.cash_variance')}</p>
@@ -223,38 +229,6 @@ export const ReportDetailScreen: React.FC = () => {
             </p>
           </div>
         </div>
-
-        {/* Payment Breakdown */}
-        {report.payment_breakdowns.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-slate-700 mb-2">{t('reports.payment_methods')}</h3>
-            <div className="space-y-1">
-              {report.payment_breakdowns.map(pb => (
-                <div key={pb.method} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">{tEnum('common.paymentMethod', pb.method)}</span>
-                  <span className="font-medium text-slate-900">{formatCurrency(pb.amount)} ({pb.count})</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tax Breakdown */}
-        {report.tax_breakdowns.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-slate-700 mb-2">{t('reports.tax_breakdown')}</h3>
-            <div className="space-y-1">
-              {report.tax_breakdowns.map(tb => (
-                <div key={tb.tax_rate} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">IVA {tb.tax_rate}%</span>
-                  <span className="font-medium text-slate-900">
-                    {formatCurrency(tb.net_amount)} + {formatCurrency(tb.tax_amount)} = {formatCurrency(tb.gross_amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Note */}

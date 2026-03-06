@@ -441,6 +441,9 @@ impl ServerState {
         // ShiftAutoCloseScheduler: 自动关闭跨营业日僵尸班次
         self.register_shift_auto_close(&mut tasks);
 
+        // DailyReportScheduler: 自动生成日报 + 补漏 + 清理
+        self.register_daily_report_scheduler(&mut tasks);
+
         // 打印任务摘要
         tasks.log_summary();
 
@@ -863,6 +866,21 @@ impl ServerState {
         let scheduler = ShiftAutoCloseScheduler::new(self.clone(), tasks.shutdown_token());
 
         tasks.spawn("shift_auto_close", TaskKind::Periodic, async move {
+            scheduler.run().await;
+        });
+    }
+
+    /// 注册日报自动生成调度器
+    ///
+    /// - 启动时补漏最近 7 天缺失的日报
+    /// - 运行期间按 business_day_cutoff 每日自动生成
+    /// - 清理超过 30 天的旧日报
+    fn register_daily_report_scheduler(&self, tasks: &mut BackgroundTasks) {
+        use crate::daily_reports::DailyReportScheduler;
+
+        let scheduler = DailyReportScheduler::new(self.clone(), tasks.shutdown_token());
+
+        tasks.spawn("daily_report_scheduler", TaskKind::Periodic, async move {
             scheduler.run().await;
         });
     }

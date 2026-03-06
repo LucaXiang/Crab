@@ -8,7 +8,6 @@
 use std::sync::Arc;
 
 use chrono::NaiveTime;
-use chrono_tz::Tz;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
@@ -49,7 +48,7 @@ impl ShiftAutoCloseScheduler {
         loop {
             let cutoff_time = self.get_cutoff_time().await;
             let tz = self.state.config.timezone;
-            let sleep_duration = Self::duration_until_next_cutoff(cutoff_time, tz);
+            let sleep_duration = time::duration_until_next_cutoff(cutoff_time, tz);
 
             tracing::info!(
                 "Next settlement check in {} minutes (cutoff={})",
@@ -121,46 +120,5 @@ impl ShiftAutoCloseScheduler {
             .unwrap_or(0);
 
         time::cutoff_to_time(cutoff)
-    }
-
-    /// 计算距离下一次 cutoff 的 Duration
-    fn duration_until_next_cutoff(cutoff_time: NaiveTime, tz: Tz) -> std::time::Duration {
-        let now = chrono::Utc::now().with_timezone(&tz);
-        let today = now.date_naive();
-
-        let target_date = if now.time() >= cutoff_time {
-            // 今天的 cutoff 已过，等明天
-            today + chrono::Duration::days(1)
-        } else {
-            today
-        };
-
-        let target_datetime = target_date
-            .and_time(cutoff_time)
-            .and_local_timezone(tz)
-            .single()
-            .unwrap_or_else(|| {
-                // DST edge case: fallback to +1 min
-                (target_date.and_time(cutoff_time) + chrono::Duration::minutes(1))
-                    .and_local_timezone(tz)
-                    .latest()
-                    .unwrap_or_else(|| {
-                        // Ultimate fallback: use current time + 1 hour
-                        tracing::error!(
-                            "Cannot resolve local time for shift close, using fallback"
-                        );
-                        now + chrono::Duration::hours(1)
-                    })
-            });
-
-        let duration = target_datetime.signed_duration_since(now);
-        if duration.num_seconds() <= 0 {
-            // Safety: 不应该发生，但以防万一用 1 分钟兜底
-            std::time::Duration::from_secs(60)
-        } else {
-            duration
-                .to_std()
-                .unwrap_or(std::time::Duration::from_secs(60))
-        }
     }
 }
