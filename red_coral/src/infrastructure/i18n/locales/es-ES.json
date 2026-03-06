@@ -634,7 +634,9 @@
       "rule_discount": "Dto. regla",
       "rule_surcharge": "Suplemento regla",
       "order_discount": "Dto. pedido",
-      "order_surcharge": "Suplemento pedido"
+      "order_surcharge": "Suplemento pedido",
+      "order_rule_discount": "Dto. regla pedido",
+      "order_rule_surcharge": "Suplemento regla pedido"
     },
     "order_detail": {
       "title": "Detalle",
@@ -750,6 +752,7 @@
       "invoices": "Facturas",
       "reports_shifts": "Informes y turnos",
       "daily_report": "Informe diario",
+      "red_flags": "Alertas",
       "audit_log": "Auditoría"
     },
     "time": {
@@ -824,12 +827,29 @@
       "merged": "Unido"
     },
     "red_flags": {
-      "item_removals": "Eliminaciones",
-      "item_comps": "Invitaciones",
-      "order_voids": "Anulaciones",
-      "order_discounts": "Descuentos",
-      "price_modifications": "Cambios de precio",
-      "operator": "Operador"
+      "group_items": "Artículos",
+      "group_orders": "Pedidos",
+      "group_payments": "Pagos/Devoluciones",
+      "operator_breakdown": "Desglose por operador",
+      "operator": "Operador",
+      "total": "Total",
+      "no_flags": "Sin alertas",
+      "event_log": "Registro de eventos",
+      "all_types": "Todos los tipos",
+      "all_operators": "Todos los operadores",
+      "load_more": "Cargar más",
+      "events": {
+        "ITEM_REMOVED": "Eliminación",
+        "ITEM_COMPED": "Invitación",
+        "ITEM_UNCOMPED": "Desinvitación",
+        "ITEM_MODIFIED": "Cambio precio",
+        "ORDER_VOIDED": "Anulación",
+        "ORDER_DISCOUNT_APPLIED": "Dto. pedido",
+        "ORDER_SURCHARGE_APPLIED": "Recargo pedido",
+        "RULE_SKIP_TOGGLED": "Regla omitida",
+        "PAYMENT_CANCELLED": "Pago cancelado",
+        "REFUND": "Devolución"
+      }
     },
     "invoices": {
       "number": "Nº factura",

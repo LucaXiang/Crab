@@ -336,6 +336,7 @@ pub async fn run() {
             commands::get_statistics,
             commands::get_sales_report,
             commands::get_red_flags,
+            commands::get_red_flag_log,
             commands::list_invoices,
         ])
         .on_window_event(|window, event| {

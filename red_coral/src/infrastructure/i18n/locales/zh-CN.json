@@ -752,6 +752,7 @@
       "invoices": "发票明细",
       "reports_shifts": "日报 & 班次",
       "daily_report": "日结报告",
+      "red_flags": "异常追踪",
       "audit_log": "审计日志"
     },
     "time": {
@@ -826,12 +827,29 @@
       "merged": "已合并"
     },
     "red_flags": {
-      "item_removals": "删除菜品",
-      "item_comps": "赠送",
-      "order_voids": "作废订单",
-      "order_discounts": "整单折扣",
-      "price_modifications": "改价",
-      "operator": "操作员"
+      "group_items": "商品操作",
+      "group_orders": "订单操作",
+      "group_payments": "支付/退款",
+      "operator_breakdown": "操作员明细",
+      "operator": "操作员",
+      "total": "总计",
+      "no_flags": "无异常记录",
+      "event_log": "事件日志",
+      "all_types": "全部类型",
+      "all_operators": "全部操作员",
+      "load_more": "加载更多",
+      "events": {
+        "ITEM_REMOVED": "删菜",
+        "ITEM_COMPED": "赠送",
+        "ITEM_UNCOMPED": "取消赠送",
+        "ITEM_MODIFIED": "改价",
+        "ORDER_VOIDED": "作废",
+        "ORDER_DISCOUNT_APPLIED": "整单折扣",
+        "ORDER_SURCHARGE_APPLIED": "整单附加费",
+        "RULE_SKIP_TOGGLED": "跳过规则",
+        "PAYMENT_CANCELLED": "取消支付",
+        "REFUND": "退款"
+      }
     },
     "invoices": {
       "number": "发票号",

@@ -5,7 +5,8 @@ import {
   TrendingUp,
   FileText,
   ClipboardList,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { ActiveTab } from '@/core/domain/types';
@@ -23,6 +24,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onBack, activeTab, onTabChange
     { id: 'overview' as const, icon: TrendingUp, label: t('statistics.sidebar.overview') },
     { id: 'invoices' as const, icon: FileText, label: t('statistics.sidebar.invoices') },
     { id: 'reports_shifts' as const, icon: ClipboardList, label: t('statistics.sidebar.reports_shifts') },
+    { id: 'red_flags' as const, icon: AlertTriangle, label: t('statistics.sidebar.red_flags') },
     { id: 'audit_log' as const, icon: ShieldCheck, label: t('statistics.sidebar.audit_log') },
   ];
 

@@ -344,16 +344,30 @@
   },
   "red_flags": {
     "title": "Alertas de operación",
-    "item_removals": "Eliminaciones",
-    "item_comps": "Invitaciones",
-    "order_voids": "Anulaciones",
-    "order_discounts": "Descuentos",
-    "price_modifications": "Modificaciones",
+    "group_items": "Artículos",
+    "group_orders": "Pedidos",
+    "group_payments": "Pagos/Devoluciones",
+    "operator_breakdown": "Desglose por operador",
     "operator": "Empleado",
-    "total": "Total alertas",
+    "total": "Total",
     "no_data": "Sin alertas en este período",
-    "unknown_operator": "Sistema",
-    "compliance": "Datos protegidos bajo normativa VeriFactu. Cadena de hashes SHA-256 verificable."
+    "event_log": "Registro de eventos",
+    "all_types": "Todos los tipos",
+    "all_operators": "Todos los operadores",
+    "load_more": "Cargar más",
+    "compliance": "Datos protegidos bajo normativa VeriFactu. Cadena de hashes SHA-256 verificable.",
+    "events": {
+      "ITEM_REMOVED": "Eliminación",
+      "ITEM_COMPED": "Invitación",
+      "ITEM_UNCOMPED": "Desinvitación",
+      "ITEM_MODIFIED": "Cambio precio",
+      "ORDER_VOIDED": "Anulación",
+      "ORDER_DISCOUNT_APPLIED": "Dto. pedido",
+      "ORDER_SURCHARGE_APPLIED": "Recargo pedido",
+      "RULE_SKIP_TOGGLED": "Regla omitida",
+      "PAYMENT_CANCELLED": "Pago cancelado",
+      "REFUND": "Devolución"
+    }
   },
   "categories": {
     "title": "Categorías",

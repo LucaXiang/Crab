@@ -220,32 +220,74 @@ pub async fn get_sales_report(
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RedFlagsSummary {
-    pub item_removals: i64,
-    pub item_comps: i64,
-    pub order_voids: i64,
-    pub order_discounts: i64,
+pub struct ItemFlags {
+    pub removals: i64,
+    pub comps: i64,
+    pub uncomps: i64,
     pub price_modifications: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderFlags {
+    pub voids: i64,
+    pub discounts: i64,
+    pub surcharges: i64,
+    pub rule_skips: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaymentFlags {
+    pub cancellations: i64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperatorRedFlags {
     pub operator_id: i64,
     pub operator_name: String,
-    pub item_removals: i64,
-    pub item_comps: i64,
-    pub order_voids: i64,
-    pub order_discounts: i64,
+    pub removals: i64,
+    pub comps: i64,
+    pub uncomps: i64,
     pub price_modifications: i64,
+    pub voids: i64,
+    pub discounts: i64,
+    pub surcharges: i64,
+    pub rule_skips: i64,
+    pub cancellations: i64,
+    pub refund_count: i64,
+    pub refund_amount: f64,
+    pub total_flags: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedFlagsResponse {
-    pub summary: RedFlagsSummary,
+    pub item_flags: ItemFlags,
+    pub order_flags: OrderFlags,
+    pub payment_flags: PaymentFlags,
     pub operator_breakdown: Vec<OperatorRedFlags>,
 }
 
-/// 获取 Red Flags 数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedFlagLogEntry {
+    pub timestamp: i64,
+    pub event_type: String,
+    pub operator_id: i64,
+    pub operator_name: String,
+    pub receipt_number: String,
+    pub order_id: i64,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedFlagLogResponse {
+    pub entries: Vec<RedFlagLogEntry>,
+    pub total: i64,
+    pub page: i32,
+    pub per_page: i32,
+}
+
+/// 获取 Red Flags 汇总数据
 #[tauri::command]
 pub async fn get_red_flags(
     bridge: State<'_, Arc<ClientBridge>>,
@@ -257,6 +299,35 @@ pub async fn get_red_flags(
         Ok(data) => Ok(ApiResponse::success(data)),
         Err(e) => {
             warn!(from, to, error = %e, "get_red_flags failed");
+            Ok(ApiResponse::from_bridge_error(e))
+        }
+    }
+}
+
+/// 获取 Red Flags 事件日志
+#[tauri::command]
+pub async fn get_red_flag_log(
+    bridge: State<'_, Arc<ClientBridge>>,
+    from: i64,
+    to: i64,
+    event_type: Option<String>,
+    operator_id: Option<i64>,
+    page: Option<i32>,
+) -> Result<ApiResponse<RedFlagLogResponse>, String> {
+    let mut path = format!("/api/statistics/red-flags/log?from={}&to={}", from, to);
+    if let Some(ref et) = event_type {
+        path.push_str(&format!("&event_type={}", et));
+    }
+    if let Some(op) = operator_id {
+        path.push_str(&format!("&operator_id={}", op));
+    }
+    if let Some(p) = page {
+        path.push_str(&format!("&page={}", p));
+    }
+    match bridge.get::<RedFlagLogResponse>(&path).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => {
+            warn!(from, to, error = %e, "get_red_flag_log failed");
             Ok(ApiResponse::from_bridge_error(e))
         }
     }

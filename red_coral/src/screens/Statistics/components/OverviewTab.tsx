@@ -4,7 +4,6 @@ import { toast } from '@/presentation/components/Toast';
 import { logger } from '@/utils/logger';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { StoreOverviewDisplay } from './StoreOverviewDisplay';
-import { RedFlagsBar, type RedFlagsData } from './RedFlagsBar';
 import { TimeRangeSelector, useTimeRange, previousRange, lastWeekRange, useCutoffMinutes } from './TimeRangeSelector';
 import type { StoreOverview } from '@/core/domain/types';
 
@@ -29,8 +28,6 @@ export const OverviewTab: React.FC = () => {
   const [data, setData] = useState<StoreOverview>(EMPTY_OVERVIEW);
   const [prevData, setPrevData] = useState<StoreOverview | null>(null);
   const [lastWeekData, setLastWeekData] = useState<StoreOverview | null>(null);
-  const [redFlags, setRedFlags] = useState<RedFlagsData | null>(null);
-
   const fetchOverview = useCallback(async (from: number, to: number): Promise<StoreOverview> => {
     return invokeApi<StoreOverview>('get_statistics', { from, to });
   }, []);
@@ -42,19 +39,17 @@ export const OverviewTab: React.FC = () => {
       try {
         const prev = previousRange(range);
         const lw = lastWeekRange(range);
-        const [current, prevResult, lwResult, flags] = await Promise.all([
+        const [current, prevResult, lwResult] = await Promise.all([
           fetchOverview(range.from, range.to),
           fetchOverview(prev.from, prev.to).catch(() => null),
           range.preset === 'today'
             ? fetchOverview(lw.from, lw.to).catch(() => null)
             : Promise.resolve(null),
-          invokeApi<RedFlagsData>('get_red_flags', { from: range.from, to: range.to }).catch(() => null),
         ]);
         if (cancelled) return;
         setData(current);
         setPrevData(prevResult);
         setLastWeekData(lwResult);
-        setRedFlags(flags);
       } catch (error) {
         if (cancelled) return;
         logger.error('Failed to fetch statistics', error);
@@ -69,7 +64,6 @@ export const OverviewTab: React.FC = () => {
   return (
     <>
       <TimeRangeSelector value={range} onChange={setRange} />
-      {redFlags && <RedFlagsBar data={redFlags} />}
       <StoreOverviewDisplay
         overview={data}
         previousOverview={prevData}

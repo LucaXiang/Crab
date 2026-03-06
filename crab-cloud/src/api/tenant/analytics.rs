@@ -141,6 +141,44 @@ pub async fn get_store_red_flags(
     Ok(Json(red_flags))
 }
 
+/// GET /api/tenant/stores/:id/red-flags/log?from=&to=&event_type=&operator_id=&page=
+pub async fn get_store_red_flag_log(
+    State(state): State<AppState>,
+    Extension(identity): Extension<TenantIdentity>,
+    Path(store_id): Path<i64>,
+    Query(query): Query<RedFlagLogQuery>,
+) -> ApiResult<tenant_queries::RedFlagLogResponse> {
+    validate_range(query.from, query.to)?;
+    verify_store(&state, store_id, identity.tenant_id).await?;
+
+    let log = tenant_queries::get_red_flag_log(
+        &state.pool,
+        store_id,
+        identity.tenant_id,
+        query.from,
+        query.to,
+        query.event_type.as_deref(),
+        query.operator_id,
+        query.page.unwrap_or(1),
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Red flag log query error: {e}");
+        AppError::new(ErrorCode::InternalError)
+    })?;
+
+    Ok(Json(log))
+}
+
+#[derive(Deserialize)]
+pub struct RedFlagLogQuery {
+    pub from: i64,
+    pub to: i64,
+    pub event_type: Option<String>,
+    pub operator_id: Option<i64>,
+    pub page: Option<i32>,
+}
+
 /// GET /api/tenant/stores/:id/shifts
 pub async fn list_shifts(
     State(state): State<AppState>,

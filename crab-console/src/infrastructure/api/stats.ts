@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { StoreOverview, DailyReportEntry, RedFlagsResponse, DailyReportDetail, ShiftEntry } from '@/core/types/stats';
+import type { StoreOverview, DailyReportEntry, RedFlagsResponse, RedFlagLogResponse, DailyReportDetail, ShiftEntry } from '@/core/types/stats';
 
 export function getTenantOverview(
   token: string,
@@ -37,6 +37,22 @@ export function getStoreRedFlags(
   to: number,
 ): Promise<RedFlagsResponse> {
   return request('GET', `/api/tenant/stores/${storeId}/red-flags?from=${from}&to=${to}`, undefined, token);
+}
+
+export function getStoreRedFlagLog(
+  token: string,
+  storeId: number,
+  from: number,
+  to: number,
+  eventType?: string,
+  operatorId?: number,
+  page?: number,
+): Promise<RedFlagLogResponse> {
+  let path = `/api/tenant/stores/${storeId}/red-flags/log?from=${from}&to=${to}`;
+  if (eventType) path += `&event_type=${eventType}`;
+  if (operatorId !== undefined) path += `&operator_id=${operatorId}`;
+  if (page) path += `&page=${page}`;
+  return request('GET', path, undefined, token);
 }
 
 export function getReportDetail(

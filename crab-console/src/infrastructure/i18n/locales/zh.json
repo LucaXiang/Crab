@@ -346,16 +346,30 @@
   },
   "red_flags": {
     "title": "操作异常监控",
-    "item_removals": "删菜",
-    "item_comps": "赠送",
-    "order_voids": "作废",
-    "order_discounts": "折扣",
-    "price_modifications": "改价",
+    "group_items": "商品操作",
+    "group_orders": "订单操作",
+    "group_payments": "支付/退款",
+    "operator_breakdown": "操作员明细",
     "operator": "员工",
-    "total": "异常总数",
+    "total": "总计",
     "no_data": "该时段无异常记录",
-    "unknown_operator": "系统",
-    "compliance": "数据受 VeriFactu 法规保护，SHA-256 哈希链可验证。"
+    "event_log": "事件日志",
+    "all_types": "全部类型",
+    "all_operators": "全部操作员",
+    "load_more": "加载更多",
+    "compliance": "数据受 VeriFactu 法规保护，SHA-256 哈希链可验证。",
+    "events": {
+      "ITEM_REMOVED": "删菜",
+      "ITEM_COMPED": "赠送",
+      "ITEM_UNCOMPED": "取消赠送",
+      "ITEM_MODIFIED": "改价",
+      "ORDER_VOIDED": "作废",
+      "ORDER_DISCOUNT_APPLIED": "整单折扣",
+      "ORDER_SURCHARGE_APPLIED": "整单附加费",
+      "RULE_SKIP_TOGGLED": "跳过规则",
+      "PAYMENT_CANCELLED": "取消支付",
+      "REFUND": "退款"
+    }
   },
   "categories": {
     "title": "分类",

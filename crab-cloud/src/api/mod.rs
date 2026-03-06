@@ -108,6 +108,10 @@ pub fn public_router(state: AppState) -> Router {
             "/api/tenant/stores/{id}/red-flags",
             get(tenant::get_store_red_flags),
         )
+        .route(
+            "/api/tenant/stores/{id}/red-flags/log",
+            get(tenant::get_store_red_flag_log),
+        )
         .route("/api/tenant/stores/{id}/shifts", get(tenant::list_shifts))
         .route(
             "/api/tenant/stores/{id}/reports/{date}",

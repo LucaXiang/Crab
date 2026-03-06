@@ -149,28 +149,65 @@ export interface DailyReportDetail {
   shift_breakdowns: ShiftBreakdown[];
 }
 
-export interface RedFlagsSummary {
-  item_removals: number;
-  item_comps: number;
-  order_voids: number;
-  order_discounts: number;
+export interface ItemFlags {
+  removals: number;
+  comps: number;
+  uncomps: number;
   price_modifications: number;
 }
 
+export interface OrderFlags {
+  voids: number;
+  discounts: number;
+  surcharges: number;
+  rule_skips: number;
+}
+
+export interface PaymentFlags {
+  cancellations: number;
+  refund_count: number;
+  refund_amount: number;
+}
+
 export interface OperatorRedFlags {
-  operator_id: number | null;
-  operator_name: string | null;
-  item_removals: number;
-  item_comps: number;
-  order_voids: number;
-  order_discounts: number;
+  operator_id: number;
+  operator_name: string;
+  removals: number;
+  comps: number;
+  uncomps: number;
   price_modifications: number;
+  voids: number;
+  discounts: number;
+  surcharges: number;
+  rule_skips: number;
+  cancellations: number;
+  refund_count: number;
+  refund_amount: number;
   total_flags: number;
 }
 
 export interface RedFlagsResponse {
-  summary: RedFlagsSummary;
+  item_flags: ItemFlags;
+  order_flags: OrderFlags;
+  payment_flags: PaymentFlags;
   operator_breakdown: OperatorRedFlags[];
+}
+
+export interface RedFlagLogEntry {
+  timestamp: number;
+  event_type: string;
+  operator_id: number;
+  operator_name: string;
+  receipt_number: string;
+  order_id: number;
+  detail: string | null;
+}
+
+export interface RedFlagLogResponse {
+  entries: RedFlagLogEntry[];
+  total: number;
+  page: number;
+  per_page: number;
 }
 
 export interface ShiftEntry {

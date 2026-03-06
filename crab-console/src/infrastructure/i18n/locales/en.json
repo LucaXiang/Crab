@@ -340,16 +340,30 @@
   },
   "red_flags": {
     "title": "Operation alerts",
-    "item_removals": "Removals",
-    "item_comps": "Comps",
-    "order_voids": "Voids",
-    "order_discounts": "Discounts",
-    "price_modifications": "Modifications",
+    "group_items": "Item operations",
+    "group_orders": "Order operations",
+    "group_payments": "Payments/Refunds",
+    "operator_breakdown": "Operator breakdown",
     "operator": "Employee",
-    "total": "Total alerts",
+    "total": "Total",
     "no_data": "No alerts in this period",
-    "unknown_operator": "System",
-    "compliance": "Data protected under VeriFactu regulation. SHA-256 hash chain verifiable."
+    "event_log": "Event log",
+    "all_types": "All types",
+    "all_operators": "All operators",
+    "load_more": "Load more",
+    "compliance": "Data protected under VeriFactu regulation. SHA-256 hash chain verifiable.",
+    "events": {
+      "ITEM_REMOVED": "Removal",
+      "ITEM_COMPED": "Comp",
+      "ITEM_UNCOMPED": "Uncomp",
+      "ITEM_MODIFIED": "Price change",
+      "ORDER_VOIDED": "Void",
+      "ORDER_DISCOUNT_APPLIED": "Order discount",
+      "ORDER_SURCHARGE_APPLIED": "Order surcharge",
+      "RULE_SKIP_TOGGLED": "Rule skipped",
+      "PAYMENT_CANCELLED": "Payment cancelled",
+      "REFUND": "Refund"
+    }
   },
   "categories": {
     "title": "Categories",

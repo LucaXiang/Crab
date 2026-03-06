@@ -41,8 +41,8 @@ pub use account::{
 pub use store::{delete_store, list_devices, list_stores, update_store};
 
 pub use analytics::{
-    get_report_detail, get_stats, get_store_overview, get_store_red_flags, get_tenant_overview,
-    list_shifts,
+    get_report_detail, get_stats, get_store_overview, get_store_red_flag_log, get_store_red_flags,
+    get_tenant_overview, list_shifts,
 };
 
 pub use order::{
