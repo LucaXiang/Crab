@@ -446,7 +446,9 @@ CREATE TABLE IF NOT EXISTS store_archived_orders (
     customer_nombre TEXT,
     customer_address TEXT,
     customer_email TEXT,
-    customer_phone TEXT
+    customer_phone TEXT,
+    mg_discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    marketing_group_name TEXT
 );
 
 CREATE UNIQUE INDEX uq_store_archived_orders_key
@@ -487,7 +489,10 @@ CREATE TABLE store_order_items (
     tax               NUMERIC(12,2) NOT NULL DEFAULT 0,
     tax_rate          INTEGER NOT NULL DEFAULT 0,
     is_comped         BOOLEAN NOT NULL DEFAULT false,
-    note              TEXT
+    note              TEXT,
+    rule_discount_amount   NUMERIC(12,2) NOT NULL DEFAULT 0,
+    rule_surcharge_amount  NUMERIC(12,2) NOT NULL DEFAULT 0,
+    mg_discount_amount     NUMERIC(12,2) NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_soi_order ON store_order_items(order_id);
 CREATE INDEX idx_soi_product ON store_order_items(product_source_id) WHERE product_source_id IS NOT NULL;
@@ -501,6 +506,34 @@ CREATE TABLE store_order_item_options (
     quantity        INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX idx_soio_item ON store_order_item_options(item_id);
+
+-- ── Order Adjustments ──
+
+CREATE TABLE store_order_adjustments (
+    id                BIGSERIAL PRIMARY KEY,
+    order_id          BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
+    item_id           BIGINT REFERENCES store_order_items(id) ON DELETE CASCADE,
+    -- NULL item_id = order-level adjustment
+
+    -- Source type: PRICE_RULE, MANUAL, MEMBER_GROUP, COMP
+    source_type       TEXT NOT NULL,
+    -- Direction: DISCOUNT or SURCHARGE
+    direction         TEXT NOT NULL,
+
+    -- Price rule specifics (NULL for non-rule sources)
+    rule_id           BIGINT,
+    rule_name         TEXT,
+    rule_receipt_name TEXT,
+    adjustment_type   TEXT,          -- PERCENTAGE / FIXED_AMOUNT (for rules)
+
+    -- Amount
+    amount            NUMERIC(12,2) NOT NULL DEFAULT 0,
+    skipped           BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE INDEX idx_soa_order ON store_order_adjustments(order_id);
+CREATE INDEX idx_soa_item ON store_order_adjustments(item_id) WHERE item_id IS NOT NULL;
+CREATE INDEX idx_soa_source ON store_order_adjustments(order_id, source_type);
 
 -- ── Order Payments ──
 
@@ -557,15 +590,10 @@ CREATE TABLE IF NOT EXISTS store_daily_reports (
     source_id        BIGINT NOT NULL,
     business_date    TEXT NOT NULL,
     total_orders     BIGINT NOT NULL DEFAULT 0,
-    completed_orders BIGINT NOT NULL DEFAULT 0,
-    void_orders      BIGINT NOT NULL DEFAULT 0,
-    total_sales      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_paid       DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_unpaid     DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    void_amount      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_tax        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_discount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    total_surcharge  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    net_revenue      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    refund_amount    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    refund_count     BIGINT NOT NULL DEFAULT 0,
+    auto_generated   BOOLEAN NOT NULL DEFAULT FALSE,
     generated_at     BIGINT,
     generated_by_id  BIGINT,
     generated_by_name TEXT,
@@ -576,28 +604,6 @@ CREATE TABLE IF NOT EXISTS store_daily_reports (
 );
 
 CREATE INDEX idx_store_daily_reports_store ON store_daily_reports(store_id);
-
-CREATE TABLE IF NOT EXISTS store_daily_report_tax_breakdown (
-    id           BIGSERIAL PRIMARY KEY,
-    report_id    BIGINT NOT NULL REFERENCES store_daily_reports(id) ON DELETE CASCADE,
-    tax_rate     INTEGER NOT NULL,
-    net_amount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    tax_amount   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    gross_amount DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    order_count  BIGINT NOT NULL DEFAULT 0
-);
-
-CREATE INDEX idx_store_dr_tax_report ON store_daily_report_tax_breakdown(report_id);
-
-CREATE TABLE IF NOT EXISTS store_daily_report_payment_breakdown (
-    id        BIGSERIAL PRIMARY KEY,
-    report_id BIGINT NOT NULL REFERENCES store_daily_reports(id) ON DELETE CASCADE,
-    method    TEXT NOT NULL,
-    amount    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    count     BIGINT NOT NULL DEFAULT 0
-);
-
-CREATE INDEX idx_store_dr_payment_report ON store_daily_report_payment_breakdown(report_id);
 
 CREATE TABLE store_daily_report_shift_breakdown (
     id               BIGSERIAL PRIMARY KEY,

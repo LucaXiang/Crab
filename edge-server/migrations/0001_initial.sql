@@ -381,6 +381,8 @@ CREATE TABLE print_config (
     id                      INTEGER PRIMARY KEY,
     default_kitchen_printer TEXT,
     default_label_printer   TEXT,
+    kitchen_enabled         INTEGER NOT NULL DEFAULT 1,
+    label_enabled           INTEGER NOT NULL DEFAULT 1,
     updated_at              INTEGER NOT NULL DEFAULT 0
 );
 INSERT INTO print_config (id) VALUES (1);
@@ -479,47 +481,24 @@ CREATE INDEX idx_shift_start_time ON shift(start_time);
 CREATE TABLE daily_report (
     id                INTEGER PRIMARY KEY,
     business_date     TEXT    NOT NULL,
+    net_revenue       REAL    NOT NULL DEFAULT 0.0,
     total_orders      INTEGER NOT NULL DEFAULT 0,
-    completed_orders  INTEGER NOT NULL DEFAULT 0,
-    void_orders       INTEGER NOT NULL DEFAULT 0,
-    total_sales       REAL    NOT NULL DEFAULT 0.0,
-    total_paid        REAL    NOT NULL DEFAULT 0.0,
-    total_unpaid      REAL    NOT NULL DEFAULT 0.0,
-    void_amount       REAL    NOT NULL DEFAULT 0.0,
-    total_tax         REAL    NOT NULL DEFAULT 0.0,
-    total_discount    REAL    NOT NULL DEFAULT 0.0,
-    total_surcharge   REAL    NOT NULL DEFAULT 0.0,
+    refund_amount     REAL    NOT NULL DEFAULT 0.0,
+    refund_count      INTEGER NOT NULL DEFAULT 0,
+    auto_generated    INTEGER NOT NULL DEFAULT 0,
     generated_at      INTEGER,
     generated_by_id   INTEGER,
     generated_by_name TEXT,
-    note              TEXT
+    note              TEXT,
+    created_at        INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+    updated_at        INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
 CREATE UNIQUE INDEX idx_daily_report_date ON daily_report(business_date);
-
-CREATE TABLE daily_report_tax_breakdown (
-    id            INTEGER PRIMARY KEY,
-    report_id     INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
-    tax_rate      INTEGER NOT NULL,
-    net_amount    REAL    NOT NULL DEFAULT 0.0,
-    tax_amount    REAL    NOT NULL DEFAULT 0.0,
-    gross_amount  REAL    NOT NULL DEFAULT 0.0,
-    order_count   INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX idx_tax_breakdown_report ON daily_report_tax_breakdown(report_id);
-
-CREATE TABLE daily_report_payment_breakdown (
-    id        INTEGER PRIMARY KEY,
-    report_id INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
-    method    TEXT    NOT NULL,
-    amount    REAL    NOT NULL DEFAULT 0.0,
-    count     INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX idx_payment_breakdown_report ON daily_report_payment_breakdown(report_id);
 
 CREATE TABLE daily_report_shift_breakdown (
     id              INTEGER PRIMARY KEY,
     report_id       INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
-    shift_id        INTEGER NOT NULL REFERENCES shift(id),
+    shift_id        INTEGER NOT NULL DEFAULT 0,
     operator_id     INTEGER NOT NULL,
     operator_name   TEXT    NOT NULL,
     status          TEXT    NOT NULL,
@@ -587,6 +566,8 @@ CREATE TABLE archived_order (
     order_manual_surcharge_amount   REAL    NOT NULL DEFAULT 0.0,
     order_rule_discount_amount      REAL    NOT NULL DEFAULT 0.0,
     order_rule_surcharge_amount     REAL    NOT NULL DEFAULT 0.0,
+    mg_discount_amount              REAL    NOT NULL DEFAULT 0.0,
+    marketing_group_name            TEXT,
     tax                             REAL    NOT NULL DEFAULT 0.0,
     start_time                      INTEGER NOT NULL,
     end_time                        INTEGER,
@@ -602,8 +583,14 @@ CREATE TABLE archived_order (
     service_type                    TEXT,
     is_voided                       INTEGER NOT NULL DEFAULT 0,
     is_upgraded                     INTEGER NOT NULL DEFAULT 0,
+    customer_nif                    TEXT,
+    customer_nombre                 TEXT,
+    customer_address                TEXT,
+    customer_email                  TEXT,
+    customer_phone                  TEXT,
     queue_number                    INTEGER,
     shift_id                        INTEGER REFERENCES shift(id),
+    order_applied_rules             TEXT,
     cloud_synced                    INTEGER NOT NULL DEFAULT 0,
     created_at                      INTEGER NOT NULL
 );
@@ -632,6 +619,7 @@ CREATE TABLE archived_order_item (
     surcharge_amount       REAL    NOT NULL DEFAULT 0.0,
     rule_discount_amount   REAL    NOT NULL DEFAULT 0.0,
     rule_surcharge_amount  REAL    NOT NULL DEFAULT 0.0,
+    mg_discount_amount     REAL    NOT NULL DEFAULT 0.0,
     tax                    REAL    NOT NULL DEFAULT 0.0,
     tax_rate               INTEGER NOT NULL DEFAULT 0,
     category_id            INTEGER,
@@ -643,6 +631,7 @@ CREATE TABLE archived_order_item (
 CREATE INDEX idx_archived_item_order ON archived_order_item(order_pk);
 CREATE INDEX idx_archived_item_spec ON archived_order_item(spec);
 CREATE INDEX idx_archived_item_instance ON archived_order_item(instance_id);
+CREATE UNIQUE INDEX idx_archived_item_order_instance ON archived_order_item(order_pk, instance_id);
 
 CREATE TABLE archived_order_item_option (
     id              INTEGER PRIMARY KEY,

@@ -92,7 +92,7 @@ impl CommandHandler for CompleteOrderAction {
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
                 receipt_number: snapshot.receipt_number.clone(),
-                service_type: self.service_type,
+                service_type: Some(self.service_type.unwrap_or(ServiceType::DineIn)),
                 final_total: snapshot.total,
                 payment_summary,
             },
