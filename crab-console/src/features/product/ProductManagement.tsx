@@ -272,7 +272,7 @@ export const ProductManagement: React.FC = () => {
     setFormError('');
     try {
       const payload: ProductUpdate = {
-        name: formName.trim(), image: formImage || undefined,
+        name: formName.trim(), image: formImage ?? undefined,
         category_id: Number(formCategoryId),
         tax_rate: formTaxRate, sort_order: formSortOrder,
         receipt_name: formReceiptName.trim() || undefined,

@@ -36,6 +36,43 @@ pub enum ArchiveError {
 
 pub type ArchiveResult<T> = Result<T, ArchiveError>;
 
+/// Collected adjustment row for batch INSERT into archived_order_adjustment
+struct AdjRow {
+    order_pk: i64,
+    item_pk: Option<i64>,
+    source_type: &'static str,
+    direction: String,
+    rule_id: Option<i64>,
+    rule_name: Option<String>,
+    rule_receipt_name: Option<String>,
+    adjustment_type: Option<String>,
+    amount: f64,
+    skipped: bool,
+}
+
+impl AdjRow {
+    fn simple(
+        order_pk: i64,
+        item_pk: Option<i64>,
+        source_type: &'static str,
+        direction: String,
+        amount: f64,
+    ) -> Self {
+        Self {
+            order_pk,
+            item_pk,
+            source_type,
+            direction,
+            rule_id: None,
+            rule_name: None,
+            rule_receipt_name: None,
+            adjustment_type: None,
+            amount,
+            skipped: false,
+        }
+    }
+}
+
 impl From<ArchiveError> for shared::error::AppError {
     fn from(err: ArchiveError) -> Self {
         use shared::error::{AppError, ErrorCode};
@@ -185,23 +222,16 @@ pub struct OrderArchiveService {
     archive_semaphore: Arc<Semaphore>,
     /// Mutex to ensure hash chain updates are serialized (prevents race conditions)
     hash_chain_lock: Arc<Mutex<()>>,
-    /// 业务时区 (用于收据编号日期)
-    tz: chrono_tz::Tz,
     /// Optional Verifactu invoice service (F2 invoices for completed orders)
     invoice_service: Option<super::invoice::InvoiceService>,
 }
 
 impl OrderArchiveService {
-    pub fn new(
-        pool: SqlitePool,
-        tz: chrono_tz::Tz,
-        invoice_service: Option<super::invoice::InvoiceService>,
-    ) -> Self {
+    pub fn new(pool: SqlitePool, invoice_service: Option<super::invoice::InvoiceService>) -> Self {
         Self {
             pool,
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
             hash_chain_lock: Arc::new(Mutex::new(())),
-            tz,
             invoice_service,
         }
     }
@@ -214,22 +244,6 @@ impl OrderArchiveService {
     /// Get the invoice service (shared with CreditNoteService for R5 invoices)
     pub fn invoice_service(&self) -> Option<&super::invoice::InvoiceService> {
         self.invoice_service.as_ref()
-    }
-
-    /// Generate the next receipt number atomically
-    ///
-    /// Format: ORD{YYYYMMDD}{sequence}
-    /// Example: ORD2026012410001
-    pub async fn generate_next_receipt_number(&self) -> ArchiveResult<String> {
-        let next_num = system_state::get_next_order_number(&self.pool)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        let now = chrono::Utc::now().with_timezone(&self.tz);
-        let date_str = now.format("%Y%m%d").to_string();
-        // Sequence starts at 10001 to match existing format
-        let sequence = 10000 + next_num;
-        Ok(format!("ORD{}{}", date_str, sequence))
     }
 
     /// Archive a completed order with its events (single attempt, concurrency limited).
@@ -351,8 +365,7 @@ impl OrderArchiveService {
                 void_type, loss_reason, loss_amount, void_note, \
                 member_id, member_name, \
                 mg_discount_amount, marketing_group_name, \
-                created_at, queue_number, shift_id, service_type, \
-                order_applied_rules\
+                created_at, queue_number, shift_id, service_type\
             ) VALUES (\
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
                 ?8, ?9, ?10, ?11, \
@@ -364,8 +377,7 @@ impl OrderArchiveService {
                 ?24, ?25, ?26, ?27, \
                 ?28, ?29, \
                 ?30, ?31, \
-                ?32, ?33, ?34, ?35, \
-                ?36\
+                ?32, ?33, ?34, ?35\
             )",
         )
         .bind(order_pk)
@@ -413,16 +425,12 @@ impl OrderArchiveService {
         .bind(snapshot.queue_number.map(|q| q as i64))
         .bind(shift_id)
         .bind(snapshot.service_type.as_ref().map(|st| st.as_str()))
-        .bind(if snapshot.order_applied_rules.is_empty() {
-            None
-        } else {
-            serde_json::to_string(&snapshot.order_applied_rules).ok()
-        })
         .execute(&mut *tx)
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 5b. INSERT items and their options
+        // 5b. INSERT items, options, and collect adjustments
+        let mut adjustments: Vec<AdjRow> = Vec::new();
         for item in &snapshot.items {
             // Compute item prices using Decimal
             let base_price = if item.original_price > 0.0 {
@@ -472,15 +480,15 @@ impl OrderArchiveService {
                     quantity, unpaid_quantity, unit_price, line_total, \
                     discount_amount, surcharge_amount, \
                     rule_discount_amount, rule_surcharge_amount, \
-                    tax, tax_rate, category_id, category_name, applied_rules, note, is_comped, \
+                    tax, tax_rate, category_id, category_name, note, is_comped, \
                     mg_discount_amount\
                 ) VALUES (\
                     ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
                     ?8, ?9, ?10, ?11, \
                     ?12, ?13, \
                     ?14, ?15, \
-                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, \
-                    ?23\
+                    ?16, ?17, ?18, ?19, ?20, ?21, \
+                    ?22\
                 )",
             )
             .bind(item_pk)
@@ -502,18 +510,59 @@ impl OrderArchiveService {
             .bind(item.tax_rate)
             .bind(item.category_id)
             .bind(&item.category_name)
-            .bind(if item.applied_rules.is_empty() {
-                None
-            } else {
-                serde_json::to_string(&item.applied_rules).ok()
-            })
             .bind(&item.note)
             .bind(item.is_comped)
-            // mg_discount_amount: per-unit from snapshot (consistent with existing data)
             .bind(item.mg_discount_amount)
             .execute(&mut *tx)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+            // Collect item-level adjustments
+            for rule in &item.applied_rules {
+                let direction = format!("{:?}", rule.rule_type).to_uppercase();
+                let adj_type = format!("{:?}", rule.adjustment_type).to_uppercase();
+                adjustments.push(AdjRow {
+                    order_pk,
+                    item_pk: Some(item_pk),
+                    source_type: "PRICE_RULE",
+                    direction,
+                    rule_id: Some(rule.rule_id),
+                    rule_name: Some(rule.name.clone()),
+                    rule_receipt_name: rule.receipt_name.clone(),
+                    adjustment_type: Some(adj_type),
+                    amount: to_f64(to_decimal(rule.calculated_amount) * d_qty),
+                    skipped: rule.skipped,
+                });
+            }
+            let manual_disc = total_discount - rule_discount_total;
+            if manual_disc > 0.0 && !item.is_comped {
+                adjustments.push(AdjRow::simple(
+                    order_pk,
+                    Some(item_pk),
+                    "MANUAL",
+                    "DISCOUNT".into(),
+                    manual_disc,
+                ));
+            }
+            if item.is_comped {
+                adjustments.push(AdjRow::simple(
+                    order_pk,
+                    Some(item_pk),
+                    "COMP",
+                    "DISCOUNT".into(),
+                    line_total,
+                ));
+            }
+            if item.mg_discount_amount > 0.0 {
+                let mg_total = to_f64(to_decimal(item.mg_discount_amount) * d_qty);
+                adjustments.push(AdjRow::simple(
+                    order_pk,
+                    Some(item_pk),
+                    "MEMBER_GROUP",
+                    "DISCOUNT".into(),
+                    mg_total,
+                ));
+            }
 
             // Options
             if let Some(options) = &item.selected_options {
@@ -535,6 +584,75 @@ impl OrderArchiveService {
                     .map_err(|e| ArchiveError::Database(e.to_string()))?;
                 }
             }
+        }
+
+        // Collect order-level adjustments
+        if snapshot.order_manual_discount_amount > 0.0 {
+            adjustments.push(AdjRow::simple(
+                order_pk,
+                None,
+                "MANUAL",
+                "DISCOUNT".into(),
+                snapshot.order_manual_discount_amount,
+            ));
+        }
+        if snapshot.order_manual_surcharge_amount > 0.0 {
+            adjustments.push(AdjRow::simple(
+                order_pk,
+                None,
+                "MANUAL",
+                "SURCHARGE".into(),
+                snapshot.order_manual_surcharge_amount,
+            ));
+        }
+        if snapshot.mg_discount_amount > 0.0 {
+            adjustments.push(AdjRow::simple(
+                order_pk,
+                None,
+                "MEMBER_GROUP",
+                "DISCOUNT".into(),
+                snapshot.mg_discount_amount,
+            ));
+        }
+        for rule in &snapshot.order_applied_rules {
+            let direction = format!("{:?}", rule.rule_type).to_uppercase();
+            let adj_type = format!("{:?}", rule.adjustment_type).to_uppercase();
+            adjustments.push(AdjRow {
+                order_pk,
+                item_pk: None,
+                source_type: "PRICE_RULE",
+                direction,
+                rule_id: Some(rule.rule_id),
+                rule_name: Some(rule.name.clone()),
+                rule_receipt_name: rule.receipt_name.clone(),
+                adjustment_type: Some(adj_type),
+                amount: rule.calculated_amount,
+                skipped: rule.skipped,
+            });
+        }
+
+        // 5b-flush. Batch INSERT all adjustments
+        for adj in &adjustments {
+            sqlx::query(
+                "INSERT INTO archived_order_adjustment (\
+                    id, order_pk, item_pk, source_type, direction, \
+                    rule_id, rule_name, rule_receipt_name, adjustment_type, amount, skipped\
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            )
+            .bind(snowflake_id())
+            .bind(adj.order_pk)
+            .bind(adj.item_pk)
+            .bind(adj.source_type)
+            .bind(&adj.direction)
+            .bind(adj.rule_id)
+            .bind(&adj.rule_name)
+            .bind(&adj.rule_receipt_name)
+            .bind(&adj.adjustment_type)
+            .bind(adj.amount)
+            .bind(adj.skipped)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
         }
 
         // 5c. INSERT payments

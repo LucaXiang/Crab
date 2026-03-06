@@ -334,3 +334,91 @@ pub async fn apply_catalog_sync_data(
 
     Ok(())
 }
+
+/// Apply recovery state from cloud after re-bind (database loss recovery).
+///
+/// Restores:
+/// 1. redb daily receipt count (avoids receipt number collisions)
+/// 2. invoice_counter (huella chain + numbering continuity)
+/// 3. BREAK chain_entry (marks the chain discontinuity)
+pub async fn apply_recovery_state(
+    state: &ServerState,
+    recovery: &shared::cloud::ws::RecoveryState,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tracing::info!(
+        daily_count = recovery.daily_receipt_count,
+        business_date = %recovery.business_date,
+        has_chain_hash = recovery.last_chain_hash.is_some(),
+        has_huella = recovery.last_huella.is_some(),
+        has_invoice = recovery.last_invoice_number.is_some(),
+        "Applying recovery state from cloud"
+    );
+
+    // 1. Restore redb daily receipt count
+    if recovery.daily_receipt_count > 0 {
+        state
+            .orders_manager
+            .storage()
+            .restore_daily_count(&recovery.business_date, recovery.daily_receipt_count as u64)?;
+        tracing::info!(
+            count = recovery.daily_receipt_count,
+            date = %recovery.business_date,
+            "Restored daily receipt count in redb"
+        );
+    }
+
+    // 2. Restore invoice counter (huella + number)
+    if let Some(ref invoice_number) = recovery.last_invoice_number {
+        crate::db::repository::invoice::restore_invoice_counter(
+            &state.pool,
+            invoice_number,
+            recovery.last_huella.as_deref(),
+        )
+        .await?;
+        tracing::info!(
+            invoice_number = %invoice_number,
+            has_huella = recovery.last_huella.is_some(),
+            "Restored invoice counter"
+        );
+    } else if recovery.last_huella.is_some() {
+        tracing::warn!(
+            "Recovery has last_huella but no last_invoice_number, skipping invoice counter restore"
+        );
+    }
+
+    // 3. Insert BREAK chain_entry + update system_state.last_chain_hash
+    if let Some(ref cloud_last_hash) = recovery.last_chain_hash {
+        let now = shared::util::now_millis();
+        let break_id = shared::util::snowflake_id();
+
+        let mut tx = sqlx::pool::Pool::begin(&state.pool).await?;
+
+        sqlx::query(
+            "INSERT INTO chain_entry (id, entry_type, entry_pk, prev_hash, curr_hash, created_at, cloud_synced) \
+             VALUES (?1, 'BREAK', 0, ?2, 'CHAIN_BREAK', ?3, 0)",
+        )
+        .bind(break_id)
+        .bind(cloud_last_hash)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            "UPDATE system_state SET last_chain_hash = 'CHAIN_BREAK', updated_at = ?1 WHERE id = 1",
+        )
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        tracing::info!(
+            break_id,
+            prev_hash = %cloud_last_hash,
+            "Inserted BREAK chain_entry and updated system_state.last_chain_hash"
+        );
+    }
+
+    tracing::info!("Recovery state applied successfully");
+    Ok(())
+}

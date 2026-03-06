@@ -170,10 +170,16 @@ impl CloudWorker {
                         msg = ws_stream.next() => {
                             match msg {
                                 Some(Ok(Message::Text(text))) => {
-                                    if let Ok(CloudMessage::CatalogSyncData { catalog }) = serde_json::from_str(&text) {
+                                    if let Ok(CloudMessage::CatalogSyncData { catalog, recovery_state }) = serde_json::from_str(&text) {
                                         match crate::cloud::ops::provisioning::apply_catalog_sync_data(&self.state, &catalog).await {
                                             Ok(()) => tracing::info!("CatalogSyncData applied (re-bind)"),
                                             Err(e) => tracing::error!("Failed to apply CatalogSyncData: {e}"),
+                                        }
+                                        if let Some(ref recovery) = recovery_state {
+                                            match crate::cloud::ops::provisioning::apply_recovery_state(&self.state, recovery).await {
+                                                Ok(()) => tracing::info!("Recovery state applied after re-bind"),
+                                                Err(e) => tracing::error!("Failed to apply recovery state: {e}"),
+                                            }
                                         }
                                         break;
                                     } else {
@@ -375,7 +381,7 @@ impl CloudWorker {
                     }
                 }
             }
-            CloudMessage::CatalogSyncData { catalog } => {
+            CloudMessage::CatalogSyncData { catalog, .. } => {
                 tracing::info!("Received CatalogSyncData from cloud");
                 match crate::cloud::ops::provisioning::apply_catalog_sync_data(
                     &self.state,

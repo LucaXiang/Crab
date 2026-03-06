@@ -50,7 +50,12 @@ pub enum CloudMessage {
     RequestCatalogSync,
 
     /// Cloud → Edge: 全量 catalog 响应 (re-bind 时使用)
-    CatalogSyncData { catalog: Box<CatalogExport> },
+    CatalogSyncData {
+        catalog: Box<CatalogExport>,
+        /// 订单层 + 发票层状态恢复 (re-bind 后计数器/链恢复)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        recovery_state: Option<RecoveryState>,
+    },
 
     // === edge → cloud: 活跃订单推送 ===
     /// 单个活跃订单快照更新（新建 or 变更）+ 事件历史
@@ -99,6 +104,24 @@ pub enum CloudRpcResult {
     },
     /// Store 操作结果
     StoreOp(Box<StoreOpResult>),
+}
+
+/// 订单层 + 发票层状态恢复数据 (数据库丢失后 re-bind 时云端返回)
+///
+/// - 订单层: 恢复 daily receipt count + 插入 BREAK chain entry
+/// - 发票层: 恢复 huella 链 + invoice counter (Verifactu 合规，不断链)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RecoveryState {
+    /// 当前 business_date 的最大 daily receipt count (恢复到 redb)
+    pub daily_receipt_count: i64,
+    /// business_date "YYYYMMDD"
+    pub business_date: String,
+    /// 最后一个 chain_entry 的 curr_hash (仅用于 BREAK entry 的 prev_hash)
+    pub last_chain_hash: Option<String>,
+    /// 最后一个 invoice 的 huella (恢复到 invoice_counter.last_huella)
+    pub last_huella: Option<String>,
+    /// 最后一个 invoice_number (恢复 invoice_counter)
+    pub last_invoice_number: Option<String>,
 }
 
 #[cfg(test)]

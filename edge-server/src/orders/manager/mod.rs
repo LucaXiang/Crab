@@ -155,7 +155,6 @@ impl OrdersManager {
         self.pool = Some(pool.clone());
         self.archive_service = Some(crate::archiving::OrderArchiveService::new(
             pool,
-            self.tz,
             invoice_service,
         ));
     }

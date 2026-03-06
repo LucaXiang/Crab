@@ -43,6 +43,7 @@ pub struct OrderDetail {
     pub is_voided: bool,
     pub is_upgraded: bool,
     pub items: Vec<OrderDetailItem>,
+    pub order_adjustments: Vec<OrderDetailAdjustment>,
     pub payments: Vec<OrderDetailPayment>,
     pub timeline: Vec<OrderDetailEvent>,
 }
@@ -65,12 +66,24 @@ pub struct OrderDetailItem {
     pub rule_discount_amount: f64,
     pub rule_surcharge_amount: f64,
     pub mg_discount_amount: f64,
-    pub applied_rules: Option<String>,
+    pub adjustments: Vec<OrderDetailAdjustment>,
     pub note: Option<String>,
     pub is_comped: bool,
     pub tax: f64,
     pub tax_rate: i32,
     pub selected_options: Vec<OrderDetailOption>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct OrderDetailAdjustment {
+    pub source_type: String,
+    pub direction: String,
+    pub rule_id: Option<i64>,
+    pub rule_name: Option<String>,
+    pub rule_receipt_name: Option<String>,
+    pub adjustment_type: Option<String>,
+    pub amount: f64,
+    pub skipped: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -189,7 +202,6 @@ struct ItemRow {
     rule_discount_amount: f64,
     rule_surcharge_amount: f64,
     mg_discount_amount: f64,
-    applied_rules: Option<String>,
     note: Option<String>,
     is_comped: bool,
     tax: f64,
@@ -209,7 +221,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
 
     // 2. Get items
     let item_rows: Vec<ItemRow> = sqlx::query_as::<_, ItemRow>(
-        "SELECT id, instance_id, name, spec_name, category_id, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, mg_discount_amount, applied_rules, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
+        "SELECT id, instance_id, name, spec_name, category_id, category_name, price, quantity, unpaid_quantity, unit_price, line_total, discount_amount, surcharge_amount, rule_discount_amount, rule_surcharge_amount, mg_discount_amount, note, is_comped, tax, tax_rate FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_id)
     .fetch_all(pool)
@@ -242,10 +254,54 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         }
     }
 
+    // Load item adjustments from normalized table
+    let mut adj_map: HashMap<i64, Vec<OrderDetailAdjustment>> = HashMap::new();
+    if !item_ids.is_empty() {
+        let placeholders = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT item_pk, source_type, direction, rule_id, rule_name, rule_receipt_name, \
+             adjustment_type, amount, skipped \
+             FROM archived_order_adjustment WHERE item_pk IN ({placeholders})"
+        );
+        #[derive(sqlx::FromRow)]
+        struct DetailAdjRow {
+            item_pk: i64,
+            source_type: String,
+            direction: String,
+            rule_id: Option<i64>,
+            rule_name: Option<String>,
+            rule_receipt_name: Option<String>,
+            adjustment_type: Option<String>,
+            amount: f64,
+            skipped: bool,
+        }
+        let mut query = sqlx::query_as::<_, DetailAdjRow>(&sql);
+        for id in &item_ids {
+            query = query.bind(id);
+        }
+        let rows = query.fetch_all(pool).await?;
+        for r in rows {
+            adj_map
+                .entry(r.item_pk)
+                .or_default()
+                .push(OrderDetailAdjustment {
+                    source_type: r.source_type,
+                    direction: r.direction,
+                    rule_id: r.rule_id,
+                    rule_name: r.rule_name,
+                    rule_receipt_name: r.rule_receipt_name,
+                    adjustment_type: r.adjustment_type,
+                    amount: r.amount,
+                    skipped: r.skipped,
+                });
+        }
+    }
+
     let items: Vec<OrderDetailItem> = item_rows
         .into_iter()
         .map(|row| {
             let selected_options = options_map.remove(&row.id).unwrap_or_default();
+            let adjustments = adj_map.remove(&row.id).unwrap_or_default();
             OrderDetailItem {
                 id: row.id,
                 instance_id: row.instance_id,
@@ -263,7 +319,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
                 rule_discount_amount: row.rule_discount_amount,
                 rule_surcharge_amount: row.rule_surcharge_amount,
                 mg_discount_amount: row.mg_discount_amount,
-                applied_rules: row.applied_rules,
+                adjustments,
                 note: row.note,
                 is_comped: row.is_comped,
                 tax: row.tax,
@@ -298,7 +354,21 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
     })
     .collect();
 
-    // 4. Get events
+    // 4. Get order-level adjustments
+    let order_adjustments: Vec<OrderDetailAdjustment> = sqlx::query_as::<_, (String, String, Option<i64>, Option<String>, Option<String>, Option<String>, f64, bool)>(
+        "SELECT source_type, direction, rule_id, rule_name, rule_receipt_name, adjustment_type, amount, skipped \
+         FROM archived_order_adjustment WHERE order_pk = ? AND item_pk IS NULL",
+    )
+    .bind(order_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|(source_type, direction, rule_id, rule_name, rule_receipt_name, adjustment_type, amount, skipped)| {
+        OrderDetailAdjustment { source_type, direction, rule_id, rule_name, rule_receipt_name, adjustment_type, amount, skipped }
+    })
+    .collect();
+
+    // 5. Get events
     let timeline: Vec<OrderDetailEvent> = sqlx::query_as::<_, EventRow>(
         "SELECT seq, id, event_type, timestamp, data FROM archived_order_event WHERE order_pk = ? ORDER BY seq",
     )
@@ -349,6 +419,7 @@ pub async fn get_order_detail(pool: &SqlitePool, order_id: i64) -> RepoResult<Or
         is_voided: order.is_voided,
         is_upgraded: order.is_upgraded,
         items,
+        order_adjustments,
         payments,
         timeline,
     })
@@ -466,7 +537,6 @@ pub async fn build_order_detail_sync(
         customer_address: Option<String>,
         customer_email: Option<String>,
         customer_phone: Option<String>,
-        order_applied_rules: Option<String>,
     }
 
     let order: SyncOrderRow = sqlx::query_as::<_, SyncOrderRow>(
@@ -478,8 +548,7 @@ pub async fn build_order_detail_sync(
          ao.operator_id, ao.operator_name, ao.void_type, ao.loss_reason, ao.loss_amount, ao.void_note, \
          ao.member_id, ao.member_name, ao.service_type, ao.queue_number, ao.shift_id, ao.cloud_synced, \
          ao.is_voided, ao.is_upgraded, \
-         ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone, \
-         ao.order_applied_rules \
+         ao.customer_nif, ao.customer_nombre, ao.customer_address, ao.customer_email, ao.customer_phone \
          FROM archived_order ao \
          JOIN chain_entry ce ON ce.entry_type = 'ORDER' AND ce.entry_pk = ao.id \
          WHERE ao.id = ?",
@@ -511,13 +580,12 @@ pub async fn build_order_detail_sync(
         rule_discount_amount: f64,
         rule_surcharge_amount: f64,
         mg_discount_amount: f64,
-        applied_rules: Option<String>,
     }
 
     let item_rows: Vec<SyncItemRow> = sqlx::query_as::<_, SyncItemRow>(
         "SELECT id, instance_id, spec, name, spec_name, category_name, price, quantity, unit_price, \
          line_total, discount_amount, surcharge_amount, tax, tax_rate, is_comped, note, \
-         rule_discount_amount, rule_surcharge_amount, mg_discount_amount, applied_rules \
+         rule_discount_amount, rule_surcharge_amount, mg_discount_amount \
          FROM archived_order_item WHERE order_pk = ? ORDER BY id",
     )
     .bind(order_pk)
@@ -560,10 +628,66 @@ pub async fn build_order_detail_sync(
         }
     }
 
+    // Load item-level applied rules from normalized table
+    let mut item_rules_map: HashMap<i64, Vec<shared::order::AppliedRule>> = HashMap::new();
+    if !item_ids.is_empty() {
+        let placeholders = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT item_pk, rule_id, rule_name, rule_receipt_name, direction, \
+             adjustment_type, amount, skipped \
+             FROM archived_order_adjustment \
+             WHERE item_pk IN ({placeholders}) AND source_type = 'PRICE_RULE'"
+        );
+        #[derive(sqlx::FromRow)]
+        struct ItemAdjRow {
+            item_pk: i64,
+            rule_id: i64,
+            rule_name: String,
+            rule_receipt_name: Option<String>,
+            direction: String,
+            adjustment_type: Option<String>,
+            amount: f64,
+            skipped: bool,
+        }
+        let mut query = sqlx::query_as::<_, ItemAdjRow>(&sql);
+        for id in &item_ids {
+            query = query.bind(id);
+        }
+        let rows = query.fetch_all(pool).await?;
+        for r in rows {
+            use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+            item_rules_map
+                .entry(r.item_pk)
+                .or_default()
+                .push(shared::order::AppliedRule {
+                    rule_id: r.rule_id,
+                    name: r.rule_name,
+                    receipt_name: r.rule_receipt_name,
+                    rule_type: if r.direction == "DISCOUNT" {
+                        RuleType::Discount
+                    } else {
+                        RuleType::Surcharge
+                    },
+                    adjustment_type: match r.adjustment_type.as_deref() {
+                        Some("PERCENTAGE") => AdjustmentType::Percentage,
+                        _ => AdjustmentType::FixedAmount,
+                    },
+                    product_scope: ProductScope::Global,
+                    zone_scope: "all".to_string(),
+                    adjustment_value: 0.0,
+                    calculated_amount: r.amount,
+                    is_stackable: true,
+                    is_exclusive: false,
+                    skipped: r.skipped,
+                });
+        }
+    }
+
     let items: Vec<OrderItemSync> = item_rows
         .into_iter()
         .map(|row| {
             let options = options_map.remove(&row.id).unwrap_or_default();
+            let applied_rules = item_rules_map.remove(&row.id).unwrap_or_default();
             // spec format: "product_id:spec_id"
             let product_source_id = row
                 .spec
@@ -585,10 +709,7 @@ pub async fn build_order_detail_sync(
                 rule_discount_amount: row.rule_discount_amount,
                 rule_surcharge_amount: row.rule_surcharge_amount,
                 mg_discount_amount: row.mg_discount_amount,
-                applied_rules: row
-                    .applied_rules
-                    .and_then(|s| serde_json::from_str(&s).ok())
-                    .unwrap_or_default(),
+                applied_rules,
                 tax: row.tax,
                 tax_rate: row.tax_rate,
                 is_comped: row.is_comped,
@@ -706,6 +827,55 @@ pub async fn build_order_detail_sync(
         })
         .collect();
 
+    // 5. Load order-level applied rules from normalized table
+    #[derive(sqlx::FromRow)]
+    struct AdjRuleRow {
+        rule_id: i64,
+        rule_name: String,
+        rule_receipt_name: Option<String>,
+        direction: String,
+        adjustment_type: Option<String>,
+        amount: f64,
+        skipped: bool,
+    }
+    let order_applied_rules: Vec<shared::order::AppliedRule> = {
+        let rows: Vec<AdjRuleRow> = sqlx::query_as(
+            "SELECT rule_id, rule_name, rule_receipt_name, direction, \
+                 adjustment_type, amount, skipped \
+                 FROM archived_order_adjustment \
+                 WHERE order_pk = ? AND item_pk IS NULL AND source_type = 'PRICE_RULE'",
+        )
+        .bind(order_pk)
+        .fetch_all(pool)
+        .await?;
+        rows.into_iter()
+            .map(|r| {
+                use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+                shared::order::AppliedRule {
+                    rule_id: r.rule_id,
+                    name: r.rule_name,
+                    receipt_name: r.rule_receipt_name,
+                    rule_type: if r.direction == "DISCOUNT" {
+                        RuleType::Discount
+                    } else {
+                        RuleType::Surcharge
+                    },
+                    adjustment_type: match r.adjustment_type.as_deref() {
+                        Some("PERCENTAGE") => AdjustmentType::Percentage,
+                        _ => AdjustmentType::FixedAmount,
+                    },
+                    product_scope: ProductScope::Global,
+                    zone_scope: "all".to_string(),
+                    adjustment_value: 0.0,
+                    calculated_amount: r.amount,
+                    is_stackable: true,
+                    is_exclusive: false,
+                    skipped: r.skipped,
+                }
+            })
+            .collect()
+    };
+
     Ok(OrderDetailSync {
         order_id: order.order_id,
         receipt_number: order.receipt_number,
@@ -733,10 +903,7 @@ pub async fn build_order_detail_sync(
             order_manual_surcharge_amount: order.order_manual_surcharge_amount,
             order_rule_discount_amount: order.order_rule_discount_amount,
             order_rule_surcharge_amount: order.order_rule_surcharge_amount,
-            order_applied_rules: order
-                .order_applied_rules
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default(),
+            order_applied_rules,
             mg_discount_amount: order.mg_discount_amount,
             marketing_group_name: order.marketing_group_name,
             start_time: order.start_time,
@@ -786,6 +953,18 @@ pub async fn cleanup_synced_order_details(
             SELECT i.id FROM archived_order_item i \
             JOIN archived_order o ON i.order_pk = o.id \
             WHERE o.cloud_synced = 1 AND o.end_time < ?1\
+        )",
+    )
+    .bind(cutoff_millis)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| RepoError::Database(e.to_string()))?;
+    total += r.rows_affected();
+
+    // 1b. Delete adjustments
+    let r = sqlx::query(
+        "DELETE FROM archived_order_adjustment WHERE order_pk IN (\
+            SELECT id FROM archived_order WHERE cloud_synced = 1 AND end_time < ?1\
         )",
     )
     .bind(cutoff_millis)

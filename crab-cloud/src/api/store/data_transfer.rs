@@ -3,7 +3,7 @@
 //! - GET  /api/tenant/stores/{id}/data-transfer/export → application/zip
 //! - POST /api/tenant/stores/{id}/data-transfer/import ← application/zip
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Write};
 
 use axum::body::Bytes;
@@ -431,6 +431,14 @@ pub async fn import_catalog(
     validate_catalog(&catalog)
         .map_err(|e| AppError::validation(format!("Catalog validation failed: {e}")))?;
 
+    // Collect old image hashes before import replaces them
+    let old_hashes: HashSet<String> =
+        crate::db::tenant_images::get_all_product_images(&state.pool, store_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
     // Import within transaction
     store::data_transfer::import_catalog(&state.pool, store_id, &catalog)
         .await
@@ -440,11 +448,45 @@ pub async fn import_catalog(
         .await
         .map_err(internal)?;
 
+    // Register image refs and notify edge to download new images
+    let new_hashes: HashSet<&str> = catalog
+        .products
+        .iter()
+        .filter_map(|p| {
+            if p.image.is_empty() {
+                None
+            } else {
+                Some(p.image.as_str())
+            }
+        })
+        .collect();
+    let now = shared::util::now_millis();
+    for hash in &new_hashes {
+        if !old_hashes.contains(*hash) {
+            let _ = crate::db::tenant_images::increment_ref(&state.pool, identity.tenant_id, hash)
+                .await;
+        }
+        super::fire_ensure_image(&state, store_id, identity.tenant_id, Some(hash)).await;
+    }
+    // Decrement refs for old images no longer used
+    for old_hash in &old_hashes {
+        if !new_hashes.contains(old_hash.as_str()) {
+            let _ = crate::db::tenant_images::decrement_ref(
+                &state.pool,
+                identity.tenant_id,
+                old_hash,
+                now,
+            )
+            .await;
+        }
+    }
+
     // Push CatalogSyncData to edge (preserves real IDs for bidirectional sync).
     // If edge is online, send directly via WebSocket channel.
     // If offline, edge will pull full catalog via RequestCatalogSync on reconnect.
     let msg = CloudMessage::CatalogSyncData {
         catalog: Box::new(catalog),
+        recovery_state: None,
     };
     if let Some(sender) = state.edges.connected.get(&store_id)
         && sender.try_send(msg).is_err()

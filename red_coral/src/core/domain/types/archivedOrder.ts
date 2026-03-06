@@ -5,7 +5,7 @@
  * Matches backend Rust types exactly.
  */
 
-import type { AppliedRule, EventPayload } from './orderEvent';
+import type { EventPayload } from './orderEvent';
 
 // ============================================================================
 // List View Types
@@ -55,6 +55,18 @@ export interface ArchivedItemOption {
   quantity: number;
 }
 
+/** Adjustment entry from normalized archived_order_adjustment table */
+export interface ArchivedAdjustment {
+  source_type: string;
+  direction: string;
+  rule_id: number | null;
+  rule_name: string | null;
+  rule_receipt_name: string | null;
+  adjustment_type: string | null;
+  amount: number;
+  skipped: boolean;
+}
+
 /** Order item for detail view */
 export interface ArchivedOrderItem {
   id: number;
@@ -72,7 +84,7 @@ export interface ArchivedOrderItem {
   surcharge_amount: number;
   rule_discount_amount: number;
   rule_surcharge_amount: number;
-  applied_rules: AppliedRule[] | null;
+  adjustments: ArchivedAdjustment[];
   note: string | null;
   mg_discount_amount: number;
   is_comped: boolean;
@@ -145,9 +157,11 @@ export interface ArchivedOrderDetail {
   void_type: ArchivedVoidType | null;
   loss_reason: ArchivedLossReason | null;
   loss_amount: number | null;
+  void_note: string | null;
   is_voided: boolean;
   is_upgraded: boolean;
   items: ArchivedOrderItem[];
+  order_adjustments: ArchivedAdjustment[];
   payments: ArchivedPayment[];
   timeline: ArchivedEvent[];
 }

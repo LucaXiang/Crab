@@ -570,161 +570,59 @@ pub async fn get_statistics(
     })
     .collect();
 
-    // ── Discount & Surcharge Breakdown ──
-    // 1. Order-level aggregates (manual + MG)
-    let (
-        order_manual_disc,
-        order_manual_sur,
-        order_mg_disc,
-        order_manual_disc_cnt,
-        order_manual_sur_cnt,
-        order_mg_cnt,
-    ): (f64, f64, f64, i32, i32, i32) = sqlx::query_as(
+    // ── Discount & Surcharge Breakdown (from normalized archived_order_adjustment) ──
+    // source_key uses same mapping as cloud: item_pk IS NULL → order level, else item level
+    let adj_rows: Vec<(String, String, String, f64, i32)> = sqlx::query_as(
         "SELECT \
-            COALESCE(SUM(order_manual_discount_amount), 0.0), \
-            COALESCE(SUM(order_manual_surcharge_amount), 0.0), \
-            COALESCE(SUM(mg_discount_amount), 0.0), \
-            CAST(COUNT(CASE WHEN order_manual_discount_amount > 0 THEN 1 END) AS INTEGER), \
-            CAST(COUNT(CASE WHEN order_manual_surcharge_amount > 0 THEN 1 END) AS INTEGER), \
-            CAST(COUNT(CASE WHEN mg_discount_amount > 0 THEN 1 END) AS INTEGER) \
-         FROM archived_order \
-         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2",
+            CASE \
+                WHEN a.source_type = 'MANUAL' AND a.item_pk IS NULL THEN 'order_manual' \
+                WHEN a.source_type = 'MANUAL' AND a.item_pk IS NOT NULL THEN 'item_manual' \
+                WHEN a.source_type = 'PRICE_RULE' AND a.item_pk IS NULL THEN 'order_rule' \
+                WHEN a.source_type = 'PRICE_RULE' AND a.item_pk IS NOT NULL THEN 'item_rule' \
+                WHEN a.source_type = 'MEMBER_GROUP' THEN 'mg' \
+                WHEN a.source_type = 'COMP' THEN 'comp' \
+                ELSE a.source_type \
+            END AS source_key, \
+            a.direction, \
+            COALESCE(a.rule_receipt_name, a.rule_name, \
+                CASE \
+                    WHEN a.source_type = 'MANUAL' AND a.item_pk IS NULL THEN 'order_manual' \
+                    WHEN a.source_type = 'MANUAL' AND a.item_pk IS NOT NULL THEN 'item_manual' \
+                    WHEN a.source_type = 'MEMBER_GROUP' THEN 'mg' \
+                    WHEN a.source_type = 'COMP' THEN 'comp' \
+                    ELSE a.source_type \
+                END \
+            ) AS display_name, \
+            COALESCE(SUM(a.amount), 0.0), \
+            CAST(COUNT(DISTINCT a.order_pk) AS INTEGER) \
+         FROM archived_order_adjustment a \
+         JOIN archived_order o ON a.order_pk = o.id \
+         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 \
+           AND o.end_time >= ?1 AND o.end_time < ?2 \
+           AND a.skipped = 0 AND a.amount > 0 \
+         GROUP BY source_key, a.direction, \
+            CASE WHEN a.source_type = 'PRICE_RULE' THEN a.rule_id ELSE NULL END \
+         ORDER BY COALESCE(SUM(a.amount), 0.0) DESC",
     )
     .bind(start_dt)
     .bind(end_dt)
-    .fetch_one(pool)
+    .fetch_all(pool)
     .await
     .map_err(|e| AppError::database(e.to_string()))?;
 
-    // 2. Item-level manual discount (discount_amount includes rule discount, subtract it)
-    let (item_manual_disc, item_manual_disc_cnt): (f64, i32) = sqlx::query_as(
-        "SELECT COALESCE(SUM(i.discount_amount - COALESCE(i.rule_discount_amount, 0.0)), 0.0), \
-            CAST(COUNT(DISTINCT o.id) AS INTEGER) \
-         FROM archived_order_item i \
-         JOIN archived_order o ON i.order_pk = o.id \
-         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
-           AND (i.discount_amount - COALESCE(i.rule_discount_amount, 0.0)) > 0 AND i.is_comped = 0",
-    )
-    .bind(start_dt)
-    .bind(end_dt)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| AppError::database(e.to_string()))?;
-
-    // 3. Item-level rule breakdown (per rule_id from applied_rules JSON)
-    let item_rules: Vec<(String, String, f64, i32)> = sqlx::query_as(
-        "SELECT \
-            COALESCE(json_extract(rule.value, '$.receipt_name'), json_extract(rule.value, '$.name')), \
-            json_extract(rule.value, '$.rule_type'), \
-            COALESCE(SUM(json_extract(rule.value, '$.calculated_amount') * i.quantity), 0.0), \
-            CAST(COUNT(DISTINCT o.id) AS INTEGER) \
-         FROM archived_order_item i \
-         JOIN archived_order o ON i.order_pk = o.id, \
-              json_each(i.applied_rules) AS rule \
-         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 \
-           AND o.end_time >= ?1 AND o.end_time < ?2 \
-           AND i.applied_rules IS NOT NULL AND i.applied_rules != '[]' \
-           AND (json_extract(rule.value, '$.skipped') = 0 OR json_extract(rule.value, '$.skipped') IS NULL) \
-         GROUP BY json_extract(rule.value, '$.rule_id'), json_extract(rule.value, '$.rule_type') \
-         ORDER BY SUM(json_extract(rule.value, '$.calculated_amount') * i.quantity) DESC",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
-
-    // 4. Order-level rule breakdown (per rule_id from order_applied_rules JSON)
-    let order_rules: Vec<(String, String, f64, i32)> = sqlx::query_as(
-        "SELECT \
-            COALESCE(json_extract(rule.value, '$.receipt_name'), json_extract(rule.value, '$.name')), \
-            json_extract(rule.value, '$.rule_type'), \
-            COALESCE(SUM(json_extract(rule.value, '$.calculated_amount')), 0.0), \
-            CAST(COUNT(DISTINCT o.id) AS INTEGER) \
-         FROM archived_order o, \
-              json_each(o.order_applied_rules) AS rule \
-         WHERE o.status = 'COMPLETED' AND o.is_voided = 0 \
-           AND o.end_time >= ?1 AND o.end_time < ?2 \
-           AND o.order_applied_rules IS NOT NULL AND o.order_applied_rules != '[]' \
-           AND (json_extract(rule.value, '$.skipped') = 0 OR json_extract(rule.value, '$.skipped') IS NULL) \
-         GROUP BY json_extract(rule.value, '$.rule_id'), json_extract(rule.value, '$.rule_type') \
-         ORDER BY SUM(json_extract(rule.value, '$.calculated_amount')) DESC",
-    )
-    .bind(start_dt).bind(end_dt)
-    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
-
-    // Assemble discount_breakdown
     let mut discount_breakdown = Vec::new();
-    if item_manual_disc > 0.0 {
-        discount_breakdown.push(AdjustmentEntry {
-            name: "item_manual".into(),
-            source: "item_manual".into(),
-            amount: item_manual_disc,
-            order_count: item_manual_disc_cnt,
-        });
-    }
-    for (name, rule_type, amount, cnt) in &item_rules {
-        if rule_type == "DISCOUNT" && *amount > 0.0 {
-            discount_breakdown.push(AdjustmentEntry {
-                name: name.clone(),
-                source: "item_rule".into(),
-                amount: *amount,
-                order_count: *cnt,
-            });
-        }
-    }
-    if order_mg_disc > 0.0 {
-        discount_breakdown.push(AdjustmentEntry {
-            name: "mg".into(),
-            source: "mg".into(),
-            amount: order_mg_disc,
-            order_count: order_mg_cnt,
-        });
-    }
-    if order_manual_disc > 0.0 {
-        discount_breakdown.push(AdjustmentEntry {
-            name: "order_manual".into(),
-            source: "order_manual".into(),
-            amount: order_manual_disc,
-            order_count: order_manual_disc_cnt,
-        });
-    }
-    for (name, rule_type, amount, cnt) in &order_rules {
-        if rule_type == "DISCOUNT" && *amount > 0.0 {
-            discount_breakdown.push(AdjustmentEntry {
-                name: name.clone(),
-                source: "order_rule".into(),
-                amount: *amount,
-                order_count: *cnt,
-            });
-        }
-    }
-
-    // Assemble surcharge_breakdown
     let mut surcharge_breakdown = Vec::new();
-    for (name, rule_type, amount, cnt) in &item_rules {
-        if rule_type == "SURCHARGE" && *amount > 0.0 {
-            surcharge_breakdown.push(AdjustmentEntry {
-                name: name.clone(),
-                source: "item_rule".into(),
-                amount: *amount,
-                order_count: *cnt,
-            });
-        }
-    }
-    if order_manual_sur > 0.0 {
-        surcharge_breakdown.push(AdjustmentEntry {
-            name: "order_manual".into(),
-            source: "order_manual".into(),
-            amount: order_manual_sur,
-            order_count: order_manual_sur_cnt,
-        });
-    }
-    for (name, rule_type, amount, cnt) in &order_rules {
-        if rule_type == "SURCHARGE" && *amount > 0.0 {
-            surcharge_breakdown.push(AdjustmentEntry {
-                name: name.clone(),
-                source: "order_rule".into(),
-                amount: *amount,
-                order_count: *cnt,
-            });
+    for (source_key, direction, display_name, amount, order_count) in &adj_rows {
+        let entry = AdjustmentEntry {
+            name: display_name.clone(),
+            source: source_key.clone(),
+            amount: *amount,
+            order_count: *order_count,
+        };
+        if direction == "DISCOUNT" {
+            discount_breakdown.push(entry);
+        } else {
+            surcharge_breakdown.push(entry);
         }
     }
 

@@ -143,3 +143,14 @@ pub async fn get_product_images_bulk(
     .await?;
     Ok(hashes)
 }
+
+/// Get all non-empty image hashes for a store's products.
+pub async fn get_all_product_images(pool: &PgPool, store_id: i64) -> Result<Vec<String>, BoxError> {
+    let hashes: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT image FROM store_products WHERE store_id = $1 AND image != ''",
+    )
+    .bind(store_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(hashes)
+}

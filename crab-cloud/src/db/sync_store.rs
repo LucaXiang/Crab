@@ -1352,6 +1352,73 @@ async fn upsert_invoice(
     Ok(())
 }
 
+/// Build recovery state for an edge server re-bind.
+///
+/// Returns `None` if no archived orders exist (first-time bind, nothing to recover).
+/// Otherwise returns counters/hashes needed to restore order layer + invoice layer.
+pub async fn build_recovery_state(
+    pool: &PgPool,
+    store_id: i64,
+) -> Result<Option<shared::cloud::ws::RecoveryState>, BoxError> {
+    // UTC today in YYYYMMDD format
+    let today = chrono::Utc::now().format("%Y%m%d").to_string();
+
+    // Check if any archived orders exist for this store
+    let has_orders: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM store_archived_orders WHERE store_id = $1)",
+    )
+    .bind(store_id)
+    .fetch_one(pool)
+    .await?;
+
+    if !has_orders {
+        return Ok(None);
+    }
+
+    // Count today's receipts by matching the date part in receipt_number (format: NN-YYYYMMDD-CCCC)
+    let daily_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM store_archived_orders
+        WHERE store_id = $1
+          AND receipt_number LIKE '%-' || $2 || '-%'
+        "#,
+    )
+    .bind(store_id)
+    .bind(&today)
+    .fetch_one(pool)
+    .await?;
+
+    // Last chain hash
+    let last_chain_hash: Option<String> = sqlx::query_scalar(
+        "SELECT curr_hash FROM store_chain_entries WHERE store_id = $1 ORDER BY id DESC LIMIT 1",
+    )
+    .bind(store_id)
+    .fetch_optional(pool)
+    .await?;
+
+    // Last invoice huella and invoice_number
+    let last_invoice: Option<(String, String)> = sqlx::query_as(
+        "SELECT huella, invoice_number FROM store_invoices WHERE store_id = $1 ORDER BY id DESC LIMIT 1",
+    )
+    .bind(store_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let (last_huella, last_invoice_number) = match last_invoice {
+        Some((h, n)) => (Some(h), Some(n)),
+        None => (None, None),
+    };
+
+    Ok(Some(shared::cloud::ws::RecoveryState {
+        daily_receipt_count: daily_count,
+        business_date: today,
+        last_chain_hash,
+        last_huella,
+        last_invoice_number,
+    }))
+}
+
 /// 将已有门店绑定到新的 entity_id/device_id
 pub async fn rebind_store(
     pool: &PgPool,

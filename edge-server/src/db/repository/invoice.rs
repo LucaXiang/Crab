@@ -437,6 +437,41 @@ pub async fn build_sync(
     })
 }
 
+/// Restore invoice counter from cloud recovery state.
+///
+/// Parses "SERIE-YYYYMMDD-NNNN" format and upserts the invoice_counter row.
+pub async fn restore_invoice_counter(
+    pool: &SqlitePool,
+    last_invoice_number: &str,
+    last_huella: Option<&str>,
+) -> RepoResult<()> {
+    // Parse "SERIE-YYYYMMDD-NNNN" format (rsplit to handle serie containing dashes)
+    let parts: Vec<&str> = last_invoice_number.rsplitn(3, '-').collect();
+    if parts.len() != 3 {
+        return Err(RepoError::Database(format!(
+            "Invalid invoice number format: {last_invoice_number}"
+        )));
+    }
+    let number: i64 = parts[0]
+        .parse()
+        .map_err(|_| RepoError::Database(format!("Invalid invoice counter: {}", parts[0])))?;
+    let date_str = parts[1];
+    let serie = parts[2];
+
+    sqlx::query(
+        "INSERT INTO invoice_counter (serie, date_str, last_number, last_huella) \
+         VALUES (?1, ?2, ?3, ?4) \
+         ON CONFLICT(serie) DO UPDATE SET date_str = ?2, last_number = ?3, last_huella = ?4",
+    )
+    .bind(serie)
+    .bind(date_str)
+    .bind(number)
+    .bind(last_huella)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Update the AEAT status of an invoice (cloud→edge callback).
 /// Cloud is authoritative for aeat_status; edge stores only the status string.
 pub async fn update_aeat_status(

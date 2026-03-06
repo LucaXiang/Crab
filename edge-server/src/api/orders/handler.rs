@@ -45,7 +45,7 @@ pub struct OrderItemDetail {
     pub rule_discount_amount: f64,
     pub rule_surcharge_amount: f64,
     pub mg_discount_amount: f64,
-    pub applied_rules: Option<serde_json::Value>,
+    pub adjustments: Vec<order::OrderDetailAdjustment>,
     pub note: Option<String>,
     pub is_comped: bool,
     pub tax: f64,
@@ -125,6 +125,7 @@ pub struct OrderDetail {
     pub is_voided: bool,
     pub is_upgraded: bool,
     pub items: Vec<OrderItemDetail>,
+    pub order_adjustments: Vec<order::OrderDetailAdjustment>,
     pub payments: Vec<OrderPaymentDetail>,
     pub timeline: Vec<OrderEventDetail>,
 }
@@ -190,7 +191,7 @@ pub async fn get_by_id(
                 rule_discount_amount: i.rule_discount_amount,
                 rule_surcharge_amount: i.rule_surcharge_amount,
                 mg_discount_amount: i.mg_discount_amount,
-                applied_rules: i.applied_rules.and_then(|s| serde_json::from_str(&s).ok()),
+                adjustments: i.adjustments,
                 note: i.note,
                 is_comped: i.is_comped,
                 tax: i.tax,
@@ -207,6 +208,7 @@ pub async fn get_by_id(
                     .collect(),
             })
             .collect(),
+        order_adjustments: detail.order_adjustments,
         payments: detail
             .payments
             .into_iter()

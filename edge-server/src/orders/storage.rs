@@ -306,6 +306,19 @@ impl OrderStorage {
         Ok(count)
     }
 
+    /// Restore daily count from cloud recovery (re-bind scenario)
+    pub fn restore_daily_count(&self, business_date: &str, count: u64) -> StorageResult<()> {
+        let txn = self.db.begin_write()?;
+        {
+            let mut table = txn.open_table(SEQUENCE_TABLE)?;
+            let date_u64: u64 = business_date.parse().unwrap_or(0);
+            table.insert(DAILY_DATE_KEY, date_u64)?;
+            table.insert(DAILY_COUNT_KEY, count)?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
     /// Get next queue number for retail orders (叫号)
     ///
     /// Queue number resets daily with a random start between 0-999.

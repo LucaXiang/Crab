@@ -443,6 +443,18 @@ async fn handle_edge_message<S>(
 
             match super::store::data_transfer::build_catalog_export(&state.pool, store_id).await {
                 Ok(catalog) => {
+                    // Build recovery state (counters + chain hashes) for re-bind
+                    let recovery_state =
+                        match crate::db::sync_store::build_recovery_state(&state.pool, store_id)
+                            .await
+                        {
+                            Ok(rs) => rs,
+                            Err(e) => {
+                                tracing::warn!(store_id, "Failed to build recovery state: {e}");
+                                None
+                            }
+                        };
+
                     // Collect image hashes for EnsureImage
                     let image_hashes: Vec<String> = catalog
                         .products
@@ -453,6 +465,7 @@ async fn handle_edge_message<S>(
 
                     let msg = CloudMessage::CatalogSyncData {
                         catalog: Box::new(catalog),
+                        recovery_state,
                     };
                     match serde_json::to_string(&msg) {
                         Ok(json) => {

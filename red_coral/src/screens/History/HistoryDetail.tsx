@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent } from '@/core/domain/types';
+import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent, ArchivedAdjustment } from '@/core/domain/types';
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { useCategoryStore } from '@/core/stores/resources';
@@ -441,26 +441,27 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                 const totalRuleSurcharge = order.items.reduce((sum, i) =>
                   i.is_comped ? sum : Currency.add(sum, i.rule_surcharge_amount).toNumber(), 0);
 
-                // Aggregate applied pricing rules by rule_id (for named breakdown rows)
-                // applied_rules[].calculated_amount is per-unit → multiply by qty
-                const ruleBreakdown = new Map<number, { name: string; ruleType: string; total: number }>();
-                for (const item of order.items) {
-                  if (item.is_comped || !item.applied_rules) continue;
-                  for (const rule of item.applied_rules) {
-                    if (rule.skipped) continue;
-                    const lineAmount = Currency.mul(rule.calculated_amount, item.quantity).toNumber();
-                    const existing = ruleBreakdown.get(rule.rule_id);
-                    if (existing) {
-                      existing.total = Currency.add(existing.total, lineAmount).toNumber();
-                    } else {
-                      ruleBreakdown.set(rule.rule_id, {
-                        name: rule.receipt_name || rule.name,
-                        ruleType: rule.rule_type,
-                        total: lineAmount,
-                      });
-                    }
+                // Aggregate price rule adjustments by rule_id, separated by level
+                const addRuleAdj = (map: Map<number, { name: string; ruleType: string; total: number }>, adj: ArchivedAdjustment) => {
+                  if (adj.source_type !== 'PRICE_RULE' || adj.skipped || !adj.rule_id) return;
+                  const existing = map.get(adj.rule_id);
+                  if (existing) {
+                    existing.total = Currency.add(existing.total, adj.amount).toNumber();
+                  } else {
+                    map.set(adj.rule_id, {
+                      name: adj.rule_receipt_name || adj.rule_name || 'rule',
+                      ruleType: adj.direction,
+                      total: adj.amount,
+                    });
                   }
+                };
+                const itemRuleBreakdown = new Map<number, { name: string; ruleType: string; total: number }>();
+                for (const item of order.items) {
+                  if (item.is_comped) continue;
+                  for (const adj of item.adjustments) addRuleAdj(itemRuleBreakdown, adj);
                 }
+                const orderRuleBreakdown = new Map<number, { name: string; ruleType: string; total: number }>();
+                for (const adj of order.order_adjustments ?? []) addRuleAdj(orderRuleBreakdown, adj);
 
                 const hasItemAdjustments = order.comp_total_amount > 0 || totalManualDiscount > 0 || totalRuleDiscount > 0 || totalRuleSurcharge > 0 || totalMgDiscount > 0;
                 const hasOrderAdjustments = order.order_manual_discount_amount > 0 || order.order_manual_surcharge_amount > 0 || order.order_rule_discount_amount > 0 || order.order_rule_surcharge_amount > 0;
@@ -495,7 +496,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                             <span className="text-orange-500">-{formatCurrency(totalManualDiscount)}</span>
                           </div>
                         )}
-                        {[...ruleBreakdown.values()].map((rule, idx) => (
+                        {[...itemRuleBreakdown.values()].map((rule, idx) => (
                           <div key={idx} className="flex justify-between text-sm">
                             <span className={rule.ruleType === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-500'}>
                               {rule.name}
@@ -534,22 +535,20 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint, 
                             <span className="text-orange-500">-{formatCurrency(order.order_manual_discount_amount)}</span>
                           </div>
                         )}
-                        {order.order_rule_discount_amount > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-amber-600">{t('checkout.breakdown.order_rule_discount')}</span>
-                            <span className="text-amber-600">-{formatCurrency(order.order_rule_discount_amount)}</span>
+                        {[...orderRuleBreakdown.values()].map((rule, idx) => (
+                          <div key={`or-${idx}`} className="flex justify-between text-sm">
+                            <span className={rule.ruleType === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-500'}>
+                              {rule.name}
+                            </span>
+                            <span className={rule.ruleType === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-500'}>
+                              {rule.ruleType === 'DISCOUNT' ? '-' : '+'}{formatCurrency(rule.total)}
+                            </span>
                           </div>
-                        )}
+                        ))}
                         {order.order_manual_surcharge_amount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-purple-500">{t('checkout.breakdown.order_surcharge')}</span>
                             <span className="text-purple-500">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
-                          </div>
-                        )}
-                        {order.order_rule_surcharge_amount > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-purple-500">{t('checkout.breakdown.order_rule_surcharge')}</span>
-                            <span className="text-purple-500">+{formatCurrency(order.order_rule_surcharge_amount)}</span>
                           </div>
                         )}
                       </>
