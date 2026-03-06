@@ -368,7 +368,6 @@ CREATE TABLE system_state (
     genesis_hash       TEXT,
     last_order_id      INTEGER,
     last_chain_hash    TEXT,
-    last_huella        TEXT,
     synced_up_to_id    TEXT,
     synced_up_to_hash  TEXT,
     last_sync_time     INTEGER,
@@ -590,7 +589,6 @@ CREATE TABLE archived_order (
     customer_phone                  TEXT,
     queue_number                    INTEGER,
     shift_id                        INTEGER REFERENCES shift(id),
-    order_applied_rules             TEXT,
     cloud_synced                    INTEGER NOT NULL DEFAULT 0,
     created_at                      INTEGER NOT NULL
 );
@@ -624,7 +622,6 @@ CREATE TABLE archived_order_item (
     tax_rate               INTEGER NOT NULL DEFAULT 0,
     category_id            INTEGER,
     category_name          TEXT,
-    applied_rules          TEXT,        -- JSON string (AppliedRule array)
     note                   TEXT,
     is_comped              INTEGER NOT NULL DEFAULT 0
 );
@@ -632,6 +629,23 @@ CREATE INDEX idx_archived_item_order ON archived_order_item(order_pk);
 CREATE INDEX idx_archived_item_spec ON archived_order_item(spec);
 CREATE INDEX idx_archived_item_instance ON archived_order_item(instance_id);
 CREATE UNIQUE INDEX idx_archived_item_order_instance ON archived_order_item(order_pk, instance_id);
+
+CREATE TABLE archived_order_adjustment (
+    id                INTEGER PRIMARY KEY,
+    order_pk          INTEGER NOT NULL REFERENCES archived_order(id),
+    item_pk           INTEGER REFERENCES archived_order_item(id),
+    source_type       TEXT    NOT NULL,  -- PRICE_RULE, MANUAL, MEMBER_GROUP, COMP
+    direction         TEXT    NOT NULL,  -- DISCOUNT, SURCHARGE
+    rule_id           INTEGER,
+    rule_name         TEXT,
+    rule_receipt_name TEXT,
+    adjustment_type   TEXT,              -- PERCENTAGE, FIXED_AMOUNT
+    amount            REAL    NOT NULL DEFAULT 0.0,
+    skipped           INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_adj_order ON archived_order_adjustment(order_pk);
+CREATE INDEX idx_adj_item ON archived_order_adjustment(item_pk);
+CREATE INDEX idx_adj_source ON archived_order_adjustment(source_type, direction);
 
 CREATE TABLE archived_order_item_option (
     id              INTEGER PRIMARY KEY,
@@ -807,9 +821,10 @@ CREATE TABLE invoice_desglose (
 );
 
 CREATE TABLE invoice_counter (
-    serie       TEXT PRIMARY KEY,
-    date_str    TEXT NOT NULL,
-    last_number INTEGER NOT NULL
+    serie        TEXT PRIMARY KEY,
+    date_str     TEXT NOT NULL,
+    last_number  INTEGER NOT NULL,
+    last_huella  TEXT
 );
 
 -- ── Invoice Anulación (Verifactu RegistroFacturaBaja) ────────

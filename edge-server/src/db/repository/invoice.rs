@@ -106,6 +106,38 @@ const INVOICE_COLUMNS: &str = "\
 // Public functions
 // ---------------------------------------------------------------------------
 
+/// Read the last huella for a given serie from `invoice_counter`.
+pub async fn get_last_huella(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    serie: &str,
+) -> RepoResult<Option<String>> {
+    let huella: Option<String> =
+        sqlx::query_scalar("SELECT last_huella FROM invoice_counter WHERE serie = ?")
+            .bind(serie)
+            .fetch_optional(&mut **tx)
+            .await?
+            .flatten();
+    Ok(huella)
+}
+
+/// Update the last huella for a given serie in `invoice_counter`.
+pub async fn update_last_huella(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    serie: &str,
+    huella: &str,
+) -> RepoResult<()> {
+    sqlx::query(
+        "INSERT INTO invoice_counter (serie, date_str, last_number, last_huella) \
+         VALUES (?1, '', 0, ?2) \
+         ON CONFLICT(serie) DO UPDATE SET last_huella = ?2",
+    )
+    .bind(serie)
+    .bind(huella)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 /// Insert a new invoice. Returns the generated snowflake id.
 pub async fn insert(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,

@@ -79,11 +79,9 @@ impl InvoiceService {
 
         // Read prev huella inside the transaction to prevent stale reads.
         // Caller must hold hash_chain_lock to serialize concurrent chain updates.
-        let prev_huella: Option<String> =
-            sqlx::query_scalar("SELECT last_huella FROM system_state WHERE id = 1")
-                .fetch_one(&mut **tx)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        let prev_huella = inv_repo::get_last_huella(tx, &self.serie)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // Allocate invoice number
         let invoice_number = inv_repo::next_invoice_number(tx, &self.serie, &date_str)
@@ -143,11 +141,8 @@ impl InvoiceService {
             inv_repo::insert_desglose(tx, invoice_id, d.tax_rate, base, tax_amt).await?;
         }
 
-        // Update system_state.last_huella within the same transaction
-        sqlx::query("UPDATE system_state SET last_huella = ?1, updated_at = ?2 WHERE id = 1")
-            .bind(&huella)
-            .bind(now)
-            .execute(&mut **tx)
+        // Update invoice_counter.last_huella within the same transaction
+        inv_repo::update_last_huella(tx, &self.serie, &huella)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -205,11 +200,9 @@ impl InvoiceService {
         };
 
         // Read prev huella inside the transaction
-        let prev_huella: Option<String> =
-            sqlx::query_scalar("SELECT last_huella FROM system_state WHERE id = 1")
-                .fetch_one(&mut **tx)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        let prev_huella = inv_repo::get_last_huella(tx, &self.serie)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // Allocate invoice number
         let invoice_number = inv_repo::next_invoice_number(tx, &self.serie, &date_str)
@@ -269,11 +262,8 @@ impl InvoiceService {
             inv_repo::insert_desglose(tx, invoice_id, d.tax_rate, base, tax_amt).await?;
         }
 
-        // Update system_state.last_huella within the same transaction
-        sqlx::query("UPDATE system_state SET last_huella = ?1, updated_at = ?2 WHERE id = 1")
-            .bind(&huella)
-            .bind(now)
-            .execute(&mut **tx)
+        // Update invoice_counter.last_huella within the same transaction
+        inv_repo::update_last_huella(tx, &self.serie, &huella)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 

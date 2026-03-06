@@ -14,7 +14,6 @@ pub struct SystemState {
     pub synced_up_to_hash: Option<String>,
     pub last_sync_time: Option<i64>,
     pub order_count: i64,
-    pub last_huella: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -29,7 +28,6 @@ pub struct SystemStateUpdate {
     pub synced_up_to_hash: Option<String>,
     pub last_sync_time: Option<i64>,
     pub order_count: Option<i64>,
-    pub last_huella: Option<String>,
 }
 
 /// Init genesis payload

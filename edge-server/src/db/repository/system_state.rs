@@ -28,7 +28,7 @@ pub async fn get_or_create(pool: &SqlitePool) -> RepoResult<SystemState> {
 
 pub async fn get(pool: &SqlitePool) -> RepoResult<Option<SystemState>> {
     let state = sqlx::query_as::<_, SystemState>(
-        "SELECT id, genesis_hash, last_order_id, last_chain_hash, synced_up_to_id, synced_up_to_hash, last_sync_time, order_count, last_huella, created_at, updated_at FROM system_state WHERE id = ?",
+        "SELECT id, genesis_hash, last_order_id, last_chain_hash, synced_up_to_id, synced_up_to_hash, last_sync_time, order_count, created_at, updated_at FROM system_state WHERE id = ?",
     )
     .bind(SINGLETON_ID)
     .fetch_optional(pool)
@@ -39,7 +39,7 @@ pub async fn get(pool: &SqlitePool) -> RepoResult<Option<SystemState>> {
 pub async fn update(pool: &SqlitePool, data: SystemStateUpdate) -> RepoResult<SystemState> {
     let now = shared::util::now_millis();
     let rows = sqlx::query!(
-        "UPDATE system_state SET genesis_hash = COALESCE(?1, genesis_hash), last_order_id = COALESCE(?2, last_order_id), last_chain_hash = COALESCE(?3, last_chain_hash), synced_up_to_id = COALESCE(?4, synced_up_to_id), synced_up_to_hash = COALESCE(?5, synced_up_to_hash), last_sync_time = COALESCE(?6, last_sync_time), order_count = COALESCE(?7, order_count), last_huella = COALESCE(?8, last_huella), updated_at = ?9 WHERE id = ?10",
+        "UPDATE system_state SET genesis_hash = COALESCE(?1, genesis_hash), last_order_id = COALESCE(?2, last_order_id), last_chain_hash = COALESCE(?3, last_chain_hash), synced_up_to_id = COALESCE(?4, synced_up_to_id), synced_up_to_hash = COALESCE(?5, synced_up_to_hash), last_sync_time = COALESCE(?6, last_sync_time), order_count = COALESCE(?7, order_count), updated_at = ?8 WHERE id = ?9",
         data.genesis_hash,
         data.last_order_id,
         data.last_chain_hash,
@@ -47,7 +47,6 @@ pub async fn update(pool: &SqlitePool, data: SystemStateUpdate) -> RepoResult<Sy
         data.synced_up_to_hash,
         data.last_sync_time,
         data.order_count,
-        data.last_huella,
         now,
         SINGLETON_ID
     )
