@@ -596,14 +596,14 @@ pub async fn get_statistics(
     .await
     .map_err(|e| AppError::database(e.to_string()))?;
 
-    // 2. Item-level manual discount
+    // 2. Item-level manual discount (discount_amount includes rule discount, subtract it)
     let (item_manual_disc, item_manual_disc_cnt): (f64, i32) = sqlx::query_as(
-        "SELECT COALESCE(SUM(i.discount_amount), 0.0), \
+        "SELECT COALESCE(SUM(i.discount_amount - COALESCE(i.rule_discount_amount, 0.0)), 0.0), \
             CAST(COUNT(DISTINCT o.id) AS INTEGER) \
          FROM archived_order_item i \
          JOIN archived_order o ON i.order_pk = o.id \
          WHERE o.status = 'COMPLETED' AND o.is_voided = 0 AND o.end_time >= ?1 AND o.end_time < ?2 \
-           AND i.discount_amount > 0 AND i.is_comped = 0",
+           AND (i.discount_amount - COALESCE(i.rule_discount_amount, 0.0)) > 0 AND i.is_comped = 0",
     )
     .bind(start_dt)
     .bind(end_dt)

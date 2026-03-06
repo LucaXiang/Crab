@@ -45,6 +45,10 @@ pub struct StoreOverview {
     pub refund_method_breakdown: Vec<RefundMethodEntry>,
     pub service_type_breakdown: Vec<ServiceTypeEntry>,
     pub zone_sales: Vec<ZoneSaleEntry>,
+    #[serde(default)]
+    pub discount_breakdown: Vec<AdjustmentEntry>,
+    #[serde(default)]
+    pub surcharge_breakdown: Vec<AdjustmentEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,9 +117,19 @@ pub struct ServiceTypeEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZoneSaleEntry {
     pub zone_name: String,
+    #[serde(default)]
+    pub is_retail: bool,
     pub revenue: f64,
     pub orders: i32,
     pub guests: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdjustmentEntry {
+    pub name: String,
+    pub source: String,
+    pub amount: f64,
+    pub order_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
