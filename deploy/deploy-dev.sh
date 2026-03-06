@@ -36,7 +36,7 @@ deploy_cloud() {
   info "Waiting for dev-cloud to start..."
   sleep 5
   local health
-  health=$($SSH "curl -sf http://localhost:8081/health" 2>/dev/null || echo "FAIL")
+  health=$($SSH "curl -sf https://dev-cloud.redcoral.app/health" 2>/dev/null || echo "FAIL")
   if echo "$health" | grep -q '"status":"ok"'; then
     info "dev-cloud healthy: $health"
   else
@@ -63,7 +63,7 @@ reset_db() {
   $SSH "
     $DEV_COMPOSE stop dev-cloud dev-postgres && \
     $DEV_COMPOSE rm -f dev-cloud dev-postgres && \
-    docker volume rm crab_dev_pgdata && \
+    docker volume rm crab-dev_dev_pgdata && \
     $DEV_COMPOSE up -d dev-postgres && \
     sleep 5 && \
     $DEV_COMPOSE up -d dev-cloud
