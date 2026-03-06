@@ -799,6 +799,10 @@ export type CommandErrorCode =
   | 'NO_MEMBER_LINKED'
   | 'MEMBER_REQUIRED'
   | 'MEMBER_LINKED_CANNOT_MERGE'
+  | 'MEMBER_NOT_FOUND'
+  | 'MARKETING_GROUP_NOT_FOUND'
+  // Stamp Prefetch
+  | 'STAMP_ACTIVITY_NOT_FOUND'
   // Split Blocks
   | 'AA_SPLIT_ACTIVE'
   | 'AMOUNT_SPLIT_ACTIVE'

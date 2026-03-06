@@ -116,7 +116,6 @@ mod tests {
         );
         assert_eq!(ErrorCode::TenantNotFound.category(), ErrorCategory::Tenant);
         assert_eq!(ErrorCode::OrderNotFound.category(), ErrorCategory::Order);
-        assert_eq!(ErrorCode::PaymentFailed.category(), ErrorCategory::Payment);
         assert_eq!(
             ErrorCode::ProductNotFound.category(),
             ErrorCategory::Product

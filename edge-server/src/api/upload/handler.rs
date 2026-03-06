@@ -56,8 +56,9 @@ fn process_and_compress_image(
     _original_ext: String,
 ) -> Result<(DynamicImage, Vec<u8>), AppError> {
     // Load image from bytes
-    let img = image::load_from_memory(&data)
-        .map_err(|e| AppError::invalid_image("input", e.to_string()))?;
+    let img = image::load_from_memory(&data).map_err(|e| {
+        AppError::with_message(ErrorCode::ValidationFailed, format!("Invalid image: {}", e))
+    })?;
 
     // Save to buffer as JPG with quality setting
     let mut buffer = Vec::new();
@@ -65,9 +66,12 @@ fn process_and_compress_image(
         let mut cursor = Cursor::new(&mut buffer);
         let rgb_img = img.to_rgb8();
         let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut cursor, JPEG_QUALITY);
-        rgb_img
-            .write_with_encoder(encoder)
-            .map_err(|e| AppError::image_processing_failed(e.to_string()))?;
+        rgb_img.write_with_encoder(encoder).map_err(|e| {
+            AppError::with_message(
+                ErrorCode::InternalError,
+                format!("Image processing failed: {}", e),
+            )
+        })?;
     }
 
     Ok((img, buffer))
@@ -77,18 +81,31 @@ fn process_and_compress_image(
 fn validate_image(data: &[u8], ext: &str) -> Result<(), AppError> {
     // Check file size
     if data.len() > MAX_FILE_SIZE {
-        return Err(AppError::file_too_large(MAX_FILE_SIZE, data.len()));
+        return Err(
+            AppError::with_message(ErrorCode::ValidationFailed, "File too large")
+                .with_detail("max_bytes", MAX_FILE_SIZE as i64)
+                .with_detail("max_mb", (MAX_FILE_SIZE / 1024 / 1024) as i64)
+                .with_detail("actual_bytes", data.len() as i64),
+        );
     }
 
     // Check file extension
     let ext_lower = ext.to_lowercase();
     if !SUPPORTED_FORMATS.contains(&ext_lower.as_str()) {
-        return Err(AppError::unsupported_format(&ext_lower, SUPPORTED_FORMATS));
+        return Err(AppError::with_message(
+            ErrorCode::ValidationFailed,
+            format!("Unsupported file format: {}", ext_lower),
+        )
+        .with_detail("format", ext_lower)
+        .with_detail("supported", SUPPORTED_FORMATS.join(", ")));
     }
 
     // Verify it's actually an image by trying to load it
     if let Err(e) = image::load_from_memory(data) {
-        return Err(AppError::invalid_image(&ext_lower, e.to_string()));
+        return Err(AppError::with_message(
+            ErrorCode::ValidationFailed,
+            format!("Invalid image file: {}", e),
+        ));
     }
 
     Ok(())
@@ -107,8 +124,9 @@ pub async fn upload(
     // Images dir: {tenant}/server/images/
     let work_dir = state.work_dir().clone();
     let images_dir = work_dir.join("images");
-    fs::create_dir_all(&images_dir)
-        .map_err(|e| AppError::file_storage_failed(format!("create directory: {}", e)))?;
+    fs::create_dir_all(&images_dir).map_err(|e| {
+        AppError::with_message(ErrorCode::InternalError, format!("create directory: {}", e))
+    })?;
 
     // Find the file field
     let mut field_data: Option<Vec<u8>> = None;
@@ -134,20 +152,27 @@ pub async fn upload(
         }
     }
 
-    let data = field_data.ok_or_else(AppError::no_file_provided)?;
+    let data = field_data.ok_or_else(|| {
+        AppError::new(ErrorCode::ValidationFailed).with_detail("reason", "No file provided")
+    })?;
 
-    let original_name = original_filename.ok_or_else(AppError::no_filename)?;
+    let original_name = original_filename.ok_or_else(|| {
+        AppError::new(ErrorCode::ValidationFailed).with_detail("reason", "No filename provided")
+    })?;
 
     // Check if data is empty
     if data.is_empty() {
-        return Err(AppError::empty_file());
+        return Err(AppError::new(ErrorCode::ValidationFailed).with_detail("reason", "Empty file"));
     }
 
     // Extract file extension
     let ext = PathBuf::from(&original_name)
         .extension()
         .and_then(|ext| ext.to_str().map(|s| s.to_string()))
-        .ok_or_else(|| AppError::invalid_file_extension(&original_name))?;
+        .ok_or_else(|| {
+            AppError::with_message(ErrorCode::ValidationFailed, "Invalid file extension")
+                .with_detail("filename", original_name.clone())
+        })?;
 
     // Validate image
     validate_image(&data, &ext)?;
@@ -181,8 +206,9 @@ pub async fn upload(
     }
 
     // Save compressed image with hash as filename
-    fs::write(&file_path, &compressed_data)
-        .map_err(|e| AppError::file_storage_failed(format!("write file: {}", e)))?;
+    fs::write(&file_path, &compressed_data).map_err(|e| {
+        AppError::with_message(ErrorCode::InternalError, format!("write file: {}", e))
+    })?;
 
     // Log audit event
     state

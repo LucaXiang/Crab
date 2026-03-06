@@ -418,13 +418,13 @@ impl OrdersManager {
                     .await
                     .map_err(|e| {
                         ManagerError::from(OrderError::InvalidOperation(
-                            CommandErrorCode::InternalError,
+                            CommandErrorCode::SystemBusy,
                             format!("Failed to query member: {e}"),
                         ))
                     })?
                     .ok_or_else(|| {
                         ManagerError::from(OrderError::InvalidOperation(
-                            CommandErrorCode::InternalError,
+                            CommandErrorCode::MemberNotFound,
                             format!("Member {} not found", member_id),
                         ))
                     })?;
@@ -443,13 +443,13 @@ impl OrdersManager {
                 .await
                 .map_err(|e| {
                     ManagerError::from(OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
+                        CommandErrorCode::SystemBusy,
                         format!("Failed to query marketing group: {e}"),
                     ))
                 })?
                 .ok_or_else(|| {
                     ManagerError::from(OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
+                        CommandErrorCode::MarketingGroupNotFound,
                         format!("Marketing group {} not found", member.marketing_group_id),
                     ))
                 })?;
@@ -461,7 +461,7 @@ impl OrdersManager {
                 .await
                 .map_err(|e| {
                     ManagerError::from(OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
+                        CommandErrorCode::SystemBusy,
                         format!("Failed to query MG rules: {e}"),
                     ))
                 })?;
@@ -495,8 +495,8 @@ impl OrdersManager {
                 .bind(*stamp_activity_id)
                 .fetch_optional(pool)
                 .await
-                .map_err(|e| OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Failed to query stamp activity: {e}")))?
-                .ok_or_else(|| OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
+                .map_err(|e| OrderError::InvalidOperation(CommandErrorCode::SystemBusy, format!("Failed to query stamp activity: {e}")))?
+                .ok_or_else(|| OrderError::InvalidOperation(CommandErrorCode::StampActivityNotFound, format!("Stamp activity {} not found or not active", stamp_activity_id)))?;
 
                 let stamp_progress = crate::db::repository::stamp::find_progress(
                     pool,
@@ -506,7 +506,7 @@ impl OrdersManager {
                 .await
                 .map_err(|e| {
                     OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
+                        CommandErrorCode::SystemBusy,
                         format!("Failed to query stamp progress: {e}"),
                     )
                 })?;
@@ -519,7 +519,7 @@ impl OrdersManager {
                 .await
                 .map_err(|e| {
                     OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
+                        CommandErrorCode::SystemBusy,
                         format!("Failed to query stamp targets: {e}"),
                     )
                 })?;
@@ -532,7 +532,7 @@ impl OrdersManager {
                     .await
                     .map_err(|e| {
                         OrderError::InvalidOperation(
-                            CommandErrorCode::InternalError,
+                            CommandErrorCode::SystemBusy,
                             format!("Failed to query reward targets: {e}"),
                         )
                     })?;
@@ -572,7 +572,7 @@ impl OrdersManager {
                         .bind(activity_id)
                         .fetch_optional(pool)
                         .await
-                        .map_err(|e| ManagerError::from(OrderError::InvalidOperation(CommandErrorCode::InternalError, format!("Failed to query stamp activity: {e}"))))?;
+                        .map_err(|e| ManagerError::from(OrderError::InvalidOperation(CommandErrorCode::SystemBusy, format!("Failed to query stamp activity: {e}"))))?;
 
                         let progress = crate::db::repository::stamp::find_progress(
                             pool,
@@ -582,7 +582,7 @@ impl OrdersManager {
                         .await
                         .map_err(|e| {
                             ManagerError::from(OrderError::InvalidOperation(
-                                CommandErrorCode::InternalError,
+                                CommandErrorCode::SystemBusy,
                                 format!("Failed to query stamp progress: {e}"),
                             ))
                         })?;
@@ -596,7 +596,7 @@ impl OrdersManager {
                             .await
                             .map_err(|e| {
                                 ManagerError::from(OrderError::InvalidOperation(
-                                    CommandErrorCode::InternalError,
+                                    CommandErrorCode::SystemBusy,
                                     format!("Failed to query stamp targets: {e}"),
                                 ))
                             })?;
@@ -708,7 +708,7 @@ impl OrdersManager {
                 tracing::debug!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
                 let receipt_number = pre_generated_receipt.ok_or_else(|| {
                     OrderError::InvalidOperation(
-                        CommandErrorCode::InternalError,
+                        CommandErrorCode::InvalidOperation,
                         "receipt_number must be pre-generated for OpenTable".to_string(),
                     )
                 })?;

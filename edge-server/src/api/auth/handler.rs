@@ -84,7 +84,10 @@ pub async fn login(
         .ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
 
     if !role.is_active {
-        return Err(AppError::role_disabled());
+        return Err(AppError::with_message(
+            shared::ErrorCode::PermissionDenied,
+            "Role is disabled",
+        ));
     }
 
     // Generate JWT token
@@ -247,7 +250,10 @@ pub async fn escalate(
         .ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
 
     if !role.is_active {
-        return Err(AppError::role_disabled());
+        return Err(AppError::with_message(
+            shared::ErrorCode::PermissionDenied,
+            "Role is disabled",
+        ));
     }
 
     // Check permission

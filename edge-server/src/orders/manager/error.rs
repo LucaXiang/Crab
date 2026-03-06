@@ -47,9 +47,9 @@ pub enum ManagerError {
 fn classify_storage_error(e: &StorageError) -> CommandErrorCode {
     // 先按枚举变体精确匹配
     match e {
-        StorageError::Serialization(_) => return CommandErrorCode::InternalError,
+        StorageError::Serialization(_) => return CommandErrorCode::StorageCorrupted,
         StorageError::OrderNotFound(_) => return CommandErrorCode::OrderNotFound,
-        StorageError::EventNotFound(_, _) => return CommandErrorCode::InternalError,
+        StorageError::EventNotFound(_, _) => return CommandErrorCode::StorageCorrupted,
         _ => {}
     }
 

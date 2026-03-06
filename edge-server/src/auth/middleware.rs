@@ -62,8 +62,12 @@ pub async fn require_auth(
         .and_then(|h| h.to_str().ok());
 
     let token = match auth_header {
-        Some(header) => JwtService::extract_from_header(header)
-            .ok_or_else(|| AppError::invalid_token("Invalid authorization header"))?,
+        Some(header) => JwtService::extract_from_header(header).ok_or_else(|| {
+            AppError::with_message(
+                shared::ErrorCode::NotAuthenticated,
+                "Invalid authorization header",
+            )
+        })?,
         None => {
             security_log!("WARN", "auth_missing", uri = format!("{:?}", req.uri()));
             return Err(AppError::unauthorized());
@@ -73,8 +77,12 @@ pub async fn require_auth(
     // 验证令牌
     match jwt_service.validate_token(token) {
         Ok(claims) => {
-            let user = CurrentUser::try_from(claims)
-                .map_err(|e| AppError::invalid_token(format!("Malformed JWT claims: {}", e)))?;
+            let user = CurrentUser::try_from(claims).map_err(|e| {
+                AppError::with_message(
+                    shared::ErrorCode::NotAuthenticated,
+                    format!("Malformed JWT claims: {}", e),
+                )
+            })?;
             req.extensions_mut().insert(user);
             Ok(next.run(req).await)
         }
@@ -88,7 +96,10 @@ pub async fn require_auth(
 
             match e {
                 crate::auth::JwtError::ExpiredToken => Err(AppError::token_expired()),
-                _ => Err(AppError::invalid_token("Invalid token")),
+                _ => Err(AppError::with_message(
+                    shared::ErrorCode::NotAuthenticated,
+                    "Invalid token",
+                )),
             }
         }
     }

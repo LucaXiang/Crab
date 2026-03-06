@@ -498,6 +498,11 @@ pub enum CommandErrorCode {
     NoMemberLinked,
     MemberRequired,
     MemberLinkedCannotMerge,
+    MemberNotFound,
+    MarketingGroupNotFound,
+
+    // === Stamp Prefetch ===
+    StampActivityNotFound,
 
     // === Split Blocks ===
     AaSplitActive,

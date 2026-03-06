@@ -46,23 +46,17 @@ export const ErrorCode = {
   InvalidRequest: 5,
   InvalidFormat: 6,
   RequiredField: 7,
-  ValueOutOfRange: 8,
 
   // 1xxx: Auth
   NotAuthenticated: 1001,
   InvalidCredentials: 1002,
   TokenExpired: 1003,
-  TokenInvalid: 1004,
   SessionExpired: 1005,
-  AccountLocked: 1006,
   AccountDisabled: 1007,
 
   // 2xxx: Permission
   PermissionDenied: 2001,
-  RoleRequired: 2002,
   AdminRequired: 2003,
-  CannotModifyAdmin: 2004,
-  CannotDeleteAdmin: 2005,
 
   // 3xxx: Tenant
   TenantNotSelected: 3001,
@@ -73,18 +67,14 @@ export const ErrorCode = {
   SubscriptionBlocked: 3006,
   StoreLimitReached: 3007,
   TenantCredentialsInvalid: 3009,
-  FeatureNotAvailable: 3010,
   TenantNoSubscription: 3011,
   AuthServerError: 3012,
   VerificationCodeExpired: 3013,
   VerificationCodeInvalid: 3014,
   TooManyAttempts: 3015,
-  EmailNotVerified: 3016,
   PaymentSetupFailed: 3017,
   PasswordTooShort: 3018,
   P12Required: 3019,
-  DeviceIdMismatch: 3020,
-  CertificateMissingDeviceId: 3021,
   ResourceLimitExceeded: 3022,
   P12InvalidFormat: 3023,
   P12WrongPassword: 3024,
@@ -98,12 +88,9 @@ export const ErrorCode = {
 
   // 4xxx: Order
   OrderNotFound: 4001,
-  OrderAlreadyPaid: 4002,
   OrderAlreadyCompleted: 4003,
   OrderAlreadyVoided: 4004,
-  OrderHasPayments: 4005,
   OrderItemNotFound: 4006,
-  OrderEmpty: 4007,
   OrderNotCompleted: 4008,
   OrderHasCreditNotes: 4009,
   CreditNoteOverRefund: 4010,
@@ -113,21 +100,11 @@ export const ErrorCode = {
   ImportInvalidFormat: 4015,
   ExportFailed: 4016,
 
-  // 5xxx: Payment
-  PaymentFailed: 5001,
-  PaymentInsufficientAmount: 5002,
-  PaymentInvalidMethod: 5003,
-  PaymentAlreadyRefunded: 5004,
-  PaymentRefundExceedsAmount: 5005,
-
   // 6xxx: Product
   ProductNotFound: 6001,
   ProductInvalidPrice: 6002,
-  ProductOutOfStock: 6003,
   CategoryNotFound: 6101,
   CategoryHasProducts: 6102,
-  CategoryNameExists: 6103,
-  SpecNotFound: 6201,
   SpecRootRequired: 6205,
   ProductExternalIdExists: 6202,
   ProductExternalIdRequired: 6203,
@@ -139,16 +116,6 @@ export const ErrorCode = {
   TagNotFound: 6401,
   TagInUse: 6402,
 
-  // 65xx: File Upload
-  FileTooLarge: 6501,
-  UnsupportedFileFormat: 6502,
-  InvalidImageFile: 6503,
-  NoFileProvided: 6504,
-  EmptyFile: 6505,
-  NoFilename: 6506,
-  InvalidFileExtension: 6507,
-  ImageProcessingFailed: 6508,
-  FileStorageFailed: 6509,
   PrintDestinationNotFound: 6511,
   PrintDestinationInUse: 6512,
   MarketingGroupNotFound: 6601,
@@ -159,23 +126,17 @@ export const ErrorCode = {
   // 7xxx: Table
   TableNotFound: 7001,
   TableOccupied: 7002,
-  TableAlreadyEmpty: 7003,
   ZoneNotFound: 7101,
   ZoneHasTables: 7102,
-  ZoneNameExists: 7103,
   TableHasOrders: 7104,
   ShiftNotFound: 7201,
   DailyReportNotFound: 7301,
 
   // 8xxx: Employee
   EmployeeNotFound: 8001,
-  EmployeeUsernameExists: 8002,
-  EmployeeCannotDeleteSelf: 8003,
   EmployeeIsSystem: 8004,
   MemberNotFound: 8005,
   RoleNotFound: 8101,
-  RoleNameExists: 8102,
-  RoleInUse: 8103,
   RoleIsSystem: 8104,
 
   // 9xxx: System
@@ -192,9 +153,6 @@ export const ErrorCode = {
   PrintFailed: 9202,
   PrintNoPrintersConfigured: 9203,
   PrintAllPrintersOffline: 9204,
-  PrintKitchenDisabled: 9205,
-  PrintLabelDisabled: 9206,
-  PrintDestinationNotConfigured: 9207,
   ClientDisconnected: 9301,
   ArchiveHashChainError: 9302,
   InvoiceNumberError: 9303,

@@ -41,9 +41,6 @@ pub enum ErrorCode {
     InvalidFormat = 6,
     /// Required field missing
     RequiredField = 7,
-    /// Value out of range
-    ValueOutOfRange = 8,
-
     // ==================== 1xxx: Auth ====================
     /// User is not authenticated
     NotAuthenticated = 1001,
@@ -51,26 +48,16 @@ pub enum ErrorCode {
     InvalidCredentials = 1002,
     /// Token has expired
     TokenExpired = 1003,
-    /// Token is invalid
-    TokenInvalid = 1004,
     /// Session has expired
     SessionExpired = 1005,
-    /// Account is locked
-    AccountLocked = 1006,
     /// Account is disabled
     AccountDisabled = 1007,
 
     // ==================== 2xxx: Permission ====================
     /// Permission denied
     PermissionDenied = 2001,
-    /// Specific role required
-    RoleRequired = 2002,
     /// Admin role required
     AdminRequired = 2003,
-    /// Cannot modify admin user
-    CannotModifyAdmin = 2004,
-    /// Cannot delete admin user
-    CannotDeleteAdmin = 2005,
 
     // ==================== 3xxx: Tenant ====================
     /// Tenant not selected
@@ -89,8 +76,6 @@ pub enum ErrorCode {
     StoreLimitReached = 3007,
     /// Tenant credentials invalid (wrong username/password)
     TenantCredentialsInvalid = 3009,
-    /// Feature not available in current subscription plan
-    FeatureNotAvailable = 3010,
     /// No active subscription for tenant
     TenantNoSubscription = 3011,
     /// Auth server internal error
@@ -101,18 +86,12 @@ pub enum ErrorCode {
     VerificationCodeInvalid = 3014,
     /// Too many verification attempts
     TooManyAttempts = 3015,
-    /// Email not verified
-    EmailNotVerified = 3016,
     /// Payment setup failed (Stripe)
     PaymentSetupFailed = 3017,
     /// Password too short
     PasswordTooShort = 3018,
     /// P12 certificate required before payment (Verifactu compliance)
     P12Required = 3019,
-    /// Hardware ID mismatch with certificate
-    DeviceIdMismatch = 3020,
-    /// Certificate missing device_id extension
-    CertificateMissingDeviceId = 3021,
     /// Resource limit exceeded (e.g. max products per store)
     ResourceLimitExceeded = 3022,
     /// P12/PFX file format invalid (not a valid PKCS#12 DER file)
@@ -137,18 +116,12 @@ pub enum ErrorCode {
     // ==================== 4xxx: Order ====================
     /// Order not found
     OrderNotFound = 4001,
-    /// Order has already been paid
-    OrderAlreadyPaid = 4002,
     /// Order has already been completed
     OrderAlreadyCompleted = 4003,
     /// Order has already been voided
     OrderAlreadyVoided = 4004,
-    /// Order has existing payments
-    OrderHasPayments = 4005,
     /// Order item not found
     OrderItemNotFound = 4006,
-    /// Order is empty
-    OrderEmpty = 4007,
     /// Order status is not COMPLETED (required for anulación/credit note)
     OrderNotCompleted = 4008,
     /// Order has credit notes — cannot create anulación
@@ -168,33 +141,15 @@ pub enum ErrorCode {
     /// Export failed: internal error during export
     ExportFailed = 4016,
 
-    // ==================== 5xxx: Payment ====================
-    /// Payment processing failed
-    PaymentFailed = 5001,
-    /// Insufficient payment amount
-    PaymentInsufficientAmount = 5002,
-    /// Invalid payment method
-    PaymentInvalidMethod = 5003,
-    /// Payment has already been refunded
-    PaymentAlreadyRefunded = 5004,
-    /// Refund amount exceeds payment
-    PaymentRefundExceedsAmount = 5005,
-
     // ==================== 6xxx: Product ====================
     /// Product not found
     ProductNotFound = 6001,
     /// Product has invalid price
     ProductInvalidPrice = 6002,
-    /// Product is out of stock
-    ProductOutOfStock = 6003,
     /// Category not found
     CategoryNotFound = 6101,
     /// Category has products
     CategoryHasProducts = 6102,
-    /// Category name already exists
-    CategoryNameExists = 6103,
-    /// Specification not found
-    SpecNotFound = 6201,
     /// Product external_id already exists
     ProductExternalIdExists = 6202,
     /// Product external_id is required
@@ -216,25 +171,6 @@ pub enum ErrorCode {
     /// Tag is in use by products
     TagInUse = 6402,
 
-    // ==================== 65xx: File Upload ====================
-    /// File too large
-    FileTooLarge = 6501,
-    /// Unsupported file format
-    UnsupportedFileFormat = 6502,
-    /// Invalid/corrupted image file
-    InvalidImageFile = 6503,
-    /// No file provided in request
-    NoFileProvided = 6504,
-    /// Empty file provided
-    EmptyFile = 6505,
-    /// No filename provided
-    NoFilename = 6506,
-    /// Invalid file extension
-    InvalidFileExtension = 6507,
-    /// Image processing failed
-    ImageProcessingFailed = 6508,
-    /// File storage failed
-    FileStorageFailed = 6509,
     /// Print destination not found
     PrintDestinationNotFound = 6511,
     /// Print destination is in use by categories
@@ -256,14 +192,10 @@ pub enum ErrorCode {
     TableNotFound = 7001,
     /// Table is occupied
     TableOccupied = 7002,
-    /// Table is already empty
-    TableAlreadyEmpty = 7003,
     /// Zone not found
     ZoneNotFound = 7101,
     /// Zone has tables
     ZoneHasTables = 7102,
-    /// Zone name already exists
-    ZoneNameExists = 7103,
     /// Table has active orders
     TableHasOrders = 7104,
 
@@ -275,20 +207,12 @@ pub enum ErrorCode {
     // ==================== 8xxx: Employee ====================
     /// Employee not found
     EmployeeNotFound = 8001,
-    /// Employee username already exists
-    EmployeeUsernameExists = 8002,
-    /// Cannot delete self
-    EmployeeCannotDeleteSelf = 8003,
     /// Cannot modify/delete system employee
     EmployeeIsSystem = 8004,
     /// Member not found
     MemberNotFound = 8005,
     /// Role not found
     RoleNotFound = 8101,
-    /// Role name already exists
-    RoleNameExists = 8102,
-    /// Role is in use
-    RoleInUse = 8103,
     /// Cannot modify/delete system role
     RoleIsSystem = 8104,
 
@@ -319,12 +243,6 @@ pub enum ErrorCode {
     PrintNoPrintersConfigured = 9203,
     /// All printers offline for destination
     PrintAllPrintersOffline = 9204,
-    /// Kitchen printing is not enabled
-    PrintKitchenDisabled = 9205,
-    /// Label printing is not enabled
-    PrintLabelDisabled = 9206,
-    /// No print destination configured for product/category
-    PrintDestinationNotConfigured = 9207,
     /// Client disconnected
     ClientDisconnected = 9301,
 
@@ -372,23 +290,17 @@ impl ErrorCode {
             ErrorCode::InvalidRequest => "Invalid request",
             ErrorCode::InvalidFormat => "Invalid format",
             ErrorCode::RequiredField => "Required field is missing",
-            ErrorCode::ValueOutOfRange => "Value is out of range",
 
             // Auth
             ErrorCode::NotAuthenticated => "User is not authenticated",
             ErrorCode::InvalidCredentials => "Invalid username or password",
             ErrorCode::TokenExpired => "Authentication token has expired",
-            ErrorCode::TokenInvalid => "Authentication token is invalid",
             ErrorCode::SessionExpired => "Session has expired",
-            ErrorCode::AccountLocked => "Account is locked",
             ErrorCode::AccountDisabled => "Account is disabled",
 
             // Permission
             ErrorCode::PermissionDenied => "Permission denied",
-            ErrorCode::RoleRequired => "Specific role is required",
             ErrorCode::AdminRequired => "Administrator role is required",
-            ErrorCode::CannotModifyAdmin => "Cannot modify administrator user",
-            ErrorCode::CannotDeleteAdmin => "Cannot delete administrator user",
 
             // Tenant
             ErrorCode::TenantNotSelected => "No tenant selected",
@@ -399,18 +311,14 @@ impl ErrorCode {
             ErrorCode::SubscriptionBlocked => "Subscription is blocked",
             ErrorCode::StoreLimitReached => "Store limit reached",
             ErrorCode::TenantCredentialsInvalid => "Invalid tenant username or password",
-            ErrorCode::FeatureNotAvailable => "Feature not available in current subscription plan",
             ErrorCode::TenantNoSubscription => "No active subscription",
             ErrorCode::AuthServerError => "Auth server internal error",
             ErrorCode::VerificationCodeExpired => "Verification code has expired",
             ErrorCode::VerificationCodeInvalid => "Invalid verification code",
             ErrorCode::TooManyAttempts => "Too many attempts",
-            ErrorCode::EmailNotVerified => "Email not verified",
             ErrorCode::PaymentSetupFailed => "Payment setup failed",
             ErrorCode::PasswordTooShort => "Password must be at least 8 characters",
             ErrorCode::P12Required => "P12 certificate must be uploaded before payment",
-            ErrorCode::DeviceIdMismatch => "Hardware ID mismatch with certificate",
-            ErrorCode::CertificateMissingDeviceId => "Certificate missing device_id extension",
             ErrorCode::ResourceLimitExceeded => "Resource limit exceeded",
             ErrorCode::P12InvalidFormat => "Invalid P12/PFX file format",
             ErrorCode::P12WrongPassword => "Incorrect P12 password",
@@ -424,12 +332,9 @@ impl ErrorCode {
 
             // Order
             ErrorCode::OrderNotFound => "Order not found",
-            ErrorCode::OrderAlreadyPaid => "Order has already been paid",
             ErrorCode::OrderAlreadyCompleted => "Order has already been completed",
             ErrorCode::OrderAlreadyVoided => "Order has already been voided",
-            ErrorCode::OrderHasPayments => "Order has existing payments",
             ErrorCode::OrderItemNotFound => "Order item not found",
-            ErrorCode::OrderEmpty => "Order is empty",
             ErrorCode::OrderNotCompleted => "Order status is not COMPLETED",
             ErrorCode::OrderHasCreditNotes => "Order has credit notes, cannot create anulación",
             ErrorCode::CreditNoteOverRefund => "Refund amount exceeds remaining refundable",
@@ -444,21 +349,11 @@ impl ErrorCode {
             ErrorCode::ImportInvalidFormat => "Import failed: invalid ZIP or catalog format",
             ErrorCode::ExportFailed => "Export failed: internal error during export",
 
-            // Payment
-            ErrorCode::PaymentFailed => "Payment processing failed",
-            ErrorCode::PaymentInsufficientAmount => "Insufficient payment amount",
-            ErrorCode::PaymentInvalidMethod => "Invalid payment method",
-            ErrorCode::PaymentAlreadyRefunded => "Payment has already been refunded",
-            ErrorCode::PaymentRefundExceedsAmount => "Refund amount exceeds original payment",
-
             // Product
             ErrorCode::ProductNotFound => "Product not found",
             ErrorCode::ProductInvalidPrice => "Product has invalid price",
-            ErrorCode::ProductOutOfStock => "Product is out of stock",
             ErrorCode::CategoryNotFound => "Category not found",
             ErrorCode::CategoryHasProducts => "Category has associated products",
-            ErrorCode::CategoryNameExists => "Category name already exists",
-            ErrorCode::SpecNotFound => "Specification not found",
             ErrorCode::SpecRootRequired => {
                 "Cannot delete root specification, each product must keep at least one"
             }
@@ -480,39 +375,23 @@ impl ErrorCode {
                 "Price rule value is out of range (percentage or amount)"
             }
 
-            // File Upload
-            ErrorCode::FileTooLarge => "File too large",
-            ErrorCode::UnsupportedFileFormat => "Unsupported file format",
-            ErrorCode::InvalidImageFile => "Invalid image file",
-            ErrorCode::NoFileProvided => "No file provided",
-            ErrorCode::EmptyFile => "Empty file provided",
-            ErrorCode::NoFilename => "No filename provided",
-            ErrorCode::InvalidFileExtension => "Invalid file extension",
-            ErrorCode::ImageProcessingFailed => "Image processing failed",
-            ErrorCode::FileStorageFailed => "File storage failed",
             ErrorCode::PrintDestinationNotFound => "Print destination not found",
             ErrorCode::PrintDestinationInUse => "Print destination is in use by categories",
 
             // Table
             ErrorCode::TableNotFound => "Table not found",
             ErrorCode::TableOccupied => "Table is occupied",
-            ErrorCode::TableAlreadyEmpty => "Table is already empty",
             ErrorCode::ZoneNotFound => "Zone not found",
             ErrorCode::ZoneHasTables => "Zone has associated tables",
-            ErrorCode::ZoneNameExists => "Zone name already exists",
             ErrorCode::TableHasOrders => "Table has active orders",
             ErrorCode::ShiftNotFound => "Shift not found",
             ErrorCode::DailyReportNotFound => "Daily report not found",
 
             // Employee
             ErrorCode::EmployeeNotFound => "Employee not found",
-            ErrorCode::EmployeeUsernameExists => "Employee username already exists",
-            ErrorCode::EmployeeCannotDeleteSelf => "Cannot delete own account",
             ErrorCode::EmployeeIsSystem => "Cannot modify system employee",
             ErrorCode::MemberNotFound => "Member not found",
             ErrorCode::RoleNotFound => "Role not found",
-            ErrorCode::RoleNameExists => "Role name already exists",
-            ErrorCode::RoleInUse => "Role is currently in use",
             ErrorCode::RoleIsSystem => "Cannot modify system role",
 
             // System
@@ -529,9 +408,6 @@ impl ErrorCode {
             ErrorCode::PrintFailed => "Print operation failed",
             ErrorCode::PrintNoPrintersConfigured => "No printers configured for destination",
             ErrorCode::PrintAllPrintersOffline => "All printers offline for destination",
-            ErrorCode::PrintKitchenDisabled => "Kitchen printing is not enabled",
-            ErrorCode::PrintLabelDisabled => "Label printing is not enabled",
-            ErrorCode::PrintDestinationNotConfigured => "No print destination configured",
             ErrorCode::ClientDisconnected => "Client disconnected",
 
             // Archive / Invoice
@@ -581,23 +457,17 @@ impl TryFrom<u16> for ErrorCode {
             5 => Ok(ErrorCode::InvalidRequest),
             6 => Ok(ErrorCode::InvalidFormat),
             7 => Ok(ErrorCode::RequiredField),
-            8 => Ok(ErrorCode::ValueOutOfRange),
 
             // Auth
             1001 => Ok(ErrorCode::NotAuthenticated),
             1002 => Ok(ErrorCode::InvalidCredentials),
             1003 => Ok(ErrorCode::TokenExpired),
-            1004 => Ok(ErrorCode::TokenInvalid),
             1005 => Ok(ErrorCode::SessionExpired),
-            1006 => Ok(ErrorCode::AccountLocked),
             1007 => Ok(ErrorCode::AccountDisabled),
 
             // Permission
             2001 => Ok(ErrorCode::PermissionDenied),
-            2002 => Ok(ErrorCode::RoleRequired),
             2003 => Ok(ErrorCode::AdminRequired),
-            2004 => Ok(ErrorCode::CannotModifyAdmin),
-            2005 => Ok(ErrorCode::CannotDeleteAdmin),
 
             // Tenant
             3001 => Ok(ErrorCode::TenantNotSelected),
@@ -608,18 +478,14 @@ impl TryFrom<u16> for ErrorCode {
             3006 => Ok(ErrorCode::SubscriptionBlocked),
             3007 => Ok(ErrorCode::StoreLimitReached),
             3009 => Ok(ErrorCode::TenantCredentialsInvalid),
-            3010 => Ok(ErrorCode::FeatureNotAvailable),
             3011 => Ok(ErrorCode::TenantNoSubscription),
             3012 => Ok(ErrorCode::AuthServerError),
             3013 => Ok(ErrorCode::VerificationCodeExpired),
             3014 => Ok(ErrorCode::VerificationCodeInvalid),
             3015 => Ok(ErrorCode::TooManyAttempts),
-            3016 => Ok(ErrorCode::EmailNotVerified),
             3017 => Ok(ErrorCode::PaymentSetupFailed),
             3018 => Ok(ErrorCode::PasswordTooShort),
             3019 => Ok(ErrorCode::P12Required),
-            3020 => Ok(ErrorCode::DeviceIdMismatch),
-            3021 => Ok(ErrorCode::CertificateMissingDeviceId),
             3022 => Ok(ErrorCode::ResourceLimitExceeded),
             3023 => Ok(ErrorCode::P12InvalidFormat),
             3024 => Ok(ErrorCode::P12WrongPassword),
@@ -633,12 +499,9 @@ impl TryFrom<u16> for ErrorCode {
 
             // Order
             4001 => Ok(ErrorCode::OrderNotFound),
-            4002 => Ok(ErrorCode::OrderAlreadyPaid),
             4003 => Ok(ErrorCode::OrderAlreadyCompleted),
             4004 => Ok(ErrorCode::OrderAlreadyVoided),
-            4005 => Ok(ErrorCode::OrderHasPayments),
             4006 => Ok(ErrorCode::OrderItemNotFound),
-            4007 => Ok(ErrorCode::OrderEmpty),
             4008 => Ok(ErrorCode::OrderNotCompleted),
             4009 => Ok(ErrorCode::OrderHasCreditNotes),
             4010 => Ok(ErrorCode::CreditNoteOverRefund),
@@ -649,21 +512,11 @@ impl TryFrom<u16> for ErrorCode {
             4015 => Ok(ErrorCode::ImportInvalidFormat),
             4016 => Ok(ErrorCode::ExportFailed),
 
-            // Payment
-            5001 => Ok(ErrorCode::PaymentFailed),
-            5002 => Ok(ErrorCode::PaymentInsufficientAmount),
-            5003 => Ok(ErrorCode::PaymentInvalidMethod),
-            5004 => Ok(ErrorCode::PaymentAlreadyRefunded),
-            5005 => Ok(ErrorCode::PaymentRefundExceedsAmount),
-
             // Product
             6001 => Ok(ErrorCode::ProductNotFound),
             6002 => Ok(ErrorCode::ProductInvalidPrice),
-            6003 => Ok(ErrorCode::ProductOutOfStock),
             6101 => Ok(ErrorCode::CategoryNotFound),
             6102 => Ok(ErrorCode::CategoryHasProducts),
-            6103 => Ok(ErrorCode::CategoryNameExists),
-            6201 => Ok(ErrorCode::SpecNotFound),
             6205 => Ok(ErrorCode::SpecRootRequired),
             6202 => Ok(ErrorCode::ProductExternalIdExists),
             6203 => Ok(ErrorCode::ProductExternalIdRequired),
@@ -675,16 +528,7 @@ impl TryFrom<u16> for ErrorCode {
             6401 => Ok(ErrorCode::TagNotFound),
             6402 => Ok(ErrorCode::TagInUse),
 
-            // File Upload + Print Destination
-            6501 => Ok(ErrorCode::FileTooLarge),
-            6502 => Ok(ErrorCode::UnsupportedFileFormat),
-            6503 => Ok(ErrorCode::InvalidImageFile),
-            6504 => Ok(ErrorCode::NoFileProvided),
-            6505 => Ok(ErrorCode::EmptyFile),
-            6506 => Ok(ErrorCode::NoFilename),
-            6507 => Ok(ErrorCode::InvalidFileExtension),
-            6508 => Ok(ErrorCode::ImageProcessingFailed),
-            6509 => Ok(ErrorCode::FileStorageFailed),
+            // Print Destination
             6511 => Ok(ErrorCode::PrintDestinationNotFound),
             6512 => Ok(ErrorCode::PrintDestinationInUse),
             6601 => Ok(ErrorCode::MarketingGroupNotFound),
@@ -695,23 +539,17 @@ impl TryFrom<u16> for ErrorCode {
             // Table
             7001 => Ok(ErrorCode::TableNotFound),
             7002 => Ok(ErrorCode::TableOccupied),
-            7003 => Ok(ErrorCode::TableAlreadyEmpty),
             7101 => Ok(ErrorCode::ZoneNotFound),
             7102 => Ok(ErrorCode::ZoneHasTables),
-            7103 => Ok(ErrorCode::ZoneNameExists),
             7104 => Ok(ErrorCode::TableHasOrders),
             7201 => Ok(ErrorCode::ShiftNotFound),
             7301 => Ok(ErrorCode::DailyReportNotFound),
 
             // Employee
             8001 => Ok(ErrorCode::EmployeeNotFound),
-            8002 => Ok(ErrorCode::EmployeeUsernameExists),
-            8003 => Ok(ErrorCode::EmployeeCannotDeleteSelf),
             8004 => Ok(ErrorCode::EmployeeIsSystem),
             8005 => Ok(ErrorCode::MemberNotFound),
             8101 => Ok(ErrorCode::RoleNotFound),
-            8102 => Ok(ErrorCode::RoleNameExists),
-            8103 => Ok(ErrorCode::RoleInUse),
             8104 => Ok(ErrorCode::RoleIsSystem),
 
             // System
@@ -728,9 +566,6 @@ impl TryFrom<u16> for ErrorCode {
             9202 => Ok(ErrorCode::PrintFailed),
             9203 => Ok(ErrorCode::PrintNoPrintersConfigured),
             9204 => Ok(ErrorCode::PrintAllPrintersOffline),
-            9205 => Ok(ErrorCode::PrintKitchenDisabled),
-            9206 => Ok(ErrorCode::PrintLabelDisabled),
-            9207 => Ok(ErrorCode::PrintDestinationNotConfigured),
             9301 => Ok(ErrorCode::ClientDisconnected),
             9302 => Ok(ErrorCode::ArchiveHashChainError),
             9303 => Ok(ErrorCode::InvoiceNumberError),
@@ -768,23 +603,17 @@ mod tests {
         assert_eq!(ErrorCode::InvalidRequest.code(), 5);
         assert_eq!(ErrorCode::InvalidFormat.code(), 6);
         assert_eq!(ErrorCode::RequiredField.code(), 7);
-        assert_eq!(ErrorCode::ValueOutOfRange.code(), 8);
 
         // Auth
         assert_eq!(ErrorCode::NotAuthenticated.code(), 1001);
         assert_eq!(ErrorCode::InvalidCredentials.code(), 1002);
         assert_eq!(ErrorCode::TokenExpired.code(), 1003);
-        assert_eq!(ErrorCode::TokenInvalid.code(), 1004);
         assert_eq!(ErrorCode::SessionExpired.code(), 1005);
-        assert_eq!(ErrorCode::AccountLocked.code(), 1006);
         assert_eq!(ErrorCode::AccountDisabled.code(), 1007);
 
         // Permission
         assert_eq!(ErrorCode::PermissionDenied.code(), 2001);
-        assert_eq!(ErrorCode::RoleRequired.code(), 2002);
         assert_eq!(ErrorCode::AdminRequired.code(), 2003);
-        assert_eq!(ErrorCode::CannotModifyAdmin.code(), 2004);
-        assert_eq!(ErrorCode::CannotDeleteAdmin.code(), 2005);
 
         // Tenant
         assert_eq!(ErrorCode::TenantNotSelected.code(), 3001);
@@ -799,28 +628,15 @@ mod tests {
 
         // Order
         assert_eq!(ErrorCode::OrderNotFound.code(), 4001);
-        assert_eq!(ErrorCode::OrderAlreadyPaid.code(), 4002);
         assert_eq!(ErrorCode::OrderAlreadyCompleted.code(), 4003);
         assert_eq!(ErrorCode::OrderAlreadyVoided.code(), 4004);
-        assert_eq!(ErrorCode::OrderHasPayments.code(), 4005);
         assert_eq!(ErrorCode::OrderItemNotFound.code(), 4006);
-        assert_eq!(ErrorCode::OrderEmpty.code(), 4007);
-
-        // Payment
-        assert_eq!(ErrorCode::PaymentFailed.code(), 5001);
-        assert_eq!(ErrorCode::PaymentInsufficientAmount.code(), 5002);
-        assert_eq!(ErrorCode::PaymentInvalidMethod.code(), 5003);
-        assert_eq!(ErrorCode::PaymentAlreadyRefunded.code(), 5004);
-        assert_eq!(ErrorCode::PaymentRefundExceedsAmount.code(), 5005);
 
         // Product
         assert_eq!(ErrorCode::ProductNotFound.code(), 6001);
         assert_eq!(ErrorCode::ProductInvalidPrice.code(), 6002);
-        assert_eq!(ErrorCode::ProductOutOfStock.code(), 6003);
         assert_eq!(ErrorCode::CategoryNotFound.code(), 6101);
         assert_eq!(ErrorCode::CategoryHasProducts.code(), 6102);
-        assert_eq!(ErrorCode::CategoryNameExists.code(), 6103);
-        assert_eq!(ErrorCode::SpecNotFound.code(), 6201);
         assert_eq!(ErrorCode::ProductCategoryInvalid.code(), 6204);
         assert_eq!(ErrorCode::AttributeNotFound.code(), 6301);
         assert_eq!(ErrorCode::AttributeBindFailed.code(), 6302);
@@ -837,10 +653,8 @@ mod tests {
         // Table
         assert_eq!(ErrorCode::TableNotFound.code(), 7001);
         assert_eq!(ErrorCode::TableOccupied.code(), 7002);
-        assert_eq!(ErrorCode::TableAlreadyEmpty.code(), 7003);
         assert_eq!(ErrorCode::ZoneNotFound.code(), 7101);
         assert_eq!(ErrorCode::ZoneHasTables.code(), 7102);
-        assert_eq!(ErrorCode::ZoneNameExists.code(), 7103);
         assert_eq!(ErrorCode::TableHasOrders.code(), 7104);
         assert_eq!(ErrorCode::ShiftNotFound.code(), 7201);
         assert_eq!(ErrorCode::DailyReportNotFound.code(), 7301);
@@ -848,12 +662,8 @@ mod tests {
         // Employee
         assert_eq!(ErrorCode::MemberNotFound.code(), 8005);
         assert_eq!(ErrorCode::EmployeeNotFound.code(), 8001);
-        assert_eq!(ErrorCode::EmployeeUsernameExists.code(), 8002);
-        assert_eq!(ErrorCode::EmployeeCannotDeleteSelf.code(), 8003);
         assert_eq!(ErrorCode::EmployeeIsSystem.code(), 8004);
         assert_eq!(ErrorCode::RoleNotFound.code(), 8101);
-        assert_eq!(ErrorCode::RoleNameExists.code(), 8102);
-        assert_eq!(ErrorCode::RoleInUse.code(), 8103);
         assert_eq!(ErrorCode::RoleIsSystem.code(), 8104);
 
         // System
@@ -869,10 +679,6 @@ mod tests {
         assert_eq!(ErrorCode::PrintFailed.code(), 9202);
         assert_eq!(ErrorCode::PrintNoPrintersConfigured.code(), 9203);
         assert_eq!(ErrorCode::PrintAllPrintersOffline.code(), 9204);
-        assert_eq!(ErrorCode::PrintKitchenDisabled.code(), 9205);
-        assert_eq!(ErrorCode::PrintLabelDisabled.code(), 9206);
-        assert_eq!(ErrorCode::PrintDestinationNotConfigured.code(), 9207);
-
         // Storage
         assert_eq!(ErrorCode::StorageFull.code(), 9401);
         assert_eq!(ErrorCode::OutOfMemory.code(), 9402);
@@ -1045,39 +851,37 @@ mod tests {
         // Exhaustive list of all ErrorCode values that must round-trip through TryFrom<u16>.
         // When adding a new variant: add it here, bump the count, and update build.rs template.
         let all_codes: Vec<u16> = vec![
-            0, 1, 2, 3, 4, 5, 6, 7, 8, // 0xxx General (9)
-            1001, 1002, 1003, 1004, 1005, 1006, 1007, // 1xxx Auth (7)
-            2001, 2002, 2003, 2004, 2005, // 2xxx Permission (5)
-            3001, 3002, 3003, 3004, 3005, 3006, 3007, 3009, 3010, // 3xxx Tenant
-            3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3021, 3022, 3023, 3024,
-            3025, 3026, 3027, 3028, 3029, 3030, 3031, // P12 errors (30)
-            4001, 4002, 4003, 4004, 4005, 4006, 4007, 4008, 4009, 4010, 4011, 4012, 4013, 4014,
-            4015, 4016, // 4xxx Order (16)
-            5001, 5002, 5003, 5004, 5005, // 5xxx Payment (5)
-            6001, 6002, 6003, // 6xxx Product
-            6101, 6102, 6103, // 61xx Category
-            6201, 6202, 6203, 6204, 6205, // 62xx Spec/ExtId
+            0, 1, 2, 3, 4, 5, 6, 7, // 0xxx General (8)
+            1001, 1002, 1003, 1005, 1007, // 1xxx Auth (5)
+            2001, 2003, // 2xxx Permission (2)
+            3001, 3002, 3003, 3004, 3005, 3006, 3007, 3009, // 3xxx Tenant
+            3011, 3012, 3013, 3014, 3015, 3017, 3018, 3019, 3022, 3023, 3024, 3025, 3026, 3027,
+            3028, 3029, 3030, 3031, // P12 errors (26)
+            4001, 4003, 4004, 4006, 4008, 4009, 4010, 4011, 4012, 4013, 4014, 4015,
+            4016, // 4xxx Order (13)
+            6001, 6002, // 6xxx Product
+            6101, 6102, // 61xx Category
+            6202, 6203, 6204, 6205, // 62xx Spec/ExtId
             6301, 6302, 6303, 6304, // 63xx Attribute
             6401, 6402, // 64xx Tag
-            6501, 6502, 6503, 6504, 6505, 6506, 6507, 6508, 6509, // 65xx File Upload
             6511, 6512, // 65xx Print Dest
             6601, // 66xx Marketing
             6701, // 67xx Label Template
-            6801, 6802, // 68xx Price Rule (29)
-            7001, 7002, 7003, // 7xxx Table
-            7101, 7102, 7103, 7104, // 71xx Zone
+            6801, 6802, // 68xx Price Rule
+            7001, 7002, // 7xxx Table
+            7101, 7102, 7104, // 71xx Zone
             7201, // 72xx Shift
-            7301, // 73xx Daily Report (9)
-            8001, 8002, 8003, 8004, 8005, // 8xxx Employee+Member
-            8101, 8102, 8103, 8104, // 81xx Role (9)
+            7301, // 73xx Daily Report
+            8001, 8004, 8005, // 8xxx Employee+Member
+            8101, 8104, // 81xx Role
             9001, 9002, 9003, 9004, 9005, 9006, // 9xxx System
             9101, 9102, 9103, // 91xx Bridge
-            9201, 9202, 9203, 9204, 9205, 9206, 9207, // 92xx Printer
+            9201, 9202, 9203, 9204, // 92xx Printer
             9301, 9302, 9303, 9304, // 93xx Client + Archive/Invoice
             9401, 9402, 9403, 9404, // 94xx Storage
         ];
 
-        const EXPECTED_VARIANT_COUNT: usize = 146;
+        const EXPECTED_VARIANT_COUNT: usize = 107;
         assert_eq!(
             all_codes.len(),
             EXPECTED_VARIANT_COUNT,

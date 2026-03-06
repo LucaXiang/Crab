@@ -19,26 +19,16 @@ impl ErrorCode {
             | Self::InvalidRequest
             | Self::InvalidFormat
             | Self::RequiredField
-            | Self::ValueOutOfRange
             | Self::PasswordTooShort
             | Self::P12Required
-            | Self::OrderEmpty
             | Self::OrderNotCompleted
             | Self::CreditNoteOverRefund
             | Self::CreditNoteItemOverRefund
-            | Self::PaymentInvalidMethod
             | Self::ProductInvalidPrice
             | Self::ProductExternalIdRequired
             | Self::ProductCategoryInvalid
             | Self::SpecRootRequired
             | Self::AttributeBindFailed
-            | Self::NoFileProvided
-            | Self::EmptyFile
-            | Self::NoFilename
-            | Self::InvalidFileExtension
-            | Self::PrintKitchenDisabled
-            | Self::PrintLabelDisabled
-            | Self::PrintDestinationNotConfigured
             | Self::PriceRuleValueOutOfRange => StatusCode::BAD_REQUEST,
 
             // ==================== 401 Unauthorized ====================
@@ -47,23 +37,14 @@ impl ErrorCode {
             | Self::InvalidCredentials
             | Self::TenantCredentialsInvalid
             | Self::TokenExpired
-            | Self::TokenInvalid
             | Self::SessionExpired
-            | Self::AccountLocked
             | Self::AccountDisabled
             | Self::VerificationCodeInvalid => StatusCode::UNAUTHORIZED,
-
-            // ==================== 402 Payment Required ====================
-            Self::PaymentInsufficientAmount => StatusCode::PAYMENT_REQUIRED,
 
             // ==================== 403 Forbidden ====================
             // Authenticated but not allowed
             Self::PermissionDenied
-            | Self::RoleRequired
             | Self::AdminRequired
-            | Self::CannotModifyAdmin
-            | Self::CannotDeleteAdmin
-            | Self::EmployeeCannotDeleteSelf
             | Self::TenantNotSelected
             | Self::TenantNotFound
             | Self::ActivationFailed
@@ -73,10 +54,6 @@ impl ErrorCode {
             | Self::ResourceLimitExceeded
             | Self::TenantNoSubscription
             | Self::SubscriptionBlocked
-            | Self::FeatureNotAvailable
-            | Self::EmailNotVerified
-            | Self::DeviceIdMismatch
-            | Self::CertificateMissingDeviceId
             | Self::EmployeeIsSystem
             | Self::RoleIsSystem => StatusCode::FORBIDDEN,
 
@@ -86,7 +63,6 @@ impl ErrorCode {
             | Self::OrderItemNotFound
             | Self::ProductNotFound
             | Self::CategoryNotFound
-            | Self::SpecNotFound
             | Self::AttributeNotFound
             | Self::TableNotFound
             | Self::ZoneNotFound
@@ -104,42 +80,24 @@ impl ErrorCode {
             // ==================== 409 Conflict ====================
             // Request conflicts with current resource state
             Self::AlreadyExists
-            | Self::OrderAlreadyPaid
             | Self::OrderAlreadyCompleted
             | Self::OrderAlreadyVoided
-            | Self::OrderHasPayments
             | Self::OrderHasCreditNotes
             | Self::OrderAlreadyUpgraded
             | Self::OrderVoidedNoCreditNote
             | Self::ImportBlockedActiveOrders
-            | Self::PaymentAlreadyRefunded
-            | Self::ProductOutOfStock
             | Self::ProductExternalIdExists
-            | Self::CategoryNameExists
             | Self::CategoryHasProducts
-            | Self::ZoneNameExists
             | Self::ZoneHasTables
-            | Self::EmployeeUsernameExists
-            | Self::RoleNameExists
-            | Self::RoleInUse
             | Self::AttributeInUse
             | Self::AttributeDuplicateBinding
             | Self::TagInUse
             | Self::PrintDestinationInUse
             | Self::TableOccupied
-            | Self::TableAlreadyEmpty
             | Self::TableHasOrders => StatusCode::CONFLICT,
 
             // ==================== 410 Gone ====================
             Self::VerificationCodeExpired => StatusCode::GONE,
-
-            // ==================== 413 Payload Too Large ====================
-            Self::FileTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
-
-            // ==================== 415 Unsupported Media Type ====================
-            Self::UnsupportedFileFormat | Self::InvalidImageFile => {
-                StatusCode::UNSUPPORTED_MEDIA_TYPE
-            }
 
             // ==================== 422 Unprocessable Entity ====================
             // Request well-formed but semantically invalid
@@ -152,8 +110,6 @@ impl ErrorCode {
             | Self::P12NifMismatch
             | Self::P12CertExpired
             | Self::P12CertNotYetValid
-            | Self::PaymentFailed
-            | Self::PaymentRefundExceedsAmount
             | Self::ImportInvalidFormat => StatusCode::UNPROCESSABLE_ENTITY,
 
             // ==================== 429 Too Many Requests ====================
@@ -174,8 +130,6 @@ impl ErrorCode {
             | Self::PrintNoPrintersConfigured
             | Self::PrintAllPrintersOffline
             | Self::ClientDisconnected
-            | Self::ImageProcessingFailed
-            | Self::FileStorageFailed
             | Self::StorageCorrupted
             | Self::ArchiveHashChainError
             | Self::InvoiceNumberError
@@ -213,22 +167,12 @@ mod tests {
             ErrorCode::InvalidRequest,
             ErrorCode::InvalidFormat,
             ErrorCode::RequiredField,
-            ErrorCode::ValueOutOfRange,
             ErrorCode::PasswordTooShort,
             ErrorCode::P12Required,
-            ErrorCode::OrderEmpty,
-            ErrorCode::PaymentInvalidMethod,
             ErrorCode::ProductInvalidPrice,
             ErrorCode::ProductExternalIdRequired,
             ErrorCode::ProductCategoryInvalid,
             ErrorCode::AttributeBindFailed,
-            ErrorCode::NoFileProvided,
-            ErrorCode::EmptyFile,
-            ErrorCode::NoFilename,
-            ErrorCode::InvalidFileExtension,
-            ErrorCode::PrintKitchenDisabled,
-            ErrorCode::PrintLabelDisabled,
-            ErrorCode::PrintDestinationNotConfigured,
         ];
         for code in cases {
             assert_eq!(code.http_status(), StatusCode::BAD_REQUEST, "{code:?}");
@@ -242,9 +186,7 @@ mod tests {
             ErrorCode::InvalidCredentials,
             ErrorCode::TenantCredentialsInvalid,
             ErrorCode::TokenExpired,
-            ErrorCode::TokenInvalid,
             ErrorCode::SessionExpired,
-            ErrorCode::AccountLocked,
             ErrorCode::AccountDisabled,
             ErrorCode::VerificationCodeInvalid,
         ];
@@ -258,7 +200,6 @@ mod tests {
         let cases = [
             ErrorCode::PermissionDenied,
             ErrorCode::AdminRequired,
-            ErrorCode::EmployeeCannotDeleteSelf,
             ErrorCode::TenantNotSelected,
             ErrorCode::LicenseExpired,
             ErrorCode::EmployeeIsSystem,
@@ -290,14 +231,8 @@ mod tests {
     fn test_conflict_status() {
         let cases = [
             ErrorCode::AlreadyExists,
-            ErrorCode::OrderAlreadyPaid,
-            ErrorCode::OrderHasPayments,
-            ErrorCode::ProductOutOfStock,
             ErrorCode::ProductExternalIdExists,
-            ErrorCode::CategoryNameExists,
             ErrorCode::TableOccupied,
-            ErrorCode::TableAlreadyEmpty,
-            ErrorCode::RoleInUse,
         ];
         for code in cases {
             assert_eq!(code.http_status(), StatusCode::CONFLICT, "{code:?}");
@@ -313,8 +248,6 @@ mod tests {
             ErrorCode::P12MissingCertificate,
             ErrorCode::P12ChainVerifyFailed,
             ErrorCode::P12UntrustedCa,
-            ErrorCode::PaymentFailed,
-            ErrorCode::PaymentRefundExceedsAmount,
         ];
         for code in cases {
             assert_eq!(
@@ -326,22 +259,12 @@ mod tests {
     }
 
     #[test]
-    fn test_payment_required_status() {
-        assert_eq!(
-            ErrorCode::PaymentInsufficientAmount.http_status(),
-            StatusCode::PAYMENT_REQUIRED
-        );
-    }
-
-    #[test]
     fn test_internal_error_status() {
         let cases = [
             ErrorCode::Unknown,
             ErrorCode::InternalError,
             ErrorCode::DatabaseError,
             ErrorCode::BridgeNotInitialized,
-            ErrorCode::ImageProcessingFailed,
-            ErrorCode::FileStorageFailed,
             ErrorCode::StorageCorrupted,
         ];
         for code in cases {
@@ -384,14 +307,6 @@ mod tests {
         assert_eq!(
             ErrorCode::PaymentSetupFailed.http_status(),
             StatusCode::BAD_GATEWAY
-        );
-        assert_eq!(
-            ErrorCode::FileTooLarge.http_status(),
-            StatusCode::PAYLOAD_TOO_LARGE
-        );
-        assert_eq!(
-            ErrorCode::UnsupportedFileFormat.http_status(),
-            StatusCode::UNSUPPORTED_MEDIA_TYPE
         );
     }
 }
