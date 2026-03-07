@@ -563,8 +563,8 @@ const AdjustmentCard: React.FC<{
           {prefix}{formatCurrency(totalAmount)}
         </span>
       </div>
-      <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
-        <div className="w-36 h-36 shrink-0">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+        <div className="w-28 h-28 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -573,8 +573,8 @@ const AdjustmentCard: React.FC<{
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                innerRadius={30}
-                outerRadius={60}
+                innerRadius={24}
+                outerRadius={48}
                 paddingAngle={2}
               >
                 {entries.map((_, i) => (
@@ -584,27 +584,29 @@ const AdjustmentCard: React.FC<{
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 min-w-0 space-y-2.5 w-full">
           {entries.map((entry, i) => {
             const pct = totalAmount > 0 ? ((entry.amount / totalAmount) * 100).toFixed(1) : '0';
             const label = entry.source === 'item_rule' || entry.source === 'order_rule'
               ? entry.name
               : t(SOURCE_I18N[entry.source] ?? entry.source);
             return (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
-                  <span className="text-slate-700 truncate">{label}</span>
-                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded whitespace-nowrap ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
-                    {t(`stats.adj_src_${entry.source}`)}
-                  </span>
+              <div key={i} className="flex items-start justify-between gap-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
+                    <span className="text-slate-700 truncate">{label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-3.5 mt-0.5">
+                    <span className={`px-1 py-px text-[10px] font-medium rounded ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
+                      {t(`stats.adj_src_${entry.source}`)}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{pct}% · {entry.order_count}{t('stats.orders_unit')}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0 ml-2">
-                  <span className="text-xs text-slate-400">{entry.order_count}{t('stats.orders_unit')}</span>
-                  <span className={`font-semibold w-20 text-right ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
-                    {prefix}{formatCurrency(entry.amount)}
-                  </span>
-                </div>
+                <span className={`font-semibold shrink-0 ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+                  {prefix}{formatCurrency(entry.amount)}
+                </span>
               </div>
             );
           })}
