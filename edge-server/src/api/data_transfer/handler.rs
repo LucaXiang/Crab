@@ -328,21 +328,29 @@ pub async fn import_catalog_data(
         .map_err(|e| AppError::database(e.to_string()))?;
 
         // Category → print_destination (kitchen + label share the same junction table)
+        // print_destination is local hardware config, may not exist after re-bind;
+        // use conditional insert to skip missing destinations (FK would fail otherwise)
         for dest_id in &cat.kitchen_print_destinations {
-            sqlx::query("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)")
-                .bind(cat.id)
-                .bind(dest_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| AppError::database(e.to_string()))?;
+            sqlx::query(
+                "INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) \
+                 SELECT ?1, ?2 WHERE EXISTS (SELECT 1 FROM print_destination WHERE id = ?2)",
+            )
+            .bind(cat.id)
+            .bind(dest_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::database(e.to_string()))?;
         }
         for dest_id in &cat.label_print_destinations {
-            sqlx::query("INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) VALUES (?, ?)")
-                .bind(cat.id)
-                .bind(dest_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| AppError::database(e.to_string()))?;
+            sqlx::query(
+                "INSERT OR IGNORE INTO category_print_dest (category_id, print_destination_id) \
+                 SELECT ?1, ?2 WHERE EXISTS (SELECT 1 FROM print_destination WHERE id = ?2)",
+            )
+            .bind(cat.id)
+            .bind(dest_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::database(e.to_string()))?;
         }
 
         // Category → tag
