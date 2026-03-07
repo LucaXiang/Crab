@@ -933,7 +933,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_single_open
 
 -- Admin role + user (password: 'admin')
 INSERT INTO role (id, name, description, permissions, is_system, is_active)
-VALUES (1, 'admin', 'administrator', '["*"]', 1, 1);
+VALUES (1, 'admin', 'administrator', '["all"]', 1, 1);
 
 INSERT INTO employee (id, username, hash_pass, name, role_id, is_system, is_active, created_at)
 VALUES (1, 'admin', '$argon2id$v=19$m=19456,t=2,p=1$4K7SyBwr5d3uF4hroPQf2w$hPqq7x5rSE1d9TTf+hK3eipuaeeElC7GMHuSJIozDws', 'admin', 1, 1, 1, 0);

@@ -314,6 +314,7 @@ scp -i deploy/ec2/crab-ec2.pem -r build/* ec2-user@51.92.72.162:/opt/crab/portal
 - **跨 Rust + TypeScript 的变更，两边都必须验证编译**，不要假设一边不受影响
 - 只 stage 当前任务范围内的文件，不包含无关 crate/目录的变更
 - 先 `git diff --stat` 检查变更范围，用 `git add <specific-files>` 而非 `git add .`
+- **Pre-commit hook 会跑 `cargo fmt` 和 `cargo clippy`**。`cargo fmt` 可能格式化不相关的文件。提交前先跑 `cargo fmt --all` 确保格式一致，然后只 stage 本次任务的文件。如果 pre-commit hook 格式化了不相关文件，用 `git checkout -- <不相关文件>` 还原，**不要还原自己的改动文件**
 
 ## 版本管理
 
