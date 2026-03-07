@@ -125,7 +125,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
     case 'ITEMS_ADDED': {
       const items = p.items || [];
       const totalQty = items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0);
-      if (totalQty > 0) summary = `${totalQty} items`;
+      if (totalQty > 0) summary = t('timeline.items_added_summary').replace('{n}', String(totalQty));
       for (const item of items) {
         const id = item.instance_id ? `#${String(item.instance_id).slice(-5)} ` : '';
         const mods: string[] = [];
@@ -222,7 +222,7 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       if (p.amount != null) summary = `+${formatCurrency(p.amount)}`;
       if (p.tendered != null) {
         details.push(`${t('orders.paid')}: ${formatCurrency(p.tendered)}`);
-        details.push(`Change: ${formatCurrency(p.change || 0)}`);
+        details.push(`${t('timeline.change_given')}: ${formatCurrency(p.change || 0)}`);
       }
       if (p.note) details.push(p.note);
       break;
@@ -290,29 +290,33 @@ export function renderEventDisplay(event: TimelineEvent, t: (k: string) => strin
       break;
     }
     case 'ORDER_DISCOUNT_APPLIED': {
-      if (p.discount_percent) {
-        const computed = p.discount !== 0 ? ` (-${formatCurrency(p.discount)})` : '';
-        detailTags.push({ label: t('orders.discount'), value: `${p.discount_percent}%${computed}`, colorClass: 'bg-orange-100 text-orange-700 border-orange-200' });
-      } else if (p.discount_fixed) {
-        detailTags.push({ label: t('orders.discount'), value: `-${formatCurrency(p.discount_fixed)}`, colorClass: 'bg-orange-100 text-orange-700 border-orange-200' });
+      const isClearing = !p.discount_percent && !p.discount_fixed;
+      if (isClearing) {
+        title = t('timeline.discount_cleared');
+      } else {
+        if (p.discount_percent) {
+          const computed = p.discount !== 0 ? ` (-${formatCurrency(p.discount)})` : '';
+          detailTags.push({ label: t('orders.discount'), value: `${p.discount_percent}%${computed}`, colorClass: 'bg-orange-100 text-orange-700 border-orange-200' });
+        } else if (p.discount_fixed) {
+          detailTags.push({ label: t('orders.discount'), value: `-${formatCurrency(p.discount_fixed)}`, colorClass: 'bg-orange-100 text-orange-700 border-orange-200' });
+        }
+        if (p.total != null) summary = `${t('orders.total')}: ${formatCurrency(p.total)}`;
       }
-      if (!p.discount_percent && !p.discount_fixed) title = t('timeline.discount_cleared');
-      if (p.subtotal != null) details.push(`${t('orders.subtotal')}: ${formatCurrency(p.subtotal)}`);
-      if (p.discount != null) details.push(`${t('orders.discount')}: -${formatCurrency(p.discount)}`);
-      if (p.total != null) details.push(`${t('orders.total')}: ${formatCurrency(p.total)}`);
       break;
     }
     case 'ORDER_SURCHARGE_APPLIED': {
-      if (p.surcharge_percent) {
-        const computed = p.surcharge !== 0 ? ` (+${formatCurrency(p.surcharge)})` : '';
-        detailTags.push({ label: t('orders.surcharge'), value: `${p.surcharge_percent}%${computed}`, colorClass: 'bg-purple-100 text-purple-700 border-purple-200' });
-      } else if (p.surcharge_amount) {
-        detailTags.push({ label: t('orders.surcharge'), value: `+${formatCurrency(p.surcharge_amount)}`, colorClass: 'bg-purple-100 text-purple-700 border-purple-200' });
+      const isClearing = !p.surcharge_percent && !p.surcharge_amount;
+      if (isClearing) {
+        title = t('timeline.surcharge_cleared');
+      } else {
+        if (p.surcharge_percent) {
+          const computed = p.surcharge !== 0 ? ` (+${formatCurrency(p.surcharge)})` : '';
+          detailTags.push({ label: t('orders.surcharge'), value: `${p.surcharge_percent}%${computed}`, colorClass: 'bg-purple-100 text-purple-700 border-purple-200' });
+        } else if (p.surcharge_amount) {
+          detailTags.push({ label: t('orders.surcharge'), value: `+${formatCurrency(p.surcharge_amount)}`, colorClass: 'bg-purple-100 text-purple-700 border-purple-200' });
+        }
+        if (p.total != null) summary = `${t('orders.total')}: ${formatCurrency(p.total)}`;
       }
-      if (!p.surcharge_percent && !p.surcharge_amount) title = t('timeline.surcharge_cleared');
-      if (p.subtotal != null) details.push(`${t('orders.subtotal')}: ${formatCurrency(p.subtotal)}`);
-      if (p.surcharge != null) details.push(`${t('orders.surcharge')}: +${formatCurrency(p.surcharge)}`);
-      if (p.total != null) details.push(`${t('orders.total')}: ${formatCurrency(p.total)}`);
       break;
     }
     case 'ORDER_NOTE_ADDED': {
