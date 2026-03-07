@@ -381,7 +381,10 @@ impl CloudWorker {
                     }
                 }
             }
-            CloudMessage::CatalogSyncData { catalog, .. } => {
+            CloudMessage::CatalogSyncData {
+                catalog,
+                recovery_state,
+            } => {
                 tracing::info!("Received CatalogSyncData from cloud");
                 match crate::cloud::ops::provisioning::apply_catalog_sync_data(
                     &self.state,
@@ -391,6 +394,17 @@ impl CloudWorker {
                 {
                     Ok(()) => {
                         tracing::info!("CatalogSyncData applied successfully");
+                        if let Some(ref recovery) = recovery_state {
+                            match crate::cloud::ops::provisioning::apply_recovery_state(
+                                &self.state,
+                                recovery,
+                            )
+                            .await
+                            {
+                                Ok(()) => tracing::info!("Recovery state applied"),
+                                Err(e) => tracing::error!("Failed to apply recovery state: {e}"),
+                            }
+                        }
                     }
                     Err(e) => {
                         tracing::error!("Failed to apply CatalogSyncData: {e}");
@@ -567,6 +581,7 @@ impl CloudWorker {
         let msg = CloudMessage::SyncBatch {
             items,
             sent_at: shared::util::now_millis(),
+            counter_state: None,
         };
 
         let json = serde_json::to_string(&msg)
@@ -649,6 +664,7 @@ impl CloudWorker {
             let msg = CloudMessage::SyncBatch {
                 items,
                 sent_at: shared::util::now_millis(),
+                counter_state: None,
             };
             let json = serde_json::to_string(&msg).map_err(|e| {
                 crate::utils::AppError::internal(format!("Serialize catalog changelog: {e}"))
@@ -818,10 +834,12 @@ impl CloudWorker {
             }
 
             let batch_count = items.len();
+            let counter_state = self.build_counter_state();
             let batch = CloudSyncBatch {
                 edge_id: self.cloud_service.edge_id().to_string(),
                 items,
                 sent_at: shared::util::now_millis(),
+                counter_state,
             };
 
             let response = self
@@ -933,6 +951,20 @@ impl CloudWorker {
             action: shared::cloud::SyncAction::Upsert,
             resource_id: entry.entry_pk,
             data,
+        })
+    }
+
+    /// Snapshot current receipt counter state for Cloud storage.
+    /// Returns None if counter cannot be read (fresh redb, no orders yet).
+    fn build_counter_state(&self) -> Option<shared::cloud::CounterState> {
+        let om = &self.state.orders_manager;
+        let (business_date, daily_count) = om.current_counter_state();
+        if daily_count == 0 {
+            return None;
+        }
+        Some(shared::cloud::CounterState {
+            daily_count: daily_count as i32,
+            business_date,
         })
     }
 
@@ -1150,6 +1182,7 @@ impl CloudWorker {
                 edge_id: self.cloud_service.edge_id().to_string(),
                 items,
                 sent_at: shared::util::now_millis(),
+                counter_state: None,
             };
 
             let response = self
@@ -1251,6 +1284,7 @@ impl CloudWorker {
         let msg = CloudMessage::SyncBatch {
             items,
             sent_at: shared::util::now_millis(),
+            counter_state: None,
         };
 
         let json = serde_json::to_string(&msg)
@@ -1435,6 +1469,7 @@ impl CloudWorker {
             edge_id: self.cloud_service.edge_id().to_string(),
             items,
             sent_at: shared::util::now_millis(),
+            counter_state: self.build_counter_state(),
         };
 
         let response = self.push_with_retry(batch).await?;

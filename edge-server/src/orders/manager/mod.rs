@@ -181,6 +181,16 @@ impl OrdersManager {
         *self.business_day_cutoff.write() = parsed;
     }
 
+    /// Read current counter state: (business_date YYYYMMDD, daily_count).
+    /// Used by CloudWorker to sync counter state to Cloud for recovery.
+    pub fn current_counter_state(&self) -> (String, u64) {
+        let cutoff = *self.business_day_cutoff.read();
+        let business_date = crate::utils::time::current_business_date(cutoff, self.tz);
+        let date_str = business_date.format("%Y%m%d").to_string();
+        let count = self.storage.current_daily_count(&date_str).unwrap_or(0);
+        (date_str, count)
+    }
+
     /// Create an OrdersManager with existing storage (for testing)
     #[cfg(test)]
     pub fn with_storage(storage: OrderStorage) -> Self {

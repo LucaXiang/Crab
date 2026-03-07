@@ -306,6 +306,19 @@ impl OrderStorage {
         Ok(count)
     }
 
+    /// Read current daily count without incrementing (for sync to Cloud).
+    /// Returns 0 if no orders exist for the given business date.
+    pub fn current_daily_count(&self, business_date: &str) -> StorageResult<u64> {
+        let txn = self.db.begin_read()?;
+        let table = txn.open_table(SEQUENCE_TABLE)?;
+        let stored_date = table.get(DAILY_DATE_KEY)?.map(|g| g.value());
+        let today_u64: u64 = business_date.parse().unwrap_or(0);
+        if stored_date != Some(today_u64) {
+            return Ok(0);
+        }
+        Ok(table.get(DAILY_COUNT_KEY)?.map(|g| g.value()).unwrap_or(0))
+    }
+
     /// Restore daily count from cloud recovery (re-bind scenario)
     pub fn restore_daily_count(&self, business_date: &str, count: u64) -> StorageResult<()> {
         let txn = self.db.begin_write()?;

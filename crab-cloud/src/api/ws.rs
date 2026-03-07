@@ -305,7 +305,11 @@ async fn handle_edge_message<S>(
     let now = shared::util::now_millis();
 
     match cloud_msg {
-        CloudMessage::SyncBatch { items, .. } => {
+        CloudMessage::SyncBatch {
+            items,
+            counter_state,
+            ..
+        } => {
             // Reject oversized batches
             if items.len() > shared::cloud::MAX_SYNC_BATCH_ITEMS {
                 tracing::warn!(
@@ -316,8 +320,11 @@ async fn handle_edge_message<S>(
                 return;
             }
 
-            // Update last_sync_at
-            if let Err(e) = sync_store::update_last_sync(&state.pool, store_id, now).await {
+            // Update last_sync_at + counter_state
+            if let Err(e) =
+                sync_store::update_last_sync(&state.pool, store_id, now, counter_state.as_ref())
+                    .await
+            {
                 tracing::warn!(store_id, "Failed to update last_sync_at: {e}");
             }
 

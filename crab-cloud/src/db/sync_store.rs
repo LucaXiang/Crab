@@ -83,12 +83,32 @@ pub async fn get_store_number(
 }
 
 /// Update last_sync_at for an edge-server
-pub async fn update_last_sync(pool: &PgPool, store_id: i64, now: i64) -> Result<(), BoxError> {
-    sqlx::query("UPDATE stores SET last_sync_at = $1 WHERE id = $2")
-        .bind(now)
-        .bind(store_id)
-        .execute(pool)
-        .await?;
+pub async fn update_last_sync(
+    pool: &PgPool,
+    store_id: i64,
+    now: i64,
+    counter_state: Option<&shared::cloud::CounterState>,
+) -> Result<(), BoxError> {
+    match counter_state {
+        Some(cs) => {
+            sqlx::query(
+                "UPDATE stores SET last_sync_at = $1, last_daily_count = $2, last_business_date = $3 WHERE id = $4",
+            )
+            .bind(now)
+            .bind(cs.daily_count)
+            .bind(&cs.business_date)
+            .bind(store_id)
+            .execute(pool)
+            .await?;
+        }
+        None => {
+            sqlx::query("UPDATE stores SET last_sync_at = $1 WHERE id = $2")
+                .bind(now)
+                .bind(store_id)
+                .execute(pool)
+                .await?;
+        }
+    }
     Ok(())
 }
 
@@ -1356,13 +1376,14 @@ async fn upsert_invoice(
 ///
 /// Returns `None` if no archived orders exist (first-time bind, nothing to recover).
 /// Otherwise returns counters/hashes needed to restore order layer + invoice layer.
+///
+/// Counter state (daily_count, business_date) is read directly from `stores` table —
+/// Edge syncs this as part of every order sync batch, so Cloud always has the latest.
+/// Chain hash and invoice data are queried from their canonical tables.
 pub async fn build_recovery_state(
     pool: &PgPool,
     store_id: i64,
 ) -> Result<Option<shared::cloud::ws::RecoveryState>, BoxError> {
-    // UTC today in YYYYMMDD format
-    let today = chrono::Utc::now().format("%Y%m%d").to_string();
-
     // Check if any archived orders exist for this store
     let has_orders: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM store_archived_orders WHERE store_id = $1)",
@@ -1375,19 +1396,19 @@ pub async fn build_recovery_state(
         return Ok(None);
     }
 
-    // Count today's receipts by matching the date part in receipt_number (format: NN-YYYYMMDD-CCCC)
-    let daily_count: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)
-        FROM store_archived_orders
-        WHERE store_id = $1
-          AND receipt_number LIKE '%-' || $2 || '-%'
-        "#,
-    )
-    .bind(store_id)
-    .bind(&today)
-    .fetch_one(pool)
-    .await?;
+    // Counter state from stores table (synced from Edge)
+    let (daily_count, business_date): (i32, String) =
+        sqlx::query_as("SELECT last_daily_count, last_business_date FROM stores WHERE id = $1")
+            .bind(store_id)
+            .fetch_one(pool)
+            .await?;
+
+    if business_date.is_empty() {
+        tracing::warn!(
+            store_id,
+            "Recovery: store has orders but no counter_state synced yet — daily_count will be 0"
+        );
+    }
 
     // Last chain hash
     let last_chain_hash: Option<String> = sqlx::query_scalar(
@@ -1412,7 +1433,7 @@ pub async fn build_recovery_state(
 
     Ok(Some(shared::cloud::ws::RecoveryState {
         daily_receipt_count: daily_count,
-        business_date: today,
+        business_date,
         last_chain_hash,
         last_huella,
         last_invoice_number,

@@ -160,6 +160,8 @@ CREATE TABLE IF NOT EXISTS stores (
     receipt_footer TEXT,
     receipt_locale TEXT,
     last_sync_at BIGINT,
+    last_daily_count INTEGER NOT NULL DEFAULT 0,
+    last_business_date TEXT NOT NULL DEFAULT '',
     registered_at BIGINT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
     deleted_at BIGINT,

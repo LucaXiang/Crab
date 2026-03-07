@@ -22,6 +22,8 @@ pub enum CloudMessage {
     SyncBatch {
         items: Vec<CloudSyncItem>,
         sent_at: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        counter_state: Option<super::CounterState>,
     },
 
     // === cloud → edge ===
@@ -113,7 +115,7 @@ pub enum CloudRpcResult {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RecoveryState {
     /// 当前 business_date 的最大 daily receipt count (恢复到 redb)
-    pub daily_receipt_count: i64,
+    pub daily_receipt_count: i32,
     /// business_date "YYYYMMDD"
     pub business_date: String,
     /// 最后一个 chain_entry 的 curr_hash (仅用于 BREAK entry 的 prev_hash)
@@ -140,6 +142,7 @@ mod tests {
                 data: serde_json::json!({"name": "Test"}),
             }],
             sent_at: 1700000000000,
+            counter_state: None,
         };
 
         let json = serde_json::to_string(&msg).unwrap();

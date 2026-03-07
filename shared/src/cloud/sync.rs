@@ -162,6 +162,15 @@ impl std::fmt::Display for SyncResource {
 /// Maximum items per sync batch (HTTP or WS).
 pub const MAX_SYNC_BATCH_ITEMS: usize = 500;
 
+/// Edge receipt counter state — synced to Cloud for recovery after database loss.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CounterState {
+    /// Current daily receipt count (from redb DAILY_COUNT_KEY)
+    pub daily_count: i32,
+    /// Business date in YYYYMMDD format (Edge local timezone + cutoff)
+    pub business_date: String,
+}
+
 /// A batch of sync items from an edge-server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudSyncBatch {
@@ -171,6 +180,9 @@ pub struct CloudSyncBatch {
     pub items: Vec<CloudSyncItem>,
     /// Timestamp when the batch was sent (Unix millis)
     pub sent_at: i64,
+    /// Edge receipt counter snapshot (present when batch contains order chain entries)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counter_state: Option<CounterState>,
 }
 
 /// Cloud sync action (edge → cloud)
@@ -1241,6 +1253,7 @@ mod tests {
                 data: serde_json::json!({"name": "Test Product", "price": 9.99}),
             }],
             sent_at: 1700000000000,
+            counter_state: None,
         };
 
         let json = serde_json::to_string(&batch).unwrap();

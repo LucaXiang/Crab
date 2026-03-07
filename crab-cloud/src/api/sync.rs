@@ -59,8 +59,8 @@ pub async fn handle_sync(
         AppError::new(ErrorCode::InternalError)
     })?;
 
-    // Update last_sync_at
-    sync_store::update_last_sync(&state.pool, store_id, now)
+    // Update last_sync_at + counter_state if present
+    sync_store::update_last_sync(&state.pool, store_id, now, batch.counter_state.as_ref())
         .await
         .map_err(|e| {
             tracing::error!("Failed to update last_sync: {e}");
