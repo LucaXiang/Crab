@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Calendar, Clock, User, AlertTriangle, CheckCircle2,
-  Banknote, ShoppingBag, XCircle, Receipt,
+  Banknote, ShoppingBag, XCircle, Receipt, CreditCard, Coins,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useStoreId } from '@/hooks/useStoreId';
@@ -194,6 +194,35 @@ export const ReportDetailScreen: React.FC = () => {
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-sm text-slate-500">
           {t('reports.no_shift_data')}
+        </div>
+      )}
+
+      {/* Payment Breakdown */}
+      {report.payment_breakdown.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-semibold text-slate-700">{t('reports.payment_breakdown')}</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {report.payment_breakdown.map((p) => {
+              const isCash = /cash|efectivo|现金/i.test(p.method);
+              return (
+                <div key={p.method} className="px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-1.5 rounded-full ${isCash ? 'bg-green-100 text-green-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                      {isCash ? <Coins className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-slate-800">{p.method}</span>
+                      <span className="text-xs text-slate-400 ml-2">{p.count} {t('reports.payment_count_unit')}</span>
+                    </div>
+                  </div>
+                  <span className="font-semibold text-slate-900">{formatCurrency(p.amount)}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

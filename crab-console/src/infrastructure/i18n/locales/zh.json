@@ -312,6 +312,7 @@
     "generated_by": "生成人",
     "daily_summary": "当日总计",
     "refund_count_unit": "笔",
+    "payment_count_unit": "笔",
     "no_shift_data": "暂无班次数据",
     "unlinked_shift": "未关联班次"
   },

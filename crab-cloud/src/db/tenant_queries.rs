@@ -462,6 +462,7 @@ pub struct DailyReportDetail {
     pub generated_by_name: Option<String>,
     pub note: Option<String>,
     pub shift_breakdowns: Vec<ShiftBreakdownDetail>,
+    pub payment_breakdown: Vec<PaymentBreakdownEntry>,
 }
 
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
@@ -547,6 +548,42 @@ pub async fn get_daily_report_detail(
     .fetch_all(pool)
     .await?;
 
+    // Derive time range from shifts for payment query
+    let payment_breakdown = if shift_breakdowns.is_empty() {
+        vec![]
+    } else {
+        let from = shift_breakdowns.iter().map(|s| s.start_time).min().unwrap();
+        let to = shift_breakdowns
+            .iter()
+            .filter_map(|s| s.end_time)
+            .max()
+            .unwrap_or_else(shared::util::now_millis);
+        sqlx::query_as::<_, PaymentBreakdownEntry>(
+            r#"
+            SELECT
+                p.method,
+                COALESCE(SUM(p.amount), 0)::DOUBLE PRECISION AS amount,
+                COUNT(*) AS count
+            FROM store_order_payments p
+            JOIN store_archived_orders o ON o.id = p.order_id
+            WHERE o.store_id = $1 AND o.tenant_id = $2
+                AND o.end_time >= $3 AND o.end_time <= $4
+                AND o.status = 'COMPLETED'
+                AND o.is_voided IS NOT TRUE
+                AND p.cancelled IS NOT TRUE
+            GROUP BY p.method
+            ORDER BY amount DESC
+            "#,
+        )
+        .bind(store_id)
+        .bind(tenant_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default()
+    };
+
     Ok(Some(DailyReportDetail {
         id: report.id,
         business_date: report.business_date,
@@ -560,6 +597,7 @@ pub async fn get_daily_report_detail(
         generated_by_name: report.generated_by_name,
         note: report.note,
         shift_breakdowns,
+        payment_breakdown,
     }))
 }
 

@@ -310,6 +310,7 @@
     "generated_by": "Generado por",
     "daily_summary": "Resumen diario",
     "refund_count_unit": "ops",
+    "payment_count_unit": "ops",
     "no_shift_data": "Sin datos de turno disponibles",
     "unlinked_shift": "Turno no vinculado"
   },

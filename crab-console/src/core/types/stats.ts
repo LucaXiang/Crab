@@ -148,6 +148,7 @@ export interface DailyReportDetail {
   generated_by_name: string | null;
   note: string | null;
   shift_breakdowns: ShiftBreakdown[];
+  payment_breakdown: PaymentBreakdown[];
 }
 
 export interface ItemFlags {
