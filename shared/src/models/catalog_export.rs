@@ -135,7 +135,11 @@ mod tests {
 
     #[test]
     fn test_deserialize_exported_catalog() {
-        let json = std::fs::read_to_string("/tmp/test_catalog.json").unwrap();
+        let json = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/test_catalog.json"
+        ))
+        .unwrap();
         match serde_json::from_str::<CatalogExport>(&json) {
             Ok(c) => {
                 println!(

@@ -1,0 +1,1319 @@
+{
+  "version": 1,
+  "exported_at": 1772534967356,
+  "tags": [],
+  "categories": [
+    {
+      "id": 278787012053054,
+      "name": "Cafe",
+      "sort_order": 0,
+      "is_kitchen_print_enabled": false,
+      "is_label_print_enabled": false,
+      "is_active": true,
+      "is_virtual": false,
+      "match_mode": "any",
+      "is_display": true,
+      "kitchen_print_destinations": [],
+      "label_print_destinations": [],
+      "tag_ids": []
+    },
+    {
+      "id": 278787012052426,
+      "name": "Matcha",
+      "sort_order": 1,
+      "is_kitchen_print_enabled": false,
+      "is_label_print_enabled": false,
+      "is_active": true,
+      "is_virtual": false,
+      "match_mode": "any",
+      "is_display": true,
+      "kitchen_print_destinations": [],
+      "label_print_destinations": [],
+      "tag_ids": []
+    },
+    {
+      "id": 278787012053646,
+      "name": "Postre",
+      "sort_order": 2,
+      "is_kitchen_print_enabled": false,
+      "is_label_print_enabled": false,
+      "is_active": true,
+      "is_virtual": false,
+      "match_mode": "any",
+      "is_display": true,
+      "kitchen_print_destinations": [],
+      "label_print_destinations": [],
+      "tag_ids": []
+    }
+  ],
+  "products": [
+    {
+      "id": 278787012064663,
+      "name": "Matcha Ceremonial",
+      "image": "",
+      "category_id": 278787012052426,
+      "sort_order": 0,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Ceremonial",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 14,
+      "specs": [
+        {
+          "id": 278790914110633,
+          "product_id": 278787012064663,
+          "name": "",
+          "price": 3.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012067185,
+      "name": "Matcha latte",
+      "image": "9628a57ab613960aa46c8710aa787226efd9f70742733c92c2ba7a111d76c545",
+      "category_id": 278787012052426,
+      "sort_order": 1,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha latte",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 15,
+      "specs": [
+        {
+          "id": 279083772076251,
+          "product_id": 278787012067185,
+          "name": "",
+          "price": 4.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012066977,
+      "name": "Iced Matcha Latte",
+      "image": "",
+      "category_id": 278787012052426,
+      "sort_order": 2,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Iced Matcha Latte",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 16,
+      "specs": [
+        {
+          "id": 279083663139247,
+          "product_id": 278787012066977,
+          "name": "",
+          "price": 5.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012064597,
+      "name": "Matcha Strawberry Tiramusu",
+      "image": "",
+      "category_id": 278787012052426,
+      "sort_order": 3,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Strawberry Tiramusu",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 17,
+      "specs": [
+        {
+          "id": 279083296081724,
+          "product_id": 278787012064597,
+          "name": "",
+          "price": 6.9,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012064172,
+      "name": "Matcha Einspanner",
+      "image": "",
+      "category_id": 278787012052426,
+      "sort_order": 4,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Einspanner",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 18,
+      "specs": [
+        {
+          "id": 279085506608694,
+          "product_id": 278787012064172,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012065245,
+      "name": "Matcha Latte Brulee",
+      "image": "",
+      "category_id": 278787012052426,
+      "sort_order": 5,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Latte Brulee",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 19,
+      "specs": [
+        {
+          "id": 279083397583570,
+          "product_id": 278787012065245,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012067232,
+      "name": "Matcha Top Cocowater",
+      "image": "",
+      "category_id": 278787012052426,
+      "sort_order": 6,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Top Cocowater",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 20,
+      "specs": [
+        {
+          "id": 278791107455414,
+          "product_id": 278787012067232,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012052946,
+      "name": "Espresso",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 0,
+      "tax_rate": 10,
+      "receipt_name": null,
+      "kitchen_print_name": null,
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 1,
+      "specs": [
+        {
+          "id": 278787603680193,
+          "product_id": 278787012052946,
+          "name": "",
+          "price": 2.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        },
+        {
+          "id": 278787603680457,
+          "product_id": 278787012052946,
+          "name": "Double",
+          "price": 2.5,
+          "display_order": 1,
+          "is_default": false,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": false
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 279795838172298,
+      "name": "Cortado",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 0,
+      "tax_rate": 10,
+      "receipt_name": "Cortado",
+      "kitchen_print_name": "Cortado",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 0,
+      "specs": [
+        {
+          "id": 279795911636576,
+          "product_id": 279795838172298,
+          "name": "Cortado",
+          "price": 2.6,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012055994,
+      "name": "Latte",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 1,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Latte",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 2,
+      "specs": [
+        {
+          "id": 279083906838491,
+          "product_id": 278787012055994,
+          "name": "",
+          "price": 2.8,
+          "display_order": 0,
+          "is_default": false,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        },
+        {
+          "id": 279083906835834,
+          "product_id": 278787012055994,
+          "name": "Grande",
+          "price": 3.8,
+          "display_order": 1,
+          "is_default": false,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": false
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012055266,
+      "name": "Capiccino",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 2,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Capiccino",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 3,
+      "specs": [
+        {
+          "id": 279084000732835,
+          "product_id": 278787012055266,
+          "name": "",
+          "price": 2.8,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012059079,
+      "name": "Americano",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 3,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Americano",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 4,
+      "specs": [
+        {
+          "id": 278790541747067,
+          "product_id": 278787012059079,
+          "name": "",
+          "price": 2.6,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012071947,
+      "name": "Flat white",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 4,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Flat white",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 5,
+      "specs": [
+        {
+          "id": 279084409106585,
+          "product_id": 278787012071947,
+          "name": "",
+          "price": 3.2,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012056605,
+      "name": "Mocha",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 5,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Mocha",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 6,
+      "specs": [
+        {
+          "id": 279084459666907,
+          "product_id": 278787012056605,
+          "name": "",
+          "price": 4.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012055544,
+      "name": "Iced Mocha",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 6,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Iced Matcha",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 7,
+      "specs": [
+        {
+          "id": 279084497205995,
+          "product_id": 278787012055544,
+          "name": "",
+          "price": 5.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012061066,
+      "name": "Iced Latte",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 7,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Iced Latte",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 8,
+      "specs": [
+        {
+          "id": 279084650688427,
+          "product_id": 278787012061066,
+          "name": "",
+          "price": 4.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012061974,
+      "name": "Iced Americano",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 8,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Iced Americano",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 9,
+      "specs": [
+        {
+          "id": 278790700388027,
+          "product_id": 278787012061974,
+          "name": "",
+          "price": 4.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012059392,
+      "name": "Coffe Eiinspanner",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 9,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Coffe Eiinspanner",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 10,
+      "specs": [
+        {
+          "id": 279084730094967,
+          "product_id": 278787012059392,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012060030,
+      "name": "Coffe Tiramisu",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 10,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Coffe Tiramisu",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 11,
+      "specs": [
+        {
+          "id": 279084809811386,
+          "product_id": 278787012060030,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012063085,
+      "name": "Coffe Latte Brulee",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 11,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Coffe Latte Brulee",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 12,
+      "specs": [
+        {
+          "id": 279084856173659,
+          "product_id": 278787012063085,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012062203,
+      "name": "Americano Cocowater",
+      "image": "",
+      "category_id": 278787012053054,
+      "sort_order": 12,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Americano Cocowater",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 13,
+      "specs": [
+        {
+          "id": 278790811350908,
+          "product_id": 278787012062203,
+          "name": "",
+          "price": 5.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012069703,
+      "name": "Classic Mocha Crepes",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 0,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Classic Mocha Crepes",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 21,
+      "specs": [
+        {
+          "id": 278791143169630,
+          "product_id": 278787012069703,
+          "name": "",
+          "price": 6.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012070778,
+      "name": "Matcha Crepes",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 1,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Crepes",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 22,
+      "specs": [
+        {
+          "id": 278791228063973,
+          "product_id": 278787012070778,
+          "name": "",
+          "price": 7.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012067557,
+      "name": "Classic Cheesecake 4.5",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 2,
+      "tax_rate": 10,
+      "receipt_name": null,
+      "kitchen_print_name": null,
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 23,
+      "specs": [
+        {
+          "id": 278787012070170,
+          "product_id": 278787012067557,
+          "name": "",
+          "price": 4.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012068150,
+      "name": "Matcha Cheescake",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 3,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Cheescake",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 24,
+      "specs": [
+        {
+          "id": 278791256389226,
+          "product_id": 278787012068150,
+          "name": "",
+          "price": 5.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012069693,
+      "name": "Red Velvet",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 4,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Red Velvet",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 25,
+      "specs": [
+        {
+          "id": 278791279331083,
+          "product_id": 278787012069693,
+          "name": "",
+          "price": 4.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012068785,
+      "name": "Carrot Cake",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 5,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Carrot Cake",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 26,
+      "specs": [
+        {
+          "id": 278791314095957,
+          "product_id": 278787012068785,
+          "name": "",
+          "price": 4.5,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012072769,
+      "name": "Matcha mochi",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 6,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha mochi",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 27,
+      "specs": [
+        {
+          "id": 278791334151677,
+          "product_id": 278787012072769,
+          "name": "",
+          "price": 4.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    },
+    {
+      "id": 278787012073841,
+      "name": "Matcha Croissant",
+      "image": "",
+      "category_id": 278787012053646,
+      "sort_order": 7,
+      "tax_rate": 10,
+      "receipt_name": "",
+      "kitchen_print_name": "Matcha Croissant",
+      "is_kitchen_print_enabled": -1,
+      "is_label_print_enabled": -1,
+      "is_active": true,
+      "external_id": 28,
+      "specs": [
+        {
+          "id": 278791357675170,
+          "product_id": 278787012073841,
+          "name": "",
+          "price": 3.0,
+          "display_order": 0,
+          "is_default": true,
+          "is_active": true,
+          "receipt_name": null,
+          "is_root": true
+        }
+      ],
+      "attributes": [],
+      "tags": []
+    }
+  ],
+  "attributes": [
+    {
+      "id": 278787012073987,
+      "name": "Matcha",
+      "is_multi_select": false,
+      "max_selections": null,
+      "default_option_ids": [
+        278787012077562
+      ],
+      "display_order": 0,
+      "is_active": true,
+      "show_on_receipt": true,
+      "receipt_name": "Level:",
+      "show_on_kitchen_print": true,
+      "kitchen_print_name": null,
+      "options": [
+        {
+          "id": 278787012077562,
+          "attribute_id": 278787012073987,
+          "name": "Matcha01",
+          "price_modifier": 0.0,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        },
+        {
+          "id": 278787012078337,
+          "attribute_id": 278787012073987,
+          "name": "Matcha02",
+          "price_modifier": 1.0,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        }
+      ]
+    },
+    {
+      "id": 278787012078261,
+      "name": "Leche",
+      "is_multi_select": false,
+      "max_selections": null,
+      "default_option_ids": [
+        279082657486986
+      ],
+      "display_order": 0,
+      "is_active": true,
+      "show_on_receipt": true,
+      "receipt_name": null,
+      "show_on_kitchen_print": true,
+      "kitchen_print_name": null,
+      "options": [
+        {
+          "id": 279082657481221,
+          "attribute_id": 278787012078261,
+          "name": "avena",
+          "price_modifier": 0.3,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        },
+        {
+          "id": 279082657481963,
+          "attribute_id": 278787012078261,
+          "name": "soja",
+          "price_modifier": 0.3,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        },
+        {
+          "id": 279082657485230,
+          "attribute_id": 278787012078261,
+          "name": "coco",
+          "price_modifier": 0.5,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        },
+        {
+          "id": 279082657486626,
+          "attribute_id": 278787012078261,
+          "name": "sin lactosa",
+          "price_modifier": 0.0,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        },
+        {
+          "id": 279082657486986,
+          "attribute_id": 278787012078261,
+          "name": "normal",
+          "price_modifier": 0.0,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        }
+      ]
+    },
+    {
+      "id": 278787012079007,
+      "name": "Temp",
+      "is_multi_select": false,
+      "max_selections": null,
+      "default_option_ids": [
+        278787012077236
+      ],
+      "display_order": 0,
+      "is_active": true,
+      "show_on_receipt": true,
+      "receipt_name": null,
+      "show_on_kitchen_print": true,
+      "kitchen_print_name": null,
+      "options": [
+        {
+          "id": 278787012077236,
+          "attribute_id": 278787012079007,
+          "name": "Hot",
+          "price_modifier": 0.0,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        },
+        {
+          "id": 278787012077832,
+          "attribute_id": 278787012079007,
+          "name": "Cold",
+          "price_modifier": 0.0,
+          "display_order": 0,
+          "is_active": true,
+          "receipt_name": null,
+          "kitchen_print_name": null,
+          "enable_quantity": false,
+          "max_quantity": null
+        }
+      ]
+    }
+  ],
+  "attribute_bindings": [
+    {
+      "id": 278793869948262,
+      "owner_type": "category",
+      "owner_id": 278787012052426,
+      "attribute_id": 278787012073987,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": [
+        278787012077562
+      ]
+    },
+    {
+      "id": 279084000877428,
+      "owner_type": "product",
+      "owner_id": 278787012055266,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279084497330151,
+      "owner_type": "product",
+      "owner_id": 278787012055544,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279083906982360,
+      "owner_type": "product",
+      "owner_id": 278787012055994,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279084459869157,
+      "owner_type": "product",
+      "owner_id": 278787012056605,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 278788100537136,
+      "owner_type": "product",
+      "owner_id": 278787012059392,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 1,
+      "default_option_ids": null
+    },
+    {
+      "id": 279084730255361,
+      "owner_type": "product",
+      "owner_id": 278787012059392,
+      "attribute_id": 278787012079007,
+      "is_required": false,
+      "display_order": 1,
+      "default_option_ids": null
+    },
+    {
+      "id": 278788174283026,
+      "owner_type": "product",
+      "owner_id": 278787012060030,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 278788008887275,
+      "owner_type": "product",
+      "owner_id": 278787012061066,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 278788239289953,
+      "owner_type": "product",
+      "owner_id": 278787012063085,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279085506774101,
+      "owner_type": "product",
+      "owner_id": 278787012064172,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": [
+        279082657486986
+      ]
+    },
+    {
+      "id": 279085506804140,
+      "owner_type": "product",
+      "owner_id": 278787012064172,
+      "attribute_id": 278787012079007,
+      "is_required": false,
+      "display_order": 1,
+      "default_option_ids": null
+    },
+    {
+      "id": 279083296242136,
+      "owner_type": "product",
+      "owner_id": 278787012064597,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279083397735810,
+      "owner_type": "product",
+      "owner_id": 278787012065245,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279083663299643,
+      "owner_type": "product",
+      "owner_id": 278787012066977,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279083772257262,
+      "owner_type": "product",
+      "owner_id": 278787012067185,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279084409248841,
+      "owner_type": "product",
+      "owner_id": 278787012071947,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    },
+    {
+      "id": 279795911756408,
+      "owner_type": "product",
+      "owner_id": 279795838172298,
+      "attribute_id": 278787012078261,
+      "is_required": false,
+      "display_order": 0,
+      "default_option_ids": null
+    }
+  ],
+  "price_rules": [
+    {
+      "id": 278795983272254,
+      "name": "Descuento 20%",
+      "receipt_name": "Descuento 20%",
+      "description": null,
+      "rule_type": "DISCOUNT",
+      "product_scope": "GLOBAL",
+      "target_id": null,
+      "zone_scope": "all",
+      "adjustment_type": "PERCENTAGE",
+      "adjustment_value": 20.0,
+      "is_stackable": false,
+      "is_exclusive": true,
+      "valid_from": null,
+      "valid_until": null,
+      "active_days": null,
+      "active_start_time": null,
+      "active_end_time": null,
+      "is_active": true,
+      "created_by": null,
+      "created_at": 1772132625603
+    }
+  ],
+  "zones": [
+    {
+      "id": 278788757390257,
+      "name": "Principal",
+      "description": "",
+      "is_active": true
+    }
+  ],
+  "dining_tables": [
+    {
+      "id": 278789094658556,
+      "name": "M1",
+      "zone_id": 278788757390257,
+      "capacity": 4,
+      "is_active": true
+    },
+    {
+      "id": 278789111591383,
+      "name": "M2",
+      "zone_id": 278788757390257,
+      "capacity": 4,
+      "is_active": true
+    },
+    {
+      "id": 278789130056437,
+      "name": "M3",
+      "zone_id": 278788757390257,
+      "capacity": 4,
+      "is_active": true
+    },
+    {
+      "id": 278789154524090,
+      "name": "M4",
+      "zone_id": 278788757390257,
+      "capacity": 4,
+      "is_active": true
+    },
+    {
+      "id": 278789178288546,
+      "name": "M5",
+      "zone_id": 278788757390257,
+      "capacity": 4,
+      "is_active": true
+    },
+    {
+      "id": 278789199815486,
+      "name": "M6",
+      "zone_id": 278788757390257,
+      "capacity": 4,
+      "is_active": true
+    }
+  ]
+}
