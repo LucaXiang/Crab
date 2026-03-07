@@ -822,7 +822,9 @@ async fn upsert_archived_order(
             }
 
             // Item-level manual discount
-            if sync_item.discount_amount > 0.0 {
+            // discount_amount = total discount (manual + rule), so subtract rule portion
+            let manual_disc = sync_item.discount_amount - sync_item.rule_discount_amount;
+            if manual_disc > 0.0 {
                 adj_oids.push(order_pk);
                 adj_item_ids.push(item_pk);
                 adj_source_types.push("MANUAL".to_string());
@@ -831,12 +833,14 @@ async fn upsert_archived_order(
                 adj_rule_names.push(None);
                 adj_rule_receipt_names.push(None);
                 adj_adjustment_types.push(None);
-                adj_amounts.push(dec(sync_item.discount_amount));
+                adj_amounts.push(dec(manual_disc));
                 adj_skipped.push(false);
             }
 
             // Item-level manual surcharge
-            if sync_item.surcharge_amount > 0.0 {
+            // surcharge_amount = total surcharge (manual + rule), subtract rule portion
+            let manual_surcharge = sync_item.surcharge_amount - sync_item.rule_surcharge_amount;
+            if manual_surcharge > 0.0 {
                 adj_oids.push(order_pk);
                 adj_item_ids.push(item_pk);
                 adj_source_types.push("MANUAL".to_string());
@@ -845,7 +849,7 @@ async fn upsert_archived_order(
                 adj_rule_names.push(None);
                 adj_rule_receipt_names.push(None);
                 adj_adjustment_types.push(None);
-                adj_amounts.push(dec(sync_item.surcharge_amount));
+                adj_amounts.push(dec(manual_surcharge));
                 adj_skipped.push(false);
             }
 

@@ -420,26 +420,28 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         </div>
       )}
 
-      {/* Discount Breakdown */}
-      {overview.discount_breakdown.length > 0 && (
-        <AdjustmentCard
-          title={t('stats.discount_breakdown')}
-          entries={overview.discount_breakdown}
-          color="amber"
-          prefix="-"
-          t={t}
-        />
-      )}
-
-      {/* Surcharge Breakdown */}
-      {overview.surcharge_breakdown.length > 0 && (
-        <AdjustmentCard
-          title={t('stats.surcharge_breakdown')}
-          entries={overview.surcharge_breakdown}
-          color="purple"
-          prefix="+"
-          t={t}
-        />
+      {/* Discount & Surcharge Breakdown */}
+      {(overview.discount_breakdown.length > 0 || overview.surcharge_breakdown.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {overview.discount_breakdown.length > 0 && (
+            <AdjustmentCard
+              title={t('stats.discount_breakdown')}
+              entries={overview.discount_breakdown}
+              color="amber"
+              prefix="-"
+              t={t}
+            />
+          )}
+          {overview.surcharge_breakdown.length > 0 && (
+            <AdjustmentCard
+              title={t('stats.surcharge_breakdown')}
+              entries={overview.surcharge_breakdown}
+              color="purple"
+              prefix="+"
+              t={t}
+            />
+          )}
+        </div>
       )}
 
       {/* Tag Sales */}
@@ -537,6 +539,9 @@ const SOURCE_I18N: Record<string, string> = {
   order_rule: 'stats.adj_src_order_rule',
 };
 
+const ADJ_COLORS_AMBER = ['#f59e0b', '#f97316', '#ef4444', '#eab308', '#d97706', '#ea580c'];
+const ADJ_COLORS_PURPLE = ['#8b5cf6', '#6366f1', '#a855f7', '#7c3aed', '#4f46e5', '#9333ea'];
+
 const AdjustmentCard: React.FC<{
   title: string;
   entries: AdjustmentEntry[];
@@ -546,6 +551,7 @@ const AdjustmentCard: React.FC<{
 }> = ({ title, entries, color, prefix, t }) => {
   const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
   const isAmber = color === 'amber';
+  const colors = isAmber ? ADJ_COLORS_AMBER : ADJ_COLORS_PURPLE;
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -557,36 +563,52 @@ const AdjustmentCard: React.FC<{
           {prefix}{formatCurrency(totalAmount)}
         </span>
       </div>
-      <div className="space-y-3">
-        {entries.map((entry, i) => {
-          const pct = totalAmount > 0 ? (entry.amount / totalAmount) * 100 : 0;
-          const label = entry.source === 'item_rule' || entry.source === 'order_rule'
-            ? entry.name
-            : t(SOURCE_I18N[entry.source] ?? entry.source);
-          const barColor = isAmber ? PIE_COLORS[3] : PIE_COLORS[4];
-          return (
-            <div key={i}>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
-                  <span className="text-slate-700">{label}</span>
-                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
+      <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
+        <div className="w-36 h-36 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={entries}
+                dataKey="amount"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={30}
+                outerRadius={60}
+                paddingAngle={2}
+              >
+                {entries.map((_, i) => (
+                  <Cell key={i} fill={colors[i % colors.length]} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex-1 space-y-2">
+          {entries.map((entry, i) => {
+            const pct = totalAmount > 0 ? ((entry.amount / totalAmount) * 100).toFixed(1) : '0';
+            const label = entry.source === 'item_rule' || entry.source === 'order_rule'
+              ? entry.name
+              : t(SOURCE_I18N[entry.source] ?? entry.source);
+            return (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
+                  <span className="text-slate-700 truncate">{label}</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded whitespace-nowrap ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
                     {t(`stats.adj_src_${entry.source}`)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">{entry.order_count} {t('stats.orders_unit')}</span>
-                  <span className={`font-semibold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+                <div className="flex items-center gap-3 shrink-0 ml-2">
+                  <span className="text-xs text-slate-400">{entry.order_count}{t('stats.orders_unit')}</span>
+                  <span className={`font-semibold w-20 text-right ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
                     {prefix}{formatCurrency(entry.amount)}
                   </span>
                 </div>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
