@@ -1139,8 +1139,8 @@ const MobileOrderDetail: React.FC<{
                   <span className="text-slate-800">{item.name}</span>
                   {item.spec_name && <span className="text-xs text-slate-500">({item.spec_name})</span>}
                   {item.is_comped && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded">{t('orders.comped')}</span>}
-                  {!item.is_comped && item.discount_amount > 0 && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full">-{formatCurrency(item.discount_amount)}</span>
+                  {!item.is_comped && (item.discount_amount - item.rule_discount_amount) > 0.001 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full">-{formatCurrency(item.discount_amount - item.rule_discount_amount)}</span>
                   )}
                   {!item.is_comped && item.rule_discount_amount > 0 && (
                     <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full">-{formatCurrency(item.rule_discount_amount)}</span>
@@ -1611,9 +1611,9 @@ const ItemRow: React.FC<{ item: OrderItem; accentColor: string; t: (k: string) =
                   <Gift size={10} /> {t('orders.comped')}
                 </span>
               )}
-              {!item.is_comped && item.discount_amount > 0 && (
+              {!item.is_comped && (item.discount_amount - item.rule_discount_amount) > 0.001 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
-                  -{formatCurrency(item.discount_amount)}
+                  -{formatCurrency(item.discount_amount - item.rule_discount_amount)}
                 </span>
               )}
               {!item.is_comped && item.rule_discount_amount > 0 && (
@@ -1705,7 +1705,8 @@ function aggregateRules(items: OrderItem[], orderRules: AppliedRule[] = []): { r
   const map = new Map<number, { name: string; total: number; direction: 'discount' | 'surcharge' }>();
   const addRule = (rule: AppliedRule, qty: number) => {
     if (rule.skipped) return;
-    const lineAmount = Math.abs(rule.calculated_amount) * qty;
+    // calculated_amount is already total (per_unit × qty) from Cloud
+    const lineAmount = Math.abs(rule.calculated_amount);
     const existing = map.get(rule.rule_id);
     const direction = rule.adjustment_type === 'Surcharge' ? 'surcharge' : 'discount';
     if (existing) {

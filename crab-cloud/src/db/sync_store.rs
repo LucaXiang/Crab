@@ -853,7 +853,7 @@ async fn upsert_archived_order(
                 adj_skipped.push(false);
             }
 
-            // MG discount
+            // MG discount (mg_discount_amount is per-unit, multiply by qty for total)
             if sync_item.mg_discount_amount > 0.0 {
                 adj_oids.push(order_pk);
                 adj_item_ids.push(item_pk);
@@ -863,7 +863,8 @@ async fn upsert_archived_order(
                 adj_rule_names.push(d.marketing_group_name.clone());
                 adj_rule_receipt_names.push(None);
                 adj_adjustment_types.push(None);
-                adj_amounts.push(dec(sync_item.mg_discount_amount));
+                adj_amounts
+                    .push(dec(sync_item.mg_discount_amount) * Decimal::from(sync_item.quantity));
                 adj_skipped.push(false);
             }
 
