@@ -543,6 +543,7 @@ CREATE TABLE store_order_payments (
     id              BIGSERIAL PRIMARY KEY,
     order_id        BIGINT NOT NULL REFERENCES store_archived_orders(id) ON DELETE CASCADE,
     seq             INTEGER NOT NULL DEFAULT 0,
+    payment_id      TEXT NOT NULL DEFAULT '',
     method          TEXT NOT NULL,
     amount          NUMERIC(12,2) NOT NULL DEFAULT 0,
     timestamp       BIGINT NOT NULL,

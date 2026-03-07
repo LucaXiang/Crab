@@ -1136,6 +1136,11 @@ const MobileOrderDetail: React.FC<{
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-medium text-slate-900">{item.quantity}x</span>
+                  {item.instance_id && (
+                    <span className="text-[0.6rem] text-blue-600 bg-blue-100 font-bold font-mono px-1 py-0.5 rounded border border-blue-200">
+                      #{item.instance_id.slice(-5)}
+                    </span>
+                  )}
                   <span className="text-slate-800">{item.name}</span>
                   {item.spec_name && <span className="text-xs text-slate-500">({item.spec_name})</span>}
                   {item.is_comped && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded">{t('orders.comped')}</span>}
@@ -1242,6 +1247,11 @@ const MobileOrderDetail: React.FC<{
                 <div className="flex items-center gap-2">
                   <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                   <span className="text-slate-700">{tEnum('common.paymentMethod', payment.method)}</span>
+                  {payment.payment_id && (
+                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono font-medium text-[10px]">
+                      #{String(payment.payment_id).slice(-5)}
+                    </span>
+                  )}
                   {payment.cancelled && <span className="px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded font-medium">{t('orders.cancelled_payment')}</span>}
                 </div>
                 <span className={`font-medium ${payment.cancelled ? 'text-slate-400 line-through' : 'text-green-600'}`}>{formatCurrency(payment.amount)}</span>
@@ -1604,6 +1614,11 @@ const ItemRow: React.FC<{ item: OrderItem; accentColor: string; t: (k: string) =
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-slate-800 flex items-center gap-2 flex-wrap">
+              {item.instance_id && (
+                <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                  #{item.instance_id.slice(-5)}
+                </span>
+              )}
               <span className="shrink-0">{item.name}</span>
               {item.spec_name && <span className="text-xs text-slate-500">({item.spec_name})</span>}
               {item.is_comped && (
@@ -1686,13 +1701,31 @@ const PaymentRow: React.FC<{ payment: OrderPayment; t: (k: string) => string }> 
               </span>
             )}
           </div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-slate-400 flex items-center gap-2">
             {new Date(payment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+            {payment.payment_id && (
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono font-medium text-[10px]">
+                #{String(payment.payment_id).slice(-5)}
+              </span>
+            )}
           </div>
         </div>
       </div>
-      <div className={`font-bold ${payment.cancelled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-        {formatCurrency(payment.amount)}
+      <div className="text-right">
+        <div className={`font-bold ${payment.cancelled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+          {formatCurrency(payment.amount)}
+        </div>
+        {payment.tendered != null && payment.tendered !== payment.amount && (
+          <div className="text-xs text-slate-400">
+            {t('orders.tendered')}: {formatCurrency(payment.tendered)}
+            {payment.change_amount != null && payment.change_amount > 0 && (
+              <span className="ml-1">· {t('timeline.change_given')}: {formatCurrency(payment.change_amount)}</span>
+            )}
+          </div>
+        )}
+        {payment.cancelled && payment.cancel_reason && (
+          <div className="text-xs text-red-400">{payment.cancel_reason}</div>
+        )}
       </div>
     </div>
   );

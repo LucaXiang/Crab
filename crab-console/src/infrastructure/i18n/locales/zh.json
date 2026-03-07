@@ -158,6 +158,7 @@
     "loss_amount": "损失",
     "member": "会员",
     "cancelled_payment": "已取消",
+    "tendered": "实付",
     "credit_notes": "退款单",
     "chain_entries": "交易记录",
     "credit_note": "退款凭证",
@@ -843,7 +844,8 @@
     "title": "时间线",
     "empty": "暂无事件",
     "table_opened": "开单",
-    "items_added": "添加商品",
+    "items_added": "加单",
+    "items_added_summary": "添加了 {n} 份菜品",
     "item_modified": "修改商品",
     "item_removed": "删除商品",
     "item_comped": "赠送商品",
@@ -879,7 +881,8 @@
     "authorizer": "授权人",
     "reason": "原因",
     "quantity": "数量",
-    "loss_amount": "损失"
+    "loss_amount": "损失",
+    "change_given": "找零"
   },
   "data_transfer": {
     "title": "数据导入导出",

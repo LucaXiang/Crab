@@ -973,6 +973,7 @@ async fn upsert_archived_order(
     if !d.payments.is_empty() {
         let oids: Vec<i64> = d.payments.iter().map(|_| order_pk).collect();
         let seqs: Vec<i32> = d.payments.iter().map(|p| p.seq).collect();
+        let payment_ids: Vec<&str> = d.payments.iter().map(|p| p.payment_id.as_str()).collect();
         let methods: Vec<&str> = d.payments.iter().map(|p| p.method.as_str()).collect();
         let amounts: Vec<Decimal> = d.payments.iter().map(|p| dec(p.amount)).collect();
         let timestamps: Vec<i64> = d.payments.iter().map(|p| p.timestamp).collect();
@@ -992,12 +993,13 @@ async fn upsert_archived_order(
 
         sqlx::query(
             r#"
-            INSERT INTO store_order_payments (order_id, seq, method, amount, timestamp, cancelled, cancel_reason, tendered, change_amount)
-            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::text[], $4::numeric[], $5::bigint[], $6::bool[], $7::text[], $8::numeric[], $9::numeric[])
+            INSERT INTO store_order_payments (order_id, seq, payment_id, method, amount, timestamp, cancelled, cancel_reason, tendered, change_amount)
+            SELECT * FROM UNNEST($1::bigint[], $2::int[], $3::text[], $4::text[], $5::numeric[], $6::bigint[], $7::bool[], $8::text[], $9::numeric[], $10::numeric[])
             "#,
         )
         .bind(&oids)
         .bind(&seqs)
+        .bind(&payment_ids)
         .bind(&methods)
         .bind(&amounts)
         .bind(&timestamps)

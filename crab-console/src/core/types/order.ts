@@ -111,10 +111,14 @@ export interface OrderItem {
 
 export interface OrderPayment {
   seq: number;
+  payment_id: string;
   method: string;
   amount: number;
   timestamp: number;
   cancelled: boolean;
+  cancel_reason?: string | null;
+  tendered?: number | null;
+  change_amount?: number | null;
 }
 
 export interface TaxDesglose {

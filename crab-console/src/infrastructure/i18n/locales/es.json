@@ -156,6 +156,7 @@
     "loss_amount": "Pérdida",
     "member": "Miembro",
     "cancelled_payment": "Cancelado",
+    "tendered": "Entregado",
     "credit_notes": "Notas de crédito",
     "chain_entries": "Transacciones",
     "credit_note": "Nota de crédito",
@@ -842,6 +843,7 @@
     "empty": "Sin historial",
     "table_opened": "Pedido mesa",
     "items_added": "Añadir",
+    "items_added_summary": "Añadidos {n} platos",
     "item_modified": "Plato modificado",
     "item_removed": "Plato eliminado",
     "item_comped": "Plato invitado",
@@ -877,7 +879,8 @@
     "authorizer": "Autorizado por",
     "reason": "Motivo",
     "quantity": "Cantidad",
-    "loss_amount": "Pérdida"
+    "loss_amount": "Pérdida",
+    "change_given": "Cambio"
   },
   "data_transfer": {
     "title": "Transferencia de datos",

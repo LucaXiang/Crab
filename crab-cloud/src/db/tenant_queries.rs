@@ -625,11 +625,13 @@ pub async fn get_order_detail(
         order_manual_surcharge_amount: Decimal,
         order_rule_discount_amount: Decimal,
         order_rule_surcharge_amount: Decimal,
+        operator_id: Option<i64>,
         operator_name: Option<String>,
+        member_id: Option<i64>,
+        member_name: Option<String>,
+        service_type: Option<String>,
         loss_reason: Option<String>,
         void_note: Option<String>,
-        member_name: Option<String>,
-        // from order header
         guest_count: Option<i32>,
         discount_amount: Decimal,
         void_type: Option<String>,
@@ -643,6 +645,8 @@ pub async fn get_order_detail(
         customer_phone: Option<String>,
         mg_discount_amount: Decimal,
         marketing_group_name: Option<String>,
+        queue_number: Option<String>,
+        shift_id: Option<i64>,
     }
 
     let header = sqlx::query_as::<_, HeaderRow>(
@@ -651,11 +655,12 @@ pub async fn get_order_detail(
                original_total, subtotal, paid_amount, surcharge_amount, comp_total_amount,
                order_manual_discount_amount, order_manual_surcharge_amount,
                order_rule_discount_amount, order_rule_surcharge_amount,
-               operator_name, loss_reason, void_note, member_name,
+               operator_id, operator_name, member_id, member_name, service_type,
+               loss_reason, void_note,
                guest_count, discount_amount, void_type, loss_amount,
                is_voided, is_upgraded, customer_nif, customer_nombre,
                customer_address, customer_email, customer_phone,
-               mg_discount_amount, marketing_group_name
+               mg_discount_amount, marketing_group_name, queue_number, shift_id
         FROM store_archived_orders
         WHERE store_id = $1 AND tenant_id = $2 AND order_id = $3
         "#,
@@ -708,10 +713,14 @@ pub async fn get_order_detail(
     #[derive(sqlx::FromRow)]
     struct PaymentRow {
         seq: i32,
+        payment_id: String,
         method: String,
         amount: Decimal,
         timestamp: i64,
         cancelled: bool,
+        cancel_reason: Option<String>,
+        tendered: Option<Decimal>,
+        change_amount: Option<Decimal>,
     }
 
     #[derive(sqlx::FromRow)]
@@ -764,7 +773,8 @@ pub async fn get_order_detail(
         .fetch_all(pool),
         sqlx::query_as::<_, PaymentRow>(
             r#"
-            SELECT seq, method, amount, timestamp, cancelled
+            SELECT seq, payment_id, method, amount, timestamp, cancelled,
+                   cancel_reason, tendered, change_amount
             FROM store_order_payments
             WHERE order_id = $1
             ORDER BY seq
@@ -896,13 +906,14 @@ pub async fn get_order_detail(
         .into_iter()
         .map(|p| shared::cloud::OrderPaymentSync {
             seq: p.seq,
+            payment_id: p.payment_id,
             method: p.method,
             amount: d(p.amount),
             timestamp: p.timestamp,
             cancelled: p.cancelled,
-            cancel_reason: None,
-            tendered: None,
-            change_amount: None,
+            cancel_reason: p.cancel_reason,
+            tendered: p.tendered.map(d),
+            change_amount: p.change_amount.map(d),
         })
         .collect();
 
@@ -937,17 +948,17 @@ pub async fn get_order_detail(
         mg_discount_amount: d(header.mg_discount_amount),
         marketing_group_name: header.marketing_group_name,
         start_time: header.start_time.unwrap_or(0),
+        operator_id: header.operator_id,
         operator_name: header.operator_name,
         void_type: header.void_type.and_then(|s| s.parse().ok()),
         loss_reason: header.loss_reason.and_then(|s| s.parse().ok()),
         loss_amount: header.loss_amount.map(d),
         void_note: header.void_note,
+        member_id: header.member_id,
         member_name: header.member_name,
-        service_type: None,
-        operator_id: None,
-        member_id: None,
-        queue_number: None,
-        shift_id: None,
+        service_type: header.service_type.and_then(|s| s.parse().ok()),
+        queue_number: header.queue_number,
+        shift_id: header.shift_id,
         items,
         payments,
         events,
@@ -1474,7 +1485,7 @@ async fn get_overview(
         sqlx::query_as::<_, ZoneSaleEntry>(
             r#"
             SELECT
-                COALESCE(zone_name, '') AS zone_name,
+                COALESCE(NULLIF(zone_name, ''), CASE WHEN is_retail THEN 'Retail' ELSE 'Default' END) AS zone_name,
                 COALESCE(BOOL_OR(is_retail), false) AS is_retail,
                 COALESCE(SUM(total), 0)::DOUBLE PRECISION AS revenue,
                 COUNT(*) AS orders,
@@ -1485,9 +1496,7 @@ async fn get_overview(
                 AND end_time >= $3 AND end_time < $4
                 AND status = 'COMPLETED'
                 AND is_voided IS NOT TRUE
-                AND zone_name IS NOT NULL
-                AND zone_name != ''
-            GROUP BY zone_name
+            GROUP BY 1, is_retail
             ORDER BY revenue DESC
             "#,
         )

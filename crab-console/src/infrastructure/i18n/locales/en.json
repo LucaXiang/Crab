@@ -153,6 +153,7 @@
     "loss_amount": "Loss",
     "member": "Member",
     "cancelled_payment": "Cancelled",
+    "tendered": "Tendered",
     "credit_notes": "Credit Notes",
     "chain_entries": "Transactions",
     "credit_note": "Credit Note",
@@ -838,6 +839,7 @@
     "empty": "No events",
     "table_opened": "Order opened",
     "items_added": "Items added",
+    "items_added_summary": "Added {n} items",
     "item_modified": "Item modified",
     "item_removed": "Item removed",
     "item_comped": "Item comped",
@@ -873,7 +875,8 @@
     "authorizer": "Authorized by",
     "reason": "Reason",
     "quantity": "Quantity",
-    "loss_amount": "Loss"
+    "loss_amount": "Loss",
+    "change_given": "Change"
   },
   "data_transfer": {
     "title": "Data Transfer",

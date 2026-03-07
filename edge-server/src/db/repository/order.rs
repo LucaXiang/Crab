@@ -451,34 +451,6 @@ pub async fn mark_cloud_synced(pool: &SqlitePool, ids: &[i64]) -> RepoResult<()>
     query.execute(pool).await?;
     Ok(())
 }
-
-/// Slim down ITEMS_ADDED event data for cloud sync.
-///
-/// The raw event data contains full item snapshots (~1.5 KB each) with runtime fields
-/// (instance_id, attribute_id, selected_specification, applied_rules, etc.) that are
-/// redundant with the top-level `items` array. This reduces each to ~60 bytes by keeping
-/// only `{name, quantity, price}` — sufficient for audit timeline display.
-fn slim_items_added_data(data: &Option<String>) -> Option<String> {
-    let raw = data.as_deref()?;
-    let parsed: serde_json::Value = serde_json::from_str(raw).ok()?;
-    let items = parsed.get("items")?.as_array()?;
-    let slim_items: Vec<serde_json::Value> = items
-        .iter()
-        .filter_map(|item| {
-            Some(serde_json::json!({
-                "name": item.get("name")?,
-                "quantity": item.get("quantity")?,
-                "price": item.get("price")?,
-            }))
-        })
-        .collect();
-    serde_json::to_string(&serde_json::json!({
-        "type": "ITEMS_ADDED",
-        "items": slim_items,
-    }))
-    .ok()
-}
-
 /// Build full OrderDetailSync from archived tables for cloud sync
 pub async fn build_order_detail_sync(
     pool: &SqlitePool,
@@ -740,22 +712,13 @@ pub async fn build_order_detail_sync(
     .into_iter()
     .map(
         |(seq, event_type, timestamp, operator_id, operator_name, data)| {
-            // Slim down ITEMS_ADDED event data for cloud sync:
-            // Full snapshots contain runtime fields (instance_id, attribute_id, etc.)
-            // that are redundant with the top-level items array.
-            // Keep only {name, quantity, price} per item for audit/timeline display.
-            let slim_data = if event_type == "ITEMS_ADDED" {
-                slim_items_added_data(&data)
-            } else {
-                data
-            };
             shared::cloud::OrderEventSync {
                 seq,
                 event_type,
                 timestamp,
                 operator_id,
                 operator_name,
-                data: slim_data,
+                data,
             }
         },
     )
@@ -773,6 +736,7 @@ pub async fn build_order_detail_sync(
     #[derive(sqlx::FromRow)]
     struct SyncPaymentRow {
         seq: i32,
+        payment_id: String,
         method: String,
         amount: f64,
         time: i64,
@@ -783,7 +747,7 @@ pub async fn build_order_detail_sync(
     }
 
     let payments: Vec<OrderPaymentSync> = sqlx::query_as::<_, SyncPaymentRow>(
-        "SELECT seq, method, amount, time, cancelled, cancel_reason, tendered, change_amount \
+        "SELECT seq, payment_id, method, amount, time, cancelled, cancel_reason, tendered, change_amount \
          FROM archived_order_payment WHERE order_pk = ? ORDER BY seq",
     )
     .bind(order_pk)
@@ -792,6 +756,7 @@ pub async fn build_order_detail_sync(
     .into_iter()
     .map(|p| OrderPaymentSync {
         seq: p.seq,
+        payment_id: p.payment_id,
         method: p.method,
         amount: p.amount,
         timestamp: p.time,

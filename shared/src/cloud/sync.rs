@@ -383,6 +383,7 @@ pub struct OrderItemOptionSync {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderPaymentSync {
     pub seq: i32,
+    pub payment_id: String,
     pub method: String,
     pub amount: f64,
     pub timestamp: i64,
@@ -1366,6 +1367,7 @@ mod tests {
                 }],
                 payments: vec![OrderPaymentSync {
                     seq: 1,
+                    payment_id: "100001".to_string(),
                     method: "CASH".to_string(),
                     amount: 36.30,
                     timestamp: 1709020800000,
