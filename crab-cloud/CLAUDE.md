@@ -49,7 +49,8 @@ src/
 │   │   ├── zone.rs        # 区域 CRUD
 │   │   ├── dining_table.rs # 餐桌 CRUD
 │   │   ├── price_rule.rs  # 价格规则 CRUD
-│   │   └── label_template.rs # 标签模板 CRUD
+│   │   ├── label_template.rs # 标签模板 CRUD
+│   │   └── data_transfer.rs # Catalog ZIP 导入导出
 │   ├── tenant/        # 租户管理 API
 │   │   ├── mod.rs         # tenant_router
 │   │   ├── analytics.rs   # stats, overview, red-flags

@@ -51,7 +51,8 @@ src/
 │   ├── upload/           # 文件上传
 │   ├── health/           # 健康检查
 │   ├── audit_log/        # 审计日志查询
-│   └── archive_verify/   # 归档验证 API
+│   ├── archive_verify/   # 归档验证 API
+│   └── data_transfer/    # Catalog ZIP 导入导出
 ├── auth/           # 认证与权限
 │   ├── jwt.rs          # JwtService (Argon2 + JWT)
 │   ├── middleware.rs   # require_auth() + require_permission()
@@ -106,7 +107,7 @@ src/
 │       ├── catalog.rs         # Product/Category/Tag CRUD
 │       ├── attribute.rs       # Attribute/Binding CRUD
 │       ├── resource.rs        # Employee/Zone/Table/PriceRule CRUD
-│       └── provisioning.rs    # LabelTemplate CRUD
+│       └── provisioning.rs    # FullSync + CatalogSyncData + Recovery State + EnsureImage
 ├── services/       # 业务服务
 │   ├── catalog_service.rs  # CatalogService (商品/分类内存缓存)
 │   ├── message_bus.rs      # MessageBusService
@@ -194,7 +195,7 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 - **VerifyScheduler**: SHA256 哈希链验证，启动补扫 + business_day_cutoff 定时
 - **Dead Letter Queue**: 永久失败的归档任务隔离
 - **CreditNoteService**: 退款凭证，追加到 chain_entry 哈希链，触发 InvoiceService 创建 R5 发票
-- **InvoiceService**: Verifactu 发票创建，维护独立 huella 链 (`system_state.last_huella`)
+- **InvoiceService**: Verifactu 发票创建，维护独立 huella 链 (`invoice_counter.last_huella`)
 
 ### 发票系统 (Verifactu)
 
@@ -206,7 +207,7 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
   - `find_by_order()` — 按订单查询发票
   - `list_unsynced_ids()` / `build_sync()` — 云端同步
   - `update_aeat_status()` — AEAT 状态回写
-- **Huella 链**: 独立于 chain_entry，`system_state.last_huella` 是链尾指针
+- **Huella 链**: 独立于 chain_entry，`invoice_counter.last_huella` 是链尾指针
 - **Desglose**: 税务明细从归档的 `TaxDesglose` 映射到发票的 `InvoiceDesglose`
 
 ### 价格规则引擎
