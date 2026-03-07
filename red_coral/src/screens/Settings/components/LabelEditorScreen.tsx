@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { invokeApi } from '@/infrastructure/api';
+import { getImageUrl } from '@/core/services/imageCache';
 import { logger } from '@/utils/logger';
 import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle, Loader2, Barcode, QrCode, Clock } from 'lucide-react';
 import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
@@ -355,46 +356,32 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
               logger.warn(`Failed to generate ${source_type} for field`, { component: 'LabelEditor', fieldId: field.field_id, detail: String(genError) });
             }
           } else if (source_type === 'image') {
-            // Load regular image and convert to Base64
-            const imagePath = field.template || field.data_source || '';
-            if (!imagePath) continue;
+            // Static image: field.template contains the image hash
+            const hash = field.template;
+            const dataKey = field.data_source || field.field_id;
 
-            // Apply variable injection to image path
-            let resolvedPath = imagePath.replace(/\{(\w+)\}/g, (_, key) => {
-              return test_data[key] !== undefined ? String(test_data[key]) : `{${key}}`;
-            });
+            // Skip if test_data already has a value for this key
+            if (test_data[dataKey]) continue;
 
-            try {
-              // Check if it's already a data URI
-              if (resolvedPath.startsWith('data:')) {
-                test_data[field.data_source || field.field_id] = resolvedPath;
-              } else if (resolvedPath.startsWith('http://') || resolvedPath.startsWith('https://')) {
-                // URL: fetch and convert to Base64
-                const response = await fetch(resolvedPath);
-                const blob = await response.blob();
-                const dataUri = await new Promise<string>((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.readAsDataURL(blob);
-                });
-                test_data[field.data_source || field.field_id] = dataUri;
-              } else {
-                // Local file path: use Tauri's convertFileSrc and fetch
-                const { convertFileSrc } = await import('@tauri-apps/api/core');
-                const assetUrl = convertFileSrc(resolvedPath);
-                const response = await fetch(assetUrl);
-                const blob = await response.blob();
-                const dataUri = await new Promise<string>((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.readAsDataURL(blob);
-                });
-                test_data[field.data_source || field.field_id] = dataUri;
+            if (hash && /^[a-f0-9]{64}$/i.test(hash)) {
+              // Hash → resolve via image cache and convert to Base64 data URI
+              try {
+                const assetUrl = await getImageUrl(hash);
+                if (assetUrl) {
+                  const response = await fetch(assetUrl);
+                  const blob = await response.blob();
+                  const dataUri = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(blob);
+                  });
+                  test_data[dataKey] = dataUri;
+                }
+              } catch (loadError) {
+                logger.warn('Failed to load static image for field', { component: 'LabelEditor', fieldId: field.field_id, hash, detail: String(loadError) });
               }
-            } catch (loadError) {
-              logger.warn('Failed to load image for field', { component: 'LabelEditor', fieldId: field.field_id, path: resolvedPath, detail: String(loadError) });
-              // Continue without this image
             }
+            // Dynamic data fields (data_source is a JSON key) — data comes from test_data
           }
         }
 

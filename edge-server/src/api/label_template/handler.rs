@@ -9,7 +9,8 @@ use crate::audit::{AuditAction, create_diff, create_snapshot};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::repository::label_template;
+use crate::db::repository::{image_ref, label_template};
+use crate::services::ImageCleanupService;
 use crate::utils::validation::{
     MAX_NAME_LEN, MAX_NOTE_LEN, validate_optional_text, validate_required_text,
 };
@@ -123,6 +124,22 @@ pub async fn update(
 
     let template = label_template::update(&state.pool, id, payload).await?;
 
+    // Cleanup orphan images after field changes
+    // sync_refs is called inside label_template::update() and returns removed hashes
+    // We need to check if those removed hashes are truly orphaned (not referenced elsewhere)
+    let old_hashes: std::collections::HashSet<String> =
+        crate::db::repository::label_template::extract_image_hashes_from_fields(&old_template.fields);
+    let new_hashes: std::collections::HashSet<String> =
+        crate::db::repository::label_template::extract_image_hashes_from_fields(&template.fields);
+    let removed: Vec<String> = old_hashes.difference(&new_hashes).cloned().collect();
+    if !removed.is_empty()
+        && let Ok(orphans) = image_ref::find_orphan_hashes(&state.pool, &removed).await
+        && !orphans.is_empty()
+    {
+        let cleanup = ImageCleanupService::new(state.config.images_dir());
+        cleanup.cleanup_orphan_images(&orphans).await;
+    }
+
     let id_str = id.to_string();
 
     audit_log!(
@@ -154,13 +171,32 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let name_for_audit = label_template::get(&state.pool, id)
-        .await
-        .ok()
-        .flatten()
-        .map(|t| t.name.clone())
-        .unwrap_or_default();
+    let old_template = label_template::get(&state.pool, id).await?.ok_or_else(|| {
+        AppError::with_message(
+            ErrorCode::LabelTemplateNotFound,
+            format!("Label template {} not found", id),
+        )
+    })?;
+    let name_for_audit = old_template.name.clone();
     let result = label_template::delete(&state.pool, id).await?;
+
+    // Cleanup orphan images from deleted template's fields
+    if result {
+        let removed_hashes: Vec<String> =
+            crate::db::repository::label_template::extract_image_hashes_from_fields(
+                &old_template.fields,
+            )
+            .into_iter()
+            .collect();
+        if !removed_hashes.is_empty()
+            && let Ok(orphans) =
+                image_ref::find_orphan_hashes(&state.pool, &removed_hashes).await
+            && !orphans.is_empty()
+        {
+            let cleanup = ImageCleanupService::new(state.config.images_dir());
+            cleanup.cleanup_orphan_images(&orphans).await;
+        }
+    }
 
     let id_str = id.to_string();
 

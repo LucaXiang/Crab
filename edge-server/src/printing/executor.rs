@@ -483,7 +483,10 @@ fn inject_static_images(
 ) {
     use base64::Engine;
 
-    let Some(images_dir) = images_dir else { return };
+    let Some(images_dir) = images_dir else {
+        tracing::debug!("inject_static_images: no images_dir configured, skipping");
+        return;
+    };
 
     for field in db_fields {
         // Only process static image fields (source_type=image with a hash in template)
@@ -491,6 +494,11 @@ fn inject_static_images(
             continue;
         }
         let Some(hash) = field.template.as_deref().filter(|h| !h.is_empty()) else {
+            tracing::debug!(
+                field_id = %field.field_id,
+                data_source = %field.data_source,
+                "inject_static_images: image field has no hash in template, skipping (dynamic field)"
+            );
             continue;
         };
 
@@ -502,8 +510,8 @@ fn inject_static_images(
             continue;
         }
 
-        // Load image file by hash from images directory
-        let path = images_dir.join(hash);
+        // Load image file by hash from images directory (images stored as {hash}.jpg)
+        let path = images_dir.join(format!("{}.jpg", hash));
         match std::fs::read(&path) {
             Ok(bytes) => {
                 // Detect MIME by magic bytes (hash filenames may lack extension)

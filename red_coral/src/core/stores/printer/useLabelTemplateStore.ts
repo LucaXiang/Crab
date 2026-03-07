@@ -173,7 +173,12 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
       const rawUpdated = await getApi().updateLabelTemplate(id, updateData);
       const updated = normalizeTemplate(rawUpdated);
       set((state) => ({
-        templates: state.templates.map((t) => (t.id === id || t.id === updated.id ? updated : t)),
+        templates: state.templates.map((t) => {
+          if (t.id === id || t.id === updated.id) return updated;
+          // 后端已把其他模板的 is_default 清除，本地同步
+          if (updated.is_default && t.is_default) return { ...t, is_default: false };
+          return t;
+        }),
         isLoading: false,
       }));
       return updated;

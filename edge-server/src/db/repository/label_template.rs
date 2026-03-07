@@ -329,6 +329,11 @@ async fn batch_load_fields(pool: &SqlitePool, templates: &mut [LabelTemplate]) -
     Ok(())
 }
 
+/// Extract image hashes from label fields (public for orphan cleanup)
+pub fn extract_image_hashes_from_fields(fields: &[shared::models::LabelField]) -> HashSet<String> {
+    extract_image_hashes(fields)
+}
+
 /// Extract image hashes from label fields
 fn extract_image_hashes(fields: &[LabelField]) -> HashSet<String> {
     fields

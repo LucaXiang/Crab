@@ -95,13 +95,24 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
               });
               src = canvas.toDataURL('image/png');
             } else {
-              // Skip extremely short strings that are likely partial inputs to avoid 404/500 errors
-              if (!content.startsWith('http') && !content.startsWith('data:') && content.length < 3) {
-                return;
+              // Static image: field.template contains the image hash
+              const hash = field.template;
+              if (hash && /^[a-f0-9]{64}$/i.test(hash)) {
+                // Hash → resolve via image cache (get_image_path + convertFileSrc)
+                src = await getImageUrl(hash);
+              } else if (!content.startsWith('http') && !content.startsWith('data:')) {
+                // Dynamic data field (data_source is a JSON key, not a path)
+                // Check if test data has an image value for this key
+                const dataKey = field.data_source || field.field_id;
+                const testValue = test_dataObj[dataKey];
+                if (typeof testValue === 'string' && testValue.startsWith('data:image/')) {
+                  src = testValue;
+                }
+                // Otherwise skip — not a file path, just a data key name
+              } else {
+                // URL or data URI
+                src = await getImageUrl(content);
               }
-
-              // Use image cache which handles hash -> path conversion and caching
-              src = await getImageUrl(content);
             }
           }
 

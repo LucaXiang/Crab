@@ -105,10 +105,10 @@ impl KitchenPrintWorker {
         executor: &PrintExecutor,
         label_ctx: &LabelContext,
     ) {
-        tracing::debug!(
+        tracing::info!(
             order_id = %event.order_id,
             event_id = %event.event_id,
-            "handle_items_added: start"
+            "handle_items_added: received ItemsAdded event"
         );
 
         // Get full snapshot
@@ -124,7 +124,7 @@ impl KitchenPrintWorker {
             }
         };
 
-        tracing::debug!(
+        tracing::info!(
             table_name = ?snapshot.table_name,
             queue_number = ?snapshot.queue_number,
             is_retail = snapshot.is_retail,
@@ -160,9 +160,9 @@ impl KitchenPrintWorker {
                     .await;
             }
             Ok(None) => {
-                tracing::debug!(
+                tracing::warn!(
                     order_id = %event.order_id,
-                    "handle_items_added: no print records created"
+                    "handle_items_added: no print records created (printing disabled or no destinations configured)"
                 );
             }
             Err(e) => {
@@ -307,6 +307,15 @@ impl KitchenPrintWorker {
         // 加载默认标签模板
         let (template, db_fields) = match label_template::get_default(&self.pool).await {
             Ok(Some(db_tmpl)) => {
+                tracing::info!(
+                    template_id = db_tmpl.id,
+                    template_name = %db_tmpl.name,
+                    width_mm = ?db_tmpl.width_mm,
+                    height_mm = ?db_tmpl.height_mm,
+                    fields_count = db_tmpl.fields.len(),
+                    image_fields = db_tmpl.fields.iter().filter(|f| f.source_type.as_deref() == Some("image")).count(),
+                    "execute_label_print: loaded default template"
+                );
                 let converted = super::executor::convert_label_template(&db_tmpl);
                 (converted, db_tmpl.fields)
             }

@@ -41,13 +41,16 @@ export const LabelTemplateManager: React.FC = () => {
   const [editingTemplate, setEditingTemplate] = useState<LabelTemplate | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load templates on mount
+  // Load templates on mount — 从 is_default 恢复选中状态
   useEffect(() => {
     ensureDefaultTemplate().then(() => {
-      // Set active template if not set
       const state = useLabelTemplateStore.getState();
-      if (!activeTemplateId && state.templates.length > 0) {
-        setActiveLabelTemplateId(state.templates[0].id);
+      if (state.templates.length > 0) {
+        const defaultTmpl = state.templates.find((t) => t.is_default);
+        const targetId = defaultTmpl?.id ?? state.templates[0].id;
+        if (activeTemplateId !== targetId) {
+          setActiveLabelTemplateId(targetId);
+        }
       }
     });
   }, []);
@@ -103,11 +106,13 @@ export const LabelTemplateManager: React.FC = () => {
           await deleteTemplate(template_id);
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
 
-          // If deleted template was active, select another one
+          // If deleted template was active/default, select another one
           if (activeTemplateId === template_id) {
             const remaining = templates.filter((t) => t.id !== template_id);
             if (remaining.length > 0) {
               setActiveLabelTemplateId(remaining[0].id);
+              // 持久化新默认
+              await updateTemplate(remaining[0].id, { is_default: true }).catch(() => {});
             }
           }
         } catch {
@@ -184,9 +189,18 @@ export const LabelTemplateManager: React.FC = () => {
               }`}
             >
               <div className="flex items-center gap-4 px-4 py-3">
-                {/* Radio-style selection */}
+                {/* Radio-style selection — 同时持久化 is_default 到后端 */}
                 <button
-                  onClick={() => setActiveLabelTemplateId(template.id)}
+                  onClick={async () => {
+                    setActiveLabelTemplateId(template.id);
+                    if (!template.is_default) {
+                      try {
+                        await updateTemplate(template.id, { is_default: true });
+                      } catch {
+                        toast.error(t('common.message.error'));
+                      }
+                    }
+                  }}
                   className="shrink-0"
                   title={t('settings.printer.template.set_active')}
                 >

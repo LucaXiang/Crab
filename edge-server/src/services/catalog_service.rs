@@ -1357,7 +1357,9 @@ impl CatalogService {
     /// Destinations: category.destinations > global default
     pub fn get_kitchen_print_config(&self, product_id: i64) -> Option<KitchenPrintConfig> {
         // Global toggle — highest priority
-        if !self.print_defaults.read().kitchen_enabled {
+        let defaults = self.print_defaults.read().clone();
+        if !defaults.kitchen_enabled {
+            tracing::info!(product_id, "get_kitchen_print_config: global kitchen toggle OFF");
             return Some(KitchenPrintConfig {
                 enabled: false,
                 destinations: vec![],
@@ -1377,11 +1379,10 @@ impl CatalogService {
             real_category.map(|c| c.is_kitchen_print_enabled),
         );
 
-        tracing::debug!(
+        tracing::info!(
             product_id,
             product_flag = product.is_kitchen_print_enabled,
             category_id = product.category_id,
-            category_found = category.is_some(),
             is_virtual = category.map(|c| c.is_virtual),
             category_flag = real_category.map(|c| c.is_kitchen_print_enabled),
             enabled,
@@ -1396,9 +1397,18 @@ impl CatalogService {
             });
         }
 
+        let cat_dests = real_category.map(|c| &c.kitchen_print_destinations);
         let destinations = self.resolve_destinations(
-            real_category.map(|c| &c.kitchen_print_destinations),
-            |defaults| defaults.kitchen_destination.as_deref(),
+            cat_dests,
+            |d| d.kitchen_destination.as_deref(),
+        );
+
+        tracing::info!(
+            product_id,
+            category_dests = ?cat_dests.map(|d| d.len()),
+            global_default = ?defaults.kitchen_destination,
+            resolved_destinations = ?destinations,
+            "get_kitchen_print_config: resolved destinations"
         );
 
         Some(KitchenPrintConfig {
@@ -1411,7 +1421,9 @@ impl CatalogService {
     /// Get label print configuration for a product (with fallback chain)
     pub fn get_label_print_config(&self, product_id: i64) -> Option<LabelPrintConfig> {
         // Global toggle — highest priority
-        if !self.print_defaults.read().label_enabled {
+        let defaults = self.print_defaults.read().clone();
+        if !defaults.label_enabled {
+            tracing::info!(product_id, "get_label_print_config: global label toggle OFF");
             return Some(LabelPrintConfig {
                 enabled: false,
                 destinations: vec![],
@@ -1430,6 +1442,15 @@ impl CatalogService {
             real_category.map(|c| c.is_label_print_enabled),
         );
 
+        tracing::info!(
+            product_id,
+            product_flag = product.is_label_print_enabled,
+            category_id = product.category_id,
+            category_flag = real_category.map(|c| c.is_label_print_enabled),
+            enabled,
+            "get_label_print_config: resolved enabled flag"
+        );
+
         if !enabled {
             return Some(LabelPrintConfig {
                 enabled: false,
@@ -1437,9 +1458,18 @@ impl CatalogService {
             });
         }
 
+        let cat_dests = real_category.map(|c| &c.label_print_destinations);
         let destinations = self.resolve_destinations(
-            real_category.map(|c| &c.label_print_destinations),
-            |defaults| defaults.label_destination.as_deref(),
+            cat_dests,
+            |d| d.label_destination.as_deref(),
+        );
+
+        tracing::info!(
+            product_id,
+            category_dests = ?cat_dests.map(|d| d.len()),
+            global_default = ?defaults.label_destination,
+            resolved_destinations = ?destinations,
+            "get_label_print_config: resolved destinations"
         );
 
         Some(LabelPrintConfig {

@@ -74,7 +74,7 @@ impl KitchenPrintService {
         let label_enabled = catalog.is_label_print_enabled();
 
         if !kitchen_enabled && !label_enabled {
-            tracing::debug!(
+            tracing::warn!(
                 order_id = %event.order_id,
                 "process_items_added: both kitchen and label printing disabled at system level"
             );
@@ -91,7 +91,8 @@ impl KitchenPrintService {
             return Ok(None);
         }
 
-        tracing::debug!(
+        tracing::info!(
+            order_id = %event.order_id,
             kitchen_enabled,
             label_enabled,
             items_count = items.len(),
@@ -105,7 +106,7 @@ impl KitchenPrintService {
         for item in items {
             let context = self.build_print_context(item, catalog);
 
-            tracing::debug!(
+            tracing::info!(
                 product_id = item.id,
                 product_name = %item.name,
                 kitchen_destinations = ?context.kitchen_destinations,
@@ -146,11 +147,11 @@ impl KitchenPrintService {
         }
 
         if kitchen_items.is_empty() && label_records.is_empty() {
-            tracing::debug!(
+            tracing::warn!(
                 order_id = %event.order_id,
                 kitchen_enabled,
                 label_enabled,
-                "process_items_added: no items matched any print destination"
+                "process_items_added: no items matched any print destination (check product/category print config & global defaults)"
             );
             return Ok(None);
         }
