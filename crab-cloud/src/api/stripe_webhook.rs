@@ -138,21 +138,20 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
         }
     };
 
-    // Determine plan from metadata or default to "basic"
-    let plan = obj
+    // Determine plan from metadata or default to Basic
+    let plan_str = obj
         .get("metadata")
         .and_then(|m| m["plan"].as_str())
         .unwrap_or("basic");
-
-    let quota = stripe::plan_quota(plan);
+    let plan_type = stripe::parse_plan_str(plan_str);
     let now = chrono::Utc::now().timestamp_millis();
 
     // Create subscription
     let sub = db::subscriptions::CreateSubscription {
         id: subscription_id,
         tenant_id: tenant.id,
-        plan,
-        max_stores: quota.max_stores,
+        plan: plan_type.as_str(),
+        max_stores: plan_type.max_stores_i32(),
         current_period_end: None, // set by subscription.updated events
         now,
     };
@@ -172,16 +171,17 @@ async fn handle_checkout_completed(state: &AppState, event: &serde_json::Value) 
     tracing::info!(
         tenant_id = tenant.id,
         subscription_id = subscription_id,
-        plan = plan,
+        plan = plan_type.as_str(),
         "Tenant activated via Stripe checkout"
     );
 
     let _ = state
         .email
-        .send_subscription_activated(&tenant.email, plan)
+        .send_subscription_activated(&tenant.email, plan_type.as_str())
         .await;
 
-    let detail = serde_json::json!({ "subscription_id": subscription_id, "plan": plan });
+    let detail =
+        serde_json::json!({ "subscription_id": subscription_id, "plan": plan_type.as_str() });
     let _ = crate::db::audit::log(
         &state.pool,
         tenant.id,

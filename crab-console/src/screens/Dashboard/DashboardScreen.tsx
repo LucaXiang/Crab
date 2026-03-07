@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getProfile, createBillingPortal, createCheckout, type ProfileResponse } from '@/infrastructure/api/profile';
+import { getProfile, createBillingPortal, createCheckout, resumeSubscription, type ProfileResponse } from '@/infrastructure/api/profile';
 import { uploadP12, type P12UploadResponse } from '@/infrastructure/api/auth';
 import { getStores } from '@/infrastructure/api/stores';
 import { getTenantOverview } from '@/infrastructure/api/stats';
@@ -52,6 +52,7 @@ export const DashboardScreen: React.FC = () => {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
   const [cutoffMinutes, setCutoffMinutes] = useState(0);
   const [timeRange, setTimeRange] = useState<TimeRange>(() => getPresetRange('today', t));
@@ -187,6 +188,19 @@ export const DashboardScreen: React.FC = () => {
     } finally {
       setBillingLoading(false);
     }
+  };
+
+  const handleResume = async () => {
+    if (!token) return;
+    setResumeLoading(true); setError('');
+    try {
+      await resumeSubscription(token);
+      // Refresh profile to update subscription state
+      const res = await getProfile(token);
+      setProfile(res);
+    } catch (err) {
+      setError(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
+    } finally { setResumeLoading(false); }
   };
 
   const handleP12Upload = async () => {
@@ -350,6 +364,23 @@ export const DashboardScreen: React.FC = () => {
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2 shadow-sm">
           <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {/* Cancel at period end warning */}
+      {profile?.subscription?.cancel_at_period_end && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <span className="font-medium">{t('dash.cancel_warning')}</span>
+          </div>
+          <button
+            onClick={handleResume}
+            disabled={resumeLoading}
+            className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 shrink-0"
+          >
+            {resumeLoading ? '...' : t('dash.resume_subscription')}
+          </button>
         </div>
       )}
 

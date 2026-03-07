@@ -80,7 +80,8 @@
     "download_windows": "Descargar",
     "welcome": "Bienvenido",
     "system_operational": "Sistema operativo",
-    "sync_warning": "Algunos locales no se han sincronizado en más de 24 horas"
+    "sync_warning": "Algunos locales no se han sincronizado en más de 24 horas",
+    "resume_subscription": "Reanudar suscripción"
   },
   "store": {
     "title": "Local",
@@ -124,7 +125,7 @@
     "void": "Anulados",
     "cancelled": "Cancelado",
     "anulada": "Anulada",
-    "loss": "Pérdida",
+    "loss": "Liquidación de pérdida",
     "merged": "Fusionados",
     "empty": "No hay pedidos.",
     "no_results": "No se encontraron pedidos que coincidan.",
@@ -199,9 +200,6 @@
     "order_surcharge": "Recargo de pedido",
     "order_rule_discount": "Descuento regla de pedido",
     "order_rule_surcharge": "Recargo regla de pedido",
-    "cancelled": "Cancelado",
-    "anulada": "Anulada",
-    "loss": "Liquidación de pérdida",
     "details": "Detalles",
     "view_order": "Ver pedido"
   },
@@ -700,7 +698,20 @@
     "printer": {
       "templates": "Configuración de plantillas"
     },
-    "supported_fields": "Campos disponibles"
+    "supported_fields": "Campos disponibles",
+    "cancel_subscription": "Cancelar suscripción",
+    "cancel_confirm": "¿Cancelar la suscripción al final del periodo actual?",
+    "resume_subscription": "Reanudar suscripción",
+    "change_plan": "Cambiar plan",
+    "current_plan": "Plan actual",
+    "billing_monthly": "Mensual",
+    "billing_yearly": "Anual",
+    "canceling": "Cancelando...",
+    "resuming": "Reanudando...",
+    "changing_plan": "Cambiando...",
+    "plan_changed": "Plan cambiado.",
+    "subscription_resumed": "Suscripción reanudada.",
+    "subscription_canceled": "La suscripción se cancelará al final del periodo."
   },
   "live": {
     "title": "Pedidos en vivo",
@@ -907,7 +918,6 @@
     "generic_desc": "Algo salió mal. Inténtalo de nuevo.",
     "go_back": "Volver",
     "go_home": "Inicio",
-
     "1": "Se ha producido un error desconocido.",
     "2": "Los datos introducidos no son válidos.",
     "3": "El recurso solicitado no existe.",
@@ -916,7 +926,6 @@
     "6": "Formato incorrecto.",
     "7": "Falta un campo obligatorio.",
     "8": "El valor está fuera del rango permitido.",
-
     "1001": "Tu sesión ha expirado. Inicia sesión de nuevo.",
     "1002": "Correo o contraseña incorrectos.",
     "1003": "Tu sesión ha expirado. Inicia sesión de nuevo.",
@@ -924,13 +933,11 @@
     "1005": "Tu sesión ha expirado. Inicia sesión de nuevo.",
     "1006": "Tu cuenta está bloqueada. Contacta con soporte.",
     "1007": "Tu cuenta está desactivada. Contacta con soporte.",
-
     "2001": "No tienes permiso para realizar esta acción.",
     "2002": "Se requiere un rol específico para esta acción.",
     "2003": "Se requiere acceso de administrador.",
     "2004": "No se puede modificar la cuenta de administrador.",
     "2005": "No se puede eliminar la cuenta de administrador.",
-
     "3001": "Selecciona un negocio primero.",
     "3002": "Negocio no encontrado.",
     "3003": "Error de activación. Inténtalo de nuevo.",
@@ -962,7 +969,6 @@
     "3029": "El NIF del nuevo certificado no coincide con el certificado vinculado. Si cambias de entidad, debes registrar una nueva cuenta.",
     "3030": "El certificado ha caducado. Sube un certificado válido.",
     "3031": "El certificado aún no es válido. Comprueba la fecha de inicio de validez.",
-
     "6001": "Producto no encontrado.",
     "6002": "Precio de producto no válido.",
     "6003": "Producto agotado.",
@@ -994,7 +1000,6 @@
     "6601": "Grupo de marketing no encontrado.",
     "6701": "Plantilla de etiqueta no encontrada.",
     "6801": "Regla de precio no encontrada.",
-
     "7001": "Mesa no encontrada.",
     "7002": "La mesa está ocupada.",
     "7003": "La mesa ya está libre.",
@@ -1004,7 +1009,6 @@
     "7104": "Esta mesa tiene pedidos activos.",
     "7201": "Turno no encontrado.",
     "7301": "Informe diario no encontrado.",
-
     "8001": "Empleado no encontrado.",
     "8002": "El nombre de usuario ya existe.",
     "8003": "No puedes eliminar tu propia cuenta.",
@@ -1014,7 +1018,6 @@
     "8102": "El nombre de rol ya existe.",
     "8103": "Este rol está en uso y no se puede eliminar.",
     "8104": "No se puede modificar un rol del sistema.",
-
     "9001": "Error interno del servidor. Inténtalo más tarde.",
     "9002": "Error de base de datos. Inténtalo más tarde.",
     "9003": "Error de conexión. Comprueba tu conexión a internet.",

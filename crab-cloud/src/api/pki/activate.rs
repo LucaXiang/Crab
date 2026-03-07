@@ -380,9 +380,5 @@ pub fn parse_subscription_status(s: &str) -> SubscriptionStatus {
 }
 
 pub fn parse_plan_type(s: &str) -> PlanType {
-    match s {
-        "pro" => PlanType::Pro,
-        "enterprise" => PlanType::Enterprise,
-        _ => PlanType::Basic,
-    }
+    PlanType::parse(s).unwrap_or(PlanType::Basic)
 }

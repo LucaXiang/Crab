@@ -3,18 +3,16 @@
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
-/// Plan -> quota mapping
-pub struct PlanQuota {
-    pub max_stores: i32,
-}
+use shared::activation::PlanType;
 
-pub fn plan_quota(plan: &str) -> PlanQuota {
-    match plan {
-        "basic" | "basic_yearly" => PlanQuota { max_stores: 1 },
-        "pro" | "pro_yearly" => PlanQuota { max_stores: 3 },
-        "enterprise" => PlanQuota { max_stores: 10 },
-        _ => PlanQuota { max_stores: 1 },
-    }
+/// Parse a legacy plan string (e.g. "basic_yearly") into PlanType,
+/// stripping the billing interval suffix.
+pub fn parse_plan_str(s: &str) -> PlanType {
+    let base = s
+        .strip_suffix("_yearly")
+        .or_else(|| s.strip_suffix("_monthly"))
+        .unwrap_or(s);
+    PlanType::parse(base).unwrap_or(PlanType::Basic)
 }
 
 /// Create a Stripe Customer
@@ -93,6 +91,104 @@ pub async fn create_billing_portal_session(
         .as_str()
         .map(String::from)
         .ok_or_else(|| format!("Stripe billing portal failed: {resp}").into())
+}
+
+/// Cancel a Stripe subscription at period end
+pub async fn cancel_subscription(
+    secret_key: &str,
+    subscription_id: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(format!(
+            "https://api.stripe.com/v1/subscriptions/{subscription_id}"
+        ))
+        .basic_auth(secret_key, None::<&str>)
+        .form(&[("cancel_at_period_end", "true")])
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    if resp.get("error").is_some() {
+        return Err(format!("Stripe cancel_subscription failed: {resp}").into());
+    }
+    Ok(resp)
+}
+
+/// Resume a Stripe subscription (undo cancel_at_period_end)
+pub async fn resume_subscription(
+    secret_key: &str,
+    subscription_id: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(format!(
+            "https://api.stripe.com/v1/subscriptions/{subscription_id}"
+        ))
+        .basic_auth(secret_key, None::<&str>)
+        .form(&[("cancel_at_period_end", "false")])
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    if resp.get("error").is_some() {
+        return Err(format!("Stripe resume_subscription failed: {resp}").into());
+    }
+    Ok(resp)
+}
+
+/// Update a Stripe subscription's price (for plan changes)
+pub async fn update_subscription_price(
+    secret_key: &str,
+    subscription_id: &str,
+    subscription_item_id: &str,
+    new_price_id: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(format!(
+            "https://api.stripe.com/v1/subscriptions/{subscription_id}"
+        ))
+        .basic_auth(secret_key, None::<&str>)
+        .form(&[
+            ("items[0][id]", subscription_item_id),
+            ("items[0][price]", new_price_id),
+            ("cancel_at_period_end", "false"),
+            ("proration_behavior", "always_invoice"),
+        ])
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    if resp.get("error").is_some() {
+        return Err(format!("Stripe update_subscription_price failed: {resp}").into());
+    }
+    Ok(resp)
+}
+
+/// Get a Stripe subscription
+pub async fn get_subscription(
+    secret_key: &str,
+    subscription_id: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .get(format!(
+            "https://api.stripe.com/v1/subscriptions/{subscription_id}"
+        ))
+        .basic_auth(secret_key, None::<&str>)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    if resp.get("error").is_some() {
+        return Err(format!("Stripe get_subscription failed: {resp}").into());
+    }
+    Ok(resp)
 }
 
 /// Verify Stripe webhook signature (HMAC-SHA256)

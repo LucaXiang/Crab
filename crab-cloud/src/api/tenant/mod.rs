@@ -52,7 +52,9 @@ pub use order::{
 
 pub use command::{create_command, list_commands};
 
-pub use billing::{billing_portal, create_checkout};
+pub use billing::{
+    billing_portal, cancel_subscription, change_plan, create_checkout, resume_subscription,
+};
 
 pub use audit::audit_log;
 

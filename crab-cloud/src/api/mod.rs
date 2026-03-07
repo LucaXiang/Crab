@@ -119,6 +119,15 @@ pub fn public_router(state: AppState) -> Router {
         )
         .route("/api/tenant/billing-portal", post(tenant::billing_portal))
         .route("/api/tenant/create-checkout", post(tenant::create_checkout))
+        .route(
+            "/api/tenant/cancel-subscription",
+            post(tenant::cancel_subscription),
+        )
+        .route(
+            "/api/tenant/resume-subscription",
+            post(tenant::resume_subscription),
+        )
+        .route("/api/tenant/change-plan", post(tenant::change_plan))
         .route("/api/tenant/audit-log", get(tenant::audit_log))
         .route("/api/tenant/sessions", get(tenant::list_sessions))
         .route("/api/tenant/sessions/revoke", post(tenant::revoke_session))

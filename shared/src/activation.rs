@@ -469,6 +469,15 @@ impl PlanType {
         }
     }
 
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "basic" => Some(Self::Basic),
+            "pro" => Some(Self::Pro),
+            "enterprise" => Some(Self::Enterprise),
+            _ => None,
+        }
+    }
+
     /// 返回该计划允许的最大门店数量
     /// 0 表示无限制
     pub fn max_stores(&self) -> usize {
@@ -476,6 +485,39 @@ impl PlanType {
             PlanType::Basic => 1,
             PlanType::Pro => 3,
             PlanType::Enterprise => 0, // 无限
+        }
+    }
+
+    pub fn max_stores_i32(&self) -> i32 {
+        match self {
+            PlanType::Basic => 1,
+            PlanType::Pro => 3,
+            PlanType::Enterprise => 10,
+        }
+    }
+}
+
+/// 付费周期
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BillingInterval {
+    Month,
+    Year,
+}
+
+impl BillingInterval {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Month => "month",
+            Self::Year => "year",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "month" => Some(Self::Month),
+            "year" => Some(Self::Year),
+            _ => None,
         }
     }
 }

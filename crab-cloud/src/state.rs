@@ -29,6 +29,46 @@ pub struct StripeConfig {
     pub pro_yearly_price_id: String,
 }
 
+impl StripeConfig {
+    /// (PlanType, BillingInterval) → Stripe price ID
+    pub fn price_for(
+        &self,
+        plan: shared::activation::PlanType,
+        interval: shared::activation::BillingInterval,
+    ) -> &str {
+        use shared::activation::{BillingInterval, PlanType};
+        match (plan, interval) {
+            (PlanType::Basic, BillingInterval::Month) => &self.basic_price_id,
+            (PlanType::Basic, BillingInterval::Year) => &self.basic_yearly_price_id,
+            (PlanType::Pro, BillingInterval::Month) => &self.pro_price_id,
+            (PlanType::Pro, BillingInterval::Year) => &self.pro_yearly_price_id,
+            (PlanType::Enterprise, _) => &self.pro_price_id, // enterprise 走定制
+        }
+    }
+
+    /// Stripe price ID → (PlanType, BillingInterval)
+    pub fn resolve_plan(
+        &self,
+        price_id: &str,
+    ) -> Option<(
+        shared::activation::PlanType,
+        shared::activation::BillingInterval,
+    )> {
+        use shared::activation::{BillingInterval, PlanType};
+        if price_id == self.basic_price_id {
+            Some((PlanType::Basic, BillingInterval::Month))
+        } else if price_id == self.pro_price_id {
+            Some((PlanType::Pro, BillingInterval::Month))
+        } else if price_id == self.basic_yearly_price_id {
+            Some((PlanType::Basic, BillingInterval::Year))
+        } else if price_id == self.pro_yearly_price_id {
+            Some((PlanType::Pro, BillingInterval::Year))
+        } else {
+            None
+        }
+    }
+}
+
 /// S3 + 更新下载配置
 #[derive(Clone)]
 pub struct S3Config {

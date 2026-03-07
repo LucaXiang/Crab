@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, CreditCard, Globe, Save, ExternalLink } from 'lucide-react';
+import { User, Lock, CreditCard, Globe, Save, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/core/stores/useAuthStore';
-import { getProfile, updateProfile, createBillingPortal } from '@/infrastructure/api/profile';
+import { getProfile, updateProfile, createBillingPortal, cancelSubscription, resumeSubscription, changePlan } from '@/infrastructure/api/profile';
 import { changePassword } from '@/infrastructure/api/auth';
 import { ApiError } from '@/infrastructure/api/client';
 import { apiErrorMessage } from '@/infrastructure/i18n';
@@ -34,9 +34,16 @@ export const SettingsScreen: React.FC = () => {
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdSaving, setPwdSaving] = useState(false);
 
-
   // Language
   const [lang, setLang] = useState<Locale>(getLocale());
+
+  // Billing actions
+  const [billingMsg, setBillingMsg] = useState('');
+  const [billingErr, setBillingErr] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [changePlanLoading, setChangePlanLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     const tk = useAuthStore.getState().token;
@@ -80,7 +87,6 @@ export const SettingsScreen: React.FC = () => {
     } finally { setPwdSaving(false); }
   };
 
-
   const handleBilling = async () => {
     if (!token) return;
     try {
@@ -93,12 +99,55 @@ export const SettingsScreen: React.FC = () => {
     } catch { /* ignore */ }
   };
 
+  const handleCancel = async () => {
+    if (!token) return;
+    setCancelLoading(true); setBillingMsg(''); setBillingErr('');
+    try {
+      await cancelSubscription(token);
+      setSubscription(s => s ? { ...s, cancel_at_period_end: true } : s);
+      setBillingMsg(t('settings.subscription_canceled'));
+      setShowCancelConfirm(false);
+    } catch (err) {
+      setBillingErr(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
+    } finally { setCancelLoading(false); }
+  };
+
+  const handleResume = async () => {
+    if (!token) return;
+    setResumeLoading(true); setBillingMsg(''); setBillingErr('');
+    try {
+      await resumeSubscription(token);
+      setSubscription(s => s ? { ...s, cancel_at_period_end: false } : s);
+      setBillingMsg(t('settings.subscription_resumed'));
+    } catch (err) {
+      setBillingErr(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
+    } finally { setResumeLoading(false); }
+  };
+
+  const handleChangePlan = async (plan: string) => {
+    if (!token) return;
+    setChangePlanLoading(true); setBillingMsg(''); setBillingErr('');
+    try {
+      await changePlan(token, plan);
+      // Refresh profile to get updated subscription
+      const res = await getProfile(token);
+      setSubscription(res.subscription);
+      setBillingMsg(t('settings.plan_changed'));
+    } catch (err) {
+      setBillingErr(err instanceof ApiError ? apiErrorMessage(t, err.code, err.message, err.status) : t('auth.error_generic'));
+    } finally { setChangePlanLoading(false); }
+  };
+
   const handleLangChange = (newLang: Locale) => {
     setLang(newLang);
     setLocale(newLang);
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner className="w-8 h-8 text-primary-500" /></div>;
+
+  const isActive = subscription && (subscription.status === 'active' || subscription.status === 'trialing');
+  const currentPlanBase = subscription?.plan ?? 'basic';
+  const currentInterval = subscription?.billing_interval ?? 'month';
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 md:px-6 md:py-8 space-y-6">
@@ -141,7 +190,6 @@ export const SettingsScreen: React.FC = () => {
         </div>
       </Section>
 
-
       {/* Language */}
       <Section icon={Globe} title={t('settings.language')}>
         <div className="flex gap-2">
@@ -156,20 +204,122 @@ export const SettingsScreen: React.FC = () => {
       {/* Billing */}
       <Section icon={CreditCard} title={t('settings.billing')}>
         {subscription ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Status row */}
             <div className="flex items-center gap-4 text-sm">
               <span className="text-slate-500">{t('dash.plan')}:</span>
               <span className="font-semibold text-slate-900 capitalize">{subscription.plan}</span>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${subscription.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${subscription.status === 'active' || subscription.status === 'trialing' ? 'bg-green-100 text-green-700' : subscription.status === 'canceled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                 {subscription.status}
               </span>
+              {subscription.billing_interval && (
+                <span className="text-xs text-slate-400">
+                  ({subscription.billing_interval === 'year' ? t('settings.billing_yearly') : t('settings.billing_monthly')})
+                </span>
+              )}
             </div>
+
+            {/* Period end */}
             {subscription.current_period_end && (
-              <p className="text-sm text-slate-500">{t('dash.next_billing')}: {new Date(subscription.current_period_end * 1000).toLocaleDateString()}</p>
+              <p className="text-sm text-slate-500">
+                {t('dash.next_billing')}: {new Date(subscription.current_period_end).toLocaleDateString()}
+              </p>
             )}
-            <button onClick={handleBilling} className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-1.5">
-              <ExternalLink className="w-4 h-4" />{t('settings.manage_billing')}
-            </button>
+
+            {/* Cancel warning */}
+            {subscription.cancel_at_period_end && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {t('dash.cancel_warning')}
+              </div>
+            )}
+
+            {/* Messages */}
+            {billingMsg && <p className="text-sm text-green-600">{billingMsg}</p>}
+            {billingErr && <p className="text-sm text-red-600">{billingErr}</p>}
+
+            {/* Cancel confirm dialog */}
+            {showCancelConfirm && (
+              <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg space-y-3">
+                <p className="text-sm text-red-700">{t('settings.cancel_confirm')}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelLoading}
+                    className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {cancelLoading ? t('settings.canceling') : t('settings.cancel_subscription')}
+                  </button>
+                  <button
+                    onClick={() => setShowCancelConfirm(false)}
+                    className="px-3 py-1.5 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                  >
+                    {t('auth.back_to_login').replace(/.*/, '取消')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleBilling} className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-1.5">
+                <ExternalLink className="w-4 h-4" />{t('settings.manage_billing')}
+              </button>
+
+              {isActive && !subscription.cancel_at_period_end && !showCancelConfirm && (
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  className="px-4 py-2 text-red-600 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  {t('settings.cancel_subscription')}
+                </button>
+              )}
+
+              {isActive && subscription.cancel_at_period_end && (
+                <button
+                  onClick={handleResume}
+                  disabled={resumeLoading}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {resumeLoading ? t('settings.resuming') : t('settings.resume_subscription')}
+                </button>
+              )}
+            </div>
+
+            {/* Change plan */}
+            {isActive && (
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-sm font-medium text-slate-700 mb-2">{t('settings.change_plan')}</p>
+                <div className="flex flex-wrap gap-2">
+                  {(['basic', 'pro'] as const).map(plan => {
+                    const intervals = ['month', 'year'] as const;
+                    return intervals.map(interval => {
+                      const planKey = interval === 'year' ? `${plan}_yearly` : plan;
+                      const isCurrent = currentPlanBase === plan && currentInterval === interval;
+                      return (
+                        <button
+                          key={planKey}
+                          onClick={() => !isCurrent && handleChangePlan(planKey)}
+                          disabled={isCurrent || changePlanLoading}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                            isCurrent
+                              ? 'bg-primary-50 text-primary-700 border-primary-300 cursor-default'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-primary-300 disabled:opacity-50'
+                          }`}
+                        >
+                          <span className="capitalize">{plan}</span>
+                          {' '}
+                          <span className="text-xs text-slate-400">
+                            ({interval === 'year' ? t('settings.billing_yearly') : t('settings.billing_monthly')})
+                          </span>
+                          {isCurrent && <span className="ml-1 text-xs">✓</span>}
+                        </button>
+                      );
+                    });
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-slate-500">{t('dash.no_stores_hint')}</p>

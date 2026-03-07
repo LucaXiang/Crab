@@ -93,6 +93,30 @@ pub struct Subscription {
     pub billing_interval: Option<String>,
 }
 
+pub async fn update_plan(
+    pool: &PgPool,
+    subscription_id: &str,
+    plan: &str,
+    max_stores: i32,
+    billing_interval: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE subscriptions SET
+            plan = $1,
+            max_stores = $2,
+            billing_interval = $3,
+            cancel_at_period_end = false
+         WHERE id = $4",
+    )
+    .bind(plan)
+    .bind(max_stores)
+    .bind(billing_interval)
+    .bind(subscription_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// 获取租户最新订阅 (不过滤 status)
 ///
 /// 返回真实订阅状态，由调用方决定如何处理：

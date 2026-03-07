@@ -80,7 +80,8 @@
     "download_windows": "Download",
     "welcome": "Welcome",
     "system_operational": "System operational",
-    "sync_warning": "Some stores haven't synced in over 24 hours"
+    "sync_warning": "Some stores haven't synced in over 24 hours",
+    "resume_subscription": "Resume subscription"
   },
   "store": {
     "title": "Store",
@@ -696,7 +697,20 @@
     "printer": {
       "templates": "Template Settings"
     },
-    "supported_fields": "Supported Fields"
+    "supported_fields": "Supported Fields",
+    "cancel_subscription": "Cancel subscription",
+    "cancel_confirm": "Cancel your subscription at the end of the current period?",
+    "resume_subscription": "Resume subscription",
+    "change_plan": "Change plan",
+    "current_plan": "Current plan",
+    "billing_monthly": "Monthly",
+    "billing_yearly": "Yearly",
+    "canceling": "Canceling...",
+    "resuming": "Resuming...",
+    "changing_plan": "Changing...",
+    "plan_changed": "Plan changed.",
+    "subscription_resumed": "Subscription resumed.",
+    "subscription_canceled": "Subscription will cancel at end of period."
   },
   "live": {
     "title": "Live Orders",
@@ -903,7 +917,6 @@
     "generic_desc": "Something went wrong. Please try again.",
     "go_back": "Go back",
     "go_home": "Home",
-
     "1": "An unknown error occurred.",
     "2": "The information you entered is not valid.",
     "3": "The requested resource was not found.",
@@ -912,7 +925,6 @@
     "6": "Invalid format.",
     "7": "A required field is missing.",
     "8": "Value is out of the allowed range.",
-
     "1001": "Your session has expired. Please sign in again.",
     "1002": "Invalid email or password.",
     "1003": "Your session has expired. Please sign in again.",
@@ -920,13 +932,11 @@
     "1005": "Your session has expired. Please sign in again.",
     "1006": "Your account has been locked. Please contact support.",
     "1007": "Your account has been disabled. Please contact support.",
-
     "2001": "You don't have permission to perform this action.",
     "2002": "A specific role is required for this action.",
     "2003": "Administrator access required.",
     "2004": "Cannot modify the administrator account.",
     "2005": "Cannot delete the administrator account.",
-
     "3001": "Please select a tenant first.",
     "3002": "Tenant not found.",
     "3003": "Activation failed. Please try again.",
@@ -958,7 +968,6 @@
     "3029": "The new certificate's NIF does not match the existing bound certificate. To change business entities, you must register a new account.",
     "3030": "This certificate has expired. Please upload a valid certificate.",
     "3031": "This certificate is not yet valid. Please check the certificate's start date.",
-
     "6001": "Product not found.",
     "6002": "Invalid product price.",
     "6003": "Product is out of stock.",
@@ -990,7 +999,6 @@
     "6601": "Marketing group not found.",
     "6701": "Label template not found.",
     "6801": "Price rule not found.",
-
     "7001": "Table not found.",
     "7002": "Table is currently in use.",
     "7003": "Table is already empty.",
@@ -1000,7 +1008,6 @@
     "7104": "This table has active orders.",
     "7201": "Shift not found.",
     "7301": "Daily report not found.",
-
     "8001": "Employee not found.",
     "8002": "Employee username already exists.",
     "8003": "You cannot delete your own account.",
@@ -1010,7 +1017,6 @@
     "8102": "Role name already exists.",
     "8103": "This role is in use and cannot be deleted.",
     "8104": "Cannot modify system role.",
-
     "9001": "Internal server error. Please try again later.",
     "9002": "Database error. Please try again later.",
     "9003": "Network connection failed. Please check your connection.",

@@ -22,3 +22,15 @@ export function createBillingPortal(token: string): Promise<{ url: string }> {
 export function createCheckout(token: string, plan: string): Promise<{ checkout_url: string }> {
   return request('POST', '/api/tenant/create-checkout', { plan }, token);
 }
+
+export function cancelSubscription(token: string): Promise<{ message: string }> {
+  return request('POST', '/api/tenant/cancel-subscription', undefined, token);
+}
+
+export function resumeSubscription(token: string): Promise<{ message: string }> {
+  return request('POST', '/api/tenant/resume-subscription', undefined, token);
+}
+
+export function changePlan(token: string, plan: string): Promise<{ message: string }> {
+  return request('POST', '/api/tenant/change-plan', { plan }, token);
+}
