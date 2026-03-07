@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invokeApi } from '@/infrastructure/api';
 import { useI18n } from '@/hooks/useI18n';
 import { localizedErrorMessage } from '@/utils/error/commandError';
+import { getErrorMessage } from '@/utils/error';
 import { X, AlertTriangle } from 'lucide-react';
 import { toast } from '@/presentation/components/Toast';
 import type { ArchivedOrderDetail } from '@/core/domain/types';
@@ -23,6 +24,7 @@ const REASONS: { value: AnulacionReason; i18nKey: string }[] = [
 
 interface EligibilityResult {
   eligible: boolean;
+  code?: number;
   reason?: string;
 }
 
@@ -44,7 +46,11 @@ export const AnulacionModal: React.FC<AnulacionModalProps> = ({ order, onClose, 
         });
         setEligible(result.eligible);
         if (!result.eligible) {
-          setIneligibleReason(result.reason ?? null);
+          setIneligibleReason(
+            result.code
+              ? getErrorMessage({ code: result.code, message: result.reason ?? '' })
+              : result.reason ?? null
+          );
         }
       } catch (err) {
         setIneligibleReason(localizedErrorMessage(err));

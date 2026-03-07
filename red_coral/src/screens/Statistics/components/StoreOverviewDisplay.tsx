@@ -14,6 +14,20 @@ import type { StoreOverview, AdjustmentEntry } from '@/core/domain/types';
 
 const PIE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
+// Semantic color maps matching the project color language
+const PAYMENT_COLORS: Record<string, string> = { CASH: '#10b981', CARD: '#6366f1' };
+const SERVICE_COLORS: Record<string, string> = { DINE_IN: '#ef4444', TAKEOUT: '#3b82f6' };
+const ADJ_SOURCE_COLORS_AMBER: Record<string, string> = {
+  item_manual: '#f97316', order_manual: '#f97316',
+  item_rule: '#d97706', order_rule: '#d97706',
+  mg: '#eab308',
+};
+const ADJ_SOURCE_COLORS_PURPLE: Record<string, string> = {
+  item_manual: '#8b5cf6', order_manual: '#8b5cf6',
+  item_rule: '#6366f1', order_rule: '#6366f1',
+  mg: '#a855f7',
+};
+
 const PAYMENT_I18N_KEYS: Record<string, string> = {
   CASH: 'checkout.method.cash',
   CARD: 'checkout.method.card',
@@ -107,32 +121,23 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 
       {/* KPI Row 2 — Secondary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {overview.payment_breakdown.slice(0, 2).map(pb => {
-          const isCash = pb.method.toUpperCase() === 'CASH';
+        {(['CASH', 'CARD'] as const).map(method => {
+          const pb = overview.payment_breakdown.find(p => p.method.toUpperCase() === method);
+          const isCash = method === 'CASH';
           return (
-            <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${paymentLabel(pb.method)} (${pb.count})`} />
+            <KpiCard key={method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb?.amount ?? 0)} label={`${paymentLabel(method)} (${pb?.count ?? 0})`} />
           );
         })}
         <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('statistics.metric.avg_guest_spend')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
         <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('statistics.metric.avg_dining_time')} />
       </div>
 
-      {/* KPI Row 3 — Losses, Discounts & Refunds */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('statistics.metric.voided_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
-        <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('statistics.metric.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
-        <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('statistics.metric.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
-        <KpiCard icon={XCircle} bg="bg-rose-100" color="text-rose-600" value={String(overview.anulacion_count)} label={`${t('statistics.metric.anulacion')} (${formatCurrency(overview.anulacion_amount)})`} delta={prev ? pctChange(overview.anulacion_count, prev.anulacion_count) : undefined} invertDelta />
-      </div>
-
-      {/* KPI Row 4 — Tax, Surcharge, Discount & Items */}
+      {/* KPI Row 3 — Financial */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard icon={DollarSign} bg="bg-green-50" color="text-green-500" value={formatCurrency(overview.revenue)} label={t('statistics.metric.gross_revenue')} delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
         <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('statistics.metric.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
         <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('statistics.metric.total_tax')} delta={prev ? pctChange(overview.total_tax, prev.total_tax) : undefined} />
-        {overview.total_surcharge > 0 && (
-          <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('statistics.metric.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />
-        )}
+        <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('statistics.metric.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />
         <KpiCard icon={Hash} bg="bg-violet-100" color="text-violet-600" value={overview.avg_items_per_order > 0 ? overview.avg_items_per_order.toFixed(1) : '-'} label={t('statistics.metric.avg_items_per_order')} delta={prev ? pctChange(overview.avg_items_per_order, prev.avg_items_per_order) : undefined} />
       </div>
 
@@ -168,12 +173,14 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
       )}
 
       {/* Hourly Revenue Trend — with comparison lines */}
-      {overview.revenue_trend.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('statistics.chart.revenue_trend')}</h3>
-          </div>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('statistics.chart.revenue_trend')}</h3>
+        </div>
+        {overview.revenue_trend.length === 0 ? (
+          <EmptySection />
+        ) : (
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={hourlyTrendData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
               <defs>
@@ -212,8 +219,8 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               {lastWeek && <Line type="monotone" dataKey="lwRevenue" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="3 3" dot={false} name="lwRevenue" />}
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Two columns: Payment Breakdown Pie + Tax Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -228,8 +235,8 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={overview.payment_breakdown} dataKey="amount" nameKey="method" cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2}>
-                      {overview.payment_breakdown.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      {overview.payment_breakdown.map((pb, i) => (
+                        <Cell key={i} fill={PAYMENT_COLORS[pb.method.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                   </PieChart>
@@ -238,10 +245,11 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               <div className="flex-1 space-y-2">
                 {overview.payment_breakdown.map((pb, i) => {
                   const pct = totalPayments > 0 ? ((pb.amount / totalPayments) * 100).toFixed(1) : '0';
+                  const color = PAYMENT_COLORS[pb.method.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length];
                   return (
                     <div key={pb.method} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                         <span className="text-slate-700 truncate">{paymentLabel(pb.method)}</span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-2">
@@ -286,6 +294,24 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
         </div>
       </div>
 
+      {/* Discount & Surcharge Breakdowns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <AdjustmentCard
+          title={t('statistics.discount_breakdown')}
+          entries={overview.discount_breakdown ?? []}
+          color="amber"
+          prefix="-"
+          t={t}
+        />
+        <AdjustmentCard
+          title={t('statistics.surcharge_breakdown')}
+          entries={overview.surcharge_breakdown ?? []}
+          color="purple"
+          prefix="+"
+          t={t}
+        />
+      </div>
+
       {/* Service Type & Zone Sales */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -301,8 +327,8 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={overview.service_type_breakdown} dataKey="orders" nameKey="service_type" cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2}>
-                        {overview.service_type_breakdown.map((_, i) => (
-                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        {overview.service_type_breakdown.map((st, i) => (
+                          <Cell key={i} fill={SERVICE_COLORS[st.service_type.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}
                       </Pie>
                     </PieChart>
@@ -311,10 +337,11 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 <div className="flex-1 space-y-2">
                   {overview.service_type_breakdown.map((st, i) => {
                     const pct = totalSvcOrders > 0 ? ((st.orders / totalSvcOrders) * 100).toFixed(1) : '0';
+                    const color = SERVICE_COLORS[st.service_type.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length];
                     return (
                       <div key={st.service_type} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                           <span className="text-slate-700 truncate">{serviceTypeLabel(st.service_type)}</span>
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
@@ -364,78 +391,6 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
             );
           })() : <EmptySection />}
         </div>
-      </div>
-
-      {/* Refund Method Breakdown */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <RotateCcw className="w-5 h-5 text-slate-400" />
-          <h3 className="font-bold text-slate-900">{t('statistics.metric.refund_methods')}</h3>
-        </div>
-        {overview.refund_method_breakdown.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('statistics.metric.method')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('statistics.metric.count')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('statistics.metric.amount')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.refund_method_breakdown.map((rm, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-0">
-                    <td className="py-2 text-slate-700 font-medium">{paymentLabel(rm.method)}</td>
-                    <td className="py-2 text-right text-slate-700">{rm.count}</td>
-                    <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(rm.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <EmptySection />}
-      </div>
-
-      {/* Discount & Surcharge Breakdowns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {overview.discount_breakdown?.length > 0 && (
-          <AdjustmentCard
-            title={t('statistics.discount_breakdown')}
-            entries={overview.discount_breakdown}
-            color="amber"
-            prefix="-"
-            t={t}
-          />
-        )}
-        {overview.surcharge_breakdown?.length > 0 && (
-          <AdjustmentCard
-            title={t('statistics.surcharge_breakdown')}
-            entries={overview.surcharge_breakdown}
-            color="purple"
-            prefix="+"
-            t={t}
-          />
-        )}
-      </div>
-
-      {/* Tag Sales */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Tag className="w-5 h-5 text-slate-400" />
-          <h3 className="font-bold text-slate-900">{t('statistics.metric.tag_sales')}</h3>
-        </div>
-        {overview.tag_sales.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
-            {overview.tag_sales.map((tag, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-slate-50">
-                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color || PIE_COLORS[i % PIE_COLORS.length] }} />
-                <span className="text-sm font-medium text-slate-700">{tag.name}</span>
-                <span className="text-xs text-slate-400">{tag.quantity}x</span>
-                <span className="text-sm font-semibold text-slate-900">{formatCurrency(tag.revenue)}</span>
-              </div>
-            ))}
-          </div>
-        ) : <EmptySection />}
       </div>
 
       {/* Two columns: Top Products + Category Sales */}
@@ -501,6 +456,64 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
           ) : <EmptySection />}
         </div>
       </div>
+
+      {/* Tag Sales */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Tag className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('statistics.metric.tag_sales')}</h3>
+        </div>
+        {overview.tag_sales.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {overview.tag_sales.map((tag, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-slate-50">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color || PIE_COLORS[i % PIE_COLORS.length] }} />
+                <span className="text-sm font-medium text-slate-700">{tag.name}</span>
+                <span className="text-xs text-slate-400">{tag.quantity}x</span>
+                <span className="text-sm font-semibold text-slate-900">{formatCurrency(tag.revenue)}</span>
+              </div>
+            ))}
+          </div>
+        ) : <EmptySection />}
+      </div>
+
+      {/* KPI Row — Losses & Refunds */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('statistics.metric.voided_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
+        <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('statistics.metric.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
+        <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('statistics.metric.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
+        <KpiCard icon={XCircle} bg="bg-rose-100" color="text-rose-600" value={String(overview.anulacion_count)} label={`${t('statistics.metric.anulacion')} (${formatCurrency(overview.anulacion_amount)})`} delta={prev ? pctChange(overview.anulacion_count, prev.anulacion_count) : undefined} invertDelta />
+      </div>
+
+      {/* Refund Method Breakdown */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <RotateCcw className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('statistics.metric.refund_methods')}</h3>
+        </div>
+        {overview.refund_method_breakdown.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('statistics.metric.method')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('statistics.metric.count')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('statistics.metric.amount')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.refund_method_breakdown.map((rm, i) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 text-slate-700 font-medium">{paymentLabel(rm.method)}</td>
+                    <td className="py-2 text-right text-slate-700">{rm.count}</td>
+                    <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(rm.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <EmptySection />}
+      </div>
     </div>
   );
 };
@@ -533,17 +546,23 @@ const AdjustmentCard: React.FC<{
           <Tag className={`w-5 h-5 ${isAmber ? 'text-amber-400' : 'text-purple-400'}`} />
           <h3 className="font-bold text-slate-900">{title}</h3>
         </div>
-        <span className={`text-lg font-bold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
-          {prefix}{formatCurrency(totalAmount)}
-        </span>
+        {entries.length > 0 && (
+          <span className={`text-lg font-bold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+            {prefix}{formatCurrency(totalAmount)}
+          </span>
+        )}
       </div>
+      {entries.length === 0 ? (
+        <EmptySection />
+      ) : (
       <div className="space-y-3">
         {entries.map((entry, i) => {
           const pct = totalAmount > 0 ? (entry.amount / totalAmount) * 100 : 0;
           const label = entry.source === 'item_rule' || entry.source === 'order_rule'
             ? entry.name
             : t(SOURCE_I18N[entry.source] ?? entry.source);
-          const barColor = isAmber ? PIE_COLORS[3] : PIE_COLORS[4];
+          const srcColors = isAmber ? ADJ_SOURCE_COLORS_AMBER : ADJ_SOURCE_COLORS_PURPLE;
+          const barColor = srcColors[entry.source] ?? (isAmber ? '#f59e0b' : '#8b5cf6');
           return (
             <div key={i}>
               <div className="flex items-center justify-between text-sm mb-1">
@@ -568,6 +587,7 @@ const AdjustmentCard: React.FC<{
           );
         })}
       </div>
+      )}
     </div>
   );
 };

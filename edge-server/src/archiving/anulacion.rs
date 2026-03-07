@@ -50,7 +50,7 @@ impl AnulacionService {
 
     /// Create an anulación (order-layer).
     ///
-    /// - Validates order is COMPLETED, not already anulada, no credit notes
+    /// - Validates order is COMPLETED, not already anulada
     /// - Creates chain_entry (entry_pk = order_pk, type = ANULACION)
     /// - Updates system_state.last_chain_hash
     /// - Marks archived_order.is_voided = 1
@@ -97,29 +97,14 @@ impl AnulacionService {
             ));
         }
 
-        // 2. Check no credit notes exist (mutually exclusive with R5)
-        let cn_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM credit_note WHERE original_order_pk = ?")
-                .bind(request.original_order_pk)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        if cn_count > 0 {
-            return Err(ArchiveError::BusinessRule(
-                ErrorCode::OrderHasCreditNotes,
-                "Cannot create anulación: order has credit notes (use R5 refund instead)".into(),
-            ));
-        }
-
-        // 3. Begin transaction
+        // 2. Begin transaction (credit notes are allowed — anulación voids the order regardless)
         let mut tx = self
             .pool
             .begin()
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 4. Read last_chain_hash
+        // 3. Read last_chain_hash
         let prev_hash: String = sqlx::query_scalar(
             "SELECT COALESCE(last_chain_hash, 'genesis') FROM system_state WHERE id = 1",
         )
@@ -127,7 +112,7 @@ impl AnulacionService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 5. Compute chain hash
+        // 4. Compute chain hash
         let receipt = order.receipt_number.as_deref().unwrap_or("unknown");
         let chain_hash = shared::order::compute_anulacion_chain_hash(
             &prev_hash,
@@ -139,7 +124,7 @@ impl AnulacionService {
             operator_name,
         );
 
-        // 6. Insert chain_entry (entry_pk = order_pk)
+        // 5. Insert chain_entry (entry_pk = order_pk)
         let chain_entry_id = snowflake_id();
         sqlx::query(
             "INSERT INTO chain_entry (id, entry_type, entry_pk, prev_hash, curr_hash, created_at) \
@@ -154,7 +139,7 @@ impl AnulacionService {
         .await
         .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 7. Update system_state.last_chain_hash
+        // 6. Update system_state.last_chain_hash
         sqlx::query("UPDATE system_state SET last_chain_hash = ?1, updated_at = ?2 WHERE id = 1")
             .bind(&chain_hash)
             .bind(now)
@@ -162,7 +147,7 @@ impl AnulacionService {
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // 8. Mark archived_order as anulada + reset cloud_synced for re-sync
+        // 7. Mark archived_order as anulada + reset cloud_synced for re-sync
         sqlx::query("UPDATE archived_order SET is_voided = 1, cloud_synced = 0 WHERE id = ?1")
             .bind(request.original_order_pk)
             .execute(&mut *tx)
@@ -218,20 +203,6 @@ impl AnulacionService {
             return Err(ArchiveError::BusinessRule(
                 ErrorCode::OrderAlreadyVoided,
                 "Order already has an anulación".into(),
-            ));
-        }
-
-        let cn_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM credit_note WHERE original_order_pk = ?")
-                .bind(order_pk)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        if cn_count > 0 {
-            return Err(ArchiveError::BusinessRule(
-                ErrorCode::OrderHasCreditNotes,
-                "Order has credit notes — cannot create anulación".into(),
             ));
         }
 

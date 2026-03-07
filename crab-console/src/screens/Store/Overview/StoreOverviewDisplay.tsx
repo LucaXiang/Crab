@@ -15,6 +15,20 @@ import type { StoreOverview, AdjustmentEntry } from '@/core/types/stats';
 
 const PIE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
+// Semantic color maps matching the project color language
+const PAYMENT_COLORS: Record<string, string> = { CASH: '#10b981', CARD: '#6366f1' };
+const SERVICE_COLORS: Record<string, string> = { DINE_IN: '#ef4444', TAKEOUT: '#3b82f6' };
+const ADJ_SOURCE_COLORS_AMBER: Record<string, string> = {
+  item_manual: '#f97316', order_manual: '#f97316', // orange-500
+  item_rule: '#d97706', order_rule: '#d97706',     // amber-600
+  mg: '#eab308',                                     // yellow-500
+};
+const ADJ_SOURCE_COLORS_PURPLE: Record<string, string> = {
+  item_manual: '#8b5cf6', order_manual: '#8b5cf6', // violet-500
+  item_rule: '#6366f1', order_rule: '#6366f1',     // indigo-500
+  mg: '#a855f7',                                     // purple-500
+};
+
 interface Props {
   overview: StoreOverview;
   previousOverview?: StoreOverview | null;
@@ -109,32 +123,23 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
 
       {/* KPI Row 2 — Secondary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
-        <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('stats.avg_dining_time')} />
-        {overview.payment_breakdown.slice(0, 2).map(pb => {
-          const isCash = pb.method.toUpperCase() === 'CASH';
+        {(['CASH', 'CARD'] as const).map(method => {
+          const pb = overview.payment_breakdown.find(p => p.method.toUpperCase() === method);
+          const isCash = method === 'CASH';
           return (
-            <KpiCard key={pb.method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb.amount)} label={`${tEnum('common.paymentMethod', pb.method)} (${pb.count})`} />
+            <KpiCard key={method} icon={isCash ? Banknote : CreditCard} bg={isCash ? 'bg-emerald-100' : 'bg-indigo-100'} color={isCash ? 'text-emerald-600' : 'text-indigo-600'} value={formatCurrency(pb?.amount ?? 0)} label={`${tEnum('common.paymentMethod', method)} (${pb?.count ?? 0})`} />
           );
         })}
+        <KpiCard icon={Users} bg="bg-teal-100" color="text-teal-600" value={formatCurrency(overview.per_guest_spend)} label={t('stats.per_guest')} delta={prev ? pctChange(overview.per_guest_spend, prev.per_guest_spend) : undefined} />
+        <KpiCard icon={Clock} bg="bg-amber-100" color="text-amber-600" value={overview.average_dining_minutes > 0 ? `${Math.round(overview.average_dining_minutes)} min` : '-'} label={t('stats.avg_dining_time')} />
       </div>
 
-      {/* KPI Row 3 — Losses, Discounts & Refunds */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('stats.void_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
-        <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('stats.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
-        <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('stats.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
-        <KpiCard icon={XCircle} bg="bg-rose-100" color="text-rose-600" value={String(overview.anulacion_count)} label={`${t('stats.anulacion')} (${formatCurrency(overview.anulacion_amount)})`} delta={prev ? pctChange(overview.anulacion_count, prev.anulacion_count) : undefined} invertDelta />
-      </div>
-
-      {/* KPI Row 4 — Tax, Surcharge, Discount & Items */}
+      {/* KPI Row 3 — Financial */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard icon={DollarSign} bg="bg-green-50" color="text-green-500" value={formatCurrency(overview.revenue)} label={t('stats.gross_revenue')} delta={prev ? pctChange(overview.revenue, prev.revenue) : undefined} />
         <KpiCard icon={Tag} bg="bg-yellow-100" color="text-yellow-600" value={formatCurrency(overview.total_discount)} label={t('stats.total_discount')} delta={prev ? pctChange(overview.total_discount, prev.total_discount) : undefined} invertDelta />
         <KpiCard icon={Receipt} bg="bg-slate-100" color="text-slate-600" value={formatCurrency(overview.total_tax)} label={t('stats.total_tax')} delta={prev ? pctChange(overview.total_tax, prev.total_tax) : undefined} />
-        {overview.total_surcharge > 0 && (
-          <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('stats.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />
-        )}
+        <KpiCard icon={Plus} bg="bg-cyan-100" color="text-cyan-600" value={formatCurrency(overview.total_surcharge)} label={t('stats.total_surcharge')} delta={prev ? pctChange(overview.total_surcharge, prev.total_surcharge) : undefined} />
         <KpiCard icon={Hash} bg="bg-violet-100" color="text-violet-600" value={overview.avg_items_per_order > 0 ? overview.avg_items_per_order.toFixed(1) : '-'} label={t('stats.avg_items_per_order')} delta={prev ? pctChange(overview.avg_items_per_order, prev.avg_items_per_order) : undefined} />
       </div>
 
@@ -171,12 +176,14 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
       )}
 
       {/* Hourly Revenue Trend — with comparison lines */}
-      {overview.revenue_trend.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('stats.revenue_trend')}</h3>
-          </div>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('stats.revenue_trend')}</h3>
+        </div>
+        {overview.revenue_trend.length === 0 ? (
+          <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+        ) : (
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={hourlyTrendData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
               <defs>
@@ -216,17 +223,19 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               {lastWeek && <Line type="monotone" dataKey="lwRevenue" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="3 3" dot={false} name="lwRevenue" />}
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Two columns: Payment Breakdown Pie + Tax Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {overview.payment_breakdown.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <CreditCard className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('stats.payment_breakdown')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CreditCard className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.payment_breakdown')}</h3>
+          </div>
+          {overview.payment_breakdown.length === 0 ? (
+            <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+          ) : (
             <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
               <div className="w-36 h-36 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
@@ -241,8 +250,8 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                       outerRadius={60}
                       paddingAngle={2}
                     >
-                      {overview.payment_breakdown.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      {overview.payment_breakdown.map((pb, i) => (
+                        <Cell key={i} fill={PAYMENT_COLORS[pb.method.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                   </PieChart>
@@ -251,10 +260,11 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
               <div className="flex-1 space-y-2">
                 {overview.payment_breakdown.map((pb, i) => {
                   const pct = totalPayments > 0 ? ((pb.amount / totalPayments) * 100).toFixed(1) : '0';
+                  const color = PAYMENT_COLORS[pb.method.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length];
                   return (
                     <div key={pb.method} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                         <span className="text-slate-700 truncate">{tEnum('common.paymentMethod', pb.method)}</span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-2">
@@ -266,15 +276,17 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 })}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {overview.tax_breakdown.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Receipt className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('stats.tax_breakdown')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Receipt className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.tax_breakdown')}</h3>
+          </div>
+          {overview.tax_breakdown.length === 0 ? (
+            <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -295,90 +307,74 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </div>
+
+      {/* Discount & Surcharge Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <AdjustmentCard
+          title={t('stats.discount_breakdown')}
+          entries={overview.discount_breakdown}
+          color="amber"
+          prefix="-"
+          t={t}
+        />
+        <AdjustmentCard
+          title={t('stats.surcharge_breakdown')}
+          entries={overview.surcharge_breakdown}
+          color="purple"
+          prefix="+"
+          t={t}
+        />
       </div>
 
       {/* Service Type & Zone Sales */}
-      {(overview.service_type_breakdown.length > 1 || overview.zone_sales.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {overview.service_type_breakdown.length > 1 && (() => {
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <UtensilsCrossed className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.service_type_breakdown')}</h3>
+          </div>
+          {overview.service_type_breakdown.length === 0 ? (
+            <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+          ) : (() => {
             const totalSvcOrders = overview.service_type_breakdown.reduce((sum, s) => sum + s.orders, 0);
             return (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <UtensilsCrossed className="w-5 h-5 text-slate-400" />
-                  <h3 className="font-bold text-slate-900">{t('stats.service_type_breakdown')}</h3>
+              <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
+                <div className="w-36 h-36 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={overview.service_type_breakdown}
+                        dataKey="orders"
+                        nameKey="service_type"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={60}
+                        paddingAngle={2}
+                      >
+                        {overview.service_type_breakdown.map((st, i) => (
+                          <Cell key={i} fill={SERVICE_COLORS[st.service_type.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
-                  <div className="w-36 h-36 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={overview.service_type_breakdown}
-                          dataKey="orders"
-                          nameKey="service_type"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={30}
-                          outerRadius={60}
-                          paddingAngle={2}
-                        >
-                          {overview.service_type_breakdown.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    {overview.service_type_breakdown.map((st, i) => {
-                      const pct = totalSvcOrders > 0 ? ((st.orders / totalSvcOrders) * 100).toFixed(1) : '0';
-                      return (
-                        <div key={st.service_type} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-slate-700 truncate">{t(`stats.svc_${st.service_type.toLowerCase()}`) || st.service_type}</span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0 ml-2">
-                            <span className="text-xs text-slate-400">{pct}% · {st.orders}</span>
-                            <span className="font-semibold text-slate-900 w-20 text-right">{formatCurrency(st.revenue)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {overview.zone_sales.length > 0 && (() => {
-            const totalZoneRev = overview.zone_sales.reduce((sum, z) => sum + z.revenue, 0);
-            return (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <MapIcon className="w-5 h-5 text-slate-400" />
-                  <h3 className="font-bold text-slate-900">{t('stats.zone_sales')}</h3>
-                </div>
-                <div className="space-y-3">
-                  {overview.zone_sales.map((zone, i) => {
-                    const pct = totalZoneRev > 0 ? (zone.revenue / totalZoneRev) * 100 : 0;
+                <div className="flex-1 space-y-2">
+                  {overview.service_type_breakdown.map((st, i) => {
+                    const pct = totalSvcOrders > 0 ? ((st.orders / totalSvcOrders) * 100).toFixed(1) : '0';
+                    const color = SERVICE_COLORS[st.service_type.toUpperCase()] ?? PIE_COLORS[i % PIE_COLORS.length];
                     return (
-                      <div key={zone.zone_name}>
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                            <span className="text-slate-700">{zone.zone_name}</span>
-                            {zone.is_retail && <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-50 text-blue-600">{t('stats.retail')}</span>}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">{zone.orders} · {zone.guests}p</span>
-                            <span className="font-semibold text-slate-900">{formatCurrency(zone.revenue)}</span>
-                          </div>
+                      <div key={st.service_type} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                          <span className="text-slate-700 truncate">{t(`stats.svc_${st.service_type.toLowerCase()}`) || st.service_type}</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <div className="flex items-center gap-3 shrink-0 ml-2">
+                          <span className="text-xs text-slate-400">{pct}% · {st.orders}</span>
+                          <span className="font-semibold text-slate-900 w-20 text-right">{formatCurrency(st.revenue)}</span>
                         </div>
                       </div>
                     );
@@ -388,90 +384,53 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
             );
           })()}
         </div>
-      )}
 
-      {/* Refund Method Breakdown */}
-      {overview.refund_method_breakdown.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <RotateCcw className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('stats.refund_methods')}</h3>
+            <MapIcon className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.zone_sales')}</h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('stats.method')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.count')}</th>
-                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.amount')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.refund_method_breakdown.map((rm, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-0">
-                    <td className="py-2 text-slate-700 font-medium">{tEnum('common.paymentMethod', rm.method)}</td>
-                    <td className="py-2 text-right text-slate-700">{rm.count}</td>
-                    <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(rm.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Discount & Surcharge Breakdown */}
-      {(overview.discount_breakdown.length > 0 || overview.surcharge_breakdown.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {overview.discount_breakdown.length > 0 && (
-            <AdjustmentCard
-              title={t('stats.discount_breakdown')}
-              entries={overview.discount_breakdown}
-              color="amber"
-              prefix="-"
-              t={t}
-            />
-          )}
-          {overview.surcharge_breakdown.length > 0 && (
-            <AdjustmentCard
-              title={t('stats.surcharge_breakdown')}
-              entries={overview.surcharge_breakdown}
-              color="purple"
-              prefix="+"
-              t={t}
-            />
+          {overview.zone_sales.length === 0 ? (
+            <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+          ) : (
+            <div className="space-y-3">
+              {overview.zone_sales.map((zone, i) => {
+                const totalZoneRev = overview.zone_sales.reduce((sum, z) => sum + z.revenue, 0);
+                const pct = totalZoneRev > 0 ? (zone.revenue / totalZoneRev) * 100 : 0;
+                return (
+                  <div key={zone.zone_name}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className="text-slate-700">{zone.zone_name}</span>
+                        {zone.is_retail && <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-50 text-blue-600">{t('stats.retail')}</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">{zone.orders} · {zone.guests}p</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(zone.revenue)}</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
-      )}
-
-      {/* Tag Sales */}
-      {overview.tag_sales.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Tag className="w-5 h-5 text-slate-400" />
-            <h3 className="font-bold text-slate-900">{t('stats.tag_sales')}</h3>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {overview.tag_sales.map((tag, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-slate-50">
-                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color || PIE_COLORS[i % PIE_COLORS.length] }} />
-                <span className="text-sm font-medium text-slate-700">{tag.name}</span>
-                <span className="text-xs text-slate-400">{tag.quantity}x</span>
-                <span className="text-sm font-semibold text-slate-900">{formatCurrency(tag.revenue)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Two columns: Top Products + Category Sales */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {overview.top_products.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Award className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('stats.top_products')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Award className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.top_products')}</h3>
+          </div>
+          {overview.top_products.length === 0 ? (
+            <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+          ) : (
             <div className="space-y-2">
               {overview.top_products.map((product, i) => {
                 const maxQty = overview.top_products[0]?.quantity ?? 1;
@@ -493,15 +452,17 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {overview.category_sales.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-900">{t('stats.category_sales')}</h3>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="w-5 h-5 text-slate-400" />
+            <h3 className="font-bold text-slate-900">{t('stats.category_sales')}</h3>
+          </div>
+          {overview.category_sales.length === 0 ? (
+            <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+          ) : (
             <div className="space-y-3">
               {overview.category_sales.map((cat, i) => {
                 const pct = totalCategorySales > 0 ? (cat.revenue / totalCategorySales) * 100 : 0;
@@ -524,6 +485,68 @@ export const StoreOverviewDisplay: React.FC<Props> = ({ overview, previousOvervi
                 );
               })}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tag Sales */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Tag className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('stats.tag_sales')}</h3>
+        </div>
+        {overview.tag_sales.length === 0 ? (
+          <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            {overview.tag_sales.map((tag, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-slate-50">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color || PIE_COLORS[i % PIE_COLORS.length] }} />
+                <span className="text-sm font-medium text-slate-700">{tag.name}</span>
+                <span className="text-xs text-slate-400">{tag.quantity}x</span>
+                <span className="text-sm font-semibold text-slate-900">{formatCurrency(tag.revenue)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* KPI Row — Losses & Refunds */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard icon={XCircle} bg="bg-red-100" color="text-red-600" value={String(overview.voided_orders)} label={`${t('stats.void_orders')} (${formatCurrency(overview.voided_amount)})`} delta={prev ? pctChange(overview.voided_orders, prev.voided_orders) : undefined} invertDelta />
+        <KpiCard icon={AlertTriangle} bg="bg-orange-100" color="text-orange-600" value={String(overview.loss_orders)} label={`${t('stats.loss_orders')} (${formatCurrency(overview.loss_amount)})`} delta={prev ? pctChange(overview.loss_orders, prev.loss_orders) : undefined} invertDelta />
+        <KpiCard icon={RotateCcw} bg="bg-pink-100" color="text-pink-600" value={String(overview.refund_count)} label={`${t('stats.refunds')} (${formatCurrency(overview.refund_amount)})`} delta={prev ? pctChange(overview.refund_count, prev.refund_count) : undefined} invertDelta />
+        <KpiCard icon={XCircle} bg="bg-rose-100" color="text-rose-600" value={String(overview.anulacion_count)} label={`${t('stats.anulacion')} (${formatCurrency(overview.anulacion_amount)})`} delta={prev ? pctChange(overview.anulacion_count, prev.anulacion_count) : undefined} invertDelta />
+      </div>
+
+      {/* Refund Method Breakdown */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <RotateCcw className="w-5 h-5 text-slate-400" />
+          <h3 className="font-bold text-slate-900">{t('stats.refund_methods')}</h3>
+        </div>
+        {overview.refund_method_breakdown.length === 0 ? (
+          <p className="text-sm text-slate-400 py-8 text-center">{t('stats.no_data')}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-2 text-xs font-medium text-slate-400">{t('stats.method')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.count')}</th>
+                  <th className="text-right py-2 text-xs font-medium text-slate-400">{t('stats.amount')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.refund_method_breakdown.map((rm, i) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 text-slate-700 font-medium">{tEnum('common.paymentMethod', rm.method)}</td>
+                    <td className="py-2 text-right text-slate-700">{rm.count}</td>
+                    <td className="py-2 text-right font-semibold text-slate-900">{formatCurrency(rm.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -551,7 +574,8 @@ const AdjustmentCard: React.FC<{
 }> = ({ title, entries, color, prefix, t }) => {
   const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
   const isAmber = color === 'amber';
-  const colors = isAmber ? ADJ_COLORS_AMBER : ADJ_COLORS_PURPLE;
+  const sourceColors = isAmber ? ADJ_SOURCE_COLORS_AMBER : ADJ_SOURCE_COLORS_PURPLE;
+  const fallbackColors = isAmber ? ADJ_COLORS_AMBER : ADJ_COLORS_PURPLE;
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -559,59 +583,44 @@ const AdjustmentCard: React.FC<{
           <Tag className={`w-5 h-5 ${isAmber ? 'text-amber-400' : 'text-purple-400'}`} />
           <h3 className="font-bold text-slate-900">{title}</h3>
         </div>
-        <span className={`text-lg font-bold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
-          {prefix}{formatCurrency(totalAmount)}
-        </span>
+        {entries.length > 0 && (
+          <span className={`text-lg font-bold ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+            {prefix}{formatCurrency(totalAmount)}
+          </span>
+        )}
       </div>
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-        <div className="w-28 h-28 shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={entries}
-                dataKey="amount"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={24}
-                outerRadius={48}
-                paddingAngle={2}
-              >
-                {entries.map((_, i) => (
-                  <Cell key={i} fill={colors[i % colors.length]} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex-1 min-w-0 space-y-2.5 w-full">
+      {entries.length === 0 ? (
+        <p className="text-sm text-slate-400 py-4 text-center">{t('stats.no_data')}</p>
+      ) : (
+        <div className="space-y-2">
           {entries.map((entry, i) => {
-            const pct = totalAmount > 0 ? ((entry.amount / totalAmount) * 100).toFixed(1) : '0';
+            const pct = totalAmount > 0 ? (entry.amount / totalAmount) * 100 : 0;
             const label = entry.source === 'item_rule' || entry.source === 'order_rule'
               ? entry.name
               : t(SOURCE_I18N[entry.source] ?? entry.source);
             return (
-              <div key={i} className="flex items-start justify-between gap-2 text-sm">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
-                    <span className="text-slate-700 truncate">{label}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 ml-3.5 mt-0.5">
-                    <span className={`px-1 py-px text-[10px] font-medium rounded ${isAmber ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'}`}>
+              <div key={i} className="relative">
+                <div className={`absolute inset-y-0 left-0 rounded ${isAmber ? 'bg-amber-50' : 'bg-purple-50'}`} style={{ width: `${pct}%` }} />
+                <div className="relative flex items-center justify-between py-2 px-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: sourceColors[entry.source] ?? fallbackColors[i % fallbackColors.length] }} />
+                    <span className="text-sm text-slate-700 truncate">{label}</span>
+                    <span className={`px-1 py-px text-[10px] font-medium rounded shrink-0 ${isAmber ? 'bg-amber-100 text-amber-600' : 'bg-purple-100 text-purple-600'}`}>
                       {t(`stats.adj_src_${entry.source}`)}
                     </span>
-                    <span className="text-[10px] text-slate-400">{pct}% · {entry.order_count}{t('stats.orders_unit')}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 ml-2">
+                    <span className="text-xs text-slate-400">{pct.toFixed(1)}% · {entry.order_count}{t('stats.orders_unit')}</span>
+                    <span className={`text-sm font-semibold w-20 text-right ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
+                      {prefix}{formatCurrency(entry.amount)}
+                    </span>
                   </div>
                 </div>
-                <span className={`font-semibold shrink-0 ${isAmber ? 'text-amber-600' : 'text-purple-600'}`}>
-                  {prefix}{formatCurrency(entry.amount)}
-                </span>
               </div>
             );
           })}
         </div>
-      </div>
+      )}
     </div>
   );
 };

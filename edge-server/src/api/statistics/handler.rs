@@ -549,11 +549,12 @@ pub async fn get_statistics(
 
     // ── Zone sales ──
     let zone_sales: Vec<ZoneSaleEntry> = sqlx::query_as::<_, (String, bool, f64, i32, i32)>(
-        "SELECT COALESCE(zone_name, 'Unknown'), is_retail, COALESCE(SUM(total_amount), 0.0), \
+        "SELECT COALESCE(NULLIF(zone_name, ''), CASE WHEN is_retail = 1 THEN 'Retail' ELSE 'Default' END), \
+            is_retail, COALESCE(SUM(total_amount), 0.0), \
             CAST(COUNT(*) AS INTEGER), CAST(COALESCE(SUM(guest_count), 0) AS INTEGER) \
          FROM archived_order \
-         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 AND zone_name IS NOT NULL \
-         GROUP BY zone_name, is_retail ORDER BY SUM(total_amount) DESC",
+         WHERE status = 'COMPLETED' AND is_voided = 0 AND end_time >= ?1 AND end_time < ?2 \
+         GROUP BY 1, is_retail ORDER BY SUM(total_amount) DESC",
     )
     .bind(start_dt)
     .bind(end_dt)

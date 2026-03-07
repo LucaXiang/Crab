@@ -1,6 +1,7 @@
 //! Anulación API Handlers
 
 use crate::archiving::AnulacionService;
+use crate::archiving::service::ArchiveError;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::utils::{AppError, AppResult};
@@ -49,6 +50,11 @@ pub async fn check_eligibility(
     let service = anulacion_service(&state)?;
     match service.check_anulacion_eligibility(order_pk).await {
         Ok(()) => Ok(Json(serde_json::json!({ "eligible": true }))),
+        Err(ArchiveError::BusinessRule(code, msg)) => Ok(Json(serde_json::json!({
+            "eligible": false,
+            "code": code as u16,
+            "reason": msg
+        }))),
         Err(e) => Ok(Json(serde_json::json!({
             "eligible": false,
             "reason": e.to_string()
